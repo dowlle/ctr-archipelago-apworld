@@ -13,7 +13,7 @@ from BaseClasses import Item, ItemClassification
 
 # These come from the other files in this example. If you want to see the source ctrl + click the name
 # You can also do that ctrl + click for any functions to see what they do
-from .Types import ItemData, ChapterType, ctrAPItem, chapter_type_to_name
+from .Types import ItemData, ctrAPItem
 from .Locations import get_total_locations
 from typing import List, Dict, TYPE_CHECKING
 
@@ -28,27 +28,6 @@ if TYPE_CHECKING:
 def create_itempool(world: "ctrAPWorld") -> List[Item]:
     # This is the empty list of items. You'll add all the items in the game to this list
     itempool: List[Item] = []
-
-    # In this function is where you would remove any starting items that you add in options such as starting chapter
-    # This is also the place you would add dynamic amounts of items from options
-    # I can point to Sly Cooper and the Thievious Raccoonus since I did that
-
-    # This is a good place to grab anything you need from options
-    starting_chapter = chapter_type_to_name[ChapterType(world.options.StartingChapter)]
-
-    # For this example I'll make it so there is a starting chapter
-    # We loop through all the chapters in the my_chapter section
-    for chapter in ap_ctr_chapters.keys():
-        # If the starting chapter equals the chapter we're looking at skip it
-        # We skip it since we dont want to add the chapter the player started with to the item pool
-        print("-------------------------")
-        print(starting_chapter)
-        print("-------------------------")
-        if starting_chapter == chapter:
-            continue
-        # Otherwise then we create an item with that name and add it to the item pool
-        else:
-            itempool.append(create_item(world, chapter))
     
     # It's up to you and how you want things organized but I like to deal with victory here
     # This creates your win item and then places it at the "location" where you win
@@ -91,14 +70,6 @@ def create_junk_items(world: "ctrAPWorld", count: int) -> List[Item]:
         if ic == ItemClassification.filler:
             junk_list[name] = junk_weights.get(name)
 
-        # This is for traps if your randomization includes it
-        # It also grabs the trap weights from the options page
-        elif trap_chance > 0 and ic == ItemClassification.trap:
-            if name == "Forcefem Trap":
-                trap_list[name] = world.options.ForcefemTrapWeight.value
-            elif name == "Speed Change Trap":
-                trap_list[name] = world.options.SpeedChangeTrapWeight.value
-
     # Where all the magic happens of adding the junk and traps randomly
     # AP does all the weight management so we just need to worry about how many are created
     for i in range(count):
@@ -117,49 +88,47 @@ def create_junk_items(world: "ctrAPWorld", count: int) -> List[Item]:
 # I've seen some games that dynamically add item codes such as DOOM as well
 ap_ctr_items = {
     # Progression items
-    "Trophy": ItemData(20050001, ItemClassification.progression),
-    "Relic": ItemData(20050002, ItemClassification.progression),
-    "Token": ItemData(20050003, ItemClassification.progression),
-    "Gem": ItemData(20050004, ItemClassification.progression),
-    "Key": ItemData(20050005, ItemClassification.progression),
+    "Trophy": ItemData(35010001, ItemClassification.progression, 16),
+    "Sapphire Relic": ItemData(35010002, ItemClassification.progression, 18),
+    "Gold Relic": ItemData(35010003, ItemClassification.progression, 18),
+    "Platinum Relic": ItemData(35010004, ItemClassification.progression, 18),
+    "Red CTR Token": ItemData(35010005, ItemClassification.progression, 4),
+    "Green CTR Token": ItemData(35010006, ItemClassification.progression, 4),
+    "Blue CTR Token": ItemData(35010007, ItemClassification.progression, 4),
+    "Yellow CTR Token": ItemData(35010008, ItemClassification.progression, 4),
+    "Purple CTR Token": ItemData(35010009, ItemClassification.progression, 4),
+    "Red Gem": ItemData(35010010, ItemClassification.progression, 1),
+    "Blue Gem": ItemData(35010011, ItemClassification.progression, 1),
+    "Green Gem": ItemData(35010012, ItemClassification.progression, 1),
+    "Blue Gem": ItemData(35010013, ItemClassification.progression, 1),
+    "Yellow Gem": ItemData(35010014, ItemClassification.progression, 1),
+    "Key": ItemData(35010015, ItemClassification.progression, 4),
+    "Progressive Door": ItemData(35010016, ItemClassification.progression, 4),
 
     # Useful items
-    "Mask Powerup": ItemData(20050006, ItemClassification.useful),
+    "Penta Penguin": ItemData(35019900, ItemClassification.useful, 1),
 
     # Victory is added here since in this organization it needs to be in the default item pool
     "Victory": ItemData(20050007, ItemClassification.progression)
 }
-
-# I like to split up the items so that its easier to look at and since sometimes you only need to look at one specific type of list
-# An example of that is in create_itempool where I simulated having a starting chapter
-ap_ctr_chapters = {
-    "Adventure Mode": ItemData(20050008, ItemClassification.progression)
-}
-
 # In the way that I made items, I added a way to specify how many of an item should exist
 # That's why junk has a 0 since how many are created is in the create_junk_items
 # There is a better way of doing this but this is my jank
 junk_items = {
     # Junk
-    "An Old Gamecube": ItemData(20050011, ItemClassification.filler, 0),
-    "Coughing Baby": ItemData(20050012, ItemClassification.filler, 0),
+    "Wumpa Fruit": ItemData(20050011, ItemClassification.filler, 0)
 
-    # Traps
-    "Forcefem Trap": ItemData(20050013, ItemClassification.trap, 0),
-    "Speed Change Trap": ItemData(20050014, ItemClassification.trap, 0)
 }
 
 # Junk weights is just how often an item will be chosen when junk is being made
 # Bigger item = more likely to show up
 junk_weights = {
-    "An Old Gamecube": 40,
-    "Coughing Baby": 20
+    "Wumpa Fruit": 40
 }
 
 # This makes a really convenient list of all the other dictionaries
 # (fun fact: {} is a dictionary)
 item_table = {
     **ap_ctr_items,
-    **ap_ctr_chapters,
     **junk_items
 }

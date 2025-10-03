@@ -12,19 +12,6 @@ def create_option_groups() -> List[OptionGroup]:
 
     return option_group_list
 
-class StartingChapter(Choice):
-    """
-    Determines which chapter you'll start with.
-    When you grab choice you'll get the associated number.
-    IE: If the player chooses the sewer then when you go to call StartingChapter you'll get 3
-    When displaying the options names on the site, _ will become spaces and the word option will go away.
-    """
-    display_name = "Starting Chapter"
-    option_green_hill_zone = 1
-    option_romania = 2
-    option_the_sewer = 3
-    default = 1
-
 class ExtraLocations(Toggle):
     """
     This will enable the extra locations option. Toggle is just true or false.
@@ -64,7 +51,6 @@ class SpeedChangeTrapWeight(Range):
 
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
-    StartingChapter:            StartingChapter
     ExtraLocations:             ExtraLocations
     TrapChance:                 TrapChance
     ForcefemTrapWeight:         ForcefemTrapWeight
@@ -73,6 +59,6 @@ class ctrAPOptions(PerGameCommonOptions):
 # This is where you organize your options
 # Its entirely up to you how you want to organize it
 ap_ctr_option_groups: Dict[str, List[Any]] = {
-    "General Options": [StartingChapter, ExtraLocations],
+    "General Options": [ExtraLocations],
     "Trap Options": [TrapChance, ForcefemTrapWeight, SpeedChangeTrapWeight]
 }

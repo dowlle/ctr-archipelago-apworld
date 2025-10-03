@@ -15,12 +15,11 @@ def set_rules(world: "ctrAPWorld"):
     player = world.player
     options = world.options
 
-    # Chapter Access
-    add_rule(world.multiworld.get_entrance("Menu -> N. Sanity Beach", player),
-             lambda state: state.has("N. Sanity Beach", player))
-    
-    add_rule(world.multiworld.get_entrance("N. Sanity Beach -> The Lost Ruins", player),
-             lambda state: state.has("Key"))
+    # Chapter Access    
+    add_rule(world.multiworld.get_entrance("N. Sanity Beach -> Gem Stone Valley", player),
+             lambda state: state.has("Progressive Door", 1))
+    add_rule(world.multiworld.get_entrance("Gem Stone Valley -> Lost Ruins", player),
+             lambda state: state.has("Progressive Door", 1))
     
     # Victory condition rule!
     world.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
