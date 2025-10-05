@@ -27,3 +27,4 @@ class ItemData(NamedTuple):
 class LocData(NamedTuple):
     ap_code: Optional[int]
     region: Optional[str]
+    flag: Optional[str]

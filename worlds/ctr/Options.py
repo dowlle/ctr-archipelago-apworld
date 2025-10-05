@@ -1,10 +1,9 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from worlds.AutoWorld import PerGameCommonOptions
-from Options import Choice, OptionGroup, Toggle, Range
+from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle
 
-# If youve ever gone to an options page and seen how sometimes options are grouped
-# This is that
+
 def create_option_groups() -> List[OptionGroup]:
     option_group_list: List[OptionGroup] = []
     for name, options in ap_ctr_option_groups.items():
@@ -12,53 +11,78 @@ def create_option_groups() -> List[OptionGroup]:
 
     return option_group_list
 
-class ExtraLocations(Toggle):
-    """
-    This will enable the extra locations option. Toggle is just true or false.
-    """
-    display_name = "Add Extra Locations"
 
-class TrapChance(Range):
+class Goal(Choice):
     """
-    Determines the chance for any junk item to become a trap.
-    Set it to 0 for no traps.
-    Range is in fact a range. You can set the limits and its default.
+    This will determine what your end goal is.
+
+    oxideOnce = Beat Oxide Once: Defeat N. Oxide in his first challenge.
+    oxideTwice = Beat Oxide Twice: Collect 18 Relics (Sapphire or Greater) and Defeat N. Oxide a second time.
+    101oxideTwice = 101% Oxide Twice: Collect all 16 Trophies, 5 of each Token, 1 of each Gem, and 18 Relics (Gold or Greater) and Defeat N. Oxide a second time.
+    allTrophies = All Trophies: Get all 16 Trophies. No Oxide required!
+    allGemCups = All Gem Cups: Complete Every Gem Cup.
     """
-    display_name = "Trap Chance"
-    range_start = 0
-    range_end = 100
+    display_name = "Goal"
+    option_oxideOnce = 0
+    option_oxideTwice = 1
+    option_101oxideTwice = 2
+    option_allTrophies = 3
+    option_allGemCups = 4
     default = 0
 
-class ForcefemTrapWeight(Range):
-    """
-    The weight of forcefem traps in the trap pool.
-    Does really cool stuff to your body.
-    """
-    display_name = "Forcefem Trap Weight"
-    range_start = 0
-    range_end = 100
-    default = 100
 
-class SpeedChangeTrapWeight(Range):
+class ShuffleRewards(OptionDict):
     """
-    The weight of speed change traps in the trap pool.
-    Speed change traps change the game speed for x seconds.
+    Shuffles the rewards into the item pool.
     """
-    display_name = "Speed Change Trap Weight"
-    range_start = 0
-    range_end = 100
-    default = 25
+    display_name = "Shuffle Rewards"
+    supports_weighting = False
+    default = {}
+    valid_keys = [ "Trophies", "Sapphire Relics", "Gold Relics", "Platinum Relics", "CTR Race Tokens", "Bonus Round Tokens", "Gems", "Characters", "Boss Keys" ]
+
+
+class Trophysanity(DefaultOnToggle):
+    """
+    Every Trophy Race will have a check behind its reward.
+    """
+
+class Relicsanity(DefaultOnToggle):
+    """
+    Every Time Trial will have a check behind its reward.
+    """
+    display_name = "Relicsanity"
+class RelicDifficulty(Choice):
+    """
+    Determines the difficulty of the Relicsanity option. Anything above the selected option will contain junk.
+    """
+    display_name = "Time Trial Difficulty"
+    option_Sapphire = 0
+    option_Gold = 1
+    option_Platinum = 2
+
+class Tokensanity(DefaultOnToggle):
+    """
+    Every CTR Token Challenge will have a check behind its reward.
+    """
+    display_name = "Tokensanity"
+
+class Gemsanity(DefaultOnToggle):
+    """
+    Every Gem will have a check behind its reward.
+    """
+    display_name = "Gemsanity"
 
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
-    ExtraLocations:             ExtraLocations
-    TrapChance:                 TrapChance
-    ForcefemTrapWeight:         ForcefemTrapWeight
-    SpeedChangeTrapWeight:      SpeedChangeTrapWeight
+    goal:   Goal
+    trophysanity: Trophysanity
+    relicsanity:    Relicsanity
+    tokesanity: Tokensanity
+    gemsanity: Gemsanity
 
-# This is where you organize your options
-# Its entirely up to you how you want to organize it
+
 ap_ctr_option_groups: Dict[str, List[Any]] = {
-    "General Options": [ExtraLocations],
-    "Trap Options": [TrapChance, ForcefemTrapWeight, SpeedChangeTrapWeight]
+    "General Options": [Goal],
+    "Shuffle Options": [ShuffleRewards],
+    "N. Sanity": [Trophysanity, Relicsanity, RelicDifficulty, Tokensanity, Gemsanity]
 }

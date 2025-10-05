@@ -1,51 +1,32 @@
-# So the goal here is to have a catalog of all the items in your game
-# To correctly generate a games items they need to be bundled in a list
-# A list in programming terms is anything in square brackets [] to put it simply
 
-# When a list is described its described as a list of x where x is the type of variable within it
-# IE: ["apple", "pear", "grape"] is a list of strings (anything inside "" OR '' are considered strings)
-
-# Logging = output. How you'll figure out whats going wrong
 import logging
 
-# Built in AP imports
 from BaseClasses import Item, ItemClassification
 
-# These come from the other files in this example. If you want to see the source ctrl + click the name
-# You can also do that ctrl + click for any functions to see what they do
 from .Types import ItemData, ctrAPItem
 from .Locations import get_total_locations
 from typing import List, Dict, TYPE_CHECKING
 
-# This is just making sure nothing gets confused dw about what its doing exactly
+
 if TYPE_CHECKING:
     from . import ctrAPWorld
 
-# If you're curious about the -> List[Item] that is a syntax to make sure you return the correct variable type
-# In this instance we're saying we only want to return a list of items
-# You'll see a bunch of other examples of this in other functions
-# It's main purpose is to protect yourself from yourself
-def create_itempool(world: "ctrAPWorld") -> List[Item]:
-    # This is the empty list of items. You'll add all the items in the game to this list
-    itempool: List[Item] = []
-    
-    # It's up to you and how you want things organized but I like to deal with victory here
-    # This creates your win item and then places it at the "location" where you win
-    victory = create_item(world, "Victory")
-    world.multiworld.get_location("Beat Final Boss", world.player).place_locked_item(victory)
 
-    # Then junk items are made
-    # Check out the create_junk_items function for more details
+def create_itempool(world: "ctrAPWorld") -> List[Item]:
+    itempool: List[Item] = []
+
+    victory = create_item(world, "Victory")
+    world.multiworld.get_location("N. Oxide Garage Reward 2", world.player).place_locked_item(victory)
+
     itempool += create_junk_items(world, get_total_locations(world) - len(itempool) - 1)
 
     return itempool
 
-# This is a generic function to create a singular item
 def create_item(world: "ctrAPWorld", name: str) -> Item:
     data = item_table[name]
     return ctrAPItem(name, data.classification, data.ap_code, world.player)
 
-# Another generic function. For creating a bunch of items at once!
+
 def create_multiple_items(world: "ctrAPWorld", name: str, count: int,
                           item_type: ItemClassification = ItemClassification.progression) -> List[Item]:
     data = item_table[name]
@@ -56,22 +37,19 @@ def create_multiple_items(world: "ctrAPWorld", name: str, count: int,
 
     return itemlist
 
-# Finally, where junk items are created
+
 def create_junk_items(world: "ctrAPWorld", count: int) -> List[Item]:
     trap_chance = world.options.TrapChance.value
     junk_pool: List[Item] = []
     junk_list: Dict[str, int] = {}
     trap_list: Dict[str, int] = {}
 
-    # This grabs all the junk items and trap items
     for name in item_table.keys():
-        # Here we are getting all the junk item names and weights
+
         ic = item_table[name].classification
         if ic == ItemClassification.filler:
             junk_list[name] = junk_weights.get(name)
 
-    # Where all the magic happens of adding the junk and traps randomly
-    # AP does all the weight management so we just need to worry about how many are created
     for i in range(count):
         if trap_chance > 0 and world.random.randint(1, 100) <= trap_chance:
             junk_pool.append(world.create_item(
@@ -82,10 +60,6 @@ def create_junk_items(world: "ctrAPWorld", count: int) -> List[Item]:
 
     return junk_pool
 
-# Time for the fun part of listing all of the items
-# Watch out for overlap with your item codes
-# These are just random numbers dont trust them PLEASE
-# I've seen some games that dynamically add item codes such as DOOM as well
 ap_ctr_items = {
     # Progression items
     "Trophy": ItemData(35010001, ItemClassification.progression, 16),
@@ -98,36 +72,37 @@ ap_ctr_items = {
     "Yellow CTR Token": ItemData(35010008, ItemClassification.progression, 4),
     "Purple CTR Token": ItemData(35010009, ItemClassification.progression, 4),
     "Red Gem": ItemData(35010010, ItemClassification.progression, 1),
-    "Blue Gem": ItemData(35010011, ItemClassification.progression, 1),
-    "Green Gem": ItemData(35010012, ItemClassification.progression, 1),
-    "Blue Gem": ItemData(35010013, ItemClassification.progression, 1),
-    "Yellow Gem": ItemData(35010014, ItemClassification.progression, 1),
+    "Green Gem": ItemData(35010011, ItemClassification.progression, 1),
+    "Blue Gem": ItemData(35010012, ItemClassification.progression, 1),
+    "Yellow Gem": ItemData(35010013, ItemClassification.progression, 1),
+    "Purple Gem": ItemData(35010014, ItemClassification.progression, 1),
     "Key": ItemData(35010015, ItemClassification.progression, 4),
     "Progressive Door": ItemData(35010016, ItemClassification.progression, 4),
 
-    # Useful items
-    "Penta Penguin": ItemData(35019900, ItemClassification.useful, 1),
+    # Character Unlocks (for character swap mod)
+    "Ripper Roo": ItemData(35019900, ItemClassification.useful, 1),
+    "Papu Papu": ItemData(35019901, ItemClassification.useful, 1),
+    "Komodo Joe": ItemData(35019902, ItemClassification.useful, 1),
+    "Pinstripe": ItemData(35019903, ItemClassification.useful, 1),
+    "Fake Crash": ItemData(35019904, ItemClassification.useful, 1),
+    "N. Tropy": ItemData(35019905, ItemClassification.useful, 1),
+    "Penta Penguin": ItemData(3501995, ItemClassification.useful, 1),
+    "Nitros Oxide": ItemData(35019906, ItemClassification.useful, 1),
 
     # Victory is added here since in this organization it needs to be in the default item pool
-    "Victory": ItemData(20050007, ItemClassification.progression)
+    "Victory": ItemData(99999999, ItemClassification.progression)
 }
-# In the way that I made items, I added a way to specify how many of an item should exist
-# That's why junk has a 0 since how many are created is in the create_junk_items
-# There is a better way of doing this but this is my jank
+
 junk_items = {
     # Junk
-    "Wumpa Fruit": ItemData(20050011, ItemClassification.filler, 0)
+    "Wumpa Fruit": ItemData(35011053, ItemClassification.filler, 0)
 
 }
 
-# Junk weights is just how often an item will be chosen when junk is being made
-# Bigger item = more likely to show up
 junk_weights = {
     "Wumpa Fruit": 40
 }
 
-# This makes a really convenient list of all the other dictionaries
-# (fun fact: {} is a dictionary)
 item_table = {
     **ap_ctr_items,
     **junk_items
