@@ -1,5 +1,5 @@
 # Look at init or Items.py for more information on imports
-from typing import Dict, TYPE_CHECKING
+from typing import Mapping, TYPE_CHECKING
 import logging
 
 from .Types import LocData
@@ -16,7 +16,7 @@ def get_total_locations(world: "ctrAPWorld") -> int:
 
     return total
 
-def get_location_names() -> Dict[str, int]:
+def get_location_names() -> Mapping[str, int]:
     names = {name: data.ap_code for name, data in location_table.items()}
 
     return names
