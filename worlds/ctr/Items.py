@@ -1,22 +1,18 @@
-
 import logging
 
 from BaseClasses import Item, ItemClassification
 
 from .Types import ItemData, ctrAPItem
 from .Locations import get_total_locations
+from .Options import Trophysanity, Relicsanity, RelicDifficulty, Tokensanity, Gemsanity, Goal
 from typing import List, Dict, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     from . import ctrAPWorld
 
-
 def create_itempool(world: "ctrAPWorld") -> List[Item]:
-    itempool: List[Item] = []
-
-    victory = create_item(world, "Victory")
-    world.multiworld.get_location("N. Oxide Garage Reward 2", world.player).place_locked_item(victory)
+    itempool: List[Item] = []    
 
     itempool += create_junk_items(world, get_total_locations(world) - len(itempool) - 1)
 
@@ -25,17 +21,6 @@ def create_itempool(world: "ctrAPWorld") -> List[Item]:
 def create_item(world: "ctrAPWorld", name: str) -> Item:
     data = item_table[name]
     return ctrAPItem(name, data.classification, data.ap_code, world.player)
-
-
-def create_multiple_items(world: "ctrAPWorld", name: str, count: int,
-                          item_type: ItemClassification = ItemClassification.progression) -> List[Item]:
-    data = item_table[name]
-    itemlist: List[Item] = []
-
-    for i in range(count):
-        itemlist += [ctrAPItem(name, item_type, data.ap_code, world.player)]
-
-    return itemlist
 
 
 def create_junk_items(world: "ctrAPWorld", count: int) -> List[Item]:
@@ -86,11 +71,8 @@ ap_ctr_items = {
     "Pinstripe": ItemData(35019903, ItemClassification.useful, 1),
     "Fake Crash": ItemData(35019904, ItemClassification.useful, 1),
     "N. Tropy": ItemData(35019905, ItemClassification.useful, 1),
-    "Penta Penguin": ItemData(3501995, ItemClassification.useful, 1),
+    "Penta Penguin": ItemData(3501905, ItemClassification.useful, 1),
     "Nitros Oxide": ItemData(35019906, ItemClassification.useful, 1),
-
-    # Victory is added here since in this organization it needs to be in the default item pool
-    "Victory": ItemData(99999999, ItemClassification.progression)
 }
 
 junk_items = {

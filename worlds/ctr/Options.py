@@ -16,18 +16,18 @@ class Goal(Choice):
     """
     This will determine what your end goal is.
 
-    oxideOnce = Beat Oxide Once: Defeat N. Oxide in his first challenge.
-    oxideTwice = Beat Oxide Twice: Collect 18 Relics (Sapphire or Greater) and Defeat N. Oxide a second time.
-    101oxideTwice = 101% Oxide Twice: Collect all 16 Trophies, 5 of each Token, 1 of each Gem, and 18 Relics (Gold or Greater) and Defeat N. Oxide a second time.
-    allTrophies = All Trophies: Get all 16 Trophies. No Oxide required!
-    allGemCups = All Gem Cups: Complete Every Gem Cup.
+    oxideonce = Beat Oxide Once: Defeat N. Oxide in his first challenge.
+    oxidetwice = Beat Oxide Twice: Collect 18 Relics (Sapphire or Greater) and Defeat N. Oxide a second time.
+    oxidetwice_full = 101% Oxide Twice: Collect all 16 Trophies, 5 of each Token, 1 of each Gem, and 18 Relics (Gold or Greater) and Defeat N. Oxide a second time.
+    alltrophies = All Trophies: Get all 16 Trophies. No Oxide required!
+    allgemcups = All Gem Cups: Complete Every Gem Cup.
     """
     display_name = "Goal"
-    option_oxideOnce = 0
-    option_oxideTwice = 1
-    option_101oxideTwice = 2
-    option_allTrophies = 3
-    option_allGemCups = 4
+    option_oxideonce = 0
+    option_oxidetwice = 1
+    option_oxidetwice_full = 2
+    option_alltrophies = 3
+    option_allgemcups = 4
     default = 0
 
 
