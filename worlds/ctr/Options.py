@@ -98,12 +98,12 @@ class Gemsanity(DefaultOnToggle):
 
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
-    Goal:                   Goal
-    Trophysanity:           Trophysanity
-    Relicsanity:            Relicsanity
-    RelicDifficulty:        RelicDifficulty
-    Tokesanity:             Tokensanity
-    Gemsanity:              Gemsanity
+    goal: Goal
+    trophysanity: Trophysanity
+    relicsanity: Relicsanity
+    relicdifficulty: RelicDifficulty
+    tokensanity: Tokensanity
+    gemsanity: Gemsanity
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {

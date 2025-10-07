@@ -190,11 +190,12 @@ gemcups_table = {
 }
 
 
+
 location_table = {
     **nsan_table,
     **lost_table,
     **glac_table,
     **city_table,
     **gemcent_table,
-    **gemcups_table
+    **gemcups_table,
 }

@@ -1,5 +1,5 @@
 import logging
-from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
+from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification, Location, Region
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from typing import Dict
 from .Locations import get_location_names, get_total_locations
@@ -33,7 +33,7 @@ class ctrAPWorld(World):
     item_name_to_id = {item["name"]: (item_prefix + index) for index, item in enumerate(item_table)}
     location_name_to_id = get_location_names()
     options_dataclass = ctrAPOptions
-    options = ctrAPOptions
+    options: ctrAPOptions
     web = ctrAPWeb()
 
 
@@ -59,10 +59,37 @@ class ctrAPWorld(World):
     
     def create_event(self, event: str):
         return ctrAPItem(event, ItemClassification.progression_skip_balancing, None, self.player)
+    
+    def place_items_from_dict(self, option_dict: Dict[str, str]):
+        for loc, item in option_dict.items():
+            self.get_location(loc).place_locked_item(self.create_item(item))
+
+    def set_goal(self) -> None:
+        player = self.player
+
+        match self.options.goal.value:
+            case 0:    
+                victory = Location(player, "N. Oxide Garage: Beat Oxide Once", None, self.get_region("N. Oxide Garage"))
+                self.get_region("N. Oxide Garage").locations.append(victory)
+                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+            case 1:
+                victory = Location(player, "N. Oxide Garage: Beat Oxide Twice", None, self.get_region("N. Oxide Garage"))
+                self.get_region("N. Oxide Garage").locations.append(victory)
+                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+            case 2:
+                victory = Location(player, "N. Oxide Garage: Beat Oxide Twice", None, self.get_region("N. Oxide Garage"))
+                self.get_region("N. Oxide Garage").locations.append(victory)
+                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+            case 3:
+                self.multiworld.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
+
+        if self.options.goal.value < 3:
+                victory.place_locked_item(self.create_event("Victory"))
+
+            
 
 
     def create_items(self):
-
         pool = []
 
         for item in item_table:
@@ -81,7 +108,12 @@ class ctrAPWorld(World):
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {
             "options": {
-            "Goal":                 self.options.Goal.value,
+            "Goal":     self.options.goal.value,
+            "Trophysanity": self.options.trophysanity.value,
+            "Relicsanity": self.options.relicsanity.value,
+            "Relic Difficulty": self.options.relicdifficulty.value,
+            "Tokensanity": self.options.tokensanity.value,
+            "Gemsanity": self.options.gemsanity.value
             },
             "Seed": self.multiworld.seed_name,  # to verify the server's multiworld
             "Slot": self.multiworld.player_name[self.player],  # to connect to server

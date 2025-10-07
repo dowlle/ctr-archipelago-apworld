@@ -1,9 +1,7 @@
 import logging
 
-from BaseClasses import Item, ItemClassification
-from .Types import ctrAPItem
-from .Locations import get_total_locations
-from typing import List, Dict, TYPE_CHECKING, TypedDict
+from BaseClasses import ItemClassification
+from typing import List, TYPE_CHECKING, TypedDict
 
 
 if TYPE_CHECKING:
@@ -63,11 +61,8 @@ item_table: List[ItemDict] = [
     {'name': "Key",
      'count': 4,
      'classification': ItemClassification.progression},
-    {'name': "Victory",
-     'count': 1,
-     'classification': ItemClassification.progression},
     {'name': "Wumpa Fruit",
-     'count': 1,
+     'count': 2,
      'classification': ItemClassification.filler},
     # {'name': "Progressive Door",
     #  'count': 4,

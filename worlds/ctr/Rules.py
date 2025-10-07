@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
 
 def set_rules(world: "ctrAPWorld"):
+    self = world.multiworld
     player = world.player
     options = world.options
 
@@ -91,17 +92,55 @@ def set_rules(world: "ctrAPWorld"):
     add_rule(world.multiworld.get_entrance("Slide Coliseum Warp Pad", player),
             lambda state: state.can_reach("Gem Stone Valley", None , player))
     add_rule(world.multiworld.get_entrance("Turbo Track Warp Pad", player),
-             lambda state: state.can_reach("Gem Stone Valley", None , player))
-
+            lambda state: state.can_reach("Gem Stone Valley", None , player))
+    
+    add_rule(world.multiworld.get_location("Slide Coliseum: Sapphire Time Trial", player),
+             lambda state: state.has("Sapphire Relic", player, 8))
+    add_rule(world.multiworld.get_location("Slide Coliseum: Gold Time Trial", player),
+             lambda state: state.has("Sapphire Relic", player, 8))
+    add_rule(world.multiworld.get_location("Slide Coliseum: Platinum Time Trial", player),
+             lambda state: state.has("Sapphire Relic", player, 8))
+    
+    add_rule(world.multiworld.get_location("Turbo Track: Sapphire Time Trial", player),
+             lambda state: state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+    add_rule(world.multiworld.get_location("Turbo Track: Gold Time Trial", player),
+             lambda state: state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+    add_rule(world.multiworld.get_location("Turbo Track: Platinum Time Trial", player),
+             lambda state: state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+    
+    # Cups Room
+    add_rule(world.multiworld.get_entrance("Gem Stone Valley -> Cups Room", player),
+             lambda state: state.has("Key", player, 2))
+    add_rule(world.multiworld.get_entrance("Red Cup Warp Pad", player),
+             lambda state: state.can_reach("Cups Room", None, player))
+    add_rule(world.multiworld.get_entrance("Green Cup Warp Pad", player),
+             lambda state: state.can_reach("Cups Room", None, player))
+    add_rule(world.multiworld.get_entrance("Blue Cup Warp Pad", player),
+             lambda state: state.can_reach("Cups Room", None, player))
+    add_rule(world.multiworld.get_entrance("Yellow Cup Warp Pad", player),
+             lambda state: state.can_reach("Cups Room", None, player))
+    add_rule(world.multiworld.get_entrance("Purple Cup Warp Pad", player),
+             lambda state: state.can_reach("Cups Room", None, player))
+    
+    add_rule(world.multiworld.get_location("Red Gem Cup: Gem", player),
+             lambda state: state.has("Red CTR Token", player, 4))
+    add_rule(world.multiworld.get_location("Green Gem Cup: Gem", player),
+             lambda state: state.has("Green CTR Token", player, 4))
+    add_rule(world.multiworld.get_location("Blue Gem Cup: Gem", player),
+             lambda state: state.has("Blue CTR Token", player, 4))
+    add_rule(world.multiworld.get_location("Yellow Gem Cup: Gem", player),
+             lambda state: state.has("Yellow CTR Token", player, 4))
+    add_rule(world.multiworld.get_location("Purple Gem Cup: Gem", player),
+             lambda state: state.has("Purple CTR Token", player, 4))
 
     # N. Oxide
     add_rule(world.multiworld.get_entrance("N. Oxide Garage Door", player),
-             lambda state: state.can_reach("Gem Stone Valley", None , player))
+            lambda state: state.can_reach("Gem Stone Valley", None , player))
     add_rule(world.multiworld.get_location("N. Oxide Garage: Beat Oxide Once", player),
-             lambda state: state.has("Trophy", player, 16) and state.has("Key", player, 4))
+            lambda state: state.has("Trophy", player, 16) and state.has("Key", player, 4))
     add_rule(world.multiworld.get_location("N. Oxide Garage: Beat Oxide Twice", player),
-                lambda state: state.has("Sapphire Relic", player, 18) and state.has("Trophy", player, 16) and state.has("Key", player, 4))
-
+            lambda state: state.has("Sapphire Relic", player, 18) and state.has("Trophy", player, 16) and state.has("Key", player, 4))
+ 
 
     # Lost Ruins
     add_rule(world.multiworld.get_entrance("Coco Park Warp Pad", player),
@@ -327,9 +366,3 @@ def set_rules(world: "ctrAPWorld"):
     # Nitro Court
     add_rule(world.multiworld.get_location("Nitro Court: Crystal Bonus Round", player),
              lambda state: state.has("Key", player, 4))
-
-
-
-    
-    # Victory condition rule!
-    world.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
