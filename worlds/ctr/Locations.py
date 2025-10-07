@@ -165,7 +165,7 @@ gemcent_table = {
     "Turbo Track: Platinum Time Trial": LocData(35012093, "Turbo Track"),
 
     "N. Oxide Garage: Beat Oxide Once": LocData(35012094, "N. Oxide Garage"),
-    "N. Oxide Garage: Character Unlock": LocData(35012095, "N. Oxide Garage"),
+    # "N. Oxide Garage: Character Unlock": LocData(35012095, "N. Oxide Garage"),
     "N. Oxide Garage: Beat Oxide Twice": LocData(35012096, "N. Oxide Garage"),
 
 }
@@ -173,20 +173,20 @@ gemcent_table = {
 # --- Gemstone Valley - Cup Room ---
 gemcups_table = {
 
-    "Red Cup: Gem Cup": LocData(35012097, "Red Cup"),
-    "Red Cup: Character Unlock": LocData(35012098, "Red Cup"),
+    "Red Gem Cup: Gem": LocData(35012097, "Red Gem Cup"),
+    # "Red Gem Cup: Character Unlock": LocData(35012098, "Red Gem Cup"),
 
-    "Green Cup: Gem Cup": LocData(35012099, "Green Cup"),
-    "Green Cup: Character Unlock": LocData(35012100, "Green Cup"),
+    "Green Gem Cup: Gem": LocData(35012099, "Green Gem Cup"),
+    # "Green Gem Cup: Character Unlock": LocData(35012100, "Green Gem Cup"),
 
-    "Blue Cup: Gem Cup": LocData(35012101, "Blue Cup"),
-    "Blue Cup: Character Unlock": LocData(35012102, "Blue Cup"),
+    "Blue Gem Cup: Gem": LocData(35012101, "Blue Gem Cup"),
+    # "Blue Gem Cup: Character Unlock": LocData(35012102, "Blue Gem Cup"),
 
-    "Yellow Cup: Gem Cup": LocData(35012103, "Yellow Cup"),
-    "Yellow Cup: Character Unlock": LocData(35012104, "Yellow Cup"),
+    "Yellow Gem Cup: Gem": LocData(35012103, "Yellow Gem Cup"),
+    # "Yellow Gem Cup: Character Unlock": LocData(35012104, "Yellow Gem Cup"),
 
-    "Purple Cup: Gem Cup": LocData(35012105, "Purple Cup"),
-    "Purple Cup: Character Unlock": LocData(35012106, "Purple Cup"),
+    "Purple Gem Cup: Gem": LocData(35012105, "Purple Gem Cup"),
+    # "Purple Gem Cup: Character Unlock": LocData(35012106, "Purple Gem Cup"),
 }
 
 

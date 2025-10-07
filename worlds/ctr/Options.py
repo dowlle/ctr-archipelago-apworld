@@ -40,25 +40,49 @@ class ShuffleRewards(OptionDict):
     default = {}
     valid_keys = [ "Trophies", "Sapphire Relics", "Gold Relics", "Platinum Relics", "CTR Race Tokens", "Bonus Round Tokens", "Gems", "Characters", "Boss Keys" ]
 
+class ShuffleWarpPads(Choice):
+    """
+    Shuffle Warp Pads
+    none = Warp Pads will lead to their Vanilla locations.
+    main_only = Only Main Track Warp Pads will be shuffled.
+    challenge_only = Only Challenge Track Warp Pads will be shuffled.
+    gem_only = Only Gem Cup Warp Pads will be shuffled.
+    main_and_challenge = Main Track and Challenge Track Warp Pads will be shuffled.
+    main_and_gem = Main Track and Gem Cup Warp Pads will be shuffled.
+    challenge_and_gem = Challenge Track and Gem Cup Warp Pads will be shuffled.
+    all_warppads = All Warp Pads will be shuffled.
+    """
+    display_name = "Shuffle Warp Pads"
+    option_none = 0
+    option_main_only = 1
+    option_challenge_only = 2
+    option_gem_only = 3
+    option_main_and_challenge = 4
+    option_main_and_gem = 5
+    option_challenge_and_gem = 6
+    option_all_warppads = 7
 
 class Trophysanity(DefaultOnToggle):
     """
     Every Trophy Race will have a check behind its reward.
     """
+    display_name = "Trophysanity"
 
 class Relicsanity(DefaultOnToggle):
     """
     Every Time Trial will have a check behind its reward.
     """
     display_name = "Relicsanity"
+
 class RelicDifficulty(Choice):
     """
     Determines the difficulty of the Relicsanity option. Anything above the selected option will contain junk.
     """
     display_name = "Time Trial Difficulty"
-    option_Sapphire = 0
-    option_Gold = 1
-    option_Platinum = 2
+    option_none = 0
+    option_sapphire = 1
+    option_gold = 2
+    option_platinum = 3
 
 class Tokensanity(DefaultOnToggle):
     """
@@ -74,11 +98,12 @@ class Gemsanity(DefaultOnToggle):
 
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
-    goal:   Goal
-    trophysanity: Trophysanity
-    relicsanity:    Relicsanity
-    tokesanity: Tokensanity
-    gemsanity: Gemsanity
+    Goal:                   Goal
+    Trophysanity:           Trophysanity
+    Relicsanity:            Relicsanity
+    RelicDifficulty:        RelicDifficulty
+    Tokesanity:             Tokensanity
+    Gemsanity:              Gemsanity
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
