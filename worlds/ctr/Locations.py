@@ -185,10 +185,9 @@ gemcent_table = {
     "Turbo Track: Gold Time Trial": LocData(35012092, "Turbo Track"),
     "Turbo Track: Platinum Time Trial": LocData(35012093, "Turbo Track"),
 
-    "N. Oxide Garage: Beat Oxide Once": LocData(None, "N. Oxide Garage"),
+    "N. Oxide Garage: N. Oxide's Challenge": LocData(None, "N. Oxide Garage"),
+    "N. Oxide Garage: N. Oxide's Final Challenge": LocData(None, "N. Oxide Garage"),
     # "N. Oxide Garage: Character Unlock": LocData(35012095, "N. Oxide Garage"),
-    "N. Oxide Garage: Beat Oxide Twice": LocData(None, "N. Oxide Garage"),
-    "N. Oxide Garage: Beat Oxide 101%": LocData(None, "N. Oxide Garage"),
 
 }
 

@@ -68,25 +68,20 @@ class ctrAPWorld(World):
             victory = ctrAPItem("Victory", ItemClassification.progression_skip_balancing, None, player)
             match self.options.goal.value:
                 case 0:
-                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide Once", player).place_locked_item(victory)
+                    self.multiworld.get_location("N. Oxide Garage: N. Oxide's Challenge", player).place_locked_item(victory)
                     self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
                 case 1:
-                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide Twice", player).place_locked_item(victory)
+                    self.multiworld.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
                 case 2:
-                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide 101%", player).place_locked_item(victory)
-                    self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+                    self.multiworld.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player) and state.has("Gold Relic", player, 18) and state.has("Red Gem", player, 1) and state.has("Green Gem", player, 1) and state.has("Blue Gem", player, 1) and state.has("Yellow Gem", player, 1) and state.has("Purple Gem", player, 1)
         elif self.options.goal.value >= 3:
             match self.options.goal.value:
                 case 3:
                     self.multiworld.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
                 case 4:
-                    self.multiworld.get_location("Red Gem Cup: Gem", player).place_locked_item("Red Gem")
-                    self.multiworld.get_location("Green Gem Cup: Gem", player).place_locked_item("Green Gem")
-                    self.multiworld.get_location("Blue Gem Cup: Gem", player).place_locked_item("Blue Gem")
-                    self.multiworld.get_location("Yellow Gem Cup: Gem", player).place_locked_item("Yellow Gem")
-                    self.multiworld.get_location("Purple Gem Cup: Gem", player).place_locked_item("Purple Gem")
-                    self.multiworld.completion_condition[player] = lambda state: state.has("Red Gem", player, 1) and state.has("Green Gem", player, 1) and state.has("Blue Gem", player, 1) and state.has("Yellow Gem", player, 1) and state.has("Purple Gem", player, 1)
+                    self.gemsanity(player)
 
 
         pool = []
@@ -101,6 +96,14 @@ class ctrAPWorld(World):
                     pool.append(self.create_item(item["name"]))
 
         self.multiworld.itempool += pool
+
+    def gemsanity(self, player):
+        self.multiworld.get_location("Red Gem Cup: Gem", player).place_locked_item("Red Gem")
+        self.multiworld.get_location("Green Gem Cup: Gem", player).place_locked_item("Green Gem")
+        self.multiworld.get_location("Blue Gem Cup: Gem", player).place_locked_item("Blue Gem")
+        self.multiworld.get_location("Yellow Gem Cup: Gem", player).place_locked_item("Yellow Gem")
+        self.multiworld.get_location("Purple Gem Cup: Gem", player).place_locked_item("Purple Gem")
+        self.multiworld.completion_condition[player] = lambda state: state.has("Red Gem", player, 1) and state.has("Green Gem", player, 1) and state.has("Blue Gem", player, 1) and state.has("Yellow Gem", player, 1) and state.has("Purple Gem", player, 1)
 
 
 #todo: add options to slot data

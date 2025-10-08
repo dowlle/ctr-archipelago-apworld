@@ -364,9 +364,8 @@ def set_rules(world: "ctrAPWorld"):
     # N. Oxide
     add_rule(self.get_entrance("N. Oxide Garage Door", player),
             lambda state: state.can_reach("Gem Stone Valley", None , player))
-    add_rule(self.get_location("N. Oxide Garage: Beat Oxide Once", player),
+    add_rule(self.get_location("N. Oxide Garage: N. Oxide's Challenge", player),
             lambda state: state.can_reach_entrance("N. Oxide Garage Door", player) and state.has("Trophy", player, 16) and state.has("Key", player, 4))
-    add_rule(self.get_location("N. Oxide Garage: Beat Oxide Twice", player),
-            lambda state: state.can_reach_entrance("N. Oxide Garage Door", player) and state.has("Sapphire Relic", player, 18) and state.can_reach_location("N. Oxide Garage: Beat Oxide Once", player))
-    add_rule(self.get_location("N. Oxide Garage: Beat Oxide 101%", player),
-            lambda state: state.can_reach_entrance("N. Oxide Garage Door", player) and state.has("Gold Relic", player, 18) and state.can_reach_location("N. Oxide Garage: Beat Oxide Twice", player))
+    add_rule(self.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player),
+            lambda state: state.can_reach_entrance("N. Oxide Garage Door", player) and state.has("Sapphire Relic", player, 18) and state.can_reach_location("N. Oxide Garage: N. Oxide's Challenge", player))
+    
