@@ -40,10 +40,6 @@ class ctrAPWorld(World):
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
 
-
-
-
-
     def create_regions(self):
         create_regions(self)
 
@@ -64,32 +60,35 @@ class ctrAPWorld(World):
         for loc, item in option_dict.items():
             self.get_location(loc).place_locked_item(self.create_item(item))
 
-    def set_goal(self) -> None:
-        player = self.player
-
-        match self.options.goal.value:
-            case 0:    
-                victory = Location(player, "N. Oxide Garage: Beat Oxide Once", None, self.get_region("N. Oxide Garage"))
-                self.get_region("N. Oxide Garage").locations.append(victory)
-                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
-            case 1:
-                victory = Location(player, "N. Oxide Garage: Beat Oxide Twice", None, self.get_region("N. Oxide Garage"))
-                self.get_region("N. Oxide Garage").locations.append(victory)
-                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
-            case 2:
-                victory = Location(player, "N. Oxide Garage: Beat Oxide Twice", None, self.get_region("N. Oxide Garage"))
-                self.get_region("N. Oxide Garage").locations.append(victory)
-                self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
-            case 3:
-                self.multiworld.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
-
-        if self.options.goal.value < 3:
-                victory.place_locked_item(self.create_event("Victory"))
-
-            
-
 
     def create_items(self):
+        player = self.player
+
+        if self.options.goal.value <= 2:
+            victory = ctrAPItem("Victory", ItemClassification.progression_skip_balancing, None, player)
+            match self.options.goal.value:
+                case 0:
+                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide Once", player).place_locked_item(victory)
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+                case 1:
+                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide Twice", player).place_locked_item(victory)
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+                case 2:
+                    self.multiworld.get_location("N. Oxide Garage: Beat Oxide 101%", player).place_locked_item(victory)
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+        elif self.options.goal.value >= 3:
+            match self.options.goal.value:
+                case 3:
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
+                case 4:
+                    self.multiworld.get_location("Red Gem Cup: Gem", player).place_locked_item("Red Gem")
+                    self.multiworld.get_location("Green Gem Cup: Gem", player).place_locked_item("Green Gem")
+                    self.multiworld.get_location("Blue Gem Cup: Gem", player).place_locked_item("Blue Gem")
+                    self.multiworld.get_location("Yellow Gem Cup: Gem", player).place_locked_item("Yellow Gem")
+                    self.multiworld.get_location("Purple Gem Cup: Gem", player).place_locked_item("Purple Gem")
+                    self.multiworld.completion_condition[player] = lambda state: state.has("Red Gem", player, 1) and state.has("Green Gem", player, 1) and state.has("Blue Gem", player, 1) and state.has("Yellow Gem", player, 1) and state.has("Purple Gem", player, 1)
+
+
         pool = []
 
         for item in item_table:
@@ -121,7 +120,7 @@ class ctrAPWorld(World):
         }
 
         return slot_data
-    
+
 
     def collect(self, state: "CollectionState", item: "Item") -> bool:
         return super().collect(state, item)

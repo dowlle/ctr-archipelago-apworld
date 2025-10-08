@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 def create_regions(world: "ctrAPWorld"):
 
     menu = create_region(world, "Menu")
+
     nsan_hub = create_region_and_connect(world, "N. Sanity Beach", "Menu -> N. Sanity Beach", menu)
     crash_cove = create_region_and_connect(world, "Crash Cove", "Crash Cove Warp Pad", nsan_hub)
     roo_tube = create_region_and_connect(world, "Roo's Tubes", "Roo's Tubes Warp Pad", nsan_hub)
@@ -20,16 +21,19 @@ def create_regions(world: "ctrAPWorld"):
     sew_speed = create_region_and_connect(world, "Sewer Speedway", "Sewer Speedway Warp Pad", nsan_hub)
     roo_grage = create_region_and_connect(world, "Ripper Roo Garage", "Ripper Roo Garage Door", nsan_hub)
     skull_rock = create_region_and_connect(world, "Skull Rock", "Skull Rock Warp Pad", nsan_hub)
+
     gemcent_hub = create_region_and_connect(world, "Gem Stone Valley", "N. Sanity Beach -> Gem Stone Valley", nsan_hub)
     slide_col = create_region_and_connect(world, "Slide Coliseum", "Slide Coliseum Warp Pad", gemcent_hub)
     turbo_track = create_region_and_connect(world, "Turbo Track", "Turbo Track Warp Pad", gemcent_hub)
     oxide_grage = create_region_and_connect(world, "N. Oxide Garage", "N. Oxide Garage Door", gemcent_hub)
+
     gemcups_hub = create_region_and_connect(world, "Cups Room", "Gem Stone Valley -> Cups Room", gemcent_hub)
     red_cup = create_region_and_connect(world, "Red Gem Cup", "Red Cup Warp Pad", gemcups_hub)
     green_cup = create_region_and_connect(world, "Green Gem Cup", "Green Cup Warp Pad", gemcups_hub)
     blue_cup = create_region_and_connect(world, "Blue Gem Cup", "Blue Cup Warp Pad", gemcups_hub)
     yellow_cup = create_region_and_connect(world, "Yellow Gem Cup", "Yellow Cup Warp Pad", gemcups_hub)
     purple_cup = create_region_and_connect(world, "Purple Gem Cup", "Purple Cup Warp Pad", gemcups_hub)
+
     lost_hub = create_region_and_connect(world, "Lost Ruins", "Gem Stone Valley -> Lost Ruins", gemcent_hub)
     coco_park = create_region_and_connect(world, "Coco Park", "Coco Park Warp Pad", lost_hub)
     tiger_temple = create_region_and_connect(world, "Tiger Temple", "Tiger Temple Warp Pad", lost_hub)
@@ -37,6 +41,7 @@ def create_regions(world: "ctrAPWorld"):
     dingo_cany = create_region_and_connect(world, "Dingo Canyon", "Dingo Canyon Warp Pad", lost_hub)
     papu_grage = create_region_and_connect(world, "Papu Papu Garage", "Papu Papu Garage Door", lost_hub)
     ramp_ruin = create_region_and_connect(world, "Rampage Ruins", "Rampage Ruins Warp Pad", lost_hub)
+
     glac_hub = create_region_and_connect(world, "Glacier Park", "Lost Ruins -> Glacier Park", lost_hub)
     nsan_hub.connect(glac_hub, "Glacier Park -> N. Sanity Beach")
     blizz_bluff = create_region_and_connect(world, "Blizzard Bluff", "Blizzard Bluff Warp Pad", glac_hub)
@@ -45,6 +50,7 @@ def create_regions(world: "ctrAPWorld"):
     tiny_arena = create_region_and_connect(world, "Tiny Arena", "Tiny Arena Warp Pad", glac_hub)
     komo_grage = create_region_and_connect(world, "Komodo Joe Garage", "Komodo Joe Garage Door", glac_hub)
     rocky_road = create_region_and_connect(world, "Rocky Road", "Rocky Road Warp Pad", glac_hub)
+    
     city_hub = create_region_and_connect(world, "Citadel City", "Glacier Park -> Citadel City", glac_hub)
     hot_air = create_region_and_connect(world, "Hot Air Skyway", "Hot Air Skyway Warp Pad", city_hub)
     cort_cast = create_region_and_connect(world, "Cortex Castle", "Cortex Castle Warp Pad", city_hub)

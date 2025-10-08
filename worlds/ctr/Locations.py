@@ -153,6 +153,27 @@ city_table = {
 
 }
 
+
+
+# --- Gemstone Valley - Cup Room ---
+gemcups_table = {
+
+    "Red Gem Cup: Gem": LocData(35012098, "Red Gem Cup"),
+    # "Red Gem Cup: Character Unlock": LocData(35012099, "Red Gem Cup"),
+
+    "Green Gem Cup: Gem": LocData(35012100, "Green Gem Cup"),
+    # "Green Gem Cup: Character Unlock": LocData(35012101, "Green Gem Cup"),
+
+    "Blue Gem Cup: Gem": LocData(35012102, "Blue Gem Cup"),
+    # "Blue Gem Cup: Character Unlock": LocData(35012103, "Blue Gem Cup"),
+
+    "Yellow Gem Cup: Gem": LocData(35012104, "Yellow Gem Cup"),
+    # "Yellow Gem Cup: Character Unlock": LocData(35012105, "Yellow Gem Cup"),
+
+    "Purple Gem Cup: Gem": LocData(35012106, "Purple Gem Cup"),
+    # "Purple Gem Cup: Character Unlock": LocData(35012107, "Purple Gem Cup"),
+}
+
 # --- Gemstone Valley - Central ---
 gemcent_table = {
 
@@ -164,31 +185,12 @@ gemcent_table = {
     "Turbo Track: Gold Time Trial": LocData(35012092, "Turbo Track"),
     "Turbo Track: Platinum Time Trial": LocData(35012093, "Turbo Track"),
 
-    "N. Oxide Garage: Beat Oxide Once": LocData(35012094, "N. Oxide Garage"),
+    "N. Oxide Garage: Beat Oxide Once": LocData(None, "N. Oxide Garage"),
     # "N. Oxide Garage: Character Unlock": LocData(35012095, "N. Oxide Garage"),
-    "N. Oxide Garage: Beat Oxide Twice": LocData(35012096, "N. Oxide Garage"),
+    "N. Oxide Garage: Beat Oxide Twice": LocData(None, "N. Oxide Garage"),
+    "N. Oxide Garage: Beat Oxide 101%": LocData(None, "N. Oxide Garage"),
 
 }
-
-# --- Gemstone Valley - Cup Room ---
-gemcups_table = {
-
-    "Red Gem Cup: Gem": LocData(35012097, "Red Gem Cup"),
-    # "Red Gem Cup: Character Unlock": LocData(35012098, "Red Gem Cup"),
-
-    "Green Gem Cup: Gem": LocData(35012099, "Green Gem Cup"),
-    # "Green Gem Cup: Character Unlock": LocData(35012100, "Green Gem Cup"),
-
-    "Blue Gem Cup: Gem": LocData(35012101, "Blue Gem Cup"),
-    # "Blue Gem Cup: Character Unlock": LocData(35012102, "Blue Gem Cup"),
-
-    "Yellow Gem Cup: Gem": LocData(35012103, "Yellow Gem Cup"),
-    # "Yellow Gem Cup: Character Unlock": LocData(35012104, "Yellow Gem Cup"),
-
-    "Purple Gem Cup: Gem": LocData(35012105, "Purple Gem Cup"),
-    # "Purple Gem Cup: Character Unlock": LocData(35012106, "Purple Gem Cup"),
-}
-
 
 
 location_table = {
