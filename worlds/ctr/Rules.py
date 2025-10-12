@@ -102,11 +102,11 @@ def set_rules(world: "ctrAPWorld"):
              lambda state: state.can_reach_entrance("Slide Coliseum Warp Pad", player) and state.has("Sapphire Relic", player, 8))
     
     add_rule(self.get_location("Turbo Track: Sapphire Time Trial", player),
-             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player) and state.has("Green Gem", player) and state.has("Blue Gem", player) and state.has("Yellow Gem", player) and state.has("Purple Gem", player))
     add_rule(self.get_location("Turbo Track: Gold Time Trial", player),
-             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player) and state.has("Green Gem", player) and state.has("Blue Gem", player) and state.has("Yellow Gem", player) and state.has("Purple Gem", player))
     add_rule(self.get_location("Turbo Track: Platinum Time Trial", player),
-             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player, 1) and ("Green Gem", player, 1) and ("Blue Gem", player, 1) and ("Yellow Gem", player, 1) and ("Purple Gem", player, 1))
+             lambda state: state.can_reach_entrance("Turbo Track Warp Pad", player) and state.has("Red Gem", player) and state.has("Green Gem", player) and state.has("Blue Gem", player) and state.has("Yellow Gem", player) and state.has("Purple Gem", player))
     
     # Cups Room
     add_rule(self.get_entrance("Gem Stone Valley -> Cups Room", player),
