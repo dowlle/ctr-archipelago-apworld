@@ -105,10 +105,10 @@ class ctrAPOptions(PerGameCommonOptions):
     relicdifficulty: RelicDifficulty
     tokensanity: Tokensanity
     gemsanity: Gemsanity
-
+    shuffle_warp_pads: ShuffleWarpPads
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
     "General Options": [Goal],
-    "Shuffle Options": [ShuffleRewards],
+    "Shuffle Options": [ShuffleRewards, ShuffleWarpPads],
     "N. Sanity": [Trophysanity, Relicsanity, RelicDifficulty, Tokensanity, Gemsanity]
 }

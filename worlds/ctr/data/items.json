@@ -1,0 +1,17 @@
+[
+  {"name": "Trophy", "count": 16, "classification": "progression"},
+  {"name": "Progressive Relic", "count": 18, "classification": "progression"},
+  {"name": "Progressive Relic", "count": 36, "classification": "progression_skip_balancing"},
+  {"name": "Red CTR Token", "count": 4, "classification": "progression"},
+  {"name": "Green CTR Token", "count": 4, "classification": "progression"},
+  {"name": "Blue CTR Token", "count": 4, "classification": "progression"},
+  {"name": "Yellow CTR Token", "count": 4, "classification": "progression"},
+  {"name": "Purple CTR Token", "count": 4, "classification": "progression"},
+  {"name": "Red Gem", "count": 1, "classification": "progression"},
+  {"name": "Green Gem", "count": 1, "classification": "progression"},
+  {"name": "Blue Gem", "count": 1, "classification": "progression"},
+  {"name": "Yellow Gem", "count": 1, "classification": "progression"},
+  {"name": "Purple Gem", "count": 1, "classification": "progression"},
+  {"name": "Key", "count": 4, "classification": "progression"},
+  {"name": "Wumpa Fruit", "count": 3, "classification": "filler"}
+]

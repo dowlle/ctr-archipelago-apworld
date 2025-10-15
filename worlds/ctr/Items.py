@@ -1,5 +1,6 @@
 import logging
-
+import os
+import json
 from BaseClasses import ItemClassification
 from typing import List, TYPE_CHECKING, TypedDict
 
@@ -13,86 +14,41 @@ class ItemDict(TypedDict):
     count: int
     classification: ItemClassification
 
-Progression = ItemClassification.progression
-Junk = ItemClassification.filler
-Character = ItemClassification.useful
+valid_classes = {
+    "progression": ItemClassification.progression,
+    "filler": ItemClassification.filler,
+    "useful": ItemClassification.useful,
+    "progression_skip_balancing": ItemClassification.progression_skip_balancing
+}
 
 item_prefix = 35010000
 
-item_table: List[ItemDict] = [
-    {'name': "Trophy",
-     'count': 16,
-     'classification': Progression},
-    {'name': "Sapphire Relic",
-     'count': 18,
-     'classification': Progression},
-    {'name': "Gold Relic",
-     'count': 18,
-     'classification': Progression},
-    {'name': "Platinum Relic",
-     'count': 18,
-     'classification': Progression},
-    {'name': "Red CTR Token",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Green CTR Token",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Blue CTR Token",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Yellow CTR Token",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Purple CTR Token",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Red Gem",
-     'count': 1,
-     'classification': Progression},
-    {'name': "Green Gem",
-     'count': 1,
-     'classification': Progression},
-    {'name': "Blue Gem",
-     'count': 1,
-     'classification': Progression},
-    {'name': "Yellow Gem",
-     'count': 1,
-     'classification': Progression},
-    {'name': "Purple Gem",
-     'count': 1,
-     'classification': Progression},
-    {'name': "Key",
-     'count': 4,
-     'classification': Progression},
-    {'name': "Wumpa Fruit",
-     'count': 3,
-     'classification': Junk},
-    # {'name': "Progressive Door",
-    #  'count': 4,
-    #  'classification': Progression},
-    # {'name': "Ripper Roo",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Papu Papu",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Komodo Joe",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Pinstripe",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Fake Crash",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "N. Tropy",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Penta Penguin",
-    #  'count': 1,
-    #  'classification': Character},
-    # {'name': "Nitros Oxide",
-    #  'count': 1,
-    #  'classification': Character},
-]
+def load_item_table() -> List[ItemDict]:
+    """
+    Loads item data from the CTR world's data/items.json file.
+    Returns a list of item dictionaries with proper ItemClassification enums.
+    """
+    data_path = os.path.join(os.path.dirname(__file__), "data", "items.json")
+    with open(data_path, "r", encoding="utf-8") as f:
+        raw_items = json.load(f)
+
+    valid_classes = {
+        "progression": ItemClassification.progression,
+        "filler": ItemClassification.filler,
+        "useful": ItemClassification.useful,
+        "progression_skip_balancing": ItemClassification.progression_skip_balancing
+    }
+
+    item_table: List[ItemDict] = []
+    for entry in raw_items:
+        cls_name = entry["classification"].lower()
+        if cls_name not in valid_classes:
+            raise ValueError(f"Unknown item classification: {cls_name}")
+
+        item_table.append({
+            "name": entry["name"],
+            "count": entry["count"],
+            "classification": valid_classes[cls_name],
+        })
+
+    return item_table

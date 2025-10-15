@@ -1,0 +1,765 @@
+{
+    "world": "Crash Team Racing",
+    "version": 1,
+    "settings": {
+        "coupled_entrances": true,
+        "randomize_group": 1
+    },
+        "regions": [
+            {   "name": "Menu",
+                "is_start": true,
+                "type": "menu",
+                "locations": [],
+                "exits": [
+                    {"name": "Menu -> Adventure",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "always"}
+                ]
+            },
+            {
+                "name": "N. Sanity Beach",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Crash Cove Warp Pad",
+                    "target": "Crash Cove",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "always"},
+                    {"name": "Roo's Tubes Warp Pad",
+                    "target": "Roo's Tubes",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "always"},
+                    {"name": "Mystery Caves Warp Pad",
+                    "target": "Mystery Caves",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "always"},
+                    {"name": "Sewer Speedway Warp Pad",
+                    "target": "Sewer Speedway",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "always"},
+                    {"name": "Ripper Roo Garage Door",
+                    "target": "Ripper Roo Garage",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Trophy', 4)"},
+                    {"name": "Skull Rock Warp Pad",
+                    "target": "Skull Rock",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "N. Sanity Beach <-> Gem Stone Valley",
+                    "target": "Gem Stone Valley",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "N. Sanity Beach <-> Glacier Park",
+                    "target": "Glacier Park",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"}
+                ]
+            },
+            {
+                "name": "Crash Cove",
+                "type": "race",
+                "locations": [
+                    {"name": "Crash Cove: Trophy Race", "type": "trophy", "requires": "has('Trophy', 0)"},
+                    {"name": "Crash Cove: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Crash Cove: Gold Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Crash Cove: Platinum Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Crash Cove: CTR Token Challenge", "type": "token", "requires": "has('Key', 1)"}
+                ],
+                "exits": [
+                    {"name": "Crash Cove -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]           
+            },
+            {
+                "name": "Roo's Tubes",
+                "type": "race",
+                "locations": [
+                    {"name": "Roo's Tubes: Trophy Race", "type": "trophy", "requires": "has('Trophy', 0)"},
+                    {"name": "Roo's Tubes: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Roo's Tubes: Gold Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Roo's Tubes: Platinum Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Roo's Tubes: CTR Token Challenge", "type": "token", "requires": "has('Key', 1)"}
+                ],
+                "exits": [
+                    {"name": "Roo's Tubes -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Mystery Caves",
+                "type": "race",
+                "locations": [
+                    {"name": "Mystery Caves: Trophy Race", "type": "trophy", "requires": "has('Trophy', 1)"},
+                    {"name": "Mystery Caves: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Mystery Caves: Gold Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Mystery Caves: Platinum Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Mystery Caves: CTR Token Challenge", "type": "token", "requires": "has('Key', 1)"}
+                ],
+                "exits": [
+                    {"name": "Mystery Caves -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {   "name": "Sewer Speedway",
+                "type": "race",
+                "locations": [
+                    {"name": "Sewer Speedway: Trophy Race", "type": "trophy", "requires": "has('Trophy', 2)"},
+                    {"name": "Sewer Speedway: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Sewer Speedway: Gold Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Sewer Speedway: Platinum Time Trial", "type": "relic", "requires": "has('Key', 1)"},
+                    {"name": "Sewer Speedway: CTR Token Challenge", "type": "token", "requires": "has('Key', 1)"}
+                ],
+                "exits": [
+                    {"name": "Sewer Speedway -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Ripper Roo Garage",
+                "type": "boss",
+                "locations": [
+                    {"name": "Ripper Roo Garage: Boss Race", "type": "boss"}
+                ],
+                "exits": [
+                    {"name": "Ripper Roo Garage -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Skull Rock",
+                "type": "crystal",
+                "locations": [
+                    {"name": "Skull Rock: Crystal Bonus Round", "type": "challenge"}
+                ],
+                "exits": [
+                    {"name": "Skull Rock -> Hub",
+                    "target": "N. Sanity Beach",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Gem Stone Valley",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Slide Coliseum Warp Pad",
+                    "target": "Slide Coliseum",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Progressive Relic', 10)"},
+                    {"name": "Turbo Track Warp Pad",
+                    "target": "Turbo Track",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Red Gem', 1) and has('Green Gem', 1) and has('Blue Gem', 1) and has('Yellow Gem', 1) and has('Purple Gem', 1)"},
+                    {"name": "N. Oxide Garage Door",
+                    "target": "N. Oxide Garage",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 4)"},
+                    {"name": "Gem Stone Valley <-> Cups Room",
+                    "target": "Cups Room",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "Gem Stone Valley <-> Lost Ruins",
+                    "target": "Lost Ruins",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"}
+                ]
+            },
+            { "name": "Slide Coliseum",
+                "type": "trial",
+                "locations": [
+                    {"name": "Slide Coliseum: Sapphire Time Trial", "type": "relic"},
+                    {"name": "Slide Coliseum: Gold Time Trial", "type": "relic"},
+                    {"name": "Slide Coliseum: Platinum Time Trial", "type": "relic"}
+                ],
+                "exits": [
+                    {"name": "Slide Coliseum -> Hub",
+                    "target": "Gem Stone Valley",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            { "name": "Turbo Track",
+                "type": "trial",
+                "locations": [
+                    {"name": "Turbo Track: Sapphire Time Trial", "type": "relic"},
+                    {"name": "Turbo Track: Gold Time Trial", "type": "relic"},
+                    {"name": "Turbo Track: Platinum Time Trial", "type": "relic"}
+                ],
+                "exits": [
+                    {"name": "Turbo Track -> Hub",
+                    "target": "Gem Stone Valley",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "N. Oxide Garage",
+                "type": "boss",
+                "locations": [
+                    {"name": "N. Oxide Garage: N. Oxide's Challenge", "type": "boss", "requires": "has('Key', 4) and has('Trophy', 16)"},
+                    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "type": "final_boss", "requires": "has('Key', 4) and has('Trophy', 16) and has('Progressive Relic', 18)"}
+                ],
+                "exits": [
+                    {"name": "N. Oxide Garage -> Hub",
+                    "target": "Gem Stone Valley",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            { "name": "Cups Room",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Red Cup Warp Pad",
+                    "target": "Red Gem Cup",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Red CTR Token', 4)"},
+                    {"name": "Green Cup Warp Pad",
+                    "target": "Green Gem Cup",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Green CTR Token', 4)"},
+                    {"name": "Blue Cup Warp Pad",
+                    "target": "Blue Gem Cup",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Blue CTR Token', 4)"},
+                    {"name": "Yellow Cup Warp Pad",
+                    "target": "Yellow Gem Cup",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Yellow CTR Token', 4)"},
+                    {"name": "Purple Cup Warp Pad",
+                    "target": "Purple Gem Cup",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Purple CTR Token', 4)"}
+                ]
+            },
+            {
+                "name": "Red Gem Cup",
+                "type": "cup",
+                "locations": [
+                    {"name": "Red Gem Cup: Gem", "type": "gem"}
+                ],
+                "exits": [
+                    {"name": "Red Gem Cup -> Hub",
+                    "target": "Cups Room",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Green Gem Cup",
+                "type": "cup",
+                "locations": [
+                    {"name": "Green Gem Cup: Gem", "type": "gem"}
+                ],
+                "exits": [
+                    {"name": "Green Gem Cup -> Hub",
+                    "target": "Cups Room",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Blue Gem Cup",
+                "type": "cup",
+                "locations": [
+                    {"name": "Blue Gem Cup: Gem", "type": "gem"}
+                ],
+                "exits": [
+                    {"name": "Blue Gem Cup -> Hub",
+                    "target": "Cups Room",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Yellow Gem Cup",
+                "type": "cup",
+                "locations": [
+                    {"name": "Yellow Gem Cup: Gem", "type": "gem"}
+                ],
+                "exits": [
+                    {"name": "Yellow Gem Cup -> Hub",
+                    "target": "Cups Room",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Purple Gem Cup",
+                "type": "cup",
+                "locations": [
+                    {"name": "Purple Gem Cup: Gem", "type": "gem"}
+                ],
+                "exits": [
+                    {"name": "Purple Gem Cup -> Hub",
+                    "target": "Cups Room",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Lost Ruins",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Lost Ruins <-> Glacier Park",
+                    "target": "Glacier Park",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"},
+                    {"name": "Coco Park Warp Pad",
+                    "target": "Coco Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "Tiger Temple Warp Pad",
+                    "target": "Tiger Temple",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "Papu's Pyramid Warp Pad",
+                    "target": "Papu's Pyramid",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "Dingo Canyon Warp Pad",
+                    "target": "Dingo Canyon",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 1)"},
+                    {"name": "Papu Papu Garage Door",
+                    "target": "Papu Papu Garage",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Trophy', 8)"},
+                    {"name": "Rampage Ruins Warp Pad",
+                    "target": "Rampage Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"}
+                ]
+            },
+            {
+                "name": "Coco Park",
+                "type": "race",
+                "locations": [
+                    {"name": "Coco Park: Trophy Race", "type": "trophy", "requires": "has('Trophy', 4)"},
+                    {"name": "Coco Park: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Coco Park: Gold Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Coco Park: Platinum Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Coco Park: CTR Token Challenge", "type": "token", "requires": "has('Key', 2)"}
+                ],
+                "exits": [
+                    {"name": "Coco Park -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Tiger Temple",
+                "type": "race",
+                "locations": [
+                    {"name": "Tiger Temple: Trophy Race", "type": "trophy", "requires": "has('Trophy', 4)"},
+                    {"name": "Tiger Temple: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Tiger Temple: Gold Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Tiger Temple: Platinum Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Tiger Temple: CTR Token Challenge", "type": "token", "requires": "has('Key', 2)"}
+                ],
+                "exits": [
+                    {"name": "Tiger Temple -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {   "name": "Papu's Pyramid",
+                "type": "race",
+                "locations": [
+                    {"name": "Papu's Pyramid: Trophy Race", "type": "trophy", "requires": "has('Trophy', 5)"},
+                    {"name": "Papu's Pyramid: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Papu's Pyramid: Gold Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Papu's Pyramid: Platinum Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Papu's Pyramid: CTR Token Challenge", "type": "token", "requires": "has('Key', 2)"}
+                ],
+                "exits": [
+                    {"name": "Papu's Pyramid -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Dingo Canyon",
+                "type": "race",
+                "locations": [
+                    {"name": "Dingo Canyon: Trophy Race", "type": "trophy", "requires": "has('Trophy', 6)"},
+                    {"name": "Dingo Canyon: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Dingo Canyon: Gold Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Dingo Canyon: Platinum Time Trial", "type": "relic", "requires": "has('Key', 2)"},
+                    {"name": "Dingo Canyon: CTR Token Challenge", "type": "token", "requires": "has('Key', 2)"}
+                ],
+                "exits": [
+                    {"name": "Dingo Canyon -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Papu Papu Garage",
+                "type": "boss",
+                "locations": [
+                    {"name": "Papu Papu Garage: Boss Race", "type": "boss"}
+                ],
+                "exits": [
+                    {"name": "Papu Papu Garage -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Rampage Ruins",
+                "type": "crystal",
+                "locations": [
+                    {"name": "Rampage Ruins: Crystal Bonus Round", "type": "challenge"}
+                ],
+                "exits": [
+                    {"name": "Rampage Ruins -> Hub",
+                    "target": "Lost Ruins",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Glacier Park",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Glacier Park <-> Citadel City",
+                    "target": "Citadel City",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "Blizzard Bluff Warp Pad",
+                    "target": "Blizzard Bluff",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"},
+                    {"name": "Dragon Mines Warp Pad",
+                    "target": "Dragon Mines",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"},
+                    {"name": "Polar Pass Warp Pad",
+                    "target": "Polar Pass",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"},
+                    {"name": "Tiny Arena Warp Pad",
+                    "target": "Tiny Arena",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 2)"},
+                    {"name": "Komodo Joe Garage Door",
+                    "target": "Komodo Joe Garage",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Trophy', 12)"},
+                    {"name": "Rocky Road Warp Pad",
+                    "target": "Rocky Road",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"}
+                ]
+            },
+            {
+                "name": "Blizzard Bluff",
+                "type": "race",
+                "locations": [
+                    {"name": "Blizzard Bluff: Trophy Race", "type": "trophy", "requires": "has('Trophy', 8)"},
+                    {"name": "Blizzard Bluff: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Blizzard Bluff: Gold Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Blizzard Bluff: Platinum Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Blizzard Bluff: CTR Token Challenge", "type": "token", "requires": "has('Key', 3)"}
+                ],
+                "exits": [
+                    {"name": "Blizzard Bluff -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Dragon Mines",
+                "type": "race",
+                "locations": [
+                    {"name": "Dragon Mines: Trophy Race", "type": "trophy", "requires": "has('Trophy', 9)"},
+                    {"name": "Dragon Mines: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Dragon Mines: Gold Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Dragon Mines: Platinum Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Dragon Mines: CTR Token Challenge", "type": "token", "requires": "has('Key', 3)"}
+                ],
+                "exits": [
+                    {"name": "Dragon Mines -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {   "name": "Polar Pass",
+                "type": "race",
+                "locations": [
+                    {"name": "Polar Pass: Trophy Race", "type": "trophy", "requires": "has('Trophy', 10)"},
+                    {"name": "Polar Pass: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Polar Pass: Gold Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Polar Pass: Platinum Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Polar Pass: CTR Token Challenge", "type": "token", "requires": "has('Key', 3)"}
+                ],
+                "exits": [
+                    {"name": "Polar Pass -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Tiny Arena",
+                "type": "race",
+                "locations": [
+                    {"name": "Tiny Arena: Trophy Race", "type": "trophy", "requires": "has('Trophy', 11)"},
+                    {"name": "Tiny Arena: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Tiny Arena: Gold Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Tiny Arena: Platinum Time Trial", "type": "relic", "requires": "has('Key', 3)"},
+                    {"name": "Tiny Arena: CTR Token Challenge", "type": "token", "requires": "has('Key', 3)"}
+                ],
+                "exits": [
+                    {"name": "Tiny Arena -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Komodo Joe Garage",
+                "type": "boss",
+                "locations": [
+                    {"name": "Komodo Joe Garage: Boss Race", "type": "boss"}
+                ],
+                "exits": [
+                    {"name": "Komodo Joe Garage -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Rocky Road",
+                "type": "crystal",
+                "locations": [
+                    {"name": "Rocky Road: Crystal Bonus Round", "type": "challenge"}
+                ],
+                "exits": [
+                    {"name": "Rocky Road -> Hub",
+                    "target": "Glacier Park",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Citadel City",
+                "type": "hub",
+                "locations": [],
+                "exits": [
+                    {"name": "Hot Air Skyway Warp Pad",
+                    "target": "Hot Air Skyway",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "Cortex Castle Warp Pad",
+                    "target": "Cortex Castle",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "N. Gin Labs Warp Pad",
+                    "target": "N. Gin Labs",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "Oxide Station Warp Pad",
+                    "target": "Oxide Station",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 3)"},
+                    {"name": "Pinstripe Garage Door",
+                    "target": "Pinstripe Garage",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Trophy', 16)"},
+                    {"name": "Nitro Court Warp Pad",
+                    "target": "Nitro Court",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY",
+                    "access_rule": "has('Key', 4)"}
+                ]
+            },
+            {
+                "name": "Hot Air Skyway",
+                "type": "race",
+                "locations": [
+                    {"name": "Hot Air Skyway: Trophy Race", "type": "trophy", "requires": "has('Trophy', 12)"},
+                    {"name": "Hot Air Skyway: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Hot Air Skyway: Gold Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Hot Air Skyway: Platinum Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Hot Air Skyway: CTR Token Challenge", "type": "token", "requires": "has('Key', 4)"}
+                ],
+                "exits": [
+                    {"name": "Hot Air Skyway -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Cortex Castle",
+                "type": "race",
+                "locations": [
+                    {"name": "Cortex Castle: Trophy Race", "type": "trophy", "requires": "has('Trophy', 13)"},
+                    {"name": "Cortex Castle: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Cortex Castle: Gold Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Cortex Castle: Platinum Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Cortex Castle: CTR Token Challenge", "type": "token", "requires": "has('Key', 4)"}
+                ],
+                "exits": [
+                    {"name": "Cortex Castle -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {   "name": "N. Gin Labs",
+                "type": "race",
+                "locations": [
+                    {"name": "N. Gin Labs: Trophy Race", "type": "trophy", "requires": "has('Trophy', 14)"},
+                    {"name": "N. Gin Labs: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "N. Gin Labs: Gold Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "N. Gin Labs: Platinum Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "N. Gin Labs: CTR Token Challenge", "type": "token", "requires": "has('Key', 4)"}
+                ],
+                "exits": [
+                    {"name": "N. Gin Labs -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Oxide Station",
+                "type": "race",
+                "locations": [
+                    {"name": "Oxide Station: Trophy Race", "type": "trophy", "requires": "has('Trophy', 15)"},
+                    {"name": "Oxide Station: Sapphire Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Oxide Station: Gold Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Oxide Station: Platinum Time Trial", "type": "relic", "requires": "has('Key', 4)"},
+                    {"name": "Oxide Station: CTR Token Challenge", "type": "token", "requires": "has('Key', 4)"}
+                ],
+                "exits": [
+                    {"name": "Oxide Station -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Pinstripe Garage",
+                "type": "boss",
+                "locations": [
+                    {"name": "Pinstripe Garage: Boss Race", "type": "boss"}
+                ],
+                "exits": [
+                    {"name": "Pinstripe Garage -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 0,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            },
+            {
+                "name": "Nitro Court",
+                "type": "crystal",
+                "locations": [
+                    {"name": "Nitro Court: Crystal Bonus Round", "type": "challenge"}
+                ],
+                "exits": [
+                    {"name": "Nitro Court -> Hub",
+                    "target": "Citadel City",
+                    "randomization_group": 1,
+                    "randomization_type": "TWO_WAY"
+                    }
+                ]
+            }
+        
+        ]            
+}
