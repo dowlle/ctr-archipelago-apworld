@@ -230,8 +230,8 @@
                 "name": "N. Oxide Garage",
                 "type": "boss",
                 "locations": [
-                    {"name": "N. Oxide Garage: N. Oxide's Challenge", "type": "boss", "requires": "has('Key', 4) and has('Trophy', 16)"},
-                    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "type": "final_boss", "requires": "has('Key', 4) and has('Trophy', 16) and has('Progressive Relic', 18)"}
+                    {"name": "N. Oxide Garage: N. Oxide's Challenge", "type": "boss", "requires": "has('Key', 4)"},
+                    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "type": "final_boss", "requires": "has('Key', 4) and has('Progressive Relic', 18)"}
                 ],
                 "exits": [
                     {"name": "N. Oxide Garage -> Hub",

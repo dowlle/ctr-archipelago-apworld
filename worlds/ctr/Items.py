@@ -1,4 +1,3 @@
-import logging
 import os
 import json
 from BaseClasses import ItemClassification
@@ -14,12 +13,6 @@ class ItemDict(TypedDict):
     count: int
     classification: ItemClassification
 
-valid_classes = {
-    "progression": ItemClassification.progression,
-    "filler": ItemClassification.filler,
-    "useful": ItemClassification.useful,
-    "progression_skip_balancing": ItemClassification.progression_skip_balancing
-}
 
 item_prefix = 35010000
 
@@ -32,23 +25,23 @@ def load_item_table() -> List[ItemDict]:
     with open(data_path, "r", encoding="utf-8") as f:
         raw_items = json.load(f)
 
-    valid_classes = {
+    classes = {
         "progression": ItemClassification.progression,
         "filler": ItemClassification.filler,
         "useful": ItemClassification.useful,
-        "progression_skip_balancing": ItemClassification.progression_skip_balancing
+        "progression_skip_balancing": ItemClassification.progression_skip_balancing,
+        "progression_deprioritized": ItemClassification.progression_deprioritized,
+        "progression_deprioritized_skip_balancing": ItemClassification.progression_deprioritized_skip_balancing,
     }
 
     item_table: List[ItemDict] = []
     for entry in raw_items:
         cls_name = entry["classification"].lower()
-        if cls_name not in valid_classes:
-            raise ValueError(f"Unknown item classification: {cls_name}")
 
         item_table.append({
             "name": entry["name"],
             "count": entry["count"],
-            "classification": valid_classes[cls_name],
+            "classification": classes[cls_name],
         })
 
     return item_table

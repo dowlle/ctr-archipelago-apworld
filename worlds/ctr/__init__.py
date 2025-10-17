@@ -1,5 +1,7 @@
 import logging
-from typing import Dict
+import json
+import os
+from typing import Dict, List
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .Locations import get_location_names, get_total_locations
@@ -8,6 +10,7 @@ from .Options import ctrAPOptions
 from .Regions import create_regions
 from .Rules import set_rules
 from .Types import ctrAPItem
+
 
 
 class ctrAPWeb(WebWorld):
@@ -30,8 +33,6 @@ class ctrAPWorld(World):
     """
     Crash Team Racing (CTR) is a kart racing game developed by Naughty Dog and published by Sony Computer Entertainment for the PlayStation in 1999.
     It features characters from the Crash Bandicoot series and combines fast-paced racing with power-ups and weapons.
-
-    In Archipelago, the CTR Randomizer limits the Adventure Profile to one save slot, and randomizes the rewards from each race, as well as the locations of Warp Pads if enabled.
     """
 
     game = "Crash Team Racing"
@@ -50,12 +51,13 @@ class ctrAPWorld(World):
 
 
     def create_regions(self):
-        """Builds region graph from data/world.json."""
         create_regions(self)
 
     def set_rules(self):
-        """Assigns parsed access rules to regions and locations."""
         set_rules(self)
+
+
+        
 
     # --- Item creation ---
     def create_item(self, name: str) -> "ctrAPItem":
@@ -67,14 +69,20 @@ class ctrAPWorld(World):
         return ctrAPItem(event, ItemClassification.progression_skip_balancing, None, self.player)
 
     def place_items_from_dict(self, option_dict: Dict[str, str]):
-        """Places specific items into fixed locations based on option dict."""
         for loc, item in option_dict.items():
             self.get_location(loc).place_locked_item(self.create_item(item))
+
+    def create_filler(self, count: int) -> List[Item]:
+        junk_pool: List[Item] = []
+        for _ in range(count):
+            junk_pool.append(self.create_item("Wumpa Fruit"))
+        return junk_pool
 
 
     def create_items(self):
         player = self.player
         mw = self.multiworld
+        pool = []
 
         if self.options.goal.value <= 2:
             victory = ctrAPItem("Victory", ItemClassification.progression_skip_balancing, None, player)
@@ -87,11 +95,13 @@ class ctrAPWorld(World):
                     mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has("Victory", player)
                 case 2:
+                    for _ in range(18):
+                        pool.append(self.create_item("Progressive Relic"))
                     mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     mw.completion_condition[player] = (
                         lambda state:
                             state.has("Victory", player)
-                            and state.has("Progressive Relic", player, 32)
+                            and state.has("Progressive Relic", player, 36)
                             and all(state.has(g, player, 1)
                                     for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"])
                     )
@@ -101,10 +111,9 @@ class ctrAPWorld(World):
                 case 3:
                     mw.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
                 case 4:
-                    self.gemsanity(player)
+                    self.gemgoal(player)
 
         # --- Create general item pool ---
-        pool = []
         for item in load_item_table():
             count = item["count"]
             if count > 0:
@@ -112,19 +121,15 @@ class ctrAPWorld(World):
                     pool.append(self.create_item(item["name"]))
 
         mw.itempool += pool
+        mw.itempool += self.create_filler((get_total_locations(self) - len(mw.itempool)))
 
-    def gemsanity(self, player):
-        """Locks gem rewards in the appropriate Gem Cup locations."""
+    def gemgoal(self, player):
+        """Locks gem rewards in the appropriate Gem Cup locations."""  
+        data_path = os.path.join(os.path.dirname(__file__), "data", "vanilla_mapping.json")
+        with open(data_path, "r", encoding="utf-8") as f:
+            _mapping = json.load(f)
         mw = self.multiworld
-        gem_mapping = {
-            "Red Gem Cup: Gem": "Red Gem",
-            "Green Gem Cup: Gem": "Green Gem",
-            "Blue Gem Cup: Gem": "Blue Gem",
-            "Yellow Gem Cup: Gem": "Yellow Gem",
-            "Purple Gem Cup: Gem": "Purple Gem",
-        }
-
-        for loc_name, gem_name in gem_mapping.items():
+        for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
             loc = mw.get_location(loc_name, player)
             loc.place_locked_item(self.create_item(gem_name))
 

@@ -1,15 +1,17 @@
 import json, os
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from . import ctrAPWorld
 
 
-def _world_path():
-    return os.path.join(os.path.dirname(__file__), "data", "world.json")
 
 
-def create_regions(world):
+def create_regions(world: "ctrAPWorld"):
     """Build all regions, exits, and locations from JSON definitions."""
-    with open(_world_path(), "r") as f:
+    data_path = os.path.join(os.path.dirname(__file__), "data", "world.json")
+    with open(data_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     player, mw = world.player, world.multiworld
@@ -44,8 +46,8 @@ def create_regions(world):
                 player,
                 ex["name"],
                 region,
-                randomization_group=ex.get("randomization_group", 0),
-                randomization_type=EntranceType[ex.get("randomization_type", "ONE_WAY")]
+                randomization_group=ex.get("randomization_group"),
+                randomization_type=EntranceType[ex.get("randomization_type")]
             )
             ent.access_rule_text = ex.get("access_rule", "True")
             tgt = ex.get("target")

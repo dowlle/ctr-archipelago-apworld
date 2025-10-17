@@ -1,15 +1,17 @@
 import json
 import os
 from BaseClasses import Location
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . import ctrAPWorld
 
 
-# --- Load static data from JSON ---
-def _data_path():
-    """Get full path to data/locations.json."""
-    return os.path.join(os.path.dirname(__file__), "data", "locations.json")
 
 
-with open(_data_path(), "r") as f:
+data_path = os.path.join(os.path.dirname(__file__), "data", "locations.json")
+
+with open(data_path, "r", encoding="utf-8") as f:
     _LOCATION_DATA = json.load(f)
 
 
