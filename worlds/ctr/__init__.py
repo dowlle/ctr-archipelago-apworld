@@ -169,7 +169,10 @@ class ctrAPWorld(World):
             player_name=self.player_name
         )
         patch.write_file("base_patch.bsdiff4", pkgutil.get_data(__name__, "data/base_patch.bsdiff4"))
-        write_tokens(self, patch)
+        write_tokens(
+            patch=patch,
+            item_placement=self.multiworld.get_locations(self.player),
+        )
 
         # Write output
         out_file_name: str = self.multiworld.get_out_file_name_base(self.player)
