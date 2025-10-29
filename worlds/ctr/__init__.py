@@ -2,12 +2,15 @@ import logging
 import json
 import os
 from typing import Dict, List
+import pkgutil
+
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
 from .Options import ctrAPOptions
 from .Regions import create_regions
+from .Rom import CrashTeamRacingProcedurePatch, write_tokens
 from .Rules import set_rules
 from .Types import ctrAPItem
 
@@ -155,3 +158,19 @@ class ctrAPWorld(World):
 
     def remove(self, state: "CollectionState", item: "Item") -> bool:
         return super().remove(state, item)
+
+
+
+
+    # --- Output generation ---
+    def generate_output(self, output_directory: str) -> None:
+        patch: CrashTeamRacingProcedurePatch = CrashTeamRacingProcedurePatch(
+            player=self.player,
+            player_name=self.player_name
+        )
+        patch.write_file("base_patch.bsdiff4", pkgutil.get_data(__name__, "data/base_patch.bsdiff4"))
+        write_tokens(self, patch)
+
+        # Write output
+        out_file_name: str = self.multiworld.get_out_file_name_base(self.player)
+        patch.write(os.path.join(output_directory, f"{out_file_name}{patch.patch_file_ending}"))
