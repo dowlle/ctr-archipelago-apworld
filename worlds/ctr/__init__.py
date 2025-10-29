@@ -95,13 +95,11 @@ class ctrAPWorld(World):
                     mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has("Victory", player)
                 case 2:
-                    for _ in range(18):
-                        pool.append(self.create_item("Progressive Relic"))
                     mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     mw.completion_condition[player] = (
                         lambda state:
                             state.has("Victory", player)
-                            and state.has("Progressive Relic", player, 36)
+                            and state.has("Gold Relic", player, 18)
                             and all(state.has(g, player, 1)
                                     for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"])
                     )

@@ -173,7 +173,7 @@
                     "target": "Slide Coliseum",
                     "randomization_group": 1,
                     "randomization_type": "TWO_WAY",
-                    "access_rule": "has('Progressive Relic', 10)"},
+                    "access_rule": "has('Sapphire Relic', 10)"},
                     {"name": "Turbo Track Warp Pad",
                     "target": "Turbo Track",
                     "randomization_group": 1,
@@ -231,7 +231,7 @@
                 "type": "boss",
                 "locations": [
                     {"name": "N. Oxide Garage: N. Oxide's Challenge", "type": "boss", "requires": "has('Key', 4)"},
-                    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "type": "final_boss", "requires": "has('Key', 4) and has('Progressive Relic', 18)"}
+                    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "type": "final_boss", "requires": "has('Key', 4) and has('Sapphire Relic', 18)"}
                 ],
                 "exits": [
                     {"name": "N. Oxide Garage -> Hub",

@@ -1,6 +1,8 @@
 [
   {"name": "Trophy", "count": 16, "classification": "progression"},
-  {"name": "Progressive Relic", "count": 18, "classification": "progression"},
+  {"name": "Sapphire Relic", "count": 18, "classification": "progression"},
+  {"name": "Gold Relic", "count": 18, "classification": "progression"},
+  {"name": "Platinum Relic", "count": 18, "classification": "progression"},
   {"name": "Red CTR Token", "count": 4, "classification": "progression"},
   {"name": "Green CTR Token", "count": 4, "classification": "progression"},
   {"name": "Blue CTR Token", "count": 4, "classification": "progression"},
