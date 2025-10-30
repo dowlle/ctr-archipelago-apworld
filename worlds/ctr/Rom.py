@@ -141,4 +141,48 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
         else:
             print(f"Invalid track_name: {track_name}")
 
+    # STUB Write settings
+    dbvalue = 0
+
+    dbkey_relicdifficulty = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+    )
+    ctr_db[dbkey_relicdifficulty] = dbvalue
+
+    dbkey_relics_need_perfect = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 1 << 16
+    )
+    ctr_db[dbkey_relics_need_perfect] = dbvalue
+
+    dbkey_boss_garage_opening = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 2 << 16
+    )
+    ctr_db[dbkey_boss_garage_opening] = dbvalue
+
+    dbkey_qol_skip_maskhints = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 3 << 16
+    )
+    ctr_db[dbkey_qol_skip_maskhints] = dbvalue
+
+    dbkey_qol_skip_podium = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 4 << 16
+    )
+    ctr_db[dbkey_qol_skip_podium] = dbvalue
+
+    dbkey_qol_skip_maskcongrats = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 5 << 16
+    )
+    ctr_db[dbkey_qol_skip_maskcongrats] = dbvalue
+
+    dbkey_oxide_required_relics = (
+        (ctr_db_mapping["db_prefixes"]["settings"] << 16)
+        | 6 << 16
+    )
+    ctr_db[dbkey_oxide_required_relics] = dbvalue
+
     return ctr_db
