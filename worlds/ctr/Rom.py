@@ -90,10 +90,22 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
     ctr_db: dict = dict()
     ctr_db_mapping: dict = dict()
 
+    # Load mapping data
     data_path = os.path.join(os.path.dirname(__file__), "data", "rom_db_mapping.json")
     with open(data_path, "r", encoding="utf-8") as f:
         ctr_db_mapping = json.load(f)
 
+    # STUB Write warp pad links
+    for trackID in list(ctr_db_mapping["trackIDs"].values()):
+        dbkey = (
+            (ctr_db_mapping["db_prefixes"]["levelids"] << 16)
+            | trackID << 16
+        )
+        dbvalue = trackID
+
+        ctr_db[dbkey] = dbvalue
+
+    # Write item placement
     for location in item_placement:
         track_name: str = location.name[:location.name.find(":")]
         race_name: str = location.name[location.name.find(":") + 2:]
