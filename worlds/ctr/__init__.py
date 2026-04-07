@@ -27,7 +27,7 @@ class ctrAPWeb(WebWorld):
             "English",
             "setup_en.md",
             "setup/en",
-            ["Taor"]
+            ["Taor", "Icebound777"]
         )
     ]
 
