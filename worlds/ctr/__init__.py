@@ -33,8 +33,10 @@ class ctrAPWeb(WebWorld):
 
 class ctrAPWorld(World):
     """
-    Crash Team Racing (CTR) is a kart racing game developed by Naughty Dog and published by Sony Computer Entertainment for the PlayStation in 1999.
-    It features characters from the Crash Bandicoot series and combines fast-paced racing with power-ups and weapons.
+    Crash Team Racing (CTR) is a kart racing game developed by Naughty Dog and published by Sony
+    Computer Entertainment for the PlayStation in 1999.
+    It features characters from the Crash Bandicoot series and combines fast-paced racing with
+    power-ups and weapons.
     """
 
     game = "Crash Team Racing"
@@ -44,8 +46,10 @@ class ctrAPWorld(World):
     options: ctrAPOptions
 
     # Item + Location mapping
-    item_name_to_id = {item["name"]: (item_prefix + index)
-                       for index, item in enumerate(load_item_table())}
+    item_name_to_id = {
+        item["name"]: (item_prefix + index)
+        for index, item in enumerate(load_item_table())
+    }
     location_name_to_id = get_location_names()
 
     def __init__(self, multiworld: "MultiWorld", player: int):
@@ -63,10 +67,20 @@ class ctrAPWorld(World):
     def create_item(self, name: str) -> "ctrAPItem":
         item_id: int = self.item_name_to_id[name]
         idx = item_id - item_prefix
-        return ctrAPItem(name, load_item_table()[idx]["classification"], item_id, player=self.player)
+        return ctrAPItem(
+            name,
+            load_item_table()[idx]["classification"],
+            item_id,
+            player=self.player
+        )
 
     def create_event(self, event: str):
-        return ctrAPItem(event, ItemClassification.progression_skip_balancing, None, self.player)
+        return ctrAPItem(
+            event,
+            ItemClassification.progression_skip_balancing,
+            None,
+            self.player
+        )
 
     def place_items_from_dict(self, option_dict: Dict[str, str]):
         for loc, item in option_dict.items():
@@ -85,35 +99,52 @@ class ctrAPWorld(World):
 
         if self.options.goal.value <= 2:
             victory = ctrAPItem(
-                "Victory", ItemClassification.progression_skip_balancing, None, player)
+                "Victory",
+                ItemClassification.progression_skip_balancing,
+                None,
+                player
+            )
 
             match self.options.goal.value:
                 case 0:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Challenge", player).place_locked_item(victory)
+                        "N. Oxide Garage: N. Oxide's Challenge",
+                        player
+                    ).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Victory", player)
+                        "Victory", player
+                    )
                 case 1:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
+                        "N. Oxide Garage: N. Oxide's Final Challenge",
+                        player
+                    ).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Victory", player)
+                        "Victory",
+                        player
+                    )
                 case 2:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
+                        "N. Oxide Garage: N. Oxide's Final Challenge",
+                        player
+                    ).place_locked_item(victory)
                     mw.completion_condition[player] = (
                         lambda state:
                             state.has("Victory", player)
                             and state.has("Gold Relic", player, 18)
                             and all(state.has(g, player, 1)
-                                    for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"])
+                                    for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
+                                )
                     )
 
         elif self.options.goal.value >= 3:
             match self.options.goal.value:
                 case 3:
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Trophy", player, 16)
+                        "Trophy",
+                        player,
+                        16
+                    )
                 case 4:
                     self.gemgoal(player)
 
@@ -126,12 +157,18 @@ class ctrAPWorld(World):
 
         mw.itempool += pool
         mw.itempool += self.create_filler(
-            (get_total_locations(self) - len(mw.itempool)))
+            (get_total_locations(self) - len(mw.itempool))
+        )
 
     def gemgoal(self, player):
         """Locks gem rewards in the appropriate Gem Cup locations."""
-        data_path = os.path.join(os.path.dirname(
-            __file__), "data", "vanilla_mapping.json")
+        data_path = os.path.join(
+            os.path.dirname(
+                __file__
+            ),
+            "data",
+            "vanilla_mapping.json"
+        )
         with open(data_path, "r", encoding="utf-8") as f:
             _mapping = json.load(f)
         mw = self.multiworld
@@ -140,7 +177,8 @@ class ctrAPWorld(World):
             loc.place_locked_item(self.create_item(gem_name))
 
         mw.completion_condition[player] = lambda state: all(
-            state.has(g, player, 1) for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
+            state.has(g, player, 1)
+            for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
         )
 
     def fill_slot_data(self) -> Dict[str, object]:
@@ -169,8 +207,13 @@ class ctrAPWorld(World):
             player=self.player,
             player_name=self.player_name
         )
-        patch.write_file("base_patch.bsdiff4", pkgutil.get_data(
-            __name__, "data/base_patch.bsdiff4"))
+        patch.write_file(
+            "base_patch.bsdiff4",
+            pkgutil.get_data(
+                __name__,
+                "data/base_patch.bsdiff4"
+            )
+        )
         write_tokens(
             patch=patch,
             item_placement=self.multiworld.get_locations(self.player),
@@ -178,6 +221,11 @@ class ctrAPWorld(World):
 
         # Write output
         out_file_name: str = self.multiworld.get_out_file_name_base(
-            self.player)
-        patch.write(os.path.join(output_directory,
-                    f"{out_file_name}{patch.patch_file_ending}"))
+            self.player
+        )
+        patch.write(
+            os.path.join(
+                output_directory,
+                f"{out_file_name}{patch.patch_file_ending}"
+            )
+        )

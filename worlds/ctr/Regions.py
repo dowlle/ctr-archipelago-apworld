@@ -53,5 +53,7 @@ def create_regions(world: "ctrAPWorld"):
             mw.regions.entrance_cache[player][ent.name] = ent
 
     world.start_region = next(
-        (r for r in regions if getattr(r, "is_start", False)), None)
+        (r for r in regions if getattr(r, "is_start", False)),
+        None
+    )
     return regions

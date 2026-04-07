@@ -38,8 +38,16 @@ class ShuffleRewards(OptionDict):
     display_name = "Shuffle Rewards"
     supports_weighting = False
     default = {}
-    valid_keys = ["Trophies", "Sapphire Relics", "Gold Relics", "Platinum Relics",
-                  "CTR Race Tokens", "Bonus Round Tokens", "Gems", "Boss Keys"]
+    valid_keys = [
+        "Trophies",
+        "Sapphire Relics",
+        "Gold Relics",
+        "Platinum Relics",
+        "CTR Race Tokens",
+        "Bonus Round Tokens",
+        "Gems",
+        "Boss Keys"
+    ]
 
 
 class ShuffleWarpPads(Toggle):

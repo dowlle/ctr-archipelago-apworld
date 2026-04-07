@@ -18,8 +18,7 @@ def make_rule(expr_text: str, player: int):
     def rule(state: CollectionState):
         for part in parts:
             if not part.startswith("has("):
-                logging.warning(
-                    f"[CTR Rules] Unsupported rule segment '{part}' in '{expr_text}'")
+                logging.warning(f"[CTR Rules] Unsupported rule segment '{part}' in '{expr_text}'")
                 return False
 
             # Parse has('Item', N)
