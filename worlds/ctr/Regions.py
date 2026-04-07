@@ -1,11 +1,10 @@
-import json, os
+import json
+import os
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from . import ctrAPWorld
-
-
 
 
 def create_regions(world: "ctrAPWorld"):
@@ -17,7 +16,6 @@ def create_regions(world: "ctrAPWorld"):
     player, mw = world.player, world.multiworld
     regions = []
 
-
     for reg in data["regions"]:
         region = Region(reg["name"], player, mw)
         region.type = reg.get("type", "generic")
@@ -26,7 +24,6 @@ def create_regions(world: "ctrAPWorld"):
         regions.append(region)
 
     region_lookup = {r.name: r for r in regions}
-
 
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
@@ -37,7 +34,6 @@ def create_regions(world: "ctrAPWorld"):
             location.logic_text = loc_data.get("requires", "True")
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
-
 
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
@@ -56,5 +52,6 @@ def create_regions(world: "ctrAPWorld"):
             region.exits.append(ent)
             mw.regions.entrance_cache[player][ent.name] = ent
 
-    world.start_region = next((r for r in regions if getattr(r, "is_start", False)), None)
+    world.start_region = next(
+        (r for r in regions if getattr(r, "is_start", False)), None)
     return regions

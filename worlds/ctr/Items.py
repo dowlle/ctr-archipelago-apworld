@@ -16,6 +16,7 @@ class ItemDict(TypedDict):
 
 item_prefix = 35010000
 
+
 def load_item_table() -> List[ItemDict]:
     """
     Loads item data from the CTR world's data/items.json file.

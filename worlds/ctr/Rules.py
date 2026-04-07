@@ -13,13 +13,13 @@ def make_rule(expr_text: str, player: int):
     if not expr_text or expr_text.lower() in ("true", "always"):
         return lambda state: True
 
-
     parts = [p.strip() for p in expr_text.split("and")]
 
     def rule(state: CollectionState):
         for part in parts:
             if not part.startswith("has("):
-                logging.warning(f"[CTR Rules] Unsupported rule segment '{part}' in '{expr_text}'")
+                logging.warning(
+                    f"[CTR Rules] Unsupported rule segment '{part}' in '{expr_text}'")
                 return False
 
             # Parse has('Item', N)
@@ -40,7 +40,6 @@ def make_rule(expr_text: str, player: int):
     return rule
 
 
-
 def set_rules(world):
     """
     Applies JSON-defined access rules to entrances and locations,
@@ -48,7 +47,6 @@ def set_rules(world):
     """
     player = world.player
     mw = world.multiworld
-
 
     for region in mw.get_regions(player):
         for ent in region.exits:
@@ -58,7 +56,6 @@ def set_rules(world):
         for loc in region.locations:
             rule_text = getattr(loc, "logic_text", "True")
             loc.access_rule = make_rule(rule_text, player)
-
 
     add_time_trial_and_ctr_requirements(world, player)
 
@@ -81,11 +78,13 @@ def add_time_trial_and_ctr_requirements(world, player):
         trophy_name = f"{track_prefix}: Trophy Race"
 
         if trophy_name not in all_location_names:
-            logging.debug(f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
+            logging.debug(
+                f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
             continue
 
         def rule(state: CollectionState, t=trophy_name, p=player):
             return state.can_reach(t, "Location", p)
 
         loc.access_rule = rule
-        logging.debug(f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
+        logging.debug(
+            f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")

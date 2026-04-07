@@ -15,7 +15,6 @@ from .Rules import set_rules
 from .Types import ctrAPItem
 
 
-
 class ctrAPWeb(WebWorld):
     theme = "Party"
 
@@ -45,13 +44,13 @@ class ctrAPWorld(World):
     options: ctrAPOptions
 
     # Item + Location mapping
-    item_name_to_id = {item["name"]: (item_prefix + index) for index, item in enumerate(load_item_table())}
+    item_name_to_id = {item["name"]: (item_prefix + index)
+                       for index, item in enumerate(load_item_table())}
     location_name_to_id = get_location_names()
 
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
         self.start_region = None
-
 
     def create_regions(self):
         create_regions(self)
@@ -59,10 +58,8 @@ class ctrAPWorld(World):
     def set_rules(self):
         set_rules(self)
 
-
-        
-
     # --- Item creation ---
+
     def create_item(self, name: str) -> "ctrAPItem":
         item_id: int = self.item_name_to_id[name]
         idx = item_id - item_prefix
@@ -81,24 +78,29 @@ class ctrAPWorld(World):
             junk_pool.append(self.create_item("Wumpa Fruit"))
         return junk_pool
 
-
     def create_items(self):
         player = self.player
         mw = self.multiworld
         pool = []
 
         if self.options.goal.value <= 2:
-            victory = ctrAPItem("Victory", ItemClassification.progression_skip_balancing, None, player)
+            victory = ctrAPItem(
+                "Victory", ItemClassification.progression_skip_balancing, None, player)
 
             match self.options.goal.value:
                 case 0:
-                    mw.get_location("N. Oxide Garage: N. Oxide's Challenge", player).place_locked_item(victory)
-                    mw.completion_condition[player] = lambda state: state.has("Victory", player)
+                    mw.get_location(
+                        "N. Oxide Garage: N. Oxide's Challenge", player).place_locked_item(victory)
+                    mw.completion_condition[player] = lambda state: state.has(
+                        "Victory", player)
                 case 1:
-                    mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
-                    mw.completion_condition[player] = lambda state: state.has("Victory", player)
+                    mw.get_location(
+                        "N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
+                    mw.completion_condition[player] = lambda state: state.has(
+                        "Victory", player)
                 case 2:
-                    mw.get_location("N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
+                    mw.get_location(
+                        "N. Oxide Garage: N. Oxide's Final Challenge", player).place_locked_item(victory)
                     mw.completion_condition[player] = (
                         lambda state:
                             state.has("Victory", player)
@@ -110,7 +112,8 @@ class ctrAPWorld(World):
         elif self.options.goal.value >= 3:
             match self.options.goal.value:
                 case 3:
-                    mw.completion_condition[player] = lambda state: state.has("Trophy", player, 16)
+                    mw.completion_condition[player] = lambda state: state.has(
+                        "Trophy", player, 16)
                 case 4:
                     self.gemgoal(player)
 
@@ -122,11 +125,13 @@ class ctrAPWorld(World):
                     pool.append(self.create_item(item["name"]))
 
         mw.itempool += pool
-        mw.itempool += self.create_filler((get_total_locations(self) - len(mw.itempool)))
+        mw.itempool += self.create_filler(
+            (get_total_locations(self) - len(mw.itempool)))
 
     def gemgoal(self, player):
-        """Locks gem rewards in the appropriate Gem Cup locations."""  
-        data_path = os.path.join(os.path.dirname(__file__), "data", "vanilla_mapping.json")
+        """Locks gem rewards in the appropriate Gem Cup locations."""
+        data_path = os.path.join(os.path.dirname(
+            __file__), "data", "vanilla_mapping.json")
         with open(data_path, "r", encoding="utf-8") as f:
             _mapping = json.load(f)
         mw = self.multiworld
@@ -137,7 +142,6 @@ class ctrAPWorld(World):
         mw.completion_condition[player] = lambda state: all(
             state.has(g, player, 1) for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
         )
-
 
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {
@@ -152,28 +156,28 @@ class ctrAPWorld(World):
         }
         return slot_data
 
-
     def collect(self, state: "CollectionState", item: "Item") -> bool:
         return super().collect(state, item)
 
     def remove(self, state: "CollectionState", item: "Item") -> bool:
         return super().remove(state, item)
 
-
-
-
     # --- Output generation ---
+
     def generate_output(self, output_directory: str) -> None:
         patch: CrashTeamRacingProcedurePatch = CrashTeamRacingProcedurePatch(
             player=self.player,
             player_name=self.player_name
         )
-        patch.write_file("base_patch.bsdiff4", pkgutil.get_data(__name__, "data/base_patch.bsdiff4"))
+        patch.write_file("base_patch.bsdiff4", pkgutil.get_data(
+            __name__, "data/base_patch.bsdiff4"))
         write_tokens(
             patch=patch,
             item_placement=self.multiworld.get_locations(self.player),
         )
 
         # Write output
-        out_file_name: str = self.multiworld.get_out_file_name_base(self.player)
-        patch.write(os.path.join(output_directory, f"{out_file_name}{patch.patch_file_ending}"))
+        out_file_name: str = self.multiworld.get_out_file_name_base(
+            self.player)
+        patch.write(os.path.join(output_directory,
+                    f"{out_file_name}{patch.patch_file_ending}"))

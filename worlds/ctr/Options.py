@@ -38,7 +38,9 @@ class ShuffleRewards(OptionDict):
     display_name = "Shuffle Rewards"
     supports_weighting = False
     default = {}
-    valid_keys = [ "Trophies", "Sapphire Relics", "Gold Relics", "Platinum Relics", "CTR Race Tokens", "Bonus Round Tokens", "Gems", "Boss Keys" ]
+    valid_keys = ["Trophies", "Sapphire Relics", "Gold Relics", "Platinum Relics",
+                  "CTR Race Tokens", "Bonus Round Tokens", "Gems", "Boss Keys"]
+
 
 class ShuffleWarpPads(Toggle):
     """
@@ -47,17 +49,20 @@ class ShuffleWarpPads(Toggle):
     """
     display_name = "Shuffle Warp Pads"
 
+
 class Trophysanity(DefaultOnToggle):
     """
     Every Trophy Race will have a check behind its reward.
     """
     display_name = "Trophysanity"
 
+
 class Relicsanity(DefaultOnToggle):
     """
     Every Time Trial will have a check behind its reward.
     """
     display_name = "Relicsanity"
+
 
 class RelicDifficulty(Choice):
     """
@@ -69,17 +74,20 @@ class RelicDifficulty(Choice):
     option_gold = 2
     option_platinum = 3
 
+
 class Tokensanity(DefaultOnToggle):
     """
     Every CTR Token Challenge will have a check behind its reward.
     """
     display_name = "Tokensanity"
 
+
 class Gemsanity(DefaultOnToggle):
     """
     Every Gem will have a check behind its reward.
     """
     display_name = "Gemsanity"
+
 
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
@@ -91,6 +99,7 @@ class ctrAPOptions(PerGameCommonOptions):
     tokensanity: Tokensanity
     gemsanity: Gemsanity
     shuffle_warp_pads: ShuffleWarpPads
+
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
     "General Options": [Goal],

@@ -7,8 +7,6 @@ if TYPE_CHECKING:
     from . import ctrAPWorld
 
 
-
-
 data_path = os.path.join(os.path.dirname(__file__), "data", "locations.json")
 
 with open(data_path, "r", encoding="utf-8") as f:
@@ -17,7 +15,6 @@ with open(data_path, "r", encoding="utf-8") as f:
 
 CTR_LOCATION_IDS = {loc["name"]: loc["code"] for loc in _LOCATION_DATA}
 CTR_LOCATION_TO_REGION = {loc["name"]: loc["region"] for loc in _LOCATION_DATA}
-
 
 
 def get_location_id(name: str):

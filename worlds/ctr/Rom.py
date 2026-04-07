@@ -72,7 +72,7 @@ def write_tokens(
 
         cur_pos += 6
 
-    #for location in world.multiworld.get_locations(world.player):
+    # for location in world.multiworld.get_locations(world.player):
     #    print(location)
     #    print(location.item)
 
@@ -91,7 +91,8 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
     ctr_db_mapping: dict = dict()
 
     # Load mapping data
-    data_path = os.path.join(os.path.dirname(__file__), "data", "rom_db_mapping.json")
+    data_path = os.path.join(os.path.dirname(
+        __file__), "data", "rom_db_mapping.json")
     with open(data_path, "r", encoding="utf-8") as f:
         ctr_db_mapping = json.load(f)
 
@@ -122,7 +123,7 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
         if db_race_key == "INVALID":
             print(f"Invalid db_race_key for {location.name}")
         elif ctr_db_mapping["trackIDs"].get(track_name) is not None:
-            #print(track_name)
+            # print(track_name)
             dbkey = (
                 (ctr_db_mapping["db_prefixes"]["rewards"] << 16)
                 | (ctr_db_mapping["trackIDs"][track_name] << 16)
@@ -135,7 +136,7 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
                     dbvalue = ctr_db_mapping["items"][item_name]
 
                     ctr_db[dbkey] = dbvalue
-                    #print(f"{hex(dbkey)}/{hex(dbvalue)}")
+                    # print(f"{hex(dbkey)}/{hex(dbvalue)}")
                 else:
                     print(f"nope: {location.item}")
         else:
