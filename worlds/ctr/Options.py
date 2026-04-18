@@ -1,14 +1,6 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
-from worlds.AutoWorld import PerGameCommonOptions
-from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle, Toggle
-
-
-def create_option_groups() -> List[OptionGroup]:
-    return [
-        OptionGroup(name=x, options=y)
-        for x, y in ap_ctr_option_groups.items()
-    ]
+from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle, Toggle, PerGameCommonOptions
 
 
 class Goal(Choice):
@@ -220,3 +212,9 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Quality of Life": [SkipMaskHints, AutoskipPodiumCutscenes, SkipMaskCongrats],
     "Tricks": [HelperTiziano, HelperTA],
 }
+
+def create_option_groups() -> List[OptionGroup]:
+    return [
+        OptionGroup(name=x, options=y)
+        for x, y in ap_ctr_option_groups.items()
+    ]
