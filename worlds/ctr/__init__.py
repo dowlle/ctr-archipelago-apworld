@@ -185,7 +185,7 @@ class ctrAPWorld(World):
         slot_data: Dict[str, object] = {
             "options": {
                 "Goal": self.options.goal.value,
-                "Relic Difficulty": self.options.relicdifficulty.value,
+                "Relic Difficulty": self.options.rr_required_minimum_time.value,
                 "Shuffle Warp Pads": self.options.shuffle_warp_pads.value,
             },
             "Seed": self.multiworld.seed_name,
@@ -207,13 +207,18 @@ class ctrAPWorld(World):
             player=self.player,
             player_name=self.player_name
         )
-        patch.write_file(
-            "base_patch.bsdiff4",
-            pkgutil.get_data(
-                __name__,
-                "data/base_patch.bsdiff4"
-            )
+        pkg_ressource: bytes | None = pkgutil.get_data(
+            __name__,
+            "data/base_patch.bsdiff4"
         )
+        if pkg_ressource is not None:
+            patch.write_file(
+                "base_patch.bsdiff4",
+                pkg_ressource
+            )
+        else:
+            None #todo we should really throw some kind of exception here
+
         write_tokens(
             patch=patch,
             item_placement=self.multiworld.get_locations(self.player),
