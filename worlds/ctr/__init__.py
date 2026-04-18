@@ -68,23 +68,27 @@ class ctrAPWorld(World):
         item_id: int = self.item_name_to_id[name]
         idx = item_id - item_prefix
         return ctrAPItem(
-            name,
-            load_item_table()[idx]["classification"],
-            item_id,
-            player=self.player
+            name=name,
+            classification=load_item_table()[idx]["classification"],
+            code=item_id,
+            player=self.player,
         )
 
     def create_event(self, event: str):
         return ctrAPItem(
-            event,
-            ItemClassification.progression_skip_balancing,
-            None,
-            self.player
+            name=event,
+            classification=ItemClassification.progression_skip_balancing,
+            code=None,
+            player=self.player,
         )
 
     def place_items_from_dict(self, option_dict: Dict[str, str]):
         for loc, item in option_dict.items():
-            self.get_location(loc).place_locked_item(self.create_item(item))
+            self.get_location(
+                location_name=loc
+            ).place_locked_item(
+                item=self.create_item(item)
+            )
 
     def create_filler(self, count: int) -> List[Item]:
         junk_pool: List[Item] = []
@@ -99,34 +103,35 @@ class ctrAPWorld(World):
 
         if self.options.goal.value <= 2:
             victory = ctrAPItem(
-                "Victory",
-                ItemClassification.progression_skip_balancing,
-                None,
-                player
+                name="Victory",
+                classification=ItemClassification.progression_skip_balancing,
+                code=None,
+                player=player,
             )
 
             match self.options.goal.value:
                 case 0:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Challenge",
-                        player
+                        location_name="N. Oxide Garage: N. Oxide's Challenge",
+                        player=player,
                     ).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Victory", player
+                        item="Victory",
+                        player=player,
                     )
                 case 1:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Final Challenge",
-                        player
+                        location_name="N. Oxide Garage: N. Oxide's Final Challenge",
+                        player=player,
                     ).place_locked_item(victory)
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Victory",
-                        player
+                        item="Victory",
+                        player=player,
                     )
                 case 2:
                     mw.get_location(
-                        "N. Oxide Garage: N. Oxide's Final Challenge",
-                        player
+                        location_name="N. Oxide Garage: N. Oxide's Final Challenge",
+                        player=player,
                     ).place_locked_item(victory)
                     mw.completion_condition[player] = (
                         lambda state:
@@ -141,9 +146,9 @@ class ctrAPWorld(World):
             match self.options.goal.value:
                 case 3:
                     mw.completion_condition[player] = lambda state: state.has(
-                        "Trophy",
-                        player,
-                        16
+                        item="Trophy",
+                        player=player,
+                        count=16,
                     )
                 case 4:
                     self.gemgoal(player)
@@ -208,13 +213,13 @@ class ctrAPWorld(World):
             player_name=self.player_name
         )
         pkg_ressource: bytes | None = pkgutil.get_data(
-            __name__,
-            "data/base_patch.bsdiff4"
+            package=__name__,
+            resource="data/base_patch.bsdiff4",
         )
         if pkg_ressource is not None:
             patch.write_file(
-                "base_patch.bsdiff4",
-                pkg_ressource
+                file_name="base_patch.bsdiff4",
+                file=pkg_ressource,
             )
         else:
             None #todo we should really throw some kind of exception here
@@ -226,7 +231,7 @@ class ctrAPWorld(World):
 
         # Write output
         out_file_name: str = self.multiworld.get_out_file_name_base(
-            self.player
+            player=self.player,
         )
         patch.write(
             os.path.join(

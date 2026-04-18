@@ -48,9 +48,9 @@ def write_tokens(
 
     # Write "start of internal database" markers
     patch.write_token(
-        APTokenTypes.WRITE,
-        cur_pos,
-        bytes(MARKER_INTERNAL_DB_START),
+        token_type=APTokenTypes.WRITE,
+        offset=cur_pos,
+        data=bytes(MARKER_INTERNAL_DB_START),
     )
     cur_pos += 6
 
@@ -58,9 +58,9 @@ def write_tokens(
     for dbkey in sorted_dbkeys:
         dbvalue = ctr_database[dbkey]
         patch.write_token(
-            APTokenTypes.WRITE,
-            cur_pos,
-            bytes([
+            token_type=APTokenTypes.WRITE,
+            offset=cur_pos,
+            data=bytes([
                 (dbkey >> 16) & 0xFF,
                 (dbkey >> 24) & 0xFF,
                 dbkey & 0xFF,
@@ -78,9 +78,9 @@ def write_tokens(
 
     # Write "end of internal database" markers
     patch.write_token(
-        APTokenTypes.WRITE,
-        cur_pos,
-        bytes(MARKER_INTERNAL_DB_END),
+        token_type=APTokenTypes.WRITE,
+        offset=cur_pos,
+        data=bytes(MARKER_INTERNAL_DB_END),
     )
 
     patch.write_file(FILENAME_CTR_TOKEN_BINARY, patch.get_token_binary())

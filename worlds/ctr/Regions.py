@@ -39,11 +39,11 @@ def create_regions(world: "ctrAPWorld"):
         region = region_lookup[reg["name"]]
         for ex in reg.get("exits", []):
             ent = Entrance(
-                player,
-                ex["name"],
-                region,
+                player=player,
+                name=ex["name"],
+                parent=region,
                 randomization_group=ex.get("randomization_group"),
-                randomization_type=EntranceType[ex.get("randomization_type")]
+                randomization_type=EntranceType[ex.get("randomization_type")],
             )
             ent.access_rule_text = ex.get("access_rule", "True")
             tgt = ex.get("target")
