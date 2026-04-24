@@ -239,3 +239,9 @@ class ctrAPWorld(World):
                 f"{out_file_name}{patch.patch_file_ending}"
             )
         )
+
+
+# Register the BizHawk client so `BizHawkClient` launcher can claim CTR ROMs.
+# ADDED FOR CLIENT TESTING — not in upstream icebound777/ctr-apworld yet.
+from . import client  # noqa: E402, F401
+
