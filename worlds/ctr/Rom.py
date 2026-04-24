@@ -3,7 +3,7 @@ Classes and functions related to creating a ROM patch
 """
 from typing import Iterable
 import json
-import os
+import pkgutil
 
 from BaseClasses import Location
 from settings import get_settings
@@ -91,13 +91,9 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
     ctr_db_mapping: dict = dict()
 
     # Load mapping data
-    data_path = os.path.join(
-        os.path.dirname(__file__),
-        "data",
-        "rom_db_mapping.json"
+    ctr_db_mapping = json.loads(
+        pkgutil.get_data(__package__, "data/rom_db_mapping.json").decode("utf-8")
     )
-    with open(data_path, "r", encoding="utf-8") as f:
-        ctr_db_mapping = json.load(f)
 
     # STUB Write warp pad links
     for trackID in list(ctr_db_mapping["trackIDs"].values()):

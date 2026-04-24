@@ -1,5 +1,5 @@
-import os
 import json
+import pkgutil
 from BaseClasses import ItemClassification
 from typing import List, TYPE_CHECKING, TypedDict
 
@@ -22,9 +22,8 @@ def load_item_table() -> List[ItemDict]:
     Loads item data from the CTR world's data/items.json file.
     Returns a list of item dictionaries with proper ItemClassification enums.
     """
-    data_path = os.path.join(os.path.dirname(__file__), "data", "items.json")
-    with open(data_path, "r", encoding="utf-8") as f:
-        raw_items = json.load(f)
+    data_bytes = pkgutil.get_data(__package__, "data/items.json")
+    raw_items = json.loads(data_bytes.decode("utf-8"))
 
     classes = {
         "progression": ItemClassification.progression,

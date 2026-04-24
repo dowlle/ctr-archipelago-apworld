@@ -1,5 +1,5 @@
 import json
-import os
+import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
 from typing import TYPE_CHECKING
@@ -9,9 +9,9 @@ if TYPE_CHECKING:
 
 def create_regions(world: "ctrAPWorld"):
     """Build all regions, exits, and locations from JSON definitions."""
-    data_path = os.path.join(os.path.dirname(__file__), "data", "world.json")
-    with open(data_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = json.loads(
+        pkgutil.get_data(__package__, "data/world.json").decode("utf-8")
+    )
 
     player, mw = world.player, world.multiworld
     regions = []

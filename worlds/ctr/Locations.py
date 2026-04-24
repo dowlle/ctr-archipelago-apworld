@@ -1,5 +1,5 @@
 import json
-import os
+import pkgutil
 from BaseClasses import Location
 from typing import TYPE_CHECKING
 
@@ -7,10 +7,9 @@ if TYPE_CHECKING:
     from . import ctrAPWorld
 
 
-data_path = os.path.join(os.path.dirname(__file__), "data", "locations.json")
-
-with open(data_path, "r", encoding="utf-8") as f:
-    _LOCATION_DATA = json.load(f)
+_LOCATION_DATA = json.loads(
+    pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
+)
 
 
 CTR_LOCATION_IDS = {loc["name"]: loc["code"] for loc in _LOCATION_DATA}
