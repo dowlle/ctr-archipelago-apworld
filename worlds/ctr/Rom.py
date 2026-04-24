@@ -9,6 +9,10 @@ from BaseClasses import Location
 from settings import get_settings
 from worlds.Files import APProcedurePatch, APTokenMixin, APTokenTypes
 
+# Import registers CtrPatchExtension with AutoPatchExtensionRegister at
+# module import time, making "regenerate_ecc" resolvable during patch().
+from . import Patches  # noqa: F401
+
 
 FILENAME_CTR_TOKEN_BINARY: str = "ctr_token_data.bin"
 MARKER_INTERNAL_DB_START: list = [0xDB, 0xDA, 0x00, 0x0D, 0xDB, 0xDA]
@@ -24,6 +28,11 @@ class CrashTeamRacingProcedurePatch(APProcedurePatch, APTokenMixin):
     procedure = [
         ("apply_bsdiff4", ["base_patch.bsdiff4"]),
         ("apply_tokens", [FILENAME_CTR_TOKEN_BINARY]),
+        # Regenerate EDC+ECC for any sectors modified by the two steps above.
+        # Required for BizHawk's PSX cores (Octoshock/Nymashock) to load the
+        # patched ROM; DuckStation tolerates stale ECC but BizHawk freezes on
+        # Adventure Mode load without this. See Patches.py.
+        ("regenerate_ecc", []),
     ]
 
     @classmethod
