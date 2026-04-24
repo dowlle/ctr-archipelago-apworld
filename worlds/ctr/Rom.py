@@ -88,7 +88,6 @@ def write_tokens(
 
 def get_ctr_database(item_placement: Iterable[Location]) -> dict:
     ctr_db: dict = dict()
-    ctr_db_mapping: dict = dict()
 
     # Load mapping data
     ctr_db_mapping = json.loads(
