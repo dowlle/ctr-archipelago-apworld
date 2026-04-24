@@ -17,6 +17,37 @@ PSX virtual address 0x8008FBA4 (BizHawk MainRAM offset 0x8FBA4). The first
 ADVPROGRESS_BASE = 0x8FBA4
 REWARDS_BYTES = 24  # rewards[6] = 6 uint32
 
+# SaveSlot 4 is Icebound's designated multiworld item inventory. Its rewards[]
+# is byte-packed counters (not bit flags), and external tools (us) write
+# received items here. See [[2026-04-24 — Reconciliation — addresses.py vs
+# RAMLocations.md]] section 3 for the full layout.
+SAVESLOT_4_BASE = 0x993D8
+
+# Save-safe gate. Only read/write SaveSlot data when this 4-byte int reads
+# exactly 0x00000001. Other values indicate cutscenes, menu transitions, or
+# save/load operations where writes can corrupt state.
+SAVE_SAFE_GATE = 0x8D984
+
+# SaveSlot 2/4 byte-packed `rewards[]` layout. Counter writes for AP
+# multiworld items go here, gated on SAVE_SAFE_GATE == 1.
+#
+# rewards[0] (4 bytes, uint32): num trophies
+# rewards[1] (4 bytes, uint32): num keys
+# rewards[2] byte 0: num red CTR tokens
+# rewards[2] byte 1: num green CTR tokens
+# rewards[2] byte 2: num blue CTR tokens
+# rewards[2] byte 3: num yellow CTR tokens
+# rewards[3] byte 0: num purple CTR tokens
+# rewards[4] byte 0: num sapphire relics
+# rewards[4] byte 1: num gold relics
+# rewards[4] byte 2: num platinum relics
+# rewards[5] byte 0: num gems (0..5)
+# rewards[5] & 0x100:  flag red gem
+# rewards[5] & 0x200:  flag green gem
+# rewards[5] & 0x400:  flag blue gem
+# rewards[5] & 0x800:  flag yellow gem
+# rewards[5] & 0x1000: flag purple gem
+
 # For ROM validation, the PSX BIOS + game boot leaves a recognizable executable
 # header. For MVP we accept any PSX ROM and warn in the log.
 # TODO: distinguish CTR vs other PSX titles via BIOS memcard ID.
