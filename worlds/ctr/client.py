@@ -78,6 +78,18 @@ class CtrClient(BizHawkClient):
         self.goal_reported: bool = False
         self.last_rewards_bytes: bytes | None = None
 
+    def on_package(self, ctx: "BizHawkClientContext", cmd: str, args: dict) -> None:
+        # Keep the existing ReceivedItems logger below; we also intercept
+        # connection lifecycle so premature detections before a server connect
+        # don't silently get latched into sent_locations and never retried.
+        if cmd == "Connected":
+            # Fresh server connection: trust the server's locations_checked
+            # and retry everything else on the next poll.
+            self.sent_locations = set(args.get("checked_locations", []) or [])
+            self.goal_reported = False
+            self.last_rewards_bytes = None
+        return self._on_package_received_items(ctx, cmd, args)
+
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
@@ -133,14 +145,25 @@ class CtrClient(BizHawkClient):
                 self.sent_locations.add(loc_id)
                 continue
             newly_checked.append(loc_id)
-            self.sent_locations.add(loc_id)
+            # DO NOT add to self.sent_locations here; we only mark as sent
+            # after the server actually accepts the send (see below). This
+            # prevents silent data loss if we detect bits before the server
+            # connection is up — the no-op send_msgs() would otherwise latch
+            # locations into sent_locations and never retry them.
 
-        if newly_checked:
+        if newly_checked and ctx.server is not None:
             logger.info("CTR: new location checks: %s", newly_checked)
-            await ctx.send_msgs([{
-                "cmd": "LocationChecks",
-                "locations": newly_checked,
-            }])
+            try:
+                await ctx.send_msgs([{
+                    "cmd": "LocationChecks",
+                    "locations": newly_checked,
+                }])
+                self.sent_locations.update(newly_checked)
+            except Exception as exc:
+                logger.warning(
+                    "CTR: send_msgs failed (%r); will retry on next poll",
+                    exc,
+                )
 
         # ── Detect goal completion ──
         if not self.goal_reported and not ctx.finished_game:
@@ -180,7 +203,9 @@ class CtrClient(BizHawkClient):
     # Item receive (placeholder)
     # ------------------------------------------------------------------
 
-    def on_package(self, ctx: "BizHawkClientContext", cmd: str, args: dict) -> None:
+    def _on_package_received_items(
+        self, ctx: "BizHawkClientContext", cmd: str, args: dict,
+    ) -> None:
         # `args["items"]` contains NetworkItem dataclasses, not dicts, so
         # `.get("item")` on them raises AttributeError and kills the socket.
         # We also wrap the whole thing in try/except so any future log formatter
