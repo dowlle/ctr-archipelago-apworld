@@ -87,7 +87,7 @@ def create_regions(world: "ctrAPWorld"):
     # --- Resolve native-randomization options up front -------------------
     opts = world.options
     do_shuffle = bool(opts.shuffle_warp_pads.value)            # STRETCH gate
-    unlock_mode = opts.warppad_unlock_requirements.value       # 0 vanilla / 1 random / 2 no-4-keys
+    unlock_mode = opts.warppad_unlock_requirements.value       # 0 vanilla / 1 randomized / 2 no-4-keys
     boss_mode = opts.bossgarage_unlock_requirements.value      # 0 orig4 / 1 same_hub / 2 trophies
 
     world.warp_pad_ids = _load_warp_pad_ids()
@@ -131,6 +131,25 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
+    # AP destination shuffle: rewire each shuffled warp-pad exit to the track
+    # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons
+    # about the same topology native runs. The exit stays in its PHYSICAL hub
+    # region and keeps its physical-pad access rule (Rules.add_warp_pad_unlock_rules)
+    # + the hub boss-key gate, so the requirement and keys apply to the PHYSICAL
+    # pad while the locations reached are the DESTINATION track's. Empty (identity)
+    # when shuffle is off. warp_pad_map is {pad_exit_name: dest_track_levelID};
+    # level_id maps back to a track name (== region name) to find the dest region.
+    _id_to_track = {
+        meta["level_id"]: pad_name[: -len(" Warp Pad")]
+        for pad_name, meta in world.warp_pad_ids.items()
+        if pad_name.endswith(" Warp Pad")
+    }
+    pad_dest_region = {}
+    for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
+        dest_track = _id_to_track.get(dest_lid)
+        if dest_track is not None:
+            pad_dest_region[pad_name] = dest_track
+
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for ex in reg.get("exits", []):
@@ -142,7 +161,10 @@ def create_regions(world: "ctrAPWorld"):
                 randomization_type=EntranceType[ex.get("randomization_type")],
             )
             ent.access_rule_text = ex.get("access_rule", "True")
-            tgt = ex.get("target")
+            # Destination shuffle: a shuffled warp-pad exit leads to the track it
+            # loads (dest region), not its static target. Non-pad exits and the
+            # no-shuffle case fall back to the static target unchanged.
+            tgt = pad_dest_region.get(ex["name"], ex.get("target"))
             if tgt in region_lookup:
                 ent.connect(region_lookup[tgt])
             region.exits.append(ent)

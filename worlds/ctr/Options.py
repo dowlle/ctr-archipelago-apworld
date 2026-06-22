@@ -92,7 +92,7 @@ class WarpPadUnlockRequirements(Choice):
     """Choose the requirements for opening warp pads."""
     display_name = "Warp Pad Unlock Requirements"
     option_vanilla = 0
-    option_random = 1
+    option_randomized = 1
     option_random_without_4_keys = 2
     default = 0
 
