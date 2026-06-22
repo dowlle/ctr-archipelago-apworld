@@ -58,6 +58,75 @@ def set_rules(world):
 
     add_time_trial_and_ctr_requirements(world, player)
 
+    # Native-randomization (Phase-2 MVP): install the resolved per-pad unlock
+    # requirements and boss-garage gates LAST so they win over the JSON text
+    # rules already applied above.
+    add_warp_pad_unlock_rules(world, player)
+    add_boss_garage_rules(world, player)
+
+
+# ITEM name resolver for a randomized requirement type code (see §0 contract).
+# colour is 0..4 = R,G,B,Y,P for token/gem types.
+ITEM_BY_TYPE = {
+    1: lambda c: "Trophy",
+    2: lambda c: "Key",
+    3: lambda c: ["Red", "Green", "Blue", "Yellow", "Purple"][c] + " CTR Token",
+    4: lambda c: "Sapphire Relic",
+    5: lambda c: ["Red", "Green", "Blue", "Yellow", "Purple"][c] + " Gem",
+}
+
+
+def add_warp_pad_unlock_rules(world, player):
+    """Install the per-seed resolved requirements on the pad exits.
+
+    world.warp_pad_unlock is {pad_exit_name -> {type,count,colour}}; empty in
+    vanilla mode. type 0 leaves the JSON text rule (native fixed pad).
+
+    SOLVABILITY: the randomized requirement is ANDed with the pad's EXISTING
+    vanilla access rule (the Key-gated hub backbone), not used as a replacement.
+    This preserves the hub-progression structure (e.g. a Key-2 pad still needs
+    Key 2 PLUS its new random requirement) so AP's fill keeps a reachable
+    item-placement frontier. The four always-open starter pads are excluded
+    upstream (Regions._shuffleable_pad_names) and never reach this loop.
+    """
+    mw = world.multiworld
+    for pad_name, req in getattr(world, "warp_pad_unlock", {}).items():
+        t, count, colour = req["type"], req["count"], req["colour"]
+        if t == 0:
+            continue  # native fixed rule; keep text rule
+        ent = mw.get_entrance(pad_name, player)
+        item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
+        base_rule = ent.access_rule  # vanilla Key-gate already applied above
+        ent.access_rule = (
+            lambda state, i=item, n=count, p=player, base=base_rule:
+            base(state) and state.has(i, p, n)
+        )
+
+
+# Garage-door exit name -> trophy threshold (vanilla 4/8/12/16). Oxide left as
+# its has('Key', 4) text rule.
+HUB_BOSS = {
+    "Ripper Roo Garage Door": 4,
+    "Papu Papu Garage Door": 8,
+    "Komodo Joe Garage Door": 12,
+    "Pinstripe Garage Door": 16,
+}
+
+
+def add_boss_garage_rules(world, player):
+    """Install boss-garage access rules from the resolved flat requirements.
+
+    MVP: all boss-garage modes map to trophy-count gates (4/8/12/16). The real
+    bossgarage_mode int is still emitted in slot_data for future native use.
+    """
+    mw = world.multiworld
+    for door, thr in HUB_BOSS.items():
+        ent = mw.get_entrance(door, player)
+        ent.access_rule = (
+            lambda s, n=thr, p=player: s.has("Trophy", p, n)
+        )
+    # N. Oxide Garage Door keeps its has('Key', 4) text rule.
+
 
 def add_time_trial_and_ctr_requirements(world, player):
     """

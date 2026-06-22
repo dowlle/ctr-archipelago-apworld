@@ -90,7 +90,7 @@ class ShuffleWarpPadsGemCups(Toggle):
 
 class WarpPadUnlockRequirements(Choice):
     """Choose the requirements for opening warp pads."""
-    diplay_name = "Warp Pad Unlock Requirements"
+    display_name = "Warp Pad Unlock Requirements"
     option_vanilla = 0
     option_random = 1
     option_random_without_4_keys = 2
@@ -110,7 +110,7 @@ class BossGarageRequirements(Choice):
     Crash Cove, Roo's Tubes, Mystery Caves, and Sewer Speedway.  
     **Original 4 Tracks** and **Same Hub Tracks** behave identically if warp pads
     are not shuffled."""
-    diplay_name = "Boss Garage Requirements"
+    display_name = "Boss Garage Requirements"
     option_original_4_tracks = 0
     option_same_hub_tracks = 1
     option_trophies = 2

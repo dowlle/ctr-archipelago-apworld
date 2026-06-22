@@ -186,16 +186,80 @@ class ctrAPWorld(World):
             for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
         )
 
+    # --- Native-randomization slot_data (Phase-2 MVP shared contract) ---
+
+    # Native warp_pad_map / warp_pad_unlock arrays are indexed by pad LevelID
+    # 0..27 (race/crystal/trial tracks). Gem cups (LevelID 100+) are handled
+    # native-side via their own fixed rule, so they are NOT part of these arrays.
+    WARP_PAD_ID_RANGE = 28
+
+    def _resolve_warp_pad_map(self) -> Dict[str, int]:
+        """{"<physicalPadLevelID>": <targetTrackID>} — ALWAYS present.
+
+        Identity over the 28 in-range pad LevelIDs, then overlay any shuffle
+        remap (STRETCH; empty in MVP -> stays identity).
+        """
+        m = {str(i): i for i in range(self.WARP_PAD_ID_RANGE)}
+        pad_ids = getattr(self, "warp_pad_ids", {})
+        for pad_name, target_track_id in getattr(self, "warp_pad_map", {}).items():
+            meta = pad_ids.get(pad_name)
+            if meta is None:
+                continue
+            lid = meta["level_id"]
+            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                m[str(lid)] = int(target_track_id)
+        return m
+
+    def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, int]]:
+        """{"<padLevelID>": {type,count,colour}} — ALWAYS present.
+
+        Emits resolved randomized requirements for shuffleable pads; every
+        other in-range pad (fixed pads, vanilla mode) emits {0,0,-1} so native
+        falls back to its own vanilla fixed rule.
+        """
+        pad_ids = getattr(self, "warp_pad_ids", {})
+        unlock = getattr(self, "warp_pad_unlock", {})
+
+        # Default all in-range pad LevelIDs to type 0 (native vanilla rule).
+        out: Dict[str, Dict[str, int]] = {}
+        for meta in pad_ids.values():
+            lid = meta["level_id"]
+            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                out[str(lid)] = {"type": 0, "count": 0, "colour": -1}
+
+        # Overlay the per-seed randomized requirements.
+        for pad_name, req in unlock.items():
+            meta = pad_ids.get(pad_name)
+            if meta is None:
+                continue
+            lid = meta["level_id"]
+            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                out[str(lid)] = {
+                    "type": int(req["type"]),
+                    "count": int(req["count"]),
+                    "colour": int(req["colour"]),
+                }
+        return out
+
     def fill_slot_data(self) -> Dict[str, object]:
+        o = self.options
         slot_data: Dict[str, object] = {
-            "options": {
-                "Goal": self.options.goal.value,
-                "Relic Difficulty": self.options.rr_required_minimum_time.value,
-                "Shuffle Warp Pads": self.options.shuffle_warp_pads.value,
-            },
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
+            "ctr_options": {
+                "schema_version": 1,
+                "goal": o.goal.value,
+                "relic_min_time": o.rr_required_minimum_time.value,
+                "relics_require_perfect": bool(o.rr_require_perfects.value),
+                "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
+                "shuffle_warp_pads": bool(o.shuffle_warp_pads.value),
+                "warppad_unlock_mode": o.warppad_unlock_requirements.value,
+                "bossgarage_mode": o.bossgarage_unlock_requirements.value,
+            },
+            "warp_pad_map": self._resolve_warp_pad_map(),
+            "warp_pad_unlock": self._resolve_warp_pad_unlock(),
+            "boss_garage_req": getattr(self, "boss_garage_req", {}),
         }
         return slot_data
 

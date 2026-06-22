@@ -1,0 +1,32 @@
+{
+    "_comment": "Maps group-1 warp-pad EXIT names to native LevelIDs (pad physical LevelID == target track LevelID). LevelIDs sourced from rom_db_mapping.json trackIDs and confirmed against spec 2026-06-22 MVP Phase-2 §0. 'kind' classifies the pad for unlock-randomization eligibility: race/crystal are randomizable; cup/trial are native-fixed (type:0). 'bootstrap':true marks the always-open N. Sanity Beach starter race pads that MUST stay reachable from an empty inventory so trophies can be earned; these are never given a randomized unlock requirement (solvability backbone).",
+    "pads": {
+        "Crash Cove Warp Pad":      {"level_id": 3,   "kind": "race", "bootstrap": true},
+        "Roo's Tubes Warp Pad":     {"level_id": 6,   "kind": "race", "bootstrap": true},
+        "Mystery Caves Warp Pad":   {"level_id": 9,   "kind": "race", "bootstrap": true},
+        "Sewer Speedway Warp Pad":  {"level_id": 8,   "kind": "race", "bootstrap": true},
+        "Coco Park Warp Pad":       {"level_id": 14,  "kind": "race"},
+        "Tiger Temple Warp Pad":    {"level_id": 4,   "kind": "race"},
+        "Papu's Pyramid Warp Pad":  {"level_id": 5,   "kind": "race"},
+        "Dingo Canyon Warp Pad":    {"level_id": 0,   "kind": "race"},
+        "Blizzard Bluff Warp Pad":  {"level_id": 2,   "kind": "race"},
+        "Dragon Mines Warp Pad":    {"level_id": 1,   "kind": "race"},
+        "Polar Pass Warp Pad":      {"level_id": 12,  "kind": "race"},
+        "Tiny Arena Warp Pad":      {"level_id": 15,  "kind": "race"},
+        "Hot Air Skyway Warp Pad":  {"level_id": 7,   "kind": "race"},
+        "Cortex Castle Warp Pad":   {"level_id": 10,  "kind": "race"},
+        "N. Gin Labs Warp Pad":     {"level_id": 11,  "kind": "race"},
+        "Oxide Station Warp Pad":   {"level_id": 13,  "kind": "race"},
+        "Skull Rock Warp Pad":      {"level_id": 21,  "kind": "crystal"},
+        "Rampage Ruins Warp Pad":   {"level_id": 19,  "kind": "crystal"},
+        "Rocky Road Warp Pad":      {"level_id": 23,  "kind": "crystal"},
+        "Nitro Court Warp Pad":     {"level_id": 18,  "kind": "crystal"},
+        "Slide Coliseum Warp Pad":  {"level_id": 16,  "kind": "trial"},
+        "Turbo Track Warp Pad":     {"level_id": 17,  "kind": "trial"},
+        "Red Cup Warp Pad":         {"level_id": 100, "kind": "cup"},
+        "Green Cup Warp Pad":       {"level_id": 101, "kind": "cup"},
+        "Blue Cup Warp Pad":        {"level_id": 102, "kind": "cup"},
+        "Yellow Cup Warp Pad":      {"level_id": 103, "kind": "cup"},
+        "Purple Cup Warp Pad":      {"level_id": 104, "kind": "cup"}
+    }
+}
