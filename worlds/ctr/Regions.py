@@ -2,6 +2,9 @@ import json
 import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
+from .warp_pad_logic import (
+    run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
+)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from . import ctrAPWorld
@@ -13,10 +16,8 @@ if TYPE_CHECKING:
 # See spec "2026-06-22 -- Spec -- Randomized Playthrough MVP (Phase 2-MVP)".
 # ---------------------------------------------------------------------------
 
-# Requirement-type code -> live item-pool ceiling (the §0 "available items" table).
-# Randomized counts MUST NOT exceed these or the seed becomes unsolvable.
-#   1 trophies (16) / 2 keys (4) / 3 tokens-per-colour (4) / 4 sapphire (18) / 5 gems-per-colour (1)
-REQ_AVAIL = {1: 16, 2: 4, 3: 4, 4: 18, 5: 1}
+# Per-pad unlock requirements are produced by warp_pad_logic.run_sphere_search
+# (Icebound's real free-subset + sphere-search algorithm), not drawn i.i.d. here.
 
 # Boss-garage trophy thresholds (vanilla 4/8/12/16). Oxide stays keys.
 BOSS_TROPHY = {"ripper_roo": 4, "papu_papu": 8, "komodo_joe": 12, "pinstripe": 16}
@@ -29,48 +30,38 @@ def _load_warp_pad_ids():
     )["pads"]
 
 
-def _shuffleable_pad_names(world, pad_ids):
-    """Group-1 pad exits eligible for unlock-requirement randomization.
+def _pad_name_for_track(track):
+    """Track name (sphere-search key / region name) -> AP pad-exit name.
 
-    Race pads always qualify. Crystal (battle-arena) pads qualify only when
-    include_battle_arenas is set. Gem cups (kind 'cup') and the bonus trial
-    pads (Slide/Turbo, kind 'trial') stay native-fixed -> they emit type:0 and
-    are NEVER randomized here.
+    Both the AP exit name and the warp_pad_ids.json key are '<track> Warp Pad',
+    so this is a direct suffix add."""
+    return f"{track} Warp Pad"
 
-    SOLVABILITY BACKBONE: the four always-open N. Sanity Beach starter race
-    pads (bootstrap=True) are EXCLUDED. They must stay reachable from an empty
-    inventory so the player can win their first trophies; randomizing them risks
-    a circular deadlock (need trophies to open the only trophy sources). They
-    emit type:0 (native vanilla / always-open) in slot_data.
-    """
-    inc_arenas = bool(world.options.include_battle_arenas.value)
-    names = []
+
+def _build_reward_track_resolver(world):
+    """Return f(track_name) -> destination track_name for the pad on that track.
+
+    Inverts world.warp_pad_map ({pad_exit_name: dest_track_levelID}) into a
+    track->track map so the sphere-search rewards each physical pad with the
+    rewards of the track it ACTUALLY loads under destination shuffle. Identity
+    when shuffle is off."""
+    pad_ids = world.warp_pad_ids
+    id_to_track = {}
     for pad_name, meta in pad_ids.items():
-        if meta.get("bootstrap"):
-            continue  # solvability backbone, never randomized
-        kind = meta["kind"]
-        if kind == "race":
-            names.append(pad_name)
-        elif kind == "crystal" and inc_arenas:
-            names.append(pad_name)
-        # cup / trial -> fixed, never randomized
-    return names
+        if pad_name.endswith(" Warp Pad"):
+            id_to_track[meta["level_id"]] = pad_name[: -len(" Warp Pad")]
+    remap = {}
+    for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
+        if pad_name.endswith(" Warp Pad"):
+            phys_track = pad_name[: -len(" Warp Pad")]
+            dest_track = id_to_track.get(dest_lid)
+            if dest_track is not None:
+                remap[phys_track] = dest_track
 
+    def resolve(track):
+        return remap.get(track, track)
 
-def _random_pad_req(world, mode):
-    """Draw a single (type, count, colour) within solvable bounds.
-
-    mode 1 = random; mode 2 = random_without_4_keys.
-    count <= REQ_AVAIL[type] guarantees the requirement is satisfiable; AP's
-    fill_restrictive then validates the whole seed and reseeds on FillError.
-    """
-    choices = [1, 3, 4, 5] if mode == 2 else [1, 2, 3, 4, 5]
-    t = world.random.choice(choices)
-    colour = world.random.randint(0, 4) if t in (3, 5) else -1
-    count = world.random.randint(1, REQ_AVAIL[t])
-    if mode == 2 and t == 2 and count == 4:  # belt-and-suspenders: never a 4-key wall
-        count = 3
-    return {"type": t, "count": count, "colour": colour}
+    return resolve
 
 
 def _resolve_boss_reqs(boss_mode):
@@ -103,18 +94,21 @@ def create_regions(world: "ctrAPWorld"):
     world.shuffle_warp_pads = do_shuffle
 
     # Per-pad resolved unlock requirement: {pad_exit_name -> {type,count,colour}}.
+    # The concrete (item, count) used to build the AP access rule (parallel dict).
     world.warp_pad_unlock = {}
-    if unlock_mode in (1, 2):
-        for pad_name in _shuffleable_pad_names(world, world.warp_pad_ids):
-            world.warp_pad_unlock[pad_name] = _random_pad_req(world, unlock_mode)
-    # unlock_mode == 0 (vanilla): leave empty -> keep JSON text rules; emit type:0.
+    world.warp_pad_unlock_concrete = {}
 
-    # Destination shuffle (STRETCH). Identity / empty when off. MVP keeps this
-    # empty so warp_pad_map serializes as identity native-side.
-    world.warp_pad_map = {}
+    # Destination shuffle. Build the NON-IDENTITY warp_pad_map FIRST so the
+    # sphere-search rewards each physical pad with the rewards of the track it
+    # actually loads (A.4<->logic coupling). Empty (identity) when shuffle off.
+    world.warp_pad_map = build_warp_pad_map(world) if do_shuffle else {}
 
     # Boss-garage requirements, resolved to flat {type,count}.
     world.boss_garage_req = _resolve_boss_reqs(boss_mode)
+
+    # Stash the unlock mode; the sphere-search runs at the END of create_regions
+    # (after regions+locations+exits exist, so build_graph can read them).
+    world._ctr_unlock_mode = unlock_mode
 
     regions = []
 
@@ -158,4 +152,32 @@ def create_regions(world: "ctrAPWorld"):
         (r for r in regions if getattr(r, "is_start", False)),
         None
     )
+
+    # --- Sphere-search warp-pad unlock requirements (Icebound's real algorithm).
+    # Runs here, after regions+locations+exits exist, so build_graph can read the
+    # live AP graph. unlock_mode 0 (vanilla) skips it -> all type:0, identity.
+    unlock_mode = getattr(world, "_ctr_unlock_mode", 0)
+    if unlock_mode in (1, 2):
+        reward_track_for = _build_reward_track_resolver(world)
+        pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for)
+        # Filter to the pad kinds the YAML actually randomizes: race always;
+        # crystal only when include_battle_arenas; trials/cups stay native-fixed.
+        inc_arenas = bool(world.options.include_battle_arenas.value)
+        for track, req in pad_reqs.items():
+            pad_name = _pad_name_for_track(track)
+            meta = world.warp_pad_ids.get(pad_name)
+            if meta is None:
+                continue
+            kind = meta["kind"]
+            if kind == "crystal" and not inc_arenas:
+                continue  # battle arenas not in this seed's shuffle pool
+            if kind in ("cup",):
+                continue  # gem cups stay native-fixed
+            # 'trial' (Slide/Turbo): Rust gives them stage-1-free; keep native-fixed
+            if kind == "trial":
+                continue
+            world.warp_pad_unlock[pad_name] = to_slot_req(req)
+            if req is not None:
+                world.warp_pad_unlock_concrete[pad_name] = req
+
     return regions

@@ -77,23 +77,28 @@ ITEM_BY_TYPE = {
 
 
 def add_warp_pad_unlock_rules(world, player):
-    """Install the per-seed resolved requirements on the pad exits.
+    """Install the per-seed sphere-search requirements on the pad exits.
 
-    world.warp_pad_unlock is {pad_exit_name -> {type,count,colour}}; empty in
-    vanilla mode. type 0 leaves the JSON text rule (native fixed pad).
+    world.warp_pad_unlock is {pad_exit_name -> {type,count,colour}} produced by
+    warp_pad_logic.run_sphere_search; empty in vanilla mode. type 0 = free pad
+    (keep the JSON text rule -> N. Sanity Beach starters chosen FREE stay open).
 
-    SOLVABILITY: the randomized requirement is ANDed with the pad's EXISTING
-    vanilla access rule (the Key-gated hub backbone), not used as a replacement.
-    This preserves the hub-progression structure (e.g. a Key-2 pad still needs
-    Key 2 PLUS its new random requirement) so AP's fill keeps a reachable
-    item-placement frontier. The four always-open starter pads are excluded
-    upstream (Regions._shuffleable_pad_names) and never reach this loop.
+    Icebound's real algorithm randomizes the N. Sanity Beach starters too: any
+    starter NOT in the free subset now arrives here with a real requirement. The
+    free subset guarantees sphere 0 is non-empty, so the seed stays solvable.
+
+    SOLVABILITY: the requirement is ANDed with the pad's EXISTING vanilla access
+    rule (the Key-gated hub backbone), not a replacement. The sphere-search
+    assigned only requirements that are satisfiable when the pad is first
+    reachable, so the AND keeps a reachable item-placement frontier for fill.
+    Any* requirements were resolved to a concrete owned colour upstream, so the
+    {type,colour} here always names a single concrete item.
     """
     mw = world.multiworld
     for pad_name, req in getattr(world, "warp_pad_unlock", {}).items():
         t, count, colour = req["type"], req["count"], req["colour"]
         if t == 0:
-            continue  # native fixed rule; keep text rule
+            continue  # free pad / native fixed rule; keep text rule
         ent = mw.get_entrance(pad_name, player)
         item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
         base_rule = ent.access_rule  # vanilla Key-gate already applied above
