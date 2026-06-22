@@ -517,12 +517,16 @@ def to_slot_req(req):
 # Destination shuffle -- non-identity warp_pad_map
 # ---------------------------------------------------------------------------
 
-# Shuffle within compatible "kinds": race + trial tracks shuffle together (both
-# full kart tracks); crystal (battle-arena) tracks shuffle among themselves; gem
-# cups stay fixed. LevelIDs from data/warp_pad_ids.json.
+# Shuffle ONLY within the same native unlock-dispatch category, else the game
+# split-keys it (AH_WarpPad ThTick dispatches by DESTINATION track while the
+# unlock requirement keys off the PHYSICAL pad). The 16 main trophy-race pads
+# all share one dispatch type -> safe to permute among themselves. The two trials
+# (16 Slide Coliseum = relic, 17 Turbo Track = gem) and the 5 gem cups each have
+# unique dispatch -> NOT shuffled (stay identity / native-fixed). Crystal/battle
+# pads share a type -> shuffle among themselves. LevelIDs from warp_pad_ids.json.
 SHUFFLE_GROUPS = {
-    # race pads (incl. Slide Coliseum 16 / Turbo Track 17 trials)
-    "race": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13, 16, 17],
+    # 16 trophy-race pads ONLY (trials 16/17 excluded -> stay fixed)
+    "race": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13],
     "crystal": [21, 19, 23, 18],
 }
 
