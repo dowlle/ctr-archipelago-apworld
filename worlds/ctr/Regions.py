@@ -131,6 +131,25 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
+    # Move the per-track trophy floor OFF the trophy-race LOCATION. world.json keys
+    # numTrophiesToOpen on "<track>: Trophy Race" by TRACK, but native keys it by the
+    # PHYSICAL pad (ap_hooks.c / AH_WarpPad.c LInB). Under destination shuffle these
+    # diverge (a low-floor pad loading a high-floor track inherits the wrong floor)
+    # -> the progression stall. When warp-pad requirements are randomized, we remove
+    # the track-keyed location floor here; the PHYSICAL-pad floor is enforced instead
+    # by the sphere-search (warp_pad_logic.TRACK_TROPHY_GATE) and re-installed on the
+    # free pad's exit in Rules.add_warp_pad_unlock_rules. Vanilla unlock mode (0) is
+    # left untouched. (Time-trial / token locations are gated by can_reach(Trophy
+    # Race) in Rules.add_time_trial_and_ctr_requirements, so they follow the floor
+    # automatically and need no change.)
+    if unlock_mode in (1, 2):
+        for region in regions:
+            if getattr(region, "type", None) != "race":
+                continue
+            for loc in region.locations:
+                if loc.name.endswith(": Trophy Race"):
+                    loc.logic_text = "True"
+
     # AP destination shuffle: rewire each shuffled warp-pad exit to the track
     # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons
     # about the same topology native runs. The exit stays in its PHYSICAL hub

@@ -1,5 +1,6 @@
 import logging
 from BaseClasses import CollectionState
+from .warp_pad_logic import TRACK_TROPHY_GATE
 
 
 def make_rule(expr_text: str, player: int):
@@ -98,7 +99,25 @@ def add_warp_pad_unlock_rules(world, player):
     for pad_name, req in getattr(world, "warp_pad_unlock", {}).items():
         t, count, colour = req["type"], req["count"], req["colour"]
         if t == 0:
-            continue  # free pad / native fixed rule; keep text rule
+            # Free pad (slot_data type:0): native gates entry on the PHYSICAL pad's
+            # vanilla trophy floor (ap_hooks.c: received Trophy >= numTrophiesToOpen,
+            # keyed by physical pad). world.json kept this floor on the trophy-race
+            # LOCATION by track; create_regions removed it (it mis-keys under
+            # destination shuffle), so re-add it HERE on the physical pad's exit.
+            # pad_name == "<physical track> Warp Pad", so the floor is the physical
+            # pad's own. A per-seed pad (t != 0 below) uses ONLY its requirement,
+            # matching native's floor-XOR-requirement behaviour.
+            track = (pad_name[: -len(" Warp Pad")]
+                     if pad_name.endswith(" Warp Pad") else pad_name)
+            floor = TRACK_TROPHY_GATE.get(track, 0)
+            if floor > 0:
+                ent = mw.get_entrance(pad_name, player)
+                base_rule = ent.access_rule  # vanilla hub Key-gate already applied
+                ent.access_rule = (
+                    lambda state, n=floor, p=player, base=base_rule:
+                    base(state) and state.has("Trophy", p, n)
+                )
+            continue
         ent = mw.get_entrance(pad_name, player)
         item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
         base_rule = ent.access_rule  # vanilla Key-gate already applied above

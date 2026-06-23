@@ -64,6 +64,32 @@ HUB_STATIC = {
     # the sphere-search never assigns them a requirement.
 }
 
+# Vanilla per-pad trophy floor (numTrophiesToOpen), keyed by the PHYSICAL pad
+# (= track name). Verified from the CTR-native decomp (zGlobal_DATA.c MetaDataLEV
+# .numTrophiesToOpen) AND from data/world.json's "<track>: Trophy Race" requires.
+#
+# A trophy-race pad only opens once the player's RECEIVED Trophy count reaches
+# this floor, and native keys it by the PHYSICAL pad (ap_hooks.c
+# ctr_cfg_warp_unlocked + AH_WarpPad.c LInB use the physical levelID). world.json
+# instead keyed it on the trophy-race LOCATION by track; under destination shuffle
+# that mis-keys the floor to the DESTINATION track (a low-floor physical pad
+# loading a high-floor track inherited the wrong floor) -> the shuffle progression
+# stall. The fix keys the floor by PHYSICAL pad in three consistent places: this
+# sphere-search reachability model, Rules (the free pad's exit rule), and removing
+# the redundant track-keyed location floor in create_regions.
+#
+# Native applies the floor ONLY to free (type:0) pads; a pad with a per-seed
+# requirement uses ONLY that requirement (floor XOR per-seed). So the floor is
+# enforced here exclusively where a pad stays free. Only the 16 trophy-race pads
+# have a floor; crystal/arena pads and trials/cups gate differently (absent -> 0).
+TRACK_TROPHY_GATE = {
+    "Crash Cove": 0, "Roo's Tubes": 0, "Mystery Caves": 1, "Sewer Speedway": 3,
+    "Tiger Temple": 4, "Coco Park": 4, "Papu's Pyramid": 6, "Dingo Canyon": 7,
+    "Blizzard Bluff": 8, "Dragon Mines": 9, "Polar Pass": 10, "Tiny Arena": 11,
+    "Cortex Castle": 12, "N. Gin Labs": 12, "Hot Air Skyway": 14,
+    "Oxide Station": 15,
+}
+
 # Vanilla CTR-Token COLOUR per track. Transcribed VERBATIM from game_world.rs
 # WarpPad::new (lines 1211-1219): Red/Green/Blue explicit, Yellow = default branch.
 TRACK_TOKEN_COLOUR = {
@@ -362,7 +388,16 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, star
                         # rewards yet (its requirement isn't decided), but record it.
                         open_unassigned.add(track)
                         continue
-                    if req is not None and not passes([req]):
+                    if req is None:
+                        # Free pad (slot_data type:0): native gates entry on the
+                        # PHYSICAL pad's vanilla trophy floor (numTrophiesToOpen),
+                        # not the destination track's. Model it so the sphere-search
+                        # agrees with native + AP fill (the track-keyed location
+                        # floor is removed in create_regions; Rules re-adds this same
+                        # floor to the free pad's exit).
+                        if inv.count("Trophy") < TRACK_TROPHY_GATE.get(track, 0):
+                            continue
+                    elif not passes([req]):
                         continue  # assigned requirement not yet met
                 seen.add(tgt)
                 frontier.append(tgt)
