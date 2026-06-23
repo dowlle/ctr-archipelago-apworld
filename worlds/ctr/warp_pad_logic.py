@@ -405,14 +405,15 @@ def run_sphere_search(world, mode, reward_track_for=None):
     exits, locations, _ = build_graph(world, reward_track_for)
     start = world.start_region.name if world.start_region else "Menu"
 
-    # 1) free subset of the 5 N. Sanity Beach candidates
+    # 1) free subset of the 5 N. Sanity Beach candidates -- the bootstrap pads
+    # that are open at spawn (sphere 0). FULLY random: a random-sized (weighted
+    # 1..5) random sample, no pinned pad. In randomized mode the vanilla trophy
+    # floor is gone (see to_slot_req / create_regions), so EVERY free pad is truly
+    # open from an empty inventory and any one of them can bootstrap the sphere --
+    # the old "always keep Crash Cove free" guarantee is no longer needed and only
+    # reduced variety. size >= 1 still guarantees at least one bootstrap pad.
     size = _weighted_choice(rnd, FREE_SIZE_WEIGHTS)
     free = rnd.sample(FREE_CANDIDATES, size)
-    # SOLVABILITY GUARANTEE: the sphere must start. Crash Cove is the only pad
-    # whose trophy race is winnable from an empty inventory (Trophy 0), so ensure
-    # a Trophy-0 bootstrap is free if the random subset didn't provide one.
-    if "Crash Cove" not in free:
-        free = free + ["Crash Cove"]
 
     pad_reqs = {t: None for t in free}  # free pads -> None
 
