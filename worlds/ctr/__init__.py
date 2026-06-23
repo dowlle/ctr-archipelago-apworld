@@ -8,7 +8,7 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
-from .Options import ctrAPOptions
+from .Options import ctrAPOptions, Goal
 from .Regions import create_regions
 from .Rom import CrashTeamRacingProcedurePatch, write_tokens
 from .Rules import set_rules
@@ -154,7 +154,19 @@ class ctrAPWorld(World):
                     self.gemgoal(player)
 
         # --- Create general item pool ---
+        # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
+        # locations, so adding the same 5 gems from the item table again makes them
+        # redundant progression items: the pool then exceeds the available
+        # locations (gemgoal also consumes 5 cup locations) -> FillError ("N more
+        # progression items than locations") and an item/location count mismatch.
+        # Exclude the gems from the general pool for that goal (they are the goal
+        # items, placed at the cups). Other goals keep gems in the pool (e.g.
+        # everythingplusone needs them findable; Turbo Track logic needs them).
+        _GEM_GOAL = self.options.goal.value == Goal.option_allgemcups
+        _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
+            if _GEM_GOAL and item["name"] in _GEMS:
+                continue
             count = item["count"]
             if count > 0:
                 for _ in range(count):
