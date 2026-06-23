@@ -170,6 +170,31 @@ def create_regions(world: "ctrAPWorld"):
         if dest_track is not None:
             pad_dest_region[pad_name] = dest_track
 
+    # VANILLA unlock mode + destination shuffle: the vanilla trophy floor stays on
+    # the trophy-race LOCATION (keyed by track), but native keys numTrophiesToOpen
+    # by the PHYSICAL pad. Under shuffle a low-floor pad loading a high-floor track
+    # would demand the destination's floor -> unsolvable (FillError). Re-key each
+    # shuffled destination track's trophy-race floor to the PHYSICAL pad that loads
+    # it. (Randomized modes already strip the floor above; this branch is only for
+    # vanilla mode, which keeps real floors but must still follow the physical pad.)
+    if unlock_mode == 0 and do_shuffle:
+        orig_floor = {
+            reg["name"]: loc.get("requires", "True")
+            for reg in data["regions"] if reg.get("type") == "race"
+            for loc in reg.get("locations", [])
+            if loc["name"].endswith(": Trophy Race")
+        }
+        for pad_name, dest_track in pad_dest_region.items():
+            phys = pad_name[: -len(" Warp Pad")] if pad_name.endswith(" Warp Pad") else pad_name
+            if phys == dest_track:
+                continue
+            dest_region = region_lookup.get(dest_track)
+            if dest_region is None or phys not in orig_floor:
+                continue
+            for loc in dest_region.locations:
+                if loc.name.endswith(": Trophy Race"):
+                    loc.logic_text = orig_floor[phys]
+
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for ex in reg.get("exits", []):

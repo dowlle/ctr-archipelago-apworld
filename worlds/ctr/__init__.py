@@ -161,21 +161,23 @@ class ctrAPWorld(World):
                     pool.append(self.create_item(item["name"]))
 
         mw.itempool += pool
-        mw.itempool += self.create_filler(
-            (get_total_locations(self) - len(mw.itempool))
-        )
+        # Size filler off the UNFILLED locations, i.e. total minus the locations
+        # already locked above (the victory item, and for the gem-cup goal the 5
+        # locked gems). Using the static get_total_locations over-counted by the
+        # number of locked locations -> 1 (or 5) excess filler items -> the
+        # item/location count mismatch the fuzzer flags. Clamp at 0 for safety.
+        unfilled = len(mw.get_unfilled_locations(self.player))
+        mw.itempool += self.create_filler(max(0, unfilled - len(mw.itempool)))
 
     def gemgoal(self, player):
         """Locks gem rewards in the appropriate Gem Cup locations."""
-        data_path = os.path.join(
-            os.path.dirname(
-                __file__
-            ),
-            "data",
-            "vanilla_mapping.json"
+        # Read via pkgutil so it works when the world is loaded from a zipped
+        # .apworld (open()/os.path on __file__ raises NotADirectoryError inside a
+        # zip -- the gem-cup goal crashed on every distributed seed). pkgutil is
+        # the mandatory pattern for all packaged data reads in this world.
+        _mapping = json.loads(
+            pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
         )
-        with open(data_path, "r", encoding="utf-8") as f:
-            _mapping = json.load(f)
         mw = self.multiworld
         for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
             loc = mw.get_location(loc_name, player)
