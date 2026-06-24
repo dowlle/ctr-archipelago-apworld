@@ -153,6 +153,44 @@ class ctrAPWorld(World):
                 case 4:
                     self.gemgoal(player)
 
+        # --- Relic-tier progression sliders (pinned-vanilla lock per the slider roll) ---
+        # For each tier, roll each of its 18 time-trial locations: with `chance`%
+        # it stays progression-eligible, else pin that tier's vanilla relic there
+        # (place_locked_item -> out of the multiworld pool). Track n_locked per tier
+        # so the general pool below creates (18 - n_locked) of that relic, keeping
+        # item count == location count (same invariant the gemgoal pass relies on).
+        _relic_tiers = [
+            ("Sapphire", "Sapphire Relic", self.options.sapphire_relic_progression.value),
+            ("Gold", "Gold Relic", self.options.gold_relic_progression.value),
+            ("Platinum", "Platinum Relic", self.options.platinum_relic_progression.value),
+        ]
+        # Precedence: only Platinum relics are pool-optional via ShuffleRewards.
+        # If the user explicitly set "Include Platinum Relics" off, the relic is not
+        # in the pool, so force platinum chance to 0 (it MUST be pinned). Sapphire/Gold
+        # are always shuffled. Warn on the off + >0 corner.
+        _shuf = dict(self.options.shuffle_rewards.value or {})
+        if "Include Platinum Relics" in _shuf and not _shuf["Include Platinum Relics"]:
+            if self.options.platinum_relic_progression.value > 0:
+                logging.warning(
+                    "[CTR] %s: 'Include Platinum Relics' is off; forcing "
+                    "platinum_relic_progression to 0 (relic must be pinned).",
+                    self.player_name,
+                )
+            _relic_tiers[2] = ("Platinum", "Platinum Relic", 0)
+
+        _relic_locked = {}  # relic item name -> count pinned out of the pool
+        for _tier_label, _relic_item, _chance in _relic_tiers:
+            _suffix = f": {_tier_label} Time Trial"
+            _locs = sorted(n for n in self.location_name_to_id if n.endswith(_suffix))
+            _n = 0
+            for _loc_name in _locs:
+                if self.random.randint(0, 99) >= _chance:   # (100 - chance)% -> pin vanilla
+                    mw.get_location(_loc_name, player).place_locked_item(
+                        self.create_item(_relic_item)
+                    )
+                    _n += 1
+            _relic_locked[_relic_item] = _n
+
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
         # locations, so adding the same 5 gems from the item table again makes them
@@ -168,6 +206,8 @@ class ctrAPWorld(World):
             if _GEM_GOAL and item["name"] in _GEMS:
                 continue
             count = item["count"]
+            if item["name"] in _relic_locked:                         # ADD
+                count = max(0, count - _relic_locked[item["name"]])   # ADD
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))

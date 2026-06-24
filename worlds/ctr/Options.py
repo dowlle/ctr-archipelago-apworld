@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
-from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle, Toggle, PerGameCommonOptions
+from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle, Toggle, NamedRange, PerGameCommonOptions
 
 
 class Goal(Choice):
@@ -37,6 +37,51 @@ class RelicsRequirePerfect(Toggle):
     relic times need to be bested, but all time boxes have to be broken during
     that run as well."""
     display_name = "Relic Races Require Perfects"
+
+
+class SapphireRelicProgression(NamedRange):
+    """How often required progression may sit behind a SAPPHIRE relic-race time
+    (the easiest tier). Per-location likelihood: for each of the 18 Sapphire Time
+    Trial locations, with this % chance the location stays progression-eligible;
+    otherwise its vanilla Sapphire Relic is pinned there (removed from the
+    multiworld shuffle) and it can never gate progression.
+      0   = never : relics pinned vanilla, out of AP generation
+      100 = full  : every sapphire location may hold progression
+    `random` gives a surprise value. NOTE: the three tiers are a skill ladder
+    (sapphire easy -> gold -> platinum hard). Setting an EASIER tier LOWER than a
+    HARDER tier is allowed but yields an inverted, counter-intuitive difficulty."""
+    display_name = "Sapphire Relic Progression"
+    range_start = 0
+    range_end = 100
+    default = 100
+    special_range_names = {"never": 0, "full": 100}
+
+
+class GoldRelicProgression(NamedRange):
+    """How often required progression may sit behind a GOLD relic-race time (the
+    medium tier). Per-location likelihood over the 18 Gold Time Trial locations;
+    locked locations pin their vanilla Gold Relic (out of the multiworld shuffle).
+      0 = never, 100 = full. `random` for a surprise value. See the Sapphire
+    option's note on the tier skill-ladder / inverted configs."""
+    display_name = "Gold Relic Progression"
+    range_start = 0
+    range_end = 100
+    default = 100
+    special_range_names = {"never": 0, "full": 100}
+
+
+class PlatinumRelicProgression(NamedRange):
+    """How often required progression may sit behind a PLATINUM relic-race time
+    (the hardest, expert-only tier). Per-location likelihood over the 18 Platinum
+    Time Trial locations; locked locations pin their vanilla Platinum Relic (out
+    of the multiworld shuffle). Default 0 = never (the safe live-bug fix: a needed
+    item never sits behind a platinum-only time). 100 = full (hardest). `random`
+    for a surprise value. See the Sapphire option's note on inverted configs."""
+    display_name = "Platinum Relic Progression"
+    range_start = 0
+    range_end = 100
+    default = 0
+    special_range_names = {"never": 0, "full": 100}
 
 
 class FinalOxideUnlock(Choice):
@@ -164,6 +209,9 @@ class ctrAPOptions(PerGameCommonOptions):
     rr_required_minimum_time: RelicTime
     rr_require_perfects: RelicsRequirePerfect
     oxide_final_challenge_unlock: FinalOxideUnlock
+    sapphire_relic_progression: SapphireRelicProgression
+    gold_relic_progression: GoldRelicProgression
+    platinum_relic_progression: PlatinumRelicProgression
     # randomization
     shuffle_rewards: ShuffleRewards
     shuffle_warp_pads: ShuffleWarpPads
@@ -192,6 +240,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         AutoUnlockCtrChallengeRelicRace,
         BossGarageRequirements,
     ],
+    "Difficulty": [SapphireRelicProgression, GoldRelicProgression, PlatinumRelicProgression],
     "Quality of Life": [SkipMaskHints, AutoskipPodiumCutscenes, SkipMaskCongrats],
     "Tricks": [HelperTiziano, HelperTA],
 }
