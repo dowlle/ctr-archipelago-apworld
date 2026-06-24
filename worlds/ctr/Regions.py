@@ -4,6 +4,7 @@ from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
+    TROPHY_TRACKS, _token_colour,
 )
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -95,8 +96,16 @@ def create_regions(world: "ctrAPWorld"):
 
     # Per-pad resolved unlock requirement: {pad_exit_name -> {type,count,colour}}.
     # The concrete (item, count) used to build the AP access rule (parallel dict).
-    world.warp_pad_unlock = {}
-    world.warp_pad_unlock_concrete = {}
+    world.warp_pad_unlock = {}            # STAGE 1, physical-pad keyed (slot_data)
+    world.warp_pad_unlock_concrete = {}   # STAGE 1 concrete (item,count), pad keyed
+    # STAGE 2 (two-stage port): the second per-pad gate on the 16 trophy pads'
+    # CTR Token Challenge + 3 relic Time Trials. Slot_data is physical-pad keyed
+    # ({pad_exit_name -> {type,count,colour}}); the concrete (item,count) for the AP
+    # access rules is keyed by DESTINATION track (where those locations live).
+    world.warp_pad_unlock_stage2 = {}            # physical-pad keyed (slot_data)
+    world.warp_pad_unlock_stage2_concrete = {}   # dest-track keyed (AP rules)
+    world.stage2_pin = {}                         # loc_name -> reward item (two-stage)
+    world._ctr_two_stage_active = False
 
     # Destination shuffle. Build the NON-IDENTITY warp_pad_map FIRST so the
     # sphere-search rewards each physical pad with the rewards of the track it
@@ -226,11 +235,18 @@ def create_regions(world: "ctrAPWorld"):
     unlock_mode = getattr(world, "_ctr_unlock_mode", 0)
     if unlock_mode in (1, 2):
         reward_track_for = _build_reward_track_resolver(world)
-        pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for)
+        # autounlock_ctrchallenge_relicrace (Icebound clear_stage2_unlocks): collapse
+        # every stage 2 to OPEN. Then there is no two-stage hold-back and no token
+        # pinning -- the seed behaves like the single-stage baseline.
+        collapse_s2 = bool(world.options.autounlock_ctrchallenge_relicrace.value)
+        world._ctr_two_stage_active = not collapse_s2
+        pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for,
+                                     collapse_stage2=collapse_s2)
         # Filter to the pad kinds the YAML actually randomizes: race always;
         # crystal only when include_battle_arenas; trials/cups stay native-fixed.
         inc_arenas = bool(world.options.include_battle_arenas.value)
-        for track, req in pad_reqs.items():
+        _NO_STAGE2 = {"type": 0, "count": 0, "colour": -1}  # native: opens immediately
+        for track, stages in pad_reqs.items():
             pad_name = _pad_name_for_track(track)
             meta = world.warp_pad_ids.get(pad_name)
             if meta is None:
@@ -243,8 +259,55 @@ def create_regions(world: "ctrAPWorld"):
             # 'trial' (Slide/Turbo): Rust gives them stage-1-free; keep native-fixed
             if kind == "trial":
                 continue
-            world.warp_pad_unlock[pad_name] = to_slot_req(req)
-            if req is not None:
-                world.warp_pad_unlock_concrete[pad_name] = req
+            s1 = stages[1]
+            s2 = stages[2]
+            # STAGE 1 (unchanged contract).
+            world.warp_pad_unlock[pad_name] = to_slot_req(s1)
+            if s1 is not None:
+                world.warp_pad_unlock_concrete[pad_name] = s1
+            # STAGE 2 — physical-pad keyed slot_data (None -> type 0 = no gate).
+            world.warp_pad_unlock_stage2[pad_name] = (
+                to_slot_req(s2) if s2 is not None else dict(_NO_STAGE2)
+            )
+            # Concrete stage-2 req keyed by the DESTINATION track (the track this
+            # physical pad loads), where its CTR/relic locations live, for Rules.
+            if s2 is not None:
+                dest_track = reward_track_for(track)
+                world.warp_pad_unlock_stage2_concrete[dest_track] = s2
+
+        # Stage-2 content pinning (two-stage active only): reproduce Icebound's
+        # FIXED reward placement for the entire stage-2 layer so the two-stage gates
+        # are solvable under AP's reward-agnostic fill. Each of the 16 trophy pads'
+        # CTR Token Challenge + 3 relic Time Trials is locked to its own vanilla
+        # reward (place_locked_item, out of the multiworld pool). This is the
+        # load-bearing fix: without it those 64 locations hold pool items but sit
+        # behind stage-2 gates, so AP's greedy fill_restrictive runs out of early
+        # free locations to place the progression that opens the gates (verified:
+        # locations are all reachable under full inventory, but fill can't order
+        # them). With the content pinned, the relic/token a stage-2 req needs comes
+        # from earlier sphere-ordered challenges, never the pool -> solvable, exactly
+        # as Icebound's get_random_warppad_unlocks reasons over zeroed_out_item_placement.
+        # Token colour follows the sphere's assumption (loaded/destination track).
+        # NOTE: this supersedes the relic-progression sliders for the 16 trophy pads
+        # while two-stage is active (their relics are structurally pinned here); the
+        # sliders still govern the 2 trial pads (Slide/Turbo) and all of vanilla /
+        # autounlock-collapse modes. create_items reads world.stage2_pin.
+        if world._ctr_two_stage_active:
+            sp = {}
+            _tier_relic = {
+                "Sapphire Time Trial": "Sapphire Relic",
+                "Gold Time Trial": "Gold Relic",
+                "Platinum Time Trial": "Platinum Relic",
+            }
+            for track in TROPHY_TRACKS:
+                tok = f"{track}: CTR Token Challenge"
+                if tok in world.location_name_to_id:
+                    colour = _token_colour(track, reward_track_for(track))
+                    sp[tok] = f"{colour} CTR Token"
+                for _sfx, _relic in _tier_relic.items():
+                    rloc = f"{track}: {_sfx}"
+                    if rloc in world.location_name_to_id:
+                        sp[rloc] = _relic
+            world.stage2_pin = sp
 
     return regions

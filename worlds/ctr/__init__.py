@@ -178,10 +178,28 @@ class ctrAPWorld(World):
                 )
             _relic_tiers[2] = ("Platinum", "Platinum Relic", 0)
 
+        # --- Two-stage content pinning (Regions.stage2_pin; set when two-stage active) ---
+        # Lock each trophy pad's CTR Token Challenge + 3 relic Time Trials to their
+        # own vanilla reward (Icebound fixed placement) so the stage-2 gates are
+        # solvable under AP fill. _pinned tracks counts pulled out of the pool. The
+        # relic-slider pass below SKIPS any location already pinned here (the 16
+        # trophy pads' relics), so it only rolls the 2 trial pads while two-stage is
+        # active; with two-stage inactive stage2_pin is empty and the sliders roll
+        # all 18 per tier exactly as before.
+        _stage2_pin = getattr(self, "stage2_pin", {})
+        _pinned = {}  # item name -> count pinned out of the pool
+        for _loc_name, _item in sorted(_stage2_pin.items()):
+            if _loc_name in self.location_name_to_id:
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_item)
+                )
+                _pinned[_item] = _pinned.get(_item, 0) + 1
+
         _relic_locked = {}  # relic item name -> count pinned out of the pool
         for _tier_label, _relic_item, _chance in _relic_tiers:
             _suffix = f": {_tier_label} Time Trial"
-            _locs = sorted(n for n in self.location_name_to_id if n.endswith(_suffix))
+            _locs = sorted(n for n in self.location_name_to_id
+                           if n.endswith(_suffix) and n not in _stage2_pin)
             _n = 0
             for _loc_name in _locs:
                 if self.random.randint(0, 99) >= _chance:   # (100 - chance)% -> pin vanilla
@@ -189,7 +207,11 @@ class ctrAPWorld(World):
                         self.create_item(_relic_item)
                     )
                     _n += 1
-            _relic_locked[_relic_item] = _n
+            _relic_locked[_relic_item] = _relic_locked.get(_relic_item, 0) + _n
+
+        # Merge the two-stage pins into the locked-count map for pool balancing.
+        for _item, _c in _pinned.items():
+            _relic_locked[_item] = _relic_locked.get(_item, 0) + _c
 
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
@@ -206,8 +228,8 @@ class ctrAPWorld(World):
             if _GEM_GOAL and item["name"] in _GEMS:
                 continue
             count = item["count"]
-            if item["name"] in _relic_locked:                         # ADD
-                count = max(0, count - _relic_locked[item["name"]])   # ADD
+            if item["name"] in _relic_locked:                         # relics + two-stage pins
+                count = max(0, count - _relic_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
@@ -264,35 +286,49 @@ class ctrAPWorld(World):
                 m[str(lid)] = int(target_track_id)
         return m
 
-    def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, int]]:
-        """{"<padLevelID>": {type,count,colour}} — ALWAYS present.
+    def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, Dict[str, int]]]:
+        """{"<padLevelID>": {"stage1": {type,count,colour},
+                             "stage2": {type,count,colour}}} — ALWAYS present.
 
-        Emits resolved randomized requirements for shuffleable pads; every
-        other in-range pad (fixed pads, vanilla mode) emits {0,0,-1} so native
-        falls back to its own vanilla fixed rule.
+        Two-stage contract (Option A, schema_version 2). Stage 1 opens the pad's
+        Trophy Race; stage 2 (the 16 trophy pads only) opens that pad's CTR Token
+        Challenge + 3 relic Time Trials, ANDed on top of stage 1. Both are keyed by
+        PHYSICAL pad LevelID. Every in-range pad defaults to stage1/stage2 type 0
+        ({0,0,-1}) so a vanilla-mode / fixed / no-stage-2 pad falls back to native's
+        own rule (type 0 stage 2 = native opens the token/relic menu immediately).
         """
         pad_ids = getattr(self, "warp_pad_ids", {})
         unlock = getattr(self, "warp_pad_unlock", {})
+        unlock_s2 = getattr(self, "warp_pad_unlock_stage2", {})
 
-        # Default all in-range pad LevelIDs to type 0 (native vanilla rule).
-        out: Dict[str, Dict[str, int]] = {}
+        def _req(d):
+            return {"type": int(d["type"]), "count": int(d["count"]),
+                    "colour": int(d["colour"])}
+
+        _ZERO = {"type": 0, "count": 0, "colour": -1}
+
+        # Default all in-range pad LevelIDs to type 0 for both stages.
+        out: Dict[str, Dict[str, Dict[str, int]]] = {}
         for meta in pad_ids.values():
             lid = meta["level_id"]
             if 0 <= lid < self.WARP_PAD_ID_RANGE:
-                out[str(lid)] = {"type": 0, "count": 0, "colour": -1}
+                out[str(lid)] = {"stage1": dict(_ZERO), "stage2": dict(_ZERO)}
 
-        # Overlay the per-seed randomized requirements.
+        # Overlay the per-seed randomized requirements (stage 1 + stage 2).
         for pad_name, req in unlock.items():
             meta = pad_ids.get(pad_name)
             if meta is None:
                 continue
             lid = meta["level_id"]
             if 0 <= lid < self.WARP_PAD_ID_RANGE:
-                out[str(lid)] = {
-                    "type": int(req["type"]),
-                    "count": int(req["count"]),
-                    "colour": int(req["colour"]),
-                }
+                out[str(lid)]["stage1"] = _req(req)
+        for pad_name, req in unlock_s2.items():
+            meta = pad_ids.get(pad_name)
+            if meta is None:
+                continue
+            lid = meta["level_id"]
+            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                out[str(lid)]["stage2"] = _req(req)
         return out
 
     def fill_slot_data(self) -> Dict[str, object]:
@@ -302,7 +338,7 @@ class ctrAPWorld(World):
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
             "ctr_options": {
-                "schema_version": 1,
+                "schema_version": 2,
                 "goal": o.goal.value,
                 "relic_min_time": o.rr_required_minimum_time.value,
                 "relics_require_perfect": bool(o.rr_require_perfects.value),

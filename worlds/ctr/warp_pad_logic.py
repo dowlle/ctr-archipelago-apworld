@@ -82,6 +82,17 @@ TRACK_TOKEN_COLOUR = {
 # single_reward = PurpleCtrToken).
 ARENA_TRACKS = {"Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court"}
 
+# The 16 trophy-race pads — the ONLY pads that carry a stage 2 (Icebound's
+# WarpPad.unlock_2; game_world.rs:1196-1231). Stage 2 gates that pad's CTR Token
+# Challenge + 3 relic Time Trials. The 4 arenas (no stage 2: their crystal
+# challenge IS their primary race) and the trials/cups (excluded from HUB_STATIC)
+# have none. HUB_STATIC has the 16 race tracks + 4 arenas, so the trophy pads are
+# exactly HUB_STATIC minus the arenas.
+TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS
+
+# NOTE: HUB_STATIC is defined above; TROPHY_TRACKS is finalised after it so the
+# set comprehension sees the full dict.
+
 # The 5 N. Sanity Beach candidates for the free subset, weighted sizes.
 FREE_CANDIDATES = ["Crash Cove", "Roo's Tubes", "Mystery Caves",
                    "Sewer Speedway", "Skull Rock"]
@@ -323,7 +334,8 @@ def _pad_exit_name(track):
     return f"{track} Warp Pad"
 
 
-def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, start):
+def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
+                                collected, start):
     """Sweep the AP graph with the current inventory + the per-pad requirements
     decided so far, collecting every reachable location's vanilla reward into the
     inventory (to a fixed point). Returns the set of OPEN, still-unassigned pads
@@ -333,7 +345,16 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, star
     passes AND the pad is either free/assigned (pad_reqs has it -> its requirement,
     None=free, is enforced) OR it is the pad we are about to assign (handled by the
     caller: unassigned pads are treated as OPEN with NO extra requirement here, so
-    we discover which pads are *reachable to assign*)."""
+    we discover which pads are *reachable to assign*).
+
+    TWO-STAGE: a trophy pad's CTR-token / relic-race rewards (its STAGE-2 content)
+    are NOT collected until that pad's stage 2 is (a) assigned and (b) satisfied by
+    the current inventory. stage2_reqs is keyed by DESTINATION track (== the region
+    the location lives in, == the 16 trophy tracks, since the race shuffle group
+    permutes the trophy pads only among themselves). A region not yet in
+    stage2_reqs (sentinel 'UNSET') means stage 2 is still closed -> its relic/token
+    rewards stay out of inventory (mirrors Icebound holding second_stage_unlocks
+    back until the same pad's stage 1 is collected)."""
     pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
 
     def passes(reqs):
@@ -379,6 +400,15 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, star
                 tlm = locations.get(tl)
                 if tlm is None or tlm["region"] not in seen or not passes(tlm["gate"]):
                     continue
+                # STAGE-2 gate: relic-race / CTR-token-challenge content on the 16
+                # trophy pads opens only once that pad's stage 2 is assigned AND met.
+                region = meta["region"]
+                if region in TROPHY_TRACKS:
+                    s2 = stage2_reqs.get(region, "UNSET")
+                    if s2 == "UNSET":
+                        continue  # stage 2 not yet assigned -> content still closed
+                    if s2 is not None and not passes([s2]):
+                        continue  # stage-2 requirement not yet satisfied
             if meta["reward"]:
                 inv.add(meta["reward"])
             collected.add(name)
@@ -386,17 +416,88 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, star
     return open_unassigned
 
 
-def run_sphere_search(world, mode, reward_track_for=None):
-    """Returns {track_name: (req_item, count) or None} for all shuffleable pads.
-    None = free pad. mode 2 = random_without_4_keys. Deterministic on world.random.
+def _assign_from_inv(rnd, inv):
+    """Pick a STAGE-1 requirement satisfiable from the CURRENT inventory. Returns
+    (item, count) or None when the inventory is degenerate-empty. Item TYPE is
+    always one currently owned, so the requirement is satisfiable the instant the
+    pad is reached -> solvable by construction. Any* is lowered to a concrete owned
+    colour and the count is clamped to what is owned."""
+    if not any(inv.items[it] > 0 for it in REQ_WEIGHTS):
+        return None
+    req = _choose_requirement(rnd, inv)
+    req = _resolve_any(inv, req)  # lower Any* to a concrete owned colour
+    item, cnt = req
+    owned = inv.count(item)
+    return (item, min(cnt, owned)) if owned > 0 else None
+
+
+# Stage-2 requirements draw from Trophy, Key and the CTR-token colours — the
+# items whose source locations are NOT themselves behind a stage-2 gate once the
+# two-stage reward placement is applied:
+#   - Trophy / Key come from stage-1 trophy/boss races (never behind stage 2).
+#   - CTR tokens are PINNED to their token-challenge locations (see __init__
+#     create_items + Regions.build_token_pin) when two-stage is active, so a
+#     "3 Blue tokens" stage-2 req is met by reaching 3 (earlier, sphere-ordered)
+#     blue challenges -- exactly Icebound's fixed-reward-placement property
+#     (get_random_warppad_unlocks runs requirements over zeroed_out_item_placement).
+# RELICS / GEMS are deliberately NOT used as stage-2 req types: relics are owned by
+# the relic-progression sliders (they may stay in the multiworld pool, so their
+# race locations are not guaranteed to hold a relic), and gems are too scarce. This
+# is the AP-faithful subset of Icebound's req_chances given our reward model; the
+# bootstrap stays solvable because the first trophy pads' stage 2 fall back to
+# Trophy/Key (no tokens collected yet), which then unlock the pinned tokens that
+# later pads' stage 2 can require.
+_STAGE2_ITEMS = ("Trophy", "Key") + TOKEN_ITEMS
+
+
+def _assign_stage2_from_inv(rnd, inv):
+    """Pick a STAGE-2 requirement from owned Trophy / Key / CTR-token items.
+    Mirrors Icebound's weighted pick + 33% AnyCtrToken collapse, then lowers Any*
+    to a concrete owned colour and clamps to owned. Returns (item,count) or None
+    when none of the eligible types are owned (early bootstrap -> handled by the
+    caller leaving stage 2 free until a trophy/key is available)."""
+    cands = [(it, inv.items[it]) for it in _STAGE2_ITEMS if inv.items[it] > 0]
+    if not cands:
+        return None
+    cands.sort()
+    chosen = _weighted_choice(rnd, [(c, REQ_WEIGHTS[c[0]]) for c in cands])
+    req_item, req_cnt = chosen[0], chosen[1]
+    if req_item in TOKEN_ITEMS and rnd.randrange(100) < 33:
+        total = inv.count("AnyCtrToken")
+        req_item, req_cnt = "AnyCtrToken", max(1, math.ceil(total * 0.6))
+    item, cnt = _resolve_any(inv, (req_item, req_cnt))  # lower Any* to owned colour
+    owned = inv.count(item)
+    return (item, min(cnt, owned)) if owned > 0 else None
+
+
+def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False):
+    """Returns {track_name: {1: stage1_req, 2: stage2_req}} for all shuffleable
+    pads. Each req is (item, count) or None (free / no-gate). Stage 2 is non-None
+    only for the 16 trophy pads (others get 2: None). mode 2 = random_without_4_keys.
+    Deterministic on world.random.
+
+    collapse_stage2 (= the autounlock_ctrchallenge_relicrace option): when True,
+    every stage 2 is left OPEN (no requirement) -- Icebound's clear_stage2_unlocks,
+    which overwrites every Stage-Two requirement to Trophy x0 so the relic/token
+    menu opens the instant the trophy race is beaten. The pad's TT/token rewards
+    then collect as soon as the trophy race is reachable (no stage-2 hold-back).
 
     AP-correct, graph-driven port: reachability is computed over the LIVE AP region
     graph (the exact logic AP fill enforces), so every requirement assigned to a
-    pad is provably satisfiable by items collectable strictly BEFORE that pad opens
-    -> the produced DAG is solvable by construction under AP's real rules.
+    pad/stage is provably satisfiable by items collectable strictly BEFORE that
+    pad/stage opens -> the produced DAG is solvable by construction under AP's real
+    rules.
+
+    TWO-STAGE (Icebound port): a trophy pad's stage 2 (its CTR Token Challenge + 3
+    relic Time Trials) is assigned only AFTER that pad's stage 1 (Trophy Race) is
+    collected, drawing from the inventory at that moment -- so a stage-2 requirement
+    can reference items from earlier-opened pads but never the pad's own (still
+    locked) relics/tokens. Mirrors randomize_warppad_requirements.rs:210-217,408-418.
 
     reward_track_for(track) -> the track this physical pad actually loads (handles
-    destination shuffle); defaults to identity.
+    destination shuffle); defaults to identity. Stage 2 is keyed internally by the
+    DESTINATION track (where the relic/token locations live); the caller re-keys it
+    to the physical pad for the slot_data contract.
     """
     rnd = world.random
     if reward_track_for is None:
@@ -415,59 +516,81 @@ def run_sphere_search(world, mode, reward_track_for=None):
     size = _weighted_choice(rnd, FREE_SIZE_WEIGHTS)
     free = rnd.sample(FREE_CANDIDATES, size)
 
-    pad_reqs = {t: None for t in free}  # free pads -> None
+    pad_reqs = {t: None for t in free}  # stage-1 reqs (physical-track keyed)
+    # stage2_reqs: dest-track keyed; only the 16 trophy tracks. When collapsed
+    # (autounlock), pre-set every trophy track to None (= open, no stage-2 gate)
+    # so the loop never assigns one and collection never holds rewards back.
+    stage2_reqs = {t: None for t in TROPHY_TRACKS} if collapse_stage2 else {}
 
     inv = Inv()
     collected = set()
-    _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, start)
+    _reachable_pads_and_collect(
+        inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
     remaining_pads = sorted(t for t in HUB_STATIC if t not in pad_reqs)
 
-    # 2) sphere loop: until every pad has a requirement
+    def _stage2_pending():
+        # A trophy dest track whose Trophy Race is collected but whose stage 2 is
+        # not yet assigned. (All trophy races become collectable once every pad has
+        # a satisfiable stage 1, so this drains to empty.)
+        return any(
+            d not in stage2_reqs and f"{d}: Trophy Race" in collected
+            for d in TROPHY_TRACKS
+        )
+
+    # 2) sphere loop: assign stage-1 reqs to every pad AND stage-2 reqs to every
+    # trophy pad once its trophy race is reachable.
     guard = 0
-    max_iter = len(HUB_STATIC) * 8 + 64
-    while remaining_pads:
+    max_iter = len(HUB_STATIC) * 16 + 128
+    while remaining_pads or _stage2_pending():
         guard += 1
         if guard > max_iter:
             raise RuntimeError("CTR warp-pad sphere-search failed to converge")
 
         open_unassigned = _reachable_pads_and_collect(
-            inv, exits, locations, pad_reqs, collected, start)
-        reachable = sorted(t for t in remaining_pads if t in open_unassigned)
-        if not reachable:
-            # No statically-reachable unassigned pad. Assign the cheapest-Key pad
-            # a FREE-ish minimal requirement so the graph can open further (this is
-            # the rare residual case; counts stay satisfiable because we only ever
-            # pick from currently-owned item types below).
-            reachable = sorted(remaining_pads,
-                               key=lambda t: (_max_key(HUB_STATIC[t]), t))[:1]
+            inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
-        track = rnd.choice(reachable)
+        # 2a) assign stage 2 for any trophy dest track now reachable (its Trophy
+        # Race collected) but still unassigned. Draw from the current inventory --
+        # which excludes that pad's own still-locked relics/tokens.
+        for dest in sorted(TROPHY_TRACKS):
+            if dest in stage2_reqs:
+                continue
+            if f"{dest}: Trophy Race" in collected:
+                stage2_reqs[dest] = _assign_stage2_from_inv(rnd, inv)
+        # re-collect: a just-opened stage 2 may add relics/tokens to inventory.
+        open_unassigned = _reachable_pads_and_collect(
+            inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
-        # choose a requirement TYPE from items currently in inventory. If the
-        # inventory is somehow empty (degenerate), leave the pad free.
-        if any(inv.items[it] > 0 for it in REQ_WEIGHTS):
-            req = _choose_requirement(rnd, inv)
-            req = _resolve_any(inv, req)  # lower Any* to a concrete owned colour
-            # clamp count to what is currently owned (never exceed reachable supply)
-            item, cnt = req
-            owned = inv.count(item)
-            if owned > 0:
-                req = (item, min(cnt, owned))
-            else:
-                req = None
-        else:
-            req = None
-        pad_reqs[track] = req
-        remaining_pads.remove(track)
-
-        # collect newly-reachable rewards now that this pad is open
-        _reachable_pads_and_collect(inv, exits, locations, pad_reqs, collected, start)
+        # 2b) assign stage 1 to one reachable unassigned pad (unchanged logic).
+        if remaining_pads:
+            reachable = sorted(t for t in remaining_pads if t in open_unassigned)
+            if not reachable:
+                # No statically-reachable unassigned pad. Assign the cheapest-Key
+                # pad a minimal requirement so the graph can open further (rare
+                # residual case; counts stay satisfiable since _assign_from_inv only
+                # ever picks currently-owned item types).
+                reachable = sorted(remaining_pads,
+                                   key=lambda t: (_max_key(HUB_STATIC[t]), t))[:1]
+            track = rnd.choice(reachable)
+            pad_reqs[track] = _assign_from_inv(rnd, inv)
+            remaining_pads.remove(track)
+            _reachable_pads_and_collect(
+                inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
     # 3) post-pass (ports lines 465-510), over a sorted copy. Only LOWERS counts,
-    # so it cannot break the solvable DAG built above.
+    # so it cannot break the solvable DAG built above. Applied to both stages.
     _post_process(rnd, pad_reqs, mode)
-    return pad_reqs
+    _post_process(rnd, stage2_reqs, mode)
+
+    # 4) assemble {track: {1: stage1, 2: stage2}}. Stage 2 for a physical pad is
+    # the req keyed by the track it LOADS (reward_track_for); non-trophy pads have
+    # no stage 2.
+    out = {}
+    for t in HUB_STATIC:
+        s2 = stage2_reqs.get(reward_track_for(t)) if t in TROPHY_TRACKS else None
+        out[t] = {1: pad_reqs.get(t), 2: s2}
+    return out
 
 
 def _post_process(rnd, pad_reqs, mode):

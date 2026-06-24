@@ -137,9 +137,18 @@ def add_time_trial_and_ctr_requirements(world, player):
     """
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
     except for bonus tracks like Slide Coliseum and Turbo Track.
+
+    TWO-STAGE: for the 16 trophy pads in randomized mode, the track's CTR Token
+    Challenge + 3 relic Time Trials carry a STAGE-2 requirement ANDed on top of the
+    Trophy-Race-reachable rule (stage 1). world.warp_pad_unlock_stage2_concrete is
+    keyed by DESTINATION track (== the location's own track prefix, since these
+    locations live in the destination region under shuffle) -> {(item,count)}.
+    Empty in vanilla mode / for pads with no stage 2 -> the rule is the plain
+    can_reach(Trophy Race), exactly as before.
     """
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
+    stage2 = getattr(world, "warp_pad_unlock_stage2_concrete", {})
 
     for loc in mw.get_locations(player):
         name = loc.name
@@ -155,9 +164,21 @@ def add_time_trial_and_ctr_requirements(world, player):
                 f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
             continue
 
-        def rule(state: CollectionState, t=trophy_name, p=player):
-            return state.can_reach(t, "Location", p)
+        s2 = stage2.get(track_prefix)
+        if s2 is not None:
+            s2_item, s2_count = s2
+
+            def rule(state: CollectionState, t=trophy_name, p=player,
+                     i=s2_item, n=s2_count):
+                return state.can_reach(t, "Location", p) and state.has(i, p, n)
+
+            logging.debug(
+                f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
+        else:
+            def rule(state: CollectionState, t=trophy_name, p=player):
+                return state.can_reach(t, "Location", p)
+
+            logging.debug(
+                f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
         loc.access_rule = rule
-        logging.debug(
-            f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
