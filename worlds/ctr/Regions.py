@@ -4,7 +4,6 @@ from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
-    TROPHY_TRACKS, _token_colour,
 )
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -104,8 +103,8 @@ def create_regions(world: "ctrAPWorld"):
     # access rules is keyed by DESTINATION track (where those locations live).
     world.warp_pad_unlock_stage2 = {}            # physical-pad keyed (slot_data)
     world.warp_pad_unlock_stage2_concrete = {}   # dest-track keyed (AP rules)
-    world.stage2_pin = {}                         # loc_name -> reward item (two-stage)
     world._ctr_two_stage_active = False
+    world._ctr_force_collapse_stage2 = False      # density-adaptive collapse (create_items)
 
     # Destination shuffle. Build the NON-IDENTITY warp_pad_map FIRST so the
     # sphere-search rewards each physical pad with the rewards of the track it
@@ -159,6 +158,20 @@ def create_regions(world: "ctrAPWorld"):
             for loc in region.locations:
                 if loc.name.endswith(": Trophy Race"):
                     loc.logic_text = "True"
+
+    # TRIAL pads (Slide Coliseum / Turbo Track): in randomized mode their warp-pad
+    # exit carries a randomized SINGLE-STAGE entry requirement (sphere-search), so
+    # strip the vanilla relic/gem gate from the exit access rule and keep ONLY the
+    # hub Key gate (Gem Stone Valley is behind Key 1). The randomized requirement is
+    # ANDed on top in Rules.add_warp_pad_unlock_rules. The 3 relic Time Trials inside
+    # the trial region have no Trophy Race, so they are gated purely by reaching the
+    # (now randomized) pad. Vanilla mode (0) keeps the real relic/gem gate untouched.
+    _TRIAL_PAD_EXITS = ("Slide Coliseum Warp Pad", "Turbo Track Warp Pad")
+    if unlock_mode in (1, 2):
+        for reg in data["regions"]:
+            for ex in reg.get("exits", []):
+                if ex["name"] in _TRIAL_PAD_EXITS:
+                    ex["access_rule"] = "has('Key', 1)"
 
     # AP destination shuffle: rewire each shuffled warp-pad exit to the track
     # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons
@@ -256,9 +269,11 @@ def create_regions(world: "ctrAPWorld"):
                 continue  # battle arenas not in this seed's shuffle pool
             if kind in ("cup",):
                 continue  # gem cups stay native-fixed
-            # 'trial' (Slide/Turbo): Rust gives them stage-1-free; keep native-fixed
-            if kind == "trial":
-                continue
+            # 'trial' (Slide/Turbo): SINGLE-STAGE randomized -- the sphere-search
+            # assigned a stage-1 entry requirement (stages[2] is always None for a
+            # non-TROPHY_TRACK), wired as a normal single-stage node. No longer
+            # native-fixed (Stef's OPEN model). The to_slot_req(s2) below yields the
+            # native "no stage 2" sentinel for them automatically.
             s1 = stages[1]
             s2 = stages[2]
             # STAGE 1 (unchanged contract).
@@ -275,39 +290,15 @@ def create_regions(world: "ctrAPWorld"):
                 dest_track = reward_track_for(track)
                 world.warp_pad_unlock_stage2_concrete[dest_track] = s2
 
-        # Stage-2 content pinning (two-stage active only): reproduce Icebound's
-        # FIXED reward placement for the entire stage-2 layer so the two-stage gates
-        # are solvable under AP's reward-agnostic fill. Each of the 16 trophy pads'
-        # CTR Token Challenge + 3 relic Time Trials is locked to its own vanilla
-        # reward (place_locked_item, out of the multiworld pool). This is the
-        # load-bearing fix: without it those 64 locations hold pool items but sit
-        # behind stage-2 gates, so AP's greedy fill_restrictive runs out of early
-        # free locations to place the progression that opens the gates (verified:
-        # locations are all reachable under full inventory, but fill can't order
-        # them). With the content pinned, the relic/token a stage-2 req needs comes
-        # from earlier sphere-ordered challenges, never the pool -> solvable, exactly
-        # as Icebound's get_random_warppad_unlocks reasons over zeroed_out_item_placement.
-        # Token colour follows the sphere's assumption (loaded/destination track).
-        # NOTE: this supersedes the relic-progression sliders for the 16 trophy pads
-        # while two-stage is active (their relics are structurally pinned here); the
-        # sliders still govern the 2 trial pads (Slide/Turbo) and all of vanilla /
-        # autounlock-collapse modes. create_items reads world.stage2_pin.
-        if world._ctr_two_stage_active:
-            sp = {}
-            _tier_relic = {
-                "Sapphire Time Trial": "Sapphire Relic",
-                "Gold Time Trial": "Gold Relic",
-                "Platinum Time Trial": "Platinum Relic",
-            }
-            for track in TROPHY_TRACKS:
-                tok = f"{track}: CTR Token Challenge"
-                if tok in world.location_name_to_id:
-                    colour = _token_colour(track, reward_track_for(track))
-                    sp[tok] = f"{colour} CTR Token"
-                for _sfx, _relic in _tier_relic.items():
-                    rloc = f"{track}: {_sfx}"
-                    if rloc in world.location_name_to_id:
-                        sp[rloc] = _relic
-            world.stage2_pin = sp
+        # NO reward pinning (Stef's OPEN model). The relic Time Trials and CTR Token
+        # Challenges keep flowing through the NORMAL multiworld pool and the relic-tier
+        # sliders exactly as on main -- relics appear as genuine progression items, not
+        # locked-to-location vanilla rewards. Solvability of the stage-2 gates is
+        # provided by (a) the sphere-search only ever assigning a stage-2 requirement
+        # whose item TYPE is owned in the synthetic inventory at that sphere, and (b)
+        # the per-pad RELAX-not-pin fallback (warp_pad_logic.run_sphere_search) that
+        # collapses a pad's tier 2 to equal its tier 1 when nothing is ownable. AP's
+        # fill_restrictive then seats the required progression in the (now un-pinned,
+        # plentiful) reachable location frontier. stage2_pin stays empty.
 
     return regions

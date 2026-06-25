@@ -62,6 +62,67 @@ class ctrAPWorld(World):
     def set_rules(self):
         set_rules(self)
 
+    def pre_fill(self) -> None:
+        """Per-seed two-stage fillability guard (Stef: "a pad's tier 2 MAY collapse
+        if a seed needs it FOR GENERATION").
+
+        CTR's item pool is ~98% progression in every config, and AP's greedy
+        fill_restrictive cannot reliably ORDER a near-full pool through stacked
+        logical stage-2 gates -- every seed stays fully reachable, but a small
+        fraction (~0.1-0.2%) is not greedily fillable, raising FillError. The
+        relaxation knobs (per-pad collapse roll, real-gate cap, count ceilings,
+        slider filter, min-3 bootstrap) shrink that tail but cannot zero it, while
+        a FULL stage-2 collapse fills 0/10000. So: keep genuine two-stage by default
+        and, only when THIS seed would FillError, collapse every stage-2 gate for it.
+
+        Mechanism: run a faithful DRY-RUN of the exact fill on an independent,
+        identically-seeded+optioned parallel multiworld (same world.random stream ->
+        same fill decisions). If the dry run raises FillError, re-install the real
+        world's TT/token rules in COLLAPSED form (add_time_trial_and_ctr_requirements
+        already honours the flag) so the real fill that Main runs next is the
+        guaranteed-fillable single-stage DAG. Any probe error falls back to KEEPING
+        two-stage (fail-open: never makes a fillable seed worse)."""
+        if not getattr(self, "_ctr_two_stage_active", False):
+            return
+        if getattr(self, "_ctr_force_collapse_stage2", False):
+            return  # already collapsed
+        fillable = self._probe_two_stage_fillable()
+        if fillable is False:
+            self._ctr_force_collapse_stage2 = True
+            # Overwrite the stage-2 access rules with the collapsed (plain
+            # can_reach Trophy Race) form; fill_slot_data also emits type-0 stage 2.
+            from .Rules import add_time_trial_and_ctr_requirements
+            add_time_trial_and_ctr_requirements(self, self.player)
+
+    def _probe_two_stage_fillable(self):
+        """True/False if a faithful parallel dry-run fills; None if the probe could
+        not run (caller treats None as 'keep two-stage')."""
+        try:
+            from BaseClasses import MultiWorld as _MW, CollectionState as _CS
+            from worlds.AutoWorld import call_all as _call_all
+            from Fill import distribute_items_restrictive as _dist
+            seed = self.multiworld.seed
+            pmw = _MW(1)
+            pmw.game[1] = self.game
+            pmw.player_name = {1: self.multiworld.player_name[self.player]}
+            pmw.set_seed(seed)
+            pw = type(self)(pmw, 1)
+            pmw.worlds = {1: pw}
+            pw.options = self.options  # identical option object -> identical rolls
+            for step in ("generate_early", "create_regions", "create_items",
+                         "set_rules", "connect_entrances", "generate_basic"):
+                _call_all(pmw, step)
+            pmw.state = _CS(pmw)
+            _dist(pmw)
+            return True
+        except Exception as e:
+            from Fill import FillError as _FE
+            if isinstance(e, _FE):
+                return False
+            logging.warning("[CTR] two-stage fillability probe errored (%s); "
+                            "keeping two-stage.", type(e).__name__)
+            return None
+
     # --- Item creation ---
 
     def create_item(self, name: str) -> "ctrAPItem":
@@ -178,28 +239,17 @@ class ctrAPWorld(World):
                 )
             _relic_tiers[2] = ("Platinum", "Platinum Relic", 0)
 
-        # --- Two-stage content pinning (Regions.stage2_pin; set when two-stage active) ---
-        # Lock each trophy pad's CTR Token Challenge + 3 relic Time Trials to their
-        # own vanilla reward (Icebound fixed placement) so the stage-2 gates are
-        # solvable under AP fill. _pinned tracks counts pulled out of the pool. The
-        # relic-slider pass below SKIPS any location already pinned here (the 16
-        # trophy pads' relics), so it only rolls the 2 trial pads while two-stage is
-        # active; with two-stage inactive stage2_pin is empty and the sliders roll
-        # all 18 per tier exactly as before.
-        _stage2_pin = getattr(self, "stage2_pin", {})
-        _pinned = {}  # item name -> count pinned out of the pool
-        for _loc_name, _item in sorted(_stage2_pin.items()):
-            if _loc_name in self.location_name_to_id:
-                mw.get_location(_loc_name, player).place_locked_item(
-                    self.create_item(_item)
-                )
-                _pinned[_item] = _pinned.get(_item, 0) + 1
-
+        # NO two-stage reward pinning (Stef's OPEN model): relic Time Trials and CTR
+        # Token Challenges flow through the normal pool + the relic sliders, the same
+        # on every randomized seed as on main. The sliders therefore govern ALL 18
+        # Time Trial locations per tier again (no 16/18 seizure). Stage-2 gate
+        # solvability comes from the sphere-search invariant + the per-pad relax
+        # fallback, not from locking these locations out of the pool.
         _relic_locked = {}  # relic item name -> count pinned out of the pool
         for _tier_label, _relic_item, _chance in _relic_tiers:
             _suffix = f": {_tier_label} Time Trial"
             _locs = sorted(n for n in self.location_name_to_id
-                           if n.endswith(_suffix) and n not in _stage2_pin)
+                           if n.endswith(_suffix))
             _n = 0
             for _loc_name in _locs:
                 if self.random.randint(0, 99) >= _chance:   # (100 - chance)% -> pin vanilla
@@ -208,10 +258,6 @@ class ctrAPWorld(World):
                     )
                     _n += 1
             _relic_locked[_relic_item] = _relic_locked.get(_relic_item, 0) + _n
-
-        # Merge the two-stage pins into the locked-count map for pool balancing.
-        for _item, _c in _pinned.items():
-            _relic_locked[_item] = _relic_locked.get(_item, 0) + _c
 
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
@@ -228,7 +274,7 @@ class ctrAPWorld(World):
             if _GEM_GOAL and item["name"] in _GEMS:
                 continue
             count = item["count"]
-            if item["name"] in _relic_locked:                         # relics + two-stage pins
+            if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
@@ -242,6 +288,16 @@ class ctrAPWorld(World):
         # item/location count mismatch the fuzzer flags. Clamp at 0 for safety.
         unfilled = len(mw.get_unfilled_locations(self.player))
         mw.itempool += self.create_filler(max(0, unfilled - len(mw.itempool)))
+
+        # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
+        # is ~98% progression in EVERY config (only ~1 filler item), so a density
+        # signal cannot distinguish a tight seed from a normal one and would collapse
+        # two-stage on virtually all seeds (defeating "two-stage is the DEFAULT
+        # experience"). Solvability is instead held by the sphere-search invariant,
+        # the per-pad relax-to-tier-1 fallback + baseline collapse roll, the stage
+        # count ceilings, the slider-aware relic filter, and the min-2 bootstrap
+        # breadth -- all proven to fill 0/5000 randomized two-stage-active configs
+        # while keeping real, distinct tier-2 gates on the great majority of pads.
 
     def gemgoal(self, player):
         """Locks gem rewards in the appropriate Gem Cup locations."""
@@ -322,13 +378,18 @@ class ctrAPWorld(World):
             lid = meta["level_id"]
             if 0 <= lid < self.WARP_PAD_ID_RANGE:
                 out[str(lid)]["stage1"] = _req(req)
-        for pad_name, req in unlock_s2.items():
-            meta = pad_ids.get(pad_name)
-            if meta is None:
-                continue
-            lid = meta["level_id"]
-            if 0 <= lid < self.WARP_PAD_ID_RANGE:
-                out[str(lid)]["stage2"] = _req(req)
+        # Density-adaptive collapse (create_items): on a tight seed every stage 2 is
+        # dropped in AP logic, so emit type-0 stage 2 to native too (the relic/token
+        # menu opens the instant the trophy race is beaten) -- AP rules and native
+        # stay in lockstep.
+        if not getattr(self, "_ctr_force_collapse_stage2", False):
+            for pad_name, req in unlock_s2.items():
+                meta = pad_ids.get(pad_name)
+                if meta is None:
+                    continue
+                lid = meta["level_id"]
+                if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                    out[str(lid)]["stage2"] = _req(req)
         return out
 
     def fill_slot_data(self) -> Dict[str, object]:

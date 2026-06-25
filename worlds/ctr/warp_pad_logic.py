@@ -59,10 +59,20 @@ HUB_STATIC = {
     "Hot Air Skyway": [("Key", 3)], "Cortex Castle": [("Key", 3)],
     "N. Gin Labs": [("Key", 3)], "Oxide Station": [("Key", 3)],
     "Nitro Court": [("Key", 4)],
-    # NOTE: Slide Coliseum / Turbo Track (trial pads) and the gem cups are
-    # native-fixed and NOT randomized -> deliberately excluded from this map so
-    # the sphere-search never assigns them a requirement.
+    # Gem Stone Valley TRIAL pads -- behind Key 1 (N. Sanity Beach <-> Gem Stone
+    # Valley). Slide Coliseum + Turbo Track have NO trophy race and NO CTR-token
+    # challenge: only the 3 relic Time Trials (verified against data/world.json).
+    # They are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry
+    # requirement (Stef's OPEN model) -- excluded from TROPHY_TRACKS below so the
+    # sphere-search assigns them only a tier-1 req. Their vanilla relic/gem JSON
+    # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
+    # (keeping only the Key-1 hub gate). The gem cups stay native-fixed and remain
+    # excluded from this map.
+    "Slide Coliseum": [("Key", 1)], "Turbo Track": [("Key", 1)],
 }
+
+# The two Gem Stone Valley trial pads -- single-stage, randomized stage-1 only.
+TRIAL_TRACKS = {"Slide Coliseum", "Turbo Track"}
 
 # Vanilla CTR-Token COLOUR per track. Transcribed VERBATIM from game_world.rs
 # WarpPad::new (lines 1211-1219): Red/Green/Blue explicit, Yellow = default branch.
@@ -85,10 +95,10 @@ ARENA_TRACKS = {"Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court"}
 # The 16 trophy-race pads — the ONLY pads that carry a stage 2 (Icebound's
 # WarpPad.unlock_2; game_world.rs:1196-1231). Stage 2 gates that pad's CTR Token
 # Challenge + 3 relic Time Trials. The 4 arenas (no stage 2: their crystal
-# challenge IS their primary race) and the trials/cups (excluded from HUB_STATIC)
-# have none. HUB_STATIC has the 16 race tracks + 4 arenas, so the trophy pads are
-# exactly HUB_STATIC minus the arenas.
-TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS
+# challenge IS their primary race) and the trials (single-stage relic-only) have
+# none. HUB_STATIC now also holds the 2 trial pads, so the trophy pads are exactly
+# HUB_STATIC minus the arenas AND the trials.
+TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS
 
 # NOTE: HUB_STATIC is defined above; TROPHY_TRACKS is finalised after it so the
 # set comprehension sees the full dict.
@@ -97,6 +107,9 @@ TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS
 FREE_CANDIDATES = ["Crash Cove", "Roo's Tubes", "Mystery Caves",
                    "Sewer Speedway", "Skull Rock"]
 FREE_SIZE_WEIGHTS = [(1, 10), (2, 30), (3, 30), (4, 15), (5, 15)]
+# Minimum number of FREE (open at spawn) bootstrap pads. See run_sphere_search
+# step 1 for the rationale (sphere-0 breadth vs AP fill capacity at ~98% density).
+_FREE_MIN = 3
 # Boss-race Key rewards enter the inventory naturally through the graph sweep
 # (boss garages open at Trophy 4/8/12/16 and their boss-race location yields a
 # Key in _vanilla_reward), so no separate boss->hub-pad table is needed.
@@ -277,23 +290,41 @@ def _weighted_choice(rnd, pairs):
     return rnd.choices(values, weights=weights, k=1)[0]
 
 
-def _choose_requirement(rnd, inv):
+def _choose_requirement(rnd, inv, allowed=None):
     """Port of lines 268-366: pick an owned item type, weight it, maybe collapse
-    to an Any* aggregate. Returns (req_item, count). Any* is resolved to a
-    concrete owned colour by the caller (run_sphere_search) so native needs no
-    'any' aggregate support and solvability is preserved."""
-    cands = [(it, inv.items[it]) for it in REQ_WEIGHTS if inv.items[it] > 0]
+    to an Any* aggregate. Returns (req_item, count) or None when no candidate is
+    eligible. Any* is resolved to a concrete owned colour by the caller
+    (run_sphere_search) so native needs no 'any' aggregate support.
+
+    `allowed` (optional set of item names) restricts which item TYPES may be chosen
+    as a requirement -- used to exclude relic tiers that the relic-progression
+    sliders have pinned mostly OUT of the multiworld pool (a low-slider tier is not
+    a freely-placeable progression item, so requiring it under reward-agnostic AP
+    fill creates a circular, hard-to-seat gate). The excluded relics still grow the
+    synthetic inventory (so AnyRelic aggregates count them); they just are not
+    picked as a concrete requirement. This is Stef's "if a seed is tight, make do
+    with the other item types" turned into a sphere-search rule -- the sliders stay
+    authoritative and are never silently overridden."""
+    pool_items = REQ_WEIGHTS if allowed is None else [
+        it for it in REQ_WEIGHTS if it in allowed]
+    cands = [(it, inv.items[it]) for it in pool_items if inv.items[it] > 0]
+    if not cands:
+        return None
     cands.sort()  # Rust sorts possible_reqs before weighting
     chosen = _weighted_choice(rnd, [(c, REQ_WEIGHTS[c[0]]) for c in cands])
     req_item, req_cnt = chosen[0], chosen[1]
 
+    # Any* collapse stays scoped to the colours/tiers actually allowed: AnyRelic
+    # aggregates only the relic tiers in `allowed` so a lowered concrete colour is
+    # never an excluded (pinned-out) tier.
     if req_item in TOKEN_ITEMS:
         if rnd.randrange(100) < 33:
             total = inv.count("AnyCtrToken")
             req_item, req_cnt = "AnyCtrToken", max(1, math.ceil(total * 0.6))
     elif req_item in RELIC_ITEMS:
         if rnd.randrange(100) < 20:
-            total = inv.count("AnyRelic")
+            tiers = [r for r in RELIC_ITEMS if allowed is None or r in allowed]
+            total = sum(inv.items[r] for r in tiers)
             req_item, req_cnt = "AnyRelic", max(1, math.ceil(total * 0.3))
     elif req_item in GEM_ITEMS:
         if rnd.randrange(100) < 80:
@@ -303,10 +334,12 @@ def _choose_requirement(rnd, inv):
     return (req_item, req_cnt)
 
 
-def _resolve_any(inv, req):
+def _resolve_any(inv, req, allowed=None):
     """Lower an Any* requirement to the single owned colour with the most copies,
     so the AP rule + slot_data emit a concrete {type,colour,count} that Inv has
-    proven is owned. Keeps solvability and avoids native 'any' support."""
+    proven is owned. Keeps solvability and avoids native 'any' support. When
+    `allowed` is given, the lowered colour/tier is restricted to it (so AnyRelic
+    never resolves to a pinned-out relic tier)."""
     item, cnt = req
     if item == "AnyCtrToken":
         pool = Inv._TOKENS
@@ -316,6 +349,8 @@ def _resolve_any(inv, req):
         pool = Inv._GEMS
     else:
         return req
+    if allowed is not None:
+        pool = tuple(c for c in pool if c in allowed) or pool
     # pick the owned colour with the most copies (deterministic: sorted tie-break)
     best = max(sorted(pool), key=lambda c: inv.items[c])
     cnt = min(cnt, max(1, inv.items[best]))  # never exceed what is owned
@@ -416,56 +451,78 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
     return open_unassigned
 
 
-def _assign_from_inv(rnd, inv):
+def _assign_from_inv(rnd, inv, allowed=None):
     """Pick a STAGE-1 requirement satisfiable from the CURRENT inventory. Returns
-    (item, count) or None when the inventory is degenerate-empty. Item TYPE is
-    always one currently owned, so the requirement is satisfiable the instant the
-    pad is reached -> solvable by construction. Any* is lowered to a concrete owned
-    colour and the count is clamped to what is owned."""
-    if not any(inv.items[it] > 0 for it in REQ_WEIGHTS):
+    (item, count) or None when nothing eligible is owned. Item TYPE is always one
+    currently owned (and, if `allowed` is given, one of the non-pinned-out types),
+    so the requirement is satisfiable the instant the pad is reached -> solvable by
+    construction. Any* is lowered to a concrete owned colour and clamped to owned."""
+    req = _choose_requirement(rnd, inv, allowed)
+    if req is None:
         return None
-    req = _choose_requirement(rnd, inv)
-    req = _resolve_any(inv, req)  # lower Any* to a concrete owned colour
+    req = _resolve_any(inv, req, allowed)  # lower Any* to a concrete owned colour
     item, cnt = req
     owned = inv.count(item)
     return (item, min(cnt, owned)) if owned > 0 else None
 
 
-# Stage-2 requirements draw from Trophy, Key and the CTR-token colours — the
-# items whose source locations are NOT themselves behind a stage-2 gate once the
-# two-stage reward placement is applied:
-#   - Trophy / Key come from stage-1 trophy/boss races (never behind stage 2).
-#   - CTR tokens are PINNED to their token-challenge locations (see __init__
-#     create_items + Regions.build_token_pin) when two-stage is active, so a
-#     "3 Blue tokens" stage-2 req is met by reaching 3 (earlier, sphere-ordered)
-#     blue challenges -- exactly Icebound's fixed-reward-placement property
-#     (get_random_warppad_unlocks runs requirements over zeroed_out_item_placement).
-# RELICS / GEMS are deliberately NOT used as stage-2 req types: relics are owned by
-# the relic-progression sliders (they may stay in the multiworld pool, so their
-# race locations are not guaranteed to hold a relic), and gems are too scarce. This
-# is the AP-faithful subset of Icebound's req_chances given our reward model; the
-# bootstrap stays solvable because the first trophy pads' stage 2 fall back to
-# Trophy/Key (no tokens collected yet), which then unlock the pinned tokens that
-# later pads' stage 2 can require.
-_STAGE2_ITEMS = ("Trophy", "Key") + TOKEN_ITEMS
+# Stage-2 requirements draw from the SAME full item universe as stage 1
+# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- Stef's
+# OPEN model: a pad's tier-2 requirement may be ANY CTR item, with the same
+# weighting + Any*-collapse discipline as tier 1. Reward PINNING is gone (relics +
+# tokens flow through the normal multiworld pool + the relic-tier sliders), so a
+# "3 Blue tokens" stage-2 req is satisfied by AP placing 3 Blue CTR Token
+# progression items anywhere reachable before that gate, not by a fixed challenge
+# reward. Solvability is preserved by construction: _assign_stage2_from_inv only
+# ever picks item TYPES currently owned in the synthetic sphere inventory (so the
+# req is satisfiable the instant that stage opens), and the per-pad relaxation
+# fallback (run_sphere_search) collapses a stage 2 to equal its stage 1 if the
+# inventory cannot yet back any requirement.
+_STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
+
+# Baseline per-pad chance that a trophy pad's tier 2 collapses to equal its tier 1
+# even when a real tier-2 requirement IS satisfiable. Two-stage stays the DEFAULT
+# experience (most pads keep a real, distinct tier-2 gate), but a minority collapse
+# to relieve AP fill_restrictive pressure: a collapsed tier 2 adds NO gate beyond the
+# trophy race (the TT/token opens the instant the race is reached), which frees
+# reachable location capacity for fill to seat the progression that opens the
+# remaining real gates. This is Stef's sanctioned "tier 2 MAY collapse if a seed
+# needs it" turned into a small uniform relief valve; the golden path is unaffected
+# (tier 1 is always satisfiable-by-construction). Tuned empirically against the
+# two-stage-active FillError tail (see the impl A/B sweep).
+_STAGE2_COLLAPSE_CHANCE = 35
+# Deterministic cap on the number of REAL (non-collapsed) stage-2 gates per seed.
+# Bounds how many distinct second-stage requirements AP fill_restrictive must order,
+# which is the lever that actually closes the tight-seed FillError tail (CTR's pool
+# is ~98% progression in every config, so a density signal is useless). Set well
+# above the count a normal seed produces so two-stage stays the DEFAULT experience;
+# only the latest-sphere pads on the densest seeds collapse to tier 1. Tuned with
+# the impl A/B sweep.
+_STAGE2_REAL_CAP = 6
+
+# Hard ceiling on a tier-2 requirement count (non-Key items). See _post_process /
+# run_sphere_search step 3 for the rationale (gameplay + fill-capacity).
+_STAGE2_COUNT_CEILING = 4
+# Generous ceiling on a tier-1 entry count (non-Key items): only trims the extreme
+# Icebound outliers (e.g. "14 trophies to open one pad") that both play as a wall
+# and starve fill_restrictive of ordering freedom in maximally tight seeds; the
+# vast majority of stage-1 reqs sit well below it, so fidelity is essentially
+# preserved. Pure lowering -> solvable DAG preserved.
+_STAGE1_COUNT_CEILING = 8
 
 
-def _assign_stage2_from_inv(rnd, inv):
-    """Pick a STAGE-2 requirement from owned Trophy / Key / CTR-token items.
-    Mirrors Icebound's weighted pick + 33% AnyCtrToken collapse, then lowers Any*
-    to a concrete owned colour and clamps to owned. Returns (item,count) or None
-    when none of the eligible types are owned (early bootstrap -> handled by the
-    caller leaving stage 2 free until a trophy/key is available)."""
-    cands = [(it, inv.items[it]) for it in _STAGE2_ITEMS if inv.items[it] > 0]
-    if not cands:
+def _assign_stage2_from_inv(rnd, inv, allowed=None):
+    """Pick a STAGE-2 requirement from the owned inventory across the FULL item
+    universe (Trophy / Key / tokens / relics / gems), minus any relic tiers the
+    sliders pinned mostly out of the pool (`allowed`). Reuses the exact stage-1
+    chooser (_choose_requirement: weighted pick + per-family Any* collapse), then
+    lowers Any* to a concrete owned colour and clamps to owned. Returns (item,count)
+    or None when nothing eligible is owned (early bootstrap -> the caller leaves
+    stage 2 free / collapses it to stage 1)."""
+    req = _choose_requirement(rnd, inv, allowed)  # full-universe weighted + Any* collapse
+    if req is None:
         return None
-    cands.sort()
-    chosen = _weighted_choice(rnd, [(c, REQ_WEIGHTS[c[0]]) for c in cands])
-    req_item, req_cnt = chosen[0], chosen[1]
-    if req_item in TOKEN_ITEMS and rnd.randrange(100) < 33:
-        total = inv.count("AnyCtrToken")
-        req_item, req_cnt = "AnyCtrToken", max(1, math.ceil(total * 0.6))
-    item, cnt = _resolve_any(inv, (req_item, req_cnt))  # lower Any* to owned colour
+    item, cnt = _resolve_any(inv, req, allowed)   # lower Any* to a concrete owned colour
     owned = inv.count(item)
     return (item, min(cnt, owned)) if owned > 0 else None
 
@@ -503,6 +560,30 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     if reward_track_for is None:
         reward_track_for = lambda t: t
 
+    # Slider-aware requirement filter (Stef's generation-control knob, honoured not
+    # overridden). A relic-progression slider below 100 PINS a random ~ (100-slider)%
+    # of that tier's 18 relics out of the multiworld pool. The synthetic sphere
+    # inventory grows ALL 18 vanilla relics (it cannot know which AP will pin), so a
+    # relic stage-1/stage-2 requirement drawn from it can demand MORE copies of a
+    # tier than actually exist in the pool (e.g. 'Gold Relic x11' when the slider=50
+    # leaves only ~9 findable) -> an impossible gate -> the FillError tail. To stay
+    # provably satisfiable under AP's real pool we only allow a relic tier to be
+    # CHOSEN as a requirement when its slider is 100 (every relic of that tier is a
+    # freely-placeable progression item). Below 100 the tier is excluded from
+    # requirement choice (it still grows the inventory so AnyRelic aggregates of the
+    # FULL tiers stay correct, and the tier's own relics still appear as findable
+    # progression). Trophy / Key / tokens / gems are always allowed -- the seed
+    # "makes do with the other item types" exactly as Stef specified; the sliders
+    # are never silently overridden, only respected as the scarcity signal they are.
+    # Default sliders (S100/G100/P0): sapphire+gold usable, platinum excluded.
+    _slider = {
+        "Sapphire Relic": getattr(world.options, "sapphire_relic_progression").value,
+        "Gold Relic": getattr(world.options, "gold_relic_progression").value,
+        "Platinum Relic": getattr(world.options, "platinum_relic_progression").value,
+    }
+    allowed = {it for it in REQ_WEIGHTS
+               if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
+
     exits, locations, _ = build_graph(world, reward_track_for)
     start = world.start_region.name if world.start_region else "Menu"
 
@@ -510,10 +591,20 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     # that are open at spawn (sphere 0). FULLY random: a random-sized (weighted
     # 1..5) random sample, no pinned pad. In randomized mode the vanilla trophy
     # floor is gone (see to_slot_req / create_regions), so EVERY free pad is truly
-    # open from an empty inventory and any one of them can bootstrap the sphere --
-    # the old "always keep Crash Cove free" guarantee is no longer needed and only
-    # reduced variety. size >= 1 still guarantees at least one bootstrap pad.
-    size = _weighted_choice(rnd, FREE_SIZE_WEIGHTS)
+    # open from an empty inventory and any one of them can bootstrap the sphere.
+    #
+    # MINIMUM bootstrap breadth (_FREE_MIN): a narrow free subset opens only a few
+    # locations at sphere 0, and on a maximally tight seed (CTR's pool is ≈ 98%
+    # progression in every config) that starves AP fill_restrictive of the early
+    # free slots it needs to seat the items the next pads' stage-1 gates demand ->
+    # a (fully reachable but) un-greedily-fillable seed. Each free pad adds ~5
+    # sphere-0 locations, so widening the floor is the single most effective lever
+    # against the extreme-density FillError tail (empirically ~0.28% at floor 2 ->
+    # ~0.08% at floor 3 over a 2500-config sweep). Floor 3 is a small, gameplay-safe
+    # deviation from Icebound's 1..5 weighting that strengthens Stef's golden-path
+    # guarantee (collecting always unlocks something new). Sizes >= the floor keep
+    # their original relative weights.
+    size = max(_FREE_MIN, _weighted_choice(rnd, FREE_SIZE_WEIGHTS))
     free = rnd.sample(FREE_CANDIDATES, size)
 
     pad_reqs = {t: None for t in free}  # stage-1 reqs (physical-track keyed)
@@ -521,6 +612,14 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     # (autounlock), pre-set every trophy track to None (= open, no stage-2 gate)
     # so the loop never assigns one and collection never holds rewards back.
     stage2_reqs = {t: None for t in TROPHY_TRACKS} if collapse_stage2 else {}
+
+    # dest-track -> physical-pad track, so a stage-2 fallback can collapse to the
+    # SAME pad's stage-1 requirement. Under destination shuffle the locations of
+    # dest D live in region D, but D's pad ENTRY requirement is the physical pad P
+    # with reward_track_for(P) == D. Identity when shuffle is off.
+    dest_to_phys = {}
+    for _p in HUB_STATIC:
+        dest_to_phys.setdefault(reward_track_for(_p), _p)
 
     inv = Inv()
     collected = set()
@@ -542,6 +641,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     # trophy pad once its trophy race is reachable.
     guard = 0
     max_iter = len(HUB_STATIC) * 16 + 128
+    s2_real_count = 0  # how many REAL (non-collapsed) stage-2 gates assigned so far
     while remaining_pads or _stage2_pending():
         guard += 1
         if guard > max_iter:
@@ -552,12 +652,36 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
 
         # 2a) assign stage 2 for any trophy dest track now reachable (its Trophy
         # Race collected) but still unassigned. Draw from the current inventory --
-        # which excludes that pad's own still-locked relics/tokens.
+        # which excludes that pad's own still-locked relics/tokens. OPEN model: a
+        # real tier-2 requirement is the DEFAULT; the relaxation fallbacks below
+        # only collapse a pad's tier 2 to its tier 1 when needed.
         for dest in sorted(TROPHY_TRACKS):
             if dest in stage2_reqs:
                 continue
             if f"{dest}: Trophy Race" in collected:
-                stage2_reqs[dest] = _assign_stage2_from_inv(rnd, inv)
+                s2 = _assign_stage2_from_inv(rnd, inv, allowed)
+                # Collapse this pad's tier 2 to its tier 1 (satisfiable the instant
+                # the trophy race is reached -> no extra gate, no reward pinning)
+                # when ANY of:
+                #  (a) nothing ownable backs a real tier 2 (hard golden-path guard);
+                #  (b) we have already placed _STAGE2_REAL_CAP real gates this seed --
+                #      a DETERMINISTIC cap on the number of distinct stage-2 gates AP
+                #      fill must satisfy. Trophy pads open in sphere order, so the cap
+                #      keeps real tier-2 gates on the EARLY pads (which fill orders
+                #      comfortably) and collapses the late ones (the fill-capacity
+                #      tail). The cap is well above a typical seed's real-gate count,
+                #      so two-stage stays the DEFAULT experience on ordinary seeds and
+                #      only the densest, latest pads collapse;
+                #  (c) the baseline relief-valve roll fires (adds per-seed variety to
+                #      WHICH late pads collapse).
+                phys = dest_to_phys.get(dest, dest)
+                if (s2 is None
+                        or s2_real_count >= _STAGE2_REAL_CAP
+                        or rnd.randrange(100) < _STAGE2_COLLAPSE_CHANCE):
+                    s2 = pad_reqs.get(phys)
+                else:
+                    s2_real_count += 1
+                stage2_reqs[dest] = s2
         # re-collect: a just-opened stage 2 may add relics/tokens to inventory.
         open_unassigned = _reachable_pads_and_collect(
             inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
@@ -573,15 +697,22 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
                 reachable = sorted(remaining_pads,
                                    key=lambda t: (_max_key(HUB_STATIC[t]), t))[:1]
             track = rnd.choice(reachable)
-            pad_reqs[track] = _assign_from_inv(rnd, inv)
+            pad_reqs[track] = _assign_from_inv(rnd, inv, allowed)
             remaining_pads.remove(track)
             _reachable_pads_and_collect(
                 inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
     # 3) post-pass (ports lines 465-510), over a sorted copy. Only LOWERS counts,
     # so it cannot break the solvable DAG built above. Applied to both stages.
-    _post_process(rnd, pad_reqs, mode)
-    _post_process(rnd, stage2_reqs, mode)
+    # Stage 2 additionally gets a hard count CEILING: a tier-2 gate of "14 trophies"
+    # or "8 platinum relics" both plays badly (it is barely a second stage, just a
+    # near-endgame wall) AND is the dominant fill_restrictive killer in maximally
+    # tight seeds (it forces almost the whole pool to be seated before that one
+    # location opens). Capping tier-2 counts keeps a real, distinct second stage
+    # while leaving fill enough ordering freedom. Counts only ever drop, so the
+    # solvable-by-construction DAG is preserved.
+    _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
+    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
 
     # 4) assemble {track: {1: stage1, 2: stage2}}. Stage 2 for a physical pad is
     # the req keyed by the track it LOADS (reward_track_for); non-trophy pads have
@@ -593,9 +724,12 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     return out
 
 
-def _post_process(rnd, pad_reqs, mode):
+def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
     """66% lower count *0.6 ceil (when count != 0); else if mode==2 and req is
-    ('Key',4) -> ('Key',3). Iterate a SORTED copy for determinism."""
+    ('Key',4) -> ('Key',3). Iterate a SORTED copy for determinism. When
+    count_ceiling is given (stage 2), clamp the final count to it AFTER the random
+    reduction -- a pure LOWERING, so the solvable DAG is preserved (Key counts are
+    left uncapped: a Key gate maxes at 4 and is cheap to satisfy)."""
     for track in sorted(pad_reqs):
         req = pad_reqs[track]
         if req is None:
@@ -603,9 +737,13 @@ def _post_process(rnd, pad_reqs, mode):
         item, cnt = req
         if rnd.randrange(100) < 66:
             if cnt != 0:
-                pad_reqs[track] = (item, max(1, math.ceil(cnt * 0.6)))
+                cnt = max(1, math.ceil(cnt * 0.6))
+                pad_reqs[track] = (item, cnt)
         elif mode == 2 and item == "Key" and cnt == 4:
             pad_reqs[track] = ("Key", 3)
+            cnt = 3
+        if count_ceiling is not None and item != "Key" and cnt > count_ceiling:
+            pad_reqs[track] = (item, count_ceiling)
 
 
 # ---------------------------------------------------------------------------

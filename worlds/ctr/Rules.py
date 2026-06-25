@@ -148,7 +148,14 @@ def add_time_trial_and_ctr_requirements(world, player):
     """
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
-    stage2 = getattr(world, "warp_pad_unlock_stage2_concrete", {})
+    # Density-adaptive collapse (set in create_items): on a maximally tight seed,
+    # drop EVERY stage-2 gate so the relic/token locations are gated only by their
+    # Trophy Race (Stef-sanctioned per-seed collapse). Keeps the seed fillable
+    # without ever pinning rewards or overriding the sliders.
+    if getattr(world, "_ctr_force_collapse_stage2", False):
+        stage2 = {}
+    else:
+        stage2 = getattr(world, "warp_pad_unlock_stage2_concrete", {})
 
     for loc in mw.get_locations(player):
         name = loc.name
