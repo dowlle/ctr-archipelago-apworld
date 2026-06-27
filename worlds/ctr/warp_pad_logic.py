@@ -41,7 +41,8 @@ import math
 # gates (data/world.json). N. Sanity Beach pads ungated; Lost Ruins behind Key 1
 # (Rampage Ruins behind Key 2); Glacier behind Key 2 (Rocky Road behind Key 3);
 # Citadel behind Key 3 (Nitro Court behind Key 4); Gem Stone Valley trials behind
-# Key 1; Gem Stone Valley gem cups behind Key 3 (the Cups Room hub gate). The
+# Key 1; Gem Stone Valley gem cups behind Key 2 (the Cups Room hub gate, native
+# arrKeysNeeded[GEM_STONE_VALLEY]=2 -- NOT 3). The
 # sphere-search reasons over these so it never assigns a requirement behind a Key
 # wall it cannot yet pass.
 HUB_STATIC = {
@@ -83,8 +84,8 @@ HUB_STATIC = {
     # NOT destination-shuffled (unique native dispatch -> absent from SHUFFLE_GROUPS),
     # only their UNLOCK REQUIREMENT is randomized. Gated in the emitter by the
     # include_gem_cups YAML option (mirrors include_battle_arenas for crystals).
-    "Red Cup": [("Key", 3)], "Green Cup": [("Key", 3)], "Blue Cup": [("Key", 3)],
-    "Yellow Cup": [("Key", 3)], "Purple Cup": [("Key", 3)],
+    "Red Cup": [("Key", 2)], "Green Cup": [("Key", 2)], "Blue Cup": [("Key", 2)],
+    "Yellow Cup": [("Key", 2)], "Purple Cup": [("Key", 2)],
 }
 
 # The two Gem Stone Valley trial pads -- single-stage, randomized stage-1 only.

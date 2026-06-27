@@ -177,13 +177,14 @@ def create_regions(world: "ctrAPWorld"):
     # trials, gated by the include_gem_cups YAML option (mirrors include_battle_arenas
     # for crystals). When ON in randomized mode, strip each cup's vanilla per-cup
     # has('<Colour> CTR Token', 4) gate from the exit access rule and keep ONLY the
-    # Key-3 Cups Room hub gate (Stef's HARD CONSTRAINT: cups STAY behind their key
-    # hub gate). The randomized single-stage requirement is ANDed on TOP of that key
-    # gate in Rules.add_warp_pad_unlock_rules, never replacing it. The Cups Room region
-    # entrance ('Gem Stone Valley <-> Cups Room' = has('Key', 3)) is left untouched, so
-    # the key gate is enforced both structurally (region reachability) and on the pad
-    # exit. Option OFF -> cups keep their vanilla token gate, unchanged. The gem REWARD
-    # ('<Colour> Gem Cup: Gem') is untouched in either case.
+    # Key-2 Cups Room hub gate (Stef's HARD CONSTRAINT: cups STAY behind their key
+    # hub gate). The gate is Key 2, matching native (arrKeysNeeded[GEM_STONE_VALLEY]=2,
+    # the GSV->Cups door = 2 keyholes) -- NOT 3. The randomized single-stage requirement
+    # is ANDed on TOP of that key gate in Rules.add_warp_pad_unlock_rules, never replacing
+    # it. The Cups Room region entrance ('Gem Stone Valley <-> Cups Room' = has('Key', 2))
+    # is left untouched, so the key gate is enforced both structurally (region
+    # reachability) and on the pad exit. Option OFF -> cups keep their vanilla token gate,
+    # unchanged. The gem REWARD ('<Colour> Gem Cup: Gem') is untouched in either case.
     _CUP_PAD_EXITS = (
         "Red Cup Warp Pad", "Green Cup Warp Pad", "Blue Cup Warp Pad",
         "Yellow Cup Warp Pad", "Purple Cup Warp Pad",
@@ -193,7 +194,7 @@ def create_regions(world: "ctrAPWorld"):
         for reg in data["regions"]:
             for ex in reg.get("exits", []):
                 if ex["name"] in _CUP_PAD_EXITS:
-                    ex["access_rule"] = "has('Key', 3)"
+                    ex["access_rule"] = "has('Key', 2)"
 
     # AP destination shuffle: rewire each shuffled warp-pad exit to the track
     # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons

@@ -307,7 +307,7 @@
                     "target": "Cups Room",
                     "randomization_group": 0,
                     "randomization_type": "TWO_WAY",
-                    "access_rule": "has('Key', 3)"
+                    "access_rule": "has('Key', 2)"
                 },
                 {
                     "name": "Gem Stone Valley <-> Lost Ruins",
