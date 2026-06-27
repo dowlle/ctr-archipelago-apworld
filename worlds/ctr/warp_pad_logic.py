@@ -41,8 +41,9 @@ import math
 # gates (data/world.json). N. Sanity Beach pads ungated; Lost Ruins behind Key 1
 # (Rampage Ruins behind Key 2); Glacier behind Key 2 (Rocky Road behind Key 3);
 # Citadel behind Key 3 (Nitro Court behind Key 4); Gem Stone Valley trials behind
-# Key 1 (cups are native-fixed and excluded). The sphere-search reasons over these
-# so it never assigns a requirement behind a Key wall it cannot yet pass.
+# Key 1; Gem Stone Valley gem cups behind Key 3 (the Cups Room hub gate). The
+# sphere-search reasons over these so it never assigns a requirement behind a Key
+# wall it cannot yet pass.
 HUB_STATIC = {
     # N. Sanity Beach -- no hub gate
     "Crash Cove": [], "Roo's Tubes": [], "Mystery Caves": [],
@@ -66,13 +67,32 @@ HUB_STATIC = {
     # requirement (Stef's OPEN model) -- excluded from TROPHY_TRACKS below so the
     # sphere-search assigns them only a tier-1 req. Their vanilla relic/gem JSON
     # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
-    # (keeping only the Key-1 hub gate). The gem cups stay native-fixed and remain
-    # excluded from this map.
+    # (keeping only the Key-1 hub gate).
     "Slide Coliseum": [("Key", 1)], "Turbo Track": [("Key", 1)],
+    # Gem Stone Valley GEM-CUP pads -- behind Key 3 (the Cups Room hub gate:
+    # 'Gem Stone Valley <-> Cups Room' = has('Key', 3) in data/world.json). Each
+    # cup yields a Gem on completion ('<Colour> Gem Cup: Gem'). Like the trials they
+    # are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry requirement
+    # (Stef's OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
+    # the sphere-search assigns them only a tier-1 req. Their vanilla per-cup
+    # has('<Colour> CTR Token', 4) JSON gate is REPLACED by this randomized requirement
+    # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-3 Cups Room hub gate
+    # (the randomized req is ANDed on TOP of that key gate, never replaces it). The
+    # track key is '<Colour> Cup' so _pad_exit_name yields '<Colour> Cup Warp Pad'
+    # (the AP exit name); the destination region is '<Colour> Gem Cup'. Gem cups are
+    # NOT destination-shuffled (unique native dispatch -> absent from SHUFFLE_GROUPS),
+    # only their UNLOCK REQUIREMENT is randomized. Gated in the emitter by the
+    # include_gem_cups YAML option (mirrors include_battle_arenas for crystals).
+    "Red Cup": [("Key", 3)], "Green Cup": [("Key", 3)], "Blue Cup": [("Key", 3)],
+    "Yellow Cup": [("Key", 3)], "Purple Cup": [("Key", 3)],
 }
 
 # The two Gem Stone Valley trial pads -- single-stage, randomized stage-1 only.
 TRIAL_TRACKS = {"Slide Coliseum", "Turbo Track"}
+
+# The five Gem Stone Valley gem-cup pads -- single-stage, randomized stage-1 only.
+# (Track keys, not region names: the region is '<Colour> Gem Cup'.)
+CUP_TRACKS = {"Red Cup", "Green Cup", "Blue Cup", "Yellow Cup", "Purple Cup"}
 
 # Vanilla CTR-Token COLOUR per track. Transcribed VERBATIM from game_world.rs
 # WarpPad::new (lines 1211-1219): Red/Green/Blue explicit, Yellow = default branch.
@@ -95,10 +115,11 @@ ARENA_TRACKS = {"Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court"}
 # The 16 trophy-race pads — the ONLY pads that carry a stage 2 (Icebound's
 # WarpPad.unlock_2; game_world.rs:1196-1231). Stage 2 gates that pad's CTR Token
 # Challenge + 3 relic Time Trials. The 4 arenas (no stage 2: their crystal
-# challenge IS their primary race) and the trials (single-stage relic-only) have
-# none. HUB_STATIC now also holds the 2 trial pads, so the trophy pads are exactly
-# HUB_STATIC minus the arenas AND the trials.
-TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS
+# challenge IS their primary race), the trials (single-stage relic-only) and the
+# gem cups (single-stage, gem reward) have none. HUB_STATIC now also holds the 2
+# trial pads and the 5 gem-cup pads, so the trophy pads are exactly HUB_STATIC
+# minus the arenas, the trials AND the cups.
+TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS - CUP_TRACKS
 
 # NOTE: HUB_STATIC is defined above; TROPHY_TRACKS is finalised after it so the
 # set comprehension sees the full dict.
@@ -256,12 +277,21 @@ def build_graph(world, reward_track_for):
 
 def _vanilla_reward(region_name, region_type, dest_track, suffix):
     """Vanilla reward a location yields, for inventory growth in the sphere search.
-    Boss races (except Oxide) yield a Key; gem cups yield nothing here (cups are
-    native-fixed and not in the pool); race/crystal locations yield their reward."""
+    Boss races (except Oxide) yield a Key; gem cups yield nothing into the synthetic
+    inventory; race/crystal locations yield their reward."""
     if region_type == "boss":
         return None if "Oxide" in region_name else "Key"
     if region_type == "cup":
-        return None  # gem cups are native-fixed; not part of the sphere pool
+        # Gem cups are now in the requirement pool (single-stage randomized entry),
+        # but their Gem reward is left OUT of the synthetic sphere inventory: the
+        # gem REWARD model is unchanged (gems flow through the normal multiworld
+        # pool, not pinned to the cup), and not seeding gems here keeps the cup
+        # entry requirement from ever circularly demanding a gem the player can only
+        # earn by clearing a (still-locked) cup. Cups are pure leaves in the DAG:
+        # they gate nothing onward and grow no inventory, so the sphere search only
+        # ASSIGNS them a tier-1 req (from items owned by the time Cups Room/Key 3 is
+        # reached) without their reward affecting any other pad's solvability.
+        return None
     track = region_name
     return _reward_for(track, dest_track, suffix)
 
@@ -794,8 +824,9 @@ def to_slot_req(req):
 # unlock requirement keys off the PHYSICAL pad). The 16 main trophy-race pads
 # all share one dispatch type -> safe to permute among themselves. The two trials
 # (16 Slide Coliseum = relic, 17 Turbo Track = gem) and the 5 gem cups each have
-# unique dispatch -> NOT shuffled (stay identity / native-fixed). Crystal/battle
-# pads share a type -> shuffle among themselves. LevelIDs from warp_pad_ids.json.
+# unique dispatch -> their DESTINATION is NOT shuffled (stay identity); only their
+# UNLOCK REQUIREMENT is randomized (see HUB_STATIC / run_sphere_search). Crystal/
+# battle pads share a type -> shuffle among themselves. LevelIDs from warp_pad_ids.json.
 SHUFFLE_GROUPS = {
     # 16 trophy-race pads ONLY (trials 16/17 excluded -> stay fixed)
     "race": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13],

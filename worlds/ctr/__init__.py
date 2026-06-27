@@ -321,8 +321,12 @@ class ctrAPWorld(World):
     # --- Native-randomization slot_data (Phase-2 MVP shared contract) ---
 
     # Native warp_pad_map / warp_pad_unlock arrays are indexed by pad LevelID
-    # 0..27 (race/crystal/trial tracks). Gem cups (LevelID 100+) are handled
-    # native-side via their own fixed rule, so they are NOT part of these arrays.
+    # 0..27 (race/crystal/trial tracks). Gem cups (LevelID 100-104) are NOT part of
+    # the dense 0..27 array: warp_pad_map stays identity for them (their destination
+    # is never shuffled), and warp_pad_unlock emits them as EXTRA keys ("100".."104")
+    # ONLY when include_gem_cups randomizes their single-stage entry requirement
+    # (see _resolve_warp_pad_unlock). Option OFF -> no cup key -> native keeps its own
+    # fixed cup rule, exactly as before.
     WARP_PAD_ID_RANGE = 28
 
     def _resolve_warp_pad_map(self) -> Dict[str, int]:
@@ -377,6 +381,18 @@ class ctrAPWorld(World):
                 continue
             lid = meta["level_id"]
             if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                out[str(lid)]["stage1"] = _req(req)
+            elif meta.get("kind") == "cup":
+                # Gem cups (LevelID 100-104) sit OUTSIDE the dense 0..27 array, but
+                # when include_gem_cups randomizes them they carry a SINGLE-STAGE
+                # requirement (Round-4). Emit them keyed by their own LevelID, with a
+                # type-0 ({0,0,-1}) stage 2 (cups have no second stage). They appear
+                # ONLY when world.warp_pad_unlock holds them (option ON); option OFF
+                # leaves no cup key, so native keeps its own fixed cup rule unchanged.
+                # The Key-3 Cups Room hub gate is enforced separately (native hub
+                # progression + the AP region rule); this requirement is ANDed on top.
+                out.setdefault(
+                    str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
                 out[str(lid)]["stage1"] = _req(req)
         # Density-adaptive collapse (create_items): on a tight seed every stage 2 is
         # dropped in AP logic, so emit type-0 stage 2 to native too (the relic/token

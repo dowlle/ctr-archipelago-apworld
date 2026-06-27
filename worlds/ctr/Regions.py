@@ -173,6 +173,28 @@ def create_regions(world: "ctrAPWorld"):
                 if ex["name"] in _TRIAL_PAD_EXITS:
                     ex["access_rule"] = "has('Key', 1)"
 
+    # GEM-CUP pads (Red/Green/Blue/Yellow/Purple Cup): same OPEN treatment as the
+    # trials, gated by the include_gem_cups YAML option (mirrors include_battle_arenas
+    # for crystals). When ON in randomized mode, strip each cup's vanilla per-cup
+    # has('<Colour> CTR Token', 4) gate from the exit access rule and keep ONLY the
+    # Key-3 Cups Room hub gate (Stef's HARD CONSTRAINT: cups STAY behind their key
+    # hub gate). The randomized single-stage requirement is ANDed on TOP of that key
+    # gate in Rules.add_warp_pad_unlock_rules, never replacing it. The Cups Room region
+    # entrance ('Gem Stone Valley <-> Cups Room' = has('Key', 3)) is left untouched, so
+    # the key gate is enforced both structurally (region reachability) and on the pad
+    # exit. Option OFF -> cups keep their vanilla token gate, unchanged. The gem REWARD
+    # ('<Colour> Gem Cup: Gem') is untouched in either case.
+    _CUP_PAD_EXITS = (
+        "Red Cup Warp Pad", "Green Cup Warp Pad", "Blue Cup Warp Pad",
+        "Yellow Cup Warp Pad", "Purple Cup Warp Pad",
+    )
+    inc_cups = bool(opts.include_gem_cups.value)
+    if unlock_mode in (1, 2) and inc_cups:
+        for reg in data["regions"]:
+            for ex in reg.get("exits", []):
+                if ex["name"] in _CUP_PAD_EXITS:
+                    ex["access_rule"] = "has('Key', 3)"
+
     # AP destination shuffle: rewire each shuffled warp-pad exit to the track
     # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons
     # about the same topology native runs. The exit stays in its PHYSICAL hub
@@ -256,8 +278,10 @@ def create_regions(world: "ctrAPWorld"):
         pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for,
                                      collapse_stage2=collapse_s2)
         # Filter to the pad kinds the YAML actually randomizes: race always;
-        # crystal only when include_battle_arenas; trials/cups stay native-fixed.
+        # crystal only when include_battle_arenas; cups only when include_gem_cups;
+        # trials always.
         inc_arenas = bool(world.options.include_battle_arenas.value)
+        inc_cups = bool(world.options.include_gem_cups.value)
         _NO_STAGE2 = {"type": 0, "count": 0, "colour": -1}  # native: opens immediately
         for track, stages in pad_reqs.items():
             pad_name = _pad_name_for_track(track)
@@ -267,9 +291,10 @@ def create_regions(world: "ctrAPWorld"):
             kind = meta["kind"]
             if kind == "crystal" and not inc_arenas:
                 continue  # battle arenas not in this seed's shuffle pool
-            if kind in ("cup",):
-                continue  # gem cups stay native-fixed
-            # 'trial' (Slide/Turbo): SINGLE-STAGE randomized -- the sphere-search
+            if kind == "cup" and not inc_cups:
+                continue  # gem cups not in this seed's pool -> keep vanilla token gate
+            # 'trial' (Slide/Turbo) and 'cup' (Red/Green/Blue/Yellow/Purple Cup):
+            # SINGLE-STAGE randomized -- the sphere-search
             # assigned a stage-1 entry requirement (stages[2] is always None for a
             # non-TROPHY_TRACK), wired as a normal single-stage node. No longer
             # native-fixed (Stef's OPEN model). The to_slot_req(s2) below yields the
