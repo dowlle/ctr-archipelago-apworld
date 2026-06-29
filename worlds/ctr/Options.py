@@ -97,19 +97,46 @@ class FinalOxideUnlock(Choice):
 
 
 class ShuffleRewards(OptionDict):
-    """Shuffles the rewards into the item pool.
+    """DEPRECATED — no longer wired. Kept only so older YAMLs that still set
+    `Shuffle Rewards` (with the old `Include Platinum Relics`/`Include Gems`/
+    `Include Keys` keys) keep generating instead of erroring.
 
-    Trophies, CTR Tokens, Sapphire & Gold Relics are always shuffled.
-    If Platinum Relics are not shuffled, then logic won't expect beating the
-    platinum times in Relic Races."""
-    display_name = "Shuffle Rewards"
+    The three concerns it used to cover are now first-class options:
+      - "Include Platinum Relics" -> `Platinum Relic Progression` slider
+        (slider = 0 already means "platinum relics not shuffled").
+      - "Include Gems"            -> `Shuffle Gems` toggle.
+      - "Include Keys"            -> `Shuffle Keys` toggle.
+
+    `valid_keys` is intentionally empty so ANY leftover key parses without a
+    validation error (the dict is simply ignored). Remove after a deprecation
+    window."""
+    display_name = "Shuffle Rewards (deprecated)"
     supports_weighting = False
     default = {}
-    valid_keys = [
-        "Include Platinum Relics",
-        "Include Gems",
-        "Include Keys"
-    ]
+    valid_keys = []
+
+
+class ShuffleGems(Toggle):
+    """Shuffle the 5 Gems into the multiworld item pool.
+
+    - **off** (default): each Gem is pinned to its own Gem Cup reward location
+      (vanilla placement, out of the multiworld shuffle).
+    - **on**: the 5 Gems enter the shuffled pool and can appear anywhere; their
+      Gem Cup locations become normal checks holding whatever the fill places.
+
+    The `All Gem Cups` goal ALWAYS pins the Gems to their cups regardless of this
+    toggle (they are the goal items)."""
+    display_name = "Shuffle Gems"
+
+
+class ShuffleKeys(Toggle):
+    """Shuffle the 4 boss Keys into the multiworld item pool.
+
+    - **off** (default): each Key is pinned to its Boss Race reward location
+      (vanilla placement, out of the multiworld shuffle).
+    - **on**: the 4 Keys enter the shuffled pool and can appear anywhere; the
+      Boss Race locations become normal checks holding whatever the fill places."""
+    display_name = "Shuffle Keys"
 
 
 class ShuffleWarpPads(Toggle):
@@ -253,7 +280,9 @@ class ctrAPOptions(PerGameCommonOptions):
     gold_relic_progression: GoldRelicProgression
     platinum_relic_progression: PlatinumRelicProgression
     # randomization
-    shuffle_rewards: ShuffleRewards
+    shuffle_rewards: ShuffleRewards  # deprecated, unwired (backward-compat only)
+    shuffle_gems: ShuffleGems
+    shuffle_keys: ShuffleKeys
     shuffle_warp_pads: ShuffleWarpPads
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -274,7 +303,8 @@ class ctrAPOptions(PerGameCommonOptions):
 ap_ctr_option_groups: Dict[str, List[Any]] = {
     "General Options": [Goal, FinalOxideUnlock, RelicTime, RelicsRequirePerfect],
     "Randomization Options": [
-        ShuffleRewards,
+        ShuffleGems,
+        ShuffleKeys,
         ShuffleWarpPads,
         ShuffleWarpPadsBattleArenas,
         ShuffleWarpPadsGemCups,

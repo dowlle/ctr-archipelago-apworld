@@ -1,0 +1,42 @@
+Item #5 — shuffle_gems / shuffle_keys placement toggles (native half).
+
+FORWARD-LOOKING ONLY — apply-ready but NOT required for the MVP. The apworld
+pins gems/keys to their vanilla locations via place_locked_item when the toggles
+are OFF, which keeps them out of the multiworld pool entirely, so native never
+receives a gem/key item it has to place. There is therefore no behavioural native
+change for the MVP. This patch only teaches the slot_data parser to READ the two
+new booleans the apworld now emits in ctr_options, so a future native build can
+branch on them (e.g. to differentiate "reward not shuffled / still in its vanilla
+spot" from "reward shuffled elsewhere in the multiworld"). Defaults to 0 (pinned
+vanilla), matching the apworld default and pre-item-5 behaviour.
+
+Apply from the ctr-native-ap repo root:  git apply 5_placement.patch
+
+diff --git a/ap/ap_seedcfg.h b/ap/ap_seedcfg.h
+--- a/ap/ap_seedcfg.h
++++ b/ap/ap_seedcfg.h
+@@ -62,6 +62,12 @@
+ 	int shuffle_warp_pads;
+ 	int warppad_unlock_mode; // 0 vanilla / 1 random / 2 random_without_4_keys
+ 	int bossgarage_mode;     // 0 original4 / 1 same_hub / 2 trophies
++	// item #5 placement toggles (forward-looking; MVP native ignores them because
++	// locked gems/keys never enter the multiworld pool -> native never receives an
++	// item it must place). A future native build can branch on these to tell
++	// "reward not shuffled" apart from "reward shuffled elsewhere".
++	int shuffle_gems;        // 0 gems pinned to gem cups / 1 gems in the pool
++	int shuffle_keys;        // 0 keys pinned to boss races / 1 keys in the pool
+
+ 	int             warp_pad_map[CTR_CFG_PAD_COUNT];    // physical pad LevelID -> target trackID (identity default)
+ 	ctr_warp_unlock warp_pad_unlock[CTR_CFG_PAD_COUNT]; // per-pad two-stage resolved reqs (stage1.type 0 = native vanilla rule)
+diff --git a/ap/ap_seedcfg.cpp b/ap/ap_seedcfg.cpp
+--- a/ap/ap_seedcfg.cpp
++++ b/ap/ap_seedcfg.cpp
+@@ -170,6 +170,8 @@
+ 	ctr_cfg.relics_require_perfect = json_int(opt, "relics_require_perfect", 0);
+ 	ctr_cfg.oxide_final_unlock = json_int(opt, "oxide_final_unlock", 0);
+ 	ctr_cfg.shuffle_warp_pads = json_int(opt, "shuffle_warp_pads", 0);
++	ctr_cfg.shuffle_gems = json_int(opt, "shuffle_gems", 0);
++	ctr_cfg.shuffle_keys = json_int(opt, "shuffle_keys", 0);
+ 	ctr_cfg.warppad_unlock_mode = json_int(opt, "warppad_unlock_mode", 0);
+ 	ctr_cfg.bossgarage_mode = json_int(opt, "bossgarage_mode", 0);
+

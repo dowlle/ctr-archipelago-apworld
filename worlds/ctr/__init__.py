@@ -225,19 +225,11 @@ class ctrAPWorld(World):
             ("Gold", "Gold Relic", self.options.gold_relic_progression.value),
             ("Platinum", "Platinum Relic", self.options.platinum_relic_progression.value),
         ]
-        # Precedence: only Platinum relics are pool-optional via ShuffleRewards.
-        # If the user explicitly set "Include Platinum Relics" off, the relic is not
-        # in the pool, so force platinum chance to 0 (it MUST be pinned). Sapphire/Gold
-        # are always shuffled. Warn on the off + >0 corner.
-        _shuf = dict(self.options.shuffle_rewards.value or {})
-        if "Include Platinum Relics" in _shuf and not _shuf["Include Platinum Relics"]:
-            if self.options.platinum_relic_progression.value > 0:
-                logging.warning(
-                    "[CTR] %s: 'Include Platinum Relics' is off; forcing "
-                    "platinum_relic_progression to 0 (relic must be pinned).",
-                    self.player_name,
-                )
-            _relic_tiers[2] = ("Platinum", "Platinum Relic", 0)
+        # Platinum relic inclusion is governed SOLELY by the Platinum Relic
+        # Progression slider now (slider = 0 already means "platinum relics not
+        # shuffled / pinned vanilla"). The old ShuffleRewards "Include Platinum
+        # Relics" coupling that forced this slider to 0 has been retired (item #5);
+        # ShuffleRewards is deprecated and no longer read.
 
         # NO two-stage reward pinning (Stef's OPEN model): relic Time Trials and CTR
         # Token Challenges flow through the normal pool + the relic sliders, the same
@@ -259,6 +251,38 @@ class ctrAPWorld(World):
                     _n += 1
             _relic_locked[_relic_item] = _relic_locked.get(_relic_item, 0) + _n
 
+        # --- Gem & Key placement toggles (item #5) ---
+        # Default OFF = pinned vanilla (each Gem locked to its Gem Cup, each Key
+        # locked to its Boss Race -> out of the multiworld pool). ON = the item
+        # enters the shuffled pool and its vanilla location becomes a normal check.
+        # Track n_locked per item name so the general pool below creates
+        # (count - n_locked) of it, keeping item count == location count.
+        _GEM_GOAL = self.options.goal.value == Goal.option_allgemcups
+        _gems_locked: Dict[str, int] = {}
+        _keys_locked: Dict[str, int] = {}
+        _vmap = json.loads(
+            pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
+        )["ShuffleOptions"]
+
+        # Gems: pin to gem-cup locations when shuffle_gems is OFF. For the all-gem-
+        # cups goal the gems are ALWAYS pinned, but gemgoal() already placed them
+        # (and place_locked_item on an already-filled location would raise), so skip
+        # the placement here for that goal -- the pool exclusion below still applies.
+        if not self.options.shuffle_gems.value and not _GEM_GOAL:
+            for _loc_name, _gem_name in _vmap["Gems"].items():
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_gem_name)
+                )
+                _gems_locked[_gem_name] = _gems_locked.get(_gem_name, 0) + 1
+
+        # Keys: pin to boss-race locations when shuffle_keys is OFF.
+        if not self.options.shuffle_keys.value:
+            for _loc_name, _key_name in _vmap["Boss Keys"].items():
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_key_name)
+                )
+                _keys_locked[_key_name] = _keys_locked.get(_key_name, 0) + 1
+
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
         # locations, so adding the same 5 gems from the item table again makes them
@@ -267,8 +291,8 @@ class ctrAPWorld(World):
         # progression items than locations") and an item/location count mismatch.
         # Exclude the gems from the general pool for that goal (they are the goal
         # items, placed at the cups). Other goals keep gems in the pool (e.g.
-        # everythingplusone needs them findable; Turbo Track logic needs them).
-        _GEM_GOAL = self.options.goal.value == Goal.option_allgemcups
+        # everythingplusone needs them findable; Turbo Track logic needs them)
+        # UNLESS shuffle_gems pinned them, in which case _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
             if _GEM_GOAL and item["name"] in _GEMS:
@@ -276,6 +300,10 @@ class ctrAPWorld(World):
             count = item["count"]
             if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
+            if item["name"] in _gems_locked:                          # gems pinned vanilla
+                count = max(0, count - _gems_locked[item["name"]])
+            if item["name"] in _keys_locked:                          # keys pinned vanilla
+                count = max(0, count - _keys_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
@@ -421,6 +449,8 @@ class ctrAPWorld(World):
                 "relics_require_perfect": bool(o.rr_require_perfects.value),
                 "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
                 "shuffle_warp_pads": bool(o.shuffle_warp_pads.value),
+                "shuffle_gems": bool(o.shuffle_gems.value),
+                "shuffle_keys": bool(o.shuffle_keys.value),
                 "warppad_unlock_mode": o.warppad_unlock_requirements.value,
                 "bossgarage_mode": o.bossgarage_unlock_requirements.value,
             },
