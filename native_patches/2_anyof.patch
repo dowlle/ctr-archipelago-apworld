@@ -1,0 +1,113 @@
+diff --git a/ap/ap_hooks.c b/ap/ap_hooks.c
+index 9325a2b..3c8ffdd 100644
+--- a/ap/ap_hooks.c
++++ b/ap/ap_hooks.c
+@@ -517,6 +517,30 @@ int AP_GateCountGemColour(int colour)
+ 	return ap_recv_count[AP_IDX_GEM_RED + colour]; // 9..13
+ }
+ 
++// ── any-of aggregate counters (requirement_specificity = any_of) ──
++// Sum the received-item counts across a whole TYPE, so a type 6/7/8 gate means
++// "any N of that type regardless of colour/tier". These read the same
++// authoritative ap_recv_count[] counters as AP_GateCount above.
++int AP_GateCountTokenSum(void)
++{
++	return AP_GateCountTokenColour(0) + AP_GateCountTokenColour(1) +
++	       AP_GateCountTokenColour(2) + AP_GateCountTokenColour(3) +
++	       AP_GateCountTokenColour(4);
++}
++
++int AP_GateCountRelicSum(void)
++{
++	return AP_GateCount(AP_IDX_SAPPHIRE) + AP_GateCount(AP_IDX_GOLD) +
++	       AP_GateCount(AP_IDX_PLATINUM);
++}
++
++int AP_GateCountGemSum(void)
++{
++	return AP_GateCountGemColour(0) + AP_GateCountGemColour(1) +
++	       AP_GateCountGemColour(2) + AP_GateCountGemColour(3) +
++	       AP_GateCountGemColour(4);
++}
++
+ // ── Phase 2: per-seed resolved-requirement comparators ──
+ // These live C-side (not in ap_seedcfg.cpp) because they read the received-item
+ // counters above (AP_GateCount*) and the per-track numTrophiesToOpen threshold
+@@ -527,7 +551,10 @@ int AP_GateCountGemColour(int colour)
+ // Returns owned >= count for a resolved requirement. colour-aware for tokens
+ // (type 3) and gems (type 5): colour 0..4 selects one colour, -1 sums the
+ // vanilla "all colours" interpretation native-side -- but the apworld emits a
+-// concrete colour for token/gem reqs, so the -1 branch only fires defensively.
++// concrete colour for token/gem reqs under specific_colour, so the type-3/5 -1
++// branch only fires defensively. The genuine any-of aggregates the apworld emits
++// under requirement_specificity = any_of are the dedicated type 6/7/8 codes, which
++// sum the whole type via AP_GateCount*Sum().
+ int AP_BossReqMet(const ctr_req *r)
+ {
+ 	if (r == 0)
+@@ -540,14 +567,21 @@ int AP_BossReqMet(const ctr_req *r)
+ 		return AP_GateCount(AP_IDX_TROPHY) >= r->count;
+ 	case 2: // keys
+ 		return AP_GateCount(AP_IDX_KEY) >= r->count;
+-	case 3: // tokens (colour 0..4, or -1 = any/Red baseline)
++	case 3: // tokens (colour 0..4 = one colour; -1 = any token, summed)
+ 		return ((r->colour >= 0) ? AP_GateCountTokenColour(r->colour)
+-		                         : AP_GateCount(AP_IDX_TOKEN_RED)) >= r->count;
+-	case 4: // sapphire
+-		return AP_GateCount(AP_IDX_SAPPHIRE) >= r->count;
+-	case 5: // gems (colour 0..4, or -1 = any/Red baseline)
++		                         : AP_GateCountTokenSum()) >= r->count;
++	case 4: // sapphire (colour -1 = any relic tier, summed)
++		return ((r->colour >= 0) ? AP_GateCount(AP_IDX_SAPPHIRE)
++		                         : AP_GateCountRelicSum()) >= r->count;
++	case 5: // gems (colour 0..4 = one colour; -1 = any gem, summed)
+ 		return ((r->colour >= 0) ? AP_GateCountGemColour(r->colour)
+-		                         : AP_GateCountGemColour(0)) >= r->count;
++		                         : AP_GateCountGemSum()) >= r->count;
++	case 6: // AnyToken: any N tokens summed across all 5 colours
++		return AP_GateCountTokenSum() >= r->count;
++	case 7: // AnyRelic: any N relics summed across Sapphire+Gold+Platinum
++		return AP_GateCountRelicSum() >= r->count;
++	case 8: // AnyGem: any N gems summed across all 5 colours
++		return AP_GateCountGemSum() >= r->count;
+ 	default:
+ 		return 1;
+ 	}
+diff --git a/ap/ap_hooks.h b/ap/ap_hooks.h
+index f993d79..d9542f5 100644
+--- a/ap/ap_hooks.h
++++ b/ap/ap_hooks.h
+@@ -54,6 +54,12 @@ int AP_GateCount(int itemType);          // received count for one of the 15 ite
+ int AP_GateCountTokenColour(int colour); // colour 0..4 = R,G,B,Y,P -> token idx 4+colour
+ int AP_GateCountGemColour(int colour);   // colour 0..4 = R,G,B,Y,P -> gem   idx 9+colour
+ 
++// ── any-of aggregate counters (requirement_specificity = any_of) ──
++// Sum the received counts across a whole item TYPE, for the type 6/7/8 gates.
++int AP_GateCountTokenSum(void); // all 5 token colours (idx 4..8)
++int AP_GateCountRelicSum(void); // all 3 relic tiers  (idx 1..3 = Sapphire+Gold+Platinum)
++int AP_GateCountGemSum(void);   // all 5 gem colours  (idx 9..13)
++
+ // Append a line to the AP debug log (forwards to the module's AP_AppendLog).
+ // Exposed so the game-side gate files (game/232/AH_*.c) can emit confirmation
+ // lines -- e.g. AH_WarpPad_LInB logs each pad whose destination was remapped.
+diff --git a/ap/ap_seedcfg.h b/ap/ap_seedcfg.h
+index 836aa42..2c729e1 100644
+--- a/ap/ap_seedcfg.h
++++ b/ap/ap_seedcfg.h
+@@ -31,7 +31,16 @@ extern "C" {
+ // One resolved requirement. type per the §0 shared table:
+ //   0 none/use native vanilla fixed rule
+ //   1 trophies   2 keys   3 tokens   4 sapphire   5 gems
++//   6 AnyToken   7 AnyRelic   8 AnyGem   (any-of aggregates, colour = -1)
+ // colour: -1 (n/a) or 0..4 = R,G,B,Y,P (only meaningful for tokens / gems).
++//
++// any-of semantics (requirement_specificity = any_of, the apworld default):
++//   type 3 token / 5 gem with colour 0..4 = a SPECIFIC colour; colour -1 = the
++//     legacy single-colour defensive fallback (apworld never emits it under any_of).
++//   type 6 AnyToken  (colour -1) = owned >= count summed over ALL 5 token colours.
++//   type 7 AnyRelic  (colour -1) = owned >= count summed over Sapphire+Gold+Platinum.
++//   type 8 AnyGem    (colour -1) = owned >= count summed over ALL 5 gem colours.
++// See AP_BossReqMet (ap_hooks.c) + AP_GateCount*Sum (ap_hooks.{h,c}).
+ typedef struct
+ {
+ 	int type;

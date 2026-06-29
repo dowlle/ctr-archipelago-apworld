@@ -348,6 +348,12 @@ _ANY_COLLAPSE_PARAMS = {
 # overwrites these from the chosen preset at run_sphere_search() start. Default seed
 # generation uses icebound_beta5 (see Options.RequirementVariety.default = 0).
 REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+# requirement_specificity toggle (Options.RequirementSpecificity). True = any_of:
+# a collapsed Any* requirement stays a genuine "any N of type" aggregate (emitted as
+# native type 6/7/8). False = specific_colour: flatten via _resolve_any to a single
+# concrete colour/tier (legacy type 3/4/5). Set per-run in _load_requirement_preset;
+# module default False keeps importers on the legacy concrete path.
+_ANY_OF_MODE = False
 _TOKEN_COLLAPSE_CHANCE = 33
 _TOKEN_COLLAPSE_SCALE = 0.6
 _TOKEN_COLLAPSE_CAP = None
@@ -387,6 +393,12 @@ def _load_requirement_preset(world):
     global _TOKEN_COLLAPSE_CHANCE, _TOKEN_COLLAPSE_SCALE, _TOKEN_COLLAPSE_CAP
     global _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP
     global _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP
+    global _ANY_OF_MODE
+
+    # requirement_specificity: any_of (default, value 0) keeps Any* unsplit; a missing
+    # option (old YAML) falls back to any_of -- the new default behaviour.
+    spec_opt = getattr(world.options, "requirement_specificity", None)
+    _ANY_OF_MODE = getattr(spec_opt, "value", 0) == 0
 
     variety_opt = getattr(world.options, "requirement_variety", None)
     # Choice options expose .current_key ("icebound_beta5" etc.); fall back to legacy.
@@ -480,8 +492,18 @@ def _resolve_any(inv, req, allowed=None):
     so the AP rule + slot_data emit a concrete {type,colour,count} that Inv has
     proven is owned. Keeps solvability and avoids native 'any' support. When
     `allowed` is given, the lowered colour/tier is restricted to it (so AnyRelic
-    never resolves to a pinned-out relic tier)."""
+    never resolves to a pinned-out relic tier).
+
+    requirement_specificity = any_of (the new default, _ANY_OF_MODE True): do NOT
+    flatten -- return the Any* requirement unchanged so it carries through to logic
+    and slot_data as a genuine "any N of type" aggregate (native type 6/7/8). The
+    aggregate is satisfiable by construction: the caller clamps the count to
+    inv.count(Any*) which already sums every colour/tier owned at this sphere. Only
+    requirement_specificity = specific_colour (_ANY_OF_MODE False, legacy) flattens
+    to a single concrete colour below."""
     item, cnt = req
+    if _ANY_OF_MODE and item in ("AnyCtrToken", "AnyRelic", "AnyGem"):
+        return req
     if item == "AnyCtrToken":
         pool = Inv._TOKENS
     elif item == "AnyRelic":
@@ -902,10 +924,12 @@ _COLOURS = ["Red", "Green", "Blue", "Yellow", "Purple"]
 def to_slot_req(req):
     """(item, count) | None -> {type,count,colour}.
 
-    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 sapphire-relic / 5 gems.
-    colour 0..4 = R,G,B,Y,P for token/gem; -1 otherwise. Any* are already
-    resolved to a concrete colour upstream (_resolve_any), so no -1 token/gem
-    aggregate is ever emitted here.
+    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 sapphire-relic / 5 gems /
+          6 AnyToken / 7 AnyRelic / 8 AnyGem (colour -1, native sums the whole type).
+    colour 0..4 = R,G,B,Y,P for token/gem; -1 otherwise. Under requirement_specificity
+    = specific_colour, Any* are flattened to a concrete colour upstream (_resolve_any)
+    so only type 1-5 reach here. Under any_of (default) the Any* aggregates survive
+    and emit type 6/7/8 with colour -1.
 
     A free bootstrap pad (req None) is emitted as an EXPLICIT "0 trophies"
     requirement (type 1, count 0) rather than type 0. type 0 makes native fall
@@ -918,6 +942,12 @@ def to_slot_req(req):
         return {"type": 1, "count": 0, "colour": -1}
     item, cnt = req
     cnt = int(cnt)
+    if item == "AnyCtrToken":
+        return {"type": 6, "count": cnt, "colour": -1}
+    if item == "AnyRelic":
+        return {"type": 7, "count": cnt, "colour": -1}
+    if item == "AnyGem":
+        return {"type": 8, "count": cnt, "colour": -1}
     if item == "Trophy":
         return {"type": 1, "count": cnt, "colour": -1}
     if item == "Key":

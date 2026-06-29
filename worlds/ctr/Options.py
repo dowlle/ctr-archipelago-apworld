@@ -209,6 +209,34 @@ class RequirementWeights(OptionDict):
     ]
 
 
+class RequirementSpecificity(Choice):
+    """How an Any*-of-a-type warp-pad requirement (the aggregates Icebound's chooser
+    produces when it collapses a token/relic/gem pick) is expressed in logic and in
+    the seed sent to native.
+
+    - **any_of** (default): a collapsed requirement stays a GENUINE "any N of that
+      type" gate -- satisfied by ANY mix of that type summed across all colours/tiers
+      (e.g. "any 3 CTR Tokens" = any 3 of the 5 token colours combined; "any 4
+      relics" = any 4 of Sapphire+Gold+Platinum; "any 2 gems" = any 2 of the 5 gem
+      colours). This matches Icebound's AnyCtrToken / AnyRelic / AnyGem semantics and
+      emits NEW slot_data type codes 6/7/8 (colour -1) that native sums per type.
+    - **specific_colour**: the legacy flatten path -- a collapsed Any* requirement is
+      lowered to the single most-owned colour/tier (`_resolve_any`) and emitted as a
+      concrete colour-specific gate (type 3/4/5). The gate then means "exactly N of
+      THIS one colour/tier". More restrictive; keeps native compatible with builds
+      that lack the any-of aggregate patch.
+
+    any_of is MORE PERMISSIVE than specific_colour (a sum across colours is easier to
+    satisfy than N of one colour). NATIVE NOTE: any_of emits type 6/7/8 which native
+    only understands with the ap_any_of_aggregates patch applied -- on an unpatched
+    native build those type codes fall through to "always open". Use specific_colour
+    if your native build is not patched."""
+    display_name = "Requirement Specificity"
+    option_any_of = 0
+    option_specific_colour = 1
+    default = 0
+
+
 class BossGarageRequirements(Choice):
     """Choose the requirements for opening boss garages.
 
@@ -311,6 +339,7 @@ class ctrAPOptions(PerGameCommonOptions):
     warppad_unlock_requirements: WarpPadUnlockRequirements
     requirement_variety: RequirementVariety
     requirement_weights: RequirementWeights
+    requirement_specificity: RequirementSpecificity
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
     comfort_guards: ComfortGuards
@@ -334,6 +363,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         WarpPadUnlockRequirements,
         RequirementVariety,
         RequirementWeights,
+        RequirementSpecificity,
         AutoUnlockCtrChallengeRelicRace,
         ComfortGuards,
         BossGarageRequirements,
