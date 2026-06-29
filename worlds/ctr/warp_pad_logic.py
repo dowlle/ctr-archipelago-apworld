@@ -972,4 +972,24 @@ def build_warp_pad_map(world):
             name = id_to_name.get(phys)
             if name is not None:
                 out[name] = dest  # pad_exit_name -> destination track LevelID
+
+    # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
+    # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
+    # Turbo Track pad keeps its vanilla 5-gem gate, so a Gem Cup / trial destination
+    # landing in a trophy pad (or a Gem Cup landing in Turbo Track) would force the
+    # tedious tokens -> gem cups -> 5 gems chain. SHUFFLE_GROUPS already segregates the
+    # trial and gem-cup pads out of the trophy-pad ('race') pool — native dispatch
+    # requires it — so they are never remapped above; this strips any such remap when
+    # the guard is active to enforce that invariant explicitly (a no-op under the
+    # current groups, defensive if a group is ever widened). The guard is set in
+    # create_regions only for unlock=vanilla + gems-not-shuffled; OFF leaves the map
+    # untouched.
+    if getattr(world, "_ctr_force_vanilla_turbotrack", False):
+        _GUARDED_PADS = (
+            "Turbo Track Warp Pad", "Slide Coliseum Warp Pad",
+            "Red Cup Warp Pad", "Green Cup Warp Pad", "Blue Cup Warp Pad",
+            "Yellow Cup Warp Pad", "Purple Cup Warp Pad",
+        )
+        for _pad in _GUARDED_PADS:
+            out.pop(_pad, None)
     return out

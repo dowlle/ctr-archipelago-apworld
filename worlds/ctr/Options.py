@@ -235,6 +235,28 @@ class AutoUnlockCtrChallengeRelicRace(Toggle):
     display_name = "Auto-unlock CTR Challenge & Relic Race"
 
 
+class ComfortGuards(DefaultOnToggle):
+    """Enable Icebound's hand-tuned solvability/comfort guards that prevent tedious
+    forced item chains. Default ON (matches Icebound's behaviour).
+
+    The guard activates only when warp-pad unlock requirements are **vanilla** and
+    gems are **not** shuffled. In that configuration the Turbo Track warp pad keeps
+    its vanilla 5-gem entry gate, and reaching it requires winning every Gem Cup
+    (each needing 4 CTR tokens) to collect all 5 gems. To stop a required item from
+    being forced behind that whole tokens -> gem cups -> 5 gems chain (Icebound's
+    `force_vanilla_turbotrack`), the guard pins Turbo Track's three relic Time Trial
+    rewards to their vanilla relics (out of the multiworld shuffle), so progression
+    is never placed there. It also keeps the Gem Cup and trial warp pads out of the
+    trophy-pad destination shuffle so a Gem Cup can never land in the Turbo Track pad
+    (Icebound's `limit_arena_gemcup_shuffle`); our shuffle groups already segregate
+    them, and this guard enforces that invariant explicitly.
+
+    Turning this OFF removes the pin, allowing the (tedious but still solvable)
+    forced chain. The guard is inert whenever unlock requirements are randomized or
+    gems are shuffled."""
+    display_name = "Comfort Guards"
+
+
 class SkipMaskHints(DefaultOnToggle):
     """Sets all adventure mode mask hint cutscenes as 'already seen', effectively skipping them."""
     display_name = "Skip Mask Hints"
@@ -291,6 +313,7 @@ class ctrAPOptions(PerGameCommonOptions):
     requirement_weights: RequirementWeights
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
+    comfort_guards: ComfortGuards
     # qol
     skip_mask_hints: SkipMaskHints
     autoskip_podium_cutscenes: AutoskipPodiumCutscenes
@@ -312,6 +335,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementVariety,
         RequirementWeights,
         AutoUnlockCtrChallengeRelicRace,
+        ComfortGuards,
         BossGarageRequirements,
     ],
     "Difficulty": [SapphireRelicProgression, GoldRelicProgression, PlatinumRelicProgression],

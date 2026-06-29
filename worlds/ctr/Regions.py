@@ -93,6 +93,22 @@ def create_regions(world: "ctrAPWorld"):
     world.warp_pad_ids = _load_warp_pad_ids()
     world.shuffle_warp_pads = do_shuffle
 
+    # --- Comfort guards (Icebound force_vanilla_turbotrack / limit_arena_gemcup) ---
+    # Activate only in Icebound's exact condition: warp-pad unlock = VANILLA and gems
+    # NOT shuffled. There the Turbo Track pad keeps its vanilla 5-gem gate, so any
+    # required item reachable only through it forces the tedious tokens -> gem cups ->
+    # 5 gems chain. The flag drives (a) build_warp_pad_map keeping Gem Cup / trial pads
+    # out of the trophy-pad destination shuffle (so a Gem Cup can never land in the
+    # Turbo Track pad), and (b) create_items pinning Turbo Track's relic rewards
+    # vanilla so progression is never placed behind that gate. Inert when unlocks are
+    # randomized or gems are shuffled; OFF removes the guard (allows the chain).
+    world._ctr_comfort_guards = bool(opts.comfort_guards.value)
+    world._ctr_force_vanilla_turbotrack = (
+        world._ctr_comfort_guards
+        and unlock_mode == 0
+        and not bool(opts.shuffle_gems.value)
+    )
+
     # Per-pad resolved unlock requirement: {pad_exit_name -> {type,count,colour}}.
     # The concrete (item, count) used to build the AP access rule (parallel dict).
     world.warp_pad_unlock = {}            # STAGE 1, physical-pad keyed (slot_data)

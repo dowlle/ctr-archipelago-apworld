@@ -237,6 +237,22 @@ class ctrAPWorld(World):
         # Time Trial locations per tier again (no 16/18 seizure). Stage-2 gate
         # solvability comes from the sphere-search invariant + the per-pad relax
         # fallback, not from locking these locations out of the pool.
+        # Comfort guard (Icebound force_vanilla_turbotrack): when warp-pad unlock
+        # requirements are vanilla and gems are not shuffled, Turbo Track keeps its
+        # vanilla 5-gem entry gate (reachable only after every Gem Cup -> all 5 gems).
+        # Pin Turbo Track's three relic Time Trial rewards to their vanilla relics so
+        # no required item is ever forced behind that tedious chain. The randint draw
+        # below is taken unconditionally (only the pin DECISION is forced) so the RNG
+        # stream is identical to the unguarded path -- guard-inactive seeds are byte
+        # for byte unchanged. Pure pin -> removes progression placement options ->
+        # can only maintain or improve fillability (item/location count stays balanced
+        # via _relic_locked). The flag is set in create_regions.
+        _force_vanilla_tt = getattr(self, "_ctr_force_vanilla_turbotrack", False)
+        _TT_RELIC_LOCS = {
+            "Turbo Track: Sapphire Time Trial",
+            "Turbo Track: Gold Time Trial",
+            "Turbo Track: Platinum Time Trial",
+        }
         _relic_locked = {}  # relic item name -> count pinned out of the pool
         for _tier_label, _relic_item, _chance in _relic_tiers:
             _suffix = f": {_tier_label} Time Trial"
@@ -244,7 +260,9 @@ class ctrAPWorld(World):
                            if n.endswith(_suffix))
             _n = 0
             for _loc_name in _locs:
-                if self.random.randint(0, 99) >= _chance:   # (100 - chance)% -> pin vanilla
+                _roll_pin = self.random.randint(0, 99) >= _chance  # (100-chance)% pin
+                _force_pin = _force_vanilla_tt and _loc_name in _TT_RELIC_LOCS
+                if _force_pin or _roll_pin:
                     mw.get_location(_loc_name, player).place_locked_item(
                         self.create_item(_relic_item)
                     )
