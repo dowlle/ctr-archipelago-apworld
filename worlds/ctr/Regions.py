@@ -277,7 +277,8 @@ def create_regions(world: "ctrAPWorld"):
         collapse_s2 = bool(world.options.autounlock_ctrchallenge_relicrace.value)
         world._ctr_two_stage_active = not collapse_s2
         pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for,
-                                     collapse_stage2=collapse_s2)
+                                     collapse_stage2=collapse_s2,
+                                     include_gem_cups=bool(world.options.include_gem_cups.value))
         # Filter to the pad kinds the YAML actually randomizes: race always;
         # crystal only when include_battle_arenas; cups only when include_gem_cups;
         # trials always.

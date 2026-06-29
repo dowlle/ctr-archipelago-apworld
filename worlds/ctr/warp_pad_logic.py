@@ -229,7 +229,7 @@ def _parse_requires(text):
     return out
 
 
-def build_graph(world, reward_track_for):
+def build_graph(world, reward_track_for, include_gem_cups=False):
     """Build a reachability model from the LIVE AP region graph so the sphere
     search reasons over the SAME logic AP fill will enforce.
 
@@ -264,7 +264,7 @@ def build_graph(world, reward_track_for):
             name = loc.name
             gate = _parse_requires(getattr(loc, "logic_text", ""))
             sfx = name.split(":", 1)[1].strip() if ":" in name else name
-            reward = _vanilla_reward(rname, rtype, dest_track, sfx)
+            reward = _vanilla_reward(rname, rtype, dest_track, sfx, include_gem_cups)
             is_tt = name.endswith("Time Trial") or name.endswith("CTR Token Challenge")
             trophy_loc = None
             if is_tt:
@@ -276,22 +276,31 @@ def build_graph(world, reward_track_for):
     return exits, locations, region_type
 
 
-def _vanilla_reward(region_name, region_type, dest_track, suffix):
+def _vanilla_reward(region_name, region_type, dest_track, suffix, include_gem_cups=False):
     """Vanilla reward a location yields, for inventory growth in the sphere search.
-    Boss races (except Oxide) yield a Key; gem cups yield nothing into the synthetic
-    inventory; race/crystal locations yield their reward."""
+    Boss races (except Oxide) yield a Key; gem cups yield their Gem ONLY when gem
+    cups are part of the seed (include_gem_cups); race/crystal locations yield their
+    reward."""
     if region_type == "boss":
         return None if "Oxide" in region_name else "Key"
     if region_type == "cup":
-        # Gem cups are now in the requirement pool (single-stage randomized entry),
-        # but their Gem reward is left OUT of the synthetic sphere inventory: the
-        # gem REWARD model is unchanged (gems flow through the normal multiworld
-        # pool, not pinned to the cup), and not seeding gems here keeps the cup
-        # entry requirement from ever circularly demanding a gem the player can only
-        # earn by clearing a (still-locked) cup. Cups are pure leaves in the DAG:
-        # they gate nothing onward and grow no inventory, so the sphere search only
-        # ASSIGNS them a tier-1 req (from items owned by the time Cups Room/Key 3 is
-        # reached) without their reward affecting any other pad's solvability.
+        # Gem cups feed their Gem into the synthetic sphere inventory ONLY when the
+        # seed actually contains gem cups (include_gem_cups). That is what lets a gem
+        # be CHOSEN as a warp-pad requirement (subject to its REQ_WEIGHTS weight):
+        # without the reward in the inventory the sphere search/_choose_requirement
+        # never owns a gem, so a gem could never gate. When cups are NOT in the seed
+        # the reward stays OUT (legacy behaviour: gems never gate).
+        #
+        # No circular dependency: cups are pure leaves in the DAG (single-stage, they
+        # gate nothing onward), and the sphere search only ASSIGNS a pad its tier-1
+        # requirement from items owned BEFORE that pad is reached. A cup's own Gem is
+        # added to the inventory only AFTER the cup is collected, so it can never be
+        # demanded as that same cup's (or an earlier-opened pad's) entry requirement.
+        if include_gem_cups and suffix == "Gem":
+            colour = region_name.split()[0]  # "Red Gem Cup" -> "Red"
+            gem = f"{colour} Gem"
+            if gem in GEM_ITEMS:
+                return gem
         return None
     track = region_name
     return _reward_for(track, dest_track, suffix)
@@ -659,7 +668,8 @@ def _assign_stage2_from_inv(rnd, inv, allowed=None):
     return (item, min(cnt, owned)) if owned > 0 else None
 
 
-def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False):
+def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
+                      include_gem_cups=False):
     """Returns {track_name: {1: stage1_req, 2: stage2_req}} for all shuffleable
     pads. Each req is (item, count) or None (free / no-gate). Stage 2 is non-None
     only for the 16 trophy pads (others get 2: None). mode 2 = random_without_4_keys.
@@ -720,7 +730,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     allowed = {it for it in REQ_WEIGHTS
                if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
 
-    exits, locations, _ = build_graph(world, reward_track_for)
+    exits, locations, _ = build_graph(world, reward_track_for, include_gem_cups)
     start = world.start_region.name if world.start_region else "Menu"
 
     # 1) free subset of the 5 N. Sanity Beach candidates -- the bootstrap pads
