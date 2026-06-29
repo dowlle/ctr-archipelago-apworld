@@ -148,8 +148,22 @@ HUB_BOSS = {
 def add_boss_garage_rules(world, player):
     """Install boss-garage access rules from the resolved flat requirements.
 
-    MVP: all boss-garage modes map to trophy-count gates (4/8/12/16). The real
-    bossgarage_mode int is still emitted in slot_data for future native use.
+    MVP: all three boss-garage modes (Original4Tracks / SameHubTracks / Trophies)
+    map to the SAME trophy-count gates (4/8/12/16) in logic. AP-core therefore
+    reasons about an identical, solvable topology regardless of the chosen mode,
+    so the three modes share one fill behaviour today (this is why all three fuzz
+    green with the same solvability).
+
+    The real bossgarage_mode int plus the per-boss 'tracks' LevelID lists for modes
+    0/1 are still emitted in slot_data (Regions._resolve_boss_reqs ->
+    boss_garage_req). The full Original4Tracks / SameHubTracks experience -- gating
+    on which specific tracks were won rather than on a flat trophy count -- is
+    deferred to native, where it needs pad-specific win-bit tracking that the gate
+    sites in AH_Garage.c do not have yet (documented in
+    native_patches/6_bossmodes.patch). When that native support lands, the trophy
+    gate here can stay as the logical proxy (winning a track yields a trophy, so the
+    trophy count is a sound lower bound on solvability), or be tightened to a
+    can_reach over the four track Trophy Races -- no slot_data change required.
     """
     mw = world.multiworld
     for door, thr in HUB_BOSS.items():

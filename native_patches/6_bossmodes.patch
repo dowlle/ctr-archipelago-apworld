@@ -1,0 +1,147 @@
+diff --git a/ap/ap_hooks.c b/ap/ap_hooks.c
+index 9325a2b..12bd6bb 100644
+--- a/ap/ap_hooks.c
++++ b/ap/ap_hooks.c
+@@ -553,6 +553,43 @@ int AP_BossReqMet(const ctr_req *r)
+ 	}
+ }
+ 
++// Per-mode boss-garage gate for the four boss hubs (bossIdx 0..3 = Roo, Papu,
++// Komodo, Pinstripe). bossgarage_mode 0 (Original4Tracks) / 1 (SameHubTracks):
++// the garage opens once the player has WON each required race track for that boss
++// (ctr_cfg.boss_tracks[bossIdx][0..n-1], emitted by the apworld -- vanilla
++// LevelIDs for mode 0, destination-remapped LevelIDs for mode 1). A track counts
++// as WON when its trophy-race AP location has been checked --
++// AP_LocationCheckedByBit(trackLevelID + ADV_REWARD_FIRST_TROPHY), NOT
++// CHECK_ADV_BIT: in AP the AdvProgress trophy bit reflects RECEIVED items, not the
++// races the player actually won, so only the checked-location signal is correct
++// here. mode 2 (Trophies) and any boss with no track list fall back to the flat
++// trophy-count requirement via AP_BossReqMet. Oxide (bossIdx 4) is a key gate and
++// is never routed through this function.
++int AP_BossGarageOpen(int bossIdx)
++{
++	if (bossIdx < 0 || bossIdx >= CTR_CFG_BOSS_COUNT)
++		return 1;
++
++	int mode = ctr_cfg.bossgarage_mode;
++	int n = ctr_cfg.boss_n_tracks[bossIdx];
++
++	if ((mode == 0 || mode == 1) && n > 0)
++	{
++		for (int i = 0; i < n; i++)
++		{
++			int track = ctr_cfg.boss_tracks[bossIdx][i];
++			if (track < 0)
++				continue;
++			if (!AP_LocationCheckedByBit(track + ADV_REWARD_FIRST_TROPHY))
++				return 0;
++		}
++		return 1;
++	}
++
++	// mode 2 (Trophies) or no track list -> flat trophy-count requirement.
++	return AP_BossReqMet(&ctr_cfg.boss_req[bossIdx]);
++}
++
+ // Trophy-track warp pad LOAD gate. When a per-seed requirement applies use it;
+ // otherwise fall back verbatim to the Phase-1 rule (received trophies vs the
+ // per-track numTrophiesToOpen). levelID is the physical pad LevelID (retail
+diff --git a/ap/ap_seedcfg.cpp b/ap/ap_seedcfg.cpp
+index 9924811..3a7ebb4 100644
+--- a/ap/ap_seedcfg.cpp
++++ b/ap/ap_seedcfg.cpp
+@@ -141,6 +141,9 @@ void ap_seedcfg_parse_json(const nlohmann::json &j)
+ 		ctr_cfg.boss_req[i].type = 0;
+ 		ctr_cfg.boss_req[i].count = 0;
+ 		ctr_cfg.boss_req[i].colour = -1;
++		ctr_cfg.boss_n_tracks[i] = 0;
++		for (int k = 0; k < 4; k++)
++			ctr_cfg.boss_tracks[i][k] = -1;
+ 	}
+ 
+ 	if (!j.is_object())
+@@ -220,7 +223,25 @@ void ap_seedcfg_parse_json(const nlohmann::json &j)
+ 		{
+ 			auto it = bossIt->find(kBossKeys[b]);
+ 			if (it != bossIt->end() && it->is_object())
++			{
+ 				ctr_cfg.boss_req[b] = parse_req(*it);
++				// Optional per-boss track list (garage modes 0/1). Mode 2 omits
++				// it; extra key is harmless to parse_req above. Cap at 4 (each
++				// boss hub has exactly four race tracks).
++				auto trIt = it->find("tracks");
++				if (trIt != it->end() && trIt->is_array())
++				{
++					int n = 0;
++					for (auto &tv : *trIt)
++					{
++						if (n >= 4)
++							break;
++						try { ctr_cfg.boss_tracks[b][n++] = tv.get<int>(); }
++						catch (...) {}
++					}
++					ctr_cfg.boss_n_tracks[b] = n;
++				}
++			}
+ 		}
+ 	}
+ 
+diff --git a/ap/ap_seedcfg.h b/ap/ap_seedcfg.h
+index 836aa42..5b273a6 100644
+--- a/ap/ap_seedcfg.h
++++ b/ap/ap_seedcfg.h
+@@ -74,6 +74,13 @@ typedef struct
+ 	// cups have no tier-2 menu); kept as ctr_warp_unlock only for parse symmetry.
+ 	ctr_warp_unlock gem_cup_unlock[5];                  // gem cups by colour (LevelID 100..104); stage1.type 0 = native vanilla rule
+ 	ctr_req         boss_req[CTR_CFG_BOSS_COUNT];       // 0 roo,1 papu,2 komodo,3 pinstripe,4 oxide
++	// Per-boss required race-track LevelIDs for the track-based garage modes
++	// (bossgarage_mode 0 Original4Tracks / 1 SameHubTracks). boss_tracks[b][0..
++	// boss_n_tracks[b]-1] are the LevelIDs the player must have WON for boss b to
++	// open; n==0 / entry -1 = no track list (mode 2 Trophies, or Oxide) -> use
++	// boss_req. Emitted by the apworld under boss_garage_req[<boss>].tracks.
++	int             boss_tracks[CTR_CFG_BOSS_COUNT][4];
++	int             boss_n_tracks[CTR_CFG_BOSS_COUNT];
+ } ctr_seed_config;
+ 
+ // Global config, zero-init; schema_version == 0 until ap_seedcfg_parse_json runs.
+@@ -121,6 +128,14 @@ int ctr_cfg_warp_stage2_unlocked(int physPadLevelID);
+ // type 0 / unknown -> 1 (no requirement). IMPLEMENTED C-SIDE in ap_hooks.c.
+ int AP_BossReqMet(const ctr_req *r);
+ 
++// Per-mode boss-garage gate for the four boss hubs (bossIdx 0..3 = Roo, Papu,
++// Komodo, Pinstripe). Honours bossgarage_mode: modes 0/1 (Original4Tracks /
++// SameHubTracks) open the garage once every required race track for that boss
++// has been WON (boss_tracks[bossIdx]); mode 2 (Trophies) and any boss with no
++// track list fall back to the flat trophy-count requirement via AP_BossReqMet.
++// IMPLEMENTED C-SIDE in ap_hooks.c (needs AP_LocationCheckedByBit).
++int AP_BossGarageOpen(int bossIdx);
++
+ #ifdef __cplusplus
+ } // extern "C"
+ 
+diff --git a/game/232/AH_Garage.c b/game/232/AH_Garage.c
+index 964f006..d844577 100644
+--- a/game/232/AH_Garage.c
++++ b/game/232/AH_Garage.c
+@@ -222,7 +222,10 @@ LAB_800aeb6c:
+ 		// the flat cumulative Trophy total (4, 8, 12, 16).
+ 		if (ctr_cfg_active())
+ 		{
+-			if (!AP_BossReqMet(&ctr_cfg.boss_req[(levelID - GEM_STONE_VALLEY) - 1]))
++			// AP Phase 2 (item #6): per-mode boss gate. Modes 0/1 (Original4Tracks /
++			// SameHubTracks) check WON tracks; mode 2 (Trophies) falls back to the
++			// resolved trophy-count requirement -- all inside AP_BossGarageOpen.
++			if (!AP_BossGarageOpen((levelID - GEM_STONE_VALLEY) - 1))
+ 				goto LAB_800aebd0;
+ 		}
+ 		else if (AP_GateCount(AP_IDX_TROPHY) < (levelID - GEM_STONE_VALLEY) * 4)
+@@ -492,7 +495,8 @@ void AH_Garage_LInB(struct Instance *inst)
+ 		// Komodo 12, Pinstripe 16). hubID = levelID - GEM_STONE_VALLEY is 1..4.
+ 		if (ctr_cfg_active())
+ 		{
+-			if (!AP_BossReqMet(&ctr_cfg.boss_req[(levelID - GEM_STONE_VALLEY) - 1]))
++			// AP Phase 2 (item #6): per-mode boss gate (see AH_Garage_ThTick).
++			if (!AP_BossGarageOpen((levelID - GEM_STONE_VALLEY) - 1))
+ 				goto GarageLocked;
+ 		}
+ 		else if (AP_GateCount(AP_IDX_TROPHY) < (levelID - GEM_STONE_VALLEY) * 4)

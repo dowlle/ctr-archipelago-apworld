@@ -22,6 +22,23 @@ if TYPE_CHECKING:
 # Boss-garage trophy thresholds (vanilla 4/8/12/16). Oxide stays keys.
 BOSS_TROPHY = {"ripper_roo": 4, "papu_papu": 8, "komodo_joe": 12, "pinstripe": 16}
 
+# Vanilla race-track LevelIDs that belong to each boss's hub, in the same
+# 0..15 numbering native + Icebound use (verified against
+# icebound-standalone LevelID enum and data/warp_pad_ids.json):
+#   Roo : Crash Cove 3, Roo's Tubes 6, Mystery Caves 9, Sewer Speedway 8
+#   Papu: Coco Park 14, Tiger Temple 4, Papu's Pyramid 5, Dingo Canyon 0
+#   Komodo: Blizzard Bluff 2, Dragon Mines 1, Polar Pass 12, Tiny Arena 15
+#   Pinstripe: Hot Air Skyway 7, Cortex Castle 10, N. Gin Labs 11, Oxide Station 13
+# Used to build the per-boss 'tracks' metadata for the Original4Tracks /
+# SameHubTracks garage modes (Icebound get_modified_garage_unlocks). Oxide has
+# no track list (it stays a 4-key gate).
+VANILLA_BOSS_TRACKS = {
+    "ripper_roo": [3, 6, 9, 8],
+    "papu_papu":  [14, 4, 5, 0],
+    "komodo_joe": [2, 1, 12, 15],
+    "pinstripe":  [7, 10, 11, 13],
+}
+
 
 def _load_warp_pad_ids():
     """pad-exit-name -> {level_id, kind} from data/warp_pad_ids.json."""
@@ -64,15 +81,61 @@ def _build_reward_track_resolver(world):
     return resolve
 
 
-def _resolve_boss_reqs(boss_mode):
-    """Resolve all 3 boss-garage modes to flat {type,count} server-side.
+def _track_dest_resolver(world):
+    """Return f(track_levelID) -> the LevelID currently LOADED at that vanilla
+    pad after destination shuffle (Icebound's level_links[original]==current).
 
-    MVP: modes 0/1/2 all collapse to trophy-count gates (4/8/12/16). The real
-    bossgarage_mode int still ships in ctr_options so a future native build can
-    branch; today native enforces these flat counts. Oxide = 4 keys, fixed.
+    Inverts world.warp_pad_ids to levelID->pad_name, then reads
+    world.warp_pad_map ({pad_exit_name: dest_track_levelID}). Identity when the
+    pad is unmapped or shuffle is off (empty warp_pad_map) -- in which case
+    SameHubTracks collapses to Original4Tracks, exactly as Icebound documents.
+    """
+    lid_to_pad = {
+        meta["level_id"]: pad_name
+        for pad_name, meta in getattr(world, "warp_pad_ids", {}).items()
+    }
+    wpm = getattr(world, "warp_pad_map", {})
+
+    def dest(lid):
+        pad = lid_to_pad.get(lid)
+        if pad is None:
+            return lid
+        return wpm.get(pad, lid)
+
+    return dest
+
+
+def _resolve_boss_reqs(world, boss_mode):
+    """Resolve all 3 boss-garage modes to flat {type,count} server-side, plus
+    mode-specific 'tracks' metadata for the two track-based modes.
+
+    MVP: modes 0/1/2 all enforce trophy-count gates (4/8/12/16) in BOTH AP logic
+    (Rules.add_boss_garage_rules) and native (AP_BossReqMet on type:1). Native
+    pad-specific win-bit tracking is not yet available, so Original4Tracks (0) and
+    SameHubTracks (1) currently FEEL identical to Trophies (2). For those two modes
+    we additionally emit a per-boss 'tracks' list of required race LevelIDs so a
+    FUTURE native build (see native_patches/6_bossmodes.patch) can switch from the
+    trophy count to a per-track win check without an apworld change. Mode 2
+    (Trophies) carries no track list. Oxide = 4 keys, fixed, no tracks.
+
+    boss_mode: 0 Original4Tracks / 1 SameHubTracks / 2 Trophies (default).
     """
     req = {b: {"type": 1, "count": c} for b, c in BOSS_TROPHY.items()}
     req["oxide"] = {"type": 2, "count": 4}
+
+    if boss_mode == 0:
+        # Original 4 Tracks: the four VANILLA race tracks of that hub, by LevelID
+        # (you must win on those specific tracks wherever their pad now loads).
+        for b, tracks in VANILLA_BOSS_TRACKS.items():
+            req[b]["tracks"] = list(tracks)
+    elif boss_mode == 1:
+        # Same Hub Tracks: the tracks currently LOADED at this hub's four vanilla
+        # race pads after destination shuffle (Icebound level_links lookup).
+        dest = _track_dest_resolver(world)
+        for b, tracks in VANILLA_BOSS_TRACKS.items():
+            req[b]["tracks"] = [dest(t) for t in tracks]
+    # boss_mode == 2 (Trophies): trophy counts only, no track list.
+
     return req
 
 
@@ -127,8 +190,9 @@ def create_regions(world: "ctrAPWorld"):
     # actually loads (A.4<->logic coupling). Empty (identity) when shuffle off.
     world.warp_pad_map = build_warp_pad_map(world) if do_shuffle else {}
 
-    # Boss-garage requirements, resolved to flat {type,count}.
-    world.boss_garage_req = _resolve_boss_reqs(boss_mode)
+    # Boss-garage requirements, resolved to flat {type,count} (+ 'tracks' for
+    # modes 0/1). warp_pad_map (above) is read for SameHubTracks, so resolve here.
+    world.boss_garage_req = _resolve_boss_reqs(world, boss_mode)
 
     # Stash the unlock mode; the sphere-search runs at the END of create_regions
     # (after regions+locations+exits exist, so build_graph can read them).

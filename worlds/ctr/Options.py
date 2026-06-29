@@ -247,9 +247,18 @@ class BossGarageRequirements(Choice):
     - **Trophies**: Roo, Papu, Joe and Pinstripe unlock with 4, 8, 12, 16 trophies respectively.
 
     As an example for **Original 4 Tracks**, unlocking Roo would require winning races in
-    Crash Cove, Roo's Tubes, Mystery Caves, and Sewer Speedway.  
+    Crash Cove, Roo's Tubes, Mystery Caves, and Sewer Speedway.
     **Original 4 Tracks** and **Same Hub Tracks** behave identically if warp pads
-    are not shuffled."""
+    are not shuffled.
+
+    MVP STATUS (read before picking a non-default): the boss garages are CURRENTLY
+    enforced as trophy-count gates (4/8/12/16) for ALL THREE modes, in both the
+    Archipelago logic and the native game, because the native build does not yet
+    track which specific tracks you have won on. The apworld already ships the
+    per-boss vanilla/destination track lists in slot_data for a future native build,
+    so **Original 4 Tracks** and **Same Hub Tracks** will FEEL identical to
+    **Trophies** until that native patch lands (see native_patches/6_bossmodes.patch).
+    The default is **Trophies**, which is fully implemented today."""
     display_name = "Boss Garage Requirements"
     option_original_4_tracks = 0
     option_same_hub_tracks = 1
