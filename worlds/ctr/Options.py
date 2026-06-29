@@ -142,6 +142,46 @@ class WarpPadUnlockRequirements(Choice):
     default = 0
 
 
+class RequirementVariety(Choice):
+    """Tuning preset for the WEIGHTS used when randomized warp-pad requirements
+    are generated (only affects `Warp Pad Unlock Requirements` = randomized /
+    random_without_4_keys).
+
+    - **icebound_beta5** (default): Icebound's rebalanced beta5 weights -- Trophy 90,
+      each CTR Token 16 (Purple 12), each Relic tier 18, Key 20, each Gem 4. Any*
+      collapse scales Token x0.8 (cap 16), Relic x0.5 (cap 27), Gem capped at 5
+      (no -1 reduction).
+    - **trophy_heavy_legacy**: the previous weights -- Trophy 100, Token 15 (Purple 10),
+      Relic 20, Key 25, Gem 2. Any* collapse Token x0.6, Relic x0.3, Gem -1 (no caps).
+    - **custom**: use the per-item weights from `Requirement Weights`; any item not
+      listed there falls back to its trophy_heavy_legacy weight. Custom mode uses the
+      legacy Any* collapse (x0.6 / x0.3 / -1, no caps)."""
+    display_name = "Requirement Variety"
+    option_icebound_beta5 = 0
+    option_trophy_heavy_legacy = 1
+    option_custom = 2
+    default = 0
+
+
+class RequirementWeights(OptionDict):
+    """Per-item requirement weights, used ONLY when `Requirement Variety` = custom.
+
+    Higher weight = that item type is chosen more often as a warp-pad requirement.
+    Any item omitted from this dict falls back to its trophy_heavy_legacy weight.
+    Valid keys: Trophy, Key, the five CTR Token colours, the three Relic tiers, and
+    the five Gem colours."""
+    display_name = "Requirement Weights"
+    supports_weighting = False
+    default = {}
+    valid_keys = [
+        "Trophy", "Key",
+        "Red CTR Token", "Green CTR Token", "Blue CTR Token",
+        "Yellow CTR Token", "Purple CTR Token",
+        "Sapphire Relic", "Gold Relic", "Platinum Relic",
+        "Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem",
+    ]
+
+
 class BossGarageRequirements(Choice):
     """Choose the requirements for opening boss garages.
 
@@ -218,6 +258,8 @@ class ctrAPOptions(PerGameCommonOptions):
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     include_gem_cups: ShuffleWarpPadsGemCups
     warppad_unlock_requirements: WarpPadUnlockRequirements
+    requirement_variety: RequirementVariety
+    requirement_weights: RequirementWeights
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
     # qol
@@ -237,6 +279,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         ShuffleWarpPadsBattleArenas,
         ShuffleWarpPadsGemCups,
         WarpPadUnlockRequirements,
+        RequirementVariety,
+        RequirementWeights,
         AutoUnlockCtrChallengeRelicRace,
         BossGarageRequirements,
     ],

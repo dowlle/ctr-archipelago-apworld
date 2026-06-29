@@ -301,17 +301,107 @@ def _vanilla_reward(region_name, region_type, dest_track, suffix):
 # Requirement weighting + Any* collapse (ports lines 250-366)
 # ---------------------------------------------------------------------------
 
-REQ_WEIGHTS = {
+# --- Requirement-weight PRESETS (YAML-tuneable, see Options.RequirementVariety) ---
+# trophy_heavy_legacy = the original CTR-apworld weights (Trophy 100, Token 15/10,
+# Relic 20, Key 25, Gem 2). icebound_beta5 = Icebound's rebalanced beta5 weights
+# (Trophy 90, Token 16/12, Relic 18, Key 20, Gem 4). Both presets share the SAME
+# key set, so _STAGE2_ITEMS / the `allowed` filter stay valid across presets.
+_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY = {
     "Trophy": 100, "Key": 25,
     "Red CTR Token": 15, "Green CTR Token": 15, "Blue CTR Token": 15,
     "Yellow CTR Token": 15, "Purple CTR Token": 10,
     "Sapphire Relic": 20, "Gold Relic": 20, "Platinum Relic": 20,
     "Red Gem": 2, "Green Gem": 2, "Blue Gem": 2, "Yellow Gem": 2, "Purple Gem": 2,
 }
+_REQ_WEIGHTS_ICEBOUND_BETA5 = {
+    "Trophy": 90, "Key": 20,
+    "Red CTR Token": 16, "Green CTR Token": 16, "Blue CTR Token": 16,
+    "Yellow CTR Token": 16, "Purple CTR Token": 12,
+    "Sapphire Relic": 18, "Gold Relic": 18, "Platinum Relic": 18,
+    "Red Gem": 4, "Green Gem": 4, "Blue Gem": 4, "Yellow Gem": 4, "Purple Gem": 4,
+}
+
+# Any* collapse parameters per preset. Tuple layout:
+#   (token_chance, token_scale, token_cap,
+#    relic_chance, relic_scale, relic_cap,
+#    gem_chance,   gem_cap)
+# A *_cap of None means "no cap". Collapse CHANCES (token 33 / relic 20 / gem 80)
+# are unchanged from the original Icebound port; beta5 only retunes scale + caps and
+# drops the gem "-1" reduction. custom mode reuses the legacy collapse row.
+_ANY_COLLAPSE_PARAMS = {
+    "trophy_heavy_legacy": (33, 0.6, None, 20, 0.3, None, 80, None),
+    "icebound_beta5":      (33, 0.8, 16,   20, 0.5, 27,   80, 5),
+    "custom":              (33, 0.6, None, 20, 0.3, None, 80, None),
+}
+
+# Active weight table + collapse params. Initialised to the LEGACY defaults so the
+# module is importable/usable before _load_requirement_preset(world) runs; the loader
+# overwrites these from the chosen preset at run_sphere_search() start. Default seed
+# generation uses icebound_beta5 (see Options.RequirementVariety.default = 0).
+REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+_TOKEN_COLLAPSE_CHANCE = 33
+_TOKEN_COLLAPSE_SCALE = 0.6
+_TOKEN_COLLAPSE_CAP = None
+_RELIC_COLLAPSE_CHANCE = 20
+_RELIC_COLLAPSE_SCALE = 0.3
+_RELIC_COLLAPSE_CAP = None
+_GEM_COLLAPSE_CHANCE = 80
+_GEM_COLLAPSE_CAP = None
+
 TOKEN_ITEMS = ("Red CTR Token", "Green CTR Token", "Blue CTR Token",
                "Yellow CTR Token", "Purple CTR Token")
 RELIC_ITEMS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
 GEM_ITEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
+
+
+def _load_requirement_preset(world):
+    """Load the requirement-weight preset chosen by the requirement_variety YAML
+    option into the module-level REQ_WEIGHTS + the eight Any*-collapse globals.
+
+    MUST be called at run_sphere_search() start (before REQ_WEIGHTS / the `allowed`
+    filter are read), and re-called on every invocation -- the state is module-global
+    and never cached on the world, so a second seed in the same process always
+    reloads its own preset.
+
+    - icebound_beta5 (default): beta5 weights + retuned collapse (Token x0.8 cap 16,
+      Relic x0.5 cap 27, Gem cap 5, no -1).
+    - trophy_heavy_legacy: original weights + original collapse (x0.6 / x0.3 / -1).
+    - custom: start from the legacy weights, then overlay requirement_weights; any
+      omitted item keeps its legacy weight. Unrecognised custom keys are ignored
+      (OptionDict.valid_keys already constrains them at parse time). custom uses the
+      legacy collapse row.
+
+    A missing requirement_variety option (e.g. an old YAML) safely falls back to the
+    legacy preset.
+    """
+    global REQ_WEIGHTS
+    global _TOKEN_COLLAPSE_CHANCE, _TOKEN_COLLAPSE_SCALE, _TOKEN_COLLAPSE_CAP
+    global _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP
+    global _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP
+
+    variety_opt = getattr(world.options, "requirement_variety", None)
+    # Choice options expose .current_key ("icebound_beta5" etc.); fall back to legacy.
+    preset = getattr(variety_opt, "current_key", "trophy_heavy_legacy")
+
+    if preset == "icebound_beta5":
+        REQ_WEIGHTS = dict(_REQ_WEIGHTS_ICEBOUND_BETA5)
+        collapse_key = "icebound_beta5"
+    elif preset == "custom":
+        weights = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)  # fallback for omitted keys
+        custom = getattr(getattr(world.options, "requirement_weights", None),
+                         "value", None) or {}
+        for k, v in custom.items():
+            if k in weights:  # ignore stray keys; keep the key universe stable
+                weights[k] = v
+        REQ_WEIGHTS = weights
+        collapse_key = "custom"
+    else:  # trophy_heavy_legacy + any unknown/missing value
+        REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+        collapse_key = "trophy_heavy_legacy"
+
+    (_TOKEN_COLLAPSE_CHANCE, _TOKEN_COLLAPSE_SCALE, _TOKEN_COLLAPSE_CAP,
+     _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP,
+     _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP) = _ANY_COLLAPSE_PARAMS[collapse_key]
 
 
 def _weighted_choice(rnd, pairs):
@@ -349,19 +439,30 @@ def _choose_requirement(rnd, inv, allowed=None):
     # aggregates only the relic tiers in `allowed` so a lowered concrete colour is
     # never an excluded (pinned-out) tier.
     if req_item in TOKEN_ITEMS:
-        if rnd.randrange(100) < 33:
+        if rnd.randrange(100) < _TOKEN_COLLAPSE_CHANCE:
             total = inv.count("AnyCtrToken")
-            req_item, req_cnt = "AnyCtrToken", max(1, math.ceil(total * 0.6))
+            cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
+            if _TOKEN_COLLAPSE_CAP is not None:
+                cnt = min(cnt, _TOKEN_COLLAPSE_CAP)
+            req_item, req_cnt = "AnyCtrToken", cnt
     elif req_item in RELIC_ITEMS:
-        if rnd.randrange(100) < 20:
+        if rnd.randrange(100) < _RELIC_COLLAPSE_CHANCE:
             tiers = [r for r in RELIC_ITEMS if allowed is None or r in allowed]
             total = sum(inv.items[r] for r in tiers)
-            req_item, req_cnt = "AnyRelic", max(1, math.ceil(total * 0.3))
+            cnt = max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
+            if _RELIC_COLLAPSE_CAP is not None:
+                cnt = min(cnt, _RELIC_COLLAPSE_CAP)
+            req_item, req_cnt = "AnyRelic", cnt
     elif req_item in GEM_ITEMS:
-        if rnd.randrange(100) < 80:
+        if rnd.randrange(100) < _GEM_COLLAPSE_CHANCE:
             total = inv.count("AnyGem")
-            # Rust subtracts 1 inside the accumulation loop (count - 1, floored at 1)
-            req_item, req_cnt = "AnyGem", max(1, total - 1)
+            # Legacy preset (cap None) keeps Rust's per-item "-1" (count - 1, floored
+            # at 1). beta5 drops the -1 and clamps to _GEM_COLLAPSE_CAP instead.
+            if _GEM_COLLAPSE_CAP is None:
+                cnt = max(1, total - 1)
+            else:
+                cnt = max(1, min(total, _GEM_COLLAPSE_CAP))
+            req_item, req_cnt = "AnyGem", cnt
     return (req_item, req_cnt)
 
 
@@ -588,6 +689,10 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     to the physical pad for the slot_data contract.
     """
     rnd = world.random
+    # Load the requirement-weight preset (icebound_beta5 default) into the module
+    # globals BEFORE REQ_WEIGHTS / the `allowed` filter below are read. Re-run every
+    # call so multi-seed processes never inherit a previous seed's preset.
+    _load_requirement_preset(world)
     if reward_track_for is None:
         reward_track_for = lambda t: t
 

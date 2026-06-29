@@ -1,0 +1,20 @@
+# native_patches/1_weights.patch
+#
+# Item #1 — Requirement weighting (Icebound beta5) + YAML-tuneable.
+#
+# NATIVE HALF: NO CHANGES REQUIRED.
+#
+# The native AP build (D:/pythonProjects/ctr-native-ap/) contains NO warp-pad
+# requirement-weight constants. All requirement weighting, the Any* collapse, and
+# the cap logic run entirely in the Python apworld seed generator
+# (worlds/ctr/warp_pad_logic.py). The resolved, concrete per-pad requirements are
+# transmitted to the client via slot_data (the `warp_pad_unlock` payload built in
+# worlds/ctr/__init__.py). Native code (AH_WarpPad*, ap_seedcfg.cpp) merely ENFORCES
+# the received {item, colour, count} requirements; it never recomputes weights.
+#
+# Verified against:
+#   - D:/pythonProjects/ctr-native-ap/ap/ap_seedcfg.cpp / ap_seedcfg.h
+#   - D:/pythonProjects/ctr-native-ap/game/AH_WarpPad*.c
+# No occurrence of weight tables / req_chances / 0.6 / 0.3 collapse constants.
+#
+# => This file is intentionally a no-op. No unified diff to apply.
