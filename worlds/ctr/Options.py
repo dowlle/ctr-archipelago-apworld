@@ -251,17 +251,30 @@ class BossGarageRequirements(Choice):
     **Original 4 Tracks** and **Same Hub Tracks** behave identically if warp pads
     are not shuffled.
 
-    MVP STATUS (read before picking a non-default): the boss garages are CURRENTLY
-    enforced as trophy-count gates (4/8/12/16) for ALL THREE modes, in both the
-    Archipelago logic and the native game, because the native build does not yet
-    track which specific tracks you have won on. The apworld already ships the
-    per-boss vanilla/destination track lists in slot_data for a future native build,
-    so **Original 4 Tracks** and **Same Hub Tracks** will FEEL identical to
-    **Trophies** until that native patch lands (see native_patches/6_bossmodes.patch).
-    The default is **Trophies**, which is fully implemented today."""
+    CURRENTLY ONLY **Trophies** IS SELECTABLE. Original 4 Tracks (0) and Same Hub
+    Tracks (1) are hard-disabled (see BUG-D note below); **Trophies** (2) is the
+    only valid value until they are reconciled."""
     display_name = "Boss Garage Requirements"
-    option_original_4_tracks = 0
-    option_same_hub_tracks = 1
+    # BUG-D (board 2026-07-01 14:36 audit, Spec §4): modes 0/1 are a cross-layer
+    # paradigm mismatch. The apworld logic gates ALL modes on a flat trophy count
+    # (Rules.add_boss_garage_rules 4/8/12/16), but native enforces a per-track WIN
+    # for modes 0/1 (ap_hooks.c AP_BossReqMet / AH_Garage.c). Orthogonal criteria =>
+    # a 16-trophy player who did NOT win the four required tracks is softlocked, and
+    # winning four tracks under-count opens a garage early. Per Spec §4 these two
+    # modes are "not shippable until reconciled", so they are removed from the
+    # selectable set here (default 2 = Trophies is unaffected and fully implemented).
+    #
+    # NOT deleted, only disabled: the per-boss vanilla/destination track lists are
+    # still resolved + emitted in slot_data (Regions._resolve_boss_reqs, kept intact),
+    # and re-enabling is a one-line uncomment once the reconciliation lands. That
+    # reconciliation is the SAME machinery as the goal-rework Goal-3 fix: the 4 code-
+    # null per-boss "personally won" companion events (paired with the Boss Race
+    # locations) are exactly the per-track win flags modes 0/1 need to gate on instead
+    # of a flat trophy count. Build those there, then tighten add_boss_garage_rules
+    # (or the native gate) to can_reach the four required Trophy Races and restore
+    # these two options.
+    # option_original_4_tracks = 0  # disabled -- see BUG-D above
+    # option_same_hub_tracks = 1    # disabled -- see BUG-D above
     option_trophies = 2
     default = 2
 
