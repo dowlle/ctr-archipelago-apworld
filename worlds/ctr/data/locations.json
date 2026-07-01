@@ -20,8 +20,8 @@
     {"name": "Papu Papu Garage: Boss Race", "region": "Papu Papu Garage", "code": 35011101},
     {"name": "Komodo Joe Garage: Boss Race", "region": "Komodo Joe Garage", "code": 35011102},
     {"name": "Pinstripe Garage: Boss Race", "region": "Pinstripe Garage", "code": 35011103},
-    {"name": "N. Oxide Garage: N. Oxide's Challenge", "region": "N. Oxide Garage", "code": null},
-    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "region": "N. Oxide Garage", "code": null},
+    {"name": "N. Oxide Garage: N. Oxide's Challenge", "region": "N. Oxide Garage", "code": 35011104},
+    {"name": "N. Oxide Garage: N. Oxide's Final Challenge", "region": "N. Oxide Garage", "code": 35011105},
 
     {"name": "Red Gem Cup: Gem", "region": "Red Gem Cup", "code": 35011200},
     {"name": "Green Gem Cup: Gem", "region": "Green Gem Cup", "code": 35011201},

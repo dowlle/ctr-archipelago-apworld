@@ -393,6 +393,80 @@ class ctrAPWorld(World):
         # the vanilla fill backstop's enumeration simulation exercises.
         return self.create_item("Wumpa Fruit")
 
+    def _add_goal_event(self, region_name: str, event_name: str, logic_text: str) -> str:
+        """Create a code-null companion EVENT location and lock a distinct flag item
+        on it, gated by the SAME win-trigger (logic_text) as its paired real reward
+        location. Per Spec §5's standing rule (option b): a goal meaning "the player
+        personally did X" must key completion off a singleton or a companion flag,
+        NEVER a state.has() against whatever arbitrary shuffled item happens to land on
+        the real reward location -- a duplicate of that item arriving from elsewhere in
+        the multiworld would false-complete the goal. The flag item is named after the
+        event and is read ONLY by completion_condition (code null -> native never sends
+        it as a check). logic_text is stored on the location so Rules.set_rules -- which
+        runs AFTER create_items and rebuilds every location's access_rule from its
+        logic_text -- gates the event exactly like a JSON location. Returns the flag
+        item name."""
+        from BaseClasses import Location
+        mw = self.multiworld
+        region = mw.get_region(region_name, self.player)
+        loc = Location(self.player, event_name, None, region)
+        loc.logic_text = logic_text
+        loc.place_locked_item(self.create_event(event_name))
+        region.locations.append(loc)
+        mw.regions.location_cache[self.player][event_name] = loc
+        return event_name
+
+    def _install_goal(self, player: int) -> None:
+        """Set this seed's completion condition and lay any companion goal-tracking
+        events (Spec §5, revised 2026-07-01).
+
+        Goals 0/1 (Oxide, Oxide-final) are now real, coded, pool-filled locations
+        (data/locations.json codes 35011104 / 35011105); each is PAIRED with a code-null
+        companion event locking a distinct flag the completion condition reads. Goal 3
+        (All Bosses) checks 4 code-null companion events paired with the 4 real Boss
+        Race locations (35011100-35011103), replacing the wrong state.has(Trophy, 16)
+        proxy -- trophies only UNLOCK the garages, they do not mean the bosses were
+        beaten. Goal 4 (All Gems) keeps gemgoal()'s singleton-gem check, which is safe
+        by construction (a unique item cannot false-positive from a duplicate) and needs
+        no companion event."""
+        mw = self.multiworld
+        goal = self.options.goal.value
+
+        if goal == Goal.option_oxide:
+            flag = self._add_goal_event(
+                "N. Oxide Garage", "N. Oxide's Challenge Cleared", "has('Key', 4)")
+            mw.completion_condition[player] = (
+                lambda state, f=flag: state.has(f, player))
+        elif goal == Goal.option_oxidefinal:
+            # This companion event is the seed's terminal win-flag. Its win-trigger
+            # mirrors the real location's vanilla logic (Key 4 + 18 Sapphire); the
+            # 18-Gold+Platinum alt of oxide_final_unlock is not modeled in apworld logic
+            # today (pre-existing -- native reads that option), so mirroring keeps the
+            # exact current solvability semantics.
+            flag = self._add_goal_event(
+                "N. Oxide Garage", "N. Oxide's Final Challenge Cleared",
+                "has('Key', 4) and has('Sapphire Relic', 18)")
+            mw.completion_condition[player] = (
+                lambda state, f=flag: state.has(f, player))
+        elif goal == Goal.option_allbosses:
+            # Pair each real Boss Race location with a companion event of the same
+            # reachability. The Boss Race location's own rule is "True"; the garage
+            # door's trophy gate (add_boss_garage_rules 4/8/12/16) is what actually
+            # gates reaching it, so a "True" event in the same region inherits that gate.
+            # These per-boss "personally won" flags are also the machinery BUG-D's
+            # future modes-0/1 reconciliation needs (see Options.BossGarageRequirements).
+            boss_events = [
+                ("Ripper Roo Garage", "Ripper Roo Boss Race Won"),
+                ("Papu Papu Garage", "Papu Papu Boss Race Won"),
+                ("Komodo Joe Garage", "Komodo Joe Boss Race Won"),
+                ("Pinstripe Garage", "Pinstripe Boss Race Won"),
+            ]
+            flags = [self._add_goal_event(r, e, "True") for r, e in boss_events]
+            mw.completion_condition[player] = (
+                lambda state, fs=flags: all(state.has(f, player) for f in fs))
+        elif goal == Goal.option_allgemcups:
+            self.gemgoal(player)
+
     def create_items(self):
         player = self.player
         mw = self.multiworld
@@ -416,44 +490,7 @@ class ctrAPWorld(World):
                 and self.options.shuffle_keys.value):
             mw.early_items.setdefault(player, {})["Key"] = 4
 
-        if self.options.goal.value <= 1:
-            victory = ctrAPItem(
-                name="Victory",
-                classification=ItemClassification.progression_skip_balancing,
-                code=None,
-                player=player,
-            )
-
-            match self.options.goal.value:
-                case 0:
-                    mw.get_location(
-                        location_name="N. Oxide Garage: N. Oxide's Challenge",
-                        player=player,
-                    ).place_locked_item(victory)
-                    mw.completion_condition[player] = lambda state: state.has(
-                        item="Victory",
-                        player=player,
-                    )
-                case 1:
-                    mw.get_location(
-                        location_name="N. Oxide Garage: N. Oxide's Final Challenge",
-                        player=player,
-                    ).place_locked_item(victory)
-                    mw.completion_condition[player] = lambda state: state.has(
-                        item="Victory",
-                        player=player,
-                    )
-
-        elif self.options.goal.value >= 3:
-            match self.options.goal.value:
-                case 3:
-                    mw.completion_condition[player] = lambda state: state.has(
-                        item="Trophy",
-                        player=player,
-                        count=16,
-                    )
-                case 4:
-                    self.gemgoal(player)
+        self._install_goal(player)
 
         # --- Relic-tier progression sliders (pinned-vanilla lock per the slider roll) ---
         # For each tier, roll each of its 18 time-trial locations: with `chance`%
@@ -547,9 +584,9 @@ class ctrAPWorld(World):
         # locations (gemgoal also consumes 5 cup locations) -> FillError ("N more
         # progression items than locations") and an item/location count mismatch.
         # Exclude the gems from the general pool for that goal (they are the goal
-        # items, placed at the cups). Other goals keep gems in the pool (Turbo Track
-        # logic needs them findable)
-        # UNLESS shuffle_gems pinned them, in which case _gems_locked subtracts them.
+        # items, placed at the cups). Other goals keep gems in the pool (Turbo Track's
+        # vanilla 5-gem gate needs them findable) UNLESS shuffle_gems pinned them, in
+        # which case _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
             if _GEM_GOAL and item["name"] in _GEMS:
