@@ -75,6 +75,25 @@ ITEM_BY_TYPE = {
     5: lambda c: ["Red", "Green", "Blue", "Yellow", "Purple"][c] + " Gem",
 }
 
+# Aggregate "any N of a type" item lists, for requirement_specificity = any_of.
+# A type-6/7/8 gate (or an "AnyCtrToken"/"AnyRelic"/"AnyGem" stage-2 tuple) is met
+# when the SUM of state.count across the whole type reaches N -- genuine any-of
+# semantics, not a single concrete colour/tier.
+_AGG_TOKENS = ["Red CTR Token", "Green CTR Token", "Blue CTR Token",
+               "Yellow CTR Token", "Purple CTR Token"]
+_AGG_RELICS = ["Sapphire Relic", "Gold Relic", "Platinum Relic"]
+_AGG_GEMS = ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
+
+# Aggregate item lists by slot_data type code (6/7/8) and by Any* item name.
+AGG_BY_TYPE = {6: _AGG_TOKENS, 7: _AGG_RELICS, 8: _AGG_GEMS}
+AGG_BY_NAME = {"AnyCtrToken": _AGG_TOKENS, "AnyRelic": _AGG_RELICS,
+               "AnyGem": _AGG_GEMS}
+
+
+def _agg_has(state, names, player, count):
+    """True iff the player owns at least `count` items summed across `names`."""
+    return sum(state.count(n, player) for n in names) >= count
+
 
 def add_warp_pad_unlock_rules(world, player):
     """Install the per-seed sphere-search requirements on the pad exits.
@@ -100,12 +119,20 @@ def add_warp_pad_unlock_rules(world, player):
         if t == 0:
             continue  # native-fixed pad (vanilla mode) / not randomized; keep text rule
         ent = mw.get_entrance(pad_name, player)
-        item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
         base_rule = ent.access_rule  # vanilla Key-gate already applied above
-        ent.access_rule = (
-            lambda state, i=item, n=count, p=player, base=base_rule:
-            base(state) and state.has(i, p, n)
-        )
+        if t in AGG_BY_TYPE:
+            # any_of aggregate: gate is "any N of this type" summed across colours/tiers.
+            names = AGG_BY_TYPE[t]
+            ent.access_rule = (
+                lambda state, ns=names, n=count, p=player, base=base_rule:
+                base(state) and _agg_has(state, ns, p, n)
+            )
+        else:
+            item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
+            ent.access_rule = (
+                lambda state, i=item, n=count, p=player, base=base_rule:
+                base(state) and state.has(i, p, n)
+            )
 
 
 # Garage-door exit name -> trophy threshold (vanilla 4/8/12/16). Oxide left as
@@ -121,8 +148,22 @@ HUB_BOSS = {
 def add_boss_garage_rules(world, player):
     """Install boss-garage access rules from the resolved flat requirements.
 
-    MVP: all boss-garage modes map to trophy-count gates (4/8/12/16). The real
-    bossgarage_mode int is still emitted in slot_data for future native use.
+    MVP: all three boss-garage modes (Original4Tracks / SameHubTracks / Trophies)
+    map to the SAME trophy-count gates (4/8/12/16) in logic. AP-core therefore
+    reasons about an identical, solvable topology regardless of the chosen mode,
+    so the three modes share one fill behaviour today (this is why all three fuzz
+    green with the same solvability).
+
+    The real bossgarage_mode int plus the per-boss 'tracks' LevelID lists for modes
+    0/1 are still emitted in slot_data (Regions._resolve_boss_reqs ->
+    boss_garage_req). The full Original4Tracks / SameHubTracks experience -- gating
+    on which specific tracks were won rather than on a flat trophy count -- is
+    deferred to native, where it needs pad-specific win-bit tracking that the gate
+    sites in AH_Garage.c do not have yet (documented in
+    native_patches/6_bossmodes.patch). When that native support lands, the trophy
+    gate here can stay as the logical proxy (winning a track yields a trophy, so the
+    trophy count is a sound lower bound on solvability), or be tightened to a
+    can_reach over the four track Trophy Races -- no slot_data change required.
     """
     mw = world.multiworld
     for door, thr in HUB_BOSS.items():
@@ -175,9 +216,15 @@ def add_time_trial_and_ctr_requirements(world, player):
         if s2 is not None:
             s2_item, s2_count = s2
 
-            def rule(state: CollectionState, t=trophy_name, p=player,
-                     i=s2_item, n=s2_count):
-                return state.can_reach(t, "Location", p) and state.has(i, p, n)
+            if s2_item in AGG_BY_NAME:
+                # any_of aggregate stage-2 gate: "any N of this type", summed.
+                def rule(state: CollectionState, t=trophy_name, p=player,
+                         ns=AGG_BY_NAME[s2_item], n=s2_count):
+                    return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
+            else:
+                def rule(state: CollectionState, t=trophy_name, p=player,
+                         i=s2_item, n=s2_count):
+                    return state.can_reach(t, "Location", p) and state.has(i, p, n)
 
             logging.debug(
                 f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")

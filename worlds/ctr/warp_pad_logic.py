@@ -229,7 +229,7 @@ def _parse_requires(text):
     return out
 
 
-def build_graph(world, reward_track_for):
+def build_graph(world, reward_track_for, include_gem_cups=False):
     """Build a reachability model from the LIVE AP region graph so the sphere
     search reasons over the SAME logic AP fill will enforce.
 
@@ -264,7 +264,7 @@ def build_graph(world, reward_track_for):
             name = loc.name
             gate = _parse_requires(getattr(loc, "logic_text", ""))
             sfx = name.split(":", 1)[1].strip() if ":" in name else name
-            reward = _vanilla_reward(rname, rtype, dest_track, sfx)
+            reward = _vanilla_reward(rname, rtype, dest_track, sfx, include_gem_cups)
             is_tt = name.endswith("Time Trial") or name.endswith("CTR Token Challenge")
             trophy_loc = None
             if is_tt:
@@ -276,22 +276,31 @@ def build_graph(world, reward_track_for):
     return exits, locations, region_type
 
 
-def _vanilla_reward(region_name, region_type, dest_track, suffix):
+def _vanilla_reward(region_name, region_type, dest_track, suffix, include_gem_cups=False):
     """Vanilla reward a location yields, for inventory growth in the sphere search.
-    Boss races (except Oxide) yield a Key; gem cups yield nothing into the synthetic
-    inventory; race/crystal locations yield their reward."""
+    Boss races (except Oxide) yield a Key; gem cups yield their Gem ONLY when gem
+    cups are part of the seed (include_gem_cups); race/crystal locations yield their
+    reward."""
     if region_type == "boss":
         return None if "Oxide" in region_name else "Key"
     if region_type == "cup":
-        # Gem cups are now in the requirement pool (single-stage randomized entry),
-        # but their Gem reward is left OUT of the synthetic sphere inventory: the
-        # gem REWARD model is unchanged (gems flow through the normal multiworld
-        # pool, not pinned to the cup), and not seeding gems here keeps the cup
-        # entry requirement from ever circularly demanding a gem the player can only
-        # earn by clearing a (still-locked) cup. Cups are pure leaves in the DAG:
-        # they gate nothing onward and grow no inventory, so the sphere search only
-        # ASSIGNS them a tier-1 req (from items owned by the time Cups Room/Key 3 is
-        # reached) without their reward affecting any other pad's solvability.
+        # Gem cups feed their Gem into the synthetic sphere inventory ONLY when the
+        # seed actually contains gem cups (include_gem_cups). That is what lets a gem
+        # be CHOSEN as a warp-pad requirement (subject to its REQ_WEIGHTS weight):
+        # without the reward in the inventory the sphere search/_choose_requirement
+        # never owns a gem, so a gem could never gate. When cups are NOT in the seed
+        # the reward stays OUT (legacy behaviour: gems never gate).
+        #
+        # No circular dependency: cups are pure leaves in the DAG (single-stage, they
+        # gate nothing onward), and the sphere search only ASSIGNS a pad its tier-1
+        # requirement from items owned BEFORE that pad is reached. A cup's own Gem is
+        # added to the inventory only AFTER the cup is collected, so it can never be
+        # demanded as that same cup's (or an earlier-opened pad's) entry requirement.
+        if include_gem_cups and suffix == "Gem":
+            colour = region_name.split()[0]  # "Red Gem Cup" -> "Red"
+            gem = f"{colour} Gem"
+            if gem in GEM_ITEMS:
+                return gem
         return None
     track = region_name
     return _reward_for(track, dest_track, suffix)
@@ -301,17 +310,119 @@ def _vanilla_reward(region_name, region_type, dest_track, suffix):
 # Requirement weighting + Any* collapse (ports lines 250-366)
 # ---------------------------------------------------------------------------
 
-REQ_WEIGHTS = {
+# --- Requirement-weight PRESETS (YAML-tuneable, see Options.RequirementVariety) ---
+# trophy_heavy_legacy = the original CTR-apworld weights (Trophy 100, Token 15/10,
+# Relic 20, Key 25, Gem 2). icebound_beta5 = Icebound's rebalanced beta5 weights
+# (Trophy 90, Token 16/12, Relic 18, Key 20, Gem 4). Both presets share the SAME
+# key set, so _STAGE2_ITEMS / the `allowed` filter stay valid across presets.
+_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY = {
     "Trophy": 100, "Key": 25,
     "Red CTR Token": 15, "Green CTR Token": 15, "Blue CTR Token": 15,
     "Yellow CTR Token": 15, "Purple CTR Token": 10,
     "Sapphire Relic": 20, "Gold Relic": 20, "Platinum Relic": 20,
     "Red Gem": 2, "Green Gem": 2, "Blue Gem": 2, "Yellow Gem": 2, "Purple Gem": 2,
 }
+_REQ_WEIGHTS_ICEBOUND_BETA5 = {
+    "Trophy": 90, "Key": 20,
+    "Red CTR Token": 16, "Green CTR Token": 16, "Blue CTR Token": 16,
+    "Yellow CTR Token": 16, "Purple CTR Token": 12,
+    "Sapphire Relic": 18, "Gold Relic": 18, "Platinum Relic": 18,
+    "Red Gem": 4, "Green Gem": 4, "Blue Gem": 4, "Yellow Gem": 4, "Purple Gem": 4,
+}
+
+# Any* collapse parameters per preset. Tuple layout:
+#   (token_chance, token_scale, token_cap,
+#    relic_chance, relic_scale, relic_cap,
+#    gem_chance,   gem_cap)
+# A *_cap of None means "no cap". Collapse CHANCES (token 33 / relic 20 / gem 80)
+# are unchanged from the original Icebound port; beta5 only retunes scale + caps and
+# drops the gem "-1" reduction. custom mode reuses the legacy collapse row.
+_ANY_COLLAPSE_PARAMS = {
+    "trophy_heavy_legacy": (33, 0.6, None, 20, 0.3, None, 80, None),
+    "icebound_beta5":      (33, 0.8, 16,   20, 0.5, 27,   80, 5),
+    "custom":              (33, 0.6, None, 20, 0.3, None, 80, None),
+}
+
+# Active weight table + collapse params. Initialised to the LEGACY defaults so the
+# module is importable/usable before _load_requirement_preset(world) runs; the loader
+# overwrites these from the chosen preset at run_sphere_search() start. Default seed
+# generation uses icebound_beta5 (see Options.RequirementVariety.default = 0).
+REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+# requirement_specificity toggle (Options.RequirementSpecificity). True = any_of:
+# a collapsed Any* requirement stays a genuine "any N of type" aggregate (emitted as
+# native type 6/7/8). False = specific_colour: flatten via _resolve_any to a single
+# concrete colour/tier (legacy type 3/4/5). Set per-run in _load_requirement_preset;
+# module default False keeps importers on the legacy concrete path.
+_ANY_OF_MODE = False
+_TOKEN_COLLAPSE_CHANCE = 33
+_TOKEN_COLLAPSE_SCALE = 0.6
+_TOKEN_COLLAPSE_CAP = None
+_RELIC_COLLAPSE_CHANCE = 20
+_RELIC_COLLAPSE_SCALE = 0.3
+_RELIC_COLLAPSE_CAP = None
+_GEM_COLLAPSE_CHANCE = 80
+_GEM_COLLAPSE_CAP = None
+
 TOKEN_ITEMS = ("Red CTR Token", "Green CTR Token", "Blue CTR Token",
                "Yellow CTR Token", "Purple CTR Token")
 RELIC_ITEMS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
 GEM_ITEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
+
+
+def _load_requirement_preset(world):
+    """Load the requirement-weight preset chosen by the requirement_variety YAML
+    option into the module-level REQ_WEIGHTS + the eight Any*-collapse globals.
+
+    MUST be called at run_sphere_search() start (before REQ_WEIGHTS / the `allowed`
+    filter are read), and re-called on every invocation -- the state is module-global
+    and never cached on the world, so a second seed in the same process always
+    reloads its own preset.
+
+    - icebound_beta5 (default): beta5 weights + retuned collapse (Token x0.8 cap 16,
+      Relic x0.5 cap 27, Gem cap 5, no -1).
+    - trophy_heavy_legacy: original weights + original collapse (x0.6 / x0.3 / -1).
+    - custom: start from the legacy weights, then overlay requirement_weights; any
+      omitted item keeps its legacy weight. Unrecognised custom keys are ignored
+      (OptionDict.valid_keys already constrains them at parse time). custom uses the
+      legacy collapse row.
+
+    A missing requirement_variety option (e.g. an old YAML) safely falls back to the
+    legacy preset.
+    """
+    global REQ_WEIGHTS
+    global _TOKEN_COLLAPSE_CHANCE, _TOKEN_COLLAPSE_SCALE, _TOKEN_COLLAPSE_CAP
+    global _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP
+    global _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP
+    global _ANY_OF_MODE
+
+    # requirement_specificity: any_of (default, value 0) keeps Any* unsplit; a missing
+    # option (old YAML) falls back to any_of -- the new default behaviour.
+    spec_opt = getattr(world.options, "requirement_specificity", None)
+    _ANY_OF_MODE = getattr(spec_opt, "value", 0) == 0
+
+    variety_opt = getattr(world.options, "requirement_variety", None)
+    # Choice options expose .current_key ("icebound_beta5" etc.); fall back to legacy.
+    preset = getattr(variety_opt, "current_key", "trophy_heavy_legacy")
+
+    if preset == "icebound_beta5":
+        REQ_WEIGHTS = dict(_REQ_WEIGHTS_ICEBOUND_BETA5)
+        collapse_key = "icebound_beta5"
+    elif preset == "custom":
+        weights = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)  # fallback for omitted keys
+        custom = getattr(getattr(world.options, "requirement_weights", None),
+                         "value", None) or {}
+        for k, v in custom.items():
+            if k in weights:  # ignore stray keys; keep the key universe stable
+                weights[k] = v
+        REQ_WEIGHTS = weights
+        collapse_key = "custom"
+    else:  # trophy_heavy_legacy + any unknown/missing value
+        REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+        collapse_key = "trophy_heavy_legacy"
+
+    (_TOKEN_COLLAPSE_CHANCE, _TOKEN_COLLAPSE_SCALE, _TOKEN_COLLAPSE_CAP,
+     _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP,
+     _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP) = _ANY_COLLAPSE_PARAMS[collapse_key]
 
 
 def _weighted_choice(rnd, pairs):
@@ -349,19 +460,30 @@ def _choose_requirement(rnd, inv, allowed=None):
     # aggregates only the relic tiers in `allowed` so a lowered concrete colour is
     # never an excluded (pinned-out) tier.
     if req_item in TOKEN_ITEMS:
-        if rnd.randrange(100) < 33:
+        if rnd.randrange(100) < _TOKEN_COLLAPSE_CHANCE:
             total = inv.count("AnyCtrToken")
-            req_item, req_cnt = "AnyCtrToken", max(1, math.ceil(total * 0.6))
+            cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
+            if _TOKEN_COLLAPSE_CAP is not None:
+                cnt = min(cnt, _TOKEN_COLLAPSE_CAP)
+            req_item, req_cnt = "AnyCtrToken", cnt
     elif req_item in RELIC_ITEMS:
-        if rnd.randrange(100) < 20:
+        if rnd.randrange(100) < _RELIC_COLLAPSE_CHANCE:
             tiers = [r for r in RELIC_ITEMS if allowed is None or r in allowed]
             total = sum(inv.items[r] for r in tiers)
-            req_item, req_cnt = "AnyRelic", max(1, math.ceil(total * 0.3))
+            cnt = max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
+            if _RELIC_COLLAPSE_CAP is not None:
+                cnt = min(cnt, _RELIC_COLLAPSE_CAP)
+            req_item, req_cnt = "AnyRelic", cnt
     elif req_item in GEM_ITEMS:
-        if rnd.randrange(100) < 80:
+        if rnd.randrange(100) < _GEM_COLLAPSE_CHANCE:
             total = inv.count("AnyGem")
-            # Rust subtracts 1 inside the accumulation loop (count - 1, floored at 1)
-            req_item, req_cnt = "AnyGem", max(1, total - 1)
+            # Legacy preset (cap None) keeps Rust's per-item "-1" (count - 1, floored
+            # at 1). beta5 drops the -1 and clamps to _GEM_COLLAPSE_CAP instead.
+            if _GEM_COLLAPSE_CAP is None:
+                cnt = max(1, total - 1)
+            else:
+                cnt = max(1, min(total, _GEM_COLLAPSE_CAP))
+            req_item, req_cnt = "AnyGem", cnt
     return (req_item, req_cnt)
 
 
@@ -370,8 +492,18 @@ def _resolve_any(inv, req, allowed=None):
     so the AP rule + slot_data emit a concrete {type,colour,count} that Inv has
     proven is owned. Keeps solvability and avoids native 'any' support. When
     `allowed` is given, the lowered colour/tier is restricted to it (so AnyRelic
-    never resolves to a pinned-out relic tier)."""
+    never resolves to a pinned-out relic tier).
+
+    requirement_specificity = any_of (the new default, _ANY_OF_MODE True): do NOT
+    flatten -- return the Any* requirement unchanged so it carries through to logic
+    and slot_data as a genuine "any N of type" aggregate (native type 6/7/8). The
+    aggregate is satisfiable by construction: the caller clamps the count to
+    inv.count(Any*) which already sums every colour/tier owned at this sphere. Only
+    requirement_specificity = specific_colour (_ANY_OF_MODE False, legacy) flattens
+    to a single concrete colour below."""
     item, cnt = req
+    if _ANY_OF_MODE and item in ("AnyCtrToken", "AnyRelic", "AnyGem"):
+        return req
     if item == "AnyCtrToken":
         pool = Inv._TOKENS
     elif item == "AnyRelic":
@@ -558,7 +690,8 @@ def _assign_stage2_from_inv(rnd, inv, allowed=None):
     return (item, min(cnt, owned)) if owned > 0 else None
 
 
-def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False):
+def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
+                      include_gem_cups=False):
     """Returns {track_name: {1: stage1_req, 2: stage2_req}} for all shuffleable
     pads. Each req is (item, count) or None (free / no-gate). Stage 2 is non-None
     only for the 16 trophy pads (others get 2: None). mode 2 = random_without_4_keys.
@@ -588,6 +721,10 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     to the physical pad for the slot_data contract.
     """
     rnd = world.random
+    # Load the requirement-weight preset (icebound_beta5 default) into the module
+    # globals BEFORE REQ_WEIGHTS / the `allowed` filter below are read. Re-run every
+    # call so multi-seed processes never inherit a previous seed's preset.
+    _load_requirement_preset(world)
     if reward_track_for is None:
         reward_track_for = lambda t: t
 
@@ -615,7 +752,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False)
     allowed = {it for it in REQ_WEIGHTS
                if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
 
-    exits, locations, _ = build_graph(world, reward_track_for)
+    exits, locations, _ = build_graph(world, reward_track_for, include_gem_cups)
     start = world.start_region.name if world.start_region else "Menu"
 
     # 1) free subset of the 5 N. Sanity Beach candidates -- the bootstrap pads
@@ -787,10 +924,12 @@ _COLOURS = ["Red", "Green", "Blue", "Yellow", "Purple"]
 def to_slot_req(req):
     """(item, count) | None -> {type,count,colour}.
 
-    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 sapphire-relic / 5 gems.
-    colour 0..4 = R,G,B,Y,P for token/gem; -1 otherwise. Any* are already
-    resolved to a concrete colour upstream (_resolve_any), so no -1 token/gem
-    aggregate is ever emitted here.
+    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 sapphire-relic / 5 gems /
+          6 AnyToken / 7 AnyRelic / 8 AnyGem (colour -1, native sums the whole type).
+    colour 0..4 = R,G,B,Y,P for token/gem; -1 otherwise. Under requirement_specificity
+    = specific_colour, Any* are flattened to a concrete colour upstream (_resolve_any)
+    so only type 1-5 reach here. Under any_of (default) the Any* aggregates survive
+    and emit type 6/7/8 with colour -1.
 
     A free bootstrap pad (req None) is emitted as an EXPLICIT "0 trophies"
     requirement (type 1, count 0) rather than type 0. type 0 makes native fall
@@ -803,6 +942,12 @@ def to_slot_req(req):
         return {"type": 1, "count": 0, "colour": -1}
     item, cnt = req
     cnt = int(cnt)
+    if item == "AnyCtrToken":
+        return {"type": 6, "count": cnt, "colour": -1}
+    if item == "AnyRelic":
+        return {"type": 7, "count": cnt, "colour": -1}
+    if item == "AnyGem":
+        return {"type": 8, "count": cnt, "colour": -1}
     if item == "Trophy":
         return {"type": 1, "count": cnt, "colour": -1}
     if item == "Key":
@@ -857,4 +1002,24 @@ def build_warp_pad_map(world):
             name = id_to_name.get(phys)
             if name is not None:
                 out[name] = dest  # pad_exit_name -> destination track LevelID
+
+    # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
+    # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
+    # Turbo Track pad keeps its vanilla 5-gem gate, so a Gem Cup / trial destination
+    # landing in a trophy pad (or a Gem Cup landing in Turbo Track) would force the
+    # tedious tokens -> gem cups -> 5 gems chain. SHUFFLE_GROUPS already segregates the
+    # trial and gem-cup pads out of the trophy-pad ('race') pool — native dispatch
+    # requires it — so they are never remapped above; this strips any such remap when
+    # the guard is active to enforce that invariant explicitly (a no-op under the
+    # current groups, defensive if a group is ever widened). The guard is set in
+    # create_regions only for unlock=vanilla + gems-not-shuffled; OFF leaves the map
+    # untouched.
+    if getattr(world, "_ctr_force_vanilla_turbotrack", False):
+        _GUARDED_PADS = (
+            "Turbo Track Warp Pad", "Slide Coliseum Warp Pad",
+            "Red Cup Warp Pad", "Green Cup Warp Pad", "Blue Cup Warp Pad",
+            "Yellow Cup Warp Pad", "Purple Cup Warp Pad",
+        )
+        for _pad in _GUARDED_PADS:
+            out.pop(_pad, None)
     return out

@@ -1,0 +1,24 @@
+# Item #3 -- Gems can actually gate (gem-cup rewards feed the requirement inventory)
+#
+# NATIVE HALF: NO CHANGES REQUIRED.
+#
+# This file intentionally contains no diff hunks. The native client already
+# applies warp-pad requirement type 5 (gem) for any colour 0..4 exactly like
+# tokens/relics -- see D:/pythonProjects/ctr-native-ap/ap/ap_hooks.c:
+#
+#   AP_GateCheckOne() ... ap_hooks.c:528-550
+#     case 5: // gems (colour 0..4, or -1 = any/Red baseline)
+#         return ((r->colour >= 0) ? AP_GateCountGemColour(r->colour)
+#                                  : AP_GateCountGemColour(0)) >= r->count;
+#
+#   AP_GateCountGemColour() ... ap_hooks.c:513-518  (reads ap_recv_count[GEM_RED+c])
+#   ITEM_BY_TYPE type 5 -> gem  ... Rules.py:70-76   (apworld, already landed item #1)
+#
+# The change in item #3 is entirely apworld-side: gem-cup rewards now enter the
+# synthetic sphere inventory (warp_pad_logic._vanilla_reward, gated behind the
+# existing include_gem_cups option), which makes a gem a CHOOSEABLE requirement
+# (subject to REQ_WEIGHTS). When the apworld emits a type-5 gem requirement in
+# slot_data, the native code above consumes it unchanged. Native colour mapping:
+# Red=0, Green=1, Blue=2, Yellow=3, Purple=4 (AP_IDX_GEM_RED + colour).
+#
+# Verified by reading ap_hooks.c on branch ap-integration; no build performed.

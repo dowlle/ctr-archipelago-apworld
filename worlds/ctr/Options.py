@@ -97,19 +97,46 @@ class FinalOxideUnlock(Choice):
 
 
 class ShuffleRewards(OptionDict):
-    """Shuffles the rewards into the item pool.
+    """DEPRECATED — no longer wired. Kept only so older YAMLs that still set
+    `Shuffle Rewards` (with the old `Include Platinum Relics`/`Include Gems`/
+    `Include Keys` keys) keep generating instead of erroring.
 
-    Trophies, CTR Tokens, Sapphire & Gold Relics are always shuffled.
-    If Platinum Relics are not shuffled, then logic won't expect beating the
-    platinum times in Relic Races."""
-    display_name = "Shuffle Rewards"
+    The three concerns it used to cover are now first-class options:
+      - "Include Platinum Relics" -> `Platinum Relic Progression` slider
+        (slider = 0 already means "platinum relics not shuffled").
+      - "Include Gems"            -> `Shuffle Gems` toggle.
+      - "Include Keys"            -> `Shuffle Keys` toggle.
+
+    `valid_keys` is intentionally empty so ANY leftover key parses without a
+    validation error (the dict is simply ignored). Remove after a deprecation
+    window."""
+    display_name = "Shuffle Rewards (deprecated)"
     supports_weighting = False
     default = {}
-    valid_keys = [
-        "Include Platinum Relics",
-        "Include Gems",
-        "Include Keys"
-    ]
+    valid_keys = []
+
+
+class ShuffleGems(Toggle):
+    """Shuffle the 5 Gems into the multiworld item pool.
+
+    - **off** (default): each Gem is pinned to its own Gem Cup reward location
+      (vanilla placement, out of the multiworld shuffle).
+    - **on**: the 5 Gems enter the shuffled pool and can appear anywhere; their
+      Gem Cup locations become normal checks holding whatever the fill places.
+
+    The `All Gem Cups` goal ALWAYS pins the Gems to their cups regardless of this
+    toggle (they are the goal items)."""
+    display_name = "Shuffle Gems"
+
+
+class ShuffleKeys(Toggle):
+    """Shuffle the 4 boss Keys into the multiworld item pool.
+
+    - **off** (default): each Key is pinned to its Boss Race reward location
+      (vanilla placement, out of the multiworld shuffle).
+    - **on**: the 4 Keys enter the shuffled pool and can appear anywhere; the
+      Boss Race locations become normal checks holding whatever the fill places."""
+    display_name = "Shuffle Keys"
 
 
 class ShuffleWarpPads(Toggle):
@@ -142,6 +169,74 @@ class WarpPadUnlockRequirements(Choice):
     default = 0
 
 
+class RequirementVariety(Choice):
+    """Tuning preset for the WEIGHTS used when randomized warp-pad requirements
+    are generated (only affects `Warp Pad Unlock Requirements` = randomized /
+    random_without_4_keys).
+
+    - **icebound_beta5** (default): Icebound's rebalanced beta5 weights -- Trophy 90,
+      each CTR Token 16 (Purple 12), each Relic tier 18, Key 20, each Gem 4. Any*
+      collapse scales Token x0.8 (cap 16), Relic x0.5 (cap 27), Gem capped at 5
+      (no -1 reduction).
+    - **trophy_heavy_legacy**: the previous weights -- Trophy 100, Token 15 (Purple 10),
+      Relic 20, Key 25, Gem 2. Any* collapse Token x0.6, Relic x0.3, Gem -1 (no caps).
+    - **custom**: use the per-item weights from `Requirement Weights`; any item not
+      listed there falls back to its trophy_heavy_legacy weight. Custom mode uses the
+      legacy Any* collapse (x0.6 / x0.3 / -1, no caps)."""
+    display_name = "Requirement Variety"
+    option_icebound_beta5 = 0
+    option_trophy_heavy_legacy = 1
+    option_custom = 2
+    default = 0
+
+
+class RequirementWeights(OptionDict):
+    """Per-item requirement weights, used ONLY when `Requirement Variety` = custom.
+
+    Higher weight = that item type is chosen more often as a warp-pad requirement.
+    Any item omitted from this dict falls back to its trophy_heavy_legacy weight.
+    Valid keys: Trophy, Key, the five CTR Token colours, the three Relic tiers, and
+    the five Gem colours."""
+    display_name = "Requirement Weights"
+    supports_weighting = False
+    default = {}
+    valid_keys = [
+        "Trophy", "Key",
+        "Red CTR Token", "Green CTR Token", "Blue CTR Token",
+        "Yellow CTR Token", "Purple CTR Token",
+        "Sapphire Relic", "Gold Relic", "Platinum Relic",
+        "Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem",
+    ]
+
+
+class RequirementSpecificity(Choice):
+    """How an Any*-of-a-type warp-pad requirement (the aggregates Icebound's chooser
+    produces when it collapses a token/relic/gem pick) is expressed in logic and in
+    the seed sent to native.
+
+    - **any_of** (default): a collapsed requirement stays a GENUINE "any N of that
+      type" gate -- satisfied by ANY mix of that type summed across all colours/tiers
+      (e.g. "any 3 CTR Tokens" = any 3 of the 5 token colours combined; "any 4
+      relics" = any 4 of Sapphire+Gold+Platinum; "any 2 gems" = any 2 of the 5 gem
+      colours). This matches Icebound's AnyCtrToken / AnyRelic / AnyGem semantics and
+      emits NEW slot_data type codes 6/7/8 (colour -1) that native sums per type.
+    - **specific_colour**: the legacy flatten path -- a collapsed Any* requirement is
+      lowered to the single most-owned colour/tier (`_resolve_any`) and emitted as a
+      concrete colour-specific gate (type 3/4/5). The gate then means "exactly N of
+      THIS one colour/tier". More restrictive; keeps native compatible with builds
+      that lack the any-of aggregate patch.
+
+    any_of is MORE PERMISSIVE than specific_colour (a sum across colours is easier to
+    satisfy than N of one colour). NATIVE NOTE: any_of emits type 6/7/8 which native
+    only understands with the ap_any_of_aggregates patch applied -- on an unpatched
+    native build those type codes fall through to "always open". Use specific_colour
+    if your native build is not patched."""
+    display_name = "Requirement Specificity"
+    option_any_of = 0
+    option_specific_colour = 1
+    default = 0
+
+
 class BossGarageRequirements(Choice):
     """Choose the requirements for opening boss garages.
 
@@ -152,12 +247,34 @@ class BossGarageRequirements(Choice):
     - **Trophies**: Roo, Papu, Joe and Pinstripe unlock with 4, 8, 12, 16 trophies respectively.
 
     As an example for **Original 4 Tracks**, unlocking Roo would require winning races in
-    Crash Cove, Roo's Tubes, Mystery Caves, and Sewer Speedway.  
+    Crash Cove, Roo's Tubes, Mystery Caves, and Sewer Speedway.
     **Original 4 Tracks** and **Same Hub Tracks** behave identically if warp pads
-    are not shuffled."""
+    are not shuffled.
+
+    CURRENTLY ONLY **Trophies** IS SELECTABLE. Original 4 Tracks (0) and Same Hub
+    Tracks (1) are hard-disabled (see BUG-D note below); **Trophies** (2) is the
+    only valid value until they are reconciled."""
     display_name = "Boss Garage Requirements"
-    option_original_4_tracks = 0
-    option_same_hub_tracks = 1
+    # BUG-D (board 2026-07-01 14:36 audit, Spec §4): modes 0/1 are a cross-layer
+    # paradigm mismatch. The apworld logic gates ALL modes on a flat trophy count
+    # (Rules.add_boss_garage_rules 4/8/12/16), but native enforces a per-track WIN
+    # for modes 0/1 (ap_hooks.c AP_BossReqMet / AH_Garage.c). Orthogonal criteria =>
+    # a 16-trophy player who did NOT win the four required tracks is softlocked, and
+    # winning four tracks under-count opens a garage early. Per Spec §4 these two
+    # modes are "not shippable until reconciled", so they are removed from the
+    # selectable set here (default 2 = Trophies is unaffected and fully implemented).
+    #
+    # NOT deleted, only disabled: the per-boss vanilla/destination track lists are
+    # still resolved + emitted in slot_data (Regions._resolve_boss_reqs, kept intact),
+    # and re-enabling is a one-line uncomment once the reconciliation lands. That
+    # reconciliation is the SAME machinery as the goal-rework Goal-3 fix: the 4 code-
+    # null per-boss "personally won" companion events (paired with the Boss Race
+    # locations) are exactly the per-track win flags modes 0/1 need to gate on instead
+    # of a flat trophy count. Build those there, then tighten add_boss_garage_rules
+    # (or the native gate) to can_reach the four required Trophy Races and restore
+    # these two options.
+    # option_original_4_tracks = 0  # disabled -- see BUG-D above
+    # option_same_hub_tracks = 1    # disabled -- see BUG-D above
     option_trophies = 2
     default = 2
 
@@ -166,6 +283,28 @@ class AutoUnlockCtrChallengeRelicRace(Toggle):
     """Makes the second stage unlock to always free, making the CTR Challenge and
     Relic Race available immediately after beating that warp pad's trophy race."""
     display_name = "Auto-unlock CTR Challenge & Relic Race"
+
+
+class ComfortGuards(DefaultOnToggle):
+    """Enable Icebound's hand-tuned solvability/comfort guards that prevent tedious
+    forced item chains. Default ON (matches Icebound's behaviour).
+
+    The guard activates only when warp-pad unlock requirements are **vanilla** and
+    gems are **not** shuffled. In that configuration the Turbo Track warp pad keeps
+    its vanilla 5-gem entry gate, and reaching it requires winning every Gem Cup
+    (each needing 4 CTR tokens) to collect all 5 gems. To stop a required item from
+    being forced behind that whole tokens -> gem cups -> 5 gems chain (Icebound's
+    `force_vanilla_turbotrack`), the guard pins Turbo Track's three relic Time Trial
+    rewards to their vanilla relics (out of the multiworld shuffle), so progression
+    is never placed there. It also keeps the Gem Cup and trial warp pads out of the
+    trophy-pad destination shuffle so a Gem Cup can never land in the Turbo Track pad
+    (Icebound's `limit_arena_gemcup_shuffle`); our shuffle groups already segregate
+    them, and this guard enforces that invariant explicitly.
+
+    Turning this OFF removes the pin, allowing the (tedious but still solvable)
+    forced chain. The guard is inert whenever unlock requirements are randomized or
+    gems are shuffled."""
+    display_name = "Comfort Guards"
 
 
 class SkipMaskHints(DefaultOnToggle):
@@ -213,13 +352,19 @@ class ctrAPOptions(PerGameCommonOptions):
     gold_relic_progression: GoldRelicProgression
     platinum_relic_progression: PlatinumRelicProgression
     # randomization
-    shuffle_rewards: ShuffleRewards
+    shuffle_rewards: ShuffleRewards  # deprecated, unwired (backward-compat only)
+    shuffle_gems: ShuffleGems
+    shuffle_keys: ShuffleKeys
     shuffle_warp_pads: ShuffleWarpPads
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     include_gem_cups: ShuffleWarpPadsGemCups
     warppad_unlock_requirements: WarpPadUnlockRequirements
+    requirement_variety: RequirementVariety
+    requirement_weights: RequirementWeights
+    requirement_specificity: RequirementSpecificity
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
+    comfort_guards: ComfortGuards
     # qol
     skip_mask_hints: SkipMaskHints
     autoskip_podium_cutscenes: AutoskipPodiumCutscenes
@@ -232,12 +377,17 @@ class ctrAPOptions(PerGameCommonOptions):
 ap_ctr_option_groups: Dict[str, List[Any]] = {
     "General Options": [Goal, FinalOxideUnlock, RelicTime, RelicsRequirePerfect],
     "Randomization Options": [
-        ShuffleRewards,
+        ShuffleGems,
+        ShuffleKeys,
         ShuffleWarpPads,
         ShuffleWarpPadsBattleArenas,
         ShuffleWarpPadsGemCups,
         WarpPadUnlockRequirements,
+        RequirementVariety,
+        RequirementWeights,
+        RequirementSpecificity,
         AutoUnlockCtrChallengeRelicRace,
+        ComfortGuards,
         BossGarageRequirements,
     ],
     "Difficulty": [SapphireRelicProgression, GoldRelicProgression, PlatinumRelicProgression],
