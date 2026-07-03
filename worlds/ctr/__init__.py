@@ -63,7 +63,9 @@ class ctrAPWorld(World):
         set_rules(self)
 
     def pre_fill(self) -> None:
-        """Per-seed two-stage fillability guard (Stef: "a pad's tier 2 MAY collapse
+        """Per-seed fillability guards -- one branch per warp-pad fill mode.
+
+        RANDOMIZED-MODE BRANCH: two-stage guard (Stef: "a pad's tier 2 MAY collapse
         if a seed needs it FOR GENERATION").
 
         CTR's item pool is ~98% progression in every config, and AP's greedy
@@ -81,8 +83,14 @@ class ctrAPWorld(World):
         world's TT/token rules in COLLAPSED form (add_time_trial_and_ctr_requirements
         already honours the flag) so the real fill that Main runs next is the
         guaranteed-fillable single-stage DAG. Any probe error falls back to KEEPING
-        two-stage (fail-open: never makes a fillable seed worse)."""
+        two-stage (fail-open: never makes a fillable seed worse).
+
+        VANILLA-MODE BRANCH: tight-fill backstop (lever 3, design note 2026-07-03;
+        Spec 6.2a) -- see _vanilla_fill_backstop. Solo generations only."""
         if not getattr(self, "_ctr_two_stage_active", False):
+            if (self.options.warppad_unlock_requirements.value == 0
+                    and len(self.multiworld.worlds) == 1):
+                self._vanilla_fill_backstop()
             return
         if getattr(self, "_ctr_force_collapse_stage2", False):
             return  # already collapsed
@@ -122,6 +130,183 @@ class ctrAPWorld(World):
             logging.warning("[CTR] two-stage fillability probe errored (%s); "
                             "keeping two-stage.", type(e).__name__)
             return None
+
+    _VANILLA_BACKSTOP_MAX_ROUNDS = 40
+
+    def _vanilla_fill_backstop(self) -> None:
+        """Vanilla-mode tight-fill backstop (lever 3, design note 2026-07-03).
+
+        Levers 1+2 (honest relic classification + vanilla early-Keys) shrink the
+        vanilla tight-fill FillError class (Spec 6.2a) to a ~0.1-0.2% residual on
+        relic-starved slider corners. The residual is pure placement-ordering luck:
+        pool == locations on every seed, and a failing seed is fully beatable --
+        greedy fill_restrictive just corners itself. This backstop removes the
+        residual exactly, by REPLAYING the upcoming fill rather than approximating
+        it:
+
+        1. SIMULATE the real fill by RUNNING it on this very multiworld and then
+           rolling every mutation back (placements, locked flags, itempool,
+           precollected items, state, and multiworld.random's RNG state). Because
+           it is the actual distribute_items_restrictive on the actual object
+           graph with the actual RNG state and the actual host panic_method, the
+           simulation makes the exact decisions the real fill is about to make:
+           in a solo generation nothing consumes multiworld.random between our
+           pre_fill and the fill (Main.py runs them back to back), so after
+           rollback the real fill replays the simulation move for move.
+        2. If the simulation fills: return. The real fill provably fills; the
+           seed is byte-identical to a build without this backstop.
+        3. If the simulation dead-ends: enumerate the stranded progression items
+           (a rollback-simulation with panic_method='start_inventory' -- AP's own
+           mechanism for naming unplaceable items), precollect them from the real
+           itempool into starting inventory, top up with filler to keep
+           item count == location count, and re-simulate. Loop until the simulated
+           fill goes green (bounded: every round strictly removes progression from
+           the ordered pool). The real fill then replays the green simulation.
+
+        SOLO ONLY (enforced by the caller): with other worlds present, their
+        pre_fill hooks may run after ours and consume multiworld.random, breaking
+        replay fidelity -- and mixed pools relax CTR's tightness anyway. Vanilla
+        multiworld seeds keep the (tiny) pre-existing residual, per Spec 6.2a.
+
+        Fail-open: any unexpected error leaves generation to proceed as if the
+        backstop did not exist. CTR_PROBE_LOG_ONLY=1 logs the would-fire verdict
+        without intervening (acceptance-sweep instrumentation).
+
+        No gate, rule, slot_data, or schema change: the only effect on a fired
+        seed is items moved to starting inventory (the player begins with them
+        collected), which never removes reachability."""
+        try:
+            from settings import get_settings
+            panic = get_settings().generator.panic_method
+        except Exception:
+            panic = "swap"
+        mw = self.multiworld
+        log_only = bool(os.environ.get("CTR_PROBE_LOG_ONLY"))
+        fired: List[str] = []
+        try:
+            converged = False
+            for _round in range(self._VANILLA_BACKSTOP_MAX_ROUNDS):
+                if self._rollback_simulate_fill(panic) is True:
+                    converged = True
+                    break
+                if log_only:
+                    logging.info("[CTR] vanilla fill backstop LOG-ONLY: simulated "
+                                 "fill dead-ends; would intervene.")
+                    return
+                stranded = self._rollback_enumerate_stranded()
+                if not stranded:
+                    logging.warning(
+                        "[CTR] vanilla fill backstop: simulated fill dead-ends but "
+                        "no stranded items identified; leaving the seed unchanged "
+                        "(fail-open).")
+                    return
+                for name in stranded:
+                    for i, item in enumerate(mw.itempool):
+                        if item.player == self.player and item.name == name:
+                            del mw.itempool[i]
+                            mw.push_precollected(item)
+                            mw.itempool.append(self.create_filler())
+                            fired.append(name)
+                            break
+                    else:
+                        logging.warning(
+                            "[CTR] vanilla fill backstop: stranded item %r not in "
+                            "the real itempool; stopping intervention (fail-open).",
+                            name)
+                        return
+            if converged and fired:
+                logging.info(
+                    "[CTR] vanilla tight-fill backstop fired: precollected %d "
+                    "item(s) (%s); simulated fill green -- seed fully beatable "
+                    "from starting inventory.", len(fired), ", ".join(fired))
+            elif not converged:
+                logging.warning(
+                    "[CTR] vanilla fill backstop: no convergence after %d rounds "
+                    "(precollected so far: %s); generation proceeds.",
+                    self._VANILLA_BACKSTOP_MAX_ROUNDS, ", ".join(fired) or "none")
+        except Exception as exc:
+            logging.warning(
+                "[CTR] vanilla fill backstop errored (%s: %s); proceeding without "
+                "it (fail-open)%s.", type(exc).__name__, exc,
+                " after precollecting: " + ", ".join(fired) if fired else "")
+
+    # -- rollback simulation machinery (vanilla fill backstop) --
+    #
+    # distribute_items_restrictive mutates exactly: location placements
+    # (location.item / item.location / location.locked, incl. lock_later),
+    # multiworld.random (shuffles), and -- only under panic_method=
+    # 'start_inventory' -- precollected_items + state (push_precollected).
+    # It never reassigns multiworld.itempool or early_items (it works on
+    # sorted local copies), but both are snapshotted anyway as cheap insurance.
+
+    def _fill_snapshot(self) -> dict:
+        mw = self.multiworld
+        return {
+            "rng": mw.random.getstate(),
+            "state": mw.state.copy(),
+            "early": {p: dict(d) for p, d in mw.early_items.items()},
+            "local_early": {p: dict(d) for p, d in mw.local_early_items.items()},
+            "precollected_len": {p: len(v) for p, v in mw.precollected_items.items()},
+            "placements": [(loc, loc.item, loc.locked) for loc in mw.get_locations()],
+            "itempool": list(mw.itempool),
+        }
+
+    def _fill_rollback(self, snap: dict) -> None:
+        mw = self.multiworld
+        for loc, item, locked in snap["placements"]:
+            if loc.item is not None and loc.item is not item:
+                loc.item.location = None
+            loc.item = item
+            loc.locked = locked
+            if item is not None:
+                item.location = loc
+        mw.itempool[:] = snap["itempool"]
+        for p, ln in snap["precollected_len"].items():
+            del mw.precollected_items[p][ln:]
+        mw.early_items.clear()
+        for p, d in snap["early"].items():
+            mw.early_items[p] = dict(d)
+        mw.local_early_items.clear()
+        for p, d in snap["local_early"].items():
+            mw.local_early_items[p] = dict(d)
+        mw.state = snap["state"]
+        mw.random.setstate(snap["rng"])
+
+    def _rollback_simulate_fill(self, panic: str) -> bool:
+        """Run the REAL upcoming fill on the REAL multiworld, then roll every
+        mutation back. True = the fill goes green (and, since the RNG state is
+        restored, the real fill will replay it identically)."""
+        from Fill import distribute_items_restrictive as _dist, FillError as _FE
+        snap = self._fill_snapshot()
+        prev_disable = logging.root.manager.disable
+        logging.disable(logging.ERROR)  # sim log noise would read as real-fill output
+        try:
+            try:
+                _dist(self.multiworld, panic)
+                return True
+            except _FE:
+                return False
+        finally:
+            self._fill_rollback(snap)
+            logging.disable(prev_disable)
+
+    def _rollback_enumerate_stranded(self) -> List[str]:
+        """Names of this player's items the upcoming fill cannot place, via a
+        rollback simulation under panic_method='start_inventory' (AP's own
+        mechanism for naming unplaceable items instead of raising)."""
+        from Fill import distribute_items_restrictive as _dist
+        mw = self.multiworld
+        snap = self._fill_snapshot()
+        prev_disable = logging.root.manager.disable
+        logging.disable(logging.ERROR)
+        try:
+            _dist(mw, panic_method="start_inventory")
+            before = snap["precollected_len"][self.player]
+            return [it.name for it in mw.precollected_items[self.player][before:]
+                    if it.player == self.player]
+        finally:
+            self._fill_rollback(snap)
+            logging.disable(prev_disable)
 
     # --- Item creation ---
 
@@ -202,11 +387,11 @@ class ctrAPWorld(World):
                 item=self.create_item(item)
             )
 
-    def create_filler(self, count: int) -> List[Item]:
-        junk_pool: List[Item] = []
-        for _ in range(count):
-            junk_pool.append(self.create_item("Wumpa Fruit"))
-        return junk_pool
+    def create_filler(self) -> Item:
+        # Standard AP World signature: the core itself calls create_filler() with
+        # no arguments on the panic_method='start_inventory' paths (Fill.py), which
+        # the vanilla fill backstop's enumeration simulation exercises.
+        return self.create_item("Wumpa Fruit")
 
     def create_items(self):
         player = self.player
@@ -401,8 +586,10 @@ class ctrAPWorld(World):
         # locked gems). Using the static get_total_locations over-counted by the
         # number of locked locations -> 1 (or 5) excess filler items -> the
         # item/location count mismatch the fuzzer flags. Clamp at 0 for safety.
+        #
         unfilled = len(mw.get_unfilled_locations(self.player))
-        mw.itempool += self.create_filler(max(0, unfilled - len(mw.itempool)))
+        mw.itempool += [self.create_filler()
+                        for _ in range(max(0, unfilled - len(mw.itempool)))]
 
         # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
         # is ~98% progression in EVERY config (only ~1 filler item), so a density
