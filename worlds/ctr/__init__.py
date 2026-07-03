@@ -587,9 +587,17 @@ class ctrAPWorld(World):
         # number of locked locations -> 1 (or 5) excess filler items -> the
         # item/location count mismatch the fuzzer flags. Clamp at 0 for safety.
         #
+        # Count against THIS player's pool, not the global mw.itempool: in a
+        # multiworld, mw.itempool already holds every earlier-processed world's
+        # items here, so the old `unfilled - len(mw.itempool)` went negative and
+        # silently skipped the top-up for any CTR world whose create_items did not
+        # run first -> that player ended 1 item short of their locations ->
+        # deterministic "Player X had 1 more locations than items" + FillError on
+        # every multi-CTR generation with a filler-needing config. Solo unchanged
+        # (there len(pool) == len(mw.itempool)).
         unfilled = len(mw.get_unfilled_locations(self.player))
         mw.itempool += [self.create_filler()
-                        for _ in range(max(0, unfilled - len(mw.itempool)))]
+                        for _ in range(max(0, unfilled - len(pool)))]
 
         # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
         # is ~98% progression in EVERY config (only ~1 filler item), so a density
