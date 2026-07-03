@@ -129,13 +129,13 @@ class ShuffleGems(Toggle):
     display_name = "Shuffle Gems"
 
 
-class ShuffleKeys(Toggle):
+class ShuffleKeys(DefaultOnToggle):
     """Shuffle the 4 boss Keys into the multiworld item pool.
 
-    - **off** (default): each Key is pinned to its Boss Race reward location
-      (vanilla placement, out of the multiworld shuffle).
-    - **on**: the 4 Keys enter the shuffled pool and can appear anywhere; the
-      Boss Race locations become normal checks holding whatever the fill places."""
+    - **on** (default): the 4 Keys enter the shuffled pool and can appear anywhere;
+      the Boss Race locations become normal checks holding whatever the fill places.
+    - **off**: each Key is pinned to its Boss Race reward location
+      (vanilla placement, out of the multiworld shuffle)."""
     display_name = "Shuffle Keys"
 
 
