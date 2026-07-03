@@ -257,7 +257,7 @@ def create_regions(world: "ctrAPWorld"):
     # trials, gated by the include_gem_cups YAML option (mirrors include_battle_arenas
     # for crystals). When ON in randomized mode, strip each cup's vanilla per-cup
     # has('<Colour> CTR Token', 4) gate from the exit access rule and keep ONLY the
-    # Key-2 Cups Room hub gate (Stef's HARD CONSTRAINT: cups STAY behind their key
+    # Key-2 Cups Room hub gate (Dowlle's HARD CONSTRAINT: cups STAY behind their key
     # hub gate). The gate is Key 2, matching native (arrKeysNeeded[GEM_STONE_VALLEY]=2,
     # the GSV->Cups door = 2 keyholes) -- NOT 3. The randomized single-stage requirement
     # is ANDed on TOP of that key gate in Rules.add_warp_pad_unlock_rules, never replacing
@@ -379,7 +379,7 @@ def create_regions(world: "ctrAPWorld"):
             # SINGLE-STAGE randomized -- the sphere-search
             # assigned a stage-1 entry requirement (stages[2] is always None for a
             # non-TROPHY_TRACK), wired as a normal single-stage node. No longer
-            # native-fixed (Stef's OPEN model). The to_slot_req(s2) below yields the
+            # native-fixed (Dowlle's OPEN model). The to_slot_req(s2) below yields the
             # native "no stage 2" sentinel for them automatically.
             s1 = stages[1]
             s2 = stages[2]
@@ -397,7 +397,7 @@ def create_regions(world: "ctrAPWorld"):
                 dest_track = reward_track_for(track)
                 world.warp_pad_unlock_stage2_concrete[dest_track] = s2
 
-        # NO reward pinning (Stef's OPEN model). The relic Time Trials and CTR Token
+        # NO reward pinning (Dowlle's OPEN model). The relic Time Trials and CTR Token
         # Challenges keep flowing through the NORMAL multiworld pool and the relic-tier
         # sliders exactly as on main -- relics appear as genuine progression items, not
         # locked-to-location vanilla rewards. Solvability of the stage-2 gates is

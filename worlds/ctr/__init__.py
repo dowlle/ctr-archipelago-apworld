@@ -65,7 +65,7 @@ class ctrAPWorld(World):
     def pre_fill(self) -> None:
         """Per-seed fillability guards -- one branch per warp-pad fill mode.
 
-        RANDOMIZED-MODE BRANCH: two-stage guard (Stef: "a pad's tier 2 MAY collapse
+        RANDOMIZED-MODE BRANCH: two-stage guard (Dowlle: "a pad's tier 2 MAY collapse
         if a seed needs it FOR GENERATION").
 
         CTR's item pool is ~98% progression in every config, and AP's greedy
@@ -485,7 +485,7 @@ class ctrAPWorld(World):
         # Relics" coupling that forced this slider to 0 has been retired (item #5);
         # ShuffleRewards is deprecated and no longer read.
 
-        # NO two-stage reward pinning (Stef's OPEN model): relic Time Trials and CTR
+        # NO two-stage reward pinning (Dowlle's OPEN model): relic Time Trials and CTR
         # Token Challenges flow through the normal pool + the relic sliders, the same
         # on every randomized seed as on main. The sliders therefore govern ALL 18
         # Time Trial locations per tier again (no 16/18 seizure). Stage-2 gate

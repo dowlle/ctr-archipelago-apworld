@@ -65,7 +65,7 @@ HUB_STATIC = {
     # Valley). Slide Coliseum + Turbo Track have NO trophy race and NO CTR-token
     # challenge: only the 3 relic Time Trials (verified against data/world.json).
     # They are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry
-    # requirement (Stef's OPEN model) -- excluded from TROPHY_TRACKS below so the
+    # requirement (Dowlle's OPEN model) -- excluded from TROPHY_TRACKS below so the
     # sphere-search assigns them only a tier-1 req. Their vanilla relic/gem JSON
     # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
     # (keeping only the Key-1 hub gate).
@@ -74,7 +74,7 @@ HUB_STATIC = {
     # 'Gem Stone Valley <-> Cups Room' = has('Key', 3) in data/world.json). Each
     # cup yields a Gem on completion ('<Colour> Gem Cup: Gem'). Like the trials they
     # are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry requirement
-    # (Stef's OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
+    # (Dowlle's OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
     # the sphere-search assigns them only a tier-1 req. Their vanilla per-cup
     # has('<Colour> CTR Token', 4) JSON gate is REPLACED by this randomized requirement
     # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-3 Cups Room hub gate
@@ -444,7 +444,7 @@ def _choose_requirement(rnd, inv, allowed=None):
     a freely-placeable progression item, so requiring it under reward-agnostic AP
     fill creates a circular, hard-to-seat gate). The excluded relics still grow the
     synthetic inventory (so AnyRelic aggregates count them); they just are not
-    picked as a concrete requirement. This is Stef's "if a seed is tight, make do
+    picked as a concrete requirement. This is Dowlle's "if a seed is tight, make do
     with the other item types" turned into a sphere-search rule -- the sliders stay
     authoritative and are never silently overridden."""
     pool_items = REQ_WEIGHTS if allowed is None else [
@@ -630,7 +630,7 @@ def _assign_from_inv(rnd, inv, allowed=None):
 
 
 # Stage-2 requirements draw from the SAME full item universe as stage 1
-# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- Stef's
+# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- Dowlle's
 # OPEN model: a pad's tier-2 requirement may be ANY CTR item, with the same
 # weighting + Any*-collapse discipline as tier 1. Reward PINNING is gone (relics +
 # tokens flow through the normal multiworld pool + the relic-tier sliders), so a
@@ -649,7 +649,7 @@ _STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
 # to relieve AP fill_restrictive pressure: a collapsed tier 2 adds NO gate beyond the
 # trophy race (the TT/token opens the instant the race is reached), which frees
 # reachable location capacity for fill to seat the progression that opens the
-# remaining real gates. This is Stef's sanctioned "tier 2 MAY collapse if a seed
+# remaining real gates. This is Dowlle's sanctioned "tier 2 MAY collapse if a seed
 # needs it" turned into a small uniform relief valve; the golden path is unaffected
 # (tier 1 is always satisfiable-by-construction). Tuned empirically against the
 # two-stage-active FillError tail (see the impl A/B sweep).
@@ -728,7 +728,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     if reward_track_for is None:
         reward_track_for = lambda t: t
 
-    # Slider-aware requirement filter (Stef's generation-control knob, honoured not
+    # Slider-aware requirement filter (Dowlle's generation-control knob, honoured not
     # overridden). A relic-progression slider below 100 PINS a random ~ (100-slider)%
     # of that tier's 18 relics out of the multiworld pool. The synthetic sphere
     # inventory grows ALL 18 vanilla relics (it cannot know which AP will pin), so a
@@ -741,7 +741,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # requirement choice (it still grows the inventory so AnyRelic aggregates of the
     # FULL tiers stay correct, and the tier's own relics still appear as findable
     # progression). Trophy / Key / tokens / gems are always allowed -- the seed
-    # "makes do with the other item types" exactly as Stef specified; the sliders
+    # "makes do with the other item types" exactly as Dowlle specified; the sliders
     # are never silently overridden, only respected as the scarcity signal they are.
     # Default sliders (S100/G100/P0): sapphire+gold usable, platinum excluded.
     _slider = {
@@ -769,7 +769,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # sphere-0 locations, so widening the floor is the single most effective lever
     # against the extreme-density FillError tail (empirically ~0.28% at floor 2 ->
     # ~0.08% at floor 3 over a 2500-config sweep). Floor 3 is a small, gameplay-safe
-    # deviation from Icebound's 1..5 weighting that strengthens Stef's golden-path
+    # deviation from Icebound's 1..5 weighting that strengthens Dowlle's golden-path
     # guarantee (collecting always unlocks something new). Sizes >= the floor keep
     # their original relative weights.
     size = max(_FREE_MIN, _weighted_choice(rnd, FREE_SIZE_WEIGHTS))
