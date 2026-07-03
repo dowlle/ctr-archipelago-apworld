@@ -128,12 +128,63 @@ class ctrAPWorld(World):
     def create_item(self, name: str) -> "ctrAPItem":
         item_id: int = self.item_name_to_id[name]
         idx = item_id - item_prefix
+        classification = load_item_table()[idx]["classification"]
+        # Honest per-seed relic classification (design note 2026-07-03; Spec 6.2a).
+        # data/items.json marks every relic "progression" unconditionally, but in a
+        # vanilla-warp-pad seed whose goal/accessibility does not depend on a relic
+        # tier, that tier gates nothing -- yet the ordered fill still treats it as
+        # progression, inflating the pool to exactly the location count (zero slack)
+        # and cornering fill_restrictive on the deepest currency. Downgrade such a
+        # tier to "useful" so it leaves the ordered fill (placed by remaining_fill).
+        # The map is a pure function of options; see _relic_progression_map.
+        relic_prog = getattr(self, "_ctr_relic_prog", None)
+        if relic_prog is not None and relic_prog.get(name) is False:
+            classification = ItemClassification.useful
         return ctrAPItem(
             name=name,
-            classification=load_item_table()[idx]["classification"],
+            classification=classification,
             code=item_id,
             player=self.player,
         )
+
+    def _relic_progression_map(self) -> Dict[str, bool]:
+        """Which relic tiers are genuine PROGRESSION in this seed (True) vs merely
+        USEFUL (False). A relic tier is progression only when some reachable-required
+        location or the goal actually depends on owning it.
+
+        Enumeration of the (warp-pad mode, goal, accessibility) matrix -- vanilla
+        mode is the ONLY case that ever downgrades:
+
+        * Randomized / random_without_4_keys (mode 1/2): ALL relics stay
+          progression. The sphere search may assign a relic entry or stage-2
+          requirement to ANY pad, so relics must remain orderable by fill; the
+          randomized path's own pre_fill relax-not-pin guard handles fillability.
+          No behavioural change from today.
+        * Vanilla mode (mode 0) -- from data/world.json, the ONLY vanilla gates that
+          name a relic are both Sapphire: the Slide Coliseum pad (has('Sapphire
+          Relic', 10)) and N. Oxide's Final Challenge (has('Sapphire Relic', 18)).
+          Gold/Platinum gate no location; only goal 2's completion_condition reads a
+          relic count (18 Gold). So:
+            - Sapphire: progression iff accessibility == full (both Sapphire-gated
+              LOCATIONS must be reachable) OR the goal makes you reach + win Oxide's
+              Final Challenge (oxidefinal / everythingplusone). Else useful.
+            - Gold: progression iff goal == everythingplusone (completion needs 18
+              Gold). No location gates on it. Else useful.
+            - Platinum: never progression in vanilla mode (no location, no goal
+              completion depends on it).
+        """
+        o = self.options
+        prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
+        if o.warppad_unlock_requirements.value != 0:
+            return prog  # randomized modes: any pad may gate on any relic tier
+        goal = o.goal.value
+        access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
+        reach_oxide_final = access_full or goal in (
+            Goal.option_oxidefinal, Goal.option_everythingplusone)
+        prog["Sapphire Relic"] = reach_oxide_final
+        prog["Gold Relic"] = goal == Goal.option_everythingplusone
+        prog["Platinum Relic"] = False
+        return prog
 
     def create_event(self, event: str):
         return ctrAPItem(
@@ -161,6 +212,24 @@ class ctrAPWorld(World):
         player = self.player
         mw = self.multiworld
         pool = []
+
+        # Per-seed relic classification (lever 1); consumed by create_item for every
+        # relic created below (pool + slider/goal pins). Computed once here so the
+        # whole create_items pass sees a single consistent map.
+        self._ctr_relic_prog = self._relic_progression_map()
+
+        # Lever 2 (design note 2026-07-03): in VANILLA warp-pad mode, seat the 4
+        # hub-backbone Keys into early spheres so greedy fill_restrictive cannot
+        # strand a Key in the zero-slack vanilla pool (the residual after lever 1).
+        # VANILLA-ONLY: randomized mode already has its pre_fill guard and must stay
+        # byte-identical, so it is untouched. Only meaningful when Keys are actually
+        # in the shuffled pool (shuffle_keys on); when off, Keys are pinned to boss
+        # races and never enter fill, so this is inert. early_items is a fill-order
+        # hint (distribute_early_items, allow_partial) -- it changes neither what is
+        # required nor any emitted slot_data value.
+        if (self.options.warppad_unlock_requirements.value == 0
+                and self.options.shuffle_keys.value):
+            mw.early_items.setdefault(player, {})["Key"] = 4
 
         if self.options.goal.value <= 2:
             victory = ctrAPItem(
