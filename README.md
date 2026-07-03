@@ -1,3 +1,10 @@
+> [!NOTE]
+> **This is the Crash Team Racing (CTR) Archipelago fork.** The CTR world lives at [`worlds/ctr/`](worlds/ctr/) — see the [CTR world README](worlds/ctr/README.md) for the project introduction, credits, and the AI usage disclosure. The companion game client is [`dowlle/ctr-native-ap`](https://github.com/dowlle/ctr-native-ap), a native CTR PC build that connects to Archipelago in-process (no emulator, no ROM patching).
+>
+> **Status: in development, not yet released.** The code is public for collaboration and transparency; there is no supported player-facing release yet. Everything below this note is the upstream Archipelago README.
+
+---
+
 # [Archipelago](https://archipelago.gg) ![Discord Shield](https://discordapp.com/api/guilds/731205301247803413/widget.png?style=shield) | [Install](https://github.com/ArchipelagoMW/Archipelago/releases)
 
 Archipelago provides a generic framework for developing multiworld capability for game randomizers. In all cases,
