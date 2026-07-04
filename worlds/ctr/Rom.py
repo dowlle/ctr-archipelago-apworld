@@ -128,7 +128,10 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
             else "INVALID"
         )
         if db_race_key == "INVALID":
-            print(f"Invalid db_race_key for {location.name}")
+            # Location types newer than this legacy ROM db (podium rungs, gem
+            # cups, garage challenges) have no ROM mapping; the native client
+            # reads slot_data instead, so skipping them here is harmless.
+            pass
         elif ctr_db_mapping["trackIDs"].get(track_name) is not None:
             # print(track_name)
             dbkey = (
@@ -145,9 +148,11 @@ def get_ctr_database(item_placement: Iterable[Location]) -> dict:
                     ctr_db[dbkey] = dbvalue
                     # print(f"{hex(dbkey)}/{hex(dbvalue)}")
                 else:
-                    print(f"nope: {location.item}")
+                    pass  # item newer than the legacy ROM db; slot_data carries it
         else:
-            print(f"Invalid track_name: {track_name}")
+            # Tracks unknown to the legacy ROM db (boss garages etc.); same
+            # harmless skip as the INVALID race types above.
+            pass
 
     # STUB Write settings
     dbvalue = 0
