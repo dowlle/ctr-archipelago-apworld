@@ -219,6 +219,33 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
+    # --- Podium placement checks (feat/podium-checks) ------------------------
+    # Per adventure trophy race, a nested rung ladder (1st / 2nd-or-3rd /
+    # optional any-position). NEW event-only locations fired native-side from the
+    # placement listener (feat/podium-listener) at the finish-line capture point;
+    # they are NOT AdvProgress bits and never touch the warp-pad/trophy gate
+    # logic. Created ONLY when the option is on (any-position rung only when its
+    # sub-toggle is on) so the toggle governs whether a seed has them at all.
+    # Their reachability == the track's Trophy Race, installed in
+    # Rules.add_podium_placement_rules (a placeholder 'True' here is overwritten
+    # there); 1st fires all rungs, so any winnable race yields every rung -> no
+    # extra solvability burden, and the extra unfilled locations pull matching
+    # filler in create_items (item/location count stays balanced automatically).
+    if bool(opts.podium_placement_checks.value):
+        from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
+        _rung_keys = enabled_rung_keys(bool(opts.podium_any_position_rung.value))
+        for _track in TROPHY_TRACKS:
+            _region = region_lookup.get(_track)
+            if _region is None:
+                continue
+            for _rk in _rung_keys:
+                _name = location_name(_track, _rk)
+                _loc = create_location(player, _name, _region)
+                _loc.type = "podium"
+                _loc.logic_text = "True"  # real rule set in Rules (can_reach Trophy Race)
+                _region.locations.append(_loc)
+                mw.regions.location_cache[player][_name] = _loc
+
     # Remove the vanilla per-track trophy floor from the trophy-race LOCATION when
     # warp-pad requirements are RANDOMIZED. world.json keys numTrophiesToOpen on
     # "<track>: Trophy Race" by TRACK (the vanilla unlock spine). Keeping it would

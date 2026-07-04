@@ -718,6 +718,61 @@ class ctrAPWorld(World):
                     out[str(lid)]["stage2"] = _req(req)
         return out
 
+    def _resolve_podium_checks(self) -> Dict[str, object]:
+        """Podium placement checks (feat/podium-checks) for the native fan-out.
+
+        {"enabled": bool, "any_position": bool,
+         "locations": {"<levelID>": {"first": <code|null>,
+                                     "podium": <code|null>,
+                                     "any": <code|null>}, ...}}
+
+        The placement listener (feat/podium-listener) reads this: at the
+        finish-line capture for track=<levelID> with final placement p, it sends
+        the rung location codes per the nesting rule -- p==1 -> first+podium+any;
+        p in {2,3} -> podium+any; p>=4 -> any only. Codes are AP location ids; a
+        rung not present in this seed (any-position off, or the whole feature off)
+        is null and native must skip it. Keyed by physical race-pad LevelID 0..15,
+        which equals the trophy-race track and matches the [AP RACE] track field.
+        Only the 16 standard trophy races carry podium checks (boss/token/relic/
+        crystal have no genuine multi-position finish -- podium-listener handoff
+        §3.3).
+
+        NOTE: additive to schema_version 2 (a v2 native build simply ignores this
+        block and sends no podium checks -- safe degradation). The schema_version
+        bump is deferred until the native fan-out lands and its version comparison
+        is confirmed `>=` rather than `==` (see the handoff's open questions), so
+        existing seeds stay byte-safe.
+        """
+        from .Locations import CTR_LOCATION_IDS
+        from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
+        enabled = bool(self.options.podium_placement_checks.value)
+        any_pos = bool(self.options.podium_any_position_rung.value)
+        block: Dict[str, object] = {
+            "enabled": enabled,
+            "any_position": enabled and any_pos,
+            "locations": {},
+        }
+        if not enabled:
+            return block
+        rung_keys = enabled_rung_keys(any_pos)
+        pad_ids = getattr(self, "warp_pad_ids", {})
+        track_to_lid = {
+            pad_name[: -len(" Warp Pad")]: meta["level_id"]
+            for pad_name, meta in pad_ids.items()
+            if pad_name.endswith(" Warp Pad")
+        }
+        locations: Dict[str, Dict[str, object]] = {}
+        for track in TROPHY_TRACKS:
+            lid = track_to_lid.get(track)
+            if lid is None or not (0 <= lid < self.WARP_PAD_ID_RANGE):
+                continue
+            entry: Dict[str, object] = {"first": None, "podium": None, "any": None}
+            for rung_key in rung_keys:
+                entry[rung_key] = CTR_LOCATION_IDS.get(location_name(track, rung_key))
+            locations[str(lid)] = entry
+        block["locations"] = locations
+        return block
+
     def fill_slot_data(self) -> Dict[str, object]:
         o = self.options
         slot_data: Dict[str, object] = {
@@ -739,6 +794,7 @@ class ctrAPWorld(World):
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
             "boss_garage_req": getattr(self, "boss_garage_req", {}),
+            "podium_checks": self._resolve_podium_checks(),
         }
         return slot_data
 
