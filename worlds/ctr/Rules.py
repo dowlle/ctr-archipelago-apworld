@@ -63,6 +63,7 @@ def set_rules(world):
     # rules already applied above.
     add_warp_pad_unlock_rules(world, player)
     add_boss_garage_rules(world, player)
+    add_podium_placement_rules(world, player)
 
 
 # ITEM name resolver for a randomized requirement type code (see §0 contract).
@@ -172,6 +173,41 @@ def add_boss_garage_rules(world, player):
             lambda s, n=thr, p=player: s.has("Trophy", p, n)
         )
     # N. Oxide Garage Door keeps its has('Key', 4) text rule.
+
+
+def add_podium_placement_rules(world, player):
+    """Podium placement checks (feat/podium-checks) are reachable exactly when
+    their track's Trophy Race is.
+
+    They fire native-side from the placement listener regardless of finishing
+    position, and finishing 1st satisfies every rung, so a plain
+    can_reach(Trophy Race) rule is both necessary (you must be able to run the
+    race) and sufficient (a winnable race yields all rungs). Delegating to the
+    Trophy Race LOCATION's reachability inherits every warp-pad mode for free --
+    vanilla trophy floor, randomized floor-strip, and destination-shuffle rekey
+    all already live on that location's rule. No placement is ever logically
+    required, so accessibility:full stays satisfiable whenever the trophy race is.
+    """
+    o = world.options
+    if not bool(o.podium_placement_checks.value):
+        return
+    from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
+    mw = world.multiworld
+    all_names = {loc.name for loc in mw.get_locations(player)}
+    rung_keys = enabled_rung_keys(bool(o.podium_any_position_rung.value))
+    for track in TROPHY_TRACKS:
+        trophy_name = f"{track}: Trophy Race"
+        if trophy_name not in all_names:
+            continue
+        for rung_key in rung_keys:
+            name = location_name(track, rung_key)
+            if name not in all_names:
+                continue
+            loc = mw.get_location(name, player)
+            loc.access_rule = (
+                lambda state, t=trophy_name, p=player:
+                state.can_reach(t, "Location", p)
+            )
 
 
 def add_time_trial_and_ctr_requirements(world, player):

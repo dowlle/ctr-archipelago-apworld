@@ -307,6 +307,32 @@ class ComfortGuards(DefaultOnToggle):
     display_name = "Comfort Guards"
 
 
+class PodiumPlacementChecks(DefaultOnToggle):
+    """Add podium placement location checks to the 16 adventure trophy races.
+
+    Each trophy race gains a nested rung ladder -- "Finish 1st" and "Finish 2nd
+    or 3rd" (and, with the any-position rung below, "Finish (Any Position)") --
+    where a better result satisfies every rung at or below it, so finishing 1st
+    awards all of that race's rungs at once. This adds 32 (or 48 with the
+    any-position rung) extra location checks as room for more items.
+
+    Placement is observed live at the finish line: because vanilla adventure only
+    lets you "complete" a trophy race by winning it, a 2nd/3rd placement check is
+    earned the moment you cross the line but does NOT by itself advance adventure
+    progression. Only the 16 standard trophy races get placement checks -- boss,
+    CTR Token, relic, and crystal events do not (they have no genuine multi-
+    position finish)."""
+    display_name = "Podium Placement Checks"
+
+
+class PodiumAnyPositionRung(DefaultOnToggle):
+    """When Podium Placement Checks is on, add a third "Finish (Any Position)"
+    rung to each trophy race -- a check earned simply by crossing the finish line
+    in any position. Raises the podium check count from 32 to 48. Has no effect
+    when Podium Placement Checks is off."""
+    display_name = "Podium: Any-Position Rung"
+
+
 class SkipMaskHints(DefaultOnToggle):
     """Sets all adventure mode mask hint cutscenes as 'already seen', effectively skipping them."""
     display_name = "Skip Mask Hints"
@@ -365,6 +391,9 @@ class ctrAPOptions(PerGameCommonOptions):
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
     comfort_guards: ComfortGuards
+    # extra locations
+    podium_placement_checks: PodiumPlacementChecks
+    podium_any_position_rung: PodiumAnyPositionRung
     # qol
     skip_mask_hints: SkipMaskHints
     autoskip_podium_cutscenes: AutoskipPodiumCutscenes
@@ -389,6 +418,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         AutoUnlockCtrChallengeRelicRace,
         ComfortGuards,
         BossGarageRequirements,
+        PodiumPlacementChecks,
+        PodiumAnyPositionRung,
     ],
     "Difficulty": [SapphireRelicProgression, GoldRelicProgression, PlatinumRelicProgression],
     "Quality of Life": [SkipMaskHints, AutoskipPodiumCutscenes, SkipMaskCongrats],
