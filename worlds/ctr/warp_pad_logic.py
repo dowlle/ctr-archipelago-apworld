@@ -81,9 +81,10 @@ HUB_STATIC = {
     # (the randomized req is ANDed on TOP of that key gate, never replaces it). The
     # track key is '<Colour> Cup' so _pad_exit_name yields '<Colour> Cup Warp Pad'
     # (the AP exit name); the destination region is '<Colour> Gem Cup'. Gem cups are
-    # NOT destination-shuffled (unique native dispatch -> absent from SHUFFLE_GROUPS),
-    # only their UNLOCK REQUIREMENT is randomized. Gated in the emitter by the
-    # include_gem_cups YAML option (mirrors include_battle_arenas for crystals).
+    # destination-shuffle-eligible (CATEGORY_POOLS['cups'], slot_data v3) when the
+    # 'cups' category is selected AND include_gem_cups puts their content in the seed;
+    # their UNLOCK REQUIREMENT is randomized on the same include_gem_cups gate (mirrors
+    # include_battle_arenas for crystals).
     "Red Cup": [("Key", 2)], "Green Cup": [("Key", 2)], "Blue Cup": [("Key", 2)],
     "Yellow Cup": [("Key", 2)], "Purple Cup": [("Key", 2)],
 }
@@ -882,12 +883,17 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
     _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
 
-    # 4) assemble {track: {1: stage1, 2: stage2}}. Stage 2 for a physical pad is
-    # the req keyed by the track it LOADS (reward_track_for); non-trophy pads have
-    # no stage 2.
+    # 4) assemble {track: {1: stage1, 2: stage2}}. Stage-2 eligibility keys off the
+    # DESTINATION (contract §2/§4, design §3): a physical pad carries a meaningful
+    # stage 2 iff the track it LOADS (reward_track_for) is one of the 16 trophy
+    # tracks -- NOT iff the physical pad itself is a trophy pad. Under merged
+    # destination shuffle a trial / cup / crystal physical pad may host a trophy
+    # track (-> real stage 2), and a trophy physical pad may host non-race content
+    # (-> no stage 2). stage2_reqs is dest-track keyed, so the lookup is by dest.
     out = {}
     for t in HUB_STATIC:
-        s2 = stage2_reqs.get(reward_track_for(t)) if t in TROPHY_TRACKS else None
+        dest = reward_track_for(t)
+        s2 = stage2_reqs.get(dest) if dest in TROPHY_TRACKS else None
         out[t] = {1: pad_reqs.get(t), 2: s2}
     return out
 
@@ -965,34 +971,96 @@ def to_slot_req(req):
 # Destination shuffle -- non-identity warp_pad_map
 # ---------------------------------------------------------------------------
 
-# Shuffle ONLY within the same native unlock-dispatch category, else the game
-# split-keys it (AH_WarpPad ThTick dispatches by DESTINATION track while the
-# unlock requirement keys off the PHYSICAL pad). The 16 main trophy-race pads
-# all share one dispatch type -> safe to permute among themselves. The two trials
-# (16 Slide Coliseum = relic, 17 Turbo Track = gem) and the 5 gem cups each have
-# unique dispatch -> their DESTINATION is NOT shuffled (stay identity); only their
-# UNLOCK REQUIREMENT is randomized (see HUB_STATIC / run_sphere_search). Crystal/
-# battle pads share a type -> shuffle among themselves. LevelIDs from warp_pad_ids.json.
-SHUFFLE_GROUPS = {
-    # 16 trophy-race pads ONLY (trials 16/17 excluded -> stay fixed)
-    "race": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13],
-    "crystal": [21, 19, 23, 18],
+# Destination-shuffle CATEGORY POOLS (design 2026-07-06, slot_data v3). A category
+# is a set of physical pad LevelIDs whose destinations may be permuted. Which
+# categories participate is chosen by warp_pad_shuffle_categories, whether they
+# cross-shuffle by warp_pad_shuffle_grouping, and cups/crystals additionally need
+# their include_* content option (see resolve_shuffle_pools). LevelIDs from
+# warp_pad_ids.json.
+#   tracks   = the 16 trophy-race pads + the 2 trials (16 Slide Coliseum, 17 Turbo
+#              Track). Trials ride in tracks per the design (race-track content
+#              Stef expects shuffled); native dispatch handles a trophy race on a
+#              trial pad and vice versa under the v3 build.
+#   crystals = the 4 battle-arena pads.
+#   cups     = the 5 gem-cup pads (LevelIDs 100-104).
+CATEGORY_POOLS = {
+    "tracks": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13, 16, 17],
+    "crystals": [21, 19, 23, 18],
+    "cups": [100, 101, 102, 103, 104],
 }
+
+# The vanilla-unlock collapse's 'races only' subset of tracks: the 16 trophy-race
+# pads WITHOUT the two trials (legacy same-category behaviour, matching the old
+# SHUFFLE_GROUPS['race']). Used only when warppad_unlock_requirements == vanilla.
+_LEGACY_RACE_IDS = [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13]
+
+
+def resolve_shuffle_pools(world):
+    """Resolve which pad-ID pools take part in destination shuffle, and how, from
+    warp_pad_shuffle_categories × warp_pad_shuffle_grouping × the include_* content
+    filters × the vanilla-unlock collapse (design §1).
+
+    Returns (pools, grouping) where `pools` is a list of ID-lists to permute
+    independently (one list under merged; one per category under per_category) and
+    `grouping` is the effective grouping string. An empty `pools` means no shuffle
+    (identity map).
+
+    Participation: a category participates iff selected AND its content is in the
+    seed -- `cups` needs include_gem_cups, `crystals` needs include_battle_arenas,
+    `tracks` is always in the seed.
+
+    Vanilla-unlock collapse: when warppad_unlock_requirements == vanilla (0), the
+    grouping is forced to per_category, cups/trials are excluded, and `tracks`
+    degrades to races-only (_LEGACY_RACE_IDS) -- regardless of the yaml. Native
+    vanilla gate enforcement + the vanilla floor re-keying are only defined for the
+    race<->race matrix, so cross-category / cup / trial shuffle require a randomized
+    unlock mode. Category SELECTION is still honoured (an unselected category never
+    shuffles, even in the collapse)."""
+    opts = world.options
+    cats = set(getattr(opts, "warp_pad_shuffle_categories").value)
+    grouping = getattr(opts, "warp_pad_shuffle_grouping").current_key  # merged/per_category
+    unlock_mode = opts.warppad_unlock_requirements.value
+    inc_arenas = bool(opts.include_battle_arenas.value)
+    inc_cups = bool(opts.include_gem_cups.value)
+
+    if unlock_mode == 0:
+        # LEGACY collapse: races-only + crystals, per_category, no cups/trials.
+        pools = []
+        if "tracks" in cats:
+            pools.append(list(_LEGACY_RACE_IDS))
+        if "crystals" in cats and inc_arenas:
+            pools.append(list(CATEGORY_POOLS["crystals"]))
+        return pools, "per_category"
+
+    # Randomized unlock modes: full category machinery.
+    participating = []
+    if "tracks" in cats:
+        participating.append(list(CATEGORY_POOLS["tracks"]))
+    if "crystals" in cats and inc_arenas:
+        participating.append(list(CATEGORY_POOLS["crystals"]))
+    if "cups" in cats and inc_cups:
+        participating.append(list(CATEGORY_POOLS["cups"]))
+
+    if grouping == "merged":
+        union = [lid for pool in participating for lid in pool]
+        return ([union] if union else []), "merged"
+    return participating, "per_category"
 
 
 def build_warp_pad_map(world):
     """{pad_exit_name -> target_track_levelID}. Permutes destinations within each
-    group; re-rolls if the whole permutation is identity. Respects
-    include_battle_arenas (crystal group)."""
+    resolved pool (resolve_shuffle_pools); re-rolls (up to 8x) if a pool's whole
+    permutation is identity. Returns an empty map (identity) when no pool
+    participates. Values span the full ID space {0..27, 100..104}: under merged a
+    track slot may load a cup/crystal and vice versa."""
     rnd = world.random
     id_to_name = {meta["level_id"]: name
                   for name, meta in world.warp_pad_ids.items()}
     out = {}
-    groups = ["race"]
-    if bool(world.options.include_battle_arenas.value):
-        groups.append("crystal")
-    for g in groups:
-        ids = list(SHUFFLE_GROUPS[g])
+    pools, _grouping = resolve_shuffle_pools(world)
+    for ids in pools:
+        if len(ids) < 2:
+            continue  # nothing to permute
         perm = ids[:]
         for _ in range(8):
             rnd.shuffle(perm)
@@ -1007,13 +1075,13 @@ def build_warp_pad_map(world):
     # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
     # Turbo Track pad keeps its vanilla 5-gem gate, so a Gem Cup / trial destination
     # landing in a trophy pad (or a Gem Cup landing in Turbo Track) would force the
-    # tedious tokens -> gem cups -> 5 gems chain. SHUFFLE_GROUPS already segregates the
-    # trial and gem-cup pads out of the trophy-pad ('race') pool — native dispatch
-    # requires it — so they are never remapped above; this strips any such remap when
-    # the guard is active to enforce that invariant explicitly (a no-op under the
-    # current groups, defensive if a group is ever widened). The guard is set in
-    # create_regions only for unlock=vanilla + gems-not-shuffled; OFF leaves the map
-    # untouched.
+    # tedious tokens -> gem cups -> 5 gems chain. The vanilla-unlock collapse in
+    # resolve_shuffle_pools already restricts the pools to races-only + crystals
+    # (no trials, no cups) whenever this guard can be active (unlock == vanilla), so
+    # the trial/cup pads are never remapped above; this strips any such remap to
+    # enforce that invariant explicitly (a no-op under the collapse, defensive). The
+    # guard is set in create_regions only for unlock=vanilla + gems-not-shuffled;
+    # OFF leaves the map untouched.
     if getattr(world, "_ctr_force_vanilla_turbotrack", False):
         _GUARDED_PADS = (
             "Turbo Track Warp Pad", "Slide Coliseum Warp Pad",
