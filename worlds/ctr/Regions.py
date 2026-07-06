@@ -149,12 +149,13 @@ def create_regions(world: "ctrAPWorld"):
 
     # --- Resolve native-randomization options up front -------------------
     opts = world.options
-    do_shuffle = bool(opts.shuffle_warp_pads.value)            # STRETCH gate
     unlock_mode = opts.warppad_unlock_requirements.value       # 0 vanilla / 1 randomized / 2 no-4-keys
     boss_mode = opts.bossgarage_unlock_requirements.value      # 0 orig4 / 1 same_hub / 2 trophies
 
     world.warp_pad_ids = _load_warp_pad_ids()
-    world.shuffle_warp_pads = do_shuffle
+    # do_shuffle is derived from the destination-shuffle map below (non-empty ==
+    # at least one participating category), NOT the deprecated shuffle_warp_pads
+    # boolean. Set once build_warp_pad_map has resolved the participating pools.
 
     # --- Comfort guards (Icebound force_vanilla_turbotrack / limit_arena_gemcup) ---
     # Activate only in Icebound's exact condition: warp-pad unlock = VANILLA and gems
@@ -187,8 +188,15 @@ def create_regions(world: "ctrAPWorld"):
 
     # Destination shuffle. Build the NON-IDENTITY warp_pad_map FIRST so the
     # sphere-search rewards each physical pad with the rewards of the track it
-    # actually loads (A.4<->logic coupling). Empty (identity) when shuffle off.
-    world.warp_pad_map = build_warp_pad_map(world) if do_shuffle else {}
+    # actually loads (A.4<->logic coupling). build_warp_pad_map resolves the
+    # participating pools itself (categories × grouping × include_* × the vanilla
+    # collapse) and returns an empty (identity) map when nothing participates.
+    # do_shuffle is then simply "the map is non-empty" -- the gate the rest of
+    # create_regions keys off (floor re-keying, exit rewiring). Requires the
+    # comfort-guard flag (above) already set, which build_warp_pad_map reads.
+    world.warp_pad_map = build_warp_pad_map(world)
+    do_shuffle = bool(world.warp_pad_map)
+    world.shuffle_warp_pads = do_shuffle
 
     # Boss-garage requirements, resolved to flat {type,count} (+ 'tracks' for
     # modes 0/1). warp_pad_map (above) is read for SameHubTracks, so resolve here.
@@ -309,18 +317,26 @@ def create_regions(world: "ctrAPWorld"):
     # region and keeps its physical-pad access rule (Rules.add_warp_pad_unlock_rules)
     # + the hub boss-key gate, so the requirement and keys apply to the PHYSICAL
     # pad while the locations reached are the DESTINATION track's. Empty (identity)
-    # when shuffle is off. warp_pad_map is {pad_exit_name: dest_track_levelID};
-    # level_id maps back to a track name (== region name) to find the dest region.
-    _id_to_track = {
-        meta["level_id"]: pad_name[: -len(" Warp Pad")]
-        for pad_name, meta in world.warp_pad_ids.items()
-        if pad_name.endswith(" Warp Pad")
-    }
+    # when shuffle is off. warp_pad_map is {pad_exit_name: dest_track_levelID}.
+    #
+    # A destination LevelID resolves to the REGION that LevelID's pad vanilla-loads,
+    # taken from world.json's own pad-exit targets. This is NOT the same as
+    # stripping " Warp Pad" off the pad name: for gem cups the pad name strips to
+    # "<Colour> Cup" but the region is "<Colour> Gem Cup" (pad key != region name).
+    # Under merged shuffle a track/crystal pad can now load a cup destination, so a
+    # wrong region name would leave that exit UNCONNECTED (connected_region None) and
+    # crash AP reachability -- hence resolving through the real exit targets.
+    _lid_to_region = {}
+    for reg in data["regions"]:
+        for ex in reg.get("exits", []):
+            meta = world.warp_pad_ids.get(ex["name"])
+            if meta is not None and ex.get("target") is not None:
+                _lid_to_region[meta["level_id"]] = ex["target"]
     pad_dest_region = {}
     for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
-        dest_track = _id_to_track.get(dest_lid)
-        if dest_track is not None:
-            pad_dest_region[pad_name] = dest_track
+        dest_region = _lid_to_region.get(dest_lid)
+        if dest_region is not None:
+            pad_dest_region[pad_name] = dest_region
 
     # VANILLA unlock mode + destination shuffle: the vanilla trophy floor stays on
     # the trophy-race LOCATION (keyed by track), but native keys numTrophiesToOpen
