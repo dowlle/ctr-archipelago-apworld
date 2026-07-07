@@ -10,7 +10,6 @@ from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
 from .Options import ctrAPOptions, Goal
 from .Regions import create_regions
-from .Rom import CrashTeamRacingProcedurePatch, write_tokens
 from .Rules import set_rules
 from .Types import ctrAPItem
 
@@ -829,41 +828,6 @@ class ctrAPWorld(World):
 
     def remove(self, state: "CollectionState", item: "Item") -> bool:
         return super().remove(state, item)
-
-    # --- Output generation ---
-
-    def generate_output(self, output_directory: str) -> None:
-        patch: CrashTeamRacingProcedurePatch = CrashTeamRacingProcedurePatch(
-            player=self.player,
-            player_name=self.player_name
-        )
-        pkg_ressource: bytes | None = pkgutil.get_data(
-            package=__name__,
-            resource="data/base_patch.bsdiff4",
-        )
-        if pkg_ressource is not None:
-            patch.write_file(
-                file_name="base_patch.bsdiff4",
-                file=pkg_ressource,
-            )
-        else:
-            None #todo we should really throw some kind of exception here
-
-        write_tokens(
-            patch=patch,
-            item_placement=self.multiworld.get_locations(self.player),
-        )
-
-        # Write output
-        out_file_name: str = self.multiworld.get_out_file_name_base(
-            player=self.player,
-        )
-        patch.write(
-            os.path.join(
-                output_directory,
-                f"{out_file_name}{patch.patch_file_ending}"
-            )
-        )
 
 
 # Register the BizHawk client so `BizHawkClient` launcher can claim CTR ROMs.
