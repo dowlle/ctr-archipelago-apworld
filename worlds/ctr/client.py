@@ -259,8 +259,9 @@ class CtrClient(BizHawkClient):
                 # N. Oxide's Challenge
                 w, m = GOAL_BITS["oxide_challenge"]
                 goal_met = bool(words[w] & m)
-            elif goal_value in (1, 2):
-                # N. Oxide's Final Challenge (and Everything+1 which also requires it)
+            elif goal_value == 1:
+                # N. Oxide's Final Challenge (goal 2 "everythingplusone" was dropped;
+                # value 2 is no longer emitted, Spec §5)
                 w, m = GOAL_BITS["oxide_final_challenge"]
                 goal_met = bool(words[w] & m)
             elif goal_value == 3:
