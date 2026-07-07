@@ -30,7 +30,11 @@ iteration that the Rust sorts is sorted here too, so the same YAML + seed
 reproduces identical output.
 """
 
+import heapq
+import json
 import math
+import pkgutil
+import re
 
 
 # ---------------------------------------------------------------------------
@@ -1047,17 +1051,174 @@ def resolve_shuffle_pools(world):
     return participating, "per_category"
 
 
-def build_warp_pad_map(world):
-    """{pad_exit_name -> target_track_levelID}. Permutes destinations within each
-    resolved pool (resolve_shuffle_pools); re-rolls (up to 8x) if a pool's whole
-    permutation is identity. Returns an empty map (identity) when no pool
-    participates. Values span the full ID space {0..27, 100..104}: under merged a
-    track slot may load a cup/crystal and vice versa."""
+# ---------------------------------------------------------------------------
+# Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation fix)
+# ---------------------------------------------------------------------------
+#
+# Under `merged` destination shuffle with `shuffle_keys: false`, the shuffle can
+# drop too many ZERO-capacity destinations (gem cups whose Gem is lock-placed when
+# gems are not shuffled) onto the pads reachable before a boss floor, leaving fewer
+# trophy-CAPABLE (reachable, non-pre-placed) locations than that boss's fixed trophy
+# gate (4/8/12/16) needs -> fill_restrictive dead-ends (FillError). Keys-off is the
+# trigger because the first Key only drops after Ripper Roo (4 Trophies), so those
+# 4 Trophies MUST be seatable in the pre-first-key sphere; keys-on floods that
+# frontier with an early Key and never starves. See the 2026-07-06 decision note +
+# 2026-07-07 B1/B2 research; the counting rule below is B1's, validated on repro
+# seed 509876816.
+#
+# We enforce a per-boss-floor capacity floor by a bounded re-roll of the destination
+# permutation (same world.random stream as the existing 8x identity re-roll; RNG is
+# consumed ONLY when a floor is breached, so a map that already satisfies every floor
+# generates byte-identically). The count is a STAGE-2-INDEPENDENT lower bound on the
+# real trophy-capable capacity: a race destination contributes only its Trophy Race
+# (+ podium rungs) because its Time Trial / CTR-token slots sit behind a stage-2 gate
+# that may hold them back pre-key (B1: "race TTs/tokens = 0 capacity pre-key"). The
+# bound is SOUND -- real capacity >= this count -- so a map that PASSES is genuinely
+# fillable at those floors and is never re-rolled; only maps at or below the bound
+# (which include every genuine starvation map) are repaired.
+
+# (trophy floor, boss keys already earned). Keys come only from bosses when
+# shuffle_keys is off: 0 before Ripper Roo, 1 before Papu, etc. A physical pad is
+# reachable at a floor iff its hub Key gate <= that floor's key count. Mirrors
+# Regions.BOSS_TROPHY + the world.json hub Key graph (verified equal to B1's tiers:
+# 4 pads @0 keys, 11 @1, 21 @2, 26 @3).
+_BOSS_CAP_FLOORS = ((4, 0), (8, 1), (12, 2), (16, 3))
+
+# Bounded re-roll budget before the constructive fallback. Only 5 of 27 merged-pool
+# destinations are ever zero-capacity (the gem cups), so a satisfying permutation is
+# dense in the sample space and a breach is cleared in far fewer draws in practice;
+# the budget is generous insurance, not an expected cost.
+_CAPACITY_MAX_REROLLS = 16
+
+_KEYGATE_CACHE = None
+
+
+def _pad_keygate_table():
+    """{pad_exit_name -> minimum boss Keys required to REACH that physical pad's
+    warp-pad exit}, derived from the static hub Key graph in data/world.json.
+
+    Keys are monotonic and hub gates nest, so the min keys to reach a region is the
+    minimax over paths of the largest has('Key', N) gate crossed; a pad's key floor
+    is then max(region floor, the pad-exit's own Key gate). This is the PHYSICAL-pad
+    reachability the capacity sweep keys off -- a destination's OWN hub gate is
+    bypassed by the exit rewire (Regions.create_regions), so only the physical pad's
+    gate matters. Static (independent of the per-seed shuffle) -> cached."""
+    global _KEYGATE_CACHE
+    if _KEYGATE_CACHE is not None:
+        return _KEYGATE_CACHE
+    data = json.loads(
+        pkgutil.get_data(__package__, "data/world.json").decode("utf-8"))
+    pads = json.loads(
+        pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8"))["pads"]
+    regions = {r["name"]: r for r in data["regions"]}
+    start = next(r["name"] for r in data["regions"] if r.get("is_start"))
+
+    def key_req(text):
+        return max((int(n) for n in re.findall(r"has\('Key',\s*(\d+)\)", text or "")),
+                   default=0)
+
+    # minimax key distance from the start region.
+    dist = {start: 0}
+    pq = [(0, start)]
+    while pq:
+        dk, cur = heapq.heappop(pq)
+        if dk > dist.get(cur, 1 << 30):
+            continue
+        for ex in regions.get(cur, {}).get("exits", []):
+            tgt = ex.get("target")
+            if tgt is None or tgt not in regions:
+                continue
+            nk = max(dk, key_req(ex.get("access_rule", "True")))
+            if nk < dist.get(tgt, 1 << 30):
+                dist[tgt] = nk
+                heapq.heappush(pq, (nk, tgt))
+
+    # host region + own access rule per pad exit.
+    exit_host = {}
+    for r in data["regions"]:
+        for ex in r.get("exits", []):
+            if ex["name"] in pads:
+                exit_host[ex["name"]] = (r["name"], ex.get("access_rule", "True"))
+    table = {}
+    for pad_name in pads:
+        host, ar = exit_host.get(pad_name, (start, "True"))
+        table[pad_name] = max(dist.get(host, 1 << 30), key_req(ar))
+    _KEYGATE_CACHE = table
+    return table
+
+
+def _capacity_context(world):
+    """Per-seed inputs to the trophy-capacity count that do not depend on the map:
+    podium rung count, guaranteed-unpinned relic-trial tiers, and whether gem-cup
+    Gem locations are lock-placed (0 capacity)."""
+    o = world.options
+    if bool(o.podium_placement_checks.value):
+        from .podium import enabled_rung_keys
+        podium = len(enabled_rung_keys(bool(o.podium_any_position_rung.value)))
+    else:
+        podium = 0
+    # A relic Time Trial location is a guaranteed (un-pinnable) fillable slot only at
+    # slider 100; below 100 it may be pinned to its vanilla relic (0 capacity), so the
+    # sound lower bound counts only the fully-open tiers.
+    sliders = (o.sapphire_relic_progression.value,
+               o.gold_relic_progression.value,
+               o.platinum_relic_progression.value)
+    trial_tiers = sum(1 for s in sliders if s >= 100)
+    # Gem-cup Gem is lock-placed when gems are not shuffled, or always for the
+    # all-gem-cups goal (Goal.option_allgemcups == 4). Locked -> 0 trophy capacity.
+    gem_locked = (not bool(o.shuffle_gems.value)) or (o.goal.value == 4)
+    return {"podium": podium, "trial_tiers": trial_tiers, "gem_locked": gem_locked}
+
+
+def _dest_trophy_capacity(dest_lid, id_kind, ctx):
+    """Stage-2-independent lower bound on the trophy-CAPABLE fillable locations a
+    destination LevelID exposes once its (physical) pad is reached:
+      race    -> 1 Trophy Race + podium rungs (TTs/token excluded: stage-2-gated)
+      crystal -> 1 Crystal Bonus Round
+      trial   -> guaranteed-unpinned relic Time Trials (single-stage, no stage-2 gate)
+      cup     -> 1, or 0 when its Gem is lock-placed (gems-off / all-gem-cups goal)."""
+    kind = id_kind.get(dest_lid)
+    if kind == "race":
+        return 1 + ctx["podium"]
+    if kind == "crystal":
+        return 1
+    if kind == "trial":
+        return ctx["trial_tiers"]
+    if kind == "cup":
+        return 0 if ctx["gem_locked"] else 1
+    return 0
+
+
+def _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
+    """True iff every boss floor's reachable pads expose >= that floor's trophy count
+    of trophy-capable slots. `out` = {pad_exit_name -> dest_levelID} (partial; an
+    unshuffled pad loads itself)."""
+    for floor, keys in _BOSS_CAP_FLOORS:
+        cap = 0
+        for pad_name, lid in own_lid.items():
+            if keygate.get(pad_name, 0) > keys:
+                continue
+            cap += _dest_trophy_capacity(out.get(pad_name, lid), id_kind, ctx)
+        if cap < floor:
+            return False
+    return True
+
+
+def _capacity_gate_open(world, grouping):
+    """Cheap keys-off + `merged` gate. The invariant is enforced ONLY here: per_category
+    keeps every category on its own pads (cups never reach the always-open race pads),
+    and keys-on floods the frontier with an early Key -- both are provably unaffected.
+    Kept deliberately allocation-free so those (default) paths stay byte-identical to
+    pre-fix generation; the heavier capacity work happens only past this gate."""
+    return grouping == "merged" and not bool(world.options.shuffle_keys.value)
+
+
+def _permute_pools(world, pools, id_to_name):
+    """Permute destinations within each resolved pool (the historical body of
+    build_warp_pad_map): re-roll up to 8x if a pool's whole permutation is identity.
+    Returns {pad_exit_name -> destination LevelID}. Uses world.random."""
     rnd = world.random
-    id_to_name = {meta["level_id"]: name
-                  for name, meta in world.warp_pad_ids.items()}
     out = {}
-    pools, _grouping = resolve_shuffle_pools(world)
     for ids in pools:
         if len(ids) < 2:
             continue  # nothing to permute
@@ -1070,6 +1231,97 @@ def build_warp_pad_map(world):
             name = id_to_name.get(phys)
             if name is not None:
                 out[name] = dest  # pad_exit_name -> destination track LevelID
+    return out
+
+
+def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_lid, ctx):
+    """Deterministic fallback when the bounded re-roll cannot land a satisfying map
+    (astronomically unlikely -- a valid arrangement always exists since only the 5
+    cups are zero-capacity). Under `merged` there is exactly one pool; pin race
+    destinations onto the always-open (0-key) pads to guarantee the Ripper Roo floor,
+    then re-permute the remaining destinations, re-rolling that remainder to satisfy
+    the higher floors' wide slack. RNG = world.random."""
+    rnd = world.random
+    ids = pools[0]  # merged == single pool of LevelIDs
+    lid_to_name = {lid: id_to_name.get(lid) for lid in ids}
+    open_pos = [i for i, lid in enumerate(ids)
+                if keygate.get(lid_to_name.get(lid), 0) == 0]
+    race_dests = [lid for lid in ids if id_kind.get(lid) == "race"]
+
+    def _assemble(perm):
+        out = {}
+        for phys, dest in zip(ids, perm):
+            name = id_to_name.get(phys)
+            if name is not None:
+                out[name] = dest
+        return out
+
+    best = None
+    for _ in range(_CAPACITY_MAX_REROLLS):
+        pinned = list(race_dests)
+        rnd.shuffle(pinned)
+        perm = [None] * len(ids)
+        used = set()
+        for pos in open_pos:
+            if not pinned:
+                break
+            d = pinned.pop()
+            perm[pos] = d
+            used.add(d)
+        rest = [lid for lid in ids if lid not in used]
+        rnd.shuffle(rest)
+        ri = 0
+        for pos in range(len(ids)):
+            if perm[pos] is None:
+                perm[pos] = rest[ri]
+                ri += 1
+        out = _assemble(perm)
+        if best is None:
+            best = out  # Ripper Roo floor guaranteed by the race pins above
+        if _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
+            return out
+    return best
+
+
+def build_warp_pad_map(world):
+    """{pad_exit_name -> target_track_levelID}. Permutes destinations within each
+    resolved pool (resolve_shuffle_pools); re-rolls (up to 8x) if a pool's whole
+    permutation is identity. Returns an empty map (identity) when no pool
+    participates. Values span the full ID space {0..27, 100..104}: under merged a
+    track slot may load a cup/crystal and vice versa.
+
+    Under `merged` + `shuffle_keys: false`, additionally enforces the per-boss-floor
+    trophy-capacity invariant (see the block above): a bounded re-roll of the whole
+    permutation until every floor has enough trophy-capable slots, else a constructive
+    pin. This fires only when a zero-capacity destination participates, and consumes
+    NO extra RNG on a map that already satisfies the floors (byte-identical seeds)."""
+    id_to_name = {meta["level_id"]: name
+                  for name, meta in world.warp_pad_ids.items()}
+    pools, grouping = resolve_shuffle_pools(world)
+    out = _permute_pools(world, pools, id_to_name)
+
+    # Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation).
+    # Guarded by the cheap keys-off + merged gate FIRST so the default keys-on and
+    # per_category paths allocate nothing new below and stay byte-identical to pre-fix.
+    if _capacity_gate_open(world, grouping):
+        id_kind = {meta["level_id"]: meta["kind"]
+                   for meta in world.warp_pad_ids.values()}
+        ctx = _capacity_context(world)
+        # Only a zero-capacity destination (a lock-placed gem cup, or a fully-pinned
+        # trial) can starve a floor; nothing to enforce when none participates.
+        if any(_dest_trophy_capacity(lid, id_kind, ctx) == 0
+               for pool in pools for lid in pool):
+            keygate = _pad_keygate_table()
+            own_lid = {name: meta["level_id"]
+                       for name, meta in world.warp_pad_ids.items()}
+            attempts = 0
+            while (not _floors_satisfied(out, keygate, id_kind, own_lid, ctx)
+                   and attempts < _CAPACITY_MAX_REROLLS):
+                out = _permute_pools(world, pools, id_to_name)
+                attempts += 1
+            if not _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
+                out = _constructive_capacity_pin(
+                    world, pools, id_to_name, keygate, id_kind, own_lid, ctx)
 
     # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
     # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
