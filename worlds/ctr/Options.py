@@ -8,13 +8,19 @@ class Goal(Choice):
 
     - **oxide:** N. Oxide's Challenge - Defeat N. Oxide's Challenge.
     - **oxidefinal:** N. Oxide's Final Challenge - Collect 18 Relics (Sapphire or Greater) and Defeat N. Oxide's Final Challenge.
-    - **everythingplusone:** 101% - Collect all 16 Trophies, 5 of each Token, 1 of each Gem, and 18 Relics (Gold or Greater) and Defeat N. Oxide's Final Challenge.
     - **allbosses:** All Bosses - Win all 5 boss challenges.
     - **allgemcups:** All Gem Cups - Complete Every Gem Cup."""
     display_name = "Goal"
     option_oxide = 0
     option_oxidefinal = 1
-    option_everythingplusone = 2
+    # Value 2 ("everythingplusone" / 101%) was DROPPED 2026-07-01 (Spec §5): its
+    # implemented condition felt arbitrary and was not true vanilla 101%; goal 1
+    # (Oxide-final) covers the "harder ending" niche. The numeric slot 2 is left as a
+    # DOCUMENTED GAP -- the surviving values keep their ints because `ctr_options.goal`
+    # is consumed natively by AP_EvaluateGoal (slot_data Contract), so renumbering
+    # would be a cross-layer break. AP's Choice permits non-contiguous option values,
+    # and an old YAML with `goal: everythingplusone` now fails generation with AP's
+    # standard invalid-option error (the intended UX -- no silently-accepting alias).
     option_allbosses = 3
     option_allgemcups = 4
     default = 0

@@ -348,13 +348,14 @@ class ctrAPWorld(World):
         * Vanilla mode (mode 0) -- from data/world.json, the ONLY vanilla gates that
           name a relic are both Sapphire: the Slide Coliseum pad (has('Sapphire
           Relic', 10)) and N. Oxide's Final Challenge (has('Sapphire Relic', 18)).
-          Gold/Platinum gate no location; only goal 2's completion_condition reads a
-          relic count (18 Gold). So:
+          Gold/Platinum gate no location, and since goal 2 ("everythingplusone")
+          was dropped (Spec §5) no surviving goal's completion_condition reads a
+          relic count above Sapphire either. So:
             - Sapphire: progression iff accessibility == full (both Sapphire-gated
               LOCATIONS must be reachable) OR the goal makes you reach + win Oxide's
-              Final Challenge (oxidefinal / everythingplusone). Else useful.
-            - Gold: progression iff goal == everythingplusone (completion needs 18
-              Gold). No location gates on it. Else useful.
+              Final Challenge (oxidefinal). Else useful.
+            - Gold: never progression in vanilla mode -- no location gates on it and,
+              with goal 2 dropped, no goal completion depends on it. Useful.
             - Platinum: never progression in vanilla mode (no location, no goal
               completion depends on it).
         """
@@ -364,10 +365,9 @@ class ctrAPWorld(World):
             return prog  # randomized modes: any pad may gate on any relic tier
         goal = o.goal.value
         access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
-        reach_oxide_final = access_full or goal in (
-            Goal.option_oxidefinal, Goal.option_everythingplusone)
+        reach_oxide_final = access_full or goal == Goal.option_oxidefinal
         prog["Sapphire Relic"] = reach_oxide_final
-        prog["Gold Relic"] = goal == Goal.option_everythingplusone
+        prog["Gold Relic"] = False
         prog["Platinum Relic"] = False
         return prog
 
@@ -416,7 +416,7 @@ class ctrAPWorld(World):
                 and self.options.shuffle_keys.value):
             mw.early_items.setdefault(player, {})["Key"] = 4
 
-        if self.options.goal.value <= 2:
+        if self.options.goal.value <= 1:
             victory = ctrAPItem(
                 name="Victory",
                 classification=ItemClassification.progression_skip_balancing,
@@ -442,19 +442,6 @@ class ctrAPWorld(World):
                     mw.completion_condition[player] = lambda state: state.has(
                         item="Victory",
                         player=player,
-                    )
-                case 2:
-                    mw.get_location(
-                        location_name="N. Oxide Garage: N. Oxide's Final Challenge",
-                        player=player,
-                    ).place_locked_item(victory)
-                    mw.completion_condition[player] = (
-                        lambda state:
-                            state.has("Victory", player)
-                            and state.has("Gold Relic", player, 18)
-                            and all(state.has(g, player, 1)
-                                    for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
-                                )
                     )
 
         elif self.options.goal.value >= 3:
@@ -562,8 +549,8 @@ class ctrAPWorld(World):
         # locations (gemgoal also consumes 5 cup locations) -> FillError ("N more
         # progression items than locations") and an item/location count mismatch.
         # Exclude the gems from the general pool for that goal (they are the goal
-        # items, placed at the cups). Other goals keep gems in the pool (e.g.
-        # everythingplusone needs them findable; Turbo Track logic needs them)
+        # items, placed at the cups). Other goals keep gems in the pool (Turbo Track
+        # logic needs them findable)
         # UNLESS shuffle_gems pinned them, in which case _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
