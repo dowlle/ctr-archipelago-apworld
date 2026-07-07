@@ -630,29 +630,38 @@ class ctrAPWorld(World):
 
     # --- Native-randomization slot_data (Phase-2 MVP shared contract) ---
 
-    # Native warp_pad_map / warp_pad_unlock arrays are indexed by pad LevelID
-    # 0..27 (race/crystal/trial tracks). Gem cups (LevelID 100-104) are NOT part of
-    # the dense 0..27 array: warp_pad_map stays identity for them (their destination
-    # is never shuffled), and warp_pad_unlock emits them as EXTRA keys ("100".."104")
-    # ONLY when include_gem_cups randomizes their single-stage entry requirement
-    # (see _resolve_warp_pad_unlock). Option OFF -> no cup key -> native keeps its own
-    # fixed cup rule, exactly as before.
+    # Native warp_pad_map / warp_pad_unlock: the dense array covers pad LevelID
+    # 0..27 (race/crystal/trial tracks). Gem cups (LevelID 100-104) sit OUTSIDE
+    # that array and are emitted as EXTRA string keys ("100".."104"). Under
+    # slot_data v3 gem cups are destination-shuffle-eligible: warp_pad_map carries
+    # their identity (and any remap) so a v3 native enforces cup destinations, and
+    # warp_pad_unlock emits a cup key whenever include_gem_cups randomizes its
+    # requirement (see _resolve_warp_pad_unlock). A v2 native simply ignores the
+    # out-of-range cup keys (contract §3 compat) -> cups stay identity there.
     WARP_PAD_ID_RANGE = 28
 
     def _resolve_warp_pad_map(self) -> Dict[str, int]:
         """{"<physicalPadLevelID>": <targetTrackID>} — ALWAYS present.
 
-        Identity over the 28 in-range pad LevelIDs, then overlay any shuffle
-        remap (STRETCH; empty in MVP -> stays identity).
+        Identity over the 28 in-range pad LevelIDs AND the 5 gem-cup LevelIDs
+        (100-104), then overlay any destination-shuffle remap (v3: cups now
+        participate, and a track slot may load a cup and vice versa, so remap
+        values span {0..27, 100..104}). Empty warp_pad_map -> pure identity.
         """
         m = {str(i): i for i in range(self.WARP_PAD_ID_RANGE)}
         pad_ids = getattr(self, "warp_pad_ids", {})
+        # Gem-cup identity base (LevelID 100-104): a v3 seed always carries a cup
+        # map so native never has to guess; absent == identity for a v2 native.
+        for meta in pad_ids.values():
+            if meta.get("kind") == "cup":
+                lid = meta["level_id"]
+                m[str(lid)] = lid
         for pad_name, target_track_id in getattr(self, "warp_pad_map", {}).items():
             meta = pad_ids.get(pad_name)
             if meta is None:
                 continue
             lid = meta["level_id"]
-            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+            if 0 <= lid < self.WARP_PAD_ID_RANGE or meta.get("kind") == "cup":
                 m[str(lid)] = int(target_track_id)
         return m
 
@@ -716,6 +725,15 @@ class ctrAPWorld(World):
                 lid = meta["level_id"]
                 if 0 <= lid < self.WARP_PAD_ID_RANGE:
                     out[str(lid)]["stage2"] = _req(req)
+                elif meta.get("kind") == "cup":
+                    # Cup pad (LevelID 100-104) hosting a TROPHY-track destination
+                    # under merged destination shuffle carries a REAL stage 2
+                    # (contract §2/§4, design §5): stop forcing type-0 on cups. The
+                    # cup key exists here only when include_gem_cups randomized it
+                    # (stage 1 already emitted above); setdefault guards the ordering.
+                    out.setdefault(
+                        str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
+                    out[str(lid)]["stage2"] = _req(req)
         return out
 
     def _resolve_podium_checks(self) -> Dict[str, object]:
@@ -775,17 +793,25 @@ class ctrAPWorld(World):
 
     def fill_slot_data(self) -> Dict[str, object]:
         o = self.options
+        # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
+        # unwired; the real signal is "did any category participate" == the resolved
+        # warp_pad_map being non-empty (set in create_regions as world.shuffle_warp_pads).
+        # Kept in ctr_options for old-native log compatibility only.
+        derived_shuffle = bool(getattr(self, "shuffle_warp_pads", False))
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
+            "schema_version": 3,
             "ctr_options": {
-                "schema_version": 2,
+                "schema_version": 3,
                 "goal": o.goal.value,
                 "relic_min_time": o.rr_required_minimum_time.value,
                 "relics_require_perfect": bool(o.rr_require_perfects.value),
                 "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
-                "shuffle_warp_pads": bool(o.shuffle_warp_pads.value),
+                "shuffle_warp_pads": derived_shuffle,
+                "warp_pad_shuffle_categories": sorted(o.warp_pad_shuffle_categories.value),
+                "warp_pad_shuffle_grouping": o.warp_pad_shuffle_grouping.current_key,
                 "shuffle_gems": bool(o.shuffle_gems.value),
                 "shuffle_keys": bool(o.shuffle_keys.value),
                 "warppad_unlock_mode": o.warppad_unlock_requirements.value,

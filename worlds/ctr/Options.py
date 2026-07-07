@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
-from Options import Choice, OptionGroup, OptionDict, DefaultOnToggle, Toggle, NamedRange, PerGameCommonOptions
+from Options import Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle, Toggle, NamedRange, PerGameCommonOptions
 
 
 class Goal(Choice):
@@ -140,24 +140,83 @@ class ShuffleKeys(DefaultOnToggle):
 
 
 class ShuffleWarpPads(Toggle):
-    """Shuffle Warp Pads.
+    """DEPRECATED — no longer wired. Kept only so older YAMLs that still set
+    `Shuffle Warp Pads` keep generating instead of erroring.
 
-    Includes regular races, Slide Coliseum, and Turbo Track."""
-    display_name = "Shuffle Warp Pads"
+    Destination shuffle is now driven by `Warp Pad Shuffle Categories` (which
+    content categories participate at all) composed with `Warp Pad Shuffle
+    Grouping` (whether the participating categories cross-shuffle or stay within
+    themselves). This toggle has NO effect; set the two options above instead.
+    Remove after a deprecation window (precedent: `Shuffle Rewards`)."""
+    display_name = "Shuffle Warp Pads (deprecated)"
 
 
 class ShuffleWarpPadsBattleArenas(Toggle):
-    """Shuffled Warp Pads include Battle Arenas and their Crystal Challenges.
+    """Bring the 4 Battle Arenas (and their Crystal Challenges) into the seed:
+    their checks become normal locations and, in a randomized-unlock seed, their
+    warp pads get a randomized entry requirement instead of the vanilla gate.
 
-    Does nothing if `Shuffle Warp Pads` is off."""
+    This is also the PARTICIPATION GATE for the `crystals` destination-shuffle
+    category: crystals can only be destination-shuffled (via `Warp Pad Shuffle
+    Categories`) when this is on. Off -> crystals stay fully vanilla-fixed
+    (vanilla checks, vanilla gate, never destination-shuffled)."""
     display_name = "Include Battle Arena Warp Pads"
 
 
 class ShuffleWarpPadsGemCups(Toggle):
-    """Shuffled Warp Pads include Gem Cups and their tounaments.
+    """Bring the 5 Gem Cups (and their tournaments) into the seed: their checks
+    become normal locations and, in a randomized-unlock seed, their warp pads get
+    a randomized entry requirement instead of the vanilla per-cup token gate (the
+    Key-2 Cups Room hub gate is always kept on top).
 
-    Does nothing if `Shuffle Warp Pads` is off."""
+    This is also the PARTICIPATION GATE for the `cups` destination-shuffle
+    category: gem cups can only be destination-shuffled (via `Warp Pad Shuffle
+    Categories`) when this is on. Off -> cups stay fully vanilla-fixed (vanilla
+    checks, vanilla gate, never destination-shuffled)."""
     display_name = "Include Gem Cup Warp Pads"
+
+
+class WarpPadShuffleCategories(OptionSet):
+    """Which content CATEGORIES take part in warp-pad destination shuffle. A
+    category left out stays 100% vanilla-fixed (its pad always loads its own
+    content); a category included has its pads' DESTINATIONS shuffled (composed
+    with `Warp Pad Shuffle Grouping`).
+
+    - **tracks**: the 16 trophy races plus Slide Coliseum and Turbo Track.
+    - **cups**: the 5 Gem Cups. Only participates when `Include Gem Cup Warp
+      Pads` is also on (that option is what puts cup content in the seed).
+    - **crystals**: the 4 Battle Arenas. Only participates when `Include Battle
+      Arena Warp Pads` is also on.
+
+    Default: all three. An EMPTY set means no destination shuffle at all (every
+    pad loads its own content). ⚠ NOTE: this defaults destination shuffle ON,
+    where the old `Shuffle Warp Pads` boolean defaulted OFF.
+
+    VANILLA-UNLOCK COLLAPSE: when `Warp Pad Unlock Requirements` = vanilla, this
+    is forced to LEGACY behaviour regardless of the values here — tracks (races
+    only, no trials) and crystals shuffle strictly within themselves
+    (per_category), and cups/trials stay fixed. Merged grouping and cup/trial
+    destination shuffle require a randomized unlock mode."""
+    display_name = "Warp Pad Shuffle Categories"
+    valid_keys = {"tracks", "cups", "crystals"}
+    default = frozenset({"tracks", "cups", "crystals"})
+
+
+class WarpPadShuffleGrouping(Choice):
+    """How the categories selected in `Warp Pad Shuffle Categories` are pooled for
+    destination shuffle.
+
+    - **merged** (default): ONE cross-category shuffle pool — a track slot can
+      load a cup or crystal and vice versa. Requires a randomized unlock mode
+      (collapses to per_category under vanilla unlock).
+    - **per_category**: each participating category shuffles only within itself
+      (a track always loads a track, a cup a cup, a crystal a crystal).
+
+    Has no effect when fewer than two categories participate (nothing to merge)."""
+    display_name = "Warp Pad Shuffle Grouping"
+    option_per_category = 0
+    option_merged = 1
+    default = 1
 
 
 class WarpPadUnlockRequirements(Choice):
@@ -381,7 +440,9 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_rewards: ShuffleRewards  # deprecated, unwired (backward-compat only)
     shuffle_gems: ShuffleGems
     shuffle_keys: ShuffleKeys
-    shuffle_warp_pads: ShuffleWarpPads
+    shuffle_warp_pads: ShuffleWarpPads  # deprecated, unwired (backward-compat only)
+    warp_pad_shuffle_categories: WarpPadShuffleCategories
+    warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     include_gem_cups: ShuffleWarpPadsGemCups
     warppad_unlock_requirements: WarpPadUnlockRequirements
@@ -408,7 +469,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Randomization Options": [
         ShuffleGems,
         ShuffleKeys,
-        ShuffleWarpPads,
+        WarpPadShuffleCategories,
+        WarpPadShuffleGrouping,
         ShuffleWarpPadsBattleArenas,
         ShuffleWarpPadsGemCups,
         WarpPadUnlockRequirements,
