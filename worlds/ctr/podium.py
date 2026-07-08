@@ -12,7 +12,7 @@ These are NEW event-only locations: the game has no AdvProgress bit for
 are fired NATIVE-side from the placement listener (feat/podium-listener) at the
 finish-line capture point -- the only surface that observes a non-1st finish,
 since vanilla adventure sends anything but 1st to the Retry/Exit menu without
-reaching the trophy-award code. See the 2026-07-04 podium-listener handoff.
+reaching the trophy-award code.
 
 This module is the single source of the podium layout (names, codes, ordering)
 and is consumed by Locations.py (datapackage), Regions.py (per-seed location

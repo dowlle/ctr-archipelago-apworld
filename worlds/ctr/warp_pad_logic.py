@@ -42,34 +42,43 @@ import re
 # ---------------------------------------------------------------------------
 
 # Hub-door static gate per shuffleable track, mirroring the AP exit-graph Key
-# gates (data/world.json). N. Sanity Beach pads ungated; Lost Ruins behind Key 1
-# (Rampage Ruins behind Key 2); Glacier behind Key 2 (Rocky Road behind Key 3);
-# Citadel behind Key 3 (Nitro Court behind Key 4); Gem Stone Valley trials behind
+# gates (data/world.json). N. Sanity Beach pads ungated; Lost Ruins behind Key 1;
+# Glacier behind Key 2; Citadel behind Key 3; Gem Stone Valley trials behind
 # Key 1; Gem Stone Valley gem cups behind Key 2 (the Cups Room hub gate, native
 # arrKeysNeeded[GEM_STONE_VALLEY]=2 -- NOT 3). The
 # sphere-search reasons over these so it never assigns a requirement behind a Key
 # wall it cannot yet pass.
+#
+# CRYSTAL pads sit at their HUB FLOOR (the open-when-free model): in randomized
+# mode with include_battle_arenas ON the vanilla "+1 Key" arena gates are
+# stripped in Regions.create_regions, so Skull Rock is a genuine 5th 0-key
+# bootstrap pad, Rampage Ruins Key 1, Rocky Road Key 2, Nitro Court Key 3.
+# CAVEAT: with include_battle_arenas OFF the live graph keeps the vanilla
+# has('Key', hub+1) rules, so these entries are then optimistic by one Key.
+# Benign: reachability always comes from the live-graph sweep
+# (_reachable_pads_and_collect); HUB_STATIC values feed only the unreachable-
+# fallback's cheapest-Key sort heuristic.
 HUB_STATIC = {
-    # N. Sanity Beach -- no hub gate
+    # N. Sanity Beach -- no hub gate (Skull Rock crystal at hub floor 0)
     "Crash Cove": [], "Roo's Tubes": [], "Mystery Caves": [],
     "Sewer Speedway": [], "Skull Rock": [],
-    # Lost Ruins -- Key 1 (Rampage Ruins crystal behind Key 2)
+    # Lost Ruins -- Key 1 (Rampage Ruins crystal at hub floor Key 1)
     "Coco Park": [("Key", 1)], "Tiger Temple": [("Key", 1)],
     "Papu's Pyramid": [("Key", 1)], "Dingo Canyon": [("Key", 1)],
-    "Rampage Ruins": [("Key", 2)],
-    # Glacier Park -- Key 2 (Rocky Road crystal behind Key 3)
+    "Rampage Ruins": [("Key", 1)],
+    # Glacier Park -- Key 2 (Rocky Road crystal at hub floor Key 2)
     "Blizzard Bluff": [("Key", 2)], "Dragon Mines": [("Key", 2)],
     "Polar Pass": [("Key", 2)], "Tiny Arena": [("Key", 2)],
-    "Rocky Road": [("Key", 3)],
-    # Citadel City -- Key 3 (Nitro Court crystal behind Key 4)
+    "Rocky Road": [("Key", 2)],
+    # Citadel City -- Key 3 (Nitro Court crystal at hub floor Key 3)
     "Hot Air Skyway": [("Key", 3)], "Cortex Castle": [("Key", 3)],
     "N. Gin Labs": [("Key", 3)], "Oxide Station": [("Key", 3)],
-    "Nitro Court": [("Key", 4)],
+    "Nitro Court": [("Key", 3)],
     # Gem Stone Valley TRIAL pads -- behind Key 1 (N. Sanity Beach <-> Gem Stone
     # Valley). Slide Coliseum + Turbo Track have NO trophy race and NO CTR-token
     # challenge: only the 3 relic Time Trials (verified against data/world.json).
     # They are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry
-    # requirement (Dowlle's OPEN model) -- excluded from TROPHY_TRACKS below so the
+    # requirement (the OPEN model) -- excluded from TROPHY_TRACKS below so the
     # sphere-search assigns them only a tier-1 req. Their vanilla relic/gem JSON
     # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
     # (keeping only the Key-1 hub gate).
@@ -78,7 +87,7 @@ HUB_STATIC = {
     # 'Gem Stone Valley <-> Cups Room' = has('Key', 3) in data/world.json). Each
     # cup yields a Gem on completion ('<Colour> Gem Cup: Gem'). Like the trials they
     # are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry requirement
-    # (Dowlle's OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
+    # (the OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
     # the sphere-search assigns them only a tier-1 req. Their vanilla per-cup
     # has('<Colour> CTR Token', 4) JSON gate is REPLACED by this randomized requirement
     # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-3 Cups Room hub gate
@@ -449,7 +458,7 @@ def _choose_requirement(rnd, inv, allowed=None):
     a freely-placeable progression item, so requiring it under reward-agnostic AP
     fill creates a circular, hard-to-seat gate). The excluded relics still grow the
     synthetic inventory (so AnyRelic aggregates count them); they just are not
-    picked as a concrete requirement. This is Dowlle's "if a seed is tight, make do
+    picked as a concrete requirement. This is the design rule "if a seed is tight, make do
     with the other item types" turned into a sphere-search rule -- the sliders stay
     authoritative and are never silently overridden."""
     pool_items = REQ_WEIGHTS if allowed is None else [
@@ -635,7 +644,7 @@ def _assign_from_inv(rnd, inv, allowed=None):
 
 
 # Stage-2 requirements draw from the SAME full item universe as stage 1
-# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- Dowlle's
+# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- the
 # OPEN model: a pad's tier-2 requirement may be ANY CTR item, with the same
 # weighting + Any*-collapse discipline as tier 1. Reward PINNING is gone (relics +
 # tokens flow through the normal multiworld pool + the relic-tier sliders), so a
@@ -654,7 +663,7 @@ _STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
 # to relieve AP fill_restrictive pressure: a collapsed tier 2 adds NO gate beyond the
 # trophy race (the TT/token opens the instant the race is reached), which frees
 # reachable location capacity for fill to seat the progression that opens the
-# remaining real gates. This is Dowlle's sanctioned "tier 2 MAY collapse if a seed
+# remaining real gates. This is the design rule "tier 2 MAY collapse if a seed
 # needs it" turned into a small uniform relief valve; the golden path is unaffected
 # (tier 1 is always satisfiable-by-construction). Tuned empirically against the
 # two-stage-active FillError tail (see the impl A/B sweep).
@@ -733,7 +742,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     if reward_track_for is None:
         reward_track_for = lambda t: t
 
-    # Slider-aware requirement filter (Dowlle's generation-control knob, honoured not
+    # Slider-aware requirement filter (a generation-control knob, honoured not
     # overridden). A relic-progression slider below 100 PINS a random ~ (100-slider)%
     # of that tier's 18 relics out of the multiworld pool. The synthetic sphere
     # inventory grows ALL 18 vanilla relics (it cannot know which AP will pin), so a
@@ -746,7 +755,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # requirement choice (it still grows the inventory so AnyRelic aggregates of the
     # FULL tiers stay correct, and the tier's own relics still appear as findable
     # progression). Trophy / Key / tokens / gems are always allowed -- the seed
-    # "makes do with the other item types" exactly as Dowlle specified; the sliders
+    # "makes do with the other item types" by design; the sliders
     # are never silently overridden, only respected as the scarcity signal they are.
     # Default sliders (S100/G100/P0): sapphire+gold usable, platinum excluded.
     _slider = {
@@ -774,7 +783,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # sphere-0 locations, so widening the floor is the single most effective lever
     # against the extreme-density FillError tail (empirically ~0.28% at floor 2 ->
     # ~0.08% at floor 3 over a 2500-config sweep). Floor 3 is a small, gameplay-safe
-    # deviation from Icebound's 1..5 weighting that strengthens Dowlle's golden-path
+    # deviation from Icebound's 1..5 weighting that strengthens the golden-path
     # guarantee (collecting always unlocks something new). Sizes >= the floor keep
     # their original relative weights.
     size = max(_FREE_MIN, _weighted_choice(rnd, FREE_SIZE_WEIGHTS))
@@ -975,15 +984,15 @@ def to_slot_req(req):
 # Destination shuffle -- non-identity warp_pad_map
 # ---------------------------------------------------------------------------
 
-# Destination-shuffle CATEGORY POOLS (design 2026-07-06, slot_data v3). A category
+# Destination-shuffle CATEGORY POOLS (slot_data v3). A category
 # is a set of physical pad LevelIDs whose destinations may be permuted. Which
 # categories participate is chosen by warp_pad_shuffle_categories, whether they
 # cross-shuffle by warp_pad_shuffle_grouping, and cups/crystals additionally need
 # their include_* content option (see resolve_shuffle_pools). LevelIDs from
 # warp_pad_ids.json.
 #   tracks   = the 16 trophy-race pads + the 2 trials (16 Slide Coliseum, 17 Turbo
-#              Track). Trials ride in tracks per the design (race-track content
-#              Stef expects shuffled); native dispatch handles a trophy race on a
+#              Track). Trials ride in tracks (they carry race-track-style content,
+#              so they shuffle with the races); native dispatch handles a trophy race on a
 #              trial pad and vice versa under the v3 build.
 #   crystals = the 4 battle-arena pads.
 #   cups     = the 5 gem-cup pads (LevelIDs 100-104).
@@ -1062,9 +1071,8 @@ def resolve_shuffle_pools(world):
 # gate (4/8/12/16) needs -> fill_restrictive dead-ends (FillError). Keys-off is the
 # trigger because the first Key only drops after Ripper Roo (4 Trophies), so those
 # 4 Trophies MUST be seatable in the pre-first-key sphere; keys-on floods that
-# frontier with an early Key and never starves. See the 2026-07-06 decision note +
-# 2026-07-07 B1/B2 research; the counting rule below is B1's, validated on repro
-# seed 509876816.
+# frontier with an early Key and never starves. The counting rule below was
+# validated on repro seed 509876816.
 #
 # We enforce a per-boss-floor capacity floor by a bounded re-roll of the destination
 # permutation (same world.random stream as the existing 8x identity re-roll; RNG is
@@ -1090,10 +1098,18 @@ _BOSS_CAP_FLOORS = ((4, 0), (8, 1), (12, 2), (16, 3))
 # the budget is generous insurance, not an expected cost.
 _CAPACITY_MAX_REROLLS = 16
 
-_KEYGATE_CACHE = None
+_KEYGATE_CACHE = {}
+
+# The 4 crystal/battle-arena pad exits whose vanilla "+1 Key" gate is stripped
+# to the hub floor in randomized mode with include_battle_arenas ON
+# (Regions.create_regions, the open-when-free model).
+_CRYSTAL_PAD_EXIT_NAMES = frozenset({
+    "Skull Rock Warp Pad", "Rampage Ruins Warp Pad",
+    "Rocky Road Warp Pad", "Nitro Court Warp Pad",
+})
 
 
-def _pad_keygate_table():
+def _pad_keygate_table(crystals_at_hub_floor=False):
     """{pad_exit_name -> minimum boss Keys required to REACH that physical pad's
     warp-pad exit}, derived from the static hub Key graph in data/world.json.
 
@@ -1102,10 +1118,18 @@ def _pad_keygate_table():
     is then max(region floor, the pad-exit's own Key gate). This is the PHYSICAL-pad
     reachability the capacity sweep keys off -- a destination's OWN hub gate is
     bypassed by the exit rewire (Regions.create_regions), so only the physical pad's
-    gate matters. Static (independent of the per-seed shuffle) -> cached."""
+    gate matters.
+
+    crystals_at_hub_floor: pass True when the seed strips the crystal pads' vanilla
+    "+1 Key" gates (randomized unlock + include_battle_arenas, Regions.create_regions);
+    the 4 crystal pad exits then sit at their host hub's floor (Skull Rock 0, Rampage
+    Ruins 1, Rocky Road 2, Nitro Court 3). This function reads the PRISTINE world.json
+    from disk, NOT the per-seed mutated copy, so the strip must be mirrored here
+    explicitly -- it does NOT follow automatically. Static per variant -> cached."""
     global _KEYGATE_CACHE
-    if _KEYGATE_CACHE is not None:
-        return _KEYGATE_CACHE
+    cached = _KEYGATE_CACHE.get(bool(crystals_at_hub_floor))
+    if cached is not None:
+        return cached
     data = json.loads(
         pkgutil.get_data(__package__, "data/world.json").decode("utf-8"))
     pads = json.loads(
@@ -1142,8 +1166,13 @@ def _pad_keygate_table():
     table = {}
     for pad_name in pads:
         host, ar = exit_host.get(pad_name, (start, "True"))
-        table[pad_name] = max(dist.get(host, 1 << 30), key_req(ar))
-    _KEYGATE_CACHE = table
+        if crystals_at_hub_floor and pad_name in _CRYSTAL_PAD_EXIT_NAMES:
+            # Stripped seed: the pad-exit's own vanilla "+1 Key" gate is gone;
+            # only the host hub's floor gates it.
+            table[pad_name] = dist.get(host, 1 << 30)
+        else:
+            table[pad_name] = max(dist.get(host, 1 << 30), key_req(ar))
+    _KEYGATE_CACHE[bool(crystals_at_hub_floor)] = table
     return table
 
 
@@ -1283,6 +1312,15 @@ def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_l
     return best
 
 
+def _crystals_open(world):
+    """True when this seed strips the crystal pads' vanilla "+1 Key" gates to the
+    hub floor (randomized unlock modes + include_battle_arenas ON; the exact gate
+    Regions.create_regions applies the strip under)."""
+    o = world.options
+    return (int(o.warppad_unlock_requirements.value) in (1, 2)
+            and bool(o.include_battle_arenas.value))
+
+
 def build_warp_pad_map(world):
     """{pad_exit_name -> target_track_levelID}. Permutes destinations within each
     resolved pool (resolve_shuffle_pools); re-rolls (up to 8x) if a pool's whole
@@ -1311,7 +1349,8 @@ def build_warp_pad_map(world):
         # trial) can starve a floor; nothing to enforce when none participates.
         if any(_dest_trophy_capacity(lid, id_kind, ctx) == 0
                for pool in pools for lid in pool):
-            keygate = _pad_keygate_table()
+            keygate = _pad_keygate_table(
+                crystals_at_hub_floor=_crystals_open(world))
             own_lid = {name: meta["level_id"]
                        for name, meta in world.warp_pad_ids.items()}
             attempts = 0

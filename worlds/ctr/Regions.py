@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Native-randomization support (Phase-2 MVP).
 # Shared slot_data contract: apworld EMITS resolved values, native PARSES.
-# See spec "2026-06-22 -- Spec -- Randomized Playthrough MVP (Phase 2-MVP)".
 # ---------------------------------------------------------------------------
 
 # Per-pad unlock requirements are produced by warp_pad_logic.run_sphere_search
@@ -292,7 +291,7 @@ def create_regions(world: "ctrAPWorld"):
     # trials, gated by the include_gem_cups YAML option (mirrors include_battle_arenas
     # for crystals). When ON in randomized mode, strip each cup's vanilla per-cup
     # has('<Colour> CTR Token', 4) gate from the exit access rule and keep ONLY the
-    # Key-2 Cups Room hub gate (Dowlle's HARD CONSTRAINT: cups STAY behind their key
+    # Key-2 Cups Room hub gate (HARD CONSTRAINT: cups STAY behind their key
     # hub gate). The gate is Key 2, matching native (arrKeysNeeded[GEM_STONE_VALLEY]=2,
     # the GSV->Cups door = 2 keyholes) -- NOT 3. The randomized single-stage requirement
     # is ANDed on TOP of that key gate in Rules.add_warp_pad_unlock_rules, never replacing
@@ -310,6 +309,37 @@ def create_regions(world: "ctrAPWorld"):
             for ex in reg.get("exits", []):
                 if ex["name"] in _CUP_PAD_EXITS:
                     ex["access_rule"] = "has('Key', 2)"
+
+    # CRYSTAL / battle-arena pads (Skull Rock, Rampage Ruins, Rocky Road, Nitro
+    # Court): same OPEN treatment as trials and cups, gated by include_battle_arenas
+    # (their participation gate). In randomized mode a
+    # crystal pad is gated by its PHYSICAL HUB FLOOR only -- Skull Rock 0 keys (a
+    # genuine 5th sphere-0 bootstrap pad), Rampage Ruins Key 1 (Lost Ruins),
+    # Rocky Road Key 2 (Glacier Park), Nitro Court Key 3 (Citadel City) -- the
+    # vanilla "+1 Key" arena gate is stripped. The
+    # hub-floor Key rule kept on the exit mirrors the trial/cup pattern (the hub
+    # doors also enforce it structurally); the randomized single-stage requirement
+    # is ANDed on top in Rules.add_warp_pad_unlock_rules. Option OFF or vanilla
+    # mode: the vanilla has('Key', hub+1) gates stay untouched, matching native's
+    # arrKeysNeeded fallback. Native side needs NO code change: an included arena
+    # always reaches the wire with a non-type-0 stage-1 (a FREE pad emits the
+    # explicit type-1/count-0, see to_slot_req), which the LInB battle-maps branch
+    # and AP_PadStage1Met enforce verbatim with no vanilla-key AND; the type-0
+    # vanilla fallback is only reachable in exactly the configs where the vanilla
+    # gate is correct (ap_hooks.c AP_PadStage1Met + AH_WarpPad.c battle maps).
+    _CRYSTAL_PAD_EXITS = {
+        "Skull Rock Warp Pad": "always",
+        "Rampage Ruins Warp Pad": "has('Key', 1)",
+        "Rocky Road Warp Pad": "has('Key', 2)",
+        "Nitro Court Warp Pad": "has('Key', 3)",
+    }
+    inc_arenas_open = bool(opts.include_battle_arenas.value)
+    if unlock_mode in (1, 2) and inc_arenas_open:
+        for reg in data["regions"]:
+            for ex in reg.get("exits", []):
+                _new_rule = _CRYSTAL_PAD_EXITS.get(ex["name"])
+                if _new_rule is not None:
+                    ex["access_rule"] = _new_rule
 
     # AP destination shuffle: rewire each shuffled warp-pad exit to the track
     # region it ACTUALLY loads, so AP-core (item placement + solvability) reasons
@@ -422,7 +452,7 @@ def create_regions(world: "ctrAPWorld"):
             # SINGLE-STAGE randomized -- the sphere-search
             # assigned a stage-1 entry requirement (stages[2] is always None for a
             # non-TROPHY_TRACK), wired as a normal single-stage node. No longer
-            # native-fixed (Dowlle's OPEN model). The to_slot_req(s2) below yields the
+            # native-fixed (the OPEN model). The to_slot_req(s2) below yields the
             # native "no stage 2" sentinel for them automatically.
             s1 = stages[1]
             s2 = stages[2]
@@ -440,7 +470,7 @@ def create_regions(world: "ctrAPWorld"):
                 dest_track = reward_track_for(track)
                 world.warp_pad_unlock_stage2_concrete[dest_track] = s2
 
-        # NO reward pinning (Dowlle's OPEN model). The relic Time Trials and CTR Token
+        # NO reward pinning (the OPEN model). The relic Time Trials and CTR Token
         # Challenges keep flowing through the NORMAL multiworld pool and the relic-tier
         # sliders exactly as on main -- relics appear as genuine progression items, not
         # locked-to-location vanilla rewards. Solvability of the stage-2 gates is
