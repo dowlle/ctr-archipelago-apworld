@@ -604,8 +604,9 @@ class ctrAPWorld(World):
 
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
-        # already locked above (the victory item, and for the gem-cup goal the 5
-        # locked gems). Using the static get_total_locations over-counted by the
+        # already locked above (the goal-tracking companion events _install_goal
+        # locks, and for the gem-cup goal the 5 locked gems). Using the static
+        # get_total_locations over-counted by the
         # number of locked locations -> 1 (or 5) excess filler items -> the
         # item/location count mismatch the fuzzer flags. Clamp at 0 for safety.
         #
