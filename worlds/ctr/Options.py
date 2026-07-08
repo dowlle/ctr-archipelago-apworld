@@ -8,8 +8,8 @@ class Goal(Choice):
 
     - **oxide:** N. Oxide's Challenge - Defeat N. Oxide's Challenge.
     - **oxidefinal:** N. Oxide's Final Challenge - Collect 18 Relics (Sapphire or Greater) and Defeat N. Oxide's Final Challenge.
-    - **allbosses:** All Bosses - Win all 5 boss challenges.
-    - **allgemcups:** All Gem Cups - Complete Every Gem Cup."""
+    - **allbosses:** All Bosses - Win all 4 boss races (Ripper Roo, Papu Papu, Komodo Joe, Pinstripe).
+    - **allgemcups:** All Gems - Complete every Gem Cup to collect all 5 Gems."""
     display_name = "Goal"
     option_oxide = 0
     option_oxidefinal = 1
