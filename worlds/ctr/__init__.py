@@ -816,8 +816,3 @@ class ctrAPWorld(World):
     def remove(self, state: "CollectionState", item: "Item") -> bool:
         return super().remove(state, item)
 
-
-# Register the BizHawk client so `BizHawkClient` launcher can claim CTR ROMs.
-# ADDED FOR CLIENT TESTING — not in upstream icebound777/ctr-apworld yet.
-from . import client  # noqa: E402, F401
-
