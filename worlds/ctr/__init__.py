@@ -64,8 +64,8 @@ class ctrAPWorld(World):
     def pre_fill(self) -> None:
         """Per-seed fillability guards -- one branch per warp-pad fill mode.
 
-        RANDOMIZED-MODE BRANCH: two-stage guard (Dowlle: "a pad's tier 2 MAY collapse
-        if a seed needs it FOR GENERATION").
+        RANDOMIZED-MODE BRANCH: two-stage guard (design rule: a pad's tier 2 MAY
+        collapse if a seed needs it FOR GENERATION).
 
         CTR's item pool is ~98% progression in every config, and AP's greedy
         fill_restrictive cannot reliably ORDER a near-full pool through stacked
@@ -84,8 +84,8 @@ class ctrAPWorld(World):
         guaranteed-fillable single-stage DAG. Any probe error falls back to KEEPING
         two-stage (fail-open: never makes a fillable seed worse).
 
-        VANILLA-MODE BRANCH: tight-fill backstop (lever 3, design note 2026-07-03;
-        Spec 6.2a) -- see _vanilla_fill_backstop. Solo generations only."""
+        VANILLA-MODE BRANCH: tight-fill backstop -- see _vanilla_fill_backstop.
+        Solo generations only."""
         if not getattr(self, "_ctr_two_stage_active", False):
             if (self.options.warppad_unlock_requirements.value == 0
                     and len(self.multiworld.worlds) == 1):
@@ -133,10 +133,11 @@ class ctrAPWorld(World):
     _VANILLA_BACKSTOP_MAX_ROUNDS = 40
 
     def _vanilla_fill_backstop(self) -> None:
-        """Vanilla-mode tight-fill backstop (lever 3, design note 2026-07-03).
+        """Vanilla-mode tight-fill backstop (the third of the three vanilla-fill
+        levers, after honest relic classification and vanilla early-Keys).
 
         Levers 1+2 (honest relic classification + vanilla early-Keys) shrink the
-        vanilla tight-fill FillError class (Spec 6.2a) to a ~0.1-0.2% residual on
+        vanilla tight-fill FillError class to a ~0.1-0.2% residual on
         relic-starved slider corners. The residual is pure placement-ordering luck:
         pool == locations on every seed, and a failing seed is fully beatable --
         greedy fill_restrictive just corners itself. This backstop removes the
@@ -165,7 +166,7 @@ class ctrAPWorld(World):
         SOLO ONLY (enforced by the caller): with other worlds present, their
         pre_fill hooks may run after ours and consume multiworld.random, breaking
         replay fidelity -- and mixed pools relax CTR's tightness anyway. Vanilla
-        multiworld seeds keep the (tiny) pre-existing residual, per Spec 6.2a.
+        multiworld seeds keep the (tiny) pre-existing residual.
 
         Fail-open: any unexpected error leaves generation to proceed as if the
         backstop did not exist. CTR_PROBE_LOG_ONLY=1 logs the would-fire verdict
@@ -313,7 +314,7 @@ class ctrAPWorld(World):
         item_id: int = self.item_name_to_id[name]
         idx = item_id - item_prefix
         classification = load_item_table()[idx]["classification"]
-        # Honest per-seed relic classification (design note 2026-07-03; Spec 6.2a).
+        # Honest per-seed relic classification (vanilla-fill lever 1).
         # data/items.json marks every relic "progression" unconditionally, but in a
         # vanilla-warp-pad seed whose goal/accessibility does not depend on a relic
         # tier, that tier gates nothing -- yet the ordered fill still treats it as
@@ -348,7 +349,7 @@ class ctrAPWorld(World):
           name a relic are both Sapphire: the Slide Coliseum pad (has('Sapphire
           Relic', 10)) and N. Oxide's Final Challenge (has('Sapphire Relic', 18)).
           Gold/Platinum gate no location, and since goal 2 ("everythingplusone")
-          was dropped (Spec §5) no surviving goal's completion_condition reads a
+          was dropped no surviving goal's completion_condition reads a
           relic count above Sapphire either. So:
             - Sapphire: progression iff accessibility == full (both Sapphire-gated
               LOCATIONS must be reachable) OR the goal makes you reach + win Oxide's
@@ -402,7 +403,7 @@ class ctrAPWorld(World):
         # whole create_items pass sees a single consistent map.
         self._ctr_relic_prog = self._relic_progression_map()
 
-        # Lever 2 (design note 2026-07-03): in VANILLA warp-pad mode, seat the 4
+        # Vanilla-fill lever 2: in VANILLA warp-pad mode, seat the 4
         # hub-backbone Keys into early spheres so greedy fill_restrictive cannot
         # strand a Key in the zero-slack vanilla pool (the residual after lever 1).
         # VANILLA-ONLY: randomized mode already has its pre_fill guard and must stay
@@ -471,7 +472,7 @@ class ctrAPWorld(World):
         # Relics" coupling that forced this slider to 0 has been retired (item #5);
         # ShuffleRewards is deprecated and no longer read.
 
-        # NO two-stage reward pinning (Dowlle's OPEN model): relic Time Trials and CTR
+        # NO two-stage reward pinning (the OPEN model): relic Time Trials and CTR
         # Token Challenges flow through the normal pool + the relic sliders, the same
         # on every randomized seed as on main. The sliders therefore govern ALL 18
         # Time Trial locations per tier again (no 16/18 seizure). Stage-2 gate
@@ -738,14 +739,12 @@ class ctrAPWorld(World):
         is null and native must skip it. Keyed by physical race-pad LevelID 0..15,
         which equals the trophy-race track and matches the [AP RACE] track field.
         Only the 16 standard trophy races carry podium checks (boss/token/relic/
-        crystal have no genuine multi-position finish -- podium-listener handoff
-        §3.3).
+        crystal have no genuine multi-position finish).
 
         NOTE: additive to schema_version 2 (a v2 native build simply ignores this
         block and sends no podium checks -- safe degradation). The schema_version
         bump is deferred until the native fan-out lands and its version comparison
-        is confirmed `>=` rather than `==` (see the handoff's open questions), so
-        existing seeds stay byte-safe.
+        is confirmed `>=` rather than `==`, so existing seeds stay byte-safe.
         """
         from .Locations import CTR_LOCATION_IDS
         from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name

@@ -13,11 +13,11 @@ class Goal(Choice):
     display_name = "Goal"
     option_oxide = 0
     option_oxidefinal = 1
-    # Value 2 ("everythingplusone" / 101%) was DROPPED 2026-07-01 (Spec §5): its
-    # implemented condition felt arbitrary and was not true vanilla 101%; goal 1
-    # (Oxide-final) covers the "harder ending" niche. The numeric slot 2 is left as a
+    # Value 2 ("everythingplusone" / 101%) was DROPPED: its implemented condition
+    # felt arbitrary and was not true vanilla 101%; goal 1 (Oxide-final) covers the
+    # "harder ending" niche. The numeric slot 2 is left as a
     # DOCUMENTED GAP -- the surviving values keep their ints because `ctr_options.goal`
-    # is consumed natively by AP_EvaluateGoal (slot_data Contract), so renumbering
+    # is consumed natively by AP_EvaluateGoal (slot_data contract), so renumbering
     # would be a cross-layer break. AP's Choice permits non-contiguous option values,
     # and an old YAML with `goal: everythingplusone` now fails generation with AP's
     # standard invalid-option error (the intended UX -- no silently-accepting alias).
@@ -320,13 +320,13 @@ class BossGarageRequirements(Choice):
     Tracks (1) are hard-disabled (see BUG-D note below); **Trophies** (2) is the
     only valid value until they are reconciled."""
     display_name = "Boss Garage Requirements"
-    # BUG-D (board 2026-07-01 14:36 audit, Spec §4): modes 0/1 are a cross-layer
+    # BUG-D: modes 0/1 are a cross-layer
     # paradigm mismatch. The apworld logic gates ALL modes on a flat trophy count
     # (Rules.add_boss_garage_rules 4/8/12/16), but native enforces a per-track WIN
     # for modes 0/1 (ap_hooks.c AP_BossReqMet / AH_Garage.c). Orthogonal criteria =>
     # a 16-trophy player who did NOT win the four required tracks is softlocked, and
-    # winning four tracks under-count opens a garage early. Per Spec §4 these two
-    # modes are "not shippable until reconciled", so they are removed from the
+    # winning four tracks under-count opens a garage early. These two
+    # modes are not shippable until reconciled, so they are removed from the
     # selectable set here (default 2 = Trophies is unaffected and fully implemented).
     #
     # NOT deleted, only disabled: the per-boss vanilla/destination track lists are
