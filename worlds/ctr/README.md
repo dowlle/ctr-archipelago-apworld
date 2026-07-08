@@ -20,3 +20,9 @@ CTR Archipelago is developed with AI assistance (Anthropic's Claude, via Claude 
 - **Why:** AI lets me actually finish my projects (I have ADHD). Using it is a considered choice, not a careless one.
 
 If AI-assisted development is a dealbreaker for you, that's a fair call to make with the facts in front of you.
+
+---
+
+## License
+
+MIT, matching upstream [ArchipelagoMW/Archipelago](https://github.com/ArchipelagoMW/Archipelago) - see [LICENSE](LICENSE). The requirement logic ports from [Icebound777's CTR randomizer](https://github.com/icebound777/CTR-Randomizer-Standalone) (MIT); his copyright notice is carried in the LICENSE file. The companion game client [`ctr-native-ap`](https://github.com/dowlle/ctr-native-ap) is a separate codebase and is GPL-3.0 (inherited from the CTR-native decompilation).
