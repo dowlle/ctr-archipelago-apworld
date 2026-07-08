@@ -14,6 +14,19 @@ from .Rules import set_rules
 from .Types import ctrAPItem
 
 
+# The v1 trap set. ORDER IS LOAD-BEARING: it must match the native effect enum
+# (AP_TrapEffect in ap/ap_traps.h) so item-id N maps to effect N on receipt. These
+# names also define the trailing item ids in data/items.json (contiguous after
+# Wumpa Fruit); the native received-item loop maps those ids -> AP_TrapReceive.
+TRAP_ITEM_NAMES = [
+    "Icy Road",      # AP_TRAP_ICY
+    "Low Gravity",   # AP_TRAP_LOWGRAV
+    "No Brakes",     # AP_TRAP_USF_NOBRAKE
+    "Forced Boost",  # AP_TRAP_BOOST
+    "First Person",  # AP_TRAP_FIRSTPERSON
+]
+
+
 class ctrAPWeb(WebWorld):
     theme = "Party"
 
@@ -619,8 +632,24 @@ class ctrAPWorld(World):
         # every multi-CTR generation with a filler-needing config. Solo unchanged
         # (there len(pool) == len(mw.itempool)).
         unfilled = len(mw.get_unfilled_locations(self.player))
-        mw.itempool += [self.create_filler()
-                        for _ in range(max(0, unfilled - len(pool)))]
+        n_filler = max(0, unfilled - len(pool))
+        # Trap fill: replace trap_fill_percentage% of the filler slots with traps,
+        # drawn UNIFORMLY across the 5 trap effects. Traps are non-progression, so
+        # this never changes reachability at any value. DEFAULT 0 IS GENERATION-
+        # NEUTRAL BY CONSTRUCTION: the else branch is byte-identical to the old
+        # Wumpa-only fill and no world.random draw is taken, so a default seed's
+        # spoiler + slot_data are unchanged. (Per-trap weighting is a flagged v2
+        # retune -- v1 is uniform.)
+        trap_pct = self.options.trap_fill_percentage.value
+        if trap_pct > 0 and n_filler > 0:
+            n_traps = (n_filler * trap_pct) // 100
+            for _ in range(n_traps):
+                pool_item = self.create_item(self.random.choice(TRAP_ITEM_NAMES))
+                mw.itempool.append(pool_item)
+            mw.itempool += [self.create_filler()
+                            for _ in range(n_filler - n_traps)]
+        else:
+            mw.itempool += [self.create_filler() for _ in range(n_filler)]
 
         # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
         # is ~98% progression in EVERY config (only ~1 filler item), so a density

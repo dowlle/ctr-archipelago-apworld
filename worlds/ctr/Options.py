@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
-from Options import Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle, Toggle, NamedRange, PerGameCommonOptions
+from Options import Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle, Toggle, NamedRange, Range, PerGameCommonOptions
 
 
 class Goal(Choice):
@@ -123,6 +123,26 @@ class ShuffleKeys(DefaultOnToggle):
     - **off**: each Key is pinned to its Boss Race reward location
       (vanilla placement, out of the multiworld shuffle)."""
     display_name = "Shuffle Keys"
+
+
+class TrapFillPercentage(Range):
+    """What percentage of this slot's FILLER items are replaced by traps.
+
+    CTR's item pool is almost entirely progression, so the filler pool is small;
+    this dial replaces that share of it with trap items rather than adding traps on
+    top of progression. The 5 trap effects (Icy Road, Low Gravity, No Brakes,
+    Forced Boost, First Person) are drawn UNIFORMLY -- each is equally likely.
+
+      0   (default) = no traps, filler stays vanilla Wumpa Fruit
+      100           = every filler slot becomes a trap
+
+    Traps are non-progression: they never gate anything, so any value is always
+    solvable. A received trap does not fire on pickup -- it arms silently and
+    triggers mid-race on a later lap, then clears."""
+    display_name = "Trap Fill Percentage"
+    range_start = 0
+    range_end = 100
+    default = 0
 
 
 class ShuffleWarpPadsBattleArenas(Toggle):
@@ -413,6 +433,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # randomization
     shuffle_gems: ShuffleGems
     shuffle_keys: ShuffleKeys
+    trap_fill_percentage: TrapFillPercentage
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     include_battle_arenas: ShuffleWarpPadsBattleArenas
@@ -441,6 +462,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Randomization Options": [
         ShuffleGems,
         ShuffleKeys,
+        TrapFillPercentage,
         WarpPadShuffleCategories,
         WarpPadShuffleGrouping,
         ShuffleWarpPadsBattleArenas,
