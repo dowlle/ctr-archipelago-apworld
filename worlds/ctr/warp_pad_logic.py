@@ -1020,9 +1020,36 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
             if _dest in stage2_reqs:
                 stage2_reqs[_dest] = pad_reqs.get(
                     dest_to_phys_real.get(_dest, _dest))
+        # Item types real fill CANNOT relocate this seed: their placement is
+        # pinned to vanilla sources, so the synthetic sweep's model of them is
+        # AUTHORITATIVE (a pinned-type requirement the sweep cannot validate may
+        # be genuinely circular -- e.g. a gem gate on the path to the cups that
+        # hold every gem). Pool-shuffled types (trophies, tokens, shuffled
+        # keys/gems, slider-100 relics) stay lenient: fill seats them freely.
+        _o = world.options
+        pinned_items = set()
+        if int(_o.goal.value) == 4 or not bool(_o.shuffle_gems.value):
+            pinned_items.update(GEM_ITEMS)   # allgemcups always pins the gems
+            pinned_items.add("AnyGem")
+        if not bool(_o.shuffle_keys.value):
+            pinned_items.add("Key")
+        # Regions holding PINNED GOAL-PROGRESSION locations: under the
+        # all-gem-cups goal the 5 Gems are pinned at their cups AND completing
+        # every cup IS the goal, so the accessibility check hard-requires each
+        # cup region reachable. The sweep must therefore prove the whole chain
+        # to every cup; requirements it cannot validate on that chain get
+        # relaxed regardless of item type. (Other pinned classes need no
+        # region rule: boss-race regions sit behind static trophy doors only,
+        # never behind pad requirements, and non-goal pinned gems' regions are
+        # only location-reachability under accessibility:full, which pool-item
+        # fill bridges -- 0 failures observed at the 14k scale.)
+        critical_regions = frozenset(
+            f"{c} Gem Cup" for c in ("Red", "Green", "Blue", "Yellow", "Purple")
+        ) if int(_o.goal.value) == 4 else frozenset()
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
-            dest_to_phys_real, start, allowed, keygate)
+            dest_to_phys_real, start, allowed, keygate,
+            frozenset(pinned_items), critical_regions)
         world._ctr_s2_relaxed_s1 = relaxed_s1
         world._ctr_s2_relaxed_s2 = relaxed_s2
 
@@ -1042,7 +1069,9 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
 
 
 def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
-                                dest_to_phys, start, allowed, keygate):
+                                dest_to_phys, start, allowed, keygate,
+                                pinned_items=frozenset(),
+                                critical_regions=frozenset()):
     """Verify the identity-topology requirement DAG against the ACTUAL shuffled
     graph; relax ONLY the requirements that fail there.
 
@@ -1058,11 +1087,27 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     (= no gate beyond the trophy race).
 
     Pads the synthetic sweep cannot REACH at the fixed point (content starvation
-    behind a static boss/key gate) are NOT relaxed: the synthetic vanilla-reward
-    inventory under-approximates real fill, which places pool items freely on
-    reachable locations, so unreached-ness is not evidence of an unsatisfiable
+    behind a static boss/key gate) are NOT relaxed as long as their requirement
+    demands a POOL-SHUFFLED item type: the synthetic vanilla-reward inventory
+    under-approximates real fill, which places pool items freely on reachable
+    locations, so unreached-ness is not evidence of an unsatisfiable
     requirement. True fill risk stays covered downstream by the pre_fill probe
     backstop, the accessibility sweep, and the fuzz gate.
+
+    The EXCEPTION is `pinned_items`: item types whose placement is pinned to
+    their vanilla sources this seed (gems under the all-gem-cups goal or
+    shuffle_gems off; Keys under shuffle_keys off). Fill cannot relocate those,
+    so the sweep's model of them is authoritative, and a pinned-type
+    requirement the sweep never validated (unreached pad / uncollected trophy
+    dest) may be genuinely circular -- e.g. a gem gate between the start and
+    the cups that hold every gem makes an all-gem-cups seed unbeatable. Those
+    are relaxed too.
+
+    `critical_regions` are regions holding pinned GOAL-progression locations
+    (the 5 gem cups under the all-gem-cups goal): while any of them is
+    unreached at the fixed point, unvalidated requirements keep being relaxed
+    (cheapest key floor first, ANY item type) until the sweep proves the chain
+    or only static gates (pool-bridgeable trophy/key doors) remain in the way.
 
     Bounded: relaxation is monotone (a weakened requirement only ever opens more
     of the graph, and the fixed-point inventory can only grow between
@@ -1092,15 +1137,22 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         while frontier:
             cur = frontier.pop()
             for exit_name, tgt, gate in exits.get(cur, []):
-                if tgt in seen or not _passes(gate):
+                if not _passes(gate):
                     continue
                 track = pad_exit_to_track.get(exit_name)
                 if track is not None:
                     req = pad_reqs.get(track)
                     if req is not None and not _passes([req]):
-                        if track not in relaxed_s1:
+                        # Blocked-ness must be evaluated BEFORE the BFS dedup:
+                        # destination regions carry ungated return exits to
+                        # their VANILLA hubs, so a pad's target being reachable
+                        # through another path must not hide that this pad's
+                        # own requirement is unsatisfiable.
+                        if track not in relaxed_s1 and track not in blocked_s1:
                             blocked_s1.append(track)
                         continue
+                if tgt in seen:
+                    continue
                 seen.add(tgt)
                 frontier.append(tgt)
 
@@ -1125,6 +1177,80 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
             relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
             stage2_reqs[dest] = pad_reqs.get(phys)
             continue
+
+        # "Proven-open": the sweep actually validated this pad at the fixed
+        # point -- host reachable, static gate passed, requirement met. Only a
+        # proven-open pad's requirement is known-satisfiable post-shuffle;
+        # everything else is unvalidated (a merely-reachable host is NOT enough:
+        # destination regions' ungated vanilla-hub return exits leak hubs into
+        # reachability, and a pad behind a failed static Key gate never had its
+        # requirement exercised at all).
+        pad_host = {}
+        pad_gate = {}
+        for region, ex_list in exits.items():
+            for exit_name, _tgt, _gate in ex_list:
+                track = pad_exit_to_track.get(exit_name)
+                if track is not None:
+                    pad_host[track] = region
+                    pad_gate[track] = _gate
+
+        def _proven_open(t):
+            if pad_host.get(t) not in seen:
+                return False
+            if not _passes(pad_gate.get(t, [])):
+                return False
+            req = pad_reqs.get(t)
+            return req is None or _passes([req])
+
+        # Pinned-item completeness (see docstring): a requirement the sweep
+        # never validated may not demand a pinned type.
+        if pinned_items:
+            pinned_s1 = sorted(
+                t for t, req in pad_reqs.items()
+                if req is not None and t not in relaxed_s1
+                and req[0] in pinned_items
+                and not _proven_open(t))
+            if pinned_s1:
+                track = min(pinned_s1,
+                            key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
+                new_req = _assign_from_inv(rnd, inv, allowed)
+                if (new_req is not None and new_req[0] != "Key"
+                        and new_req[1] > _STAGE1_COUNT_CEILING):
+                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                relaxed_s1[track] = (pad_reqs.get(track), new_req)
+                pad_reqs[track] = new_req
+                continue
+            pinned_s2 = sorted(
+                dest for dest, s2 in stage2_reqs.items()
+                if s2 is not None and dest not in relaxed_s2
+                and s2[0] in pinned_items
+                and f"{dest}: Trophy Race" not in collected)
+            if pinned_s2:
+                dest = pinned_s2[0]
+                phys = dest_to_phys.get(dest, dest)
+                relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
+                stage2_reqs[dest] = pad_reqs.get(phys)
+                continue
+
+        # Critical-region completeness (see docstring): while a region holding
+        # a pinned goal-progression location is unreached, keep relaxing
+        # unvalidated requirements (any type). When none remain, only static
+        # gates (pool-bridgeable trophy/key doors) block the path -- stop.
+        if critical_regions and not critical_regions <= seen:
+            unvalidated = sorted(
+                t for t, req in pad_reqs.items()
+                if req is not None and t not in relaxed_s1
+                and not _proven_open(t))
+            if unvalidated:
+                track = min(unvalidated,
+                            key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
+                new_req = _assign_from_inv(rnd, inv, allowed)
+                if (new_req is not None and new_req[0] != "Key"
+                        and new_req[1] > _STAGE1_COUNT_CEILING):
+                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                relaxed_s1[track] = (pad_reqs.get(track), new_req)
+                pad_reqs[track] = new_req
+                continue
         break
     return relaxed_s1, relaxed_s2
 
