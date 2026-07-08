@@ -467,10 +467,8 @@ class ctrAPWorld(World):
             ("Platinum", "Platinum Relic", self.options.platinum_relic_progression.value),
         ]
         # Platinum relic inclusion is governed SOLELY by the Platinum Relic
-        # Progression slider now (slider = 0 already means "platinum relics not
-        # shuffled / pinned vanilla"). The old ShuffleRewards "Include Platinum
-        # Relics" coupling that forced this slider to 0 has been retired (item #5);
-        # ShuffleRewards is deprecated and no longer read.
+        # Progression slider (slider = 0 already means "platinum relics not
+        # shuffled / pinned vanilla").
 
         # NO two-stage reward pinning (the OPEN model): relic Time Trials and CTR
         # Token Challenges flow through the normal pool + the relic sliders, the same
