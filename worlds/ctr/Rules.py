@@ -67,12 +67,17 @@ def set_rules(world):
 
 
 # ITEM name resolver for a randomized requirement type code (see §0 contract).
-# colour is 0..4 = R,G,B,Y,P for token/gem types.
+# colour is 0..4 = R,G,B,Y,P for token/gem types; 0..2 = Sapphire,Gold,Platinum for
+# the type-4 relic tier (schema_version 4). Relic tiers are INDEPENDENT items with no
+# downward hierarchy, so type 4 must decode the concrete tier -- hard-coding "Sapphire
+# Relic" (the pre-schema-4 bug) silently rewrote every gold/platinum gate to sapphire.
+# The call site passes `colour if colour >= 0 else 0`, so a legacy colour -1 still
+# decodes to Sapphire, preserving pre-4 behaviour for any old {type:4,colour:-1} req.
 ITEM_BY_TYPE = {
     1: lambda c: "Trophy",
     2: lambda c: "Key",
     3: lambda c: ["Red", "Green", "Blue", "Yellow", "Purple"][c] + " CTR Token",
-    4: lambda c: "Sapphire Relic",
+    4: lambda c: ["Sapphire", "Gold", "Platinum"][c] + " Relic",
     5: lambda c: ["Red", "Green", "Blue", "Yellow", "Purple"][c] + " Gem",
 }
 

@@ -777,10 +777,11 @@ class ctrAPWorld(World):
         Only the 16 standard trophy races carry podium checks (boss/token/relic/
         crystal have no genuine multi-position finish).
 
-        NOTE: additive to schema_version 2 (a v2 native build simply ignores this
-        block and sends no podium checks -- safe degradation). The schema_version
-        bump is deferred until the native fan-out lands and its version comparison
-        is confirmed `>=` rather than `==`, so existing seeds stay byte-safe.
+        NOTE: podium is additive/safe-degrading (a native build without podium
+        support simply ignores this block and sends no podium checks). It did NOT
+        drive a schema_version bump of its own -- the v4 bump is the relic-tier
+        colour change (fill_slot_data), independent of podium. A native predating
+        podium still degrades safely on a v4 seed for this block specifically.
         """
         from .Locations import CTR_LOCATION_IDS
         from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
@@ -823,9 +824,15 @@ class ctrAPWorld(World):
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
-            "schema_version": 3,
+            # schema_version 4 (2026-07-08): type-4 relic requirements now carry the
+            # concrete tier in `colour` (0 Sapphire / 1 Gold / 2 Platinum) instead of a
+            # flattened -1. This is a native-version GATE: an old native reading a v4
+            # seed would treat every gold/platinum gate as sapphire, so it must check
+            # schema_version >= 4 before trusting type-4 colour. (v3 = podium + stage-2
+            # padgate; v2 = two-stage contract.)
+            "schema_version": 4,
             "ctr_options": {
-                "schema_version": 3,
+                "schema_version": 4,
                 "goal": o.goal.value,
                 "relic_min_time": o.rr_required_minimum_time.value,
                 "relics_require_perfect": bool(o.rr_require_perfects.value),
@@ -844,6 +851,58 @@ class ctrAPWorld(World):
             "podium_checks": self._resolve_podium_checks(),
         }
         return slot_data
+
+    def _describe_pad_req(self, req: Dict[str, int]) -> str:
+        """Render a {type,count,colour} pad requirement as a tier-true, human-readable
+        string. Decodes via the SAME ITEM_BY_TYPE / AGG_BY_TYPE tables native mirrors,
+        so it reflects exactly what the wire carries -- a dropped relic tier (the
+        pre-schema-4 bug, every gold/platinum gate flattened to sapphire) would surface
+        here rather than staying invisible."""
+        from .Rules import ITEM_BY_TYPE, AGG_BY_TYPE
+        t, count, colour = req["type"], req["count"], req["colour"]
+        if t == 0:
+            return "free (native default)"
+        if t == 1 and count == 0:
+            return "free (0 trophies, bootstrap)"
+        if t in AGG_BY_TYPE:
+            label = {6: "CTR Token", 7: "Relic", 8: "Gem"}[t]
+            return f"any {count} {label}"
+        return f"{count}x {ITEM_BY_TYPE[t](colour if colour >= 0 else 0)}"
+
+    def write_spoiler(self, spoiler_handle) -> None:
+        """Record this seed's per-pad unlock requirements (stage 1 + stage 2) with
+        tier-true item names. The spoiler previously logged NOTHING about pad
+        requirements, so the 2026-07-08 relic-tier wire bug was invisible to a spoiler
+        read; this section makes the exact gate native enforces auditable per seed."""
+        padgate = self._resolve_warp_pad_unlock()
+        id_to_name = {
+            meta["level_id"]: pad_name
+            for pad_name, meta in getattr(self, "warp_pad_ids", {}).items()
+        }
+        rows = []
+        for lid_str, stages in padgate.items():
+            s1 = stages.get("stage1", {"type": 0, "count": 0, "colour": -1})
+            s2 = stages.get("stage2", {"type": 0, "count": 0, "colour": -1})
+            if s1.get("type", 0) == 0 and s2.get("type", 0) == 0:
+                continue  # fully-default (vanilla / non-randomized) pad -- keep it compact
+            try:
+                lid = int(lid_str)
+            except (TypeError, ValueError):
+                lid = 1_000_000
+            name = id_to_name.get(lid, f"pad {lid_str}")
+            parts = [f"stage1: {self._describe_pad_req(s1)}"]
+            if s2.get("type", 0) != 0:
+                parts.append(f"stage2: {self._describe_pad_req(s2)}")
+            rows.append((lid, name, "; ".join(parts)))
+        player_name = self.multiworld.player_name[self.player]
+        spoiler_handle.write(
+            f"\n\nCTR warp-pad unlock requirements ({player_name}):\n")
+        if not rows:
+            spoiler_handle.write(
+                "  (vanilla unlock mode -- no randomized pad requirements)\n")
+            return
+        for _, name, desc in sorted(rows):
+            spoiler_handle.write(f"  {name}: {desc}\n")
 
     def collect(self, state: "CollectionState", item: "Item") -> bool:
         return super().collect(state, item)

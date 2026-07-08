@@ -1282,14 +1282,21 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
 # ---------------------------------------------------------------------------
 
 _COLOURS = ["Red", "Green", "Blue", "Yellow", "Purple"]
+# Relic tiers ride the SAME colour field as token/gem colours (Stef ruling
+# 2026-07-08): 0 = Sapphire, 1 = Gold, 2 = Platinum. Tiers are INDEPENDENT items
+# (a Gold req is met ONLY by Gold Relic -- no downward hierarchy), so the concrete
+# tier must survive the wire; dropping it to colour -1 silently rewrote every
+# stage-1 relic gate to Sapphire (the pre-schema-4 bug).
+_RELIC_TIERS = ["Sapphire", "Gold", "Platinum"]
 
 
 def to_slot_req(req):
     """(item, count) | None -> {type,count,colour}.
 
-    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 sapphire-relic / 5 gems /
+    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 relic / 5 gems /
           6 AnyToken / 7 AnyRelic / 8 AnyGem (colour -1, native sums the whole type).
-    colour 0..4 = R,G,B,Y,P for token/gem; -1 otherwise. Under requirement_specificity
+    colour 0..4 = R,G,B,Y,P for token/gem; 0..2 = Sapphire,Gold,Platinum for the
+    type-4 relic tier (schema_version 4); -1 otherwise. Under requirement_specificity
     = specific_colour, Any* are flattened to a concrete colour upstream (_resolve_any)
     so only type 1-5 reach here. Under any_of (default) the Any* aggregates survive
     and emit type 6/7/8 with colour -1.
@@ -1318,7 +1325,7 @@ def to_slot_req(req):
     if item.endswith("CTR Token"):
         return {"type": 3, "count": cnt, "colour": _COLOURS.index(item.split()[0])}
     if item.endswith("Relic"):
-        return {"type": 4, "count": cnt, "colour": -1}
+        return {"type": 4, "count": cnt, "colour": _RELIC_TIERS.index(item.split()[0])}
     if item.endswith("Gem"):
         return {"type": 5, "count": cnt, "colour": _COLOURS.index(item.split()[0])}
     raise ValueError(f"unmappable warp-pad requirement item: {item!r}")
