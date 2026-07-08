@@ -546,6 +546,73 @@ def _pad_exit_name(track):
     return f"{track} Warp Pad"
 
 
+_VANILLA_PAD_TARGET = None
+
+
+def _vanilla_pad_targets():
+    """{pad_exit_name -> the region that pad vanilla-loads}, from the PRISTINE
+    data/world.json exit targets (NOT the live, possibly destination-rewired
+    graph). Used to build the identity-topology view of the sweep graph. Cached
+    (static data)."""
+    global _VANILLA_PAD_TARGET
+    if _VANILLA_PAD_TARGET is None:
+        data = json.loads(
+            pkgutil.get_data(__package__, "data/world.json").decode("utf-8"))
+        pads = json.loads(
+            pkgutil.get_data(__package__,
+                             "data/warp_pad_ids.json").decode("utf-8"))["pads"]
+        tgt = {}
+        for r in data["regions"]:
+            for ex in r.get("exits", []):
+                if ex["name"] in pads and ex.get("target") is not None:
+                    tgt[ex["name"]] = ex["target"]
+        _VANILLA_PAD_TARGET = tgt
+    return _VANILLA_PAD_TARGET
+
+
+def _identity_exits(exits):
+    """Copy of a build_graph exits dict with every warp-pad exit re-targeted to
+    the region it vanilla-loads -- the identity-topology view. The live AP graph
+    is rewired to shuffled destinations by create_regions BEFORE the sweep runs,
+    so identity must be reconstructed here explicitly. Exits keep their physical
+    static gates (hub floors); only the target region changes."""
+    vanilla = _vanilla_pad_targets()
+    return {
+        region: [(name, vanilla.get(name, tgt), gate)
+                 for (name, tgt, gate) in ex_list]
+        for region, ex_list in exits.items()
+    }
+
+
+def _free_candidates_live(exits, start):
+    """The pads genuinely open at sphere 0 in THIS seed's graph: host region
+    reachable and pad-exit static gate satisfied with an EMPTY inventory.
+    Derived from the live geography, never a hardcoded list or count: with
+    battle arenas included (crystal pads at their hub floor) this is the 5
+    N. Sanity pads including Skull Rock; with arenas excluded (vanilla crystal
+    gates) it is the 4 race pads. Ordered canonically (legacy candidate order
+    first, then any others sorted) so RNG consumption stays stable when the
+    geography matches the legacy list."""
+    pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
+    zero = set()
+    seen = {start}
+    frontier = [start]
+    while frontier:
+        cur = frontier.pop()
+        for exit_name, tgt, gate in exits.get(cur, []):
+            track = pad_exit_to_track.get(exit_name)
+            if track is not None:
+                if not gate:  # empty static gate == open at 0 items
+                    zero.add(track)
+                continue
+            if tgt in seen or gate:
+                continue  # gated non-pad exits are closed at 0 items
+            seen.add(tgt)
+            frontier.append(tgt)
+    legacy_first = [t for t in FREE_CANDIDATES if t in zero]
+    return legacy_first + sorted(zero - set(legacy_first))
+
+
 def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
                                 collected, start):
     """Sweep the AP graph with the current inventory + the per-pad requirements
@@ -733,6 +800,14 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     destination shuffle); defaults to identity. Stage 2 is keyed internally by the
     DESTINATION track (where the relic/token locations live); the caller re-keys it
     to the physical pad for the slot_data contract.
+
+    IDENTITY-TOPOLOGY + RE-VALIDATION (two-phase, active only under destination
+    shuffle): the DAG is built on an identity view of the graph (pad exits
+    re-targeted to their vanilla regions) so the boss-Key cascade always fires
+    and requirements stay rich and varied, then re-validated against the actual
+    shuffled graph (_revalidate_against_shuffle), relaxing only the requirements
+    that fail there. With shuffle off the sweep runs directly on the live graph
+    exactly as before (single phase, byte-identical draws).
     """
     rnd = world.random
     # Load the requirement-weight preset (icebound_beta5 default) into the module
@@ -766,12 +841,38 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     allowed = {it for it in REQ_WEIGHTS
                if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
 
-    exits, locations, _ = build_graph(world, reward_track_for, include_gem_cups)
+    # The LIVE graph (destination-rewired by create_regions when shuffle is
+    # on): this is what AP fill enforces and what the re-validation pass walks.
+    exits_real, locations_real, _ = build_graph(
+        world, reward_track_for, include_gem_cups)
     start = world.start_region.name if world.start_region else "Menu"
 
-    # 1) free subset of the 5 N. Sanity Beach candidates -- the bootstrap pads
-    # that are open at spawn (sphere 0). FULLY random: a random-sized (weighted
-    # 1..5) random sample, no pinned pad. In randomized mode the vanilla trophy
+    # IDENTITY-TOPOLOGY DAG (stage-2 starvation fix). Destination shuffle breaks
+    # the sweep's bootstrap chain (collect 4 trophy races -> boss 1 opens ->
+    # Key 1 -> next hub -> ...): with trophy destinations scattered across all
+    # pads the synthetic inventory freezes below Trophy 4 and most pads drain
+    # through the unreachable fallback with trivial requirements. Fix: build the
+    # requirement DAG on the IDENTITY topology (trophy races on trophy pads, so
+    # the sweep always cascades and assigns rich, varied gates), then RE-VALIDATE
+    # it against the actual shuffled graph after the post-pass, relaxing only
+    # the requirements that fail there (_revalidate_against_shuffle). A
+    # requirement is a property of a pad's ENTRY; the shuffle is about content.
+    pad_ids = getattr(world, "warp_pad_ids", {})
+    wpm = getattr(world, "warp_pad_map", {}) or {}
+    shuffle_active = any(
+        pad_ids.get(pad, {}).get("level_id") != dest
+        for pad, dest in wpm.items())
+    if shuffle_active:
+        _ex_live, locations_id, _ = build_graph(
+            world, lambda t: t, include_gem_cups)
+        exits, locations = _identity_exits(_ex_live), locations_id
+    else:
+        exits, locations = exits_real, locations_real
+
+    # 1) free subset of the sphere-0 bootstrap candidates (live-derived from
+    # THIS seed's graph: the pads whose host region and static gate are open at
+    # zero items -- see _free_candidates_live; never a hardcoded list). FULLY
+    # random: a random-sized (weighted 1..5) random sample, no pinned pad. In randomized mode the vanilla trophy
     # floor is gone (see to_slot_req / create_regions), so EVERY free pad is truly
     # open from an empty inventory and any one of them can bootstrap the sphere.
     #
@@ -786,8 +887,10 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # deviation from Icebound's 1..5 weighting that strengthens the golden-path
     # guarantee (collecting always unlocks something new). Sizes >= the floor keep
     # their original relative weights.
+    free_candidates = _free_candidates_live(exits, start)
     size = max(_FREE_MIN, _weighted_choice(rnd, FREE_SIZE_WEIGHTS))
-    free = rnd.sample(FREE_CANDIDATES, size)
+    size = min(size, len(free_candidates))
+    free = rnd.sample(free_candidates, size)
 
     pad_reqs = {t: None for t in free}  # stage-1 reqs (physical-track keyed)
     # stage2_reqs: dest-track keyed; only the 16 trophy tracks. When collapsed
@@ -799,9 +902,12 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     # SAME pad's stage-1 requirement. Under destination shuffle the locations of
     # dest D live in region D, but D's pad ENTRY requirement is the physical pad P
     # with reward_track_for(P) == D. Identity when shuffle is off.
+    sweep_resolver = (lambda t: t) if shuffle_active else reward_track_for
     dest_to_phys = {}
+    dest_to_phys_real = {}
     for _p in HUB_STATIC:
-        dest_to_phys.setdefault(reward_track_for(_p), _p)
+        dest_to_phys.setdefault(sweep_resolver(_p), _p)
+        dest_to_phys_real.setdefault(reward_track_for(_p), _p)
 
     inv = Inv()
     collected = set()
@@ -821,9 +927,14 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
 
     # 2) sphere loop: assign stage-1 reqs to every pad AND stage-2 reqs to every
     # trophy pad once its trophy race is reachable.
+    # world.json-derived Key geography for the fallback's cheapest-first sort
+    # (never HUB_STATIC, whose values are a heuristic that can drift from the
+    # live geography).
+    keygate = _pad_keygate_table(crystals_at_hub_floor=_crystals_open(world))
     guard = 0
     max_iter = len(HUB_STATIC) * 16 + 128
     s2_real_count = 0  # how many REAL (non-collapsed) stage-2 gates assigned so far
+    s2_collapsed = set()  # dest tracks whose stage 2 collapsed to a stage-1 echo
     while remaining_pads or _stage2_pending():
         guard += 1
         if guard > max_iter:
@@ -861,6 +972,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
                         or s2_real_count >= _STAGE2_REAL_CAP
                         or rnd.randrange(100) < _STAGE2_COLLAPSE_CHANCE):
                     s2 = pad_reqs.get(phys)
+                    s2_collapsed.add(dest)
                 else:
                     s2_real_count += 1
                 stage2_reqs[dest] = s2
@@ -876,8 +988,9 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
                 # pad a minimal requirement so the graph can open further (rare
                 # residual case; counts stay satisfiable since _assign_from_inv only
                 # ever picks currently-owned item types).
-                reachable = sorted(remaining_pads,
-                                   key=lambda t: (_max_key(HUB_STATIC[t]), t))[:1]
+                reachable = sorted(
+                    remaining_pads,
+                    key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))[:1]
             track = rnd.choice(reachable)
             pad_reqs[track] = _assign_from_inv(rnd, inv, allowed)
             remaining_pads.remove(track)
@@ -896,6 +1009,50 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
     _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
 
+    # 3b) RE-VALIDATION against the actual shuffled graph (only when the DAG was
+    # built on the identity view). First re-key every COLLAPSED stage 2 to its
+    # REAL host pad's final stage-1: a collapse means "no gate beyond the trophy
+    # race", and only the value of the pad that actually HOSTS the destination
+    # preserves that meaning post-shuffle. Then sweep the shuffled graph and
+    # relax only the requirements that fail there.
+    if shuffle_active:
+        for _dest in s2_collapsed:
+            if _dest in stage2_reqs:
+                stage2_reqs[_dest] = pad_reqs.get(
+                    dest_to_phys_real.get(_dest, _dest))
+        # Item types real fill CANNOT relocate this seed: their placement is
+        # pinned to vanilla sources, so the synthetic sweep's model of them is
+        # AUTHORITATIVE (a pinned-type requirement the sweep cannot validate may
+        # be genuinely circular -- e.g. a gem gate on the path to the cups that
+        # hold every gem). Pool-shuffled types (trophies, tokens, shuffled
+        # keys/gems, slider-100 relics) stay lenient: fill seats them freely.
+        _o = world.options
+        pinned_items = set()
+        if int(_o.goal.value) == 4 or not bool(_o.shuffle_gems.value):
+            pinned_items.update(GEM_ITEMS)   # allgemcups always pins the gems
+            pinned_items.add("AnyGem")
+        if not bool(_o.shuffle_keys.value):
+            pinned_items.add("Key")
+        # Regions holding PINNED GOAL-PROGRESSION locations: under the
+        # all-gem-cups goal the 5 Gems are pinned at their cups AND completing
+        # every cup IS the goal, so the accessibility check hard-requires each
+        # cup region reachable. The sweep must therefore prove the whole chain
+        # to every cup; requirements it cannot validate on that chain get
+        # relaxed regardless of item type. (Other pinned classes need no
+        # region rule: boss-race regions sit behind static trophy doors only,
+        # never behind pad requirements, and non-goal pinned gems' regions are
+        # only location-reachability under accessibility:full, which pool-item
+        # fill bridges -- 0 failures observed at the 14k scale.)
+        critical_regions = frozenset(
+            f"{c} Gem Cup" for c in ("Red", "Green", "Blue", "Yellow", "Purple")
+        ) if int(_o.goal.value) == 4 else frozenset()
+        relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
+            rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
+            dest_to_phys_real, start, allowed, keygate,
+            frozenset(pinned_items), critical_regions)
+        world._ctr_s2_relaxed_s1 = relaxed_s1
+        world._ctr_s2_relaxed_s2 = relaxed_s2
+
     # 4) assemble {track: {1: stage1, 2: stage2}}. Stage-2 eligibility keys off the
     # DESTINATION (contract §2/§4, design §3): a physical pad carries a meaningful
     # stage 2 iff the track it LOADS (reward_track_for) is one of the 16 trophy
@@ -909,6 +1066,193 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
         s2 = stage2_reqs.get(dest) if dest in TROPHY_TRACKS else None
         out[t] = {1: pad_reqs.get(t), 2: s2}
     return out
+
+
+def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
+                                dest_to_phys, start, allowed, keygate,
+                                pinned_items=frozenset(),
+                                critical_regions=frozenset()):
+    """Verify the identity-topology requirement DAG against the ACTUAL shuffled
+    graph; relax ONLY the requirements that fail there.
+
+    Sweeps the shuffled graph to a fixed point with all assigned requirements
+    enforced (_reachable_pads_and_collect). A stage-1 requirement FAILS when its
+    pad sits at the sweep frontier (host region reached, static hub gate passed)
+    but the requirement is unsatisfiable from everything collectable before the
+    pad opens. A stage-2 requirement FAILS when its destination's Trophy Race is
+    collected but the gate is unsatisfiable from the final inventory. A failed
+    stage 1 is re-drawn from the inventory actually collectable at that point
+    (satisfiable by construction, the sweep's own assignment rule, stage-1 count
+    ceiling applied); a failed stage 2 collapses to its REAL host pad's stage-1
+    (= no gate beyond the trophy race).
+
+    Pads the synthetic sweep cannot REACH at the fixed point (content starvation
+    behind a static boss/key gate) are NOT relaxed as long as their requirement
+    demands a POOL-SHUFFLED item type: the synthetic vanilla-reward inventory
+    under-approximates real fill, which places pool items freely on reachable
+    locations, so unreached-ness is not evidence of an unsatisfiable
+    requirement. True fill risk stays covered downstream by the pre_fill probe
+    backstop, the accessibility sweep, and the fuzz gate.
+
+    The EXCEPTION is `pinned_items`: item types whose placement is pinned to
+    their vanilla sources this seed (gems under the all-gem-cups goal or
+    shuffle_gems off; Keys under shuffle_keys off). Fill cannot relocate those,
+    so the sweep's model of them is authoritative, and a pinned-type
+    requirement the sweep never validated (unreached pad / uncollected trophy
+    dest) may be genuinely circular -- e.g. a gem gate between the start and
+    the cups that hold every gem makes an all-gem-cups seed unbeatable. Those
+    are relaxed too.
+
+    `critical_regions` are regions holding pinned GOAL-progression locations
+    (the 5 gem cups under the all-gem-cups goal): while any of them is
+    unreached at the fixed point, unvalidated requirements keep being relaxed
+    (cheapest key floor first, ANY item type) until the sweep proves the chain
+    or only static gates (pool-bridgeable trophy/key doors) remain in the way.
+
+    Bounded: relaxation is monotone (a weakened requirement only ever opens more
+    of the graph, and the fixed-point inventory can only grow between
+    iterations), each pad/dest relaxes at most once, one relaxation per sweep.
+    Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
+    relaxed_s1 = {}
+    relaxed_s2 = {}
+    pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
+    guard = 0
+    while True:
+        guard += 1
+        if guard > len(HUB_STATIC) + len(TROPHY_TRACKS) + 8:
+            raise RuntimeError("CTR stage-2 re-validation failed to converge")
+        inv = Inv()
+        collected = set()
+        _reachable_pads_and_collect(
+            inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
+
+        def _passes(reqs):
+            return all(inv.count(i) >= c for i, c in reqs)
+
+        # Frontier scan under the final inventory: which assigned pads are
+        # reachable-but-closed purely because of their own stage-1 requirement?
+        seen = {start}
+        frontier = [start]
+        blocked_s1 = []
+        while frontier:
+            cur = frontier.pop()
+            for exit_name, tgt, gate in exits.get(cur, []):
+                if not _passes(gate):
+                    continue
+                track = pad_exit_to_track.get(exit_name)
+                if track is not None:
+                    req = pad_reqs.get(track)
+                    if req is not None and not _passes([req]):
+                        # Blocked-ness must be evaluated BEFORE the BFS dedup:
+                        # destination regions carry ungated return exits to
+                        # their VANILLA hubs, so a pad's target being reachable
+                        # through another path must not hide that this pad's
+                        # own requirement is unsatisfiable.
+                        if track not in relaxed_s1 and track not in blocked_s1:
+                            blocked_s1.append(track)
+                        continue
+                if tgt in seen:
+                    continue
+                seen.add(tgt)
+                frontier.append(tgt)
+
+        if blocked_s1:
+            track = min(blocked_s1,
+                        key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
+            new = _assign_from_inv(rnd, inv, allowed)
+            if (new is not None and new[0] != "Key"
+                    and new[1] > _STAGE1_COUNT_CEILING):
+                new = (new[0], _STAGE1_COUNT_CEILING)
+            relaxed_s1[track] = (pad_reqs.get(track), new)
+            pad_reqs[track] = new
+            continue
+
+        blocked_s2 = sorted(
+            dest for dest, s2 in stage2_reqs.items()
+            if s2 is not None and dest not in relaxed_s2
+            and f"{dest}: Trophy Race" in collected and not _passes([s2]))
+        if blocked_s2:
+            dest = blocked_s2[0]
+            phys = dest_to_phys.get(dest, dest)
+            relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
+            stage2_reqs[dest] = pad_reqs.get(phys)
+            continue
+
+        # "Proven-open": the sweep actually validated this pad at the fixed
+        # point -- host reachable, static gate passed, requirement met. Only a
+        # proven-open pad's requirement is known-satisfiable post-shuffle;
+        # everything else is unvalidated (a merely-reachable host is NOT enough:
+        # destination regions' ungated vanilla-hub return exits leak hubs into
+        # reachability, and a pad behind a failed static Key gate never had its
+        # requirement exercised at all).
+        pad_host = {}
+        pad_gate = {}
+        for region, ex_list in exits.items():
+            for exit_name, _tgt, _gate in ex_list:
+                track = pad_exit_to_track.get(exit_name)
+                if track is not None:
+                    pad_host[track] = region
+                    pad_gate[track] = _gate
+
+        def _proven_open(t):
+            if pad_host.get(t) not in seen:
+                return False
+            if not _passes(pad_gate.get(t, [])):
+                return False
+            req = pad_reqs.get(t)
+            return req is None or _passes([req])
+
+        # Pinned-item completeness (see docstring): a requirement the sweep
+        # never validated may not demand a pinned type.
+        if pinned_items:
+            pinned_s1 = sorted(
+                t for t, req in pad_reqs.items()
+                if req is not None and t not in relaxed_s1
+                and req[0] in pinned_items
+                and not _proven_open(t))
+            if pinned_s1:
+                track = min(pinned_s1,
+                            key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
+                new_req = _assign_from_inv(rnd, inv, allowed)
+                if (new_req is not None and new_req[0] != "Key"
+                        and new_req[1] > _STAGE1_COUNT_CEILING):
+                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                relaxed_s1[track] = (pad_reqs.get(track), new_req)
+                pad_reqs[track] = new_req
+                continue
+            pinned_s2 = sorted(
+                dest for dest, s2 in stage2_reqs.items()
+                if s2 is not None and dest not in relaxed_s2
+                and s2[0] in pinned_items
+                and f"{dest}: Trophy Race" not in collected)
+            if pinned_s2:
+                dest = pinned_s2[0]
+                phys = dest_to_phys.get(dest, dest)
+                relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
+                stage2_reqs[dest] = pad_reqs.get(phys)
+                continue
+
+        # Critical-region completeness (see docstring): while a region holding
+        # a pinned goal-progression location is unreached, keep relaxing
+        # unvalidated requirements (any type). When none remain, only static
+        # gates (pool-bridgeable trophy/key doors) block the path -- stop.
+        if critical_regions and not critical_regions <= seen:
+            unvalidated = sorted(
+                t for t, req in pad_reqs.items()
+                if req is not None and t not in relaxed_s1
+                and not _proven_open(t))
+            if unvalidated:
+                track = min(unvalidated,
+                            key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
+                new_req = _assign_from_inv(rnd, inv, allowed)
+                if (new_req is not None and new_req[0] != "Key"
+                        and new_req[1] > _STAGE1_COUNT_CEILING):
+                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                relaxed_s1[track] = (pad_reqs.get(track), new_req)
+                pad_reqs[track] = new_req
+                continue
+        break
+    return relaxed_s1, relaxed_s2
 
 
 def _post_process(rnd, pad_reqs, mode, count_ceiling=None):

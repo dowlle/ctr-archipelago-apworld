@@ -102,26 +102,6 @@ class FinalOxideUnlock(Choice):
     default = 0
 
 
-class ShuffleRewards(OptionDict):
-    """DEPRECATED — no longer wired. Kept only so older YAMLs that still set
-    `Shuffle Rewards` (with the old `Include Platinum Relics`/`Include Gems`/
-    `Include Keys` keys) keep generating instead of erroring.
-
-    The three concerns it used to cover are now first-class options:
-      - "Include Platinum Relics" -> `Platinum Relic Progression` slider
-        (slider = 0 already means "platinum relics not shuffled").
-      - "Include Gems"            -> `Shuffle Gems` toggle.
-      - "Include Keys"            -> `Shuffle Keys` toggle.
-
-    `valid_keys` is intentionally empty so ANY leftover key parses without a
-    validation error (the dict is simply ignored). Remove after a deprecation
-    window."""
-    display_name = "Shuffle Rewards (deprecated)"
-    supports_weighting = False
-    default = {}
-    valid_keys = []
-
-
 class ShuffleGems(Toggle):
     """Shuffle the 5 Gems into the multiworld item pool.
 
@@ -143,18 +123,6 @@ class ShuffleKeys(DefaultOnToggle):
     - **off**: each Key is pinned to its Boss Race reward location
       (vanilla placement, out of the multiworld shuffle)."""
     display_name = "Shuffle Keys"
-
-
-class ShuffleWarpPads(Toggle):
-    """DEPRECATED — no longer wired. Kept only so older YAMLs that still set
-    `Shuffle Warp Pads` keep generating instead of erroring.
-
-    Destination shuffle is now driven by `Warp Pad Shuffle Categories` (which
-    content categories participate at all) composed with `Warp Pad Shuffle
-    Grouping` (whether the participating categories cross-shuffle or stay within
-    themselves). This toggle has NO effect; set the two options above instead.
-    Remove after a deprecation window (precedent: `Shuffle Rewards`)."""
-    display_name = "Shuffle Warp Pads (deprecated)"
 
 
 class ShuffleWarpPadsBattleArenas(Toggle):
@@ -443,10 +411,8 @@ class ctrAPOptions(PerGameCommonOptions):
     gold_relic_progression: GoldRelicProgression
     platinum_relic_progression: PlatinumRelicProgression
     # randomization
-    shuffle_rewards: ShuffleRewards  # deprecated, unwired (backward-compat only)
     shuffle_gems: ShuffleGems
     shuffle_keys: ShuffleKeys
-    shuffle_warp_pads: ShuffleWarpPads  # deprecated, unwired (backward-compat only)
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     include_battle_arenas: ShuffleWarpPadsBattleArenas
