@@ -29,6 +29,7 @@ def load_item_table() -> List[ItemDict]:
         "progression": ItemClassification.progression,
         "filler": ItemClassification.filler,
         "useful": ItemClassification.useful,
+        "trap": ItemClassification.trap,
         "progression_skip_balancing": ItemClassification.progression_skip_balancing,
         "progression_deprioritized": ItemClassification.progression_deprioritized,
         "progression_deprioritized_skip_balancing": ItemClassification.progression_deprioritized_skip_balancing,
