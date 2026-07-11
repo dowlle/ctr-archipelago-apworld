@@ -97,22 +97,36 @@ class ctrAPWorld(World):
         guaranteed-fillable single-stage DAG. Any probe error falls back to KEEPING
         two-stage (fail-open: never makes a fillable seed worse).
 
-        VANILLA-MODE BRANCH: tight-fill backstop -- see _vanilla_fill_backstop.
-        Solo generations only."""
-        if not getattr(self, "_ctr_two_stage_active", False):
-            if (self.options.warppad_unlock_requirements.value == 0
-                    and len(self.multiworld.worlds) == 1):
-                self._vanilla_fill_backstop()
-            return
-        if getattr(self, "_ctr_force_collapse_stage2", False):
-            return  # already collapsed
-        fillable = self._probe_two_stage_fillable()
-        if fillable is False:
-            self._ctr_force_collapse_stage2 = True
-            # Overwrite the stage-2 access rules with the collapsed (plain
-            # can_reach Trophy Race) form; fill_slot_data also emits type-0 stage 2.
-            from .Rules import add_time_trial_and_ctr_requirements
-            add_time_trial_and_ctr_requirements(self, self.player)
+        TERMINAL BACKSTOP (both modes, solo only): after any mode-specific rung,
+        the shared rollback-precollect backstop replays the real fill and, if it
+        still dead-ends, precollects the stranded progression so the seed cannot
+        ship an unfillable red. See _rollback_precollect_backstop."""
+        solo = len(self.multiworld.worlds) == 1
+        # Randomized two-stage rung: faithful parallel-MW probe; on a predicted
+        # FillError collapse every stage-2 gate for this seed. Necessary but, on
+        # dense post-fix trees, not always sufficient (the stage-2 collapse cannot
+        # touch the stage-1 + near-full-pool residual -- 0.43% at the max any_of
+        # corner on 60415b4ad) -- the terminal backstop below closes that residual.
+        if (getattr(self, "_ctr_two_stage_active", False)
+                and not getattr(self, "_ctr_force_collapse_stage2", False)):
+            if self._probe_two_stage_fillable() is False:
+                self._ctr_force_collapse_stage2 = True
+                # Overwrite the stage-2 access rules with the collapsed (plain
+                # can_reach Trophy Race) form; fill_slot_data also emits type-0
+                # stage 2. This re-install only reassigns loc.access_rule closures
+                # and consumes no multiworld.random (verified) -- so the terminal
+                # backstop's replay fidelity survives it.
+                from .Rules import add_time_trial_and_ctr_requirements
+                add_time_trial_and_ctr_requirements(self, self.player)
+        # Terminal rollback-precollect backstop -- the universal solo safety net.
+        # Solo only (replay fidelity: nothing consumes multiworld.random between
+        # here and the fill). Vanilla and randomized both route through the same
+        # mode-agnostic machinery; a non-fired seed is byte-identical to an
+        # un-backstopped build, a fired seed is logged to the spoiler.
+        if solo:
+            mode = ("vanilla" if self.options.warppad_unlock_requirements.value == 0
+                    else "randomized")
+            self._rollback_precollect_backstop(mode)
 
     def _probe_two_stage_fillable(self):
         """True/False if a faithful parallel dry-run fills; None if the probe could
@@ -143,19 +157,23 @@ class ctrAPWorld(World):
                             "keeping two-stage.", type(e).__name__)
             return None
 
-    _VANILLA_BACKSTOP_MAX_ROUNDS = 40
+    _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40
 
     def _vanilla_fill_backstop(self) -> None:
-        """Vanilla-mode tight-fill backstop (the third of the three vanilla-fill
-        levers, after honest relic classification and vanilla early-Keys).
+        """Vanilla-mode entry to the shared terminal backstop. Kept as a named
+        method because the vanilla-fill story (levers 1+2 -- honest relic
+        classification + vanilla early-Keys -- shrink the tight-fill FillError
+        class to a ~0.1-0.2% residual that this removes exactly) is documented
+        against this name across the design notes. See
+        _rollback_precollect_backstop for the mechanism."""
+        self._rollback_precollect_backstop("vanilla")
 
-        Levers 1+2 (honest relic classification + vanilla early-Keys) shrink the
-        vanilla tight-fill FillError class to a ~0.1-0.2% residual on
-        relic-starved slider corners. The residual is pure placement-ordering luck:
-        pool == locations on every seed, and a failing seed is fully beatable --
-        greedy fill_restrictive just corners itself. This backstop removes the
-        residual exactly, by REPLAYING the upcoming fill rather than approximating
-        it:
+    def _rollback_precollect_backstop(self, mode: str) -> None:
+        """Mode-agnostic terminal fill backstop: REPLAY the upcoming fill and, if
+        it dead-ends, precollect the stranded progression so the real fill goes
+        green. Called for solo generations in BOTH warp-pad modes (the machinery
+        is mode-agnostic; only the vanilla-specific docstring/entry assumptions
+        were lifted). It removes the residual exactly rather than approximating it:
 
         1. SIMULATE the real fill by RUNNING it on this very multiworld and then
            rolling every mutation back (placements, locked flags, itempool,
@@ -176,10 +194,20 @@ class ctrAPWorld(World):
            fill goes green (bounded: every round strictly removes progression from
            the ordered pool). The real fill then replays the green simulation.
 
+        REPLAY FIDELITY across modes (why solo is enough for both):
+          - vanilla mode: pre_fill routes straight here;
+          - randomized mode: the two-stage probe builds its OWN parallel
+            MultiWorld with its own RNG, and the stage-2 collapse re-install
+            (add_time_trial_and_ctr_requirements) only reassigns loc.access_rule
+            closures -- neither consumes self.multiworld.random. create_filler
+            returns a fixed Wumpa Fruit, so the precollect top-up draws no RNG
+            either. So the RNG state the simulation snapshots is exactly the state
+            the real fill will run from (harness-asserted over 100 seeds).
+
         SOLO ONLY (enforced by the caller): with other worlds present, their
         pre_fill hooks may run after ours and consume multiworld.random, breaking
-        replay fidelity -- and mixed pools relax CTR's tightness anyway. Vanilla
-        multiworld seeds keep the (tiny) pre-existing residual.
+        replay fidelity -- and mixed pools relax CTR's tightness anyway. This is
+        why the multiworld FillError residual is NOT covered by this backstop.
 
         Fail-open: any unexpected error leaves generation to proceed as if the
         backstop did not exist. CTR_PROBE_LOG_ONLY=1 logs the would-fire verdict
@@ -187,7 +215,9 @@ class ctrAPWorld(World):
 
         No gate, rule, slot_data, or schema change: the only effect on a fired
         seed is items moved to starting inventory (the player begins with them
-        collected), which never removes reachability."""
+        collected), which never removes reachability. A fired seed is recorded on
+        self for write_spoiler so rescued seeds are diagnosable; a non-fired seed
+        records nothing (byte-neutral)."""
         try:
             from settings import get_settings
             panic = get_settings().generator.panic_method
@@ -198,20 +228,21 @@ class ctrAPWorld(World):
         fired: List[str] = []
         try:
             converged = False
-            for _round in range(self._VANILLA_BACKSTOP_MAX_ROUNDS):
+            for _round in range(self._ROLLBACK_BACKSTOP_MAX_ROUNDS):
                 if self._rollback_simulate_fill(panic) is True:
                     converged = True
                     break
                 if log_only:
-                    logging.info("[CTR] vanilla fill backstop LOG-ONLY: simulated "
-                                 "fill dead-ends; would intervene.")
+                    logging.info("[CTR] %s fill backstop LOG-ONLY: simulated "
+                                 "fill dead-ends; would intervene.", mode)
+                    self._ctr_backstop_would_fire = True
                     return
                 stranded = self._rollback_enumerate_stranded()
                 if not stranded:
                     logging.warning(
-                        "[CTR] vanilla fill backstop: simulated fill dead-ends but "
+                        "[CTR] %s fill backstop: simulated fill dead-ends but "
                         "no stranded items identified; leaving the seed unchanged "
-                        "(fail-open).")
+                        "(fail-open).", mode)
                     return
                 for name in stranded:
                     for i, item in enumerate(mw.itempool):
@@ -223,24 +254,28 @@ class ctrAPWorld(World):
                             break
                     else:
                         logging.warning(
-                            "[CTR] vanilla fill backstop: stranded item %r not in "
+                            "[CTR] %s fill backstop: stranded item %r not in "
                             "the real itempool; stopping intervention (fail-open).",
-                            name)
+                            mode, name)
                         return
             if converged and fired:
+                self._ctr_backstop_fired = True
+                self._ctr_backstop_mode = mode
+                self._ctr_backstop_items = list(fired)
                 logging.info(
-                    "[CTR] vanilla tight-fill backstop fired: precollected %d "
+                    "[CTR] %s tight-fill backstop fired: precollected %d "
                     "item(s) (%s); simulated fill green -- seed fully beatable "
-                    "from starting inventory.", len(fired), ", ".join(fired))
+                    "from starting inventory.", mode, len(fired), ", ".join(fired))
             elif not converged:
                 logging.warning(
-                    "[CTR] vanilla fill backstop: no convergence after %d rounds "
+                    "[CTR] %s fill backstop: no convergence after %d rounds "
                     "(precollected so far: %s); generation proceeds.",
-                    self._VANILLA_BACKSTOP_MAX_ROUNDS, ", ".join(fired) or "none")
+                    mode, self._ROLLBACK_BACKSTOP_MAX_ROUNDS,
+                    ", ".join(fired) or "none")
         except Exception as exc:
             logging.warning(
-                "[CTR] vanilla fill backstop errored (%s: %s); proceeding without "
-                "it (fail-open)%s.", type(exc).__name__, exc,
+                "[CTR] %s fill backstop errored (%s: %s); proceeding without "
+                "it (fail-open)%s.", mode, type(exc).__name__, exc,
                 " after precollecting: " + ", ".join(fired) if fired else "")
 
     # -- rollback simulation machinery (vanilla fill backstop) --
@@ -902,7 +937,21 @@ class ctrAPWorld(World):
         """Record this seed's per-pad unlock requirements (stage 1 + stage 2) with
         tier-true item names. The spoiler previously logged NOTHING about pad
         requirements, so the 2026-07-08 relic-tier wire bug was invisible to a spoiler
-        read; this section makes the exact gate native enforces auditable per seed."""
+        read; this section makes the exact gate native enforces auditable per seed.
+
+        Also records a terminal fill-backstop firing (rollback-precollect) so a
+        rescued seed is diagnosable. Written ONLY when the backstop fired: a
+        non-fired seed adds nothing here, keeping it byte-identical to a build
+        without the backstop (the fired: yes/no verdict is the line's presence)."""
+        if getattr(self, "_ctr_backstop_fired", False):
+            player_name = self.multiworld.player_name[self.player]
+            items = getattr(self, "_ctr_backstop_items", [])
+            mode = getattr(self, "_ctr_backstop_mode", "?")
+            spoiler_handle.write(
+                f"\n\nCTR fill backstop FIRED ({player_name}, {mode} mode): "
+                f"precollected {len(items)} progression item(s) into starting "
+                f"inventory so the greedy fill converges -- {', '.join(items)}. "
+                f"Seed stays fully reachable; this is a diagnosable rescue.\n")
         padgate = self._resolve_warp_pad_unlock()
         id_to_name = {
             meta["level_id"]: pad_name
