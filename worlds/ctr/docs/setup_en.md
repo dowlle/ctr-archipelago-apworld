@@ -1,32 +1,162 @@
-# Your game here!
+# Crash Team Racing Setup Guide
+
+This guide covers setting up Crash Team Racing (PS1, 1999) for Archipelago. CTR
+runs as a native PC port with the Archipelago client built directly into it:
+no emulator and no ROM patching. The client connects to the server, receives
+items, locks and unlocks warp pads, boss garages, doors and gem cups per seed,
+and sends your location checks and goal.
+
+> This game is in development and not yet released. Once released, Windows and
+> Linux builds will be posted on the client's Releases page. Until then the
+> steps below describe how it works, and some links point at pre-release
+> locations.
 
 ## Required Software
 
-- A legally obtained copy of the game your are randomizing. Include the version if it needs to be specific (IE: NTSC/NA/Steam/Whatever else)
-- Anything else!
-    - You can use [this syntax to add hyperlinks to emulators or other web pages](https://www.ikea.com/us/en/p/blahaj-soft-toy-shark-90373590/)
-    - Be specific! Include versions! You'll still get asked why it's broken and it'll be a versioning issue but hey you can try
-- The built-in Archipelago client, which can be installed [here](https://github.com/ArchipelagoMW/Archipelago/releases)
+- The **CTR Archipelago client**, `ctr_native_ap` (Windows `.exe` or Linux
+  binary), from the [client Releases page](https://github.com/dowlle/ctr-native-ap/releases).
+- The **CTR apworld** (`ctr.apworld`), from the same Releases page. Only the
+  person who generates the multiworld needs this.
+- A legally obtained **NTSC-U (North American)** disc image of Crash Team
+  Racing. A `.cue` plus `.bin`, a single `.bin`, or a `.chd` all work. Only the
+  North American release is supported: PAL (European) and Japanese discs are
+  detected and refused. This project ships no game data; you supply it from your
+  own disc.
+- **Python 3.8 or newer**, only for the recommended asset extractor below. If
+  your image is a `.chd`, you also need the `chdman` tool (it ships with the MAME
+  tools) on your PATH.
+- The **Archipelago installation**, if you are the one generating the
+  multiworld, from the [Archipelago releases page](https://github.com/ArchipelagoMW/Archipelago/releases).
+
+## Installing the apworld (generation only)
+
+Only the person generating the multiworld needs this step. Double-click
+`ctr.apworld`, or place it in the `custom_worlds` folder of your Archipelago
+installation, so the generator can build CTR seeds.
 
 ## Configuring your YAML file
 
 ### What is a YAML file and why do I need one?
 
-You can leave this alone since it will be the same for every game so just delete this! I'm just here for explanations.
-
-Your YAML file contains a set of configuration options which provide the generator with information about how it should
-generate your game. Each player of a multiworld will provide their own YAML file. This setup allows each player to enjoy
-an experience customized for their taste, and different players in the same multiworld can all have different options.
+Your YAML file contains a set of configuration options which provide the
+generator with information about how it should generate your game. Each player
+of a multiworld provides their own YAML file. This lets each player enjoy an
+experience customized for their taste, and different players in the same
+multiworld can all have different options.
 
 ### Where do I get a YAML file?
 
-You can customize your options by visiting the [Your Game Here Options Page](/games/Your%20Game%20Here/player-options).
+After installing the apworld, open the Archipelago Launcher, choose **Generate
+Template Options**, and pick Crash Team Racing to get the template YAML. You can
+also customize options on the
+[Crash Team Racing options page](/games/Crash%20Team%20Racing/player-options).
 
-Another hyperlink to the options page. The %20 in the link is a space. Make sure it matches the name you put for the your_game_here for the en_your_game_here.md doc.
+Set your slot name (spelled exactly as it will appear in the room) and your
+options, then hand the YAML to whoever generates the multiworld. As a player you
+only need the YAML you submitted, the client set up below, and your slot name.
 
-### Connect to the MultiServer
+## Setting up the game client
 
-1. Just describe how to get it connected
+### Step 1: get the game executable
 
-2. Include any optional steps
-    - You can use this syntax to add sub steps
+Download `ctr_native_ap` for your platform from the
+[client Releases page](https://github.com/dowlle/ctr-native-ap/releases) and put
+it in a folder of its own, for example a folder called `CTR-AP`. The next steps
+add the game data and your server settings next to it.
+
+### Step 2: add your game assets
+
+You have two options. The extractor is recommended.
+
+**Recommended: extract the assets.** The extractor reads your disc image and
+copies out only the files the game needs into an `assets` folder, checking the
+region and that nothing is missing. From the folder that holds the executable,
+run:
+
+```
+python extract_assets.py "path/to/your/CTR.cue"
+```
+
+You can also point it at a `.bin` or a `.chd`. By default it writes an `assets`
+folder in the current directory; add `--out "path/to/CTR-AP/assets"` to send it
+elsewhere. When it finishes you should have:
+
+```
+CTR-AP/
+  ctr_native_ap.exe
+  assets/
+    BIGFILE.BIG
+    SOUNDS/KART.HWL
+    TEST.STR
+    XA/ENG.XNF
+    XA/ENG/EXTRA/S00.XA ... S05.XA
+    XA/ENG/GAME/S00.XA ... S20.XA
+    XA/MUSIC/S00.XA ... S01.XA
+```
+
+**Alternative: one raw file, no extractor.** The game can also read the raw disc
+image directly. Rename your NTSC-U `.bin` to `ctr-u.bin` and place it in the
+`assets` folder:
+
+```
+CTR-AP/
+  ctr_native_ap.exe
+  assets/
+    ctr-u.bin
+```
+
+This must be the common single-track raw PlayStation BIN layout (MODE2/2352
+sectors). A cooked 2048-byte `.iso` does not carry the audio and video sector
+data the game needs, so it will not work. This path skips the region check and
+uses more disk space than the extracted folder, which is why the extractor is
+recommended.
+
+### Step 3: create your config file
+
+Copy `ap-config.example.txt` to `ap-config.txt` in the same folder as the
+executable, and open it in a text editor. Set at least:
+
+- `uri`: the Archipelago server address, for example `ws://localhost:38281` for
+  a server on your own machine.
+- `slot`: your player name in the room, spelled exactly as it appears there.
+- `password`: the room password, or leave it blank if there is none.
+
+The other options (`skip_hints`, `map_flash`) are optional quality of life
+toggles and can be left at their defaults. Every option is documented inline in
+the example file.
+
+> During development the client connects over a plain, unencrypted WebSocket
+> (`ws://`), so it is best suited to a local or self-hosted server. Secure
+> connections (`wss://`, for archipelago.gg rooms) and an in-game connection
+> screen are planned before release.
+
+### Step 4: run
+
+Launch the executable. It connects to the server at startup using your
+`ap-config.txt`, then boots the game.
+
+## Troubleshooting
+
+- **"Missing or incomplete assets" at startup:** the `assets` folder is not next
+  to the executable, or a file did not extract. Re-run the extractor and make
+  sure the `assets` folder sits in the same directory as the executable.
+- **"PAL is not supported yet" from the extractor:** your disc is the European
+  release. You need the North American (NTSC-U) disc, whose boot id starts with
+  SCUS.
+- **"This is a .chd image, which needs the chdman tool":** install `chdman` (it
+  ships with the MAME tools) and make sure it is on your PATH, or convert the
+  `.chd` to `.bin`/`.cue` yourself and run the extractor on the `.cue`.
+- **"does not look like a PlayStation disc image":** you likely pointed the tool
+  at the wrong file (a zip, a folder, or a cooked `.iso`). Use the raw `.bin`,
+  `.cue`, or `.chd` of the disc.
+- **The game window opens but there is no music or the intro video is black:**
+  your image was probably a cooked 2048-byte `.iso`, which drops the XA and STR
+  sector data. Re-dump or re-obtain the disc as a raw MODE2/2352 image.
+- **Cannot connect to the server:** check the `uri`, `slot`, and `password` in
+  `ap-config.txt`. This build uses a plain (unencrypted) WebSocket connection,
+  so it is best suited to a local or self-hosted server.
+
+## Joining a multiworld
+
+New to Archipelago itself? Start with the
+[Archipelago tutorials](https://archipelago.gg/tutorial/).
