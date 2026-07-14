@@ -438,6 +438,69 @@ def _load_requirement_preset(world):
      _RELIC_COLLAPSE_CHANCE, _RELIC_COLLAPSE_SCALE, _RELIC_COLLAPSE_CAP,
      _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP) = _ANY_COLLAPSE_PARAMS[collapse_key]
 
+    _load_two_stage_density(world)
+
+
+# two_stage_density presets: (real-gate cap per seed, per-pad collapse chance %).
+# "standard" MUST stay byte-identical to the pre-option constants (6, 35): same
+# values, and the diversity discount stays disabled (k=0) so the weights passed to
+# rnd.choices are the untouched ints. "off" uses cap 0 (the cap short-circuits
+# before the collapse roll, so every stage 2 echoes its stage 1 and consumes no
+# RNG on the roll -- deliberate, documented in the option).
+_TWO_STAGE_DENSITY_PARAMS = {
+    "off":      (0, 100),
+    "light":    (4, 50),
+    "standard": (6, 35),
+    "deep":     (10, 20),
+}
+
+# Within-seed diminishing-repeat discount (T6, deep-dive 2026-07-11): each
+# requirement FAMILY's weight is divided by (1 + k * families_assigned_so_far).
+# Active ONLY at non-standard two_stage_density (T1 re-baseline: type shares are
+# in band at the default, but real stage-2 draws run 56-59% Trophy, so a raised
+# cap needs this pressure or the extra gates come out Trophy-shaped). k is
+# internal, not a YAML knob. No new RNG draws: only the weights fed to the
+# existing rnd.choices call change, so determinism is preserved.
+_DIVERSITY_K = 0.0
+_DIVERSITY_COUNTS = {}
+
+
+def _req_family(item):
+    """Map a requirement item (concrete or Any* aggregate) to its weight family."""
+    if item in TOKEN_ITEMS or item == "AnyCtrToken":
+        return "Token"
+    if item in RELIC_ITEMS or item == "AnyRelic":
+        return "Relic"
+    if item in GEM_ITEMS or item == "AnyGem":
+        return "Gem"
+    return item  # Trophy, Key
+
+
+def _note_assigned_requirement(req):
+    """Record a KEPT requirement's family for the diversity discount. Called only
+    at the two primary assignment sites in run_sphere_search (stage-1 pad reqs and
+    real stage-2 gates); collapsed echoes and revalidation relaxations do not add
+    diversity pressure."""
+    if req is None:
+        return
+    fam = _req_family(req[0])
+    _DIVERSITY_COUNTS[fam] = _DIVERSITY_COUNTS.get(fam, 0) + 1
+
+
+def _load_two_stage_density(world):
+    """Load the two_stage_density option into the module globals. Called from
+    _load_requirement_preset (i.e. at every run_sphere_search start), so a second
+    seed in the same process always reloads its own values. A missing option (old
+    YAML) falls back to standard = the pre-option constants."""
+    global _STAGE2_REAL_CAP, _STAGE2_COLLAPSE_CHANCE, _DIVERSITY_K, _DIVERSITY_COUNTS
+    opt = getattr(world.options, "two_stage_density", None)
+    key = getattr(opt, "current_key", "standard")
+    if key not in _TWO_STAGE_DENSITY_PARAMS:
+        key = "standard"
+    _STAGE2_REAL_CAP, _STAGE2_COLLAPSE_CHANCE = _TWO_STAGE_DENSITY_PARAMS[key]
+    _DIVERSITY_K = 0.0 if key == "standard" else 0.5
+    _DIVERSITY_COUNTS = {}
+
 
 def _weighted_choice(rnd, pairs):
     """pairs = [(value, weight)]; returns one value via rnd.choices."""
@@ -467,7 +530,15 @@ def _choose_requirement(rnd, inv, allowed=None):
     if not cands:
         return None
     cands.sort()  # Rust sorts possible_reqs before weighting
-    chosen = _weighted_choice(rnd, [(c, REQ_WEIGHTS[c[0]]) for c in cands])
+    if _DIVERSITY_K:
+        # Diminishing-repeat discount (see _DIVERSITY_K above). Guarded so the
+        # standard path passes the untouched int weights (byte-identical draws).
+        pairs = [(c, REQ_WEIGHTS[c[0]]
+                  / (1.0 + _DIVERSITY_K * _DIVERSITY_COUNTS.get(_req_family(c[0]), 0)))
+                 for c in cands]
+    else:
+        pairs = [(c, REQ_WEIGHTS[c[0]]) for c in cands]
+    chosen = _weighted_choice(rnd, pairs)
     req_item, req_cnt = chosen[0], chosen[1]
 
     # Any* collapse stays scoped to the colours/tiers actually allowed: AnyRelic
@@ -734,6 +805,9 @@ _STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
 # needs it" turned into a small uniform relief valve; the golden path is unaffected
 # (tier 1 is always satisfiable-by-construction). Tuned empirically against the
 # two-stage-active FillError tail (see the impl A/B sweep).
+# NOTE: this and _STAGE2_REAL_CAP are import-time defaults (= the "standard"
+# preset); _load_two_stage_density overwrites both per run from the
+# two_stage_density YAML option.
 _STAGE2_COLLAPSE_CHANCE = 35
 # Deterministic cap on the number of REAL (non-collapsed) stage-2 gates per seed.
 # Bounds how many distinct second-stage requirements AP fill_restrictive must order,
@@ -975,6 +1049,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
                     s2_collapsed.add(dest)
                 else:
                     s2_real_count += 1
+                    _note_assigned_requirement(s2)
                 stage2_reqs[dest] = s2
         # re-collect: a just-opened stage 2 may add relics/tokens to inventory.
         open_unassigned = _reachable_pads_and_collect(
@@ -993,6 +1068,7 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
                     key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))[:1]
             track = rnd.choice(reachable)
             pad_reqs[track] = _assign_from_inv(rnd, inv, allowed)
+            _note_assigned_requirement(pad_reqs[track])
             remaining_pads.remove(track)
             _reachable_pads_and_collect(
                 inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
