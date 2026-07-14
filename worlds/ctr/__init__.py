@@ -19,11 +19,11 @@ from .Types import ctrAPItem
 # names also define the trailing item ids in data/items.json (contiguous after
 # Wumpa Fruit); the native received-item loop maps those ids -> AP_TrapReceive.
 TRAP_ITEM_NAMES = [
-    "Icy Road",      # AP_TRAP_ICY
-    "Low Gravity",   # AP_TRAP_LOWGRAV
-    "No Brakes",     # AP_TRAP_USF_NOBRAKE
-    "Forced Boost",  # AP_TRAP_BOOST
-    "First Person",  # AP_TRAP_FIRSTPERSON
+    "Icy Road Trap",      # AP_TRAP_ICY
+    "Low Gravity Trap",   # AP_TRAP_LOWGRAV
+    "No Brakes Trap",     # AP_TRAP_USF_NOBRAKE
+    "Forced Boost Trap",  # AP_TRAP_BOOST
+    "First Person Trap",  # AP_TRAP_FIRSTPERSON
 ]
 
 

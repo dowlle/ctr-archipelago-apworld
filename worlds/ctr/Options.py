@@ -130,8 +130,9 @@ class TrapFillPercentage(Range):
 
     CTR's item pool is almost entirely progression, so the filler pool is small;
     this dial replaces that share of it with trap items rather than adding traps on
-    top of progression. The 5 trap effects (Icy Road, Low Gravity, No Brakes,
-    Forced Boost, First Person) are drawn UNIFORMLY -- each is equally likely.
+    top of progression. The 5 traps (Icy Road Trap, Low Gravity Trap, No Brakes
+    Trap, Forced Boost Trap, First Person Trap) are drawn UNIFORMLY -- each is
+    equally likely.
 
       0   (default) = no traps, filler stays vanilla Wumpa Fruit
       100           = every filler slot becomes a trap
