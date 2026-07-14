@@ -290,6 +290,34 @@ class RequirementSpecificity(Choice):
     default = 0
 
 
+class TwoStageDensity(Choice):
+    """How many trophy pads keep a REAL second-stage gate (a distinct requirement
+    on the pad's CTR Challenge + relic Time Trials beyond the Trophy Race itself)
+    when requirements are randomized. Only affects `Warp Pad Unlock Requirements`
+    = randomized / random_without_4_keys.
+
+    Each value sets the per-seed cap on real stage-2 gates and the per-pad chance
+    that a stage 2 collapses to echo its stage 1 (no extra gate):
+
+    - **off**: every stage 2 echoes its stage 1 -- single-stage seeds.
+    - **light**: cap 4, collapse chance 50% -- a few real second gates.
+    - **standard** (default): cap 6, collapse chance 35% -- the tuned shipping
+      behaviour (byte-identical to seeds generated before this option existed).
+    - **deep**: cap 10, collapse chance 20% -- closest to Icebound's layered feel.
+
+    Higher density puts more ordering pressure on AP's fill. Solo generation is
+    protected by the terminal rollback backstop; expect rare longer generation
+    times at deep on maxed-out configs. At non-standard densities an internal
+    diversity discount also nudges repeat requirement families (mostly Trophies)
+    toward variety, so extra gates do not all come out Trophy-shaped."""
+    display_name = "Two-Stage Gate Density"
+    option_off = 0
+    option_light = 1
+    option_standard = 2
+    option_deep = 3
+    default = 2
+
+
 class BossGarageRequirements(Choice):
     """Choose the requirements for opening boss garages.
 
@@ -442,6 +470,7 @@ class ctrAPOptions(PerGameCommonOptions):
     requirement_variety: RequirementVariety
     requirement_weights: RequirementWeights
     requirement_specificity: RequirementSpecificity
+    two_stage_density: TwoStageDensity
     bossgarage_unlock_requirements: BossGarageRequirements
     autounlock_ctrchallenge_relicrace: AutoUnlockCtrChallengeRelicRace
     comfort_guards: ComfortGuards
@@ -471,6 +500,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementVariety,
         RequirementWeights,
         RequirementSpecificity,
+        TwoStageDensity,
         AutoUnlockCtrChallengeRelicRace,
         ComfortGuards,
         BossGarageRequirements,
