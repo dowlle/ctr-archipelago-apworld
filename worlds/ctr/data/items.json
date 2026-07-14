@@ -15,9 +15,9 @@
   {"name": "Purple Gem", "count": 1, "classification": "progression"},
   {"name": "Key", "count": 4, "classification": "progression"},
   {"name": "Wumpa Fruit", "count": 1, "classification": "filler"},
-  {"name": "Icy Road", "count": 0, "classification": "trap"},
-  {"name": "Low Gravity", "count": 0, "classification": "trap"},
-  {"name": "No Brakes", "count": 0, "classification": "trap"},
-  {"name": "Forced Boost", "count": 0, "classification": "trap"},
-  {"name": "First Person", "count": 0, "classification": "trap"}
+  {"name": "Icy Road Trap", "count": 0, "classification": "trap"},
+  {"name": "Low Gravity Trap", "count": 0, "classification": "trap"},
+  {"name": "No Brakes Trap", "count": 0, "classification": "trap"},
+  {"name": "Forced Boost Trap", "count": 0, "classification": "trap"},
+  {"name": "First Person Trap", "count": 0, "classification": "trap"}
 ]
