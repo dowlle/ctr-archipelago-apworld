@@ -164,8 +164,10 @@ def create_regions(world: "ctrAPWorld"):
     # out of the trophy-pad destination shuffle (so a Gem Cup can never land in the
     # Turbo Track pad), and (b) create_items pinning Turbo Track's relic rewards
     # vanilla so progression is never placed behind that gate. Inert when unlocks are
-    # randomized or gems are shuffled; OFF removes the guard (allows the chain).
-    world._ctr_comfort_guards = bool(opts.comfort_guards.value)
+    # randomized or gems are shuffled. ALWAYS ON since the 2026-07-15 release
+    # polish (design ruling): the former `comfort_guards` YAML toggle only ever
+    # bought its user the tedious forced chain, so the knob was removed.
+    world._ctr_comfort_guards = True
     world._ctr_force_vanilla_turbotrack = (
         world._ctr_comfort_guards
         and unlock_mode == 0
@@ -424,10 +426,14 @@ def create_regions(world: "ctrAPWorld"):
     unlock_mode = getattr(world, "_ctr_unlock_mode", 0)
     if unlock_mode in (1, 2):
         reward_track_for = _build_reward_track_resolver(world)
-        # autounlock_ctrchallenge_relicrace (Icebound clear_stage2_unlocks): collapse
-        # every stage 2 to OPEN. Then there is no two-stage hold-back and no token
-        # pinning -- the seed behaves like the single-stage baseline.
-        collapse_s2 = bool(world.options.autounlock_ctrchallenge_relicrace.value)
+        # two_stage_density = off (Icebound clear_stage2_unlocks): collapse every
+        # stage 2 to OPEN -- no two-stage hold-back, no token pinning; the seed
+        # behaves like the single-stage baseline. This absorbed the former
+        # `autounlock_ctrchallenge_relicrace` toggle (2026-07-15 release polish):
+        # the old off=echo behaviour was outcome-identical (an echoed stage-2
+        # requirement is met the moment stage 1 is), so one knob now covers it.
+        collapse_s2 = (getattr(world.options.two_stage_density, "current_key",
+                               "standard") == "off")
         world._ctr_two_stage_active = not collapse_s2
         pad_reqs = run_sphere_search(world, unlock_mode, reward_track_for,
                                      collapse_stage2=collapse_s2,

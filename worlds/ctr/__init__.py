@@ -8,7 +8,7 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
-from .Options import ctrAPOptions, Goal
+from .Options import ctrAPOptions, Goal, create_option_groups
 from .Regions import create_regions
 from .Rules import set_rules
 from .Types import ctrAPItem
@@ -29,6 +29,9 @@ TRAP_ITEM_NAMES = [
 
 class ctrAPWeb(WebWorld):
     theme = "Party"
+    # Groups the options page + YAML template by topic (was defined in Options.py
+    # but never wired here, so the page rendered one flat list).
+    option_groups = create_option_groups()
 
     tutorials = [
         Tutorial(
@@ -606,10 +609,11 @@ class ctrAPWorld(World):
             pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
         )["ShuffleOptions"]
 
-        # Gems: pin to gem-cup locations when shuffle_gems is OFF. For the all-gem-
-        # cups goal the gems are ALWAYS pinned, but gemgoal() already placed them
-        # (and place_locked_item on an already-filled location would raise), so skip
-        # the placement here for that goal -- the pool exclusion below still applies.
+        # Gems: pin to gem-cup locations when shuffle_gems is OFF. For the All-Gems
+        # goal with shuffle off, gemgoal() already placed them (and
+        # place_locked_item on an already-filled location would raise), so skip the
+        # placement here for that goal -- the pool exclusion below still applies.
+        # All-Gems + shuffle ON pins nothing anywhere: the gems ride the pool.
         if not self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
                 mw.get_location(_loc_name, player).place_locked_item(
@@ -637,7 +641,13 @@ class ctrAPWorld(World):
         # which case _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
-            if _GEM_GOAL and item["name"] in _GEMS:
+            # All-Gems goal: exclude the gems from the general pool ONLY when
+            # gemgoal() locked them onto their cups (shuffle_gems off) -- adding
+            # them again would overflow the pool (see the note above). With
+            # shuffle_gems ON the gems stay in the pool: they are the goal items,
+            # hidden wherever the fill puts them (2026-07-15 ruling).
+            if _GEM_GOAL and not self.options.shuffle_gems.value \
+                    and item["name"] in _GEMS:
                 continue
             count = item["count"]
             if item["name"] in _relic_locked:                         # slider-pinned relics
@@ -697,18 +707,24 @@ class ctrAPWorld(World):
         # while keeping real, distinct tier-2 gates on the great majority of pads.
 
     def gemgoal(self, player):
-        """Locks gem rewards in the appropriate Gem Cup locations."""
+        """All-Gems goal: completion = own all 5 Gems. With Shuffle Gems OFF the
+        gems are additionally locked onto their own Gem Cup locations (win every
+        cup); with Shuffle Gems ON they stay in the multiworld pool and the goal
+        is a hunt for wherever the fill hid them (create_items keeps them in the
+        pool for this goal, and native's goal 4 already counts RECEIVED gems, so
+        both placements complete identically)."""
         # Read via pkgutil so it works when the world is loaded from a zipped
         # .apworld (open()/os.path on __file__ raises NotADirectoryError inside a
         # zip -- the gem-cup goal crashed on every distributed seed). pkgutil is
         # the mandatory pattern for all packaged data reads in this world.
-        _mapping = json.loads(
-            pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
-        )
         mw = self.multiworld
-        for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
-            loc = mw.get_location(loc_name, player)
-            loc.place_locked_item(self.create_item(gem_name))
+        if not self.options.shuffle_gems.value:
+            _mapping = json.loads(
+                pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
+            )
+            for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
+                loc = mw.get_location(loc_name, player)
+                loc.place_locked_item(self.create_item(gem_name))
 
         mw.completion_condition[player] = lambda state: all(
             state.has(g, player, 1)
@@ -898,8 +914,11 @@ class ctrAPWorld(World):
             "ctr_options": {
                 "schema_version": 4,
                 "goal": o.goal.value,
-                "relic_min_time": o.rr_required_minimum_time.value,
-                "relics_require_perfect": bool(o.rr_require_perfects.value),
+                # relic_min_time / relics_require_perfect were dropped with their
+                # YAML options (2026-07-15 release polish): native parsed both but
+                # never enforced them. json_int defaults the absent keys to 0, the
+                # exact values every seed ever sent. Reintroduce key+option together
+                # when the native enforcement lands.
                 "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
                 "shuffle_warp_pads": derived_shuffle,
                 "warp_pad_shuffle_categories": sorted(o.warp_pad_shuffle_categories.value),
