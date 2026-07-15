@@ -51,13 +51,17 @@ Set your slot name (spelled exactly as it will appear in the room) and your
 options, then hand the YAML to whoever generates the multiworld. As a player you
 only need the YAML you submitted, the client set up below, and your slot name.
 
-A few options worth knowing about: with randomized warp pad requirements,
-`two_stage_density` controls how many trophy pads carry a real second-stage
-gate (an extra requirement on the pad's CTR Challenge and Time Trial beyond
-the Trophy Race itself), from `off` to `deep`; and `trap_fill_percentage` adds
-trap items to the pool — they are all named with a "... Trap" suffix (for
-example "Icy Road Trap"), so you can tell at a glance when one is headed your
-way. Every option is documented in the template YAML.
+The defaults give you the full randomizer experience: randomized warp-pad
+requirements with destination shuffle, the Gems shuffled into the pool, Gem
+Cups included, and a 10% sprinkle of trap items (all named with a "... Trap"
+suffix, for example "Icy Road Trap", so you can tell at a glance when one is
+headed your way). A few dials worth knowing about: `two_stage_density`
+controls how many trophy pads carry a real second-stage gate (an extra
+requirement on the pad's CTR Challenge and Time Trial beyond the Trophy Race
+itself), from `off` to `full`; `trap_fill_percentage` sets the trap share; and
+`warppad_unlock_requirements: vanilla` gives you the original adventure's
+trophy gates if you want a gentler first seed. Every option is documented in
+the template YAML.
 
 ## Setting up the game client
 
