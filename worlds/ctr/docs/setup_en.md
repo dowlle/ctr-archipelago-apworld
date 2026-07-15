@@ -141,6 +141,21 @@ from the in-game Connection screen (`config.ini`) take precedence when both
 exist. The example file also documents a few optional quality of life toggles
 (`skip_hints`, `map_flash`).
 
+### Optional: controllers and Steam Input
+
+Controllers work out of the box: the game uses SDL, so common gamepads (Xbox
+controllers, DualShock 4 / DualSense, and most others) are picked up
+automatically with a PlayStation-style layout, whether connected before or
+after launch.
+
+If you would rather run your controller through **Steam Input** (a Steam
+Controller, custom button remapping, or per-game controller configurations),
+add the game to Steam as a non-Steam game: in Steam, choose **Games → Add a
+Non-Steam Game to My Library…**, browse to the game executable, and from then
+on launch it from your Steam library. Steam Input then treats it like any
+other Steam game. One note: the in-game Connection screen is typed with a
+real keyboard, so set up your room before handing off to the couch.
+
 ## Troubleshooting
 
 - **"Missing or incomplete assets" at startup:** the `assets` folder is not next
