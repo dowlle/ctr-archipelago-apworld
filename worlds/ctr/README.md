@@ -6,7 +6,9 @@ This world targets the native PC client [`ctr-native-ap`](https://github.com/dow
 
 The randomization design builds on Icebound777's CTR randomizer (MIT), and this project carries the native path forward with his blessing. The foundational work, and the credit for it, stays with him and Taor.
 
-**Status: in development, not yet released.** The code is public for collaboration and transparency; there is no supported player-facing release yet.
+Releases ship as a pair (client + `ctr.apworld`) on the [client's releases page](https://github.com/dowlle/ctr-native-ap/releases).
+
+**Found a bug?** Please report it on the [client repo's issue tracker](https://github.com/dowlle/ctr-native-ap/issues), whichever half seems at fault - that is the single intake for the whole project. Issues that turn out to be purely generation-side get transferred here, and the link you posted keeps working.
 
 ---
 
