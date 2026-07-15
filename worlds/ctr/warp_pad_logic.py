@@ -362,12 +362,14 @@ _ANY_COLLAPSE_PARAMS = {
 # overwrites these from the chosen preset at run_sphere_search() start. Default seed
 # generation uses icebound_beta5 (see Options.RequirementVariety.default = 0).
 REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
-# requirement_specificity toggle (Options.RequirementSpecificity). True = any_of:
-# a collapsed Any* requirement stays a genuine "any N of type" aggregate (emitted as
-# native type 6/7/8). False = specific_colour: flatten via _resolve_any to a single
-# concrete colour/tier (legacy type 3/4/5). Set per-run in _load_requirement_preset;
-# module default False keeps importers on the legacy concrete path.
-_ANY_OF_MODE = False
+# Any*-aggregate expression mode. True = any_of: a collapsed Any* requirement
+# stays a genuine "any N of type" aggregate (emitted as native type 6/7/8).
+# ALWAYS TRUE since the 2026-07-15 release polish: the former
+# `requirement_specificity` YAML option existed only as a compatibility escape
+# hatch for native builds without the any-of aggregate patch, which every
+# release build has. The False (specific_colour) flatten path via _resolve_any
+# is kept in code but is no longer reachable from options.
+_ANY_OF_MODE = True
 _TOKEN_COLLAPSE_CHANCE = 33
 _TOKEN_COLLAPSE_SCALE = 0.6
 _TOKEN_COLLAPSE_CAP = None
@@ -409,10 +411,9 @@ def _load_requirement_preset(world):
     global _GEM_COLLAPSE_CHANCE, _GEM_COLLAPSE_CAP
     global _ANY_OF_MODE
 
-    # requirement_specificity: any_of (default, value 0) keeps Any* unsplit; a missing
-    # option (old YAML) falls back to any_of -- the new default behaviour.
-    spec_opt = getattr(world.options, "requirement_specificity", None)
-    _ANY_OF_MODE = getattr(spec_opt, "value", 0) == 0
+    # any_of is the only mode since the 2026-07-15 release polish (the
+    # requirement_specificity option was removed; see the module-global note).
+    _ANY_OF_MODE = True
 
     variety_opt = getattr(world.options, "requirement_variety", None)
     # Choice options expose .current_key ("icebound_beta5" etc.); fall back to legacy.
@@ -448,10 +449,17 @@ def _load_requirement_preset(world):
 # before the collapse roll, so every stage 2 echoes its stage 1 and consumes no
 # RNG on the roll -- deliberate, documented in the option).
 _TWO_STAGE_DENSITY_PARAMS = {
+    # "off" no longer reaches this table: since the 2026-07-15 release polish it
+    # short-circuits in Regions.py as collapse_stage2=True (the former autounlock
+    # behaviour -- stage 2 literally free). The row is kept as a safe fallback.
     "off":      (0, 100),
     "light":    (4, 50),
     "standard": (6, 35),
     "deep":     (10, 20),
+    # "full": every trophy pad that CAN carry a real stage-2 gate gets one -- cap
+    # = all 16 trophy pads, no random collapse. Only the golden-path guard (a)
+    # still collapses (nothing ownable backs a gate). The densest legal seeds.
+    "full":     (16, 0),
 }
 
 # Within-seed diminishing-repeat discount (T6, deep-dive 2026-07-11): each
@@ -852,8 +860,9 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
     only for the 16 trophy pads (others get 2: None). mode 2 = random_without_4_keys.
     Deterministic on world.random.
 
-    collapse_stage2 (= the autounlock_ctrchallenge_relicrace option): when True,
-    every stage 2 is left OPEN (no requirement) -- Icebound's clear_stage2_unlocks,
+    collapse_stage2 (= two_stage_density "off"; absorbed the former
+    autounlock_ctrchallenge_relicrace toggle, 2026-07-15): when True, every
+    stage 2 is left OPEN (no requirement) -- Icebound's clear_stage2_unlocks,
     which overwrites every Stage-Two requirement to Trophy x0 so the relic/token
     menu opens the instant the trophy race is beaten. The pad's TT/token rewards
     then collect as soon as the trophy race is reachable (no stage-2 hold-back).
@@ -1358,7 +1367,7 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
 # ---------------------------------------------------------------------------
 
 _COLOURS = ["Red", "Green", "Blue", "Yellow", "Purple"]
-# Relic tiers ride the SAME colour field as token/gem colours (Stef ruling
+# Relic tiers ride the SAME colour field as token/gem colours (design ruling
 # 2026-07-08): 0 = Sapphire, 1 = Gold, 2 = Platinum. Tiers are INDEPENDENT items
 # (a Gold req is met ONLY by Gold Relic -- no downward hierarchy), so the concrete
 # tier must survive the wire; dropping it to colour -1 silently rewrote every
