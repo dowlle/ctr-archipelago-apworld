@@ -17,9 +17,10 @@ and sends your location checks and goal.
   North American release is supported: PAL (European) and Japanese discs are
   detected and refused. This project ships no game data; you supply it from your
   own disc.
-- **Python 3.8 or newer**, only for the recommended asset extractor below. If
-  your image is a `.chd`, you also need the `chdman` tool (it ships with the MAME
-  tools) on your PATH.
+- **Python 3.8 or newer**, only if you use the optional asset extractor below
+  (it saves disk space and is the route for `.chd` images). If your image is a
+  `.chd`, you also need the `chdman` tool (it ships with the MAME tools) on
+  your PATH.
 - The **Archipelago installation**, if you are the one generating the
   multiworld, from the [Archipelago releases page](https://github.com/ArchipelagoMW/Archipelago/releases).
 
@@ -69,12 +70,30 @@ add the game data and your server settings next to it.
 
 ### Step 2: add your game assets
 
-You have two options. The extractor is recommended.
+You have two options. The disc image drop-in is the easiest and needs no extra
+tools.
 
-**Recommended: extract the assets.** The extractor reads your disc image and
-copies out only the files the game needs into an `assets` folder, checking the
-region and that nothing is missing. From the folder that holds the executable,
-run:
+**Recommended: drop in your disc image.** The game reads the raw disc image
+directly. Copy your NTSC-U `.bin`, rename the copy to `ctr-u.bin`, and place
+it in an `assets` folder next to the executable:
+
+```
+CTR-AP/
+  ctr_native_ap.exe
+  assets/
+    ctr-u.bin
+```
+
+That's it — no Python, no extraction step. The image must be the common
+single-track raw PlayStation BIN layout (MODE2/2352 sectors). A cooked
+2048-byte `.iso` does not carry the audio and video sector data the game
+needs, so it will not work. This path does not check the disc region, so make
+sure the image really is the North American (NTSC-U) release.
+
+**Alternative: extract the assets** (saves disk space; the route for `.chd`
+images). The extractor reads your disc image, verifies the region, and copies
+out only the files the game needs into an `assets` folder. It needs Python
+3.8+. From the folder that holds the executable, run:
 
 ```
 python extract_assets.py "path/to/your/CTR.cue"
@@ -96,23 +115,6 @@ CTR-AP/
     XA/ENG/GAME/S00.XA ... S20.XA
     XA/MUSIC/S00.XA ... S01.XA
 ```
-
-**Alternative: one raw file, no extractor.** The game can also read the raw disc
-image directly. Rename your NTSC-U `.bin` to `ctr-u.bin` and place it in the
-`assets` folder:
-
-```
-CTR-AP/
-  ctr_native_ap.exe
-  assets/
-    ctr-u.bin
-```
-
-This must be the common single-track raw PlayStation BIN layout (MODE2/2352
-sectors). A cooked 2048-byte `.iso` does not carry the audio and video sector
-data the game needs, so it will not work. This path skips the region check and
-uses more disk space than the extracted folder, which is why the extractor is
-recommended.
 
 ### Step 3: connect to your room
 
@@ -142,8 +144,10 @@ exist. The example file also documents a few optional quality of life toggles
 ## Troubleshooting
 
 - **"Missing or incomplete assets" at startup:** the `assets` folder is not next
-  to the executable, or a file did not extract. Re-run the extractor and make
-  sure the `assets` folder sits in the same directory as the executable.
+  to the executable, the disc image inside it is not named `ctr-u.bin`, or a
+  file did not extract. Make sure the `assets` folder sits in the same
+  directory as the executable and holds either `ctr-u.bin` or a complete
+  extracted set.
 - **"PAL is not supported yet" from the extractor:** your disc is the European
   release. You need the North American (NTSC-U) disc, whose boot id starts with
   SCUS.
