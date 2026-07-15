@@ -101,15 +101,16 @@ class TrapFillPercentage(Range):
     default = 10
 
 
-class ShuffleWarpPadsBattleArenas(Toggle):
+class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
     """Bring the 4 Battle Arenas (and their Crystal Challenges) into the seed:
     their checks become normal locations and, in a randomized-unlock seed, their
     warp pads get a randomized entry requirement instead of the vanilla gate.
 
-    This is also the participation gate for the `crystals` destination-shuffle
-    category: crystals can only be destination-shuffled (via `Warp Pad Shuffle
-    Categories`) when this is on. Off -> crystals stay fully vanilla-fixed
-    (vanilla checks, vanilla gate, never destination-shuffled)."""
+    Not the same thing as `crystals` in `Warp Pad Shuffle Categories`: THIS
+    option puts the arenas in the seed at all; the category set only controls
+    whether their pads' DESTINATIONS get shuffled, and it does nothing while
+    this is off. Off -> crystals stay fully vanilla-fixed (vanilla checks,
+    vanilla gate, never destination-shuffled)."""
     display_name = "Include Battle Arena Warp Pads"
 
 
