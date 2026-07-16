@@ -101,6 +101,21 @@ class TrapFillPercentage(Range):
     default = 10
 
 
+class OneLapCups(Toggle):
+    """Make Cup races one lap each instead of the usual three.
+
+    A pure pace/quality-of-life setting for seeds that send you through many
+    cups. It only shortens CUP races (Arcade/VS cups, including the Gem Cups);
+    single races, boss races, relic time trials and CTR Token challenges keep
+    their normal lap count. It reuses the engine's built-in one-lap mechanism
+    (the vanilla one-lap cheat), just scoped to cups.
+
+    It changes NOTHING about logic, item placement or which locations exist --
+    every check is reached exactly as it would be with this off, only faster.
+    Off by default."""
+    display_name = "One-Lap Cup Races"
+
+
 class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
     """Bring the 4 Battle Arenas (and their Crystal Challenges) into the seed:
     their checks become normal locations and, in a randomized-unlock seed, their
@@ -379,6 +394,8 @@ class ctrAPOptions(PerGameCommonOptions):
     # extra location checks
     podium_placement_checks: PodiumPlacementChecks
     podium_any_position_rung: PodiumAnyPositionRung
+    # quality of life
+    one_lap_cups: OneLapCups
     # relic difficulty
     sapphire_relic_progression: SapphireRelicProgression
     gold_relic_progression: GoldRelicProgression
@@ -401,6 +418,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementWeights,
     ],
     "Extra Checks": [PodiumPlacementChecks, PodiumAnyPositionRung],
+    "Quality of Life": [OneLapCups],
     "Relic Difficulty": [SapphireRelicProgression, GoldRelicProgression,
                          PlatinumRelicProgression],
 }

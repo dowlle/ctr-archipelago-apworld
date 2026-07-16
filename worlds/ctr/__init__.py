@@ -927,6 +927,11 @@ class ctrAPWorld(World):
                 "shuffle_keys": bool(o.shuffle_keys.value),
                 "warppad_unlock_mode": o.warppad_unlock_requirements.value,
                 "bossgarage_mode": o.bossgarage_unlock_requirements.value,
+                # QoL, additive (no schema bump): one-lap cup races. Native
+                # json_int defaults the absent key to 0, so a pre-one-lap-cups
+                # native (or an old seed on a new native) is exactly vanilla lap
+                # counts. Pure pace setting -- never touches logic/fill/reachability.
+                "one_lap_cups": bool(o.one_lap_cups.value),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
