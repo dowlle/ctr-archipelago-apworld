@@ -522,9 +522,17 @@ class ctrAPWorld(World):
         # Oxide-final goal (issue #23): the relic tiers that satisfy the configured
         # mode+count must be progression so fill, the spoiler playthrough, and
         # beatability chase the REAL goal (not the old hard-coded 18 Sapphire).
-        # Respect the per-tier sliders -- a tier at `never` (0) stays out and is
-        # caught by generate_early's guard rather than silently forced back on.
+        # Respect the per-tier sliders -- a satisfying tier at `never` (0) stays
+        # out and is caught by generate_early's guard rather than silently forced.
         if goal == Goal.option_oxidefinal:
+            # Sapphire is progression on ANY oxidefinal seed (mode-independent).
+            # The two vanilla relic-count LOCATION gates are BOTH sapphire (Slide
+            # Coliseum has('Sapphire Relic', 10); N. Oxide's Final Challenge has 18),
+            # so once the goal makes any relic tier progression, fill may place a
+            # progression relic behind the Slide Coliseum sapphire gate -- Sapphire
+            # must stay progression to keep those locations reachable. This mirrors
+            # the pre-#23 goal, which was itself 18 Sapphire and always set this.
+            prog["Sapphire Relic"] = True
             for tier in self._oxide_goal_tiers():
                 if self._relic_slider_for(tier) > 0:
                     prog[tier] = True
