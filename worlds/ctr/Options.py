@@ -30,15 +30,55 @@ class Goal(Choice):
 
 
 class FinalOxideUnlock(Choice):
-    """Choose what types of relics are required to turn Oxide's Challenge into
-    Oxide's Final Challenge.
+    """Choose WHICH relics gate turning Oxide's Challenge into Oxide's Final
+    Challenge. The COUNT is set separately by `Oxide's Final Challenge Relic
+    Count` (1-18, default 18) and is shared by every mode.
 
-    - **18 Sapphire Relics**: You need all 18 Sapphire relics (Golds and Platinums are ignored).
-    - **18 Gold+Platinum Relics**: You need at least a combined total of 18 Gold relics and Platinum relics."""
+    Relic tiers are INDEPENDENT items with no downward hierarchy: a Platinum
+    relic does NOT count toward a Gold requirement. (The only cross-tier
+    hierarchy is location-side, on the race award path -- beating a Platinum
+    time also sends that track's Gold and Sapphire checks -- which is unrelated
+    to which relic ITEMS you own.)
+
+    - **sapphire_relics** (default): N Sapphire Relic items received.
+    - **gold_relics**: N Gold Relic items received.
+    - **platinum_relics**: N Platinum Relic items received.
+    - **any_relic_type**: any single relic type reaches N (Sapphire OR Gold OR Platinum).
+    - **total_relics**: all relic items added together reach N.
+
+    NOTE: a goal (or a settings combo) that requires a relic tier whose
+    `<tier>_relic_progression` is set to `never` fails generation with a clear
+    message -- raise that tier's progression, or pick a mode/count the enabled
+    tiers can satisfy. The old `18_gold_and_platinum_relics` value is REMOVED;
+    YAMLs carrying it must update."""
     display_name = "Oxide's Final Challenge Unlock"
-    option_18_sapphire_relics = 0
-    option_18_gold_and_platinum_relics = 1
+    option_sapphire_relics = 0
+    option_gold_relics = 1
+    option_platinum_relics = 2
+    option_any_relic_type = 3
+    option_total_relics = 4
+    # Back-compat alias: the pre-v0.1.1 default value maps exactly onto the new
+    # default (sapphire_relics + the default count 18 == the old "18 Sapphire
+    # Relics"). The other pre-v0.1.1 value, 18_gold_and_platinum_relics, is
+    # DELIBERATELY not aliased -- it is removed, not remapped (issue #23), so an
+    # old YAML carrying it fails generation with AP's standard invalid-option
+    # error instead of silently changing meaning.
+    alias_18_sapphire_relics = 0
     default = 0
+
+
+class FinalOxideRelicCount(NamedRange):
+    """How many relics `Oxide's Final Challenge Unlock` requires. Shared by every
+    mode (for `total_relics` it is the summed total; for `any_relic_type` it is
+    the threshold any single tier must reach).
+
+    Range 1-18. Totals above 18 are deliberately not offered (all-relics-slog
+    territory)."""
+    display_name = "Oxide's Final Challenge Relic Count"
+    range_start = 1
+    range_end = 18
+    default = 18
+    special_range_names = {"all": 18}
 
 
 class ShuffleGems(DefaultOnToggle):
@@ -362,6 +402,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # goal & endgame
     goal: Goal
     oxide_final_challenge_unlock: FinalOxideUnlock
+    oxide_final_challenge_relic_count: FinalOxideRelicCount
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -388,7 +429,7 @@ class ctrAPOptions(PerGameCommonOptions):
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
-    "Goal": [Goal, FinalOxideUnlock],
+    "Goal": [Goal, FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, ShuffleKeys,
                      TrapFillPercentage],
     "Warp Pads": [

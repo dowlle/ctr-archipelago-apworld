@@ -8,7 +8,7 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
-from .Options import ctrAPOptions, Goal, create_option_groups
+from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
 from .Regions import create_regions
 from .Rules import set_rules
 from .Types import ctrAPItem
@@ -70,6 +70,102 @@ class ctrAPWorld(World):
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
         self.start_region = None
+
+    # --- Oxide-final goal helpers (issue #23) ---
+
+    # Relic item name per FinalOxideUnlock relic-count slider.
+    _OXIDE_TIER_SLIDER = {
+        "Sapphire Relic": "sapphire_relic_progression",
+        "Gold Relic": "gold_relic_progression",
+        "Platinum Relic": "platinum_relic_progression",
+    }
+
+    def _oxide_goal_tiers(self) -> List[str]:
+        """Relic item names that can satisfy the configured Oxide-final mode.
+        Single-tier modes name one tier; any_relic_type / total_relics draw on
+        all three (independent items -- no downward hierarchy)."""
+        mode = self.options.oxide_final_challenge_unlock.value
+        F = FinalOxideUnlock
+        if mode == F.option_gold_relics:
+            return ["Gold Relic"]
+        if mode == F.option_platinum_relics:
+            return ["Platinum Relic"]
+        if mode in (F.option_any_relic_type, F.option_total_relics):
+            return ["Sapphire Relic", "Gold Relic", "Platinum Relic"]
+        return ["Sapphire Relic"]  # sapphire_relics (default) + any unknown
+
+    def _relic_slider_for(self, relic_item: str) -> int:
+        return getattr(self.options, self._OXIDE_TIER_SLIDER[relic_item]).value
+
+    def _oxide_final_relic_rule(self):
+        """A CollectionState predicate for the configured Oxide-final relic
+        requirement (mode + count). Relic tiers are independent counted items,
+        so this reads item counts directly: owning N relic items IS the
+        requirement, and a duplicate landing elsewhere cannot false-complete a
+        count -- so no companion-flag decoupling is needed for the relic half
+        (the Key-4 reachability half keeps its flag event)."""
+        p = self.player
+        n = self.options.oxide_final_challenge_relic_count.value
+        mode = self.options.oxide_final_challenge_unlock.value
+        F = FinalOxideUnlock
+        S, G, Pl = "Sapphire Relic", "Gold Relic", "Platinum Relic"
+        if mode == F.option_gold_relics:
+            return lambda st: st.has(G, p, n)
+        if mode == F.option_platinum_relics:
+            return lambda st: st.has(Pl, p, n)
+        if mode == F.option_any_relic_type:
+            return lambda st: st.has(S, p, n) or st.has(G, p, n) or st.has(Pl, p, n)
+        if mode == F.option_total_relics:
+            return lambda st: (st.count(S, p) + st.count(G, p)
+                               + st.count(Pl, p)) >= n
+        return lambda st: st.has(S, p, n)  # sapphire_relics (default)
+
+    def generate_early(self) -> None:
+        """Generation-time progression guard for the Oxide-final goal (issue #23).
+
+        When the goal IS Oxide's Final Challenge, the relic tiers that satisfy the
+        configured mode+count must be able to supply the goal as PROGRESSION
+        (visible to fill / beatability). A tier whose `*_relic_progression` is
+        `never` (0) is opted fully out of AP progression by the player; if the
+        goal can only be satisfied by such tiers, the goal would be invisible to
+        AP (the stranding class in the report). Error clearly here instead of
+        emitting a world whose goal AP cannot see -- respecting the per-tier
+        sliders rather than silently forcing a tier back on."""
+        from Options import OptionError
+        if self.options.goal.value != Goal.option_oxidefinal:
+            return
+        n = self.options.oxide_final_challenge_relic_count.value
+        tiers = self._oxide_goal_tiers()
+        # A satisfying tier can supply the goal exactly when this seed classifies
+        # it as PROGRESSION (its 18 relics are then reachable + visible to fill).
+        # _relic_progression_map is the single source of that truth and is already
+        # warp-pad-mode-aware: randomized mode keeps ALL tiers progression (slider
+        # only governs pinning, not classification), while vanilla mode makes a
+        # goal tier progression only when its slider > 0. Basing the guard on the
+        # same map means it fires exactly when the goal really would be invisible.
+        prog = self._relic_progression_map()
+        prog_tiers = [t for t in tiers if prog.get(t, False)]
+        # N <= 18 and each progression tier supplies 18 reachable relics, so one
+        # progression tier satisfies single-tier / any_relic_type; total_relics
+        # needs the summed progression supply to reach N.
+        if self.options.oxide_final_challenge_unlock.value \
+                == FinalOxideUnlock.option_total_relics:
+            ok = 18 * len(prog_tiers) >= n
+        else:
+            ok = len(prog_tiers) >= 1
+        if not ok:
+            mode_key = self.options.oxide_final_challenge_unlock.current_key
+            sliders = ", ".join(
+                f"{self._OXIDE_TIER_SLIDER[t]}={self._relic_slider_for(t)}"
+                for t in tiers)
+            raise OptionError(
+                f"CTR goal 'oxidefinal' with Oxide's Final Challenge Unlock "
+                f"'{mode_key}' needs {n} relic(s) from {tiers}, but no satisfying "
+                f"tier is generated as progression in this seed ({sliders}); in "
+                f"vanilla warp-pad mode a tier whose *_relic_progression is "
+                f"'never' (0) is opted out of progression, so the goal would be "
+                f"unreachable. Raise one of those sliders above 0, switch to "
+                f"randomized warp-pad unlock, or change the goal, mode, or count.")
 
     def create_regions(self):
         create_regions(self)
@@ -416,10 +512,22 @@ class ctrAPWorld(World):
             return prog  # randomized modes: any pad may gate on any relic tier
         goal = o.goal.value
         access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
-        reach_oxide_final = access_full or goal == Goal.option_oxidefinal
-        prog["Sapphire Relic"] = reach_oxide_final
+        # Base vanilla-mode classification: the ONLY vanilla LOCATION gate that
+        # names a relic is Sapphire (Slide Coliseum has('Sapphire Relic', 10)),
+        # so Sapphire is progression exactly when every location must be reachable
+        # (accessibility: full). Gold/Platinum gate no vanilla location.
+        prog["Sapphire Relic"] = access_full
         prog["Gold Relic"] = False
         prog["Platinum Relic"] = False
+        # Oxide-final goal (issue #23): the relic tiers that satisfy the configured
+        # mode+count must be progression so fill, the spoiler playthrough, and
+        # beatability chase the REAL goal (not the old hard-coded 18 Sapphire).
+        # Respect the per-tier sliders -- a tier at `never` (0) stays out and is
+        # caught by generate_early's guard rather than silently forced back on.
+        if goal == Goal.option_oxidefinal:
+            for tier in self._oxide_goal_tiers():
+                if self._relic_slider_for(tier) > 0:
+                    prog[tier] = True
         return prog
 
     def create_event(self, event: str):
@@ -489,16 +597,22 @@ class ctrAPWorld(World):
             mw.completion_condition[player] = (
                 lambda state, f=flag: state.has(f, player))
         elif goal == Goal.option_oxidefinal:
-            # This companion event is the seed's terminal win-flag. Its win-trigger
-            # mirrors the real location's vanilla logic (Key 4 + 18 Sapphire); the
-            # 18-Gold+Platinum alt of oxide_final_unlock is not modeled in apworld logic
-            # today (pre-existing -- native reads that option), so mirroring keeps the
-            # exact current solvability semantics.
+            # The companion event is the seed's terminal win-flag; its win-trigger
+            # is reaching Oxide's garage (Key 4). The relic requirement that turns
+            # Oxide's Challenge into the FINAL Challenge (issue #23) is ANDed into
+            # completion_condition below from the configured
+            # oxide_final_challenge_unlock mode + count -- so fill, the spoiler
+            # playthrough, and beatability chase the real goal instead of the old
+            # hard-coded 18 Sapphire. The satisfying tiers are made progression by
+            # _relic_progression_map, and generate_early has already errored out on
+            # any mode/count/slider combo that could not reach the goal.
             flag = self._add_goal_event(
                 "N. Oxide Garage", "N. Oxide's Final Challenge Cleared",
-                "has('Key', 4) and has('Sapphire Relic', 18)")
+                "has('Key', 4)")
+            relic_rule = self._oxide_final_relic_rule()
             mw.completion_condition[player] = (
-                lambda state, f=flag: state.has(f, player))
+                lambda state, f=flag, r=relic_rule:
+                    state.has(f, player) and r(state))
         elif goal == Goal.option_allbosses:
             # Pair each real Boss Race location with a companion event of the same
             # reachability. The Boss Race location's own rule is "True"; the garage
@@ -904,22 +1018,28 @@ class ctrAPWorld(World):
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
-            # schema_version 4 (2026-07-08): type-4 relic requirements now carry the
-            # concrete tier in `colour` (0 Sapphire / 1 Gold / 2 Platinum) instead of a
-            # flattened -1. This is a native-version GATE: an old native reading a v4
-            # seed would treat every gold/platinum gate as sapphire, so it must check
-            # schema_version >= 4 before trusting type-4 colour. (v3 = podium + stage-2
-            # padgate; v2 = two-stage contract.)
-            "schema_version": 4,
+            # schema_version 5 (2026-07-16, issue #23): oxide_final_unlock grows
+            # from a 0/1 flag into a relic-goal MODE (0 sapphire / 1 gold / 2
+            # platinum / 3 any-single-type / 4 total) plus a new oxide_final_count
+            # (1-18). This is a native-version GATE: a v4 native reads
+            # oxide_final_unlock==1 as the removed "18 gold AND 18 platinum" rule
+            # and has no count field, so a v5 seed's Oxide-final gate would be
+            # mis-enforced -- it must check schema_version >= 5. Ships with the
+            # newer-schema warn/refuse (issue #8). (v4 = relic-tier colour +
+            # goal-rework; v3 = podium + stage-2 padgate; v2 = two-stage contract.)
+            "schema_version": 5,
             "ctr_options": {
-                "schema_version": 4,
+                "schema_version": 5,
                 "goal": o.goal.value,
                 # relic_min_time / relics_require_perfect were dropped with their
                 # YAML options (2026-07-15 release polish): native parsed both but
                 # never enforced them. json_int defaults the absent keys to 0, the
                 # exact values every seed ever sent. Reintroduce key+option together
                 # when the native enforcement lands.
+                # oxide_final_unlock = relic-goal MODE (0-4); oxide_final_count =
+                # the shared 1-18 count. 0 (sapphire) stays frozen = the old 0.
                 "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
+                "oxide_final_count": o.oxide_final_challenge_relic_count.value,
                 "shuffle_warp_pads": derived_shuffle,
                 "warp_pad_shuffle_categories": sorted(o.warp_pad_shuffle_categories.value),
                 "warp_pad_shuffle_grouping": o.warp_pad_shuffle_grouping.current_key,
