@@ -467,6 +467,21 @@ class ctrAPWorld(World):
         mw.regions.location_cache[self.player][event_name] = loc
         return event_name
 
+    def _exclude_goal_location(self, player: int, location_name: str) -> None:
+        """Issue #27: mark this seed's goal location EXCLUDED so fill places only
+        filler there. The real (coded) location stays present -- the native client
+        sends the check in the same moment as the goal, so it is claimed by play
+        rather than by release -- but LocationProgressType.EXCLUDED bars fill from
+        seating any progression item on it, which keeps another world's progression
+        off the finish line and stops the player's own progression from being wasted
+        on a location only reachable once the seed is already won. Runs from
+        _install_goal (create_items), after create_regions has built the JSON
+        location, so get_location resolves it. Generation-side only: no datapackage,
+        slot_data, or client change -- the location still exists and is still sent."""
+        from BaseClasses import LocationProgressType
+        loc = self.multiworld.get_location(location_name, player)
+        loc.progress_type = LocationProgressType.EXCLUDED
+
     def _install_goal(self, player: int) -> None:
         """Set this seed's completion condition and lay any companion goal-tracking
         events (Spec §5, revised 2026-07-01).
@@ -488,6 +503,12 @@ class ctrAPWorld(World):
                 "N. Oxide Garage", "N. Oxide's Challenge Cleared", "has('Key', 4)")
             mw.completion_condition[player] = (
                 lambda state, f=flag: state.has(f, player))
+            # Issue #27: keep the real goal location as a check (the client sends it
+            # in the same moment as the goal, so it is claimed by play), but mark it
+            # EXCLUDED so fill only places filler there. No world's progression can
+            # sit on the finish line, and the player's own progression can't be
+            # stranded on a location that is only reachable once the seed is won.
+            self._exclude_goal_location(player, "N. Oxide Garage: N. Oxide's Challenge")
         elif goal == Goal.option_oxidefinal:
             # This companion event is the seed's terminal win-flag. Its win-trigger
             # mirrors the real location's vanilla logic (Key 4 + 18 Sapphire); the
@@ -499,6 +520,10 @@ class ctrAPWorld(World):
                 "has('Key', 4) and has('Sapphire Relic', 18)")
             mw.completion_condition[player] = (
                 lambda state, f=flag: state.has(f, player))
+            # Issue #27: exclude the real Final Challenge location (see the oxide
+            # branch above for the full rationale).
+            self._exclude_goal_location(
+                player, "N. Oxide Garage: N. Oxide's Final Challenge")
         elif goal == Goal.option_allbosses:
             # Pair each real Boss Race location with a companion event of the same
             # reachability. The Boss Race location's own rule is "True"; the garage
