@@ -487,4 +487,38 @@ def create_regions(world: "ctrAPWorld"):
         # fill_restrictive then seats the required progression in the (now un-pinned,
         # plentiful) reachable location frontier. stage2_pin stays empty.
 
+    # --- Vanilla-hub return-exit drift fix (Option 1b) -----------------------
+    # Under destination shuffle the wiring loop above rewires only the FORWARD
+    # pad exits; every destination region's "<Dest> -> Hub" return exit still
+    # points at its VANILLA hub, handing AP an ungated phantom edge into hubs
+    # the player cannot reach on foot (in-game a warp-pad race returns you to
+    # the PHYSICAL pad, native is the source of truth). Proven load-bearing on
+    # 2026-07-17 (community seed 87763653607652956054: fill placed all 4 Keys
+    # behind phantom edges -> in-game hard lock, zero Keys obtainable).
+    # Retarget each shuffled destination's return exit to the PHYSICAL hub of
+    # the pad that loads it, so the fill graph matches the game. Runs AFTER
+    # run_sphere_search on purpose (sub-variant 1b of the 2026-07-10 drift
+    # evidence note): the sphere search keeps its already-fuzzed view of the
+    # graph; only AP's main fill and reachability see the corrected topology.
+    if pad_dest_region:
+        pad_phys_hub = {}
+        for reg in data["regions"]:
+            for ex in reg.get("exits", []):
+                if ex["name"] in pad_dest_region:
+                    pad_phys_hub[ex["name"]] = reg["name"]
+        for pad_name, dest_region_name in pad_dest_region.items():
+            phys_hub = pad_phys_hub.get(pad_name)
+            ret = mw.regions.entrance_cache[player].get(
+                f"{dest_region_name} -> Hub")
+            new_target = region_lookup.get(phys_hub) if phys_hub else None
+            if ret is None or new_target is None:
+                continue
+            old_target = ret.connected_region
+            if old_target is new_target:
+                continue  # same-hub shuffle: already game-accurate
+            if old_target is not None and ret in old_target.entrances:
+                old_target.entrances.remove(ret)
+            ret.connected_region = None
+            ret.connect(new_target)
+
     return regions
