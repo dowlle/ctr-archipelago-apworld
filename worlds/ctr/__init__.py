@@ -120,6 +120,77 @@ class ctrAPWorld(World):
                                + st.count(Pl, p)) >= n
         return lambda st: st.has(S, p, n)  # sapphire_relics (default)
 
+    # --- Universal Tracker support (issue #29) ---
+
+    @staticmethod
+    def interpret_slot_data(slot_data: Dict[str, object]) -> Dict[str, object]:
+        """Universal Tracker hook. Returning a truthy value tells UT to re-generate
+        this world with the value placed in multiworld.re_gen_passthrough[game]. We
+        return the slot_data verbatim: generate_early restores the seed's options
+        from it and create_regions pins the rolled warp-pad map + per-pad unlock
+        requirements from it (Regions._ut_reconstruct_*), so the re-generated world's
+        logic graph is identical to the connected seed's instead of re-rolling a
+        divergent one. Everything the reconstruction needs already travels on the
+        wire (ctr_options, warp_pad_map, warp_pad_unlock), so no extra emit is
+        required in fill_slot_data."""
+        return slot_data
+
+    def _ut_restore_options(self, passthrough: Dict[str, object]) -> None:
+        """Restore the logic-relevant options from the connected seed's slot_data so
+        UT's re-generation reasons about the SAME world the seed was built from,
+        regardless of the tracking player's own YAML.
+
+        Only options that steer the reachability graph are restored. include_gem_cups
+        / include_battle_arenas are not on the wire, so they are DERIVED from whether
+        their pad class carries a randomized (non-type-0) stage-1 requirement -- the
+        exact condition create_items / create_regions gate their exit-rule handling
+        on. Logic-irrelevant mirrors (one_lap_cups, death_link, ...) are skipped."""
+        o = self.options
+        co = passthrough.get("ctr_options", {})
+
+        def _restore(opt_name: str, key: str) -> None:
+            if key in co:
+                getattr(o, opt_name).value = co[key]
+
+        _restore("goal", "goal")
+        _restore("warppad_unlock_requirements", "warppad_unlock_mode")
+        _restore("bossgarage_unlock_requirements", "bossgarage_mode")
+        _restore("shuffle_gems", "shuffle_gems")
+        _restore("shuffle_keys", "shuffle_keys")
+        _restore("oxide_final_challenge_unlock", "oxide_final_unlock")
+        _restore("oxide_final_challenge_relic_count", "oxide_final_count")
+
+        # Derive the two content-inclusion toggles from the pad gates: a cup /
+        # crystal pad only carries a non-type-0 stage-1 requirement when its class
+        # was included in this seed's randomization pool.
+        _CUP_LIDS = {100, 101, 102, 103, 104}
+        _CRYSTAL_LIDS = {18, 19, 21, 23}
+        inc_cups = inc_arenas = False
+        for lid_str, stages in passthrough.get("warp_pad_unlock", {}).items():
+            if int(stages.get("stage1", {}).get("type", 0)) == 0:
+                continue
+            lid = int(lid_str)
+            if lid in _CUP_LIDS:
+                inc_cups = True
+            elif lid in _CRYSTAL_LIDS:
+                inc_arenas = True
+        o.include_gem_cups.value = int(inc_cups)
+        o.include_battle_arenas.value = int(inc_arenas)
+
+        # Podium rung set is decided by five options that are NOT on the wire, but
+        # the podium_checks block encodes exactly which rungs this seed created:
+        # its "enabled" flag plus, per track, a 5-slot array in podium.SLOT_ORDER
+        # ([held_1st, held_3rd, held_5th, finish_podium, finish_any], -1 = absent).
+        # Recover the toggles from a sample track so create_regions / Rules /
+        # _resolve_podium_checks rebuild the identical rung locations.
+        pod = passthrough.get("podium_checks", {}) or {}
+        o.podium_placement_checks.value = int(bool(pod.get("enabled", False)))
+        sample = next(iter((pod.get("locations", {}) or {}).values()), None)
+        o.podium_held_rungs.value = int(bool(sample) and sample[0] != -1)
+        o.podium_held_fifth_rung.value = int(bool(sample) and sample[2] != -1)
+        o.podium_finish_rungs.value = int(bool(sample) and sample[3] != -1)
+        o.podium_any_position_rung.value = int(bool(sample) and sample[4] != -1)
+
     def generate_early(self) -> None:
         """Generation-time progression guard for the Oxide-final goal (issue #23).
 
@@ -131,6 +202,14 @@ class ctrAPWorld(World):
         AP (the stranding class in the report). Error clearly here instead of
         emitting a world whose goal AP cannot see -- respecting the per-tier
         sliders rather than silently forcing a tier back on."""
+        # Universal Tracker re-generation (issue #29): restore the seed's options
+        # from slot_data so the rest of generation rebuilds the SAME world, then
+        # skip the progression guard (the connected seed already passed it, and the
+        # tracking player's own sliders are irrelevant to the pinned graph).
+        passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if passthrough:
+            self._ut_restore_options(passthrough)
+            return
         from Options import OptionError
         if self.options.goal.value != Goal.option_oxidefinal:
             return
