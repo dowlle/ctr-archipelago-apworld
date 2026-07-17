@@ -60,6 +60,13 @@ class ctrAPWorld(World):
     options_dataclass = ctrAPOptions
     options: ctrAPOptions
 
+    # Universal Tracker: interpret_slot_data is a staticmethod that always forces a
+    # re-generation from the connected seed's slot_data, and that re-generation
+    # reconstructs the whole logic graph from the wire (map + per-pad requirements +
+    # the mirrored options). So UT can skip its throwaway first generation and track
+    # a slot straight from slot_data with no player YAML (issue #29).
+    ut_can_gen_without_yaml = True
+
     # Item + Location mapping
     item_name_to_id = {
         item["name"]: (item_prefix + index)
@@ -279,6 +286,13 @@ class ctrAPWorld(World):
         the shared rollback-precollect backstop replays the real fill and, if it
         still dead-ends, precollects the stranded progression so the seed cannot
         ship an unfillable red. See _rollback_precollect_backstop."""
+        # Universal Tracker (issue #29): under a fake generation there is no real
+        # fill to protect, and the two-stage probe would re-roll a parallel fill on
+        # a DIFFERENT seed and could wrongly collapse the stage-2 gates we just
+        # pinned from slot_data. Skip all fill machinery -- reachability is fixed by
+        # the reconstructed rules, and the server supplies the real item placements.
+        if getattr(self.multiworld, "generation_is_fake", False):
+            return
         solo = len(self.multiworld.worlds) == 1
         # Randomized two-stage rung: faithful parallel-MW probe; on a predicted
         # FillError collapse every stage-2 gate for this seed. Necessary but, on
@@ -587,6 +601,14 @@ class ctrAPWorld(World):
         """
         o = self.options
         prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
+        # Universal Tracker (issue #29): the per-tier progression sliders are NOT on
+        # the wire, so a UT re-generation cannot recover the seed's vanilla-mode
+        # relic classification. Keep every tier progression on the UT path so that
+        # has()-based relic gates and the oxidefinal goal condition track correctly
+        # (reachability is unaffected -- no vanilla LOCATION gates on gold/platinum;
+        # this only restores goal/gate visibility for the tracker).
+        if getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game):
+            return prog
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
         goal = o.goal.value
