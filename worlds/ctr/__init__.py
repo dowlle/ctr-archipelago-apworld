@@ -1060,6 +1060,14 @@ class ctrAPWorld(World):
                 # native (or an old seed on a new native) is exactly vanilla lap
                 # counts. Pure pace setting -- never touches logic/fill/reachability.
                 "one_lap_cups": bool(o.one_lap_cups.value),
+                # DeathLink (issue #6): ADDITIVE keys, no schema bump. A native
+                # predating these keys reads neither and DeathLink stays off (the
+                # one_lap_cups precedent: absent additive key degrades to the 0/off
+                # default). death_link is 0 off / 1 mask_reset / 2 any_hit; amnesty
+                # is send-every-Nth (>=1). Native enables the "DeathLink" connection
+                # tag and its send/receive plumbing only when death_link != 0.
+                "death_link": o.death_link.value,
+                "deathlink_amnesty": o.deathlink_amnesty.value,
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
