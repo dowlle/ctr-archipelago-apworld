@@ -389,23 +389,58 @@ class DeathLinkAmnesty(Range):
 
 
 class PodiumPlacementChecks(DefaultOnToggle):
-    """Add finishing-position location checks to the 16 adventure trophy races:
-    "Finish 1st" and "Finish 2nd or 3rd" per race (32 extra checks). A better
-    finish awards every rung at or below it, so winning a race sends all of its
-    position checks at once.
+    """Add finishing-position location checks to the 16 adventure trophy races.
 
-    These checks exist mostly to make room for more items in the pool (today
-    that means traps; future item packs will lean on them harder). They never
-    advance adventure progression by themselves."""
+    This is the master switch for the whole podium-rung feature. With it on, each
+    trophy race can carry up to five position rungs, split across two families you
+    toggle separately:
+
+    - Finish rungs (`Podium Finish Rungs`): "Finish on Podium" and "Finish (Any
+      Position)", earned by where you cross the finish line.
+    - Held rungs (`Held-Position Rungs`): "Held 1st" and "Held 3rd" (plus an
+      optional "Held 5th"), earned by the best live position you hold DURING the
+      race, not just at the line.
+
+    A better result awards every rung at or below it, so winning a race sends all
+    of that race's rungs at once. These checks exist mostly to make room for more
+    items in the pool (today that means traps; future item packs lean on them
+    harder); they never advance adventure progression by themselves. Off means no
+    position checks at all, whatever the family toggles say."""
     display_name = "Podium Placement Checks"
 
 
+class PodiumFinishRungs(DefaultOnToggle):
+    """Include the finish-line rungs on each trophy race (needs `Podium Placement
+    Checks` on): "Finish on Podium" (cross the line 1st, 2nd or 3rd) and "Finish
+    (Any Position)" (just cross the line). Toggle the any-position half separately
+    with `Podium: Any-Position Rung`. Off leaves only the held-position rungs, if
+    those are on."""
+    display_name = "Podium Finish Rungs"
+
+
 class PodiumAnyPositionRung(DefaultOnToggle):
-    """When `Podium Placement Checks` is on, also add a "Finish (Any Position)"
-    check per trophy race — earned by simply crossing the finish line (48 extra
-    checks total instead of 32). Has no effect when `Podium Placement Checks`
-    is off."""
+    """When the finish rungs are on (`Podium Finish Rungs`), also include the
+    "Finish (Any Position)" rung on each trophy race, earned by simply crossing the
+    finish line. Off keeps only "Finish on Podium" in the finish family. Has no
+    effect when `Podium Placement Checks` or `Podium Finish Rungs` is off."""
     display_name = "Podium: Any-Position Rung"
+
+
+class PodiumHeldRungs(DefaultOnToggle):
+    """Include the live-position "held" rungs on each trophy race (needs `Podium
+    Placement Checks` on): "Held 1st" and "Held 3rd", earned the moment you hold
+    that position on track rather than at the finish. Add a harder "Held 5th" rung
+    with `Podium: Held 5th Rung`. Off leaves only the finish-line rungs, if those
+    are on."""
+    display_name = "Held-Position Rungs"
+
+
+class PodiumHeldFifthRung(Toggle):
+    """Also add a "Held 5th" rung to each trophy race, earned by holding 5th place
+    or better at any point. Only has an effect when `Held-Position Rungs` is on.
+    Off by default: it is the widest, easiest held rung, kept off to hold the
+    item/location pool in balance. Turn it on for 16 extra early checks."""
+    display_name = "Podium: Held 5th Rung"
 
 
 class SapphireRelicProgression(NamedRange):
@@ -474,9 +509,12 @@ class ctrAPOptions(PerGameCommonOptions):
     two_stage_density: TwoStageDensity
     requirement_variety: RequirementVariety
     requirement_weights: RequirementWeights
-    # extra location checks
+    # extra location checks (podium position rungs)
     podium_placement_checks: PodiumPlacementChecks
+    podium_finish_rungs: PodiumFinishRungs
     podium_any_position_rung: PodiumAnyPositionRung
+    podium_held_rungs: PodiumHeldRungs
+    podium_held_fifth_rung: PodiumHeldFifthRung
     # quality of life
     one_lap_cups: OneLapCups
     # deathlink
@@ -503,7 +541,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementVariety,
         RequirementWeights,
     ],
-    "Extra Checks": [PodiumPlacementChecks, PodiumAnyPositionRung],
+    "Extra Checks": [PodiumPlacementChecks, PodiumFinishRungs,
+                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
     "Quality of Life": [OneLapCups],
     "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicProgression, GoldRelicProgression,

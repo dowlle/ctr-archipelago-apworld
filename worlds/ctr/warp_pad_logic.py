@@ -1617,11 +1617,10 @@ def _capacity_context(world):
     podium rung count, guaranteed-unpinned relic-trial tiers, and whether gem-cup
     Gem locations are lock-placed (0 capacity)."""
     o = world.options
-    if bool(o.podium_placement_checks.value):
-        from .podium import enabled_rung_keys
-        podium = len(enabled_rung_keys(bool(o.podium_any_position_rung.value)))
-    else:
-        podium = 0
+    # Podium rungs created per trophy race (0 when the feature is off); the new
+    # 5-rung superset count comes straight from the shared creation-subset helper.
+    from .podium import created_rung_keys_from_options
+    podium = len(created_rung_keys_from_options(o))
     # A relic Time Trial location is a guaranteed (un-pinnable) fillable slot only at
     # slider 100; below 100 it may be pinned to its vanilla relic (0 capacity), so the
     # sound lower bound counts only the fully-open tiers.

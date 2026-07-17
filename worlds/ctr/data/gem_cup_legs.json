@@ -1,0 +1,10 @@
+{
+    "_comment": "Gem-cup leg composition: each cup region -> the 4 trophy-race tracks it runs as legs, in cup order. Transcribed VERBATIM from the native engine table advCupTrackIDs[5*4] (game/zGlobal_DATA.c) -- the authoritative source. NOT derivable from the CTR-token colour grouping: R/G/B/Y cups happen to coincide with their token colour's four tracks, but the Purple Gem Cup runs one track from each other cup (Roo's Tubes, Papu's Pyramid, Dragon Mines, Hot Air Skyway), NOT the four crystal-arena Bonus Rounds the Purple token comes from. Used by Rules.add_podium_placement_rules to put a leg track's podium rungs in logic whenever its cup is reachable (a cup leg is a real track load that fires that track's placement rungs). Track names match the trophy-race region names in world.json.",
+    "cup_legs": {
+        "Red Gem Cup":    ["Crash Cove", "Mystery Caves", "Blizzard Bluff", "Papu's Pyramid"],
+        "Green Gem Cup":  ["Roo's Tubes", "Coco Park", "Polar Pass", "Cortex Castle"],
+        "Blue Gem Cup":   ["Tiger Temple", "Sewer Speedway", "Dragon Mines", "N. Gin Labs"],
+        "Yellow Gem Cup": ["Dingo Canyon", "Tiny Arena", "Hot Air Skyway", "Oxide Station"],
+        "Purple Gem Cup": ["Roo's Tubes", "Papu's Pyramid", "Dragon Mines", "Hot Air Skyway"]
+    }
+}
