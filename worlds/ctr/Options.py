@@ -291,6 +291,48 @@ class BossGarageRequirements(Choice):
     default = 2
 
 
+class DeathLink(Choice):
+    """DeathLink: share your wipeouts with the other DeathLink players in the
+    multiworld, and take theirs.
+
+    - **off** (default): DeathLink is disabled; nothing is sent or received.
+    - **mask_reset**: send a death only when the mask carries you back, i.e. you
+      fell off the track or were eaten. Unambiguous, low-frequency wipeouts.
+    - **any_hit**: additionally send on every hit that lands on you (spin-out,
+      blast, squish, burn), so the cadence is much higher; pair this with
+      `DeathLink Amnesty` to keep it playable.
+
+    Receiving a death always forces the full mask reset on you (carried back),
+    the game's heaviest wipeout, regardless of which tier you send at. Only
+    adventure-mode races send; a received death never triggers an outgoing one.
+
+    NOTE ON THE TYPE: AP core ships DeathLink as a plain on/off Toggle. CTR uses a
+    3-value Choice instead because the two send tiers (mask_reset vs any_hit) are a
+    real gameplay difference in a kart racer, not a cosmetic one, and folding them
+    into a separate toggle would let a player pick "any_hit but do not send", which
+    is not a mode we support. off still reads as the disabled state, so the value
+    mirrored into slot_data is 0 when DeathLink is off, matching the Toggle
+    convention native keys off."""
+    display_name = "DeathLink"
+    option_off = 0
+    option_mask_reset = 1
+    option_any_hit = 2
+    default = 0
+
+
+class DeathLinkAmnesty(Range):
+    """How many of YOUR deaths must pile up before one is actually sent. 1
+    (default) sends every death; N sends one death per N. Meant for the `any_hit`
+    tier, where hits are frequent enough to spam the multiworld; it does nothing
+    useful at `mask_reset` (those wipeouts are already rare) and is inert while
+    DeathLink is off. Incoming deaths are unaffected: you always take every death
+    another player sends you, amnesty only throttles your OUTGOING deaths."""
+    display_name = "DeathLink Amnesty"
+    range_start = 1
+    range_end = 30
+    default = 1
+
+
 class PodiumPlacementChecks(DefaultOnToggle):
     """Add finishing-position location checks to the 16 adventure trophy races:
     "Finish 1st" and "Finish 2nd or 3rd" per race (32 extra checks). A better
@@ -379,6 +421,9 @@ class ctrAPOptions(PerGameCommonOptions):
     # extra location checks
     podium_placement_checks: PodiumPlacementChecks
     podium_any_position_rung: PodiumAnyPositionRung
+    # deathlink
+    death_link: DeathLink
+    deathlink_amnesty: DeathLinkAmnesty
     # relic difficulty
     sapphire_relic_progression: SapphireRelicProgression
     gold_relic_progression: GoldRelicProgression
@@ -401,6 +446,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementWeights,
     ],
     "Extra Checks": [PodiumPlacementChecks, PodiumAnyPositionRung],
+    "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicProgression, GoldRelicProgression,
                          PlatinumRelicProgression],
 }
