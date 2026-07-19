@@ -4,6 +4,7 @@ from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
+    _COLOURS, _RELIC_TIERS,
 )
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -138,6 +139,118 @@ def _resolve_boss_reqs(world, boss_mode):
     return req
 
 
+# ---------------------------------------------------------------------------
+# Universal Tracker (interpret_slot_data) support
+# ---------------------------------------------------------------------------
+# Universal Tracker re-generates the world locally from the connected room's
+# slot_data. Left alone it re-rolls this seed's per-pad requirements and
+# destination shuffle (world.random is a DIFFERENT stream), so the tracker's
+# reachability view diverges from the real seed in both directions (issue #29).
+# The fix pins the rolled state back from slot_data during that re-generation:
+# ctrAPWorld.interpret_slot_data returns the slot_data, UT re-runs generation
+# with it in multiworld.re_gen_passthrough, and these helpers reconstruct the
+# exact warp_pad_map / warp_pad_unlock state the sphere search would have rolled
+# -- so the graph AP builds is identical to the generating seed's.
+
+
+def _slot_req_to_concrete(req):
+    """Inverse of warp_pad_logic.to_slot_req: a {type,count,colour} wire req back
+    to the (item, count) tuple Rules.add_time_trial_and_ctr_requirements consumes,
+    or None for a type-0 (no-gate) req. type 6/7/8 map to the AnyCtrToken/AnyRelic/
+    AnyGem aggregate names Rules resolves via AGG_BY_NAME."""
+    t = int(req.get("type", 0))
+    if t == 0:
+        return None
+    count = int(req.get("count", 0))
+    colour = int(req.get("colour", -1))
+    if t == 1:
+        return ("Trophy", count)
+    if t == 2:
+        return ("Key", count)
+    if t == 3:
+        return (_COLOURS[colour] + " CTR Token", count)
+    if t == 4:
+        return (_RELIC_TIERS[colour] + " Relic", count)
+    if t == 5:
+        return (_COLOURS[colour] + " Gem", count)
+    if t == 6:
+        return ("AnyCtrToken", count)
+    if t == 7:
+        return ("AnyRelic", count)
+    if t == 8:
+        return ("AnyGem", count)
+    return None
+
+
+def _ut_reconstruct_warp_pad_map(world, passthrough):
+    """Rebuild world.warp_pad_map ({pad_exit_name: dest_track_levelID}) from the
+    seed's slot_data instead of re-rolling build_warp_pad_map.
+
+    slot_data.warp_pad_map is the FULL 0..27 + cup identity map overlaid with the
+    remaps; build_warp_pad_map returns only the pads that participate in a pool.
+    Every consumer in create_regions reads world.warp_pad_map via .get(pad, pad)
+    and skips identity entries, so keeping only the NON-identity remaps reproduces
+    the same graph and the same `do_shuffle` verdict as the real seed.
+    """
+    pad_by_lid = {meta["level_id"]: name
+                  for name, meta in world.warp_pad_ids.items()}
+    out = {}
+    for lid_str, dest_lid in passthrough.get("warp_pad_map", {}).items():
+        lid = int(lid_str)
+        name = pad_by_lid.get(lid)
+        if name is not None and int(dest_lid) != lid:
+            out[name] = int(dest_lid)
+    return out
+
+
+def _ut_reconstruct_unlock(world, passthrough):
+    """Rebuild the per-pad unlock state the sphere search would have produced,
+    read back from slot_data.warp_pad_unlock (physical-pad keyed):
+
+    * world.warp_pad_unlock[pad] = stage-1 wire req (only non-type-0 pads, matching
+      add_warp_pad_unlock_rules which skips type 0);
+    * world.warp_pad_unlock_stage2[pad] = stage-2 wire req (all pads, for parity
+      with the emit path / spoiler);
+    * world.warp_pad_unlock_stage2_concrete[dest_track] = (item, count) for the
+      Time-Trial / CTR-Token stage-2 gate, keyed by the DESTINATION track (where
+      those locations live under shuffle), exactly as create_regions keys it.
+
+    This is the logic-critical half: Rules reads warp_pad_unlock and
+    warp_pad_unlock_stage2_concrete to build the pad-entry and tier-2 access rules,
+    so pinning them makes UT's reachability identical to the generating seed.
+    """
+    pad_by_lid = {meta["level_id"]: name
+                  for name, meta in world.warp_pad_ids.items()}
+    lid_to_track = {meta["level_id"]: name[: -len(" Warp Pad")]
+                    for name, meta in world.warp_pad_ids.items()
+                    if name.endswith(" Warp Pad")}
+    full_map = {int(k): int(v)
+                for k, v in passthrough.get("warp_pad_map", {}).items()}
+    _ZERO = {"type": 0, "count": 0, "colour": -1}
+    two_stage_active = False
+    for lid_str, stages in passthrough.get("warp_pad_unlock", {}).items():
+        lid = int(lid_str)
+        pad_name = pad_by_lid.get(lid)
+        if pad_name is None:
+            continue
+        s1 = stages.get("stage1", _ZERO)
+        s2 = stages.get("stage2", _ZERO)
+        if int(s1.get("type", 0)) != 0:
+            world.warp_pad_unlock[pad_name] = {
+                "type": int(s1["type"]), "count": int(s1["count"]),
+                "colour": int(s1["colour"])}
+        world.warp_pad_unlock_stage2[pad_name] = {
+            "type": int(s2.get("type", 0)), "count": int(s2.get("count", 0)),
+            "colour": int(s2.get("colour", -1))}
+        if int(s2.get("type", 0)) != 0:
+            two_stage_active = True
+            concrete = _slot_req_to_concrete(s2)
+            dest_track = lid_to_track.get(full_map.get(lid, lid))
+            if concrete is not None and dest_track is not None:
+                world.warp_pad_unlock_stage2_concrete[dest_track] = concrete
+    world._ctr_two_stage_active = two_stage_active
+
+
 def create_regions(world: "ctrAPWorld"):
     """Build all regions, exits, and locations from JSON definitions."""
     data = json.loads(
@@ -152,6 +265,13 @@ def create_regions(world: "ctrAPWorld"):
     boss_mode = opts.bossgarage_unlock_requirements.value      # 0 orig4 / 1 same_hub / 2 trophies
 
     world.warp_pad_ids = _load_warp_pad_ids()
+    # Universal Tracker re-generation (issue #29): when UT re-runs generation with
+    # the connected room's slot_data in re_gen_passthrough, pin the rolled state
+    # from it instead of re-rolling build_warp_pad_map / run_sphere_search below.
+    # options were already restored in generate_early, so every option-driven
+    # branch here (floor strip, trial/cup/crystal exit rules, floor rekey) matches
+    # the seed; only the two RNG rolls need replacing.
+    ut_passthrough = getattr(mw, "re_gen_passthrough", {}).get(world.game)
     # do_shuffle is derived from the destination-shuffle map below (non-empty ==
     # at least one participating category), NOT the deprecated shuffle_warp_pads
     # boolean. Set once build_warp_pad_map has resolved the participating pools.
@@ -195,7 +315,9 @@ def create_regions(world: "ctrAPWorld"):
     # do_shuffle is then simply "the map is non-empty" -- the gate the rest of
     # create_regions keys off (floor re-keying, exit rewiring). Requires the
     # comfort-guard flag (above) already set, which build_warp_pad_map reads.
-    world.warp_pad_map = build_warp_pad_map(world)
+    world.warp_pad_map = (
+        _ut_reconstruct_warp_pad_map(world, ut_passthrough)
+        if ut_passthrough else build_warp_pad_map(world))
     do_shuffle = bool(world.warp_pad_map)
     world.shuffle_warp_pads = do_shuffle
 
@@ -425,7 +547,12 @@ def create_regions(world: "ctrAPWorld"):
     # Runs here, after regions+locations+exits exist, so build_graph can read the
     # live AP graph. unlock_mode 0 (vanilla) skips it -> all type:0, identity.
     unlock_mode = getattr(world, "_ctr_unlock_mode", 0)
-    if unlock_mode in (1, 2):
+    if ut_passthrough:
+        # UT re-generation: pin stage-1 / stage-2 requirements from slot_data
+        # instead of re-rolling the sphere search (issue #29). Vanilla-mode seeds
+        # carry only type-0 pads, so this is a no-op there, matching the skip below.
+        _ut_reconstruct_unlock(world, ut_passthrough)
+    elif unlock_mode in (1, 2):
         reward_track_for = _build_reward_track_resolver(world)
         # two_stage_density = off (Icebound clear_stage2_unlocks): collapse every
         # stage 2 to OPEN -- no two-stage hold-back, no token pinning; the seed
