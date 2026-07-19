@@ -987,56 +987,55 @@ class ctrAPWorld(World):
         return out
 
     def _resolve_podium_checks(self) -> Dict[str, object]:
-        """Podium placement checks (feat/podium-checks) for the native fan-out.
+        """Podium position rungs (v0.2.0 Phase A) for the native fan-out.
 
-        {"enabled": bool, "any_position": bool,
-         "locations": {"<levelID>": {"first": <code|null>,
-                                     "podium": <code|null>,
-                                     "any": <code|null>}, ...}}
+        Schema 6 shape (agreed with the native session):
 
-        The placement listener (feat/podium-listener) reads this: at the
-        finish-line capture for track=<levelID> with final placement p, it sends
-        the rung location codes per the nesting rule -- p==1 -> first+podium+any;
-        p in {2,3} -> podium+any; p>=4 -> any only. Codes are AP location ids; a
-        rung not present in this seed (any-position off, or the whole feature off)
-        is null and native must skip it. Keyed by physical race-pad LevelID 0..15,
-        which equals the trophy-race track and matches the [AP RACE] track field.
-        Only the 16 standard trophy races carry podium checks (boss/token/relic/
-        crystal have no genuine multi-position finish).
+        {"enabled": bool,
+         "locations": {"<levelID>": [held_1st, held_3rd, held_5th,
+                                     finish_podium, finish_any], ...}}
 
-        NOTE: podium is additive/safe-degrading (a native build without podium
-        support simply ignores this block and sends no podium checks). It did NOT
-        drive a schema_version bump of its own -- the v4 bump is the relic-tier
-        colour change (fill_slot_data), independent of podium. A native predating
-        podium still degrades safely on a v4 seed for this block specifically.
+        Each per-track value is a 5-slot array of AP location codes in the fixed
+        SLOT_ORDER; a rung absent from THIS seed is -1 (native skips it). Keyed by
+        physical race-pad LevelID 0..15, which equals the trophy-race track and
+        matches the [AP RACE] track field. Only the 16 standard trophy races carry
+        podium rungs (boss/token/relic/crystal have no genuine live/finish ladder).
+
+        The placement listener reads this: at the live/finish capture for
+        track=<levelID> it sends the rung codes per the ladder (a better result
+        grants every lower rung), skipping any -1 slot.
+
+        SCHEMA BUMP: the array shape replaces the v3-era
+        {"first","podium","any"} object, so this rides the schema 5 -> 6 bump
+        (fill_slot_data). A native predating schema 6 must not read this block as
+        the old object; the #8 newer-schema guard covers that direction.
         """
         from .Locations import CTR_LOCATION_IDS
-        from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
+        from .podium import (TROPHY_TRACKS, SLOT_ORDER,
+                             created_rung_keys_from_options, location_name)
         enabled = bool(self.options.podium_placement_checks.value)
-        any_pos = bool(self.options.podium_any_position_rung.value)
-        block: Dict[str, object] = {
-            "enabled": enabled,
-            "any_position": enabled and any_pos,
-            "locations": {},
-        }
-        if not enabled:
+        block: Dict[str, object] = {"enabled": enabled, "locations": {}}
+        rung_keys = created_rung_keys_from_options(self.options)
+        if not rung_keys:
             return block
-        rung_keys = enabled_rung_keys(any_pos)
+        created = set(rung_keys)
         pad_ids = getattr(self, "warp_pad_ids", {})
         track_to_lid = {
             pad_name[: -len(" Warp Pad")]: meta["level_id"]
             for pad_name, meta in pad_ids.items()
             if pad_name.endswith(" Warp Pad")
         }
-        locations: Dict[str, Dict[str, object]] = {}
+        locations: Dict[str, object] = {}
         for track in TROPHY_TRACKS:
             lid = track_to_lid.get(track)
             if lid is None or not (0 <= lid < self.WARP_PAD_ID_RANGE):
                 continue
-            entry: Dict[str, object] = {"first": None, "podium": None, "any": None}
-            for rung_key in rung_keys:
-                entry[rung_key] = CTR_LOCATION_IDS.get(location_name(track, rung_key))
-            locations[str(lid)] = entry
+            arr = [
+                CTR_LOCATION_IDS[location_name(track, slot_key)]
+                if slot_key in created else -1
+                for slot_key in SLOT_ORDER
+            ]
+            locations[str(lid)] = arr
         block["locations"] = locations
         return block
 
@@ -1051,18 +1050,18 @@ class ctrAPWorld(World):
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
-            # schema_version 5 (2026-07-16, issue #23): oxide_final_unlock grows
-            # from a 0/1 flag into a relic-goal MODE (0 sapphire / 1 gold / 2
-            # platinum / 3 any-single-type / 4 total) plus a new oxide_final_count
-            # (1-18). This is a native-version GATE: a v4 native reads
-            # oxide_final_unlock==1 as the removed "18 gold AND 18 platinum" rule
-            # and has no count field, so a v5 seed's Oxide-final gate would be
-            # mis-enforced -- it must check schema_version >= 5. Ships with the
-            # newer-schema warn/refuse (issue #8). (v4 = relic-tier colour +
-            # goal-rework; v3 = podium + stage-2 padgate; v2 = two-stage contract.)
-            "schema_version": 5,
+            # schema_version 6 (v0.2.0, position-rung rework Phase A): the
+            # podium_checks block changes SHAPE -- each per-track entry becomes a
+            # 5-slot code array [held_1st, held_3rd, held_5th, finish_podium,
+            # finish_any] (-1 = absent), replacing the v3-era {first,podium,any}
+            # object. A native predating schema 6 must not read the old object, so
+            # this is a native-version GATE (schema_version >= 6), shipped with the
+            # #8 newer-schema warn/refuse. (v5 = oxide-final relic-goal mode/count;
+            # v4 = relic-tier colour + goal-rework; v3 = podium + stage-2 padgate;
+            # v2 = two-stage contract.)
+            "schema_version": 6,
             "ctr_options": {
-                "schema_version": 5,
+                "schema_version": 6,
                 "goal": o.goal.value,
                 # relic_min_time / relics_require_perfect were dropped with their
                 # YAML options (2026-07-15 release polish): native parsed both but

@@ -228,21 +228,22 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
-    # --- Podium placement checks (feat/podium-checks) ------------------------
-    # Per adventure trophy race, a nested rung ladder (1st / 2nd-or-3rd /
-    # optional any-position). NEW event-only locations fired native-side from the
-    # placement listener (feat/podium-listener) at the finish-line capture point;
-    # they are NOT AdvProgress bits and never touch the warp-pad/trophy gate
-    # logic. Created ONLY when the option is on (any-position rung only when its
-    # sub-toggle is on) so the toggle governs whether a seed has them at all.
-    # Their reachability == the track's Trophy Race, installed in
-    # Rules.add_podium_placement_rules (a placeholder 'True' here is overwritten
-    # there); 1st fires all rungs, so any winnable race yields every rung -> no
-    # extra solvability burden, and the extra unfilled locations pull matching
-    # filler in create_items (item/location count stays balanced automatically).
-    if bool(opts.podium_placement_checks.value):
-        from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
-        _rung_keys = enabled_rung_keys(bool(opts.podium_any_position_rung.value))
+    # --- Podium placement checks (position-rung rework, v0.2.0 Phase A) -------
+    # Per adventure trophy race, a 5-rung superset split into held-position rungs
+    # (Held 1st / Held 3rd / optional Held 5th) and finish-line rungs (Finish on
+    # Podium / optional Finish (Any Position)). Which rungs a seed creates is
+    # decided by podium.created_rung_keys_from_options (the single source shared
+    # with Rules + slot_data). NEW event-only locations fired native-side from the
+    # placement listener at the live/finish capture points; they are NOT AdvProgress
+    # bits and never touch the warp-pad/trophy gate logic. Their reachability ==
+    # the track's Trophy Race (installed in Rules.add_podium_placement_rules, a
+    # placeholder 'True' here is overwritten there, plus cup-leg reachability); a
+    # win fires every rung, so any winnable race yields all of them -> no extra
+    # solvability burden, and the extra unfilled locations pull matching filler in
+    # create_items (item/location count stays balanced automatically).
+    from .podium import TROPHY_TRACKS, created_rung_keys_from_options, location_name
+    _rung_keys = created_rung_keys_from_options(opts)
+    if _rung_keys:
         for _track in TROPHY_TRACKS:
             _region = region_lookup.get(_track)
             if _region is None:

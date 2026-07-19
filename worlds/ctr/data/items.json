@@ -19,5 +19,11 @@
   {"name": "Low Gravity Trap", "count": 0, "classification": "trap"},
   {"name": "No Brakes Trap", "count": 0, "classification": "trap"},
   {"name": "Forced Boost Trap", "count": 0, "classification": "trap"},
-  {"name": "First Person Trap", "count": 0, "classification": "trap"}
+  {"name": "First Person Trap", "count": 0, "classification": "trap"},
+  {"name": "Ignore Grass", "count": 0, "classification": "filler"},
+  {"name": "Ignore Dirt", "count": 0, "classification": "filler"},
+  {"name": "Ignore Snow", "count": 0, "classification": "filler"},
+  {"name": "Ignore Water", "count": 0, "classification": "filler"},
+  {"name": "Ignore Ice", "count": 0, "classification": "filler"},
+  {"name": "Ignore Sand", "count": 0, "classification": "filler"}
 ]

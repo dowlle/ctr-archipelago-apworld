@@ -1,5 +1,26 @@
 import logging
+import json
+import pkgutil
 from BaseClasses import CollectionState
+
+
+def _load_gem_cup_legs():
+    """cup region name -> its 4 trophy-track leg names, from data/gem_cup_legs.json
+    (transcribed from the native advCupTrackIDs engine table)."""
+    return json.loads(
+        pkgutil.get_data(__package__, "data/gem_cup_legs.json").decode("utf-8")
+    )["cup_legs"]
+
+
+def _track_to_cups():
+    """Invert the cup->legs table into leg-track name -> [cup region names]. A
+    track can leg more than one cup (e.g. Roo's Tubes legs both Green and Purple),
+    so the value is a list."""
+    out: dict = {}
+    for cup, legs in _load_gem_cup_legs().items():
+        for track in legs:
+            out.setdefault(track, []).append(cup)
+    return out
 
 
 def make_rule(expr_text: str, player: int):
@@ -181,38 +202,58 @@ def add_boss_garage_rules(world, player):
 
 
 def add_podium_placement_rules(world, player):
-    """Podium placement checks (feat/podium-checks) are reachable exactly when
-    their track's Trophy Race is.
+    """Podium placement rungs (position-rung rework, v0.2.0 Phase A) are reachable
+    exactly when their destination track is RACEABLE.
 
-    They fire native-side from the placement listener regardless of finishing
-    position, and finishing 1st satisfies every rung, so a plain
-    can_reach(Trophy Race) rule is both necessary (you must be able to run the
-    race) and sufficient (a winnable race yields all rungs). Delegating to the
-    Trophy Race LOCATION's reachability inherits every warp-pad mode for free --
-    vanilla trophy floor, randomized floor-strip, and destination-shuffle rekey
-    all already live on that location's rule. No placement is ever logically
-    required, so accessibility:full stays satisfiable whenever the trophy race is.
-    """
+    They fire native-side from the placement listener, and a win satisfies every
+    rung (the ladder), so "the track is raceable" is both necessary (you must be
+    able to run it) and sufficient (a winnable race yields all rungs) -- the same
+    assumption the shipped podium checks used. A track is raceable when EITHER:
+
+    * its own Trophy Race LOCATION is reachable -- delegating here inherits every
+      warp-pad mode for free (vanilla floor, randomized floor-strip,
+      destination-shuffle rekey all already live on that location's rule); OR
+    * one of the Gem Cups that runs this track as a LEG is reachable -- a cup leg
+      is a real track load, so finishing a leg fires that track's rungs (design
+      decision 3). Modelled as an OR on the RUNG rule (not a region entrance):
+      a region entrance from the cup would also expose that track's Time Trials /
+      CTR Token Challenge / Trophy Race, which a cup leg does NOT earn, and would
+      over-state their reachability (golden-rule violation). The OR touches only
+      the rungs, which is exactly what a leg finish earns.
+
+    No placement is ever logically required, so accessibility:full stays
+    satisfiable whenever the trophy race is."""
     o = world.options
-    if not bool(o.podium_placement_checks.value):
+    from .podium import TROPHY_TRACKS, created_rung_keys_from_options, location_name
+    rung_keys = created_rung_keys_from_options(o)
+    if not rung_keys:
         return
-    from .podium import TROPHY_TRACKS, enabled_rung_keys, location_name
     mw = world.multiworld
     all_names = {loc.name for loc in mw.get_locations(player)}
-    rung_keys = enabled_rung_keys(bool(o.podium_any_position_rung.value))
+    all_regions = {r.name for r in mw.get_regions(player)}
+    track_cups = _track_to_cups()
     for track in TROPHY_TRACKS:
         trophy_name = f"{track}: Trophy Race"
         if trophy_name not in all_names:
             continue
+        # Cups that leg this track AND actually exist as regions this seed.
+        cups = [c for c in track_cups.get(track, []) if c in all_regions]
         for rung_key in rung_keys:
             name = location_name(track, rung_key)
             if name not in all_names:
                 continue
             loc = mw.get_location(name, player)
-            loc.access_rule = (
-                lambda state, t=trophy_name, p=player:
-                state.can_reach(t, "Location", p)
-            )
+            if cups:
+                loc.access_rule = (
+                    lambda state, t=trophy_name, cs=tuple(cups), p=player:
+                    state.can_reach(t, "Location", p)
+                    or any(state.can_reach(c, "Region", p) for c in cs)
+                )
+            else:
+                loc.access_rule = (
+                    lambda state, t=trophy_name, p=player:
+                    state.can_reach(t, "Location", p)
+                )
 
 
 def add_time_trial_and_ctr_requirements(world, player):
