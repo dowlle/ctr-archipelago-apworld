@@ -877,6 +877,31 @@ class ctrAPWorld(World):
                 )
                 _keys_locked[_key_name] = _keys_locked.get(_key_name, 0) + 1
 
+        # Battle arenas (issue #50): pin the vanilla Purple CTR Tokens onto the 4
+        # Crystal Bonus Round checks when include_battle_arenas is OFF.
+        #
+        # The option never removed those locations -- the four Crystal Bonus Round
+        # entries live unconditionally in data/world.json, so the location count is
+        # 213 with the option on and off alike. All the option did (Regions.py,
+        # warp_pad_logic) was keep the crystal pads out of the randomized-unlock
+        # pool. The checks themselves stayed live multiworld slots, and a 12-seed
+        # sample put a logic-required progression item on an arena check in 4 of
+        # them: the player is forced through content they explicitly opted out of.
+        #
+        # Pinning is the same contract the Gems / Boss Keys toggles above use:
+        # place_locked_item takes the location out of the multiworld pool and puts
+        # its vanilla item back on it, so nobody else's progression can be hidden
+        # there. The mapping already existed in data/vanilla_mapping.json and was
+        # read by nothing until now. Removing the locations outright would be the
+        # cleaner fix but is a native/location-table change, not apworld-only.
+        _arena_locked: Dict[str, int] = {}
+        if not self.options.include_battle_arenas.value:
+            for _loc_name, _token_name in _vmap["Bonus Round Tokens"].items():
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_token_name)
+                )
+                _arena_locked[_token_name] = _arena_locked.get(_token_name, 0) + 1
+
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
         # locations, so adding the same 5 gems from the item table again makes them
@@ -904,6 +929,8 @@ class ctrAPWorld(World):
                 count = max(0, count - _gems_locked[item["name"]])
             if item["name"] in _keys_locked:                          # keys pinned vanilla
                 count = max(0, count - _keys_locked[item["name"]])
+            if item["name"] in _arena_locked:                         # arenas pinned vanilla
+                count = max(0, count - _arena_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
