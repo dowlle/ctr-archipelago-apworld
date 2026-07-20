@@ -601,13 +601,28 @@ class ctrAPWorld(World):
         """
         o = self.options
         prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
-        # Universal Tracker (issue #29): the per-tier progression sliders are NOT on
-        # the wire, so a UT re-generation cannot recover the seed's vanilla-mode
-        # relic classification. Keep every tier progression on the UT path so that
-        # has()-based relic gates and the oxidefinal goal condition track correctly
-        # (reachability is unaffected -- no vanilla LOCATION gates on gold/platinum;
-        # this only restores goal/gate visibility for the tracker).
-        if getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game):
+        # Universal Tracker (issue #29): read the seed's RESOLVED classification off
+        # the wire rather than trying to recompute it from inputs that do not travel
+        # (the per-tier progression sliders are not emitted). This map is not merely
+        # cosmetic on the UT path: CollectionState.collect ignores non-advancement
+        # items, so a tier the seed classified `useful` can never satisfy a has()
+        # gate server-side. Assuming "all tiers progression" therefore made UT open
+        # the vanilla Slide Coliseum pad (has('Sapphire Relic', 10), data/world.json)
+        # on seeds where the server never can -- UT then reported its three time
+        # trials in logic against a sphere that will never contain them (the ~12.6%
+        # UT-check failures, all vanilla + accessibility:minimal + non-oxidefinal
+        # seeds). The earlier comment here was right that no vanilla gate names
+        # gold/platinum, but missed the Sapphire one.
+        #
+        # BACKWARDS COMPATIBILITY: seeds generated before `relic_progression` was
+        # emitted carry no such key. For those, fall back to the historical
+        # all-progression behaviour -- no worse than before, and it keeps UT usable
+        # against already-rolled seeds.
+        _pt = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if _pt:
+            wire = (_pt.get("ctr_options") or {}).get("relic_progression")
+            if isinstance(wire, dict):
+                return {tier: bool(wire.get(tier, True)) for tier in prog}
             return prog
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
@@ -877,6 +892,31 @@ class ctrAPWorld(World):
                 )
                 _keys_locked[_key_name] = _keys_locked.get(_key_name, 0) + 1
 
+        # Battle arenas (issue #50): pin the vanilla Purple CTR Tokens onto the 4
+        # Crystal Bonus Round checks when include_battle_arenas is OFF.
+        #
+        # The option never removed those locations -- the four Crystal Bonus Round
+        # entries live unconditionally in data/world.json, so the location count is
+        # 213 with the option on and off alike. All the option did (Regions.py,
+        # warp_pad_logic) was keep the crystal pads out of the randomized-unlock
+        # pool. The checks themselves stayed live multiworld slots, and a 12-seed
+        # sample put a logic-required progression item on an arena check in 4 of
+        # them: the player is forced through content they explicitly opted out of.
+        #
+        # Pinning is the same contract the Gems / Boss Keys toggles above use:
+        # place_locked_item takes the location out of the multiworld pool and puts
+        # its vanilla item back on it, so nobody else's progression can be hidden
+        # there. The mapping already existed in data/vanilla_mapping.json and was
+        # read by nothing until now. Removing the locations outright would be the
+        # cleaner fix but is a native/location-table change, not apworld-only.
+        _arena_locked: Dict[str, int] = {}
+        if not self.options.include_battle_arenas.value:
+            for _loc_name, _token_name in _vmap["Bonus Round Tokens"].items():
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_token_name)
+                )
+                _arena_locked[_token_name] = _arena_locked.get(_token_name, 0) + 1
+
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
         # locations, so adding the same 5 gems from the item table again makes them
@@ -904,6 +944,8 @@ class ctrAPWorld(World):
                 count = max(0, count - _gems_locked[item["name"]])
             if item["name"] in _keys_locked:                          # keys pinned vanilla
                 count = max(0, count - _keys_locked[item["name"]])
+            if item["name"] in _arena_locked:                         # arenas pinned vanilla
+                count = max(0, count - _arena_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
@@ -1193,6 +1235,21 @@ class ctrAPWorld(World):
                 # tag and its send/receive plumbing only when death_link != 0.
                 "death_link": o.death_link.value,
                 "deathlink_amnesty": o.deathlink_amnesty.value,
+                # Universal Tracker: this seed's RESOLVED per-tier relic
+                # classification (True = progression, False = useful), exactly as
+                # create_item applied it. ADDITIVE key, no schema bump -- native
+                # reads ctr_options by explicit named key (ap_seedcfg json_int) and
+                # never enumerates, so an unknown key is inert there; it is also
+                # purely a tracker-side hint and steers nothing native does.
+                # UT cannot recompute this (the per-tier sliders are not on the
+                # wire) and guessing "all progression" made it report vanilla
+                # Sapphire-gated locations as in-logic that the server can never
+                # send -- see _relic_progression_map.
+                "relic_progression": {
+                    tier: bool(flag) for tier, flag in
+                    (getattr(self, "_ctr_relic_prog", None)
+                     or self._relic_progression_map()).items()
+                },
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),

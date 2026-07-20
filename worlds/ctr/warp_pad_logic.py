@@ -692,6 +692,71 @@ def _free_candidates_live(exits, start):
     return legacy_first + sorted(zero - set(legacy_first))
 
 
+def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
+    """How many CTR locations a FINISHED requirement DAG leaves open at ZERO items.
+
+    This is the "sphere-0 breadth" the fill-tail repair below is measured against.
+    It mirrors _reachable_pads_and_collect's traversal exactly, but with a
+    permanently empty inventory and no collection: BFS the live graph from the
+    start region, traverse a warp-pad exit only when that pad is FREE
+    (out[track][1] is None) and its static gate passes, then count every location
+    whose own gate passes -- with the same two-stage hold-back, so a trophy-track
+    TT / token location only counts when that destination's stage 2 is OPEN
+    (out[phys][2] is None).
+
+    `out` is run_sphere_search's return shape: {physical_track: {1: req, 2: req}}.
+    Stage 2 is keyed there by PHYSICAL pad, so it is re-keyed to destination track
+    here (reward_track_for) to match where the locations actually live.
+
+    Pure read-only: writes nothing to `world` and consumes no RNG, so calling it
+    between sphere-search attempts cannot perturb generation determinism.
+    """
+    exits, locations, _ = build_graph(world, reward_track_for, include_gem_cups)
+    start = world.start_region.name if world.start_region else "Menu"
+    pad_reqs = {t: out[t][1] for t in out}
+    s2_by_region = {reward_track_for(t): out[t][2] for t in out}
+    inv = Inv()
+
+    def passes(reqs):
+        return all(inv.count(i) >= c for i, c in reqs)
+
+    pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
+    seen = {start}
+    frontier = [start]
+    while frontier:
+        cur = frontier.pop()
+        for exit_name, tgt, gate in exits.get(cur, []):
+            if tgt in seen or not passes(gate):
+                continue
+            track = pad_exit_to_track.get(exit_name)
+            if track is not None:
+                req = pad_reqs.get(track, "UNSET")
+                if req == "UNSET":
+                    continue
+                if req is not None and not passes([req]):
+                    continue
+            seen.add(tgt)
+            frontier.append(tgt)
+
+    n = 0
+    for name, meta in locations.items():
+        if meta["region"] not in seen or not passes(meta["gate"]):
+            continue
+        if meta["is_tt_or_token"]:
+            tl = locations.get(meta["trophy_loc"])
+            if tl is None or tl["region"] not in seen or not passes(tl["gate"]):
+                continue
+            region = meta["region"]
+            if region in TROPHY_TRACKS:
+                s2 = s2_by_region.get(region, "UNSET")
+                if s2 == "UNSET":
+                    continue
+                if s2 is not None and not passes([s2]):
+                    continue
+        n += 1
+    return n
+
+
 def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
                                 collected, start):
     """Sweep the AP graph with the current inventory + the per-pad requirements
@@ -853,9 +918,13 @@ def _assign_stage2_from_inv(rnd, inv, allowed=None):
     return (item, min(cnt, owned)) if owned > 0 else None
 
 
-def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
-                      include_gem_cups=False):
-    """Returns {track_name: {1: stage1_req, 2: stage2_req}} for all shuffleable
+def _run_sphere_search_once(world, mode, reward_track_for=None,
+                            collapse_stage2=False, include_gem_cups=False):
+    """ONE roll of the sphere search. Public entry point is run_sphere_search
+    below, which re-rolls this until sphere-0 breadth is wide enough (see the
+    comment block there).
+
+    Returns {track_name: {1: stage1_req, 2: stage2_req}} for all shuffleable
     pads. Each req is (item, count) or None (free / no-gate). Stage 2 is non-None
     only for the 16 trophy pads (others get 2: None). mode 2 = random_without_4_keys.
     Deterministic on world.random.
@@ -1151,6 +1220,99 @@ def run_sphere_search(world, mode, reward_track_for=None, collapse_stage2=False,
         s2 = stage2_reqs.get(dest) if dest in TROPHY_TRACKS else None
         out[t] = {1: pad_reqs.get(t), 2: s2}
     return out
+
+
+# --------------------------------------------------------------------------
+# SPHERE-0 BREADTH REPAIR
+#
+# WHY THIS EXISTS
+# ---------------
+# CTR generation used to fail with AP's FillError on roughly 0.3% of seeds in a
+# multiworld. The DAG _run_sphere_search_once produces is always SOLVABLE by
+# construction (every requirement is drawn from an inventory owned strictly
+# before that gate opens), so the seed is never logically impossible. What fails
+# is fill_restrictive's greedy placement: CTR's item pool is ~98% progression in
+# every config, so when sphere 0 opens only a handful of locations there is
+# nowhere to seat the early progression that would open the next pads, and fill
+# runs out of reachable slots for the last progression items.
+#
+# The lever is how WIDE sphere 0 is -- how many locations are open at zero items
+# once the free-pad subset and the stage-1/stage-2 gates are decided. Measured
+# over 10,000 default-config + Empty-companion seeds, failures vs sphere-0
+# breadth (_sphere0_breadth above):
+#
+#     breadth   1      2       3        4      5      6+
+#     fails   0/25   4/169   27/230   0/15   0/43   0/9518
+#
+# Every failure sat at breadth 2 or 3. Breadth >= 4 produced ZERO failures over
+# ~19.5k samples. So instead of widening the floor for everyone, we simply
+# re-roll the sphere search on the seeds that landed narrow, and keep the first
+# roll that clears the threshold. Measured over seeds 0-9999: baseline 31
+# failures, this repair 3.
+#
+# WHY NOT JUST RAISE _FREE_MIN
+# ----------------------------
+# _FREE_MIN = 5 also drops to ~1 failure, but it destroys starting-pad variety:
+# 100% of seeds would open with 5 free pads, versus ~70% getting 3 today. The
+# re-roll preserves the distribution (68.8% of seeds still get 3 free pads) and
+# fires on only ~4.2% of seeds. _FREE_MIN stays at 3.
+#
+# THIS IS NOT A COMPLETE FIX -- DO NOT READ IT AS ONE
+# ---------------------------------------------------
+# The residual is ~3 failures per 10k, and that is ACCEPTED and documented as a
+# known issue. The seeds that still fail are GEOGRAPHY-CAPPED: on those, no
+# choice of free-pad subset can widen sphere 0 past the threshold, because the
+# locations behind the openable pads simply are not there. Re-rolling more times
+# does not help them -- hence the bounded attempt count and the last-resort
+# stage-2 collapse below (which measured 1 failure per 10k but changes the
+# played experience by dropping every second-stage gate, so it only fires when
+# the seed would otherwise be left narrow).
+#
+# Future maintainers: if you want to push this further, the remaining tail is
+# not a tuning problem in this function. It is either an AP fill ordering
+# concern or a question of adding sphere-0 location capacity to the geography.
+# --------------------------------------------------------------------------
+
+# Minimum sphere-0 breadth we re-roll toward. 4 is the measured zero-failure
+# floor (see the table above); it is not a round number, do not "tidy" it.
+_SPHERE0_MIN_BREADTH = 4
+# Bounded re-roll budget. ~4.2% of seeds enter the loop at all and nearly all of
+# those clear on the first or second retry; the cap exists so a geography-capped
+# seed cannot spin. Each attempt costs one extra build_graph.
+_SPHERE0_REPAIR_TRIES = 8
+
+
+def run_sphere_search(world, mode, reward_track_for=None,
+                      collapse_stage2=False, include_gem_cups=False):
+    """Sphere search with the sphere-0 breadth repair. Same signature and return
+    shape as _run_sphere_search_once; see the comment block above for why.
+
+    Deterministic on world.random: every attempt consumes RNG from the same
+    stream, and _sphere0_breadth consumes none, so a given seed always produces
+    the same result.
+    """
+    rtf = reward_track_for or (lambda t: t)
+    best, best_b = None, -1
+    for _ in range(_SPHERE0_REPAIR_TRIES):
+        out = _run_sphere_search_once(world, mode, reward_track_for,
+                                      collapse_stage2, include_gem_cups)
+        b = _sphere0_breadth(world, out, rtf, include_gem_cups)
+        if b > best_b:
+            best, best_b = out, b
+        if b >= _SPHERE0_MIN_BREADTH:
+            return out
+    if not collapse_stage2:
+        # Geography-capped seed: no free-pad subset widens sphere 0. Last resort
+        # -- drop every stage-2 gate for this seed, which frees the TT / token
+        # locations on every reachable trophy race into sphere 0. Costs this
+        # seed its two-stage experience, but it is the difference between a
+        # playable seed and a FillError. Assigning _ctr_two_stage_active here is
+        # safe: Regions.create_regions sets it BEFORE calling us, so this False
+        # sticks and __init__ correctly skips the two-stage fill probe.
+        world._ctr_two_stage_active = False
+        return _run_sphere_search_once(world, mode, reward_track_for,
+                                       True, include_gem_cups)
+    return best
 
 
 def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
