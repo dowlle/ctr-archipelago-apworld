@@ -601,13 +601,28 @@ class ctrAPWorld(World):
         """
         o = self.options
         prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
-        # Universal Tracker (issue #29): the per-tier progression sliders are NOT on
-        # the wire, so a UT re-generation cannot recover the seed's vanilla-mode
-        # relic classification. Keep every tier progression on the UT path so that
-        # has()-based relic gates and the oxidefinal goal condition track correctly
-        # (reachability is unaffected -- no vanilla LOCATION gates on gold/platinum;
-        # this only restores goal/gate visibility for the tracker).
-        if getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game):
+        # Universal Tracker (issue #29): read the seed's RESOLVED classification off
+        # the wire rather than trying to recompute it from inputs that do not travel
+        # (the per-tier progression sliders are not emitted). This map is not merely
+        # cosmetic on the UT path: CollectionState.collect ignores non-advancement
+        # items, so a tier the seed classified `useful` can never satisfy a has()
+        # gate server-side. Assuming "all tiers progression" therefore made UT open
+        # the vanilla Slide Coliseum pad (has('Sapphire Relic', 10), data/world.json)
+        # on seeds where the server never can -- UT then reported its three time
+        # trials in logic against a sphere that will never contain them (the ~12.6%
+        # UT-check failures, all vanilla + accessibility:minimal + non-oxidefinal
+        # seeds). The earlier comment here was right that no vanilla gate names
+        # gold/platinum, but missed the Sapphire one.
+        #
+        # BACKWARDS COMPATIBILITY: seeds generated before `relic_progression` was
+        # emitted carry no such key. For those, fall back to the historical
+        # all-progression behaviour -- no worse than before, and it keeps UT usable
+        # against already-rolled seeds.
+        _pt = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if _pt:
+            wire = (_pt.get("ctr_options") or {}).get("relic_progression")
+            if isinstance(wire, dict):
+                return {tier: bool(wire.get(tier, True)) for tier in prog}
             return prog
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
@@ -1193,6 +1208,21 @@ class ctrAPWorld(World):
                 # tag and its send/receive plumbing only when death_link != 0.
                 "death_link": o.death_link.value,
                 "deathlink_amnesty": o.deathlink_amnesty.value,
+                # Universal Tracker: this seed's RESOLVED per-tier relic
+                # classification (True = progression, False = useful), exactly as
+                # create_item applied it. ADDITIVE key, no schema bump -- native
+                # reads ctr_options by explicit named key (ap_seedcfg json_int) and
+                # never enumerates, so an unknown key is inert there; it is also
+                # purely a tracker-side hint and steers nothing native does.
+                # UT cannot recompute this (the per-tier sliders are not on the
+                # wire) and guessing "all progression" made it report vanilla
+                # Sapphire-gated locations as in-logic that the server can never
+                # send -- see _relic_progression_map.
+                "relic_progression": {
+                    tier: bool(flag) for tier, flag in
+                    (getattr(self, "_ctr_relic_prog", None)
+                     or self._relic_progression_map()).items()
+                },
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
