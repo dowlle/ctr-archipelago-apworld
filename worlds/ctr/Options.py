@@ -12,7 +12,12 @@ class Goal(Choice):
     - **allbosses:** All Bosses - Win all 4 boss races (Ripper Roo, Papu Papu, Komodo Joe, Pinstripe).
     - **allgemcups:** All Gems - Collect all 5 Gems. With `Shuffle Gems` off they
       sit on their own Gem Cups (win every cup); with `Shuffle Gems` on they are
-      hidden anywhere in the multiworld and the hunt is on."""
+      hidden anywhere in the multiworld and the hunt is on.
+
+    Note: `allgemcups` requires `Include Gem Cup Warp Pads` to be **on**. The goal
+    lives in the gem cups, so excluding them while `Shuffle Gems` is on would leave
+    the goal's own races out of the seed; that combination fails generation with a
+    clear message."""
     display_name = "Goal"
     option_oxide = 0
     option_oxidefinal = 1
@@ -105,7 +110,14 @@ class ShuffleWarpPadsGemCups(DefaultOnToggle):
     This is also the participation gate for the `cups` destination-shuffle
     category: gem cups can only be destination-shuffled (via `Warp Pad Shuffle
     Categories`) when this is on. Off -> cups stay fully vanilla-fixed (vanilla
-    checks, vanilla gate, never destination-shuffled)."""
+    checks, vanilla gate, never destination-shuffled).
+
+    Off is safe with shuffled Gems: when this is off and `Shuffle Gems` is on,
+    each Gem is pinned back onto its own vanilla Gem Cup check (out of the
+    multiworld pool) so opted-out cups never hold another world's progression.
+    Required to be **on** for the `All Gems` goal -- that goal's races ARE the
+    gem cups, so `allgemcups` + `Shuffle Gems` on + this off fails generation
+    with a clear message rather than stranding the goal."""
     display_name = "Include Gem Cup Warp Pads"
 
 
