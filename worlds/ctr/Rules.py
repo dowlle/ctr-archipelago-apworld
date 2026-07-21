@@ -83,6 +83,12 @@ def set_rules(world):
     # requirements and boss-garage gates LAST so they win over the JSON text
     # rules already applied above.
     add_warp_pad_unlock_rules(world, player)
+    # Vanilla warp-pad mode (issue #80): the per-pad native trophy floor. In
+    # randomized modes add_warp_pad_unlock_rules already installed the sphere-search
+    # requirements (and world.warp_pad_unlock is empty in vanilla), so this ANDs the
+    # vanilla floor on exactly one mode. Same slot as add_warp_pad_unlock_rules.
+    if world.options.warppad_unlock_requirements.value == 0:
+        add_vanilla_floor_rules(world, player)
     add_boss_garage_rules(world, player)
     add_podium_placement_rules(world, player)
 
@@ -160,6 +166,43 @@ def add_warp_pad_unlock_rules(world, player):
                 lambda state, i=item, n=count, p=player, base=base_rule:
                 base(state) and state.has(i, p, n)
             )
+
+
+def add_vanilla_floor_rules(world, player):
+    """Vanilla warp-pad mode (warppad_unlock_requirements = vanilla, issue #80):
+    AND each race pad's native trophy floor onto its ENTRANCE rule.
+
+    The floor is a property of the PHYSICAL pad -- native gates the pad LOAD by
+    physLevelID against metaDataLEV[].numTrophiesToOpen (AH_WarpPad.c:810/1865),
+    NOT the race -- so it belongs on the pad exit, which Regions keeps in its
+    physical hub and keeps physical-pad-keyed even under destination shuffle
+    (race<->race per_category in this mode). Flooring the entrance rather than the
+    Trophy Race location thus reproduces native's physical-pad keying for free and
+    makes Regions' old location-floor re-key hack unnecessary (removed).
+
+    Floors are read from data/warp_pad_ids.json ("vanilla_trophies"), the single
+    source transcribed from the native table; NEVER retyped here. A floor of 0
+    (Crash Cove / Roo's Tubes) adds no rule, so the two vanilla starter pads stay
+    open from an empty inventory -- the bootstrap that lets the first trophies be
+    earned. Only "kind": "race" pads carry a floor (arenas gate on hub keys, trials
+    on relics/gems).
+
+    Base-rule capture: the floor is ANDed onto the entrance's existing hub-Key rule
+    (the pattern of add_warp_pad_unlock_rules), never replacing it.
+    """
+    mw = world.multiworld
+    for pad_name, meta in getattr(world, "warp_pad_ids", {}).items():
+        if meta.get("kind") != "race":
+            continue
+        floor = meta.get("vanilla_trophies", 0)
+        if floor <= 0:
+            continue  # floor-0 pads (Crash Cove / Roo's Tubes): stay open, bootstrap
+        ent = mw.get_entrance(pad_name, player)
+        base_rule = ent.access_rule  # vanilla hub-Key gate already applied above
+        ent.access_rule = (
+            lambda state, n=floor, p=player, base=base_rule:
+            base(state) and state.has("Trophy", p, n)
+        )
 
 
 # Garage-door exit name -> trophy threshold (vanilla 4/8/12/16). Oxide left as

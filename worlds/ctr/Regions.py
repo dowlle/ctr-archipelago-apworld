@@ -425,25 +425,11 @@ def create_regions(world: "ctrAPWorld"):
                 _src.exits.append(_ent)
                 mw.regions.entrance_cache[player][_ent.name] = _ent
 
-    # Remove the vanilla per-track trophy floor from the trophy-race LOCATION when
-    # warp-pad requirements are RANDOMIZED. world.json keys numTrophiesToOpen on
-    # "<track>: Trophy Race" by TRACK (the vanilla unlock spine). Keeping it would
-    # (a) mis-key under destination shuffle (a low-floor pad loading a high-floor
-    # track inherits the wrong floor -> the progression stall) and (b) force a
-    # deterministic vanilla trophy path into every seed. In randomized mode the
-    # randomizer owns ALL entry requirements (sphere-search per-pad reqs + truly
-    # free bootstrap pads), so we drop the vanilla floor entirely here; free pads
-    # are emitted as "0 trophies" (to_slot_req) so native never falls back to the
-    # floor. Vanilla unlock mode (0) is left untouched and keeps its real floors.
-    # (Time-trial / token locations are gated by can_reach(Trophy Race) in
-    # Rules.add_time_trial_and_ctr_requirements, so they follow automatically.)
-    if unlock_mode in (1, 2):
-        for region in regions:
-            if getattr(region, "type", None) != "race":
-                continue
-            for loc in region.locations:
-                if loc.name.endswith(": Trophy Race"):
-                    loc.logic_text = "True"
+    # Trophy-race LOCATIONS carry NO floor in any mode (issue #80): world.json now
+    # normalizes every "<track>: Trophy Race" requires to "always". The vanilla
+    # per-pad trophy floor lives on the pad ENTRANCE instead (Rules.add_vanilla_floor_rules,
+    # keyed by PHYSICAL pad like native), and randomized modes own all entry
+    # requirements via the sphere search. No location-floor strip is needed here.
 
     # TRIAL pads (Slide Coliseum / Turbo Track): in randomized mode their warp-pad
     # exit carries a randomized SINGLE-STAGE entry requirement (sphere-search), so
@@ -540,30 +526,13 @@ def create_regions(world: "ctrAPWorld"):
         if dest_region is not None:
             pad_dest_region[pad_name] = dest_region
 
-    # VANILLA unlock mode + destination shuffle: the vanilla trophy floor stays on
-    # the trophy-race LOCATION (keyed by track), but native keys numTrophiesToOpen
-    # by the PHYSICAL pad. Under shuffle a low-floor pad loading a high-floor track
-    # would demand the destination's floor -> unsolvable (FillError). Re-key each
-    # shuffled destination track's trophy-race floor to the PHYSICAL pad that loads
-    # it. (Randomized modes already strip the floor above; this branch is only for
-    # vanilla mode, which keeps real floors but must still follow the physical pad.)
-    if unlock_mode == 0 and do_shuffle:
-        orig_floor = {
-            reg["name"]: loc.get("requires", "True")
-            for reg in data["regions"] if reg.get("type") == "race"
-            for loc in reg.get("locations", [])
-            if loc["name"].endswith(": Trophy Race")
-        }
-        for pad_name, dest_track in pad_dest_region.items():
-            phys = pad_name[: -len(" Warp Pad")] if pad_name.endswith(" Warp Pad") else pad_name
-            if phys == dest_track:
-                continue
-            dest_region = region_lookup.get(dest_track)
-            if dest_region is None or phys not in orig_floor:
-                continue
-            for loc in dest_region.locations:
-                if loc.name.endswith(": Trophy Race"):
-                    loc.logic_text = orig_floor[phys]
+    # VANILLA unlock mode + destination shuffle: no floor re-keying is needed here.
+    # The vanilla trophy floor now lives on the pad ENTRANCE, keyed by the PHYSICAL
+    # pad (Rules.add_vanilla_floor_rules), and the exit wiring below keeps that exit
+    # in its physical hub with its physical-pad rule while retargeting it to the
+    # shuffled destination -- so the physical pad's floor already gates the
+    # destination it loads, exactly as native keys numTrophiesToOpen by physLevelID.
+    # (This superseded the old location-floor re-key hack, issue #80.)
 
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
