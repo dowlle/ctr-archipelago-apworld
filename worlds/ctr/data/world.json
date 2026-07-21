@@ -91,7 +91,7 @@
                 {
                     "name": "Crash Cove: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 0)"
+                    "requires": "always"
                 },
                 {
                     "name": "Crash Cove: Sapphire Time Trial",
@@ -130,7 +130,7 @@
                 {
                     "name": "Roo's Tubes: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 0)"
+                    "requires": "always"
                 },
                 {
                     "name": "Roo's Tubes: Sapphire Time Trial",
@@ -169,7 +169,7 @@
                 {
                     "name": "Mystery Caves: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 1)"
+                    "requires": "always"
                 },
                 {
                     "name": "Mystery Caves: Sapphire Time Trial",
@@ -208,7 +208,7 @@
                 {
                     "name": "Sewer Speedway: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 2)"
+                    "requires": "always"
                 },
                 {
                     "name": "Sewer Speedway: Sapphire Time Trial",
@@ -589,7 +589,7 @@
                 {
                     "name": "Coco Park: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 4)"
+                    "requires": "always"
                 },
                 {
                     "name": "Coco Park: Sapphire Time Trial",
@@ -628,7 +628,7 @@
                 {
                     "name": "Tiger Temple: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 4)"
+                    "requires": "always"
                 },
                 {
                     "name": "Tiger Temple: Sapphire Time Trial",
@@ -667,7 +667,7 @@
                 {
                     "name": "Papu's Pyramid: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 5)"
+                    "requires": "always"
                 },
                 {
                     "name": "Papu's Pyramid: Sapphire Time Trial",
@@ -706,7 +706,7 @@
                 {
                     "name": "Dingo Canyon: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 6)"
+                    "requires": "always"
                 },
                 {
                     "name": "Dingo Canyon: Sapphire Time Trial",
@@ -837,7 +837,7 @@
                 {
                     "name": "Blizzard Bluff: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 8)"
+                    "requires": "always"
                 },
                 {
                     "name": "Blizzard Bluff: Sapphire Time Trial",
@@ -876,7 +876,7 @@
                 {
                     "name": "Dragon Mines: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 9)"
+                    "requires": "always"
                 },
                 {
                     "name": "Dragon Mines: Sapphire Time Trial",
@@ -915,7 +915,7 @@
                 {
                     "name": "Polar Pass: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 10)"
+                    "requires": "always"
                 },
                 {
                     "name": "Polar Pass: Sapphire Time Trial",
@@ -954,7 +954,7 @@
                 {
                     "name": "Tiny Arena: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 11)"
+                    "requires": "always"
                 },
                 {
                     "name": "Tiny Arena: Sapphire Time Trial",
@@ -1078,7 +1078,7 @@
                 {
                     "name": "Hot Air Skyway: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 12)"
+                    "requires": "always"
                 },
                 {
                     "name": "Hot Air Skyway: Sapphire Time Trial",
@@ -1117,7 +1117,7 @@
                 {
                     "name": "Cortex Castle: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 13)"
+                    "requires": "always"
                 },
                 {
                     "name": "Cortex Castle: Sapphire Time Trial",
@@ -1156,7 +1156,7 @@
                 {
                     "name": "N. Gin Labs: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 14)"
+                    "requires": "always"
                 },
                 {
                     "name": "N. Gin Labs: Sapphire Time Trial",
@@ -1195,7 +1195,7 @@
                 {
                     "name": "Oxide Station: Trophy Race",
                     "type": "trophy",
-                    "requires": "has('Trophy', 15)"
+                    "requires": "always"
                 },
                 {
                     "name": "Oxide Station: Sapphire Time Trial",

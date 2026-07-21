@@ -1623,10 +1623,11 @@ def resolve_shuffle_pools(world):
     Vanilla-unlock collapse: when warppad_unlock_requirements == vanilla (0), the
     grouping is forced to per_category, cups/trials are excluded, and `tracks`
     degrades to races-only (_LEGACY_RACE_IDS) -- regardless of the yaml. Native
-    vanilla gate enforcement + the vanilla floor re-keying are only defined for the
-    race<->race matrix, so cross-category / cup / trial shuffle require a randomized
-    unlock mode. Category SELECTION is still honoured (an unselected category never
-    shuffles, even in the collapse)."""
+    vanilla gate enforcement + the entrance-keyed vanilla trophy floor
+    (Rules.add_vanilla_floor_rules, issue #80) are only defined for the race<->race
+    matrix, so cross-category / cup / trial shuffle require a randomized unlock mode.
+    Category SELECTION is still honoured (an unselected category never shuffles, even
+    in the collapse)."""
     opts = world.options
     cats = set(getattr(opts, "warp_pad_shuffle_categories").value)
     grouping = getattr(opts, "warp_pad_shuffle_grouping").current_key  # merged/per_category
@@ -1835,7 +1836,15 @@ def _capacity_gate_open(world, grouping):
     keeps every category on its own pads (cups never reach the always-open race pads),
     and keys-on floods the frontier with an early Key -- both are provably unaffected.
     Kept deliberately allocation-free so those (default) paths stay byte-identical to
-    pre-fix generation; the heavier capacity work happens only past this gate."""
+    pre-fix generation; the heavier capacity work happens only past this gate.
+
+    VANILLA-FLOOR SOUNDNESS (issue #80): the vanilla trophy floors installed by
+    Rules.add_vanilla_floor_rules gate each race pad by trophies, which this count
+    does NOT model. That is sound today because vanilla mode forces grouping ==
+    per_category (resolve_shuffle_pools), so this gate is CLOSED in vanilla mode and
+    the re-roll never runs. If vanilla-mode shuffle is ever widened to `merged`
+    (past the current race<->race per_category collapse), this counter must also
+    account for the per-pad trophy floor before it can be trusted with floors present."""
     return grouping == "merged" and not bool(world.options.shuffle_keys.value)
 
 
