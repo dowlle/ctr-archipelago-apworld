@@ -218,6 +218,22 @@ class ctrAPWorld(World):
             self._ut_restore_options(passthrough)
             return
         from Options import OptionError
+        # Issue #50: the All-Gems goal's own races ARE the 5 Gem Cups. Turning
+        # include_gem_cups OFF keeps those cups vanilla-fixed while shuffle_gems
+        # ON scatters the 5 goal Gems anywhere in the multiworld -- so the goal's
+        # own cup races are opted out of the seed and the create_items #50 pin
+        # (which would put the Gems back on the cups) is intentionally skipped for
+        # the goal (gems ride the pool, 2026-07-15 ruling). That leaves an
+        # unwinnable-by-design combination, so forbid it here with a clear message
+        # rather than emit it. shuffle_gems OFF is fine (gemgoal pins the gems onto
+        # the cups directly), so this fires only on the shuffle-ON conflict.
+        if self.options.goal.value == Goal.option_allgemcups \
+                and self.options.shuffle_gems.value \
+                and not self.options.include_gem_cups.value:
+            raise OptionError(
+                "CTR goal 'allgemcups' requires 'include_gem_cups: true' (the "
+                "goal lives in the gem cups; excluding them while shuffling gems "
+                "leaves the goal's own races out of the seed).")
         if self.options.goal.value != Goal.option_oxidefinal:
             return
         n = self.options.oxide_final_challenge_relic_count.value
@@ -917,6 +933,33 @@ class ctrAPWorld(World):
                 )
                 _arena_locked[_token_name] = _arena_locked.get(_token_name, 0) + 1
 
+        # Gem cups (issue #50, sibling of the arena block above): pin the vanilla
+        # Gem onto each of the 5 "<Colour> Gem Cup: Gem" checks when
+        # include_gem_cups is OFF but shuffle_gems is ON. Same defect as the
+        # arenas: the option only keeps the cup warp pads vanilla-gated
+        # (Regions.py) -- the 5 cup locations stay unconditional in
+        # data/world.json, so with the Gems shuffled they are live multiworld
+        # slots and fill hid logic-required progression on them (measured 4 of a
+        # 12-seed sample). Pinning restores the vanilla Gem there and takes the
+        # slot out of the pool; the cups stay reachable in logic (their vanilla
+        # has('<Colour> CTR Token', 4) gate persists), so nothing softlocks.
+        #
+        # The three sibling configs are already covered elsewhere and must NOT
+        # double-pin (place_locked_item on a filled location raises):
+        #   - shuffle_gems OFF, non-goal: _gems_locked block (above) pinned them.
+        #   - shuffle_gems OFF, allgemcups: gemgoal() pinned them.
+        #   - shuffle_gems ON, allgemcups: forbidden in generate_early (the goal
+        #     Gems ride the pool, so pinning them onto opted-out cups would strand
+        #     the goal -- the _GEM_GOAL guard below is the belt-and-suspenders).
+        _cups_locked: Dict[str, int] = {}
+        if not self.options.include_gem_cups.value \
+                and self.options.shuffle_gems.value and not _GEM_GOAL:
+            for _loc_name, _gem_name in _vmap["Gems"].items():
+                mw.get_location(_loc_name, player).place_locked_item(
+                    self.create_item(_gem_name)
+                )
+                _cups_locked[_gem_name] = _cups_locked.get(_gem_name, 0) + 1
+
         # --- Create general item pool ---
         # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
         # locations, so adding the same 5 gems from the item table again makes them
@@ -946,6 +989,8 @@ class ctrAPWorld(World):
                 count = max(0, count - _keys_locked[item["name"]])
             if item["name"] in _arena_locked:                         # arenas pinned vanilla
                 count = max(0, count - _arena_locked[item["name"]])
+            if item["name"] in _cups_locked:                          # gem cups pinned vanilla
+                count = max(0, count - _cups_locked[item["name"]])
             if count > 0:
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
