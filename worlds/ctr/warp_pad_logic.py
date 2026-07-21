@@ -385,6 +385,22 @@ RELIC_ITEMS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
 GEM_ITEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
 
 
+def effective_custom_weights(world):
+    """The requirement-weight table for requirement_variety=custom: the legacy
+    defaults overlaid with the player's requirement_weights, keeping only valid
+    keys so the key universe stays stable. Pure -- reads options, mutates no
+    module state. Shared by _load_requirement_preset (the live weight loader) and
+    __init__.generate_early's zero-Trophy guard (issue #87) so both read the exact
+    same effective weights."""
+    weights = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)  # fallback for omitted keys
+    custom = getattr(getattr(world.options, "requirement_weights", None),
+                     "value", None) or {}
+    for k, v in custom.items():
+        if k in weights:  # ignore stray keys; keep the key universe stable
+            weights[k] = v
+    return weights
+
+
 def _load_requirement_preset(world):
     """Load the requirement-weight preset chosen by the requirement_variety YAML
     option into the module-level REQ_WEIGHTS + the eight Any*-collapse globals.
@@ -423,13 +439,7 @@ def _load_requirement_preset(world):
         REQ_WEIGHTS = dict(_REQ_WEIGHTS_ICEBOUND_BETA5)
         collapse_key = "icebound_beta5"
     elif preset == "custom":
-        weights = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)  # fallback for omitted keys
-        custom = getattr(getattr(world.options, "requirement_weights", None),
-                         "value", None) or {}
-        for k, v in custom.items():
-            if k in weights:  # ignore stray keys; keep the key universe stable
-                weights[k] = v
-        REQ_WEIGHTS = weights
+        REQ_WEIGHTS = effective_custom_weights(world)
         collapse_key = "custom"
     else:  # trophy_heavy_legacy + any unknown/missing value
         REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
