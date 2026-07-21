@@ -215,11 +215,23 @@ def add_podium_placement_rules(world, player):
       destination-shuffle rekey all already live on that location's rule); OR
     * one of the Gem Cups that runs this track as a LEG is reachable -- a cup leg
       is a real track load, so finishing a leg fires that track's rungs (design
-      decision 3). Modelled as an OR on the RUNG rule (not a region entrance):
-      a region entrance from the cup would also expose that track's Time Trials /
-      CTR Token Challenge / Trophy Race, which a cup leg does NOT earn, and would
-      over-state their reachability (golden-rule violation). The OR touches only
-      the rungs, which is exactly what a leg finish earns.
+      decision 3). Modelled as an OR on the RUNG rule (not a cup->track region
+      entrance): a cup->track entrance would also expose that track's Time Trials
+      / CTR Token Challenge / Trophy Race, which a cup leg does NOT earn, and
+      would over-state their reachability (golden-rule violation). The OR touches
+      only the rungs, which is exactly what a leg finish earns.
+
+    JOINT PODIUM REGION (issue #86). The rungs do NOT live in the track region;
+    Regions.create_regions parents them to a dead-end "<track>: Podium" region
+    with rule-True entrances FROM the track region and FROM each legging cup. That
+    is what keeps this OR alive: AP-core ANDs a Location's rule with its parent
+    region's reachability, so a cup-only rung parented to the track region (its
+    pad shut) would be ANDed out of logic. The podium region holds only rungs and
+    has no exits, so the cup entrance still exposes nothing but the rungs -- the
+    golden rule above is preserved by the region's dead-end shape, not just by the
+    rule. can_reach = (trackRegion OR cup) AND (trophyLoc OR cup) = (trophyLoc OR
+    cup), since trophyLoc reachability implies trackRegion. This rule is unchanged
+    by the fix.
 
     No placement is ever logically required, so accessibility:full stays
     satisfiable whenever the trophy race is."""

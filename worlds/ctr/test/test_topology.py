@@ -109,3 +109,90 @@ class TestTopologyNoShuffle(ReturnExitGuardMixin, CTRTestBase):
         "warppad_unlock_requirements": "randomized",
         "warp_pad_shuffle_categories": [],
     }
+
+
+class TestPodiumCupLegReachability(CTRTestBase):
+    """Issue #86 -- a podium rung reachable ONLY via a Gem Cup leg must stay in
+    logic when the track's own warp pad is shut.
+
+    Vanilla unlock mode so the cup pad keeps its real has('<colour> CTR Token', 4)
+    gate and every track pad sits behind its Key-gated hub (verified against
+    data/world.json: N.Sanity->Gem Stone Valley Key-1, Gem Stone Valley->Cups Room
+    Key-2, Yellow Cup pad Yellow CTR Token-4, Glacier Park->Citadel City Key-3).
+    Yellow Gem Cup legs Hot Air Skyway (data/gem_cup_legs.json), and Hot Air Skyway
+    lives in the Key-3 Citadel City hub, so with 2 Keys + 4 Yellow CTR Tokens the
+    Yellow Gem Cup is reachable while the Hot Air Skyway track region is not -- the
+    cup-leg-only case that was False before the joint-region fix."""
+    options = {
+        "warppad_unlock_requirements": "vanilla",
+        "warp_pad_shuffle_categories": [],  # identity destinations: pin a
+        # deterministic topology (default shuffle would re-key which physical pad
+        # loads Hot Air Skyway per seed; the shuffle case is covered by the
+        # randomized TestTopology* classes above, and the fix is shuffle-correct
+        # because a cup leg belongs to the cup region regardless of pad).
+        "podium_placement_checks": True,
+        "podium_held_rungs": True,
+        "include_gem_cups": True,
+    }
+
+    def _state_with(self, items):
+        """A fresh CollectionState granting exactly the given {item_name: count}."""
+        state = CollectionState(self.multiworld)
+        world = self.multiworld.worlds[self.player]
+        for name, n in items.items():
+            for _ in range(n):
+                state.collect(world.create_item(name), prevent_sweep=True)
+        return state
+
+    def test_cup_only_rung_in_logic(self):
+        p = self.player
+        state = self._state_with({"Key": 2, "Yellow CTR Token": 4})
+        self.assertTrue(
+            state.can_reach("Yellow Gem Cup", "Region", p),
+            "Yellow Gem Cup should be reachable with 2 Keys + 4 Yellow CTR Tokens")
+        self.assertFalse(
+            state.can_reach("Hot Air Skyway", "Region", p),
+            "Hot Air Skyway track region must stay Key-3 gated (Citadel City)")
+        self.assertTrue(
+            state.can_reach("Hot Air Skyway: Held 1st", "Location", p),
+            "cup-only rung must be in logic via the Yellow Gem Cup leg (issue #86)")
+
+    def test_cup_leg_exposes_only_rungs(self):
+        p = self.player
+        state = self._state_with({"Key": 2, "Yellow CTR Token": 4})
+        # A Yellow Gem Cup leg is a real track load that fires Hot Air Skyway's
+        # placement rungs, but does NOT earn its Trophy Race, CTR Token Challenge,
+        # or Time Trials -- the joint podium region is a dead end, so cup
+        # reachability exposes nothing else on the track (golden rule).
+        for loc in ("Hot Air Skyway: Trophy Race",
+                    "Hot Air Skyway: CTR Token Challenge",
+                    "Hot Air Skyway: Sapphire Time Trial",
+                    "Hot Air Skyway: Gold Time Trial",
+                    "Hot Air Skyway: Platinum Time Trial"):
+            self.assertFalse(
+                state.can_reach(loc, "Location", p),
+                f"{loc} must stay unreachable via a cup leg (golden rule)")
+
+    def test_empty_inventory_no_rungs(self):
+        p = self.player
+        state = CollectionState(self.multiworld)
+        self.assertFalse(state.has("Key", p),
+                         "test premise broken: a Key is precollected")
+        # Neither the Hot Air Skyway pad (Key-gated hub) nor any cup that legs it
+        # is reachable from an empty inventory, so its rung is out of logic.
+        self.assertFalse(
+            state.can_reach("Hot Air Skyway: Held 1st", "Location", p),
+            "a Key-gated track's rung must be unreachable with zero items")
+
+    def test_joint_region_entrances(self):
+        p, mw = self.player, self.multiworld
+        # Hot Air Skyway is legged by BOTH Yellow and Purple Gem Cups, the exact
+        # entrance-name-uniqueness hazard flagged for the joint region: names must
+        # be unique per (source, track), all landing in the one podium region.
+        for name in ("Hot Air Skyway -> Hot Air Skyway: Podium",
+                     "Yellow Gem Cup -> Hot Air Skyway: Podium",
+                     "Purple Gem Cup -> Hot Air Skyway: Podium"):
+            ent = mw.get_entrance(name, p)
+            self.assertEqual(
+                ent.connected_region.name, "Hot Air Skyway: Podium",
+                f"entrance '{name}' must connect to the joint podium region")
