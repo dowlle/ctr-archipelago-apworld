@@ -366,17 +366,64 @@ def create_regions(world: "ctrAPWorld"):
     from .podium import TROPHY_TRACKS, created_rung_keys_from_options, location_name
     _rung_keys = created_rung_keys_from_options(opts)
     if _rung_keys:
+        # Issue #86 -- JOINT PODIUM REGION. AP-core ANDs a Location's own rule
+        # with its PARENT region's reachability (BaseClasses.Location.can_reach:
+        # parent_region.can_reach AND access_rule). If the rungs are parented to
+        # the track region, a shut track warp pad makes that parent unreachable,
+        # so the cup-leg branch of the OR rule installed in
+        # Rules.add_podium_placement_rules can never fire -- a cup-only rung is
+        # hidden in Universal Tracker and dropped from fill logic. Fix: hold each
+        # track's rungs in a dedicated dead-end "<track>: Podium" region reached
+        # by a rule-True entrance from the track region AND from every Gem Cup
+        # that legs the track (data/gem_cup_legs.json). The rung's own OR rule is
+        # left unchanged in Rules; can_reach then evaluates to
+        # (trackRegion OR cup) AND (trophyLoc OR cup), which reduces to exactly
+        # (trophyLoc OR cup) since trophyLoc reachability implies trackRegion.
+        # The region holds ONLY rungs and has no exits, so a cup leg exposes
+        # nothing else on the track -- golden rule preserved (the concern in
+        # Rules.add_podium_placement_rules's docstring). The rule-True entrances
+        # need no register_indirect_condition (they never read region
+        # reachability) and the new "podium"-type regions are sphere-search
+        # reward-neutral (podium locations resolve to reward None).
+        _cup_legs = json.loads(
+            pkgutil.get_data(__package__, "data/gem_cup_legs.json").decode("utf-8")
+        )["cup_legs"]
+        _track_to_cups: dict = {}
+        for _cup, _legs in _cup_legs.items():
+            for _leg in _legs:
+                _track_to_cups.setdefault(_leg, []).append(_cup)
         for _track in TROPHY_TRACKS:
-            _region = region_lookup.get(_track)
-            if _region is None:
+            _track_region = region_lookup.get(_track)
+            if _track_region is None:
                 continue
+            _podium = Region(f"{_track}: Podium", player, mw)
+            _podium.type = "podium"
+            mw.regions.append(_podium)
+            regions.append(_podium)
+            region_lookup[_podium.name] = _podium
             for _rk in _rung_keys:
                 _name = location_name(_track, _rk)
-                _loc = create_location(player, _name, _region)
+                _loc = create_location(player, _name, _podium)
                 _loc.type = "podium"
-                _loc.logic_text = "True"  # real rule set in Rules (can_reach Trophy Race)
-                _region.locations.append(_loc)
+                _loc.logic_text = "True"  # real OR rule set in Rules (Trophy Race OR cup)
+                _podium.locations.append(_loc)
                 mw.regions.location_cache[player][_name] = _loc
+            # Rule-True entrances into the dead-end podium region: one from the
+            # track region, one from each Gem Cup that legs this track (names
+            # unique per track AND cup -- Purple Gem Cup legs four tracks, and a
+            # track can be legged by two cups). Cup filtered to regions that
+            # exist this seed, mirroring Rules.add_podium_placement_rules. No
+            # access_rule_text -> set_rules' getattr default "True" covers it.
+            _sources = [_track_region]
+            _sources += [region_lookup[_c] for _c in _track_to_cups.get(_track, [])
+                         if _c in region_lookup]
+            for _src in _sources:
+                _ent = Entrance(player=player,
+                                name=f"{_src.name} -> {_podium.name}",
+                                parent=_src)
+                _ent.connect(_podium)
+                _src.exits.append(_ent)
+                mw.regions.entrance_cache[player][_ent.name] = _ent
 
     # Remove the vanilla per-track trophy floor from the trophy-race LOCATION when
     # warp-pad requirements are RANDOMIZED. world.json keys numTrophiesToOpen on
