@@ -218,6 +218,34 @@ class ctrAPWorld(World):
             self._ut_restore_options(passthrough)
             return
         from Options import OptionError
+        # Zero-weight Trophy guard (issue #87). With randomized warp-pad
+        # requirements (modes 1/2) and requirement_variety=custom, run_sphere_search
+        # draws pad requirements weighted by the effective custom weights. Trophy is
+        # the ONLY item guaranteed present in the synthetic inventory at every draw
+        # (the sphere-0 bootstrap collects the free pads' trophy races first -- see
+        # the bootstrap section of warp_pad_logic.run_sphere_search), so a Trophy
+        # weight of 0 makes the candidate weights sum to zero at the first randomized
+        # draw and random.choices raises a bare ValueError. Reject that config here
+        # with a clean OptionError instead of emitting a raw traceback. Scoped to
+        # modes 1/2 (vanilla mode 0 never reads the weights) and to custom (the
+        # presets all keep Trophy positive), and placed after the UT passthrough
+        # (a connected seed already cleared this) but before the non-oxidefinal
+        # early return below -- appended after that return it would never run for
+        # non-oxidefinal goals.
+        if self.options.warppad_unlock_requirements.value != 0 \
+                and self.options.requirement_variety.current_key == "custom":
+            from .warp_pad_logic import effective_custom_weights
+            if effective_custom_weights(self).get("Trophy", 0) <= 0:
+                raise OptionError(
+                    "CTR 'requirement_variety: custom' needs a positive 'Trophy' "
+                    "weight in requirement_weights (this YAML sets Trophy: 0). "
+                    "Trophies are the only reward available when the seed's first "
+                    "randomized warp-pad requirements are drawn, so with Trophy at 0 "
+                    "the candidate weights sum to zero and generation cannot pick a "
+                    "requirement. In your YAML either set 'Trophy' above 0 (the "
+                    "default is 100), remove the 'Trophy' entry to keep that default, "
+                    "or switch requirement_variety to a preset. Weight 0 remains "
+                    "legal for every other item, including Key.")
         # Issue #50: the All-Gems goal's own races ARE the 5 Gem Cups. Turning
         # include_gem_cups OFF keeps those cups vanilla-fixed while shuffle_gems
         # ON scatters the 5 goal Gems anywhere in the multiworld -- so the goal's

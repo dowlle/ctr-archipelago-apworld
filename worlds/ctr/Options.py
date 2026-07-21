@@ -297,7 +297,9 @@ class RequirementWeights(OptionDict):
     custom. Each entry is `item name: weight` — a pad requirement is drawn with
     chance proportional to its weight, so an item with weight 100 is picked
     about five times as often as one with weight 20, and weight 0 disables an
-    item entirely. Items you leave out keep their trophy_heavy_legacy weight.
+    item entirely, except Trophy, which must stay above 0 (it bootstraps the
+    randomized warp-pad requirements). Items you leave out keep their
+    trophy_heavy_legacy weight.
 
     Example — trophy-light seeds that lean hard on relics and keys:
 
