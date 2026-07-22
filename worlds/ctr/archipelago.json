@@ -1,7 +1,7 @@
 {
     "game": "Crash Team Racing",
     "compatible_version": 7,
-    "world_version": "0.1.3",
+    "world_version": "0.1.4",
     "minimum_ap_version": "0.6.7",
     "description": "Crash Team Racing (PSX, 1999) Adventure Mode as an Archipelago multiworld: warp pads, boss garages, relics, gems, CTR tokens and podium checks, with randomized gating, two-stage locks and destination shuffle. Plays through ctr-native-ap, a decompiled native PC build that is itself the AP client. No emulator, no ROM patching.",
     "authors": ["Dowlle"],
