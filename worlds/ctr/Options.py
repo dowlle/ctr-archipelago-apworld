@@ -131,8 +131,8 @@ class TrapFillPercentage(Range):
     default = 10
 
 
-class OneLapCups(Toggle):
-    """Make Cup races one lap each instead of the usual three. Off by default.
+class OneLapCups(DefaultOnToggle):
+    """Make Cup races one lap each instead of the usual three. On by default.
 
     Only cup races shorten (including the Gem Cups); single races, boss races,
     relic time trials and CTR Token challenges keep their normal lap count.
@@ -221,9 +221,9 @@ class TwoStageDensity(Choice):
 
     - **off**: no second gates.
     - **light**: a few per seed (up to 4).
-    - **standard** (default): the tuned shipping behaviour (up to 6).
+    - **standard**: a moderate spread (up to 6).
     - **deep**: layered progression (up to 10).
-    - **full**: every pad that can carry one gets one (up to 16).
+    - **full** (default): every pad that can carry one gets one (up to 16).
 
     Also accepts `random`. The densest settings can generate slower on
     maxed-out configs."""
@@ -238,7 +238,7 @@ class TwoStageDensity(Choice):
     option_standard = 2
     option_deep = 3
     option_full = 4
-    default = 2
+    default = 4
 
 
 class RequirementVariety(Choice):
