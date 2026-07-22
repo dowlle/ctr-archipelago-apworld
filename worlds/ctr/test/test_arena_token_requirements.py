@@ -29,10 +29,16 @@ These tests lock in:
 """
 
 import math
+import unittest
+
+from BaseClasses import CollectionState
+from Fill import distribute_items_restrictive
+from worlds.AutoWorld import call_all
 
 from . import CTRTestBase
 from .. import warp_pad_logic
 from ..warp_pad_logic import Inv, TOKEN_ITEMS, _choose_requirement
+from ..Rules import _scoped_agg_names, _AGG_TOKENS, _AGG_RELICS, _AGG_GEMS
 
 # Wire encoding (warp_pad_logic.to_slot_req): type 3 = concrete CTR token,
 # colour index 4 = Purple; type 6 = AnyCtrToken aggregate.
@@ -56,6 +62,56 @@ class _ScriptedRandom:
 
     def randrange(self, n):
         return 0  # always < every collapse chance
+
+
+class _StubOption:
+    def __init__(self, value):
+        self.value = value
+
+
+class _StubOptions:
+    def __init__(self, arenas_on):
+        self.include_battle_arenas = _StubOption(arenas_on)
+
+
+class _StubWorld:
+    """Just enough of a world for Rules._scoped_agg_names -- no generation."""
+    def __init__(self, arenas_on):
+        self.options = _StubOptions(arenas_on)
+
+
+class TestAggTokenScoping(unittest.TestCase):
+    """Tight guard on the Rules.py side of the fix (the AP-logic counting that
+    the AP-level beatability tests below exercise end-to-end). This is the test
+    that fails if _scoped_agg_names stops dropping Purple: with arenas OFF the
+    token aggregate that _agg_has sums over -- feeding the type-6 warp-pad gate
+    (Rules.add_warp_pad_unlock_rules) and the AnyCtrToken stage-2 gate
+    (Rules.add_time_trial_and_ctr_requirements) -- must exclude Purple CTR
+    Token, so no aggregate token gate can be met via the four vanilla-pinned
+    arena Purples."""
+
+    def test_purple_dropped_from_token_aggregate_when_arenas_off(self):
+        names = _scoped_agg_names(_StubWorld(arenas_on=False), _AGG_TOKENS)
+        self.assertNotIn("Purple CTR Token", names)
+        self.assertEqual(
+            names,
+            ["Red CTR Token", "Green CTR Token", "Blue CTR Token", "Yellow CTR Token"],
+            "arenas off: only the 4 non-arena token colours count toward an "
+            "any-token gate")
+
+    def test_token_aggregate_intact_when_arenas_on(self):
+        names = _scoped_agg_names(_StubWorld(arenas_on=True), _AGG_TOKENS)
+        self.assertIn("Purple CTR Token", names)
+        self.assertEqual(names, _AGG_TOKENS)
+
+    def test_relic_and_gem_aggregates_never_scoped(self):
+        # The exclusion is token-only; relic/gem any-of gates are untouched
+        # regardless of the arena option.
+        for arenas_on in (True, False):
+            self.assertEqual(
+                _scoped_agg_names(_StubWorld(arenas_on), _AGG_RELICS), _AGG_RELICS)
+            self.assertEqual(
+                _scoped_agg_names(_StubWorld(arenas_on), _AGG_GEMS), _AGG_GEMS)
 
 
 class TestAnyTokenCollapseScoping(CTRTestBase):
@@ -200,4 +256,87 @@ class TestArenaTokensOnStillDrawable(ArenaTokenRequirementMixin, CTRTestBase):
         "include_battle_arenas": True,
         "include_gem_cups": True,
         "warppad_unlock_requirements": "random_without_4_keys",
+    }
+
+
+_CRYSTAL_SUFFIX = "Crystal Bonus Round"
+
+
+class ArenaNotRequiredAtAPLevelMixin:
+    """AP-level (post-fill) guard for issue #118.
+
+    The slot_data tests above pin what generation EMITS; this pins what the
+    finished multiworld MEANS. For a batch of arenas-off seeds we run the real
+    fill, then rebuild reachability collecting advancement items from every
+    location EXCEPT the four Crystal Bonus Rounds (the arena checks) and assert
+    the seed's completion_condition is still satisfied. That is the property the
+    option promises: no arena play is ever logically required. It would fail if
+    any gate on the beatable path counted the arena-locked Purple CTR Tokens
+    (Rules._agg_has over the token aggregate) -- the AP-side sibling of the
+    sphere-search exclusion that the slot_data tests cover.
+
+    Subclasses set `options` and (optionally) `seeds`."""
+
+    seeds = range(1, 7)
+
+    def test_completion_never_requires_an_arena_location(self):
+        for seed in self.seeds:
+            with self.subTest(seed=seed):
+                self.world_setup(seed=seed)
+                distribute_items_restrictive(self.multiworld)
+                call_all(self.multiworld, "post_fill")
+
+                mw, player = self.multiworld, self.player
+                arena = [loc for loc in mw.get_locations(player)
+                         if loc.name.endswith(_CRYSTAL_SUFFIX)]
+                # Premise guards: arenas off must still leave the 4 crystal checks
+                # in the seed, vanilla-pinned with their own Purple CTR Tokens
+                # (#50). Without this a vacuous pass could hide a regression.
+                self.assertEqual(len(arena), 4,
+                                 "expected the 4 vanilla-pinned Crystal Bonus Rounds")
+                for loc in arena:
+                    self.assertEqual(
+                        loc.item.name, "Purple CTR Token",
+                        f"{loc.name} should hold its vanilla Purple CTR Token")
+
+                # Collect advancement items from every NON-arena location only,
+                # in reachability order (a real sphere sweep restricted to that
+                # set), then check the win condition. Reaching completion here
+                # means the arena Purples were never on the critical path.
+                non_arena = [loc for loc in mw.get_locations(player)
+                             if not loc.name.endswith(_CRYSTAL_SUFFIX)]
+                state = CollectionState(mw)
+                state.sweep_for_advancements(non_arena)
+                self.assertTrue(
+                    mw.completion_condition[player](state),
+                    "seed is not beatable without collecting an arena location: "
+                    "arena play is logically required (issue #118)")
+
+
+class TestArenaNotRequiredRandomizedDeep(ArenaNotRequiredAtAPLevelMixin, CTRTestBase):
+    """arenas OFF, randomized unlocks, dense two-stage gating -- the mode most
+    likely to draw an AnyCtrToken second gate."""
+
+    run_default_tests = False
+    auto_construct = False
+    options = {
+        "include_battle_arenas": False,
+        "include_gem_cups": True,
+        "warppad_unlock_requirements": "randomized",
+        "two_stage_density": "deep",
+    }
+
+
+class TestArenaNotRequiredWithout4KeysFull(ArenaNotRequiredAtAPLevelMixin, CTRTestBase):
+    """arenas OFF, random_without_4_keys, full two-stage density (every eligible
+    pad gated) -- maximum ordering pressure and the most interlocked token
+    gates."""
+
+    run_default_tests = False
+    auto_construct = False
+    options = {
+        "include_battle_arenas": False,
+        "include_gem_cups": True,
+        "warppad_unlock_requirements": "random_without_4_keys",
+        "two_stage_density": "full",
     }
