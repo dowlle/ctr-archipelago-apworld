@@ -173,11 +173,19 @@ class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
     their checks become normal locations and, in a randomized-unlock seed, their
     warp pads get a randomized entry requirement instead of the vanilla gate.
 
+    Off -> the arenas are fully OUT of the seed, and no arena play is ever
+    logically required: the crystal pads stay vanilla-fixed (vanilla entry
+    gate, never destination-shuffled), their four Crystal Bonus Round checks
+    keep their vanilla Purple CTR Tokens (locked, so no other world's item can
+    hide there), and randomized warp-pad requirements never demand Purple CTR
+    Tokens -- neither directly nor through an "any tokens" count that only
+    arena play could reach. The arenas remain playable behind their vanilla
+    gates if you feel like it; logic just never sends you there.
+
     Not the same thing as `crystals` in `Warp Pad Shuffle Categories`: THIS
     option puts the arenas in the seed at all; the category set only controls
     whether their pads' DESTINATIONS get shuffled, and it does nothing while
-    this is off. Off -> crystals stay fully vanilla-fixed (vanilla checks,
-    vanilla gate, never destination-shuffled)."""
+    this is off."""
     display_name = "Include Battle Arena Warp Pads"
 
 

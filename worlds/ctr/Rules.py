@@ -128,6 +128,28 @@ def _agg_has(state, names, player, count):
     return sum(state.count(n, player) for n in names) >= count
 
 
+def _scoped_agg_names(world, names):
+    """Scope an aggregate item list for AP reachability (issue #118).
+
+    When include_battle_arenas is OFF the arenas are out of the seed: the four
+    Crystal Bonus Round checks are vanilla-pinned with their own Purple CTR Tokens,
+    so every Purple is locked behind arena play. If AP logic counted those Purples
+    toward an "any N tokens" gate, fill/playthrough could route a required item
+    behind a gate only arena play satisfies -- exactly what the option promises it
+    will not. So drop Purple CTR Token from the token aggregate here, mirroring the
+    sphere-search exclusion in warp_pad_logic._run_sphere_search_once (which also
+    sized N over the non-Purple colours only, so the gate stays satisfiable).
+
+    Only the token aggregate is affected; relic/gem lists pass through unchanged.
+    This makes apworld logic STRICTER than native, which still counts received
+    Purples toward its gate sums -- that asymmetry only ever makes a seed easier
+    than AP logic assumes, never unbeatable, so the direction of safety holds.
+    """
+    if not bool(world.options.include_battle_arenas.value):
+        return [n for n in names if n != "Purple CTR Token"]
+    return names
+
+
 def add_warp_pad_unlock_rules(world, player):
     """Install the per-seed sphere-search requirements on the pad exits.
 
@@ -155,7 +177,7 @@ def add_warp_pad_unlock_rules(world, player):
         base_rule = ent.access_rule  # vanilla Key-gate already applied above
         if t in AGG_BY_TYPE:
             # any_of aggregate: gate is "any N of this type" summed across colours/tiers.
-            names = AGG_BY_TYPE[t]
+            names = _scoped_agg_names(world, AGG_BY_TYPE[t])
             ent.access_rule = (
                 lambda state, ns=names, n=count, p=player, base=base_rule:
                 base(state) and _agg_has(state, ns, p, n)
@@ -356,7 +378,7 @@ def add_time_trial_and_ctr_requirements(world, player):
             if s2_item in AGG_BY_NAME:
                 # any_of aggregate stage-2 gate: "any N of this type", summed.
                 def rule(state: CollectionState, t=trophy_name, p=player,
-                         ns=AGG_BY_NAME[s2_item], n=s2_count):
+                         ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
                     return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
             else:
                 def rule(state: CollectionState, t=trophy_name, p=player,

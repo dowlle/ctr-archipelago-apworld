@@ -537,9 +537,13 @@ def _choose_requirement(rnd, inv, allowed=None):
     as a requirement -- used to exclude relic tiers that the relic-progression
     sliders have pinned mostly OUT of the multiworld pool (a low-slider tier is not
     a freely-placeable progression item, so requiring it under reward-agnostic AP
-    fill creates a circular, hard-to-seat gate). The excluded relics still grow the
-    synthetic inventory (so AnyRelic aggregates count them); they just are not
-    picked as a concrete requirement. This is the design rule "if a seed is tight, make do
+    fill creates a circular, hard-to-seat gate), and to exclude Purple CTR Token
+    when include_battle_arenas is off (issue #118: with the arenas out of the seed
+    every Purple is vanilla-pinned behind arena play, so no requirement -- direct
+    or via the AnyCtrToken collapse total -- may demand it). The excluded items
+    still grow the synthetic inventory; they just are not picked as a concrete
+    requirement, and the Any* collapse totals below are summed over the allowed
+    colours/tiers only. This is the design rule "if a seed is tight, make do
     with the other item types" turned into a sphere-search rule -- the sliders stay
     authoritative and are never silently overridden."""
     pool_items = REQ_WEIGHTS if allowed is None else [
@@ -564,7 +568,17 @@ def _choose_requirement(rnd, inv, allowed=None):
     # never an excluded (pinned-out) tier.
     if req_item in TOKEN_ITEMS:
         if rnd.randrange(100) < _TOKEN_COLLAPSE_CHANCE:
-            total = inv.count("AnyCtrToken")
+            # Aggregate total scoped to the ALLOWED colours (mirrors the relic
+            # tiers below). With include_battle_arenas off, Purple is excluded
+            # from `allowed` (issue #118) and must also leave this total: the
+            # sim inventory still collects Purples from the vanilla-gated
+            # crystal pads, so an all-colour count could size an AnyCtrToken
+            # gate only arena play can satisfy. With every colour allowed
+            # (arenas on) the sum is identical to inv.count("AnyCtrToken"),
+            # and no extra RNG is drawn either way -- arenas-on seeds are
+            # byte-identical.
+            colours = [c for c in TOKEN_ITEMS if allowed is None or c in allowed]
+            total = sum(inv.items[c] for c in colours)
             cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
             if _TOKEN_COLLAPSE_CAP is not None:
                 cnt = min(cnt, _TOKEN_COLLAPSE_CAP)
@@ -1002,6 +1016,23 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     }
     allowed = {it for it in REQ_WEIGHTS
                if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
+    # Arena participation filter (issue #118, the requirement-side sibling of
+    # #50's fill-side pinning). include_battle_arenas OFF means the arenas are
+    # OUT of the seed: the four Crystal Bonus Rounds are vanilla-pinned with
+    # their Purple CTR Tokens (#50), so every Purple is locked behind arena
+    # play. A Purple requirement would therefore route an opted-out player
+    # through arena content anyway -- exclude Purple from the drawable set,
+    # mirroring the relic-slider mechanism above. Deliberate asymmetry with
+    # the relic sliders (design ruling, 2026-07-22): an excluded relic tier is
+    # still findable progression, but with arenas off the option's intent is
+    # that NO arena play is ever required, so Purple must ALSO leave the
+    # AnyCtrToken collapse totals (see _choose_requirement) -- an any-token
+    # count sized on all five colours could only be met by playing arenas.
+    # The synthetic inventory still grows Purples (the crystal pads stay
+    # reachable behind their vanilla gates), which is harmless: every count
+    # below is derived from the allowed colours only.
+    if not bool(getattr(world.options, "include_battle_arenas").value):
+        allowed.discard("Purple CTR Token")
 
     # The LIVE graph (destination-rewired by create_regions when shuffle is
     # on): this is what AP fill enforces and what the re-validation pass walks.
