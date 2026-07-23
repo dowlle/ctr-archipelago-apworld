@@ -1331,6 +1331,78 @@ class ctrAPWorld(World):
         }
         return slot_data
 
+    def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:
+        """Issue #52: annotate each location with the PHYSICAL warp pad that loads
+        its track, so under destination shuffle a hint reads "... at the Sewer
+        Speedway pad". This is the INVERSE of Regions.pad_dest_region
+        (Regions.py:523-527): for a location whose region is a shuffled DESTINATION,
+        name the physical pad whose exit now loads that region.
+
+        Per-seed multidata channel only (AutoWorld.extend_hint_information ->
+        Main.er_hint_data -> the server's Hint.entrance text, rendered "at <text>").
+        It touches no ids, names, the datapackage, fill, or reachability, so there is
+        NO schema_version / world_version bump. AP calls it at output, after
+        create_regions has run, so warp_pad_map / warp_pad_ids / every region and
+        location are already resolved.
+
+        Identity / vanilla seeds have an empty warp_pad_map, so this emits no hint
+        text (a location's own name already carries its track) -- the correct no-op.
+        """
+        warp_pad_map = getattr(self, "warp_pad_map", None)
+        if not warp_pad_map:
+            return
+        pad_ids = getattr(self, "warp_pad_ids", {})
+
+        # Rebuild lid_to_region EXACTLY as Regions.py:517-522 (from world.json's own
+        # pad-exit targets), NOT by stripping " Warp Pad": a cup pad name strips to
+        # "Red Cup" but its region is "Red Gem Cup" (pad key != region name).
+        data = json.loads(
+            pkgutil.get_data(__package__, "data/world.json").decode("utf-8"))
+        lid_to_region: Dict[int, str] = {}
+        for reg in data["regions"]:
+            for ex in reg.get("exits", []):
+                meta = pad_ids.get(ex["name"])
+                if meta is not None and ex.get("target") is not None:
+                    lid_to_region[meta["level_id"]] = ex["target"]
+
+        # Inverse of pad_dest_region, filtered to genuinely-shuffled pads. A pad that
+        # loads its own vanilla destination (a fixed point within a pool) is not worth
+        # a hint; warp_pad_map already holds non-identity remaps only, but skip
+        # explicitly to match the research spec. Label = the pad-exit name minus
+        # " Warp Pad" ("Sewer Speedway"), the vanilla hub spot the player recognizes.
+        region_to_label: Dict[str, str] = {}
+        for pad_name, dest_lid in warp_pad_map.items():
+            meta = pad_ids.get(pad_name)
+            if meta is not None and dest_lid == meta.get("level_id"):
+                continue  # identity within a pool
+            dest_region = lid_to_region.get(dest_lid)
+            if dest_region is None:
+                continue
+            label = (pad_name[:-len(" Warp Pad")]
+                     if pad_name.endswith(" Warp Pad") else pad_name)
+            region_to_label[dest_region] = f"the {label} pad"
+
+        if not region_to_label:
+            return
+
+        text: Dict[int, str] = {}
+        for loc in self.multiworld.get_locations(self.player):
+            if loc.address is None or loc.parent_region is None:
+                continue
+            region_name = loc.parent_region.name
+            label = region_to_label.get(region_name)
+            if label is None and region_name.endswith(": Podium"):
+                # Podium-rung locations live in the dead-end "<track>: Podium" region
+                # (Regions.py:399), not "<track>", so their parent_region never matches
+                # a destination region directly. Map by the track-name prefix so rungs
+                # of a shuffled track carry the pad hint too (podium_placement_checks).
+                label = region_to_label.get(region_name[:-len(": Podium")])
+            if label is not None:
+                text[loc.address] = label
+
+        if text:
+            hint_data[self.player] = text
+
     def _describe_pad_req(self, req: Dict[str, int]) -> str:
         """Render a {type,count,colour} pad requirement as a tier-true, human-readable
         string. Decodes via the SAME ITEM_BY_TYPE / AGG_BY_TYPE tables native mirrors,
