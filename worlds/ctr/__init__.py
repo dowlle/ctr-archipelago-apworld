@@ -1295,6 +1295,15 @@ class ctrAPWorld(World):
                 "shuffle_keys": bool(o.shuffle_keys.value),
                 "warppad_unlock_mode": o.warppad_unlock_requirements.value,
                 "bossgarage_mode": o.bossgarage_unlock_requirements.value,
+                # Warp-pad item display (issue #59): 0 one_pile / 1
+                # by_reward_type. ADDITIVE key, no schema bump -- the one_lap_cups
+                # precedent: native json_int defaults the absent key to 0, which
+                # IS today's one-pile rotation, so an older client on a new seed
+                # and a new client on an old seed both behave exactly as they do
+                # now. Display only: it steers no gate, no location and no item,
+                # and nothing in AP logic reads it, so two seeds differing only in
+                # this value are identical apart from the key itself.
+                "warp_pad_item_display": o.warp_pad_item_display.value,
                 # QoL, additive (no schema bump): one-lap cup races. Native
                 # json_int defaults the absent key to 0, so a pre-one-lap-cups
                 # native (or an old seed on a new native) is exactly vanilla lap
