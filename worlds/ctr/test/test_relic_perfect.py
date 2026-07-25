@@ -200,20 +200,35 @@ class TestRelicPerfectLogicParity(CTRTestBase):
                                      bool(trial.access_rule(state)))
 
     def test_trophy_tracks_need_their_trophy_race(self):
-        empty = CollectionState(self.multiworld)
+        # NECESSARY, not equivalent. With a stage-2 gate on a track, its relic
+        # races can still be shut while its Trophy Race is already reachable --
+        # that IS stage 2, and it applies to the perfect check for the same reason
+        # it applies to the trials. So the property to hold is one-directional:
+        # the perfect check must never be open on a track you cannot race.
+        # (Equality with the trials is test_rule_matches_the_sapphire_trial.)
+        # An earlier version of this test asserted equality with can_reach and
+        # flaked on exactly the seeds where a sphere-0 free pad drew a stage 2.
+        states = list(self._states())
+        gated_from_empty = False
         for track in EXPECTED_RELIC_TRACKS:
             if track in TRIAL_TRACKS:
                 continue
-            with self.subTest(track=track):
-                perfect = self.multiworld.get_location(location_name(track),
-                                                       self.player)
-                # From an empty inventory no trophy race is beatable except via
-                # the free sphere-0 pads, so the rule must agree with can_reach
-                # on the Trophy Race location rather than be blanket-True.
-                self.assertEqual(
-                    bool(perfect.access_rule(empty)),
-                    bool(empty.can_reach(f"{track}: Trophy Race", "Location",
-                                         self.player)))
+            perfect = self.multiworld.get_location(location_name(track),
+                                                   self.player)
+            trophy = f"{track}: Trophy Race"
+            for i, state in enumerate(states):
+                with self.subTest(track=track, state=i):
+                    if perfect.access_rule(state):
+                        self.assertTrue(
+                            state.can_reach(trophy, "Location", self.player),
+                            "a relic-perfect check is open on a track whose "
+                            "Trophy Race is not reachable")
+                    elif i == 0:
+                        gated_from_empty = True
+        # Sanity that the rule is not blanket-True: from an empty inventory the
+        # deep hub tracks are unreachable in every seed.
+        self.assertTrue(gated_from_empty,
+                        "no perfect check was gated at all from an empty state")
 
     def test_nothing_gates_on_a_perfect_check(self):
         # It is pure location supply: no rule anywhere may require it, so
