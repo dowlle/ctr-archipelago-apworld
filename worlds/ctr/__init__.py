@@ -198,6 +198,14 @@ class ctrAPWorld(World):
         o.podium_finish_rungs.value = int(bool(sample) and sample[3] != -1)
         o.podium_any_position_rung.value = int(bool(sample) and sample[4] != -1)
 
+        # Relic-race perfect checks (#49) decide 18 locations, so UT's re-generation
+        # must recreate exactly the seed's set. The option is not on the wire as
+        # such, but the relic_perfect block's "enabled" flag is the same single
+        # source create_regions reads. A seed generated before this block existed
+        # has no key -> False -> no perfect checks, which is what those seeds have.
+        rp = passthrough.get("relic_perfect", {}) or {}
+        o.relic_perfect_checks.value = int(bool(rp.get("enabled", False)))
+
     def generate_early(self) -> None:
         """Generation-time progression guard for the Oxide-final goal (issue #23).
 
@@ -1255,6 +1263,53 @@ class ctrAPWorld(World):
         block["locations"] = locations
         return block
 
+    def _resolve_relic_perfect(self) -> Dict[str, object]:
+        """Relic-race perfect checks (#49) for the native fan-out.
+
+        Shape:
+
+        {"enabled": bool,
+         "locations": {"<levelID>": <AP location code>, ...}}
+
+        Keyed by physical relic-race pad LevelID (0..15 for the adventure tracks,
+        plus Slide Coliseum / Turbo Track), the same keying podium_checks and
+        warp_pad_unlock use, so native can look the code up from the [AP RACE]
+        track field when a relic race ends with every time crate broken
+        (driver->numTimeCrates == gGT->timeCratesInLEV). Absent when the option is
+        off, in which case "locations" is empty and native sends nothing.
+
+        ADDITIVE KEY, NO SCHEMA BUMP -- the one_lap_cups / death_link precedent. A
+        native predating this block ignores it entirely and behaves exactly as
+        today; that is also why the option is default OFF (a native without the
+        detection half can never send these checks, so a seed that turned it on
+        would carry 18 checks nobody can collect). Bumping schema_version instead
+        would make every schema-6 native warn/refuse on EVERY seed, including the
+        default ones this feature does not touch, so the additive route is the
+        correct one -- but the 0.2.0 release still owns the final call on whether
+        the whole 0.2.0 slot_data surface takes one bump.
+        """
+        from .Locations import CTR_LOCATION_IDS
+        from .relic_perfect import (RELIC_TRACKS, created_from_options,
+                                    location_name)
+        enabled = created_from_options(self.options)
+        block: Dict[str, object] = {"enabled": enabled, "locations": {}}
+        if not enabled:
+            return block
+        pad_ids = getattr(self, "warp_pad_ids", {})
+        track_to_lid = {
+            pad_name[: -len(" Warp Pad")]: meta["level_id"]
+            for pad_name, meta in pad_ids.items()
+            if pad_name.endswith(" Warp Pad")
+        }
+        locations: Dict[str, object] = {}
+        for track in RELIC_TRACKS:
+            lid = track_to_lid.get(track)
+            if lid is None or not (0 <= lid < self.WARP_PAD_ID_RANGE):
+                continue
+            locations[str(lid)] = CTR_LOCATION_IDS[location_name(track)]
+        block["locations"] = locations
+        return block
+
     def fill_slot_data(self) -> Dict[str, object]:
         o = self.options
         # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -1328,6 +1383,9 @@ class ctrAPWorld(World):
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
             "boss_garage_req": getattr(self, "boss_garage_req", {}),
             "podium_checks": self._resolve_podium_checks(),
+            # Relic-race perfect checks (#49). Additive block, no schema bump --
+            # see _resolve_relic_perfect.
+            "relic_perfect": self._resolve_relic_perfect(),
         }
         return slot_data
 

@@ -425,6 +425,36 @@ def create_regions(world: "ctrAPWorld"):
                 _src.exits.append(_ent)
                 mw.regions.entrance_cache[player][_ent.name] = _ent
 
+    # --- Relic-race perfect checks (#49) -------------------------------------
+    # One optional check per relic race ("break every time crate"), default OFF.
+    # Created in the SAME region as that track's relic Time Trials (the track's own
+    # region, for the 16 adventure tracks and the two trial tracks alike), because
+    # it is earned in the same race the trials are run in. Its logic mirrors the
+    # trials exactly: Rules.add_time_trial_and_ctr_requirements installs the real
+    # rule (Trophy Race reachable AND any stage-2 gate) for the 16 trophy tracks,
+    # and leaves the trial tracks gated purely by reaching their pad -- so the
+    # placeholder logic_text here copies the track's Sapphire trial text, which is
+    # what warp_pad_logic.build_graph reads for its synthetic sphere model.
+    # The check yields NO reward (warp_pad_logic._reward_for returns None for this
+    # suffix), so it is sphere-search reward-neutral and adds no solvability
+    # burden; the extra unfilled locations pull matching filler in create_items.
+    from .relic_perfect import (RELIC_TRACKS, created_from_options,
+                                location_name as relic_perfect_name)
+    if created_from_options(opts):
+        for _rp_track in RELIC_TRACKS:
+            _rp_region = region_lookup.get(_rp_track)
+            if _rp_region is None:
+                continue
+            _rp_name = relic_perfect_name(_rp_track)
+            _rp_loc = create_location(player, _rp_name, _rp_region)
+            _rp_loc.type = "relic_perfect"
+            _rp_sapphire = mw.regions.location_cache[player].get(
+                f"{_rp_track}: Sapphire Time Trial")
+            _rp_loc.logic_text = getattr(_rp_sapphire, "logic_text", "True") \
+                if _rp_sapphire is not None else "True"
+            _rp_region.locations.append(_rp_loc)
+            mw.regions.location_cache[player][_rp_name] = _rp_loc
+
     # Trophy-race LOCATIONS carry NO floor in any mode (issue #80): world.json now
     # normalizes every "<track>: Trophy Race" requires to "always". The vanilla
     # per-pad trophy floor lives on the pad ENTRANCE instead (Rules.add_vanilla_floor_rules,

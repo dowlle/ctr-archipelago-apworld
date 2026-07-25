@@ -410,6 +410,21 @@ class PodiumHeldFifthRung(Toggle):
     display_name = "Podium: Held 5th Rung"
 
 
+class RelicPerfectChecks(Toggle):
+    """Add a "Relic Race Perfect" check to each of the 18 relic races, earned by
+    breaking every time crate in that race. Off by default.
+
+    Purely an extra check: it never changes whether a relic is awarded, and no
+    relic time has to be beaten to earn it. Needs a client that supports the
+    checks -- an older one simply never sends them, so leave this off unless your
+    client's release notes mention it."""
+    # 18 locations when on (one per relic track: the 16 adventure tracks plus
+    # Slide Coliseum and Turbo Track), all-or-nothing like the rung families. The
+    # stricter "no relic unless you broke every crate" variant is a DIFFERENT,
+    # backlogged mechanic and deliberately does not share this option's name.
+    display_name = "Relic Race Perfect Checks"
+
+
 class SapphireRelicProgression(NamedRange):
     """How often progression may sit behind a Sapphire relic-race time (the
     easiest tier). Per-location % chance over the 18 Sapphire Time Trials; a
@@ -478,6 +493,8 @@ class ctrAPOptions(PerGameCommonOptions):
     podium_any_position_rung: PodiumAnyPositionRung
     podium_held_rungs: PodiumHeldRungs
     podium_held_fifth_rung: PodiumHeldFifthRung
+    # extra location checks (relic-race perfects, issue #49)
+    relic_perfect_checks: RelicPerfectChecks
     # quality of life
     one_lap_cups: OneLapCups
     # deathlink
@@ -505,7 +522,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementWeights,
     ],
     "Extra Checks": [PodiumPlacementChecks, PodiumFinishRungs,
-                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
+                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung,
+                     RelicPerfectChecks],
     "Quality of Life": [OneLapCups],
     "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicProgression, GoldRelicProgression,

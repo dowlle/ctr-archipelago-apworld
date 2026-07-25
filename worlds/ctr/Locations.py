@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 
 from .podium import all_podium_locations
+from .relic_perfect import all_relic_perfect_locations
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
@@ -17,15 +18,24 @@ _LOCATION_DATA = json.loads(
 CTR_LOCATION_IDS = {loc["name"]: loc["code"] for loc in _LOCATION_DATA}
 CTR_LOCATION_TO_REGION = {loc["name"]: loc["region"] for loc in _LOCATION_DATA}
 
-# Podium placement checks (feat/podium-checks) are part of the game's global
-# datapackage (name<->id must be stable for servers/trackers), so ALL 48 rungs
-# are registered here unconditionally. Whether a given SEED creates them is
-# decided per-option in Regions.create_regions; get_total_locations counts only
-# the locations a seed actually creates, so the datapackage size never inflates
-# a seed's reported location count.
+# Podium placement checks are part of the game's global datapackage (name<->id
+# must be stable for servers/trackers), so the FULL rung superset is registered
+# here unconditionally (podium.all_podium_locations -- 7 names per track across
+# the frozen 35015000 and additive 35015100 blocks; the live v0.2.0 layout is the
+# 5-rung one described in podium.py, not the v0.1.x 3-rung set). Whether a given
+# SEED creates them is decided per-option in Regions.create_regions;
+# get_total_locations counts only the locations a seed actually creates, so the
+# datapackage size never inflates a seed's reported location count.
 for _pod_name, _pod_code, _pod_region in all_podium_locations():
     CTR_LOCATION_IDS[_pod_name] = _pod_code
     CTR_LOCATION_TO_REGION[_pod_name] = _pod_region
+
+# Relic-race perfect checks (#49): same datapackage rule as the rungs above --
+# all 18 names registered unconditionally, creation decided per-option in
+# Regions.create_regions.
+for _rp_name, _rp_code, _rp_region in all_relic_perfect_locations():
+    CTR_LOCATION_IDS[_rp_name] = _rp_code
+    CTR_LOCATION_TO_REGION[_rp_name] = _rp_region
 
 
 def get_location_id(name: str):

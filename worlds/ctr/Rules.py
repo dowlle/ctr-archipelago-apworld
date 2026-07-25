@@ -338,6 +338,15 @@ def add_time_trial_and_ctr_requirements(world, player):
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
     except for bonus tracks like Slide Coliseum and Turbo Track.
 
+    RELIC-PERFECT CHECKS (#49) ride this same rule. "Break every time crate" is
+    earned INSIDE a relic race, so reaching it is exactly reaching that track's
+    relic Time Trials -- including any stage-2 gate, which native applies to the
+    relic-race entry itself, not to the individual tiers. Treating the perfect
+    check as one more member of this family (rather than giving it a rule of its
+    own) is what keeps apworld logic and native gating identical for it in every
+    warp-pad mode. It is never logically required (nothing gates on it), so it
+    adds no solvability burden at accessibility: full.
+
     TWO-STAGE: for the 16 trophy pads in randomized mode, the track's CTR Token
     Challenge + 3 relic Time Trials carry a STAGE-2 requirement ANDed on top of the
     Trophy-Race-reachable rule (stage 1). world.warp_pad_unlock_stage2_concrete is
@@ -346,6 +355,7 @@ def add_time_trial_and_ctr_requirements(world, player):
     Empty in vanilla mode / for pads with no stage 2 -> the rule is the plain
     can_reach(Trophy Race), exactly as before.
     """
+    from .relic_perfect import RELIC_PERFECT_SUFFIX
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
     # Density-adaptive collapse (set in create_items): on a maximally tight seed,
@@ -360,7 +370,9 @@ def add_time_trial_and_ctr_requirements(world, player):
     for loc in mw.get_locations(player):
         name = loc.name
 
-        if not (name.endswith("Time Trial") or name.endswith("CTR Token Challenge")):
+        if not (name.endswith("Time Trial")
+                or name.endswith("CTR Token Challenge")
+                or name.endswith(RELIC_PERFECT_SUFFIX)):
             continue
 
         track_prefix = name.split(":")[0].strip()
