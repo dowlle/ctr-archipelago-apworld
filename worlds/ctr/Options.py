@@ -195,6 +195,34 @@ class WarpPadShuffleGrouping(Choice):
     default = 1
 
 
+class WarpPadItemDisplay(Choice):
+    """How a warp pad shows the items still waiting on its checks.
+
+    A pad advertises its destination's unclaimed rewards in three floating slots.
+
+    - **one_pile** (default): every unclaimed item shares those slots and they
+      cycle through the whole pile together, so a pad with a race, a CTR
+      challenge, relics and podium rungs left mixes them all in one rotation.
+    - **by_reward_type**: each reward type keeps its own slot and only rotates
+      within it, so you can tell at a glance whether the relic you see is the
+      relic check or the CTR check. With the podium rungs on, the race slot can
+      cycle through five or six items.
+
+    Purely a display setting: it changes nothing about which checks exist, what
+    they hold, or how anything unlocks. Needs a client that supports it -- an
+    older one shows one pile whatever this says."""
+    # Requested in issue #59 (thanks stroodlydoodles and MarioSpore), modelled on
+    # Icebound's randomizer. The apworld half is this option plus its slot_data
+    # mirror; the pad render itself is native's (its glow pass already enumerates
+    # a destination's unchecked reward bits and cycles a 3-wide window over them,
+    # which IS the one_pile behaviour, so by_reward_type is a grouping of that
+    # same enumeration -- no new location or item data is needed on the wire).
+    display_name = "Warp Pad Item Display"
+    option_one_pile = 0
+    option_by_reward_type = 1
+    default = 0
+
+
 class WarpPadUnlockRequirements(Choice):
     """How warp pads unlock -- the heart of the randomizer.
 
@@ -467,6 +495,8 @@ class ctrAPOptions(PerGameCommonOptions):
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
+    # warp pads: display (issue #59)
+    warp_pad_item_display: WarpPadItemDisplay
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -499,6 +529,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         ShuffleWarpPadsBattleArenas,
         WarpPadShuffleCategories,
         WarpPadShuffleGrouping,
+        WarpPadItemDisplay,
         WarpPadUnlockRequirements,
         TwoStageDensity,
         RequirementVariety,
