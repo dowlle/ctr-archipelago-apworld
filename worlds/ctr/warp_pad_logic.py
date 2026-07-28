@@ -1910,6 +1910,81 @@ def _permute_pools(world, pools, id_to_name):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Gem-cup placement floor (issue #149)
+# ---------------------------------------------------------------------------
+#
+# Under `merged` destination shuffle a Gem Cup LevelID can be dealt to ANY physical
+# pad, including the 3-5 N. Sanity Beach pads the sphere search leaves requirement-free
+# at spawn -- so half of default seeds opened a cup at zero items (measured: 507/1000).
+# The cup then pays out far more than its own Gem: add_podium_placement_rules puts a
+# trophy track's podium rungs in logic when a Gem Cup that runs it as a leg is
+# reachable (Rules.py, the reachability OR), so one early cup is 1 Gem + 4 leg tracks
+# x the rung count, up to 17 locations on four trophy tracks whose own pads are shut.
+#
+# The cup's OWN unlock requirement cannot fix this. warp_pad_unlock is keyed to the
+# PHYSICAL pad and the exit rewire keeps it that way on purpose (Regions.create_regions),
+# so an early cup is reached through somebody else's pad and no weighting on the cup
+# pads' requirements ever touches it. The lever is placement, not requirement.
+#
+# So: a Gem Cup destination is never dealt to a physical pad whose hub Key floor is
+# below the Cups Room's own Key-2 door. That is the floor the gate taxonomy already
+# assigns gem cups, which is why the constant is 2 and not "sphere 1" -- a literal
+# sphere rule is not even computable here, because build_warp_pad_map runs at the TOP
+# of create_regions and the sphere search that picks the free pads runs at the END,
+# on the finished region graph this map helps build. The Key floor is static
+# world.json geometry, available before either, and is a conservative superset: a pad
+# needing 2 boss Keys to reach cannot be free at spawn.
+#
+# Enforced as a bounded repair on the rolled permutation rather than a re-roll: each
+# offending cup is swapped with a non-cup destination sitting on an eligible pad in
+# the SAME pool. In-pool keeps per_category per-category, and the swap is capacity-
+# monotone, so it composes with the trophy-capacity invariant below in the improving
+# direction (it moves a 0-or-1 capacity destination off a low-floor pad and a
+# higher-capacity one onto it; pads at or above the floor are counted at every tier
+# that counts the cup's new home, so no floor's count can drop).
+#
+# ALWAYS ON, no YAML knob, on the `comfort_guards` precedent in this same file (that
+# toggle was removed in the 2026-07-15 release polish because it only ever bought its
+# user a worse seed). Players who want cups back on the opening pads still have three
+# opt-outs that predate this rule: per_category grouping, dropping `cups` from
+# warp_pad_shuffle_categories, or include_gem_cups off -- each of which already
+# produced zero early cups before this change. Tests patch the constant to 0 to
+# reproduce pre-#149 behaviour.
+_GEM_CUP_KEY_FLOOR = 2
+
+_CUP_LEVEL_IDS = frozenset(CATEGORY_POOLS["cups"])
+
+
+def _enforce_gem_cup_floor(world, out, pools, id_to_name, keygate, floor):
+    """Swap every Gem Cup destination off a physical pad below `floor` boss Keys.
+
+    `out` = {pad_exit_name -> dest LevelID}, mutated in place and returned. Consumes
+    world.random ONLY when a cup actually sits below the floor, so every seed that
+    already satisfies it (per_category, cups not participating, or a lucky merged
+    roll) generates byte-identically to pre-#149. A swap partner is any pad in the
+    same pool at or above the floor that is not itself holding a cup; with 5 cups
+    against 13-15 eligible pads one always exists, and if geometry ever said
+    otherwise the map is left as rolled rather than failing generation."""
+    if floor <= 0:
+        return out
+    rnd = world.random
+    for ids in pools:
+        names = [n for n in (id_to_name.get(lid) for lid in ids)
+                 if n is not None and n in out]
+        below = [n for n in names
+                 if out[n] in _CUP_LEVEL_IDS and keygate.get(n, 0) < floor]
+        for name in below:
+            # Recomputed per swap: an earlier swap may have just filled a pad.
+            eligible = [n for n in names
+                        if keygate.get(n, 0) >= floor and out[n] not in _CUP_LEVEL_IDS]
+            if not eligible:
+                break
+            target = eligible[rnd.randrange(len(eligible))]
+            out[name], out[target] = out[target], out[name]
+    return out
+
+
 def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_lid, ctx):
     """Deterministic fallback when the bounded re-roll cannot land a satisfying map
     (astronomically unlikely -- a valid arrangement always exists since only the 5
@@ -1975,15 +2050,35 @@ def build_warp_pad_map(world):
     participates. Values span the full ID space {0..27, 100..104}: under merged a
     track slot may load a cup/crystal and vice versa.
 
+    Whenever the cups pool participates, the gem-cup placement floor (issue #149) is
+    applied to every permutation this function produces: no Gem Cup destination is
+    left on a physical pad below _GEM_CUP_KEY_FLOOR boss Keys, so a cup can never be
+    one of the free pads the sphere search opens at spawn.
+
     Under `merged` + `shuffle_keys: false`, additionally enforces the per-boss-floor
     trophy-capacity invariant (see the block above): a bounded re-roll of the whole
     permutation until every floor has enough trophy-capable slots, else a constructive
     pin. This fires only when a zero-capacity destination participates, and consumes
-    NO extra RNG on a map that already satisfies the floors (byte-identical seeds)."""
+    NO extra RNG on a map that already satisfies the floors (byte-identical seeds).
+    The cup floor is applied INSIDE that loop, before each capacity check, so the
+    invariant always validates the map that is actually returned."""
     id_to_name = {meta["level_id"]: name
                   for name, meta in world.warp_pad_ids.items()}
     pools, grouping = resolve_shuffle_pools(world)
-    out = _permute_pools(world, pools, id_to_name)
+
+    # Gem-cup placement floor (#149). Resolved once: 0 (inert) unless the cups pool
+    # actually participates, so every other configuration keeps its old RNG stream
+    # and allocates nothing new here. _pad_keygate_table is cached and shared with
+    # the capacity invariant below, which needs the same table under the same seed.
+    cup_floor = (_GEM_CUP_KEY_FLOOR
+                 if any(lid in _CUP_LEVEL_IDS for pool in pools for lid in pool)
+                 else 0)
+    keygate = (_pad_keygate_table(crystals_at_hub_floor=_crystals_open(world))
+               if cup_floor > 0 else None)
+
+    out = _enforce_gem_cup_floor(
+        world, _permute_pools(world, pools, id_to_name),
+        pools, id_to_name, keygate, cup_floor)
 
     # Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation).
     # Guarded by the cheap keys-off + merged gate FIRST so the default keys-on and
@@ -1996,18 +2091,27 @@ def build_warp_pad_map(world):
         # trial) can starve a floor; nothing to enforce when none participates.
         if any(_dest_trophy_capacity(lid, id_kind, ctx) == 0
                for pool in pools for lid in pool):
-            keygate = _pad_keygate_table(
-                crystals_at_hub_floor=_crystals_open(world))
+            if keygate is None:
+                keygate = _pad_keygate_table(
+                    crystals_at_hub_floor=_crystals_open(world))
             own_lid = {name: meta["level_id"]
                        for name, meta in world.warp_pad_ids.items()}
             attempts = 0
             while (not _floors_satisfied(out, keygate, id_kind, own_lid, ctx)
                    and attempts < _CAPACITY_MAX_REROLLS):
-                out = _permute_pools(world, pools, id_to_name)
+                out = _enforce_gem_cup_floor(
+                    world, _permute_pools(world, pools, id_to_name),
+                    pools, id_to_name, keygate, cup_floor)
                 attempts += 1
             if not _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
-                out = _constructive_capacity_pin(
-                    world, pools, id_to_name, keygate, id_kind, own_lid, ctx)
+                # The pin's own guarantee survives the floor pass: it pins RACE
+                # destinations onto the 0-key pads, and a cup swap never sources
+                # from a non-cup pad nor targets one below the floor.
+                out = _enforce_gem_cup_floor(
+                    world,
+                    _constructive_capacity_pin(
+                        world, pools, id_to_name, keygate, id_kind, own_lid, ctx),
+                    pools, id_to_name, keygate, cup_floor)
 
     # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
     # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
