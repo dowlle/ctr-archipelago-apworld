@@ -188,7 +188,13 @@ class WarpPadShuffleGrouping(Choice):
       cup or crystal and vice versa. Needs a randomized unlock mode.
     - **per_category**: each category shuffles only within itself.
 
-    Has no effect when fewer than two categories participate."""
+    Has no effect when fewer than two categories participate.
+
+    Gem Cups are the one exception to `merged`: a cup is never placed on a pad that
+    opens before the Cups Room's own two-Key door, so a cup can never be one of the
+    pads you start with. An early cup also advertises the podium checks of the four
+    trophy tracks it runs as legs, which is a large opening handout on tracks whose
+    own pads are still shut."""
     display_name = "Warp Pad Shuffle Grouping"
     option_per_category = 0
     option_merged = 1
