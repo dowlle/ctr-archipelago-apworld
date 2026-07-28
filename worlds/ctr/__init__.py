@@ -1332,6 +1332,18 @@ class ctrAPWorld(World):
                     (getattr(self, "_ctr_relic_prog", None)
                      or self._relic_progression_map()).items()
                 },
+                # This apworld's own world_version, read at generation time from
+                # the packaged archipelago.json (AutoWorld sets world_version from
+                # the manifest; it can never be assigned in-class). Under the
+                # release policy the apworld's world_version IS the pair version,
+                # so a seed carrying a version higher than a client's compiled
+                # CTR_AP_VERSION proves a newer client exists -- that is the whole
+                # basis of the client's zero-network update notice (#150).
+                # ADDITIVE key, no schema bump (the one_lap_cups precedent): a
+                # native predating it reads nothing and says nothing, and the key
+                # steers no gate, no location, no item and no logic, so two seeds
+                # differing only in it are identical apart from the key.
+                "world_version": self.world_version.as_simple_string(),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
