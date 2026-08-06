@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A problem with the game itself
+    url: https://github.com/dowlle/ctr-native-ap/issues/new/choose
+    about: Crashes, display, controls, audio, Linux and Steam Deck problems belong with the game client. If you are unsure, file here anyway and it will be moved.
+  - name: Setup and troubleshooting guide
+    url: https://github.com/dowlle/ctr-native-ap/blob/main/SETUP.md
+    about: Installing, extracting your disc, connecting to a room, and the common fixes.
+  - name: What the options do
+    url: https://github.com/dowlle/ctr-archipelago-apworld/blob/main/worlds/ctr/README.md
+    about: The CTR world README, its options and how the randomization is put together.
+  - name: An Archipelago core problem, not CTR
+    url: https://github.com/ArchipelagoMW/Archipelago/issues
+    about: This repository is a fork carrying the CTR world. Bugs in Archipelago itself belong upstream.
