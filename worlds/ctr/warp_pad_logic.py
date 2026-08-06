@@ -83,14 +83,14 @@ HUB_STATIC = {
     # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
     # (keeping only the Key-1 hub gate).
     "Slide Coliseum": [("Key", 1)], "Turbo Track": [("Key", 1)],
-    # Gem Stone Valley GEM-CUP pads -- behind Key 3 (the Cups Room hub gate:
-    # 'Gem Stone Valley <-> Cups Room' = has('Key', 3) in data/world.json). Each
+    # Gem Stone Valley GEM-CUP pads -- behind Key 2 (the Cups Room hub gate:
+    # 'Gem Stone Valley <-> Cups Room' = has('Key', 2) in data/world.json). Each
     # cup yields a Gem on completion ('<Colour> Gem Cup: Gem'). Like the trials they
     # are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry requirement
     # (the OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
     # the sphere-search assigns them only a tier-1 req. Their vanilla per-cup
     # has('<Colour> CTR Token', 4) JSON gate is REPLACED by this randomized requirement
-    # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-3 Cups Room hub gate
+    # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-2 Cups Room hub gate
     # (the randomized req is ANDed on TOP of that key gate, never replaces it). The
     # track key is '<Colour> Cup' so _pad_exit_name yields '<Colour> Cup Warp Pad'
     # (the AP exit name); the destination region is '<Colour> Gem Cup'. Gem cups are

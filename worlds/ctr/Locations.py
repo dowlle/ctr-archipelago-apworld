@@ -18,11 +18,12 @@ CTR_LOCATION_IDS = {loc["name"]: loc["code"] for loc in _LOCATION_DATA}
 CTR_LOCATION_TO_REGION = {loc["name"]: loc["region"] for loc in _LOCATION_DATA}
 
 # Podium placement checks (feat/podium-checks) are part of the game's global
-# datapackage (name<->id must be stable for servers/trackers), so ALL 48 rungs
-# are registered here unconditionally. Whether a given SEED creates them is
-# decided per-option in Regions.create_regions; get_total_locations counts only
-# the locations a seed actually creates, so the datapackage size never inflates
-# a seed's reported location count.
+# datapackage (name<->id must be stable for servers/trackers), so ALL 112 rungs
+# (16 tracks x 7 entries: 3 shipped names at the 35015000 block plus 4 new
+# rungs at the 35015100 block) are registered here unconditionally. Whether a
+# given SEED creates them is decided per-option in Regions.create_regions;
+# get_total_locations counts only the locations a seed actually creates, so
+# the datapackage size never inflates a seed's reported location count.
 for _pod_name, _pod_code, _pod_region in all_podium_locations():
     CTR_LOCATION_IDS[_pod_name] = _pod_code
     CTR_LOCATION_TO_REGION[_pod_name] = _pod_region
@@ -50,8 +51,9 @@ def get_total_locations(world) -> int:
     Return the number of locations THIS seed actually created (incl. events, to
     preserve the historical value for non-podium seeds). Counting created
     locations -- rather than len(CTR_LOCATION_IDS), the full static datapackage --
-    keeps TotalLocations accurate now that the datapackage always carries the 48
-    podium rungs while a seed may create 0/32/48 of them per option.
+    keeps TotalLocations accurate now that the datapackage always carries the 112
+    podium rungs while a seed may create 0-80 of them per option (up to 5 rungs
+    across 16 tracks).
     """
     return len(world.multiworld.get_locations(world.player))
 

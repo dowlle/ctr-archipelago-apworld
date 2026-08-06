@@ -8,7 +8,7 @@ Papu's Pyramid, Dingo Canyon, Hot Air Skyway) made logic's reachable set strictl
 WIDER than the game's, which is the unbeatable-seed mechanism the issue reported,
 plus two OVER-counts (Cortex Castle, N. Gin Labs). The fix moves the floor to the
 pad ENTRANCE, keyed by the PHYSICAL pad exactly like native (which gates the pad
-LOAD by physLevelID against numTrophiesToOpen, AH_WarpPad.c:810/1865), sourced
+LOAD by physLevelID against numTrophiesToOpen, AH_WarpPad.c:836/1923), sourced
 from a single data field (data/warp_pad_ids.json "vanilla_trophies").
 
 These tests lock that in:

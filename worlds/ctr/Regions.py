@@ -350,7 +350,7 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
-    # --- Podium placement checks (position-rung rework, v0.2.0 Phase A) -------
+    # --- Podium placement checks (position-rung rework, shipped 0.1.x) --------
     # Per adventure trophy race, a 5-rung superset split into held-position rungs
     # (Held 1st / Held 3rd / optional Held 5th) and finish-line rungs (Finish on
     # Podium / optional Finish (Any Position)). Which rungs a seed creates is
