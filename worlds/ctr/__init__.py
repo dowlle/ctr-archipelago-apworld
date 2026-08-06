@@ -74,6 +74,24 @@ class ctrAPWorld(World):
     }
     location_name_to_id = get_location_names()
 
+    # Item groups (issue #167). Group names live in the SAME namespace as item
+    # names (AutoWorld.AutoWorldRegister builds all_item_and_group_names from the
+    # union), so none of these four may collide with an entry in data/items.json --
+    # test_item_groups asserts that plus verbatim membership. The server exposes
+    # them for group hints (!hint Gems) and core expands them in item_links,
+    # local_items / non_local_items, start_inventory_from_pool and plando_items
+    # (Options.py 872/1534/1667, BaseClasses.py 274-280); nothing in fill reads
+    # them, so placement is unchanged. AutoWorld adds "Everything" itself.
+    item_name_groups = {
+        "Relics": {"Sapphire Relic", "Gold Relic", "Platinum Relic"},
+        "CTR Tokens": {"Red CTR Token", "Green CTR Token", "Blue CTR Token",
+                       "Yellow CTR Token", "Purple CTR Token"},
+        "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
+        # Sourced from the trap constant above so the group cannot drift from the
+        # native effect enum the trap set is pinned to.
+        "Traps": set(TRAP_ITEM_NAMES),
+    }
+
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
         self.start_region = None
