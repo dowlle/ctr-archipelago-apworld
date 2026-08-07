@@ -43,7 +43,7 @@ def build_manifest() -> dict:
 
     world_type = AutoWorldRegister.world_types["Crash Team Racing"]
     package = world_type.get_data_package_data()
-    world_version = json.loads(ARCHIPELAGO_JSON_PATH.read_text())["world_version"]
+    world_version = json.loads(ARCHIPELAGO_JSON_PATH.read_text(encoding="utf-8"))["world_version"]
 
     return {
         "game": world_type.game,
@@ -71,7 +71,7 @@ def main(argv=None) -> int:
         if not MANIFEST_PATH.exists():
             sys.stderr.write(f"{MANIFEST_PATH} does not exist -- run without --check to create it.\n")
             return 1
-        committed = json.loads(MANIFEST_PATH.read_text())
+        committed = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         if committed != current:
             sys.stderr.write(
                 f"{MANIFEST_PATH} is stale relative to the registered world.\n"
@@ -83,7 +83,7 @@ def main(argv=None) -> int:
         sys.stdout.write(f"{MANIFEST_PATH} matches the registered world.\n")
         return 0
 
-    MANIFEST_PATH.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n")
+    MANIFEST_PATH.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     sys.stdout.write(f"wrote {MANIFEST_PATH}\n")
     return 0
 

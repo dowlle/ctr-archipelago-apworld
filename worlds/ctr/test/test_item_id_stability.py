@@ -32,9 +32,21 @@ FIXTURE_PATH = (
 )
 
 
+def _reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate key in item id stability fixture: {key!r}")
+        result[key] = value
+    return result
+
+
 class TestItemIdStability(unittest.TestCase):
     def test_existing_items_keep_their_frozen_id(self) -> None:
-        frozen: dict = json.loads(FIXTURE_PATH.read_text())
+        frozen: dict = json.loads(
+            FIXTURE_PATH.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+        )
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         current = world_type.item_name_to_id
 
