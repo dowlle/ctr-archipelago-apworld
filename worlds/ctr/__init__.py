@@ -1192,7 +1192,7 @@ class ctrAPWorld(World):
                 # type-0 ({0,0,-1}) stage 2 (cups have no second stage). They appear
                 # ONLY when world.warp_pad_unlock holds them (option ON); option OFF
                 # leaves no cup key, so native keeps its own fixed cup rule unchanged.
-                # The Key-3 Cups Room hub gate is enforced separately (native hub
+                # The Key-2 Cups Room hub gate is enforced separately (native hub
                 # progression + the AP region rule); this requirement is ANDed on top.
                 out.setdefault(
                     str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
@@ -1221,7 +1221,7 @@ class ctrAPWorld(World):
         return out
 
     def _resolve_podium_checks(self) -> Dict[str, object]:
-        """Podium position rungs (v0.2.0 Phase A) for the native fan-out.
+        """Podium position rungs (position-rung rework, shipped 0.1.x) for the native fan-out.
 
         Schema 6 shape (agreed with the native session):
 
@@ -1280,7 +1280,7 @@ class ctrAPWorld(World):
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
             "TotalLocations": get_total_locations(self),
-            # schema_version 6 (v0.2.0, position-rung rework Phase A): the
+            # schema_version 6 (position-rung rework, shipped 0.1.x): the
             # podium_checks block changes SHAPE -- each per-track entry becomes a
             # 5-slot code array [held_1st, held_3rd, held_5th, finish_podium,
             # finish_any] (-1 = absent), replacing the v3-era {first,podium,any}

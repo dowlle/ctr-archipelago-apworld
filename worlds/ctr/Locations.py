@@ -68,8 +68,9 @@ def get_total_locations(world) -> int:
     Return the number of locations THIS seed actually created (incl. events, to
     preserve the historical value for non-podium seeds). Counting created
     locations -- rather than len(CTR_LOCATION_IDS), the full static datapackage --
-    keeps TotalLocations accurate now that the datapackage always carries the 48
-    podium rungs while a seed may create 0/32/48 of them per option.
+    keeps TotalLocations accurate now that the datapackage always carries the 112
+    podium rungs while a seed may create 0-80 of them per option (up to 5 rungs
+    across 16 tracks).
     """
     return len(world.multiworld.get_locations(world.player))
 
