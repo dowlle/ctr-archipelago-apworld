@@ -372,6 +372,11 @@ class ctrAPWorld(World):
                 # backstop's replay fidelity survives it.
                 from .Rules import add_time_trial_and_ctr_requirements
                 add_time_trial_and_ctr_requirements(self, self.player)
+                from .warp_pad_logic import warn_stage2_collapsed
+                n = len(self.multiworld.worlds)
+                warn_stage2_collapsed(
+                    self, "fill",
+                    f"{n} slot{'' if n == 1 else 's'} in the room")
         # Terminal rollback-precollect backstop -- the universal solo safety net.
         # Solo only (replay fidelity: nothing consumes multiworld.random between
         # here and the fill). Vanilla and randomized both route through the same
@@ -384,19 +389,56 @@ class ctrAPWorld(World):
 
     def _probe_two_stage_fillable(self):
         """True/False if a faithful parallel dry-run fills; None if the probe could
-        not run (caller treats None as 'keep two-stage')."""
+        not run (caller treats None as 'keep two-stage').
+
+        MULTIWORLD-AWARE (issue #75, ruled 2026-08-07). The probe mirrors the REAL
+        room: same player count, same games per slot, each slot carrying its own
+        option object. It used to dry-run `_MW(1)` unconditionally, so in a
+        multiworld it predicted the fillability of a room that does not exist.
+
+        Why that mattered: CTR's FillError tail is a property of the ROOM, not of
+        the CTR slot. Measured on 0.1.5 (`podium_placement_checks: false`, 2-player
+        against a 0-location companion, 10,000 seeds), the solo-shaped probe let 90
+        seeds reach a real FillError, and separately collapsed stage 2 on seeds that
+        fill perfectly well in the real room -- a third of its collapses in the
+        tightest config were such false positives. Mirroring the room removes both
+        directions of the error, because the dry run and the real fill are finally
+        the same problem.
+
+        SOLO IS UNCHANGED BY CONSTRUCTION: with one player the mirror IS `_MW(1)`
+        with this world's own options, i.e. exactly the shipped probe. Verified as a
+        byte-identical 10,000-seed arm, not just argued.
+
+        The probe deliberately does NOT call `pre_fill` on the mirror (that would
+        recurse into this method) and does not reproduce item links. It is a
+        fillability predictor, not a second generator; any error keeps two-stage."""
         try:
             from BaseClasses import MultiWorld as _MW, CollectionState as _CS
-            from worlds.AutoWorld import call_all as _call_all
+            from worlds.AutoWorld import call_all as _call_all, AutoWorldRegister
             from Fill import distribute_items_restrictive as _dist
-            seed = self.multiworld.seed
-            pmw = _MW(1)
-            pmw.game[1] = self.game
-            pmw.player_name = {1: self.multiworld.player_name[self.player]}
-            pmw.set_seed(seed)
-            pw = type(self)(pmw, 1)
-            pmw.worlds = {1: pw}
-            pw.options = self.options  # identical option object -> identical rolls
+            real = self.multiworld
+            # AP numbers real slots 1..N contiguously, which is what _MW(n) builds.
+            # If that ever stops holding, fail open rather than probe a room whose
+            # slot numbering does not match the one we are predicting for.
+            players = tuple(real.player_ids)
+            if players != tuple(range(1, len(players) + 1)):
+                logging.warning("[CTR] two-stage fillability probe skipped: "
+                                "non-contiguous player ids; keeping two-stage.")
+                return None
+            pmw = _MW(len(players))
+            pmw.game = dict(real.game)
+            pmw.player_name = dict(real.player_name)
+            pmw.set_seed(real.seed)
+            # Same construction style as the shipped solo probe, one slot per real
+            # slot: instantiate the slot's own world type and hand it the REAL
+            # world's option object, so every slot rolls identically to the room
+            # being predicted.
+            pmw.worlds = {
+                p: AutoWorldRegister.world_types[real.game[p]](pmw, p)
+                for p in players
+            }
+            for p in players:
+                pmw.worlds[p].options = real.worlds[p].options
             for step in ("generate_early", "create_regions", "create_items",
                          "set_rules", "connect_entrances", "generate_basic"):
                 _call_all(pmw, step)
