@@ -32,9 +32,58 @@ reproduces identical output.
 
 import heapq
 import json
+import logging
 import math
 import pkgutil
 import re
+
+
+# ---------------------------------------------------------------------------
+# Stage-2 collapse reporting (issue #75, ruled 2026-08-07)
+# ---------------------------------------------------------------------------
+# A stage-2 collapse is a SANCTIONED mechanism -- the design rule is that a pad's
+# tier 2 may collapse if a seed needs it for generation -- but until 0.2.0 it
+# happened silently, so a YAML could ask for layered warp-pad gating, not get it,
+# and give no one a way to notice. Measured on the 0.1.5 apworld it is not rare:
+# 0 in 10,000 seeds at shipped defaults, but 15.8% with podium_placement_checks
+# off and 43.3% at the tightest measured content config.
+#
+# The two ways a seed can lose stage 2, both reported here with the same wording
+# so the line is greppable and stable:
+#   geography -- no free-pad subset opens sphere 0 wide enough (run_sphere_search)
+#   fill      -- the pre_fill dry run predicts this room would FillError (__init__)
+#
+# NOT reported: two_stage_density "off". That collapse is what the YAML asked for,
+# so it is neither silent nor a surprise.
+
+_STAGE2_COLLAPSE_REASONS = {
+    "geography": ("no free starting-pad subset could open sphere 0 wide enough "
+                  "({detail})"),
+    "fill": ("a dry run of this multiworld predicted the item fill would fail "
+             "otherwise ({detail})"),
+}
+
+
+def warn_stage2_collapsed(world, reason, detail=""):
+    """Emit the single generation warning for a silent stage-2 collapse.
+
+    Wording is deliberately stable: players and maintainers grep for
+    "two-stage warp-pad gating was collapsed". Keep the prefix if you edit it.
+    """
+    try:
+        who = world.multiworld.player_name[world.player]
+    except Exception:
+        who = f"player {getattr(world, 'player', '?')}"
+    template = _STAGE2_COLLAPSE_REASONS.get(reason)
+    if template is None:  # unknown reason -> still warn, never swallow
+        template = "{detail}"
+    logging.warning(
+        "[CTR] %s: two-stage warp-pad gating was collapsed for this seed because "
+        "%s. Every stage-2 warp-pad requirement drops to a plain Trophy Race "
+        "check, so this seed has less layered gating than two_stage_density "
+        "requested. The seed is fully playable and beatable; re-roll if you want "
+        "the layered version.",
+        who, template.format(detail=detail))
 
 
 # ---------------------------------------------------------------------------
@@ -1351,6 +1400,10 @@ def run_sphere_search(world, mode, reward_track_for=None,
         # safe: Regions.create_regions sets it BEFORE calling us, so this False
         # sticks and __init__ correctly skips the two-stage fill probe.
         world._ctr_two_stage_active = False
+        warn_stage2_collapsed(
+            world, "geography",
+            f"best breadth over {_SPHERE0_REPAIR_TRIES} attempts was {best_b}, "
+            f"and {_SPHERE0_MIN_BREADTH} is required")
         return _run_sphere_search_once(world, mode, reward_track_for,
                                        True, include_gem_cups)
     return best
