@@ -34,9 +34,20 @@ This module is the single source of the podium layout (names, codes, slot order,
 creation subset) and is consumed by Locations.py (datapackage), Regions.py
 (per-seed creation), Rules.py (reachability), and __init__._resolve_podium_checks
 (the schema-6 slot_data fan-out array).
+
+SHARED INFRASTRUCTURE (#176). The frozen superset, the per-seed subset and the
+name/code helpers live on `PodiumLocationClass`, a subclass of
+`location_class.LocationClass`, so the rest of the sanity family (#49, #109,
+#145, #148) inherits them instead of copying this module a fourth time. The
+module-level functions at the bottom are an unchanged facade over that class:
+`Regions.py` and `Rules.py` keep calling them exactly as before. Podium's region
+shape (a dead-end "<track>: Podium" region with rule-True entrances) and its
+slot_data block stay HERE, because they are podium's, not the family's.
 """
 import json
 import pkgutil
+
+from .location_class import LocationClass
 
 # v0.1.x block (retired-but-registered names + the still-created finish_any).
 PODIUM_CODE_BASE = 35015000
@@ -90,11 +101,6 @@ def _trophy_tracks():
 TROPHY_TRACKS = _trophy_tracks()
 
 
-def location_name(track: str, rung_key: str) -> str:
-    """AP location name for a track's rung, e.g. 'Crash Cove: Held 1st'."""
-    return f"{track}: {_RUNG_SUFFIX[rung_key]}"
-
-
 def _rung_code(track_index: int, rung_key: str) -> int:
     """Location code for a (track, rung). Shipped rungs (first/podium/any) and
     finish_any resolve into the frozen 35015000 block; the four new rungs resolve
@@ -129,40 +135,95 @@ def created_rung_keys(finish_on: bool, any_on: bool,
     return keys
 
 
+class PodiumLocationClass(LocationClass):
+    """The podium rungs as a `LocationClass` (#176).
+
+    The only member of the sanity family that exists on `main`, and therefore the
+    instance the shared base is proved against. Its per-seed subset varies along
+    the RUNG axis only -- all 16 trophy tracks always carry whichever rungs the
+    seed created -- which is why `created_location_names` is the family's shared
+    surface and the rung keys stay podium's own vocabulary.
+    """
+
+    key = "podium"
+    display_name = "Podium Placement Rungs"
+    code_blocks = (PODIUM_CODE_BASE, HELD_CODE_BASE)
+
+    def all_locations(self):
+        """Every possible podium rung as (name, code, region) for the DATAPACKAGE
+        -- the full frozen superset independent of options: the 3 shipped rungs at
+        the 35015000 block PLUS the 4 new rungs at the 35015100 block, for all 16
+        tracks (7 entries/track; finish_any is not double-registered -- it shares
+        the shipped 'any' name/code). Which rungs a given seed CREATES is decided
+        in Regions.py."""
+        out = []
+        for ti, track in enumerate(TROPHY_TRACKS):
+            for rung_key, suffix in SHIPPED_RUNGS:
+                out.append((f"{track}: {suffix}", _rung_code(ti, rung_key), track))
+            for rung_key, suffix in NEW_RUNGS:
+                out.append((f"{track}: {suffix}", _rung_code(ti, rung_key), track))
+        return out
+
+    def location_name(self, track: str, rung_key: str) -> str:
+        """AP location name for a track's rung, e.g. 'Crash Cove: Held 1st'."""
+        return f"{track}: {_RUNG_SUFFIX[rung_key]}"
+
+    def created_rung_keys(self, options):
+        """created_rung_keys read straight off a seed's options, honouring the
+        master Podium Placement Checks gate. Single source of the creation subset
+        shared by Regions.py, Rules.py and __init__._resolve_podium_checks so they
+        can never disagree on which rungs a seed has."""
+        if not bool(options.podium_placement_checks.value):
+            return []
+        return created_rung_keys(
+            finish_on=bool(options.podium_finish_rungs.value),
+            any_on=bool(options.podium_any_position_rung.value),
+            held_on=bool(options.podium_held_rungs.value),
+            held_fifth_on=bool(options.podium_held_fifth_rung.value),
+        )
+
+    def created_location_names(self, options):
+        """The family-shared per-seed surface: every rung name this seed creates,
+        across all 16 trophy tracks."""
+        rung_keys = self.created_rung_keys(options)
+        return [self.location_name(track, rung_key)
+                for track in TROPHY_TRACKS for rung_key in rung_keys]
+
+    def slot_codes(self, track: str, created_keys) -> list:
+        """The schema-6 5-slot code array for a track: SLOT_ORDER mapped to each
+        rung's location code, or -1 where that rung is absent from this seed.
+
+        Resolves each code through the frozen superset (`code_for`) rather than
+        re-deriving the block arithmetic, so a slot can never carry a code the
+        datapackage does not have.
+        """
+        created = set(created_keys)
+        return [(self.code_for(track, slot_key) if slot_key in created else -1)
+                for slot_key in SLOT_ORDER]
+
+
+#: The registered podium class. `Locations.py` registers this instance.
+PODIUM_CLASS = PodiumLocationClass()
+
+
+# --- module-level facade, unchanged for existing callers ---------------------
+
+def location_name(track: str, rung_key: str) -> str:
+    """AP location name for a track's rung, e.g. 'Crash Cove: Held 1st'."""
+    return PODIUM_CLASS.location_name(track, rung_key)
+
+
 def created_rung_keys_from_options(options):
-    """created_rung_keys read straight off a seed's options, honouring the master
-    Podium Placement Checks gate. Single source of the creation subset shared by
-    Regions.py, Rules.py and __init__._resolve_podium_checks so they can never
-    disagree on which rungs a seed has."""
-    if not bool(options.podium_placement_checks.value):
-        return []
-    return created_rung_keys(
-        finish_on=bool(options.podium_finish_rungs.value),
-        any_on=bool(options.podium_any_position_rung.value),
-        held_on=bool(options.podium_held_rungs.value),
-        held_fifth_on=bool(options.podium_held_fifth_rung.value),
-    )
+    """The rung keys this seed creates. See PodiumLocationClass.created_rung_keys."""
+    return PODIUM_CLASS.created_rung_keys(options)
 
 
 def podium_slot_codes(track: str, created_keys) -> list:
-    """The schema-6 5-slot code array for a track: SLOT_ORDER mapped to each
-    rung's location code, or -1 where that rung is absent from this seed."""
-    ti = TROPHY_TRACKS.index(track)
-    created = set(created_keys)
-    return [(_rung_code(ti, slot_key) if slot_key in created else -1)
-            for slot_key in SLOT_ORDER]
+    """The schema-6 5-slot code array for a track. See
+    PodiumLocationClass.slot_codes."""
+    return PODIUM_CLASS.slot_codes(track, created_keys)
 
 
 def all_podium_locations():
-    """Every possible podium rung as (name, code, region) for the DATAPACKAGE --
-    the full frozen superset independent of options: the 3 shipped rungs at the
-    35015000 block PLUS the 4 new rungs at the 35015100 block, for all 16 tracks
-    (7 entries/track; finish_any is not double-registered -- it shares the shipped
-    'any' name/code). Which rungs a given seed CREATES is decided in Regions.py."""
-    out = []
-    for ti, track in enumerate(TROPHY_TRACKS):
-        for rung_key, suffix in SHIPPED_RUNGS:
-            out.append((f"{track}: {suffix}", _rung_code(ti, rung_key), track))
-        for rung_key, suffix in NEW_RUNGS:
-            out.append((f"{track}: {suffix}", _rung_code(ti, rung_key), track))
-    return out
+    """The frozen podium superset. See PodiumLocationClass.all_locations."""
+    return PODIUM_CLASS.all_locations()
