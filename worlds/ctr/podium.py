@@ -1,8 +1,9 @@
-"""Podium placement checks -- position-rung location rework (v0.2.0, Phase A).
+"""Podium placement checks -- position-rung location rework (shipped in the 0.1.x line).
 
-Per adventure trophy race (16 tracks) the game exposes a rung ladder. v0.1.x
-shipped a 3-rung finish ladder; v0.2.0 reworks it into a 5-rung superset that
-splits live-position ("held") rungs from finish-line rungs:
+Per adventure trophy race (16 tracks) the game exposes a rung ladder. The
+original release shipped a 3-rung finish ladder; a later 0.1.x rework replaced
+it with a 5-rung superset that splits live-position ("held") rungs from
+finish-line rungs:
 
     slot 0  held_1st       "Held 1st"            live position hit 1st
     slot 1  held_3rd       "Held 3rd"            live position hit top-3
@@ -40,7 +41,7 @@ import pkgutil
 
 # v0.1.x block (retired-but-registered names + the still-created finish_any).
 PODIUM_CODE_BASE = 35015000
-# v0.2.0 additive block for the four new rungs. Does NOT overlap 35015000..047
+# 0.1.x additive block for the four new rungs (position-rung rework). Does NOT overlap 35015000..047
 # (16 tracks * 3). Kept clear of that range with headroom.
 HELD_CODE_BASE = 35015100
 
@@ -53,7 +54,7 @@ SHIPPED_RUNGS = [
 ]
 _SHIPPED_INDEX = {key: i for i, (key, _s) in enumerate(SHIPPED_RUNGS)}
 
-# New rungs (v0.2.0). Order == code offset within the 35015100 block.
+# New rungs (position-rung rework, shipped 0.1.x). Order == code offset within the 35015100 block.
 NEW_RUNGS = [
     ("held_1st",      "Held 1st"),
     ("held_3rd",      "Held 3rd"),

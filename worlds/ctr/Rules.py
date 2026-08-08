@@ -195,7 +195,7 @@ def add_vanilla_floor_rules(world, player):
     AND each race pad's native trophy floor onto its ENTRANCE rule.
 
     The floor is a property of the PHYSICAL pad -- native gates the pad LOAD by
-    physLevelID against metaDataLEV[].numTrophiesToOpen (AH_WarpPad.c:810/1865),
+    physLevelID against metaDataLEV[].numTrophiesToOpen (AH_WarpPad.c:836/1923),
     NOT the race -- so it belongs on the pad exit, which Regions keeps in its
     physical hub and keeps physical-pad-keyed even under destination shuffle
     (race<->race per_category in this mode). Flooring the entrance rather than the
@@ -267,7 +267,7 @@ def add_boss_garage_rules(world, player):
 
 
 def add_podium_placement_rules(world, player):
-    """Podium placement rungs (position-rung rework, v0.2.0 Phase A) are reachable
+    """Podium placement rungs (position-rung rework, shipped 0.1.x) are reachable
     exactly when their destination track is RACEABLE.
 
     They fire native-side from the placement listener, and a win satisfies every
