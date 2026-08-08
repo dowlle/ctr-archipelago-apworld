@@ -1,11 +1,12 @@
 import logging
 import json
 import os
-from typing import Dict, List
+from typing import ClassVar, Dict, List
 import pkgutil
 
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
+from .elastic_bounds import CTRSettings
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
@@ -60,6 +61,15 @@ class ctrAPWorld(World):
     options_dataclass = ctrAPOptions
     options: ctrAPOptions
 
+    # Issue #179: host.yaml settings group (elastic-option friendly bounds +
+    # future per-option vetoes). Explicit settings_key -- the AutoWorld default
+    # would be "ctr_options" (folder name "ctr" + "_options"), which collides in
+    # NAME (though not in namespace: one lives in host.yaml, the other on the
+    # wire) with the slot_data Contract's top-level `ctr_options` dict. "ctr"
+    # avoids inviting that confusion in a host's host.yaml.
+    settings_key = "ctr"
+    settings: ClassVar[CTRSettings]
+
     # Universal Tracker: interpret_slot_data is a staticmethod that always forces a
     # re-generation from the connected seed's slot_data, and that re-generation
     # reconstructs the whole logic graph from the wire (map + per-pad requirements +
@@ -95,6 +105,11 @@ class ctrAPWorld(World):
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
         self.start_region = None
+        # Issue #179: names _exclude_goal_location has excluded so far this
+        # seed, appended at the call site rather than re-derived elsewhere --
+        # elastic_bounds.goal_excluded_location_reserve reads this instead of
+        # restating which goals exclude a location.
+        self._goal_excluded_location_names: List[str] = []
 
     # --- Oxide-final goal helpers (issue #23) ---
 
@@ -817,6 +832,8 @@ class ctrAPWorld(World):
         from BaseClasses import LocationProgressType
         loc = self.multiworld.get_location(location_name, player)
         loc.progress_type = LocationProgressType.EXCLUDED
+        # Issue #179: record it for elastic_bounds.goal_excluded_location_reserve.
+        self._goal_excluded_location_names.append(location_name)
 
     def _install_goal(self, player: int) -> None:
         """Set this seed's completion condition and lay any companion goal-tracking
