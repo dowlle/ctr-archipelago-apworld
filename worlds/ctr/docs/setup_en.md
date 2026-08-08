@@ -51,8 +51,9 @@ to extract the release archive, add your disc image, connect from **OPTIONS →
 Connection**, configure controllers or Steam Input, and troubleshoot platform or
 disc-image errors.
 
-Once the status says **Connected**, start Adventure mode. The canonical guide
-covers connection, reporting, and troubleshooting for the current client.
+Once the status says **Connected**, start Adventure mode. The canonical guide's
+“Your first five minutes” section explains checks, received items, traps, saving,
+the seed warning, and the current disconnect limitation.
 
 ## Getting help
 
