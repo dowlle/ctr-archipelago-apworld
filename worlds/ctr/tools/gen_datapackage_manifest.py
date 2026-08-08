@@ -2,7 +2,7 @@
 
 Emits every item + location name this world's datapackage currently registers,
 each with its numeric id, plus the datapackage checksum
-(`worlds.AutoWorld.WebWorld.get_data_package_data`) that would ship if nothing
+(`worlds.AutoWorld.World.get_data_package_data`) that would ship if nothing
 else changed.
 
 The manifest reads the LIVE registered world class rather than re-deriving ids
