@@ -1244,15 +1244,16 @@ class ctrAPWorld(World):
         (fill_slot_data). A native predating schema 6 must not read this block as
         the old object; the #8 newer-schema guard covers that direction.
         """
-        from .Locations import CTR_LOCATION_IDS
-        from .podium import (TROPHY_TRACKS, SLOT_ORDER,
-                             created_rung_keys_from_options, location_name)
+        # #176: the code array comes from the location class itself
+        # (PodiumLocationClass.slot_codes), so the wire block and the created
+        # locations resolve through the same frozen superset instead of this
+        # method re-deriving the name -> code lookup.
+        from .podium import PODIUM_CLASS, TROPHY_TRACKS
         enabled = bool(self.options.podium_placement_checks.value)
         block: Dict[str, object] = {"enabled": enabled, "locations": {}}
-        rung_keys = created_rung_keys_from_options(self.options)
+        rung_keys = PODIUM_CLASS.created_rung_keys(self.options)
         if not rung_keys:
             return block
-        created = set(rung_keys)
         pad_ids = getattr(self, "warp_pad_ids", {})
         track_to_lid = {
             pad_name[: -len(" Warp Pad")]: meta["level_id"]
@@ -1264,12 +1265,7 @@ class ctrAPWorld(World):
             lid = track_to_lid.get(track)
             if lid is None or not (0 <= lid < self.WARP_PAD_ID_RANGE):
                 continue
-            arr = [
-                CTR_LOCATION_IDS[location_name(track, slot_key)]
-                if slot_key in created else -1
-                for slot_key in SLOT_ORDER
-            ]
-            locations[str(lid)] = arr
+            locations[str(lid)] = PODIUM_CLASS.slot_codes(track, rung_keys)
         block["locations"] = locations
         return block
 

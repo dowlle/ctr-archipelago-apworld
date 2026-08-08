@@ -7,7 +7,19 @@ if TYPE_CHECKING:
     from . import ctrAPWorld
 
 
-from .podium import all_podium_locations
+from .location_class import LocationClassRegistry
+from .podium import PODIUM_CLASS
+
+# The registered optional location classes (#176), in registration order.
+#
+# REGISTRATION IS APPEND-ONLY. Registration order is the order every class's
+# locations enter CTR_LOCATION_IDS, so a new class (relic perfects #49, item
+# boxes #109, itemsanity #145, lettersanity #148) goes at the END of this list.
+# Codes are explicit per class so a reorder would not renumber anything, but
+# keeping the order stable keeps location_name_to_id byte-stable, which is what
+# makes a datapackage manifest diff (#177) readable.
+CTR_LOCATION_CLASSES = LocationClassRegistry()
+CTR_LOCATION_CLASSES.register(PODIUM_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
@@ -17,16 +29,21 @@ _LOCATION_DATA = json.loads(
 CTR_LOCATION_IDS = {loc["name"]: loc["code"] for loc in _LOCATION_DATA}
 CTR_LOCATION_TO_REGION = {loc["name"]: loc["region"] for loc in _LOCATION_DATA}
 
-# Podium placement checks (feat/podium-checks) are part of the game's global
-# datapackage (name<->id must be stable for servers/trackers), so ALL 112 rungs
-# (16 tracks x 7 entries: 3 shipped names at the 35015000 block plus 4 new
-# rungs at the 35015100 block) are registered here unconditionally. Whether a
-# given SEED creates them is decided per-option in Regions.create_regions;
-# get_total_locations counts only the locations a seed actually creates, so
-# the datapackage size never inflates a seed's reported location count.
-for _pod_name, _pod_code, _pod_region in all_podium_locations():
-    CTR_LOCATION_IDS[_pod_name] = _pod_code
-    CTR_LOCATION_TO_REGION[_pod_name] = _pod_region
+# Optional location classes are part of the game's global datapackage
+# (name<->id must be stable for servers/trackers), so every class's FULL frozen
+# superset is registered here unconditionally -- for podium that is all 112 rungs
+# (16 tracks x 7 entries: 3 shipped names at the 35015000 block plus 4 new rungs
+# at the 35015100 block). Whether a given SEED creates them is decided per-option
+# in Regions.create_regions; get_total_locations counts only the locations a seed
+# actually creates, so the datapackage size never inflates a seed's reported
+# location count.
+#
+# The disjointness check runs BEFORE the merge: a class block colliding with the
+# static table would otherwise silently overwrite a shipped id.
+CTR_LOCATION_CLASSES.assert_disjoint_from(CTR_LOCATION_IDS, "data/locations.json")
+for _cls_name, _cls_code, _cls_region in CTR_LOCATION_CLASSES.all_locations():
+    CTR_LOCATION_IDS[_cls_name] = _cls_code
+    CTR_LOCATION_TO_REGION[_cls_name] = _cls_region
 
 
 def get_location_id(name: str):
