@@ -1,9 +1,10 @@
 # Crash Team Racing
 
-## Where is the options page?
+## How do I configure the options?
 
-The [Crash Team Racing player options page](../player-options) explains every
-setting and exports a YAML file for generation. The defaults provide the full
+Install `ctr.apworld`, then open the Archipelago Launcher and choose **Generate
+Template Options**. Select Crash Team Racing to create a YAML file with every
+available setting and value documented inside it. The defaults provide the full
 randomizer experience. For a gentler first seed, use vanilla warp-pad unlock
 requirements or reduce the two-stage gate and trap settings.
 

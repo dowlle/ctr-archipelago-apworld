@@ -32,17 +32,16 @@ double-clicking it or placing it in the `custom_worlds` folder of your
 Archipelago installation.
 
 Open the Archipelago Launcher, choose **Generate Template Options**, and select
-Crash Team Racing. You can also use the
-[Crash Team Racing options page](../player-options). Set your player name and
-options in the generated YAML, then add it to the room's player files.
+Crash Team Racing. Set your player name and options in the generated YAML, then
+add it to the room's player files. Every available setting and value is
+documented in that template.
 
 The released client and apworld are a pair. Update both together, even when a
 release appears to change only one side.
 
 The defaults provide the full randomizer experience: randomized warp-pad
 requirements and destinations, shuffled Gems, Gem Cups, and a small share of
-trap items. Every setting is documented in the generated YAML and on the player
-options page.
+trap items.
 
 ## Setting up the client
 
@@ -52,9 +51,8 @@ to extract the release archive, add your disc image, connect from **OPTIONS →
 Connection**, configure controllers or Steam Input, and troubleshoot platform or
 disc-image errors.
 
-Once the status says **Connected**, start Adventure mode. The canonical guide's
-“Your first five minutes” section explains checks, received items, traps, saving,
-the seed warning, and the current disconnect limitation.
+Once the status says **Connected**, start Adventure mode. The canonical guide
+covers connection, reporting, and troubleshooting for the current client.
 
 ## Getting help
 
