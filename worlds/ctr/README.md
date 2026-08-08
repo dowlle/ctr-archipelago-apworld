@@ -12,16 +12,11 @@ Releases ship as a pair (client + `ctr.apworld`) on the [client's releases page]
 
 ---
 
-## AI Usage Disclosure
+## AI usage
 
-CTR Archipelago is developed with AI assistance (Anthropic's Claude, via Claude Code). The short version:
+I use Claude Code while developing CTR Archipelago. It helps with implementation, debugging, and review, while I make the design decisions and test releases in game. The project does not use AI-generated art. I am disclosing this because I want people to know how the project is made. I have ADHD, and this is one of the tools that helps me turn ideas into finished projects.
 
-- **AI writes much of the code**, under my direction: randomization and generation logic, the native AP integration, debugging, and review passes.
-- **No AI-generated art.** Every tracker icon and in-game marker is rendered from the game's own 3D models. No generated textures, logos, or models.
-- **Nothing ships unverified.** Every apworld release passes a full run of Eijebong's Archipelago fuzzer (10/10 check categories across ~14,000 generations; nothing ships red). I playtest every native build in-game on real seeds, and gating logic is verified against the game's actual code, not guessed. The project has a human-reviewed specification and data contract; I don't merge code I haven't understood.
-- **Why:** AI lets me actually finish my projects (I have ADHD). Using it is a considered choice, not a careless one.
-
-If AI-assisted development is a dealbreaker for you, that's a fair call to make with the facts in front of you.
+More detail about how I use and verify AI-assisted work is available in the client repository's [AI usage note](https://github.com/dowlle/ctr-native-ap/blob/main/AI_USAGE.md).
 
 ---
 
