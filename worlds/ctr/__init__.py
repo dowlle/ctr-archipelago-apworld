@@ -8,7 +8,7 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
 from .Locations import get_location_names, get_total_locations
-from .Items import load_item_table, item_prefix
+from .Items import load_item_table
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
 from .Regions import create_regions
 from .relic_tiers import (
@@ -82,9 +82,9 @@ class ctrAPWorld(World):
     ut_can_gen_without_yaml = True
 
     # Item + Location mapping
+    _item_data_by_name = {item["name"]: item for item in load_item_table()}
     item_name_to_id = {
-        item["name"]: (item_prefix + index)
-        for index, item in enumerate(load_item_table())
+        name: item["code"] for name, item in _item_data_by_name.items()
     }
     location_name_to_id = get_location_names()
 
@@ -613,8 +613,7 @@ class ctrAPWorld(World):
 
     def create_item(self, name: str) -> "ctrAPItem":
         item_id: int = self.item_name_to_id[name]
-        idx = item_id - item_prefix
-        classification = load_item_table()[idx]["classification"]
+        classification = self._item_data_by_name[name]["classification"]
         # Honest per-seed relic classification (vanilla-fill lever 1).
         # data/items.json marks every relic "progression" unconditionally, but in a
         # vanilla-warp-pad seed whose goal/accessibility does not depend on a relic
@@ -1495,4 +1494,3 @@ class ctrAPWorld(World):
 
     def remove(self, state: "CollectionState", item: "Item") -> bool:
         return super().remove(state, item)
-
