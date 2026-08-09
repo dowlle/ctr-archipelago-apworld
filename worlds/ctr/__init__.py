@@ -7,6 +7,7 @@ import pkgutil
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
+from .gem_cup_legs import cup_legs_to_wire, load_vanilla_cup_legs
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
@@ -172,11 +173,12 @@ class ctrAPWorld(World):
         this world with the value placed in multiworld.re_gen_passthrough[game]. We
         return the slot_data verbatim: generate_early restores the seed's options
         from it and create_regions pins the rolled warp-pad map + per-pad unlock
-        requirements from it (Regions._ut_reconstruct_*), so the re-generated world's
-        logic graph is identical to the connected seed's instead of re-rolling a
-        divergent one. Everything the reconstruction needs already travels on the
-        wire (ctr_options, warp_pad_map, warp_pad_unlock), so no extra emit is
-        required in fill_slot_data."""
+        requirements + gem-cup leg map from it (Regions._ut_reconstruct_*,
+        gem_cup_legs.reconstruct_gem_cup_legs_from_wire), so the re-generated
+        world's logic graph is identical to the connected seed's instead of
+        re-rolling a divergent one. Everything the reconstruction needs already
+        travels on the wire (ctr_options, warp_pad_map, warp_pad_unlock,
+        gem_cup_legs), so no extra emit is required in fill_slot_data."""
         return slot_data
 
     def _ut_restore_options(self, passthrough: Dict[str, object]) -> None:
@@ -234,6 +236,13 @@ class ctrAPWorld(World):
         o.podium_held_fifth_rung.value = int(bool(sample) and sample[2] != -1)
         o.podium_finish_rungs.value = int(bool(sample) and sample[3] != -1)
         o.podium_any_position_rung.value = int(bool(sample) and sample[4] != -1)
+
+        # Issue #166: the emitter writes the top-level `gem_cup_legs` key only
+        # when the option randomized the cups' legs, so key presence IS the
+        # toggle's value. create_regions pins the actual map from the same
+        # block (gem_cup_legs.reconstruct_gem_cup_legs_from_wire); an absent
+        # key (any pre-#166 seed) correctly restores to off + vanilla legs.
+        o.randomize_gem_cup_tracks.value = int("gem_cup_legs" in passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -1118,6 +1127,19 @@ class ctrAPWorld(World):
                 m[str(lid)] = int(target_track_id)
         return m
 
+    def _resolve_gem_cup_legs(self) -> Dict[str, List[int]]:
+        """{"<cupLevelID 100..104>": [trackLevelID x4]} -- the gem_cup_legs block
+        (issue #166, schema 7).
+
+        Serializes world.gem_cup_legs (resolved in create_regions) as LevelIDs,
+        always all five cups: the smallest COMPLETE mapping -- a partial map
+        would force native to guess the missing cups, and the whole block is
+        simply omitted when the option is off (native then keeps its vanilla
+        advCupTrackIDs table, which is exactly what an option-off seed uses).
+        """
+        return cup_legs_to_wire(
+            getattr(self, "gem_cup_legs", None) or load_vanilla_cup_legs())
+
     def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, Dict[str, int]]]:
         """{"<padLevelID>": {"stage1": {type,count,colour},
                              "stage2": {type,count,colour}}} — ALWAYS present.
@@ -1245,6 +1267,16 @@ class ctrAPWorld(World):
         # warp_pad_map being non-empty (set in create_regions as world.shuffle_warp_pads).
         # Kept in ctr_options for old-native log compatibility only.
         derived_shuffle = bool(getattr(self, "shuffle_warp_pads", False))
+        # schema_version 7 (0.2.0, issue #166): the top-level gem_cup_legs block.
+        # CONDITIONAL on the option actually randomizing the cups' legs -- only
+        # then is the block emitted and only then does a native need to parse it
+        # to load the same tracks the generation logic used (an old native would
+        # silently load vanilla legs: the golden-rule desync class of the v3 cup
+        # destination bump, so the #8 newer-schema warn must fire). An option-off
+        # seed is shape-identical to schema 6 and keeps emitting 6, so current
+        # clients are never warned over a seed that uses nothing new.
+        legs_randomized = bool(o.randomize_gem_cup_tracks.value)
+        schema = 7 if legs_randomized else 6
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -1257,10 +1289,10 @@ class ctrAPWorld(World):
             # this is a native-version GATE (schema_version >= 6), shipped with the
             # #8 newer-schema warn/refuse. (v5 = oxide-final relic-goal mode/count;
             # v4 = relic-tier colour + goal-rework; v3 = podium + stage-2 padgate;
-            # v2 = two-stage contract.)
-            "schema_version": 6,
+            # v2 = two-stage contract. v7 = gem_cup_legs, conditional, see above.)
+            "schema_version": schema,
             "ctr_options": {
-                "schema_version": 6,
+                "schema_version": schema,
                 "goal": o.goal.value,
                 # relic_min_time / relics_require_perfect were dropped with their
                 # YAML options (2026-07-15 release polish): native parsed both but
@@ -1349,6 +1381,14 @@ class ctrAPWorld(World):
             "boss_garage_req": getattr(self, "boss_garage_req", {}),
             "podium_checks": self._resolve_podium_checks(),
         }
+        if legs_randomized:
+            # Issue #166: the five cups' leg tracks (see _resolve_gem_cup_legs).
+            # Emitted only when randomized -- absent means vanilla legs to both
+            # native (advCupTrackIDs fallback) and UT (reconstruct falls back to
+            # the vanilla table). HARD bump (schema 7 above), NOT the additive
+            # no-bump precedent: an old native keeps loading the vanilla legs
+            # while this seed's podium logic follows the shuffled map.
+            slot_data["gem_cup_legs"] = self._resolve_gem_cup_legs()
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:

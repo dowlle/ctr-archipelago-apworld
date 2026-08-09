@@ -1,26 +1,7 @@
 import logging
-import json
-import pkgutil
 from BaseClasses import CollectionState
 
-
-def _load_gem_cup_legs():
-    """cup region name -> its 4 trophy-track leg names, from data/gem_cup_legs.json
-    (transcribed from the native advCupTrackIDs engine table)."""
-    return json.loads(
-        pkgutil.get_data(__package__, "data/gem_cup_legs.json").decode("utf-8")
-    )["cup_legs"]
-
-
-def _track_to_cups():
-    """Invert the cup->legs table into leg-track name -> [cup region names]. A
-    track can leg more than one cup (e.g. Roo's Tubes legs both Green and Purple),
-    so the value is a list."""
-    out: dict = {}
-    for cup, legs in _load_gem_cup_legs().items():
-        for track in legs:
-            out.setdefault(track, []).append(cup)
-    return out
+from .gem_cup_legs import load_vanilla_cup_legs, track_to_cups
 
 
 def make_rule(expr_text: str, player: int):
@@ -308,7 +289,12 @@ def add_podium_placement_rules(world, player):
     mw = world.multiworld
     all_names = {loc.name for loc in mw.get_locations(player)}
     all_regions = {r.name for r in mw.get_regions(player)}
-    track_cups = _track_to_cups()
+    # The seed's resolved leg map (issue #166), stashed by create_regions:
+    # vanilla table, or the randomized/UT-pinned map. The getattr fallback
+    # keeps a direct unit call working on a world that never ran
+    # create_regions.
+    track_cups = track_to_cups(
+        getattr(world, "gem_cup_legs", None) or load_vanilla_cup_legs())
     for track in TROPHY_TRACKS:
         trophy_name = f"{track}: Trophy Race"
         if trophy_name not in all_names:
