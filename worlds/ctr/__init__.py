@@ -31,6 +31,12 @@ TRAP_ITEM_NAMES = [
     "First Person Trap",  # AP_TRAP_FIRSTPERSON
 ]
 
+# Comfort-only issues #14/#15 pack. It stays atomic when a reduced location
+# set cannot host all five, rather than emitting a seed-dependent subset.
+SURFACE_ITEM_NAMES = frozenset({
+    "Ignore Grass", "Ignore Dirt", "Ignore Snow", "Ignore Water", "Ignore Ice",
+})
+
 
 class ctrAPWeb(WebWorld):
     theme = "Party"
@@ -1010,6 +1016,18 @@ class ctrAPWorld(World):
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
 
+        # These five useful items spend spare slots supplied by optional
+        # location classes (podium rungs by default). A deliberately reduced
+        # seed can have fewer than five spare locations. Omit the whole comfort
+        # pack there instead of overflowing the pool or choosing an arbitrary
+        # subset. Shipped defaults have ample room and always include all five.
+        unfilled = len(mw.get_unfilled_locations(self.player))
+        if len(pool) > unfilled:
+            without_surface = [item for item in pool
+                               if item.name not in SURFACE_ITEM_NAMES]
+            if len(without_surface) <= unfilled:
+                pool = without_surface
+
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
         # already locked above (the goal-tracking companion events _install_goal
@@ -1026,7 +1044,6 @@ class ctrAPWorld(World):
         # deterministic "Player X had 1 more locations than items" + FillError on
         # every multi-CTR generation with a filler-needing config. Solo unchanged
         # (there len(pool) == len(mw.itempool)).
-        unfilled = len(mw.get_unfilled_locations(self.player))
         n_filler = max(0, unfilled - len(pool))
         # Trap fill: replace trap_fill_percentage% of the filler slots with traps,
         # drawn UNIFORMLY across the 5 trap effects. Traps are non-progression, so
