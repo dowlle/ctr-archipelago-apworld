@@ -217,103 +217,22 @@ class ctrAPWorld(World):
         o.podium_any_position_rung.value = int(bool(sample) and sample[4] != -1)
 
     def generate_early(self) -> None:
-        """Generation-time progression guard for the Oxide-final goal (issue #23).
-
-        When the goal IS Oxide's Final Challenge, the relic tiers that satisfy the
-        configured mode+count must be able to supply the goal as PROGRESSION
-        (visible to fill / beatability). A tier whose `*_relic_progression` is
-        `never` (0) is opted fully out of AP progression by the player; if the
-        goal can only be satisfied by such tiers, the goal would be invisible to
-        AP (the stranding class in the report). Error clearly here instead of
-        emitting a world whose goal AP cannot see -- respecting the per-tier
-        sliders rather than silently forcing a tier back on."""
+        """Universal Tracker restore, then the option interaction / constraint
+        matrix (issue #178): raise-guards that block an unsolvable seed, then
+        downgrade-warnings that tell the player when an option they set has no
+        effect this seed. See forced_options.py for the full convention and
+        the per-constraint justification."""
         # Universal Tracker re-generation (issue #29): restore the seed's options
         # from slot_data so the rest of generation rebuilds the SAME world, then
-        # skip the progression guard (the connected seed already passed it, and the
-        # tracking player's own sliders are irrelevant to the pinned graph).
+        # skip the constraint matrix (the connected seed already passed it, and
+        # the tracking player's own sliders/downgrades are irrelevant to the
+        # pinned graph).
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough:
             self._ut_restore_options(passthrough)
             return
-        from Options import OptionError
-        # Zero-weight Trophy guard (issue #87). With randomized warp-pad
-        # requirements (modes 1/2) and requirement_variety=custom, run_sphere_search
-        # draws pad requirements weighted by the effective custom weights. Trophy is
-        # the ONLY item guaranteed present in the synthetic inventory at every draw
-        # (the sphere-0 bootstrap collects the free pads' trophy races first -- see
-        # the bootstrap section of warp_pad_logic.run_sphere_search), so a Trophy
-        # weight of 0 makes the candidate weights sum to zero at the first randomized
-        # draw and random.choices raises a bare ValueError. Reject that config here
-        # with a clean OptionError instead of emitting a raw traceback. Scoped to
-        # modes 1/2 (vanilla mode 0 never reads the weights) and to custom (the
-        # presets all keep Trophy positive), and placed after the UT passthrough
-        # (a connected seed already cleared this) but before the non-oxidefinal
-        # early return below -- appended after that return it would never run for
-        # non-oxidefinal goals.
-        if self.options.warppad_unlock_requirements.value != 0 \
-                and self.options.requirement_variety.current_key == "custom":
-            from .warp_pad_logic import effective_custom_weights
-            if effective_custom_weights(self).get("Trophy", 0) <= 0:
-                raise OptionError(
-                    "CTR 'requirement_variety: custom' needs a positive 'Trophy' "
-                    "weight in requirement_weights (this YAML sets Trophy: 0). "
-                    "Trophies are the only reward available when the seed's first "
-                    "randomized warp-pad requirements are drawn, so with Trophy at 0 "
-                    "the candidate weights sum to zero and generation cannot pick a "
-                    "requirement. In your YAML either set 'Trophy' above 0 (the "
-                    "default is 100), remove the 'Trophy' entry to keep that default, "
-                    "or switch requirement_variety to a preset. Weight 0 remains "
-                    "legal for every other item, including Key.")
-        # Issue #50: the All-Gems goal's own races ARE the 5 Gem Cups. Turning
-        # include_gem_cups OFF keeps those cups vanilla-fixed while shuffle_gems
-        # ON scatters the 5 goal Gems anywhere in the multiworld -- so the goal's
-        # own cup races are opted out of the seed and the create_items #50 pin
-        # (which would put the Gems back on the cups) is intentionally skipped for
-        # the goal (gems ride the pool, 2026-07-15 ruling). That leaves an
-        # unwinnable-by-design combination, so forbid it here with a clear message
-        # rather than emit it. shuffle_gems OFF is fine (gemgoal pins the gems onto
-        # the cups directly), so this fires only on the shuffle-ON conflict.
-        if self.options.goal.value == Goal.option_allgemcups \
-                and self.options.shuffle_gems.value \
-                and not self.options.include_gem_cups.value:
-            raise OptionError(
-                "CTR goal 'allgemcups' requires 'include_gem_cups: true' (the "
-                "goal lives in the gem cups; excluding them while shuffling gems "
-                "leaves the goal's own races out of the seed).")
-        if self.options.goal.value != Goal.option_oxidefinal:
-            return
-        n = self.options.oxide_final_challenge_relic_count.value
-        tiers = self._oxide_goal_tiers()
-        # A satisfying tier can supply the goal exactly when this seed classifies
-        # it as PROGRESSION (its 18 relics are then reachable + visible to fill).
-        # _relic_progression_map is the single source of that truth and is already
-        # warp-pad-mode-aware: randomized mode keeps ALL tiers progression (slider
-        # only governs pinning, not classification), while vanilla mode makes a
-        # goal tier progression only when its slider > 0. Basing the guard on the
-        # same map means it fires exactly when the goal really would be invisible.
-        prog = self._relic_progression_map()
-        prog_tiers = [t for t in tiers if prog.get(t, False)]
-        # N <= 18 and each progression tier supplies 18 reachable relics, so one
-        # progression tier satisfies single-tier / any_relic_type; total_relics
-        # needs the summed progression supply to reach N.
-        if self.options.oxide_final_challenge_unlock.value \
-                == FinalOxideUnlock.option_total_relics:
-            ok = 18 * len(prog_tiers) >= n
-        else:
-            ok = len(prog_tiers) >= 1
-        if not ok:
-            mode_key = self.options.oxide_final_challenge_unlock.current_key
-            sliders = ", ".join(
-                f"{self._OXIDE_TIER_SLIDER[t]}={self._relic_slider_for(t)}"
-                for t in tiers)
-            raise OptionError(
-                f"CTR goal 'oxidefinal' with Oxide's Final Challenge Unlock "
-                f"'{mode_key}' needs {n} relic(s) from {tiers}, but no satisfying "
-                f"tier is generated as progression in this seed ({sliders}); in "
-                f"vanilla warp-pad mode a tier whose *_relic_progression is "
-                f"'never' (0) is opted out of progression, so the goal would be "
-                f"unreachable. Raise one of those sliders above 0, switch to "
-                f"randomized warp-pad unlock, or change the goal, mode, or count.")
+        from . import forced_options
+        forced_options.apply(self)
 
     def create_regions(self):
         create_regions(self)
