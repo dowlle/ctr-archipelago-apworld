@@ -444,45 +444,62 @@ class PodiumHeldFifthRung(Toggle):
     display_name = "Podium: Held 5th Rung"
 
 
-class SapphireRelicProgression(NamedRange):
-    """How often progression may sit behind a Sapphire relic-race time (the
-    easiest tier). Per-location % chance over the 18 Sapphire Time Trials; a
-    location that misses the roll keeps its vanilla Sapphire Relic and never
-    gates progression. 0 = never, 100 = full (default). Also accepts `random`.
+class SapphireRelicCount(Range):
+    """How many of the 18 Sapphire Time Trials (the easiest relic tier) stay
+    in the seed. Exactly this many are created, drawn at random which ones;
+    the rest do not exist this seed at all (issue #171: replaces the old
+    0-100 percentage; issue #28: a removed Time Trial holds no check and no
+    pinned vanilla relic -- beating it in game still awards the relic exactly
+    like vanilla, it just is not part of this Archipelago seed). 0 = none,
+    18 = all (default).
 
     The three tiers are a skill ladder (sapphire easy, platinum hard); setting
-    an easier tier lower than a harder one gives inverted difficulty."""
-    display_name = "Sapphire Relic Progression"
+    an easier tier lower than a harder one gives inverted difficulty.
+
+    Migration note: this replaces the removed `sapphire_relic_progression`
+    option (0-100 percentage). The two are not the same numbering (a percent
+    and a location count), so old YAMLs are not silently reinterpreted --
+    `sapphire_relic_progression` is gone, AP ignores the unrecognized key with
+    its standard notice, and this option starts from its own default (18,
+    the closest equivalent to the old option's own default of 100/full)."""
+    display_name = "Sapphire Relic Count"
     range_start = 0
-    range_end = 100
-    default = 100
-    special_range_names = {"never": 0, "full": 100}
+    range_end = 18
+    default = 18
 
 
-class GoldRelicProgression(NamedRange):
-    """How often progression may sit behind a Gold relic-race time (the medium
-    tier). Per-location % chance over the 18 Gold Time Trials; a location that
-    misses the roll keeps its vanilla Gold Relic. 0 = never, 100 = full
-    (default). Also accepts `random`. See `Sapphire Relic Progression` for the
-    skill-ladder note."""
-    display_name = "Gold Relic Progression"
+class GoldRelicCount(Range):
+    """How many of the 18 Gold Time Trials (the medium relic tier) stay in
+    the seed. Exactly this many are created, drawn at random which ones; the
+    rest do not exist this seed at all. See `Sapphire Relic Count` for the
+    full removal semantics and the skill-ladder note. 0 = none, 18 = all
+    (default).
+
+    Migration note: replaces the removed `gold_relic_progression` percentage
+    option; see `Sapphire Relic Count`'s migration note -- the old key is
+    gone, not reinterpreted, and this option starts from its own default."""
+    display_name = "Gold Relic Count"
     range_start = 0
-    range_end = 100
-    default = 100
-    special_range_names = {"never": 0, "full": 100}
+    range_end = 18
+    default = 18
 
 
-class PlatinumRelicProgression(NamedRange):
-    """How often progression may sit behind a Platinum relic-race time (the
-    hardest, expert-only tier). Per-location % chance over the 18 Platinum Time
-    Trials; a location that misses the roll keeps its vanilla Platinum Relic.
-    0 = never (default, so a needed item never sits behind a platinum-only
-    time), 100 = full. Also accepts `random`."""
-    display_name = "Platinum Relic Progression"
+class PlatinumRelicCount(Range):
+    """How many of the 18 Platinum Time Trials (the hardest, expert-only
+    relic tier) stay in the seed. Exactly this many are created, drawn at
+    random which ones; the rest do not exist this seed at all. See
+    `Sapphire Relic Count` for the full removal semantics. 0 = none (default,
+    so a needed item never sits behind a platinum-only time), 18 = all.
+
+    Migration note: replaces the removed `platinum_relic_progression`
+    percentage option; see `Sapphire Relic Count`'s migration note -- the old
+    key is gone, not reinterpreted, and this option starts from its own
+    default (0, the closest equivalent to the old option's own default of
+    0/never)."""
+    display_name = "Platinum Relic Count"
     range_start = 0
-    range_end = 100
+    range_end = 18
     default = 0
-    special_range_names = {"never": 0, "full": 100}
 
 
 @dataclass
@@ -520,9 +537,9 @@ class ctrAPOptions(PerGameCommonOptions):
     death_link: DeathLink
     deathlink_amnesty: DeathLinkAmnesty
     # relic difficulty
-    sapphire_relic_progression: SapphireRelicProgression
-    gold_relic_progression: GoldRelicProgression
-    platinum_relic_progression: PlatinumRelicProgression
+    sapphire_relic_count: SapphireRelicCount
+    gold_relic_count: GoldRelicCount
+    platinum_relic_count: PlatinumRelicCount
     # wired but hidden (single implemented mode; see BUG-D note)
     bossgarage_unlock_requirements: BossGarageRequirements
 
@@ -545,8 +562,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                      PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
     "Quality of Life": [OneLapCups],
     "DeathLink": [DeathLink, DeathLinkAmnesty],
-    "Relic Difficulty": [SapphireRelicProgression, GoldRelicProgression,
-                         PlatinumRelicProgression],
+    "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
+                         PlatinumRelicCount],
 }
 
 def create_option_groups() -> List[OptionGroup]:

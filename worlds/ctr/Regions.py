@@ -1,4 +1,5 @@
 import json
+import logging
 import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
@@ -6,9 +7,12 @@ from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
     _COLOURS, _RELIC_TIERS,
 )
+from .relic_tiers import RELIC_TIERS, tier_location_pool
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from . import ctrAPWorld
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +255,29 @@ def _ut_reconstruct_unlock(world, passthrough):
     world._ctr_two_stage_active = two_stage_active
 
 
+def _log_never_created_excludes(world):
+    """Issue #28 P1 (the exclusion-semantics packet's adopted ruling): a name
+    in the player's exclude_locations that this seed never created (known to
+    the frozen datapackage, but no Location object exists for it this seed)
+    is a silent no-op today -- AP core's exclusion_rules
+    (worlds/generic/Rules.py) neither raises (the name IS known, so the "not
+    in location_name_to_id" branch does not fire) nor warns (there is no
+    Location to refuse). Log one generation-log INFO line per such name
+    instead -- no behaviour change, just visibility. Generic on purpose: it
+    fires for ANY location class that freezes more names than a given seed
+    creates -- podium rungs today, relic Time Trials from issue #171, any
+    future class (#49/#109/#148) -- not a relic-specific check."""
+    created = set(world.multiworld.regions.location_cache[world.player].keys())
+    known = set(world.location_name_to_id.keys())
+    for name in sorted(world.options.exclude_locations.value):
+        if name in known and name not in created:
+            logger.info(
+                f"CTR: exclude_locations names '{name}' for player "
+                f"{world.player} ({world.multiworld.player_name[world.player]}), "
+                f"but this seed never created that location -- the exclusion "
+                f"has no effect.")
+
+
 def create_regions(world: "ctrAPWorld"):
     """Build all regions, exits, and locations from JSON definitions."""
     data = json.loads(
@@ -282,17 +309,18 @@ def create_regions(world: "ctrAPWorld"):
     # required item reachable only through it forces the tedious tokens -> gem cups ->
     # 5 gems chain. The flag drives (a) build_warp_pad_map keeping Gem Cup / trial pads
     # out of the trophy-pad destination shuffle (so a Gem Cup can never land in the
-    # Turbo Track pad), and (b) create_items pinning Turbo Track's relic rewards
-    # vanilla so progression is never placed behind that gate. Inert when unlocks are
-    # randomized or gems are shuffled. ALWAYS ON since the 2026-07-15 release
-    # polish (design ruling): the former `comfort_guards` YAML toggle only ever
-    # bought its user the tedious forced chain, so the knob was removed.
-    world._ctr_comfort_guards = True
-    world._ctr_force_vanilla_turbotrack = (
-        world._ctr_comfort_guards
-        and unlock_mode == 0
-        and not bool(opts.shuffle_gems.value)
-    )
+    # Turbo Track pad), and (b, issue #171) the relic draw excluding Turbo Track's own
+    # slot from each tier's sample pool so progression is never placed behind that
+    # gate. Inert when unlocks are randomized or gems are shuffled. ALWAYS ON since the
+    # 2026-07-15 release polish (design ruling): the former `comfort_guards` YAML
+    # toggle only ever bought its user the tedious forced chain, so the knob was
+    # removed.
+    #
+    # Set in generate_early (relic_tiers.resolve_comfort_guards), which runs before
+    # this function and needs the same flags for the relic draw; read-only here so
+    # there is exactly one place computing the condition (Lessons Learned #5).
+    assert hasattr(world, "_ctr_force_vanilla_turbotrack"), \
+        "generate_early must set comfort-guard flags before create_regions runs"
 
     # Per-pad resolved unlock requirement: {pad_exit_name -> {type,count,colour}}.
     # The concrete (item, count) used to build the AP access rule (parallel dict).
@@ -340,10 +368,25 @@ def create_regions(world: "ctrAPWorld"):
 
     region_lookup = {r.name: r for r in regions}
 
+    # Issue #171/#28 R1: the relic-tier draw (generate_early) already decided
+    # which of each tier's 18 Time Trial locations this seed creates
+    # (world._ctr_relic_keep). The other (18-N) names are skipped below --
+    # "registered but not created": still in the frozen datapackage (name/id
+    # never move), just never given a Location object this seed, so they hold
+    # no check and receive no pinned vanilla item (superseding the pinned-
+    # vanilla block this replaces in create_items).
+    _relic_removed_names = set()
+    for _tier_label, _relic_item, _opt_name in RELIC_TIERS:
+        _pool = set(tier_location_pool(world.location_name_to_id, _tier_label))
+        _keep = world._ctr_relic_keep.get(_relic_item, frozenset(_pool))
+        _relic_removed_names |= (_pool - _keep)
+
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for loc_data in reg.get("locations", []):
             name = loc_data["name"]
+            if name in _relic_removed_names:
+                continue
             location = create_location(player, name, region)
             location.type = loc_data.get("type", "default")
             location.logic_text = loc_data.get("requires", "True")
@@ -664,5 +707,7 @@ def create_regions(world: "ctrAPWorld"):
                 old_target.entrances.remove(ret)
             ret.connected_region = None
             ret.connect(new_target)
+
+    _log_never_created_excludes(world)
 
     return regions

@@ -47,38 +47,50 @@ class TestRaiseOxidefinalNoProgressionTier(unittest.TestCase):
 
     Sapphire is unconditionally progression on any oxidefinal seed (see
     _relic_progression_map's "mode-independent" comment), so a sapphire-tier
-    goal can never trip this guard through the sliders alone -- these tests use
-    the gold tier, whose vanilla-mode progression is slider-gated with no such
-    exception."""
+    goal can never trip this guard through the counts alone -- these tests use
+    the gold tier, whose vanilla-mode progression is count-gated with no such
+    exception. (Issue #171: the option was a 0-100 percentage slider, now a
+    0-18 exact count; 0 still means "none of this tier", 18 is the new "all".)
+    """
 
-    def test_vanilla_mode_goal_tier_slider_at_zero_raises(self):
+    def test_vanilla_mode_goal_tier_count_at_zero_raises(self):
         with self.assertRaises(OptionError) as ctx:
             _early({
                 "goal": "oxidefinal",
                 "warppad_unlock_requirements": "vanilla",
                 "oxide_final_challenge_unlock": "gold_relics",
-                "gold_relic_progression": 0,
+                "gold_relic_count": 0,
             })
         self.assertIn("oxidefinal", str(ctx.exception))
 
-    def test_vanilla_mode_goal_tier_slider_above_zero_generates(self):
-        # Non-conflicting: the goal's own tier has progression > 0.
+    def test_vanilla_mode_goal_tier_count_above_zero_generates(self):
+        # Non-conflicting: the goal's own tier has a created count > 0, and the
+        # default oxide_final_challenge_relic_count (18) is exactly met.
         _early({
             "goal": "oxidefinal",
             "warppad_unlock_requirements": "vanilla",
             "oxide_final_challenge_unlock": "gold_relics",
-            "gold_relic_progression": 100,
+            "gold_relic_count": 18,
         })
 
-    def test_randomized_mode_ignores_the_sliders(self):
-        # Randomized modes keep every tier progression regardless of slider
+    def test_randomized_mode_ignores_the_counts(self):
+        # Randomized modes keep every tier progression regardless of count
         # value (_relic_progression_map returns early for unlock_mode != 0),
-        # so the same zeroed slider that raises in vanilla mode is safe here.
+        # so the same zeroed count that raises in vanilla mode is safe here
+        # (0 created also means the guard's "any(created >= n)" is vacuously
+        # false for that tier, but oxide_final_challenge_relic_count defaults
+        # to 18 and this test's mode targets ONLY gold -- 0 created gold with
+        # a progression classification of True and n defaulting to 18 would
+        # actually raise even in randomized mode now that the guard checks
+        # created supply, not just classification, so this uses a count of 1
+        # to keep the assertion about mode-independent classification without
+        # colliding with the new supply check).
         _early({
             "goal": "oxidefinal",
             "warppad_unlock_requirements": "randomized",
             "oxide_final_challenge_unlock": "gold_relics",
-            "gold_relic_progression": 0,
+            "oxide_final_challenge_relic_count": 1,
+            "gold_relic_count": 1,
         })
 
 

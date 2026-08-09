@@ -1042,29 +1042,34 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     if reward_track_for is None:
         reward_track_for = lambda t: t
 
-    # Slider-aware requirement filter (a generation-control knob, honoured not
-    # overridden). A relic-progression slider below 100 PINS a random ~ (100-slider)%
-    # of that tier's 18 relics out of the multiworld pool. The synthetic sphere
-    # inventory grows ALL 18 vanilla relics (it cannot know which AP will pin), so a
-    # relic stage-1/stage-2 requirement drawn from it can demand MORE copies of a
-    # tier than actually exist in the pool (e.g. 'Gold Relic x11' when the slider=50
-    # leaves only ~9 findable) -> an impossible gate -> the FillError tail. To stay
-    # provably satisfiable under AP's real pool we only allow a relic tier to be
-    # CHOSEN as a requirement when its slider is 100 (every relic of that tier is a
-    # freely-placeable progression item). Below 100 the tier is excluded from
-    # requirement choice (it still grows the inventory so AnyRelic aggregates of the
-    # FULL tiers stay correct, and the tier's own relics still appear as findable
-    # progression). Trophy / Key / tokens / gems are always allowed -- the seed
-    # "makes do with the other item types" by design; the sliders
-    # are never silently overridden, only respected as the scarcity signal they are.
-    # Default sliders (S100/G100/P0): sapphire+gold usable, platinum excluded.
-    _slider = {
-        "Sapphire Relic": getattr(world.options, "sapphire_relic_progression").value,
-        "Gold Relic": getattr(world.options, "gold_relic_progression").value,
-        "Platinum Relic": getattr(world.options, "platinum_relic_progression").value,
+    # Count-aware requirement filter (a generation-control knob, honoured not
+    # overridden). Issue #171/#28 R1-R3: a relic tier's count below 18 now means
+    # (18 - count) of that tier's 18 Time Trials are REMOVED (never created), not
+    # pinned -- the eligibility MEANING below is otherwise unchanged from before
+    # #171 (this order only re-expresses the same "guaranteed full supply" gate in
+    # exact-count terms; issue #28's capped-requirement-eligibility package is
+    # what actually widens eligibility below max, and lands separately). The
+    # synthetic sphere inventory grows ALL 18 vanilla relics (it cannot know which
+    # AP will remove), so a relic stage-1/stage-2 requirement drawn from it can
+    # demand MORE copies of a tier than actually exist in the pool (e.g. 'Gold
+    # Relic x11' when only 9 were created) -> an impossible gate -> the FillError
+    # tail. To stay provably satisfiable under AP's real pool we only allow a
+    # relic tier to be CHOSEN as a requirement when its created count is the full
+    # 18 (every relic of that tier is a freely-placeable progression item). Below
+    # 18 the tier is excluded from requirement choice (it still grows the
+    # inventory so AnyRelic aggregates of the FULL tiers stay correct, and the
+    # tier's own relics still appear as findable progression up to their created
+    # count). Trophy / Key / tokens / gems are always allowed -- the seed "makes
+    # do with the other item types" by design; the counts are never silently
+    # overridden, only respected as the scarcity signal they are. Default counts
+    # (S18/G18/P0): sapphire+gold usable, platinum excluded.
+    _created = {
+        "Sapphire Relic": world._ctr_relic_created.get("Sapphire Relic", 0),
+        "Gold Relic": world._ctr_relic_created.get("Gold Relic", 0),
+        "Platinum Relic": world._ctr_relic_created.get("Platinum Relic", 0),
     }
     allowed = {it for it in REQ_WEIGHTS
-               if it not in RELIC_ITEMS or _slider.get(it, 0) >= 100}
+               if it not in RELIC_ITEMS or _created.get(it, 0) >= 18}
     # Arena participation filter (issue #118, the requirement-side sibling of
     # #50's fill-side pinning). include_battle_arenas OFF means the arenas are
     # OUT of the seed: the four Crystal Bonus Rounds are vanilla-pinned with
@@ -1878,13 +1883,15 @@ def _capacity_context(world):
     # 5-rung superset count comes straight from the shared creation-subset helper.
     from .podium import created_rung_keys_from_options
     podium = len(created_rung_keys_from_options(o))
-    # A relic Time Trial location is a guaranteed (un-pinnable) fillable slot only at
-    # slider 100; below 100 it may be pinned to its vanilla relic (0 capacity), so the
-    # sound lower bound counts only the fully-open tiers.
-    sliders = (o.sapphire_relic_progression.value,
-               o.gold_relic_progression.value,
-               o.platinum_relic_progression.value)
-    trial_tiers = sum(1 for s in sliders if s >= 100)
+    # A relic Time Trial location is a guaranteed fillable slot only when its
+    # tier's created count is the full 18; below 18 some of the tier's 18 are
+    # REMOVED this seed (issue #171 -- not pinned, so a "removed" one is simply
+    # absent rather than 0-capacity, but it is equally not GUARANTEED present),
+    # so the sound lower bound counts only the fully-created tiers.
+    created_counts = (world._ctr_relic_created.get("Sapphire Relic", 0),
+                      world._ctr_relic_created.get("Gold Relic", 0),
+                      world._ctr_relic_created.get("Platinum Relic", 0))
+    trial_tiers = sum(1 for s in created_counts if s >= 18)
     # Gem-cup Gem is lock-placed when gems are not shuffled, or always for the
     # all-gem-cups goal (Goal.option_allgemcups == 4). Locked -> 0 trophy capacity.
     gem_locked = (not bool(o.shuffle_gems.value)) or (o.goal.value == 4)
