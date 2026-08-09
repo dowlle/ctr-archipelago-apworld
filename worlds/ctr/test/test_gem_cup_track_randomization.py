@@ -38,6 +38,7 @@ from types import SimpleNamespace
 
 from BaseClasses import CollectionState, MultiWorld
 from Generate import get_seed_name
+from NetUtils import convert_to_base_types
 from test.general import gen_steps
 from worlds import AutoWorld
 from worlds.AutoWorld import call_all
@@ -352,6 +353,28 @@ class TestUTRegenParity(CTRTestBase):
                 self.assertEqual(
                     {e.parent_region.name for e in podium.entrances},
                     {track} | set(t2c.get(track, [])))
+
+    def test_ut_regen_pins_the_map_through_the_real_wire_pipeline(self):
+        # Regression for the 2026-08-09 fuzz gate (check-ut, 28/500): a
+        # json.loads(json.dumps(...)) round-trip (used by every other test
+        # in this class) can never expose this, because JSON has no tuple
+        # type. AP's REAL slot_data pipeline runs every value through
+        # NetUtils.convert_to_base_types (Main.py) before pickling into
+        # multidata, which turns every list into a tuple -- so the
+        # reconstructor must accept tuples, not just lists, or a live UT
+        # session silently falls back to vanilla on every randomized seed.
+        self.world_setup(seed=LEGS_SEED)
+        server_legs = dict(self.world.gem_cup_legs)
+        slot_data = convert_to_base_types(self.world.fill_slot_data())
+        self.assertIsInstance(slot_data["gem_cup_legs"]["100"], tuple,
+                               "test fixture no longer reproduces the real "
+                               "wire shape -- convert_to_base_types changed")
+
+        self._setup_with_passthrough(LEGS_SEED, slot_data)
+        ut_world = self.world
+
+        self.assertEqual(ut_world.gem_cup_legs, server_legs)
+        self.assertEqual(ut_world.options.randomize_gem_cup_tracks.value, 1)
 
     def test_ut_regen_without_key_falls_back_to_vanilla(self):
         # A pre-#166 seed carries no gem_cup_legs key: the re-generation must

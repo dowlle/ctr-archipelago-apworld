@@ -172,7 +172,14 @@ def reconstruct_gem_cup_legs_from_wire(
     out: Dict[str, List[str]] = {}
     for cup, cup_lid in CUP_LEVEL_IDS:
         legs = wire.get(str(cup_lid))
-        if not (isinstance(legs, list) and len(legs) == 4
+        # AP's real slot_data pipeline runs every value through
+        # NetUtils.convert_to_base_types before it is pickled into multidata
+        # (Main.py), which turns every list into a tuple -- so a live/UT
+        # wire block arrives as a tuple, not a list (json.loads/dumps in a
+        # unit test masks this because JSON has no tuple type; the
+        # relic_tiers.py precedent for the same reason never hard-checks
+        # `isinstance(x, list)`). Accept both.
+        if not (isinstance(legs, (list, tuple)) and len(legs) == 4
                 and all(type(x) is int and x in lid_to_track for x in legs)):
             logger.warning(
                 "gem_cup_legs wire key present but malformed for cup %s "
