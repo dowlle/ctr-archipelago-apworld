@@ -1,31 +1,26 @@
-"""Append-only guard for item ids (issue #168).
+"""Explicit-code stability guard for item ids (issue #168).
 
-`item_name_to_id` is built as `item_prefix + enumerate(load_item_table())`
-(__init__.py:71-74), so an item's id is its POSITION in data/items.json, not
-anything pinned to the item itself. Reordering the file, or removing an entry
-from the middle, silently renumbers every entry after it -- the same failure
-mode a moved podium code would be, except nothing today catches it. Locations
-already carry an explicit `code` field (data/locations.json) and are immune to
-this; items are not.
+Each entry in data/items.json carries an explicit code, so its ID is stable
+regardless of array order. This fixture additionally pins every item ID shipped
+in v0.1.5 and catches an accidental code edit or removal.
 
 This test pins the id every item held as of the v0.1.5 release
 (fixtures/item_id_stability_v0_1_5.json) and fails if any of those names now
 resolve to a different id. It reads the mapping straight off the registered
-world class -- not by recomputing the formula here -- so it also catches a
-changed `item_prefix` or a changed load order, not just a reshuffled JSON
-array.
+world class rather than re-reading the JSON, so it covers the actual mapping
+published in the datapackage.
 
-Appends are NOT covered by the fixture and are meant to pass silently: adding
-a new entry at the END of items.json only mints a new id, it does not move
-anyone else's. When 0.2.0's frozen name manifest (issue #177) lands and new
-items are appended, extend this fixture with the new names' ids (append-only,
-same as the file it is guarding) rather than editing the existing entries.
+New entries are not covered by this v0.1.5 fixture and are meant to pass
+silently. When 0.2.0's frozen name manifest (issue #177) lands, extend this
+fixture with the new names and their explicit IDs without editing existing
+entries.
 """
 import json
 import pathlib
 import unittest
 
 from worlds.AutoWorld import AutoWorldRegister
+from worlds.ctr.Items import load_item_table
 
 FIXTURE_PATH = (
     pathlib.Path(__file__).parent / "fixtures" / "item_id_stability_v0_1_5.json"
@@ -42,6 +37,18 @@ def _reject_duplicate_keys(pairs):
 
 
 class TestItemIdStability(unittest.TestCase):
+    def test_registered_ids_come_from_explicit_item_codes(self) -> None:
+        table = load_item_table()
+        explicit = {item["name"]: item["code"] for item in table}
+        world_type = AutoWorldRegister.world_types["Crash Team Racing"]
+
+        self.assertEqual(len(explicit), len(table), "CTR item names must be unique")
+        self.assertEqual(
+            len(set(explicit.values())), len(table),
+            "CTR item codes must be unique",
+        )
+        self.assertEqual(world_type.item_name_to_id, explicit)
+
     def test_existing_items_keep_their_frozen_id(self) -> None:
         frozen: dict = json.loads(
             FIXTURE_PATH.read_text(encoding="utf-8"),
@@ -55,17 +62,13 @@ class TestItemIdStability(unittest.TestCase):
                 self.assertIn(
                     name, current,
                     f"{name!r} is gone from data/items.json. If it was "
-                    "genuinely retired, its id must stay reserved (do not let "
-                    "a later item shift into it) -- items are positional, "
-                    "unlike locations, which carry an explicit code.",
+                    "genuinely retired, its explicit id must stay reserved.",
                 )
                 self.assertEqual(
                     current[name], frozen_id,
                     f"{name!r} moved from id {frozen_id} to {current[name]}. "
-                    "Item ids are item_prefix + array position in "
-                    "data/items.json, so this means an existing entry was "
-                    "reordered, removed, or item_prefix itself changed. New "
-                    "items must be appended at the END of items.json; if this "
+                    "Item ids are explicit codes in data/items.json, so this "
+                    "means an existing code changed. If this "
                     "move is genuinely intentional (a frozen manifest sign-off "
                     "that deliberately renumbers), update this fixture in the "
                     "same commit and say so in the PR description.",

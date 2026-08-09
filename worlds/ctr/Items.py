@@ -10,12 +10,9 @@ if TYPE_CHECKING:
 
 class ItemDict(TypedDict):
     name: str
+    code: int
     count: int
     classification: ItemClassification
-
-
-item_prefix = 35010000
-
 
 def load_item_table() -> List[ItemDict]:
     """
@@ -36,11 +33,27 @@ def load_item_table() -> List[ItemDict]:
     }
 
     item_table: List[ItemDict] = []
+    seen_names = set()
+    seen_codes = set()
     for entry in raw_items:
         cls_name = entry["classification"].lower()
+        name = entry["name"]
+        code = entry["code"]
+
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"Invalid CTR item name: {name!r}")
+        if type(code) is not int or code < 0:
+            raise ValueError(f"Invalid CTR item code for {name!r}: {code!r}")
+        if name in seen_names:
+            raise ValueError(f"Duplicate CTR item name: {name!r}")
+        if code in seen_codes:
+            raise ValueError(f"Duplicate CTR item code: {code}")
+        seen_names.add(name)
+        seen_codes.add(code)
 
         item_table.append({
-            "name": entry["name"],
+            "name": name,
+            "code": code,
             "count": entry["count"],
             "classification": classes[cls_name],
         })
