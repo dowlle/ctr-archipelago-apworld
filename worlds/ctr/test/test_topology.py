@@ -133,6 +133,11 @@ class TestPodiumCupLegReachability(CTRTestBase):
         "podium_placement_checks": True,
         "podium_held_rungs": True,
         "include_gem_cups": True,
+        # Issue #171: Platinum Relic Count now defaults to 0 (no Platinum Time
+        # Trials created at all), but test_cup_leg_exposes_only_rungs below
+        # asserts "Hot Air Skyway: Platinum Time Trial" stays unreachable via a
+        # cup leg -- an assertion that needs the location to exist. Pin it on.
+        "platinum_relic_count": 18,
     }
 
     def _state_with(self, items):

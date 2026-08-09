@@ -73,6 +73,11 @@ class TestRelicClassificationVanillaMinimal(CTRTestBase):
         "warppad_unlock_requirements": "vanilla",
         "accessibility": "minimal",
         "goal": "oxide",
+        # Issue #171: Platinum Relic Count now defaults to 0 (no Platinum Time
+        # Trials created at all), but this class's SLIDE_COLISEUM_TRIALS names
+        # a Platinum Time Trial and needs it to exist (just unreachable, which
+        # is the whole point of the regression this class guards). Pin it on.
+        "platinum_relic_count": 18,
     }
 
     def test_sapphire_is_useful_not_progression(self):

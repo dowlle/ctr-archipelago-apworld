@@ -11,6 +11,10 @@ from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table, item_prefix
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
 from .Regions import create_regions
+from .relic_tiers import (
+    RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
+    resolve_comfort_guards,
+)
 from .Rules import set_rules
 from .Types import ctrAPItem
 
@@ -113,11 +117,14 @@ class ctrAPWorld(World):
 
     # --- Oxide-final goal helpers (issue #23) ---
 
-    # Relic item name per FinalOxideUnlock relic-count slider.
+    # Relic item name per its issue #171 exact-count option field (renamed from
+    # _OXIDE_TIER_SLIDER when the three options converted from 0-100 percentage
+    # sliders to 0-18 exact counts; kept as a label lookup for build/error
+    # messages -- forced_options.py's oxide-final guard uses it that way).
     _OXIDE_TIER_SLIDER = {
-        "Sapphire Relic": "sapphire_relic_progression",
-        "Gold Relic": "gold_relic_progression",
-        "Platinum Relic": "platinum_relic_progression",
+        "Sapphire Relic": "sapphire_relic_count",
+        "Gold Relic": "gold_relic_count",
+        "Platinum Relic": "platinum_relic_count",
     }
 
     def _oxide_goal_tiers(self) -> List[str]:
@@ -133,9 +140,6 @@ class ctrAPWorld(World):
         if mode in (F.option_any_relic_type, F.option_total_relics):
             return ["Sapphire Relic", "Gold Relic", "Platinum Relic"]
         return ["Sapphire Relic"]  # sapphire_relics (default) + any unknown
-
-    def _relic_slider_for(self, relic_item: str) -> int:
-        return getattr(self.options, self._OXIDE_TIER_SLIDER[relic_item]).value
 
     def _oxide_final_relic_rule(self):
         """A CollectionState predicate for the configured Oxide-final relic
@@ -236,7 +240,22 @@ class ctrAPWorld(World):
         matrix (issue #178): raise-guards that block an unsolvable seed, then
         downgrade-warnings that tell the player when an option they set has no
         effect this seed. See forced_options.py for the full convention and
-        the per-constraint justification."""
+        the per-constraint justification.
+
+        Issue #171/#28 R1-R3: the per-tier relic Time Trial draw also runs
+        here (`self._ctr_relic_keep` / `self._ctr_relic_created`), before
+        anything downstream needs it -- the #178 raise-guards below check
+        created counts (R5's derived gate-count constraint), then
+        `create_regions` reads `_ctr_relic_keep` to decide which Time Trial
+        locations to build (R1: a below-count slot is never created), then
+        `create_items` reads `_ctr_relic_created` to size the relic item
+        pool (R3)."""
+        # Comfort guard flags (Icebound force_vanilla_turbotrack): needed by
+        # the relic draw below, ahead of when Regions.create_regions would
+        # otherwise compute them. See relic_tiers.resolve_comfort_guards.
+        self._ctr_comfort_guards, self._ctr_force_vanilla_turbotrack = \
+            resolve_comfort_guards(self.options)
+
         # Universal Tracker re-generation (issue #29): restore the seed's options
         # from slot_data so the rest of generation rebuilds the SAME world, then
         # skip the constraint matrix (the connected seed already passed it, and
@@ -245,7 +264,11 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough:
             self._ut_restore_options(passthrough)
+            self._ctr_relic_keep, self._ctr_relic_created = \
+                restore_relic_tier_keep_from_wire(
+                    self, passthrough.get("ctr_options", {}) or {})
             return
+        self._ctr_relic_keep, self._ctr_relic_created = draw_relic_tier_keep(self)
         from . import forced_options
         forced_options.apply(self)
 
@@ -676,7 +699,8 @@ class ctrAPWorld(World):
         # Oxide-final goal (issue #23): the relic tiers that satisfy the configured
         # mode+count must be progression so fill, the spoiler playthrough, and
         # beatability chase the REAL goal (not the old hard-coded 18 Sapphire).
-        # Respect the per-tier sliders -- a satisfying tier at `never` (0) stays
+        # Respect the per-tier exact counts (issue #171: was a percentage slider,
+        # now a created-location count) -- a satisfying tier with 0 created stays
         # out and is caught by generate_early's guard rather than silently forced.
         if goal == Goal.option_oxidefinal:
             # Sapphire is progression on ANY oxidefinal seed (mode-independent).
@@ -688,7 +712,7 @@ class ctrAPWorld(World):
             # the pre-#23 goal, which was itself 18 Sapphire and always set this.
             prog["Sapphire Relic"] = True
             for tier in self._oxide_goal_tiers():
-                if self._relic_slider_for(tier) > 0:
+                if self._ctr_relic_created.get(tier, 0) > 0:
                     prog[tier] = True
         return prog
 
@@ -846,58 +870,26 @@ class ctrAPWorld(World):
 
         self._install_goal(player)
 
-        # --- Relic-tier progression sliders (pinned-vanilla lock per the slider roll) ---
-        # For each tier, roll each of its 18 time-trial locations: with `chance`%
-        # it stays progression-eligible, else pin that tier's vanilla relic there
-        # (place_locked_item -> out of the multiworld pool). Track n_locked per tier
-        # so the general pool below creates (18 - n_locked) of that relic, keeping
-        # item count == location count (same invariant the gemgoal pass relies on).
-        _relic_tiers = [
-            ("Sapphire", "Sapphire Relic", self.options.sapphire_relic_progression.value),
-            ("Gold", "Gold Relic", self.options.gold_relic_progression.value),
-            ("Platinum", "Platinum Relic", self.options.platinum_relic_progression.value),
-        ]
-        # Platinum relic inclusion is governed SOLELY by the Platinum Relic
-        # Progression slider (slider = 0 already means "platinum relics not
-        # shuffled / pinned vanilla").
-
-        # NO two-stage reward pinning (the OPEN model): relic Time Trials and CTR
-        # Token Challenges flow through the normal pool + the relic sliders, the same
-        # on every randomized seed as on main. The sliders therefore govern ALL 18
-        # Time Trial locations per tier again (no 16/18 seizure). Stage-2 gate
-        # solvability comes from the sphere-search invariant + the per-pad relax
-        # fallback, not from locking these locations out of the pool.
-        # Comfort guard (Icebound force_vanilla_turbotrack): when warp-pad unlock
-        # requirements are vanilla and gems are not shuffled, Turbo Track keeps its
-        # vanilla 5-gem entry gate (reachable only after every Gem Cup -> all 5 gems).
-        # Pin Turbo Track's three relic Time Trial rewards to their vanilla relics so
-        # no required item is ever forced behind that tedious chain. The randint draw
-        # below is taken unconditionally (only the pin DECISION is forced) so the RNG
-        # stream is identical to the unguarded path -- guard-inactive seeds are byte
-        # for byte unchanged. Pure pin -> removes progression placement options ->
-        # can only maintain or improve fillability (item/location count stays balanced
-        # via _relic_locked). The flag is set in create_regions.
-        _force_vanilla_tt = getattr(self, "_ctr_force_vanilla_turbotrack", False)
-        _TT_RELIC_LOCS = {
-            "Turbo Track: Sapphire Time Trial",
-            "Turbo Track: Gold Time Trial",
-            "Turbo Track: Platinum Time Trial",
+        # --- Relic-tier exact-count removal (issue #171 conversion; issue #28
+        # R1: removal, not pinning) ---
+        # generate_early's relic draw (relic_tiers.draw_relic_tier_keep) already
+        # decided exactly which of each tier's 18 Time Trial locations this seed
+        # creates (self._ctr_relic_keep), and Regions.create_regions already built
+        # Location objects for only those -- a below-count slot was never created
+        # at all, so unlike the pinned-vanilla block this replaces (used to sit
+        # here, __init__.py:849-902 on origin/main), there is no location left to
+        # place_locked_item onto. _relic_locked below exists purely so the general
+        # item-pool loop two blocks down creates (18 - n_created) fewer of that
+        # relic -- the exact same "keep item count == location count" invariant
+        # the old block's own n_locked bookkeeping maintained, just driven by the
+        # draw's created count instead of a per-location pin roll. The Turbo Track
+        # comfort guard is enforced inside the draw itself now (excluded from the
+        # sample pool, relic_tiers.draw_relic_tier_keep), so there is nothing
+        # left for create_items to force here.
+        _relic_locked = {
+            _relic_item: 18 - self._ctr_relic_created.get(_relic_item, 18)
+            for _tier_label, _relic_item, _opt_name in RELIC_TIERS
         }
-        _relic_locked = {}  # relic item name -> count pinned out of the pool
-        for _tier_label, _relic_item, _chance in _relic_tiers:
-            _suffix = f": {_tier_label} Time Trial"
-            _locs = sorted(n for n in self.location_name_to_id
-                           if n.endswith(_suffix))
-            _n = 0
-            for _loc_name in _locs:
-                _roll_pin = self.random.randint(0, 99) >= _chance  # (100-chance)% pin
-                _force_pin = _force_vanilla_tt and _loc_name in _TT_RELIC_LOCS
-                if _force_pin or _roll_pin:
-                    mw.get_location(_loc_name, player).place_locked_item(
-                        self.create_item(_relic_item)
-                    )
-                    _n += 1
-            _relic_locked[_relic_item] = _relic_locked.get(_relic_item, 0) + _n
 
         # --- Gem & Key placement toggles (item #5) ---
         # Default OFF = pinned vanilla (each Gem locked to its Gem Cup, each Key
@@ -1323,6 +1315,22 @@ class ctrAPWorld(World):
                     tier: bool(flag) for tier, flag in
                     (getattr(self, "_ctr_relic_prog", None)
                      or self._relic_progression_map()).items()
+                },
+                # Issue #171: exactly which Time Trial locations this seed
+                # created per relic tier (AP location codes, not names -- the
+                # datapackage already carries name<->code). ADDITIVE key, no
+                # schema bump -- native ignores it today (package 3, the
+                # local-grant native companion, is what will read it; not
+                # this order -- see the build note); Universal Tracker is the
+                # one real consumer right now, via
+                # relic_tiers.restore_relic_tier_keep_from_wire, so its
+                # re-generation creates the SAME location set the real seed
+                # did instead of re-rolling a different random subset.
+                "relic_tier_locations": {
+                    relic_item: sorted(
+                        self.location_name_to_id[name]
+                        for name in self._ctr_relic_keep.get(relic_item, ()))
+                    for _tier_label, relic_item, _opt_name in RELIC_TIERS
                 },
                 # This apworld's own world_version, read at generation time from
                 # the packaged archipelago.json (AutoWorld sets world_version from
