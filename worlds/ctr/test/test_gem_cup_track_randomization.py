@@ -8,18 +8,20 @@ Purple Gem Cup keeps no special boss-track handling. Slide Coliseum / Turbo
 Track (16/17) are never drawn (the ruled pool clamp).
 
 Wire shape: a top-level `gem_cup_legs` block {"<cupLevelID 100..104>":
-[trackLevelID x4]}, emitted ONLY when the option is on, riding a conditional
-schema_version 7 (an option-off seed is shape-identical to schema 6). An old
-native on a leg-randomized seed would silently load vanilla legs while the
-logic follows the shuffled map -- the golden-rule desync class of the v3 cup
-destination bump -- so the bump (and the #8 newer-schema warning) confines
-itself to seeds that actually need it.
+[trackLevelID x4]}, emitted ONLY when the option is on. The `schema_version`
+BUMP to 7 is unconditional (Q28 ruling, #152 dossier: "ALWAYS BUMP...no
+conditional emission"), every 0.2.0 seed declares 7 whether or not this
+option is on; only the block's presence is conditional. An old native on a
+leg-randomized seed would silently load vanilla legs while the logic follows
+the shuffled map -- the golden-rule desync class of the v3 cup destination
+bump -- so the #8 newer-schema warning fires on every 0.2.0 seed for a
+pre-0.2.0 client, honestly, per the ruling.
 
 Native parsing, cup loading and the native verifier are a separate package;
 these tests lock in the apworld half:
 
 - vanilla parity: option off reproduces the static table exactly, draws no
-  RNG, emits no key, and keeps schema 6;
+  RNG, emits no key, and schema is still 7 (the unconditional bump);
 - determinism: same seed, same map;
 - the draw's ruled properties: repeats, all-same-track, absent tracks,
   Purple without boss tracks, pool clamped to the 16 trophy tracks;
@@ -208,11 +210,11 @@ class TestVanillaLegParity(CTRTestBase):
     def test_world_map_is_the_vanilla_table(self):
         self.assertEqual(self.world.gem_cup_legs, load_vanilla_cup_legs())
 
-    def test_no_wire_key_and_schema_stays_6(self):
+    def test_no_wire_key_but_schema_bumps_to_7(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("gem_cup_legs", slot_data)
-        self.assertEqual(slot_data["schema_version"], 6)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 6)
+        self.assertEqual(slot_data["schema_version"], 7)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
 
     def test_podium_wiring_matches_vanilla_legs(self):
         # Hot Air Skyway legs the Yellow and Purple cups in vanilla; its

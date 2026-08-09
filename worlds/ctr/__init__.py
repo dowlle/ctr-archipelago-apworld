@@ -1268,15 +1268,14 @@ class ctrAPWorld(World):
         # Kept in ctr_options for old-native log compatibility only.
         derived_shuffle = bool(getattr(self, "shuffle_warp_pads", False))
         # schema_version 7 (0.2.0, issue #166): the top-level gem_cup_legs block.
-        # CONDITIONAL on the option actually randomizing the cups' legs -- only
-        # then is the block emitted and only then does a native need to parse it
-        # to load the same tracks the generation logic used (an old native would
-        # silently load vanilla legs: the golden-rule desync class of the v3 cup
-        # destination bump, so the #8 newer-schema warn must fire). An option-off
-        # seed is shape-identical to schema 6 and keeps emitting 6, so current
-        # clients are never warned over a seed that uses nothing new.
+        # The BUMP is unconditional (Q28 ruling, #152 dossier: "ALWAYS BUMP...no
+        # conditional emission" -- Stef, "they should just update the client to be
+        # honest. Keeps it simple."). The `gem_cup_legs` block ITSELF stays
+        # conditional on the option actually randomizing the cups' legs -- only
+        # then does a native need to parse it to load the same tracks the
+        # generation logic used. Every 0.2.0 seed, on or off, now declares 7.
         legs_randomized = bool(o.randomize_gem_cup_tracks.value)
-        schema = 7 if legs_randomized else 6
+        schema = 7
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -1289,7 +1288,8 @@ class ctrAPWorld(World):
             # this is a native-version GATE (schema_version >= 6), shipped with the
             # #8 newer-schema warn/refuse. (v5 = oxide-final relic-goal mode/count;
             # v4 = relic-tier colour + goal-rework; v3 = podium + stage-2 padgate;
-            # v2 = two-stage contract. v7 = gem_cup_legs, conditional, see above.)
+            # v2 = two-stage contract. v7 = gem_cup_legs, unconditional bump, the
+            # block itself conditional, see above.)
             "schema_version": schema,
             "ctr_options": {
                 "schema_version": schema,
