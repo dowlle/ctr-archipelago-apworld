@@ -1043,33 +1043,54 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         reward_track_for = lambda t: t
 
     # Count-aware requirement filter (a generation-control knob, honoured not
-    # overridden). Issue #171/#28 R1-R3: a relic tier's count below 18 now means
-    # (18 - count) of that tier's 18 Time Trials are REMOVED (never created), not
-    # pinned -- the eligibility MEANING below is otherwise unchanged from before
-    # #171 (this order only re-expresses the same "guaranteed full supply" gate in
-    # exact-count terms; issue #28's capped-requirement-eligibility package is
-    # what actually widens eligibility below max, and lands separately). The
-    # synthetic sphere inventory grows ALL 18 vanilla relics (it cannot know which
-    # AP will remove), so a relic stage-1/stage-2 requirement drawn from it can
-    # demand MORE copies of a tier than actually exist in the pool (e.g. 'Gold
-    # Relic x11' when only 9 were created) -> an impossible gate -> the FillError
-    # tail. To stay provably satisfiable under AP's real pool we only allow a
-    # relic tier to be CHOSEN as a requirement when its created count is the full
-    # 18 (every relic of that tier is a freely-placeable progression item). Below
-    # 18 the tier is excluded from requirement choice (it still grows the
-    # inventory so AnyRelic aggregates of the FULL tiers stay correct, and the
-    # tier's own relics still appear as findable progression up to their created
-    # count). Trophy / Key / tokens / gems are always allowed -- the seed "makes
-    # do with the other item types" by design; the counts are never silently
-    # overridden, only respected as the scarcity signal they are. Default counts
-    # (S18/G18/P0): sapphire+gold usable, platinum excluded.
+    # overridden). Issue #28 R2 (capped requirement eligibility, supersedes the
+    # #171/R1-R3 all-or-nothing gate this filter used to enforce): a relic tier
+    # is drawable as a pad requirement whenever its created count is above zero
+    # -- NOT only at the full 18 -- and any count actually drawn for it is
+    # bounded by what the tier supplies this seed.
+    #
+    # Why this is safe without an extra explicit clamp here: since #171 (R1), a
+    # tier's non-created Time Trials are REMOVED, not pinned -- Regions.create_
+    # regions never builds a Location object for them (world._ctr_relic_keep),
+    # so they never enter the live AP region graph. The synthetic sphere
+    # inventory this module builds (_reachable_pads_and_collect -> Inv.add) is
+    # walked over that SAME live, already-pruned graph, so it can only ever
+    # collect as many copies of a tier as this seed actually created -- it
+    # cannot "grow all 18" regardless of the created count. Every requirement
+    # count this module ever chooses for a tier is subsequently clamped to
+    # inv.count(item) (_assign_from_inv / _assign_stage2_from_inv's `owned`
+    # clamp) or to the Any*-aggregate's own summed-owned total
+    # (_choose_requirement's AnyRelic branch, _resolve_any) -- both already
+    # read from this same graph-bounded inventory. So "capped at the tier's
+    # created count" falls out of the existing owned-inventory mechanism by
+    # construction; verified empirically (not just argued) by instrumenting
+    # Inv.add across a real sphere search at tight counts (S5/G9/P3): observed
+    # peak inv values were <= the created counts in every tier, never above
+    # (see the build note's evidence section) -- Lessons Learned #1 (verify the
+    # instrument) and #16 (a claimed mechanism is verified only when it
+    # reproduces against real data).
+    #
+    # A created count of exactly 0 must still exclude the tier: inv can never
+    # own a single copy of it (no Location exists to grow it), so nothing
+    # would ever be chosen from `cands` in _choose_requirement anyway -- the
+    # explicit `> 0` filter here just documents that as an eligibility rule
+    # instead of relying on it falling out of an empty candidate list, and
+    # keeps a 0-count tier out of the AnyRelic aggregate's summed total too:
+    # _choose_requirement's relic-collapse branch scopes `tiers` to this same
+    # `allowed` set, so an excluded tier never contributes to the sum.
+    #
+    # Trophy / Key / tokens / gems are always allowed -- the seed "makes do
+    # with the other item types" by design; the counts are never silently
+    # overridden, only respected as the scarcity signal they are. Default
+    # counts (S18/G18/P0): sapphire+gold eligible, platinum excluded (0
+    # created).
     _created = {
         "Sapphire Relic": world._ctr_relic_created.get("Sapphire Relic", 0),
         "Gold Relic": world._ctr_relic_created.get("Gold Relic", 0),
         "Platinum Relic": world._ctr_relic_created.get("Platinum Relic", 0),
     }
     allowed = {it for it in REQ_WEIGHTS
-               if it not in RELIC_ITEMS or _created.get(it, 0) >= 18}
+               if it not in RELIC_ITEMS or _created.get(it, 0) > 0}
     # Arena participation filter (issue #118, the requirement-side sibling of
     # #50's fill-side pinning). include_battle_arenas OFF means the arenas are
     # OUT of the seed: the four Crystal Bonus Rounds are vanilla-pinned with
@@ -1876,26 +1897,44 @@ def _pad_keygate_table(crystals_at_hub_floor=False):
 
 def _capacity_context(world):
     """Per-seed inputs to the trophy-capacity count that do not depend on the map:
-    podium rung count, guaranteed-unpinned relic-trial tiers, and whether gem-cup
-    Gem locations are lock-placed (0 capacity)."""
+    podium rung count, per-trial-pad guaranteed-unpinned relic capacity, and
+    whether gem-cup Gem locations are lock-placed (0 capacity)."""
     o = world.options
     # Podium rungs created per trophy race (0 when the feature is off); the new
     # 5-rung superset count comes straight from the shared creation-subset helper.
     from .podium import created_rung_keys_from_options
     podium = len(created_rung_keys_from_options(o))
-    # A relic Time Trial location is a guaranteed fillable slot only when its
-    # tier's created count is the full 18; below 18 some of the tier's 18 are
-    # REMOVED this seed (issue #171 -- not pinned, so a "removed" one is simply
-    # absent rather than 0-capacity, but it is equally not GUARANTEED present),
-    # so the sound lower bound counts only the fully-created tiers.
-    created_counts = (world._ctr_relic_created.get("Sapphire Relic", 0),
-                      world._ctr_relic_created.get("Gold Relic", 0),
-                      world._ctr_relic_created.get("Platinum Relic", 0))
-    trial_tiers = sum(1 for s in created_counts if s >= 18)
+    # Issue #28 R2: a relic Time Trial location is a guaranteed fillable slot
+    # whenever it was CREATED this seed -- issue #171/R1 made removal (not
+    # pinning) the below-count mechanism, so every surviving location is fully
+    # unpinned/free regardless of how many of its tier's 18 exist (there is no
+    # more "present but pinned" state to distinguish from "guaranteed free").
+    # What is NOT guaranteed at a partial count is which of the two TRIAL
+    # tracks (Slide Coliseum / Turbo Track) specifically kept a given tier's
+    # Time Trial: draw_relic_tier_keep samples per-tier across all 18 tracks
+    # uniformly, so at a partial count a trial pad's own slot can easily have
+    # been one of the ones removed even though the tier's aggregate count is
+    # > 0 elsewhere. The old `s >= 18` aggregate-per-tier count was sound only
+    # because at full count every track (including both trial tracks)
+    # necessarily kept it; that premise breaks the moment eligibility widens
+    # below 18 (this order), so capacity must be checked per PHYSICAL trial
+    # pad against its own track's actual keep-set membership, not against the
+    # tier's seed-wide aggregate count.
+    _keep = getattr(world, "_ctr_relic_keep", {})
+    trial_capacity = {}
+    for pad_name, meta in world.warp_pad_ids.items():
+        if meta.get("kind") != "trial":
+            continue
+        track = pad_name[:-len(" Warp Pad")] if pad_name.endswith(" Warp Pad") else pad_name
+        cnt = sum(
+            1 for relic_item in RELIC_ITEMS
+            if f"{track}: {relic_item.split()[0]} Time Trial" in _keep.get(relic_item, ())
+        )
+        trial_capacity[meta["level_id"]] = cnt
     # Gem-cup Gem is lock-placed when gems are not shuffled, or always for the
     # all-gem-cups goal (Goal.option_allgemcups == 4). Locked -> 0 trophy capacity.
     gem_locked = (not bool(o.shuffle_gems.value)) or (o.goal.value == 4)
-    return {"podium": podium, "trial_tiers": trial_tiers, "gem_locked": gem_locked}
+    return {"podium": podium, "trial_capacity": trial_capacity, "gem_locked": gem_locked}
 
 
 def _dest_trophy_capacity(dest_lid, id_kind, ctx):
@@ -1903,7 +1942,9 @@ def _dest_trophy_capacity(dest_lid, id_kind, ctx):
     destination LevelID exposes once its (physical) pad is reached:
       race    -> 1 Trophy Race + podium rungs (TTs/token excluded: stage-2-gated)
       crystal -> 1 Crystal Bonus Round
-      trial   -> guaranteed-unpinned relic Time Trials (single-stage, no stage-2 gate)
+      trial   -> guaranteed-unpinned relic Time Trials actually kept for THIS
+                 destination track (single-stage, no stage-2 gate; issue #28 R2 --
+                 per-pad, not a seed-wide tier aggregate, see _capacity_context)
       cup     -> 1, or 0 when its Gem is lock-placed (gems-off / all-gem-cups goal)."""
     kind = id_kind.get(dest_lid)
     if kind == "race":
@@ -1911,7 +1952,7 @@ def _dest_trophy_capacity(dest_lid, id_kind, ctx):
     if kind == "crystal":
         return 1
     if kind == "trial":
-        return ctx["trial_tiers"]
+        return ctx["trial_capacity"].get(dest_lid, 0)
     if kind == "cup":
         return 0 if ctx["gem_locked"] else 1
     return 0
