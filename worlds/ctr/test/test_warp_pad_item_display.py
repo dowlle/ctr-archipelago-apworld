@@ -68,9 +68,11 @@ class TestWarpPadItemDisplayByRewardType(CTRTestBase):
     def test_schema_version_is_not_bumped(self):
         # Additive key (the one_lap_cups / death_link precedent): an older client
         # never sees it and defaults to 0 == one pile == what it already does.
+        # Baseline is 7, the unconditional #166 bump (Q28 ruling); this
+        # feature itself contributes no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 6)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 6)
+        self.assertEqual(slot_data["schema_version"], 7)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
 
 
 class TestWarpPadItemDisplayIsGenerationNeutral(CTRTestBase):

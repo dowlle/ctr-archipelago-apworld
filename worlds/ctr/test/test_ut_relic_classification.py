@@ -202,6 +202,8 @@ class TestRelicClassificationNoSchemaBump(CTRTestBase):
     options = {"warppad_unlock_requirements": "vanilla", "accessibility": "minimal"}
 
     def test_schema_version_unchanged(self):
+        # Baseline is 7, the unconditional #166 bump (Q28 ruling); relic
+        # classification itself contributes no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 6)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 6)
+        self.assertEqual(slot_data["schema_version"], 7)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)

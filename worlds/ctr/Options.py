@@ -103,6 +103,27 @@ class ShuffleWarpPadsGemCups(DefaultOnToggle):
     display_name = "Include Gem Cup Warp Pads"
 
 
+class RandomizeGemCupTracks(Toggle):
+    """Randomize which tracks each Gem Cup runs.
+
+    - **off** (default): every Gem Cup runs its vanilla four tracks.
+    - **on**: every leg of every cup is drawn at random from the 16 trophy
+      tracks. A track can appear in several cups, several times in one cup,
+      or not at all. Slide Coliseum and Turbo Track are never drawn. The
+      Purple Gem Cup loses its vanilla all-boss-track line-up like any other
+      cup.
+
+    A track's own warp pad always stays an independent way to race it, so no
+    draw can lock a check away. Seeds with this on are marked schema 7: an
+    older client warns that it is out of date instead of silently loading
+    the vanilla cup tracks."""
+    # Ruled 2026-08-07 (issue #166): exactly two states, vanilla or
+    # completely random over the 16-trophy-track pool, repeats allowed; the
+    # reporter's intermediate "shuffled" permutation mode was dropped. Wire:
+    # top-level `gem_cup_legs` block, emitted only when on.
+    display_name = "Randomize Gem Cup Tracks"
+
+
 class ShuffleKeys(DefaultOnToggle):
     """Shuffle the 4 boss Keys into the multiworld item pool.
 
@@ -512,6 +533,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
+    randomize_gem_cup_tracks: RandomizeGemCupTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     # warp pads: content & destination shuffle
@@ -546,8 +568,8 @@ class ctrAPOptions(PerGameCommonOptions):
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [Goal, FinalOxideUnlock, FinalOxideRelicCount],
-    "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, ShuffleKeys,
-                     TrapFillPercentage],
+    "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
+                     ShuffleKeys, TrapFillPercentage],
     "Warp Pads": [
         ShuffleWarpPadsBattleArenas,
         WarpPadShuffleCategories,

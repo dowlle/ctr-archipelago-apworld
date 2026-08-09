@@ -3,6 +3,9 @@ import logging
 import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
 from .Locations import create_location
+from .gem_cup_legs import (
+    reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
+)
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
     _COLOURS, _RELIC_TIERS,
@@ -349,6 +352,18 @@ def create_regions(world: "ctrAPWorld"):
     do_shuffle = bool(world.warp_pad_map)
     world.shuffle_warp_pads = do_shuffle
 
+    # Gem Cup leg composition (issue #166): which 4 trophy tracks each cup
+    # runs. Resolved ONCE per seed and stashed; the podium-region cup
+    # entrances below and Rules.add_podium_placement_rules read this exact
+    # map, and fill_slot_data serializes it. Option off (or a pre-#166 UT
+    # seed) -> the vanilla table, identical to the pre-#166 static read;
+    # option on -> 20 independent draws from trophy tracks 0..15 (repeats
+    # allowed). UT re-generation pins the connected seed's map from
+    # slot_data instead of re-drawing (issue #29's re-roll divergence class).
+    world.gem_cup_legs = (
+        reconstruct_gem_cup_legs_from_wire(ut_passthrough)
+        if ut_passthrough else resolve_gem_cup_legs(world))
+
     # Boss-garage requirements, resolved to flat {type,count} (+ 'tracks' for
     # modes 0/1). warp_pad_map (above) is read for SameHubTracks, so resolve here.
     world.boss_garage_req = _resolve_boss_reqs(world, boss_mode)
@@ -418,8 +433,9 @@ def create_regions(world: "ctrAPWorld"):
         # hidden in Universal Tracker and dropped from fill logic. Fix: hold each
         # track's rungs in a dedicated dead-end "<track>: Podium" region reached
         # by a rule-True entrance from the track region AND from every Gem Cup
-        # that legs the track (data/gem_cup_legs.json). The rung's own OR rule is
-        # left unchanged in Rules; can_reach then evaluates to
+        # that legs the track (world.gem_cup_legs, resolved above -- the vanilla
+        # table, or the seed's randomized map under issue #166). The rung's own
+        # OR rule is left unchanged in Rules; can_reach then evaluates to
         # (trackRegion OR cup) AND (trophyLoc OR cup), which reduces to exactly
         # (trophyLoc OR cup) since trophyLoc reachability implies trackRegion.
         # The region holds ONLY rungs and has no exits, so a cup leg exposes
@@ -428,13 +444,7 @@ def create_regions(world: "ctrAPWorld"):
         # need no register_indirect_condition (they never read region
         # reachability) and the new "podium"-type regions are sphere-search
         # reward-neutral (podium locations resolve to reward None).
-        _cup_legs = json.loads(
-            pkgutil.get_data(__package__, "data/gem_cup_legs.json").decode("utf-8")
-        )["cup_legs"]
-        _track_to_cups: dict = {}
-        for _cup, _legs in _cup_legs.items():
-            for _leg in _legs:
-                _track_to_cups.setdefault(_leg, []).append(_cup)
+        _track_to_cups = track_to_cups(world.gem_cup_legs)
         for _track in TROPHY_TRACKS:
             _track_region = region_lookup.get(_track)
             if _track_region is None:
