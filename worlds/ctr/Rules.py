@@ -1,7 +1,7 @@
 import logging
 from BaseClasses import CollectionState
 
-from .gem_cup_legs import load_vanilla_cup_legs, track_to_cups
+from .gem_cup_legs import resolved_gem_cup_legs, track_to_cups
 
 
 def make_rule(expr_text: str, player: int):
@@ -290,11 +290,10 @@ def add_podium_placement_rules(world, player):
     all_names = {loc.name for loc in mw.get_locations(player)}
     all_regions = {r.name for r in mw.get_regions(player)}
     # The seed's resolved leg map (issue #166), stashed by create_regions:
-    # vanilla table, or the randomized/UT-pinned map. The getattr fallback
-    # keeps a direct unit call working on a world that never ran
-    # create_regions.
-    track_cups = track_to_cups(
-        getattr(world, "gem_cup_legs", None) or load_vanilla_cup_legs())
+    # vanilla table, or the randomized/UT-pinned map. Fails loudly rather
+    # than silently falling back to vanilla if create_regions never ran --
+    # a wrong-but-plausible seed is worse than a crash (N3, Opus review).
+    track_cups = track_to_cups(resolved_gem_cup_legs(world))
     for track in TROPHY_TRACKS:
         trophy_name = f"{track}: Trophy Race"
         if trophy_name not in all_names:

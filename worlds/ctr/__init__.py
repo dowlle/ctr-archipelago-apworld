@@ -7,7 +7,7 @@ import pkgutil
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
-from .gem_cup_legs import cup_legs_to_wire, load_vanilla_cup_legs
+from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
@@ -1136,9 +1136,10 @@ class ctrAPWorld(World):
         would force native to guess the missing cups, and the whole block is
         simply omitted when the option is off (native then keeps its vanilla
         advCupTrackIDs table, which is exactly what an option-off seed uses).
+        Fails loudly rather than silently falling back to vanilla if
+        create_regions never ran (N3, Opus review).
         """
-        return cup_legs_to_wire(
-            getattr(self, "gem_cup_legs", None) or load_vanilla_cup_legs())
+        return cup_legs_to_wire(resolved_gem_cup_legs(self))
 
     def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, Dict[str, int]]]:
         """{"<padLevelID>": {"stage1": {type,count,colour},

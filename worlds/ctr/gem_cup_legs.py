@@ -38,8 +38,11 @@ class as issue #29's warp-pad re-roll. A pre-#166 seed carries no
 what its generation used.
 """
 import json
+import logging
 import pkgutil
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
 
 # The five Gem Cup regions in their native LevelID order (cup LevelID ==
 # 100 + colour index), matching data/warp_pad_ids.json ("<Colour> Cup Warp
@@ -117,6 +120,22 @@ def resolve_gem_cup_legs(world) -> Dict[str, List[str]]:
     }
 
 
+def resolved_gem_cup_legs(world) -> Dict[str, List[str]]:
+    """world.gem_cup_legs, set exactly once per seed by
+    Regions.create_regions. Raises instead of silently falling back to the
+    vanilla table: a missing attribute here means create_regions never ran
+    (a call-order bug), not "the option is off" (which resolve_gem_cup_legs
+    already handles by returning the vanilla table itself, so world.gem_cup_legs
+    is always a real, non-empty map by the time any consumer reads it)."""
+    try:
+        return world.gem_cup_legs
+    except AttributeError:
+        raise RuntimeError(
+            "world.gem_cup_legs read before Regions.create_regions resolved "
+            "it for this seed -- call order bug, not a missing-option case"
+        ) from None
+
+
 def cup_legs_to_wire(cup_legs: Dict[str, List[str]]) -> Dict[str, List[int]]:
     """Serialize the map for slot_data: {"<cupLevelID>": [trackLevelID x4]}.
     Always all five cups -- the smallest COMPLETE mapping (a partial map
@@ -132,10 +151,21 @@ def reconstruct_gem_cup_legs_from_wire(
         passthrough: Dict[str, object]) -> Dict[str, List[str]]:
     """Universal Tracker re-generation: rebuild world.gem_cup_legs from the
     connected seed's slot_data instead of re-drawing (world.random is a
-    different stream there). Absent or malformed key -> the vanilla table,
-    which is exactly what any pre-#166 seed generated with."""
+    different stream there). Absent key -> the vanilla table, silently --
+    that is exactly what any pre-#166 seed generated with, not an error.
+    A PRESENT but malformed key falls back to vanilla too (the emitter can
+    never produce this shape), but logs a warning: unlike the absent-key
+    case, this state means the seed DID randomize and the wire could not be
+    trusted, so the tracker's map may not match the server's (N1, Opus
+    review)."""
     wire = passthrough.get("gem_cup_legs")
+    if wire is None:
+        return load_vanilla_cup_legs()
     if not isinstance(wire, dict):
+        logger.warning(
+            "gem_cup_legs wire key present but not an object (%r) -- "
+            "falling back to vanilla cup legs; this seed's UT map may not "
+            "match the server's", type(wire).__name__)
         return load_vanilla_cup_legs()
     ids = track_level_ids()
     lid_to_track = {lid: track for track, lid in ids.items()}
@@ -144,6 +174,10 @@ def reconstruct_gem_cup_legs_from_wire(
         legs = wire.get(str(cup_lid))
         if not (isinstance(legs, list) and len(legs) == 4
                 and all(type(x) is int and x in lid_to_track for x in legs)):
+            logger.warning(
+                "gem_cup_legs wire key present but malformed for cup %s "
+                "(%r) -- falling back to vanilla cup legs; this seed's UT "
+                "map may not match the server's", cup, legs)
             return load_vanilla_cup_legs()
         out[cup] = [lid_to_track[x] for x in legs]
     return out
