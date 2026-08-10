@@ -568,5 +568,563 @@
     "code": 35010094,
     "count": 0,
     "classification": "useful"
+  },
+  {
+    "name": "Turbo",
+    "code": 35010095,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Bomb",
+    "code": 35010096,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Missile",
+    "code": 35010097,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "TNT",
+    "code": 35010098,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Beaker",
+    "code": 35010099,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Shield Bubble",
+    "code": 35010100,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Mask",
+    "code": 35010101,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "N. Tropy Clock",
+    "code": 35010102,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Warpball",
+    "code": 35010103,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Bomb x3",
+    "code": 35010104,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Missile x3",
+    "code": 35010105,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Wumpa Reset Trap",
+    "code": 35010106,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Flatten Trap",
+    "code": 35010107,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Item Reroll Trap",
+    "code": 35010108,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Auto-Use Trap",
+    "code": 35010109,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Empty Crates Trap",
+    "code": 35010110,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Weakened Kart Trap",
+    "code": 35010111,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "No Boost Trap",
+    "code": 35010112,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Wireframe Trap",
+    "code": 35010113,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Nitro Trap",
+    "code": 35010114,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Reverse Controls Trap",
+    "code": 35010115,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Red Potion Trap",
+    "code": 35010116,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Passive Shield",
+    "code": 35010117,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Invincibility Mask",
+    "code": 35010118,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Invisibility",
+    "code": 35010119,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Small Wumpa Bundle",
+    "code": 35010120,
+    "count": 0,
+    "classification": "filler"
+  },
+  {
+    "name": "Big Wumpa Bundle",
+    "code": 35010121,
+    "count": 0,
+    "classification": "filler"
+  },
+  {
+    "name": "Progressive Starting Wumpa",
+    "code": 35010122,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Crash Bandicoot",
+    "code": 35010123,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Coco Bandicoot",
+    "code": 35010124,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Polar",
+    "code": 35010125,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Pura",
+    "code": 35010126,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Neo Cortex",
+    "code": 35010127,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "N. Tropy",
+    "code": 35010128,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Ripper Roo",
+    "code": 35010129,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Papu Papu",
+    "code": 35010130,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Komodo Joe",
+    "code": 35010131,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Pinstripe",
+    "code": 35010132,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Dingodile",
+    "code": 35010133,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Tiny Tiger",
+    "code": 35010134,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "N. Gin",
+    "code": 35010135,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Fake Crash",
+    "code": 35010136,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Nitros Oxide",
+    "code": 35010137,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Penta Penguin",
+    "code": 35010138,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Letter C (Crash Cove)",
+    "code": 35010139,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Crash Cove)",
+    "code": 35010140,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Crash Cove)",
+    "code": 35010141,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Roo's Tubes)",
+    "code": 35010142,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Roo's Tubes)",
+    "code": 35010143,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Roo's Tubes)",
+    "code": 35010144,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Mystery Caves)",
+    "code": 35010145,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Mystery Caves)",
+    "code": 35010146,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Mystery Caves)",
+    "code": 35010147,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Sewer Speedway)",
+    "code": 35010148,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Sewer Speedway)",
+    "code": 35010149,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Sewer Speedway)",
+    "code": 35010150,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Coco Park)",
+    "code": 35010151,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Coco Park)",
+    "code": 35010152,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Coco Park)",
+    "code": 35010153,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Tiger Temple)",
+    "code": 35010154,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Tiger Temple)",
+    "code": 35010155,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Tiger Temple)",
+    "code": 35010156,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Papu's Pyramid)",
+    "code": 35010157,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Papu's Pyramid)",
+    "code": 35010158,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Papu's Pyramid)",
+    "code": 35010159,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Dingo Canyon)",
+    "code": 35010160,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Dingo Canyon)",
+    "code": 35010161,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Dingo Canyon)",
+    "code": 35010162,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Blizzard Bluff)",
+    "code": 35010163,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Blizzard Bluff)",
+    "code": 35010164,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Blizzard Bluff)",
+    "code": 35010165,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Dragon Mines)",
+    "code": 35010166,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Dragon Mines)",
+    "code": 35010167,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Dragon Mines)",
+    "code": 35010168,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Polar Pass)",
+    "code": 35010169,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Polar Pass)",
+    "code": 35010170,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Polar Pass)",
+    "code": 35010171,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Tiny Arena)",
+    "code": 35010172,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Tiny Arena)",
+    "code": 35010173,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Tiny Arena)",
+    "code": 35010174,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Hot Air Skyway)",
+    "code": 35010175,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Hot Air Skyway)",
+    "code": 35010176,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Hot Air Skyway)",
+    "code": 35010177,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Cortex Castle)",
+    "code": 35010178,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Cortex Castle)",
+    "code": 35010179,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Cortex Castle)",
+    "code": 35010180,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (N. Gin Labs)",
+    "code": 35010181,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (N. Gin Labs)",
+    "code": 35010182,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (N. Gin Labs)",
+    "code": 35010183,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter C (Oxide Station)",
+    "code": 35010184,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter T (Oxide Station)",
+    "code": 35010185,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Letter R (Oxide Station)",
+    "code": 35010186,
+    "count": 0,
+    "classification": "progression"
+  },
+  {
+    "name": "Gas Pedal",
+    "code": 35010187,
+    "count": 0,
+    "classification": "progression"
   }
 ]

@@ -20,14 +20,33 @@ from worlds.AutoWorld import AutoWorldRegister
 from . import CTRTestBase
 from ..Items import load_item_table
 
-# The four groups exactly as issue #167 specifies them.
+# The four groups exactly as issue #167 specifies them, with "Traps" extended by
+# the 0.2.0 name freeze (#177).
+#
+# The 11 added traps are the H-dossier families ruled in on 2026-08-10. They are
+# registered but not buildable: they carry count 0 in data/items.json and stay
+# out of __init__.TRAP_ITEM_NAMES (the draw list pinned to native's
+# AP_TrapEffect enum) until their native effects exist. They are in the GROUP
+# anyway because item_name_groups is part of the checksummed datapackage
+# payload, so adding them later would spend a second bump -- the exact churn
+# #177 exists to prevent. Membership feeds !hint / item_links /
+# start_inventory_from_pool expansion and is read by nothing in fill, so this
+# changes no placement.
 EXPECTED_GROUPS = {
     "Relics": {"Sapphire Relic", "Gold Relic", "Platinum Relic"},
     "CTR Tokens": {"Red CTR Token", "Green CTR Token", "Blue CTR Token",
                    "Yellow CTR Token", "Purple CTR Token"},
     "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
-    "Traps": {"Icy Road Trap", "Low Gravity Trap", "No Brakes Trap",
-              "Forced Boost Trap", "First Person Trap"},
+    "Traps": {
+        # shipped, buildable (native AP_TrapEffect 0-4)
+        "Icy Road Trap", "Low Gravity Trap", "No Brakes Trap",
+        "Forced Boost Trap", "First Person Trap",
+        # frozen by #177, not yet buildable
+        "Wumpa Reset Trap", "Flatten Trap", "Item Reroll Trap", "Auto-Use Trap",
+        "Empty Crates Trap", "Weakened Kart Trap", "No Boost Trap",
+        "Wireframe Trap", "Nitro Trap", "Reverse Controls Trap",
+        "Red Potion Trap",
+    },
 }
 
 
