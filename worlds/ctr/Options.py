@@ -133,6 +133,79 @@ class ShuffleKeys(DefaultOnToggle):
     display_name = "Shuffle Keys"
 
 
+class ProgressiveBoostMode(Choice):
+    """Stage the Progressive Boost chain (issue #12, ruled 07-16 + the 07-26
+    correction).
+
+    - **off** (default): no Progressive Boost items exist this seed. Every
+      kart keeps full self-earned boost (slides, hang time, reserve items)
+      and every turbo pad works at its vanilla strength -- byte-identical to
+      a pre-#12 seed, no RNG draw taken for this feature.
+    - **shared_global**: one Progressive Boost chain enters the pool. Its
+      received copies raise a single shared tier for every character: 0 =
+      no self-earned boost at all (ordinary turbo pads still work; Super
+      Turbo pads act as ordinary pads), 1 = Boost, 2 = USF-level speeds,
+      and, only with `Progressive Boost: Blue Fire` also on, 3 = the Blue
+      Fire capstone.
+    - **per_character**: each of the 16 racers gets its own separate chain
+      (16x the shared-global pool size), per the 2026-08-07 completability
+      ruling. **Not yet generatable**: CTR's current location supply cannot
+      place that many additional items without new locations (issue #71,
+      unbuilt), so this value raises a clear OptionError at generation
+      instead of silently overflowing or under-filling. The names and codes
+      are already reserved on the datapackage so #71's landing does not need
+      a second naming pass."""
+    # Logic is deliberately NOT gated on any tier yet (0.2.0 spine-1 order
+    # scope: pool/fill correctness only) -- these items ride as `useful`,
+    # never required by any location's access rule.
+    display_name = "Progressive Boost"
+    option_off = 0
+    option_shared_global = 1
+    option_per_character = 2
+    default = 0
+
+
+class ProgressiveBoostBlueFire(Toggle):
+    """Add the Blue Fire capstone tier above USF to the Progressive Boost
+    chain (issue #12, 07-26 correction). Values sourced from CTR Unlimited's
+    Retro Fueled mode.
+
+    - **off** (default): the chain caps at USF -- 3 tiers, 2 received copies.
+    - **on**: the chain gains a 4th tier -- 4 tiers, 3 received copies.
+
+    No effect while `Progressive Boost` is off."""
+    display_name = "Progressive Boost: Blue Fire"
+
+
+class ProgressiveStatsMode(Choice):
+    """Stage the Progressive Speed / Acceleration / Turning chains (issue
+    #13, ruled 07-16 + the 07-26 update + the 2026-08-07 five-rank ladder
+    ruling).
+
+    - **off** (default): no Progressive stat items exist this seed. Every
+      character keeps its normal vanilla stat table -- byte-identical to a
+      pre-#13 seed, no RNG draw taken for this feature.
+    - **shared_global**: three chains (Progressive Top Speed, Progressive
+      Acceleration, Progressive Turning) enter the pool, 4 copies each (12
+      items). While active every character starts at the ladder's bottom
+      rank (`VERY LOW`, the per-stat minimum across every vanilla engine
+      class) and received copies climb one shared rank per stat, per copy,
+      up through `LOW / MEDIUM / HIGH` to `VERY HIGH` -- a rank beyond the
+      best vanilla character. Character choice becomes cosmetic for these
+      three stats while this mode is active.
+    - **per_character**: each of the 16 racers gets its own separate set of
+      three chains (192 items total), per the 2026-08-07 ruling. **Not yet
+      generatable**: see `Progressive Boost`'s per_character note -- same
+      issue #71 location-supply blocker, same reserved-names precedent."""
+    # Same deliberate non-gating as ProgressiveBoostMode: pool/fill
+    # correctness only, no track logic reads a stat tier yet.
+    display_name = "Progressive Stats"
+    option_off = 0
+    option_shared_global = 1
+    option_per_character = 2
+    default = 0
+
+
 class TrapFillPercentage(Range):
     """What percentage of this slot's filler items are replaced by traps (Icy
     Road, Low Gravity, No Brakes, Forced Boost, First Person -- each equally
@@ -536,6 +609,10 @@ class ctrAPOptions(PerGameCommonOptions):
     randomize_gem_cup_tracks: RandomizeGemCupTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
+    # capability item packs (issues #12, #13)
+    progressive_boost: ProgressiveBoostMode
+    progressive_boost_blue_fire: ProgressiveBoostBlueFire
+    progressive_stats: ProgressiveStatsMode
     # warp pads: content & destination shuffle
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
@@ -570,6 +647,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [Goal, FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
                      ShuffleKeys, TrapFillPercentage],
+    "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
+                         ProgressiveStatsMode],
     "Warp Pads": [
         ShuffleWarpPadsBattleArenas,
         WarpPadShuffleCategories,

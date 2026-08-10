@@ -1,29 +1,572 @@
 [
-  {"name": "Trophy", "code": 35010000, "count": 16, "classification": "progression"},
-  {"name": "Sapphire Relic", "code": 35010001, "count": 18, "classification": "progression"},
-  {"name": "Gold Relic", "code": 35010002, "count": 18, "classification": "progression"},
-  {"name": "Platinum Relic", "code": 35010003, "count": 18, "classification": "progression"},
-  {"name": "Red CTR Token", "code": 35010004, "count": 4, "classification": "progression"},
-  {"name": "Green CTR Token", "code": 35010005, "count": 4, "classification": "progression"},
-  {"name": "Blue CTR Token", "code": 35010006, "count": 4, "classification": "progression"},
-  {"name": "Yellow CTR Token", "code": 35010007, "count": 4, "classification": "progression"},
-  {"name": "Purple CTR Token", "code": 35010008, "count": 4, "classification": "progression"},
-  {"name": "Red Gem", "code": 35010009, "count": 1, "classification": "progression"},
-  {"name": "Green Gem", "code": 35010010, "count": 1, "classification": "progression"},
-  {"name": "Blue Gem", "code": 35010011, "count": 1, "classification": "progression"},
-  {"name": "Yellow Gem", "code": 35010012, "count": 1, "classification": "progression"},
-  {"name": "Purple Gem", "code": 35010013, "count": 1, "classification": "progression"},
-  {"name": "Key", "code": 35010014, "count": 4, "classification": "progression"},
-  {"name": "Wumpa Fruit", "code": 35010015, "count": 1, "classification": "filler"},
-  {"name": "Icy Road Trap", "code": 35010016, "count": 0, "classification": "trap"},
-  {"name": "Low Gravity Trap", "code": 35010017, "count": 0, "classification": "trap"},
-  {"name": "No Brakes Trap", "code": 35010018, "count": 0, "classification": "trap"},
-  {"name": "Forced Boost Trap", "code": 35010019, "count": 0, "classification": "trap"},
-  {"name": "First Person Trap", "code": 35010020, "count": 0, "classification": "trap"},
-  {"name": "Ignore Grass", "code": 35010021, "count": 1, "classification": "useful"},
-  {"name": "Ignore Dirt", "code": 35010022, "count": 1, "classification": "useful"},
-  {"name": "Ignore Snow", "code": 35010023, "count": 1, "classification": "useful"},
-  {"name": "Ignore Water", "code": 35010024, "count": 1, "classification": "useful"},
-  {"name": "Ignore Ice", "code": 35010025, "count": 1, "classification": "useful"},
-  {"name": "Ignore Sand", "code": 35010026, "count": 0, "classification": "filler"}
+  {
+    "name": "Trophy",
+    "code": 35010000,
+    "count": 16,
+    "classification": "progression"
+  },
+  {
+    "name": "Sapphire Relic",
+    "code": 35010001,
+    "count": 18,
+    "classification": "progression"
+  },
+  {
+    "name": "Gold Relic",
+    "code": 35010002,
+    "count": 18,
+    "classification": "progression"
+  },
+  {
+    "name": "Platinum Relic",
+    "code": 35010003,
+    "count": 18,
+    "classification": "progression"
+  },
+  {
+    "name": "Red CTR Token",
+    "code": 35010004,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Green CTR Token",
+    "code": 35010005,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Blue CTR Token",
+    "code": 35010006,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Yellow CTR Token",
+    "code": 35010007,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Purple CTR Token",
+    "code": 35010008,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Red Gem",
+    "code": 35010009,
+    "count": 1,
+    "classification": "progression"
+  },
+  {
+    "name": "Green Gem",
+    "code": 35010010,
+    "count": 1,
+    "classification": "progression"
+  },
+  {
+    "name": "Blue Gem",
+    "code": 35010011,
+    "count": 1,
+    "classification": "progression"
+  },
+  {
+    "name": "Yellow Gem",
+    "code": 35010012,
+    "count": 1,
+    "classification": "progression"
+  },
+  {
+    "name": "Purple Gem",
+    "code": 35010013,
+    "count": 1,
+    "classification": "progression"
+  },
+  {
+    "name": "Key",
+    "code": 35010014,
+    "count": 4,
+    "classification": "progression"
+  },
+  {
+    "name": "Wumpa Fruit",
+    "code": 35010015,
+    "count": 1,
+    "classification": "filler"
+  },
+  {
+    "name": "Icy Road Trap",
+    "code": 35010016,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Low Gravity Trap",
+    "code": 35010017,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "No Brakes Trap",
+    "code": 35010018,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Forced Boost Trap",
+    "code": 35010019,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "First Person Trap",
+    "code": 35010020,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Ignore Grass",
+    "code": 35010021,
+    "count": 1,
+    "classification": "useful"
+  },
+  {
+    "name": "Ignore Dirt",
+    "code": 35010022,
+    "count": 1,
+    "classification": "useful"
+  },
+  {
+    "name": "Ignore Snow",
+    "code": 35010023,
+    "count": 1,
+    "classification": "useful"
+  },
+  {
+    "name": "Ignore Water",
+    "code": 35010024,
+    "count": 1,
+    "classification": "useful"
+  },
+  {
+    "name": "Ignore Ice",
+    "code": 35010025,
+    "count": 1,
+    "classification": "useful"
+  },
+  {
+    "name": "Ignore Sand",
+    "code": 35010026,
+    "count": 0,
+    "classification": "filler"
+  },
+  {
+    "name": "Progressive Boost",
+    "code": 35010027,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed",
+    "code": 35010028,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration",
+    "code": 35010029,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning",
+    "code": 35010030,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Crash Bandicoot)",
+    "code": 35010031,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Crash Bandicoot)",
+    "code": 35010032,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Crash Bandicoot)",
+    "code": 35010033,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Crash Bandicoot)",
+    "code": 35010034,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Coco Bandicoot)",
+    "code": 35010035,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Coco Bandicoot)",
+    "code": 35010036,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Coco Bandicoot)",
+    "code": 35010037,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Coco Bandicoot)",
+    "code": 35010038,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Polar)",
+    "code": 35010039,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Polar)",
+    "code": 35010040,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Polar)",
+    "code": 35010041,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Polar)",
+    "code": 35010042,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Pura)",
+    "code": 35010043,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Pura)",
+    "code": 35010044,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Pura)",
+    "code": 35010045,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Pura)",
+    "code": 35010046,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Neo Cortex)",
+    "code": 35010047,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Neo Cortex)",
+    "code": 35010048,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Neo Cortex)",
+    "code": 35010049,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Neo Cortex)",
+    "code": 35010050,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (N. Tropy)",
+    "code": 35010051,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (N. Tropy)",
+    "code": 35010052,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (N. Tropy)",
+    "code": 35010053,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (N. Tropy)",
+    "code": 35010054,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Ripper Roo)",
+    "code": 35010055,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Ripper Roo)",
+    "code": 35010056,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Ripper Roo)",
+    "code": 35010057,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Ripper Roo)",
+    "code": 35010058,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Papu Papu)",
+    "code": 35010059,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Papu Papu)",
+    "code": 35010060,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Papu Papu)",
+    "code": 35010061,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Papu Papu)",
+    "code": 35010062,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Komodo Joe)",
+    "code": 35010063,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Komodo Joe)",
+    "code": 35010064,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Komodo Joe)",
+    "code": 35010065,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Komodo Joe)",
+    "code": 35010066,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Pinstripe)",
+    "code": 35010067,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Pinstripe)",
+    "code": 35010068,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Pinstripe)",
+    "code": 35010069,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Pinstripe)",
+    "code": 35010070,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Dingodile)",
+    "code": 35010071,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Dingodile)",
+    "code": 35010072,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Dingodile)",
+    "code": 35010073,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Dingodile)",
+    "code": 35010074,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Tiny Tiger)",
+    "code": 35010075,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Tiny Tiger)",
+    "code": 35010076,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Tiny Tiger)",
+    "code": 35010077,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Tiny Tiger)",
+    "code": 35010078,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (N. Gin)",
+    "code": 35010079,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (N. Gin)",
+    "code": 35010080,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (N. Gin)",
+    "code": 35010081,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (N. Gin)",
+    "code": 35010082,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Fake Crash)",
+    "code": 35010083,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Fake Crash)",
+    "code": 35010084,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Fake Crash)",
+    "code": 35010085,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Fake Crash)",
+    "code": 35010086,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Nitros Oxide)",
+    "code": 35010087,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Nitros Oxide)",
+    "code": 35010088,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Nitros Oxide)",
+    "code": 35010089,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Nitros Oxide)",
+    "code": 35010090,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Boost (Penta Penguin)",
+    "code": 35010091,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Top Speed (Penta Penguin)",
+    "code": 35010092,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Acceleration (Penta Penguin)",
+    "code": 35010093,
+    "count": 0,
+    "classification": "useful"
+  },
+  {
+    "name": "Progressive Turning (Penta Penguin)",
+    "code": 35010094,
+    "count": 0,
+    "classification": "useful"
+  }
 ]
