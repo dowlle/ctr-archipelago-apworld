@@ -46,9 +46,15 @@ from ..podium import (NEW_RUNGS, PODIUM_CLASS, SHIPPED_RUNGS, SLOT_ORDER,
                       created_rung_keys_from_options, location_name,
                       podium_slot_codes)
 
-FIXTURE_PATH = (
-    pathlib.Path(__file__).parent / "fixtures"
-    / "location_class_id_stability_v0_1_5.json"
+FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
+FIXTURE_PATH = FIXTURE_DIR / "location_class_id_stability_v0_1_5.json"
+#: One entry per release that spent a datapackage bump. Append-only. The 0.2.0
+#: file holds the 361 class-owned names the #177 freeze minted (relic perfects,
+#: lettersanity, item boxes, itemsanity, the wumpa check, the trial trophy
+#: races); the v0.1.5 file keeps the 112 podium rungs and is never edited.
+FIXTURE_PATHS = (
+    FIXTURE_PATH,
+    FIXTURE_DIR / "location_class_id_stability_v0_2_0.json",
 )
 
 PODIUM_TOGGLES = (
@@ -461,12 +467,18 @@ class TestLocationClassIdStability(unittest.TestCase):
                 out[key] = value
             return out
 
-        return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"),
-                          object_pairs_hook=reject_duplicates)
+        merged = {}
+        for path in FIXTURE_PATHS:
+            batch = json.loads(path.read_text(encoding="utf-8"),
+                               object_pairs_hook=reject_duplicates)
+            assert not (set(batch) & set(merged)), (
+                f"{path.name} re-pins a name an earlier fixture already owns")
+            merged.update(batch)
+        return merged
 
     def test_fixture_covers_every_class_owned_location(self) -> None:
         frozen = self._frozen()
-        self.assertEqual(len(frozen), 112)
+        self.assertEqual(len(frozen), 473)  # 112 podium + 361 frozen by #177
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(

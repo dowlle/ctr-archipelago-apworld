@@ -7,19 +7,50 @@ if TYPE_CHECKING:
     from . import ctrAPWorld
 
 
+from .item_boxes import ITEM_BOX_CLASS
+from .itemsanity import ITEMSANITY_CLASS
+from .lettersanity import LETTERSANITY_CLASS
 from .location_class import LocationClassRegistry
 from .podium import PODIUM_CLASS
+from .relic_perfect import RELIC_PERFECT_CLASS
+from .trial_trophy import TRIAL_TROPHY_CLASS
+from .wumpa_checks import WUMPA_CLASS
 
 # The registered optional location classes (#176), in registration order.
 #
 # REGISTRATION IS APPEND-ONLY. Registration order is the order every class's
-# locations enter CTR_LOCATION_IDS, so a new class (relic perfects #49, item
-# boxes #109, itemsanity #145, lettersanity #148) goes at the END of this list.
+# locations enter CTR_LOCATION_IDS, so a new class goes at the END of this list.
 # Codes are explicit per class so a reorder would not renumber anything, but
 # keeping the order stable keeps location_name_to_id byte-stable, which is what
 # makes a datapackage manifest diff (#177) readable.
+#
+# The six classes after podium are the 0.2.0 name freeze (#177): every location
+# name the release will ever register, minted in one datapackage bump. They are
+# INERT -- each one's created_location_names returns nothing, because the freeze
+# mints names, not features, and each feature's own build attaches to the names
+# already sitting here. The spine-1 precedent is the same shape on the item side
+# (64 per-character capability names registered, pool gated behind an
+# OptionError). Order below is ascending code block, which is also the order the
+# blocks were claimed:
+#
+#   relic_perfect  #49   35012400  18 names
+#   lettersanity   #148  35012500  48 names
+#   item_boxes     #109  35014000  270 names
+#   podium         (shipped)       35015000 / 35015100  112 names
+#   itemsanity     #145  35016000  22 names
+#   wumpa          R-H   35016100  1 name
+#   trial_trophy   #203  35016200  2 names
+#
+# podium keeps its FIRST registration slot regardless: it shipped, and moving it
+# would churn the manifest diff for every already-frozen rung name.
 CTR_LOCATION_CLASSES = LocationClassRegistry()
 CTR_LOCATION_CLASSES.register(PODIUM_CLASS)
+CTR_LOCATION_CLASSES.register(RELIC_PERFECT_CLASS)
+CTR_LOCATION_CLASSES.register(LETTERSANITY_CLASS)
+CTR_LOCATION_CLASSES.register(ITEM_BOX_CLASS)
+CTR_LOCATION_CLASSES.register(ITEMSANITY_CLASS)
+CTR_LOCATION_CLASSES.register(WUMPA_CLASS)
+CTR_LOCATION_CLASSES.register(TRIAL_TROPHY_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")

@@ -34,6 +34,39 @@ TRAP_ITEM_NAMES = [
     "First Person Trap",  # AP_TRAP_FIRSTPERSON
 ]
 
+# The 11 trap names the 0.2.0 name freeze (#177) minted from the H-dossier
+# ruling (Stef, 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
+# and that is deliberate: TRAP_ITEM_NAMES is the BUILDABLE set -- it drives the
+# trap_fill_percentage draw and its order is pinned to native's AP_TrapEffect
+# enum, so a name whose native effect does not exist yet must stay out of it or
+# the fill would hand players a trap that does nothing. These names are inert
+# (count 0 in data/items.json, never drawn); each one joins TRAP_ITEM_NAMES, in
+# native enum order, in the build that implements its effect.
+#
+# They ARE in the "Traps" item name group below, because item_name_groups is
+# part of the datapackage payload AP checksums: adding a trap to its own group
+# later would be a SECOND datapackage churn, which is exactly what #177 spends
+# one bump to avoid. Group membership feeds !hint, item_links and
+# start_inventory_from_pool expansion; nothing in fill reads it, so this changes
+# no placement.
+#
+# Trap registry capacity: 5 shipped + 11 = 16 effect types, exactly native's
+# AP_TRAP_REGISTRY_CAP. The native build that lands the last of these must bump
+# that constant or the final trap silently has no slot (flagged in the ruling).
+FROZEN_TRAP_ITEM_NAMES = [
+    "Wumpa Reset Trap",
+    "Flatten Trap",
+    "Item Reroll Trap",
+    "Auto-Use Trap",
+    "Empty Crates Trap",
+    "Weakened Kart Trap",
+    "No Boost Trap",
+    "Wireframe Trap",
+    "Nitro Trap",
+    "Reverse Controls Trap",
+    "Red Potion Trap",
+]
+
 # Comfort-only issues #14/#15 pack. It stays atomic when a reduced location
 # set cannot host all five, rather than emitting a seed-dependent subset.
 SURFACE_ITEM_NAMES = frozenset({
@@ -110,9 +143,11 @@ class ctrAPWorld(World):
         "CTR Tokens": {"Red CTR Token", "Green CTR Token", "Blue CTR Token",
                        "Yellow CTR Token", "Purple CTR Token"},
         "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
-        # Sourced from the trap constant above so the group cannot drift from the
-        # native effect enum the trap set is pinned to.
-        "Traps": set(TRAP_ITEM_NAMES),
+        # Sourced from the two trap constants above so the group cannot drift
+        # from either the native effect enum (the buildable set) or the #177
+        # freeze (the frozen set). All 16 are in the group; only the 5 buildable
+        # ones are ever drawn into a pool.
+        "Traps": set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES),
     }
 
     def __init__(self, multiworld: "MultiWorld", player: int):

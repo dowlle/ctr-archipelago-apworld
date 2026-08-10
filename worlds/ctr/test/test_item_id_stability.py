@@ -10,10 +10,16 @@ resolve to a different id. It reads the mapping straight off the registered
 world class rather than re-reading the JSON, so it covers the actual mapping
 published in the datapackage.
 
-New entries are not covered by this v0.1.5 fixture and are meant to pass
-silently. When 0.2.0's frozen name manifest (issue #177) lands, extend this
-fixture with the new names and their explicit IDs without editing existing
-entries.
+The 0.2.0 name freeze (issue #177) added a SECOND fixture,
+fixtures/item_id_stability_v0_2_0.json, pinning every item name registered during
+the 0.2.0 cycle -- the spine-1 capability names plus the 93 the freeze itself
+minted. It is a separate file rather than an extension of the v0.1.5 one so each
+fixture keeps saying honestly which release froze the ids it holds; both are read
+below and neither is ever edited in place.
+
+Entries added AFTER the 0.2.0 freeze are covered by neither fixture and are meant
+to pass silently. Any release that spends a datapackage bump adds its own fixture
+here the same way.
 """
 import json
 import pathlib
@@ -22,8 +28,12 @@ import unittest
 from worlds.AutoWorld import AutoWorldRegister
 from worlds.ctr.Items import load_item_table
 
-FIXTURE_PATH = (
-    pathlib.Path(__file__).parent / "fixtures" / "item_id_stability_v0_1_5.json"
+FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
+FIXTURE_PATH = FIXTURE_DIR / "item_id_stability_v0_1_5.json"
+#: One entry per release that spent a datapackage bump. Append-only.
+FIXTURE_PATHS = (
+    FIXTURE_PATH,
+    FIXTURE_DIR / "item_id_stability_v0_2_0.json",
 )
 
 
@@ -50,10 +60,20 @@ class TestItemIdStability(unittest.TestCase):
         self.assertEqual(world_type.item_name_to_id, explicit)
 
     def test_existing_items_keep_their_frozen_id(self) -> None:
-        frozen: dict = json.loads(
-            FIXTURE_PATH.read_text(encoding="utf-8"),
-            object_pairs_hook=_reject_duplicate_keys,
-        )
+        frozen: dict = {}
+        for path in FIXTURE_PATHS:
+            batch = json.loads(
+                path.read_text(encoding="utf-8"),
+                object_pairs_hook=_reject_duplicate_keys,
+            )
+            overlap = set(batch) & set(frozen)
+            self.assertEqual(
+                overlap, set(),
+                f"{path.name} re-pins name(s) an earlier fixture already owns: "
+                f"{sorted(overlap)[:5]}. Each fixture owns its own release's "
+                "names and none is ever edited in place.",
+            )
+            frozen.update(batch)
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         current = world_type.item_name_to_id
 
