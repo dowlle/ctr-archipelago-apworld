@@ -20,10 +20,10 @@
   {"name": "No Brakes Trap", "code": 35010018, "count": 0, "classification": "trap"},
   {"name": "Forced Boost Trap", "code": 35010019, "count": 0, "classification": "trap"},
   {"name": "First Person Trap", "code": 35010020, "count": 0, "classification": "trap"},
-  {"name": "Ignore Grass", "code": 35010021, "count": 0, "classification": "filler"},
-  {"name": "Ignore Dirt", "code": 35010022, "count": 0, "classification": "filler"},
-  {"name": "Ignore Snow", "code": 35010023, "count": 0, "classification": "filler"},
-  {"name": "Ignore Water", "code": 35010024, "count": 0, "classification": "filler"},
-  {"name": "Ignore Ice", "code": 35010025, "count": 0, "classification": "filler"},
+  {"name": "Ignore Grass", "code": 35010021, "count": 1, "classification": "useful"},
+  {"name": "Ignore Dirt", "code": 35010022, "count": 1, "classification": "useful"},
+  {"name": "Ignore Snow", "code": 35010023, "count": 1, "classification": "useful"},
+  {"name": "Ignore Water", "code": 35010024, "count": 1, "classification": "useful"},
+  {"name": "Ignore Ice", "code": 35010025, "count": 1, "classification": "useful"},
   {"name": "Ignore Sand", "code": 35010026, "count": 0, "classification": "filler"}
 ]
