@@ -1298,24 +1298,47 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # keys/gems, slider-100 relics) stay lenient: fill seats them freely.
         _o = world.options
         pinned_items = set()
-        if int(_o.goal.value) == 4 or not bool(_o.shuffle_gems.value):
-            pinned_items.update(GEM_ITEMS)   # allgemcups always pins the gems
+        # Issue #152 C5/C6 (Q30 ruling: the drift fix folds into the
+        # composition, corrected against intended-final semantics rather than
+        # the partly-wrong baseline). The legacy `goal.value == 4` disjunct
+        # here was ALREADY wrong as of the 2026-07-15 ruling: create_items
+        # only ever pins the 5 Gems onto their cups when shuffle_gems is OFF
+        # (create_item's own _GEM_GOAL branch does not pin when shuffle_gems
+        # is ON, regardless of whether a gem goal is active -- see
+        # create_items). Gem pin status is a pure function of shuffle_gems,
+        # not of the goal, so the goal disjunct is dropped rather than
+        # translated to gems_required_goal > 0.
+        if not bool(_o.shuffle_gems.value):
+            pinned_items.update(GEM_ITEMS)
             pinned_items.add("AnyGem")
         if not bool(_o.shuffle_keys.value):
             pinned_items.add("Key")
-        # Regions holding PINNED GOAL-PROGRESSION locations: under the
-        # all-gem-cups goal the 5 Gems are pinned at their cups AND completing
-        # every cup IS the goal, so the accessibility check hard-requires each
-        # cup region reachable. The sweep must therefore prove the whole chain
-        # to every cup; requirements it cannot validate on that chain get
-        # relaxed regardless of item type. (Other pinned classes need no
-        # region rule: boss-race regions sit behind static trophy doors only,
-        # never behind pad requirements, and non-goal pinned gems' regions are
-        # only location-reachability under accessibility:full, which pool-item
-        # fill bridges -- 0 failures observed at the 14k scale.)
+        # Regions holding PINNED GOAL-PROGRESSION locations: when Gems
+        # Required Goal is active AND the 5 Gems are pinned at their cups
+        # (shuffle_gems off -- see the pinned_items correction just above),
+        # completing every cup IS necessary to reach the goal, so the
+        # accessibility check hard-requires each cup region reachable. The
+        # sweep must therefore prove the whole chain to every cup;
+        # requirements it cannot validate on that chain get relaxed
+        # regardless of item type. With shuffle_gems ON the Gems are
+        # pool-placed, not pinned to the cups at all, so no region needs this
+        # special-case treatment -- the ORIGINAL code set this unconditionally
+        # on `goal.value == 4`, over-constraining every already-legal
+        # gems-required + shuffle_gems=ON + include_gem_cups=ON seed (a
+        # config `raise_if_gems_required_goal_needs_excluded_cups` permits).
+        # Relaxing more than needed is conservative for solvability (Lessons
+        # Learned precedent), so this correction can only shrink, never grow,
+        # what the sweep treats as unsatisfiable; verified with a before/after
+        # generation comparison against pre-change main (see the build note).
+        # (Other pinned classes need no region rule: boss-race regions sit
+        # behind static trophy doors only, never behind pad requirements, and
+        # non-goal pinned gems' regions are only location-reachability under
+        # accessibility:full, which pool-item fill bridges -- 0 failures
+        # observed at the 14k scale.)
         critical_regions = frozenset(
             f"{c} Gem Cup" for c in ("Red", "Green", "Blue", "Yellow", "Purple")
-        ) if int(_o.goal.value) == 4 else frozenset()
+        ) if _o.gems_required_goal.value > 0 and not bool(_o.shuffle_gems.value) \
+            else frozenset()
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
             dest_to_phys_real, start, allowed, keygate,
@@ -1931,9 +1954,12 @@ def _capacity_context(world):
             if f"{track}: {relic_item.split()[0]} Time Trial" in _keep.get(relic_item, ())
         )
         trial_capacity[meta["level_id"]] = cnt
-    # Gem-cup Gem is lock-placed when gems are not shuffled, or always for the
-    # all-gem-cups goal (Goal.option_allgemcups == 4). Locked -> 0 trophy capacity.
-    gem_locked = (not bool(o.shuffle_gems.value)) or (o.goal.value == 4)
+    # Issue #152 C5/C6: gem-cup Gem is lock-placed exactly when gems are not
+    # shuffled -- NOT "always for the goal" (that legacy `goal == 4` disjunct
+    # was already wrong as of the 2026-07-15 ruling; see the matching fix and
+    # its rationale in _run_sphere_search_once's pinned_items block above).
+    # Locked -> 0 trophy capacity.
+    gem_locked = not bool(o.shuffle_gems.value)
     return {"podium": podium, "trial_capacity": trial_capacity, "gem_locked": gem_locked}
 
 

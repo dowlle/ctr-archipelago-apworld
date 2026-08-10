@@ -22,9 +22,10 @@ These tests lock in:
 - cups ON: nothing pinned, behaviour unchanged (Gems ride the pool);
 - Shuffle Gems OFF + cups OFF: the existing shuffle-off pin still runs exactly
   once (no double-pin crash from the new block);
-- goal allgemcups + Shuffle Gems ON + cups OFF: forbidden, raises OptionError;
-- goal allgemcups + Shuffle Gems OFF + cups OFF: allowed (gemgoal pins the Gems
-  onto the cups), no double-pin.
+- gems_required_goal:5 (issue #152, formerly goal allgemcups) + Shuffle Gems
+  ON + cups OFF: forbidden, raises OptionError;
+- gems_required_goal:5 + Shuffle Gems OFF + cups OFF: allowed (gemgoal pins
+  the Gems onto the cups), no double-pin.
 """
 
 import json
@@ -213,13 +214,15 @@ class TestGemCupsShuffleOffCupsOff(CupPinningMixin, CTRTestBase):
 
 
 class TestGemCupsAllGemsGoalShuffleOffCupsOff(CupPinningMixin, CTRTestBase):
-    """goal allgemcups + Shuffle Gems OFF + cups OFF is ALLOWED: gemgoal() pins
-    the five Gems onto the cups (win every cup). The new #50 block must skip this
-    config (its _GEM_GOAL guard) so gemgoal's pins are not double-placed."""
+    """gems_required_goal:5 (issue #152, formerly goal allgemcups) + Shuffle
+    Gems OFF + cups OFF is ALLOWED: gemgoal() pins the five Gems onto the
+    cups (win every cup). The #50 block must skip this config (its _GEM_GOAL
+    guard) so gemgoal's pins are not double-placed."""
 
     run_default_tests = False
     options = {
-        "goal": "allgemcups",
+        "oxide_goal": "none",
+        "gems_required_goal": 5,
         "shuffle_gems": False,
         "include_gem_cups": False,
         "warppad_unlock_requirements": "randomized",
@@ -234,13 +237,15 @@ class TestGemCupsAllGemsGoalShuffleOffCupsOff(CupPinningMixin, CTRTestBase):
 
 
 class TestGemCupsForbiddenCombo(CTRTestBase):
-    """goal allgemcups + Shuffle Gems ON + cups OFF is FORBIDDEN: the goal's own
-    races are the gem cups, so opting the cups out while the Gems scatter into the
-    pool would strand the goal. generate_early must raise a clean OptionError."""
+    """gems_required_goal:5 (issue #152, formerly goal allgemcups) + Shuffle
+    Gems ON + cups OFF is FORBIDDEN: the goal's own races are the gem cups,
+    so opting the cups out while the Gems scatter into the pool would strand
+    the goal. generate_early must raise a clean OptionError."""
 
     auto_construct = False
     options = {
-        "goal": "allgemcups",
+        "oxide_goal": "none",
+        "gems_required_goal": 5,
         "shuffle_gems": True,
         "include_gem_cups": False,
     }
@@ -248,5 +253,5 @@ class TestGemCupsForbiddenCombo(CTRTestBase):
     def test_generation_raises_option_error(self):
         with self.assertRaises(OptionError) as ctx:
             self.world_setup()
-        self.assertIn("allgemcups", str(ctx.exception))
+        self.assertIn("gems_required_goal", str(ctx.exception))
         self.assertIn("include_gem_cups", str(ctx.exception))

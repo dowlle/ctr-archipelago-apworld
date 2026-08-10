@@ -189,7 +189,8 @@ class TestVanillaBadSeedClass(CTRTestBase):
     all-state reachability there would assert an unrelated, already-true fact."""
     options = {
         "warppad_unlock_requirements": "vanilla",
-        "goal": "allbosses",
+        "oxide_goal": "none",
+        "bosses_required_goal": 4,
         "accessibility": "minimal",
         "shuffle_gems": True,
         "shuffle_keys": True,

@@ -223,7 +223,7 @@ class TestGateCountGuards(unittest.TestCase):
     def test_minimal_accessibility_warns_not_raises(self):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({"accessibility": "minimal", "sapphire_relic_count": 5,
-                    "goal": "allbosses"})
+                    "oxide_goal": "none", "bosses_required_goal": 4})
         self.assertTrue(any("permanently unreachable" in line for line in cm.output))
 
     def test_vanilla_full_accessibility_raises_below_10_at_slide_coliseum(self):
@@ -247,7 +247,7 @@ class TestGateCountGuards(unittest.TestCase):
     def test_oxidefinal_raises_when_tier_supply_below_requested_count(self):
         with self.assertRaises(OptionError) as ctx:
             _early({
-                "goal": "oxidefinal",
+                "oxide_goal": "final",
                 "accessibility": "minimal",
                 "oxide_final_challenge_unlock": "gold_relics",
                 "oxide_final_challenge_relic_count": 10,
@@ -257,7 +257,7 @@ class TestGateCountGuards(unittest.TestCase):
 
     def test_oxidefinal_ok_when_tier_supply_meets_requested_count(self):
         _early({
-            "goal": "oxidefinal",
+            "oxide_goal": "final",
             "accessibility": "minimal",
             "oxide_final_challenge_unlock": "gold_relics",
             "oxide_final_challenge_relic_count": 10,
@@ -269,7 +269,7 @@ class TestGateCountGuards(unittest.TestCase):
         # the guard must sum their CREATED counts (5+5+0=10), not just count
         # progression tiers (which would wrongly pass any count <= 18).
         _early({
-            "goal": "oxidefinal",
+            "oxide_goal": "final",
             "accessibility": "minimal",
             "warppad_unlock_requirements": "randomized",
             "oxide_final_challenge_unlock": "total_relics",
@@ -280,7 +280,7 @@ class TestGateCountGuards(unittest.TestCase):
         })
         with self.assertRaises(OptionError):
             _early({
-                "goal": "oxidefinal",
+                "oxide_goal": "final",
                 "accessibility": "minimal",
                 "warppad_unlock_requirements": "randomized",
                 "oxide_final_challenge_unlock": "total_relics",
@@ -306,7 +306,7 @@ class TestGeneralPoolSizing(CTRTestBase):
     options = {
         "sapphire_relic_count": 5, "gold_relic_count": 18,
         "platinum_relic_count": 0, "accessibility": "minimal",
-        "goal": "allbosses",
+        "oxide_goal": "none", "bosses_required_goal": 4,
     }
 
     def test_pool_relic_item_counts_match_created(self):

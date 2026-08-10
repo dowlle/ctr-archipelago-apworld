@@ -262,18 +262,18 @@ class TestGoalLocationForcedExclusionIndependentOfPlayerOption(unittest.TestCase
     is forced."""
 
     def test_oxide_goal_location_is_already_excluded_before_the_player_option_runs(self):
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         loc = mw.get_location(GOAL_LOCATION_OXIDE, 1)
         self.assertEqual(loc.progress_type, LocationProgressType.EXCLUDED,
                          "the world must force this BEFORE exclusion_rules runs")
 
     def test_oxidefinal_goal_location_is_already_excluded(self):
-        mw = _build(goal="oxidefinal")
+        mw = _build(oxide_goal="final")
         loc = mw.get_location(GOAL_LOCATION_OXIDEFINAL, 1)
         self.assertEqual(loc.progress_type, LocationProgressType.EXCLUDED)
 
     def test_player_excluding_the_goal_location_is_an_idempotent_no_op(self):
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         loc = mw.get_location(GOAL_LOCATION_OXIDE, 1)
         exclusion_rules(mw, 1, {GOAL_LOCATION_OXIDE})
         self.assertEqual(loc.progress_type, LocationProgressType.EXCLUDED)
@@ -286,7 +286,7 @@ class TestGoalLocationForcedExclusionIndependentOfPlayerOption(unittest.TestCase
         loop's own `progress_type != EXCLUDED` check is what catches it, and
         that check cannot distinguish world-forced EXCLUDED from
         player-requested EXCLUDED -- both refuse identically."""
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         loc = mw.get_location(GOAL_LOCATION_OXIDE, 1)
         with self.assertLogs(level="WARNING") as cm:
             refused = _apply_priority(mw, 1, {GOAL_LOCATION_OXIDE})
@@ -307,7 +307,7 @@ class TestEventLocationExclusionPriorityAsymmetry(unittest.TestCase):
     #28 designs a unified semantics on top of this."""
 
     def test_excluding_an_event_location_is_refused_and_warned(self):
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         loc = mw.get_location(EVENT_OXIDE, 1)
         self.assertTrue(loc.advancement)
         with self.assertLogs(level="WARNING") as cm:
@@ -318,7 +318,7 @@ class TestEventLocationExclusionPriorityAsymmetry(unittest.TestCase):
                             for msg in cm.output))
 
     def test_excluding_the_oxidefinal_event_location_is_also_refused(self):
-        mw = _build(goal="oxidefinal")
+        mw = _build(oxide_goal="final")
         loc = mw.get_location(EVENT_OXIDEFINAL, 1)
         with self.assertLogs(level="WARNING"):
             exclusion_rules(mw, 1, {EVENT_OXIDEFINAL})
@@ -328,7 +328,7 @@ class TestEventLocationExclusionPriorityAsymmetry(unittest.TestCase):
         """A second goal mode's companion event, so this is not a fact about
         the oxide goal specifically -- every `_add_goal_event` location shares
         the mechanism (locked advancement item -> exclusion_rules refuses)."""
-        mw = _build(goal="allbosses")
+        mw = _build(oxide_goal="none", bosses_required_goal=4)
         loc = mw.get_location(EVENT_ALLBOSSES_SAMPLE, 1)
         self.assertTrue(loc.advancement)
         with self.assertLogs(level="WARNING"):
@@ -339,7 +339,7 @@ class TestEventLocationExclusionPriorityAsymmetry(unittest.TestCase):
         """The asymmetry, made explicit: no exception, no warning, no refused
         set entry -- progress_type simply becomes PRIORITY on a location that
         already holds a locked item and will never reach fill."""
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         loc = mw.get_location(EVENT_OXIDE, 1)
         with self.assertNoLogs(level="WARNING"):
             refused = _apply_priority(mw, 1, {EVENT_OXIDE})
@@ -350,7 +350,7 @@ class TestEventLocationExclusionPriorityAsymmetry(unittest.TestCase):
         """The PRIORITY marking from the previous test has no observable
         effect: the location is not in get_unfilled_locations either before or
         after, because place_locked_item already resolved it in create_items."""
-        mw = _build(goal="oxide")
+        mw = _build(oxide_goal="first")
         _apply_priority(mw, 1, {EVENT_OXIDE})
         unfilled_names = {loc.name for loc in mw.get_unfilled_locations(1)}
         self.assertNotIn(EVENT_OXIDE, unfilled_names)
