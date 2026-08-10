@@ -11,6 +11,7 @@ from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table
 from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
+from . import progressive_capability
 from .Regions import create_regions
 from .relic_tiers import (
     RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
@@ -286,6 +287,7 @@ class ctrAPWorld(World):
         self._ctr_relic_keep, self._ctr_relic_created = draw_relic_tier_keep(self)
         from . import forced_options
         forced_options.apply(self)
+        progressive_capability.raise_if_per_character_mode_selected(self)
 
     def create_regions(self):
         create_regions(self)
@@ -1037,6 +1039,24 @@ class ctrAPWorld(World):
             if len(without_surface) <= unfilled:
                 pool = without_surface
 
+        # --- Progressive Boost / Progressive Stats item packs (issues #12,
+        # #13). `useful`, not `progression` -- issue scope is pool/fill
+        # correctness only, no track logic reads a tier yet. Empty dict when
+        # both packs are off, so this is a no-op (byte-identical to a
+        # pre-#12/#13 seed, no RNG draw taken) in the default configuration.
+        # Runs AFTER the #14/#15 comfort-pack trim above so a tight seed's
+        # freed slots (from omitting the comfort pack) are available to these
+        # items too -- `unfilled` is the same live count either block reads,
+        # `len(pool)` reflects whatever the trim above already did.
+        _capability_counts = progressive_capability.created_item_counts(self)
+        if _capability_counts:
+            _capability_supply = unfilled - len(pool)
+            progressive_capability.raise_if_capability_items_exceed_location_supply(
+                self, available_supply=_capability_supply)
+            for _cap_name, _cap_count in _capability_counts.items():
+                for _ in range(_cap_count):
+                    pool.append(self.create_item(_cap_name))
+
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
         # already locked above (the goal-tracking companion events _install_goal
@@ -1393,6 +1413,19 @@ class ctrAPWorld(World):
                 # steers no gate, no location, no item and no logic, so two seeds
                 # differing only in it are identical apart from the key.
                 "world_version": self.world_version.as_simple_string(),
+                # Progressive Boost / Progressive Stats (issues #12, #13).
+                # ADDITIVE keys, no schema bump (Q28 already makes schema 7
+                # unconditional on every 0.2.0 seed, so this feature rides
+                # that standing bump rather than needing its own). boost_mode
+                # / stats_mode: 0 off / 1 shared_global / 2 per_character
+                # (per_character never actually reaches here -- generate_early
+                # raises first -- but the wire shape reserves the value so a
+                # future native/#71 landing needs no contract rework).
+                # boost_blue_fire only matters when boost_mode != 0. No
+                # native consumer exists yet (apworld-only order scope): a
+                # pre-this-feature native reads none of these three keys by
+                # explicit named lookup and is unaffected either way.
+                **progressive_capability.fill_slot_data(self),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
