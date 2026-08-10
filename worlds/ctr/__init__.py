@@ -10,7 +10,8 @@ from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import get_location_names, get_total_locations
 from .Items import load_item_table
-from .Options import ctrAPOptions, Goal, FinalOxideUnlock, create_option_groups
+from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
+                      create_option_groups)
 from . import progressive_capability
 from .Regions import create_regions
 from .relic_tiers import (
@@ -205,7 +206,32 @@ class ctrAPWorld(World):
             if key in co:
                 getattr(o, opt_name).value = co[key]
 
-        _restore("goal", "goal")
+        # Issue #152: restore the composed goal fields. Wire data from a
+        # pre-#152 seed carries only the legacy `goal` int (no goal_oxide/
+        # goal_bosses/goal_gems keys) -- translate it into the exactly
+        # equivalent composed values so UT's re-generation reasons about the
+        # same win condition an older seed actually has.
+        if "goal_oxide" in co or "goal_bosses" in co or "goal_gems" in co:
+            _restore("oxide_goal", "goal_oxide")
+            _restore("bosses_required_goal", "goal_bosses")
+            _restore("gems_required_goal", "goal_gems")
+        elif "goal" in co:
+            _legacy = co["goal"]
+            _LEGACY_GOAL_MAP = {
+                # legacy int -> (oxide_goal, bosses_required_goal, gems_required_goal)
+                0: (OxideGoal.option_first, 0, 0),
+                1: (OxideGoal.option_final, 0, 0),
+                3: (OxideGoal.option_none, 4, 0),
+                4: (OxideGoal.option_none, 0, 5),
+            }
+            if _legacy in _LEGACY_GOAL_MAP:
+                _oxide, _bosses, _gems = _LEGACY_GOAL_MAP[_legacy]
+                o.oxide_goal.value = _oxide
+                o.bosses_required_goal.value = _bosses
+                o.gems_required_goal.value = _gems
+            # else: unrecognised legacy value -- leave the tracking player's
+            # own YAML defaults in place, matching the pre-#152
+            # _restore("goal", "goal") no-op-when-absent/unknown behaviour.
         _restore("warppad_unlock_requirements", "warppad_unlock_mode")
         _restore("bossgarage_unlock_requirements", "bossgarage_mode")
         _restore("shuffle_gems", "shuffle_gems")
@@ -703,7 +729,6 @@ class ctrAPWorld(World):
             return prog
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
-        goal = o.goal.value
         access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
         # Base vanilla-mode classification: the ONLY vanilla LOCATION gate that
         # names a relic is Sapphire (Slide Coliseum has('Sapphire Relic', 10)),
@@ -712,14 +737,19 @@ class ctrAPWorld(World):
         prog["Sapphire Relic"] = access_full
         prog["Gold Relic"] = False
         prog["Platinum Relic"] = False
-        # Oxide-final goal (issue #23): the relic tiers that satisfy the configured
-        # mode+count must be progression so fill, the spoiler playthrough, and
-        # beatability chase the REAL goal (not the old hard-coded 18 Sapphire).
-        # Respect the per-tier exact counts (issue #171: was a percentage slider,
-        # now a created-location count) -- a satisfying tier with 0 created stays
-        # out and is caught by generate_early's guard rather than silently forced.
-        if goal == Goal.option_oxidefinal:
-            # Sapphire is progression on ANY oxidefinal seed (mode-independent).
+        # Oxide-final goal (issue #23; #152 C4: generalized from the legacy
+        # `goal == oxidefinal` value to the composed `oxide_goal == final`
+        # condition -- this branch and forced_options.py's
+        # raise_if_oxidefinal_goal_has_no_progression_tier guard must move in
+        # lockstep, see that guard's docstring): the relic tiers that satisfy
+        # the configured mode+count must be progression so fill, the spoiler
+        # playthrough, and beatability chase the REAL goal (not the old
+        # hard-coded 18 Sapphire). Respect the per-tier exact counts (issue
+        # #171: was a percentage slider, now a created-location count) -- a
+        # satisfying tier with 0 created stays out and is caught by
+        # generate_early's guard rather than silently forced.
+        if o.oxide_goal.value == OxideGoal.option_final:
+            # Sapphire is progression on ANY oxide-final seed (mode-independent).
             # The two vanilla relic-count LOCATION gates are BOTH sapphire (Slide
             # Coliseum has('Sapphire Relic', 10); N. Oxide's Final Challenge has 18),
             # so once the goal makes any relic tier progression, fill may place a
@@ -794,61 +824,100 @@ class ctrAPWorld(World):
         # Issue #179: record it for elastic_bounds.goal_excluded_location_reserve.
         self._goal_excluded_location_names.append(location_name)
 
+    def _legacy_goal_value(self) -> int:
+        """Best-effort legacy `ctr_options.goal` int for a composed goal
+        (issue #152), for spoiler-log / ap-state debug readability ONLY --
+        see the fill_slot_data comment at its call site for why a
+        schema>=7-aware native never reads this for evaluation. -1 when the
+        composed goal has no single-condition legacy analogue."""
+        o = self.options
+        oxide = o.oxide_goal.value
+        bosses = o.bosses_required_goal.value
+        gems = o.gems_required_goal.value
+        if oxide == OxideGoal.option_first and bosses == 0 and gems == 0:
+            return 0  # legacy option_oxide
+        if oxide == OxideGoal.option_final and bosses == 0 and gems == 0:
+            return 1  # legacy option_oxidefinal
+        if oxide == OxideGoal.option_none and bosses == 4 and gems == 0:
+            return 3  # legacy option_allbosses
+        if oxide == OxideGoal.option_none and bosses == 0 and gems == 5:
+            return 4  # legacy option_allgemcups
+        return -1
+
     def _install_goal(self, player: int) -> None:
-        """Set this seed's completion condition and lay any companion goal-tracking
-        events (Spec §5, revised 2026-07-01).
+        """Set this seed's composed completion condition and lay any companion
+        goal-tracking events (Spec §5, revised 2026-07-01; composed 2026-08-10,
+        issue #152).
 
-        Goals 0/1 (Oxide, Oxide-final) are now real, coded, pool-filled locations
-        (data/locations.json codes 35011104 / 35011105); each is PAIRED with a code-null
-        companion event locking a distinct flag the completion condition reads. Goal 3
-        (All Bosses) checks 4 code-null companion events paired with the 4 real Boss
-        Race locations (35011100-35011103), replacing the wrong state.has(Trophy, 16)
-        proxy -- trophies only UNLOCK the garages, they do not mean the bosses were
-        beaten. Goal 4 (All Gems) keeps gemgoal()'s singleton-gem check, which is safe
-        by construction (a unique item cannot false-positive from a duplicate) and needs
-        no companion event."""
+        The goal is the AND of every ACTIVE condition among Oxide Goal
+        (none/first/final), Bosses Required Goal (0-4) and Gems Required Goal
+        (0-5) -- generate_early's raise_if_composed_goal_is_empty guard has
+        already rejected the all-off combination, so `predicates` below is
+        never empty by the time completion_condition is installed.
+
+        Oxide first/final are real, coded, pool-filled locations
+        (data/locations.json codes 35011104 / 35011105); each is PAIRED with
+        a code-null companion event locking a distinct flag the predicate
+        reads (Spec §5's standing rule: a goal meaning "the player personally
+        did X" must key off a singleton or a companion flag, never a
+        state.has() against an arbitrary shuffled item -- a duplicate landing
+        elsewhere in the multiworld must not false-complete it). Bosses
+        Required Goal checks N of the 4 real Boss Race locations the same
+        way, replacing the wrong state.has(Trophy, 16) proxy -- trophies only
+        UNLOCK the garages, they do not mean the bosses were beaten. Gems
+        Required Goal counts held Gems directly via gemgoal(): singleton
+        items, safe by construction (a duplicate cannot false-positive a
+        count), so it needs no companion event."""
         mw = self.multiworld
-        goal = self.options.goal.value
+        o = self.options
+        predicates: List = []
 
-        if goal == Goal.option_oxide:
+        if o.oxide_goal.value == OxideGoal.option_first:
             flag = self._add_goal_event(
                 "N. Oxide Garage", "N. Oxide's Challenge Cleared", "has('Key', 4)")
-            mw.completion_condition[player] = (
-                lambda state, f=flag: state.has(f, player))
+            predicates.append(lambda state, f=flag: state.has(f, player))
             # Issue #27: keep the real goal location as a check (the client sends it
             # in the same moment as the goal, so it is claimed by play), but mark it
             # EXCLUDED so fill only places filler there. No world's progression can
             # sit on the finish line, and the player's own progression can't be
             # stranded on a location that is only reachable once the seed is won.
             self._exclude_goal_location(player, "N. Oxide Garage: N. Oxide's Challenge")
-        elif goal == Goal.option_oxidefinal:
+        elif o.oxide_goal.value == OxideGoal.option_final:
             # The companion event is the seed's terminal win-flag; its win-trigger
             # is reaching Oxide's garage (Key 4). The relic requirement that turns
             # Oxide's Challenge into the FINAL Challenge (issue #23) is ANDed into
-            # completion_condition below from the configured
-            # oxide_final_challenge_unlock mode + count -- so fill, the spoiler
-            # playthrough, and beatability chase the real goal instead of the old
-            # hard-coded 18 Sapphire. The satisfying tiers are made progression by
-            # _relic_progression_map, and generate_early has already errored out on
-            # any mode/count/slider combo that could not reach the goal.
+            # this predicate from the configured oxide_final_challenge_unlock
+            # mode + count -- so fill, the spoiler playthrough, and beatability
+            # chase the real goal instead of the old hard-coded 18 Sapphire. The
+            # satisfying tiers are made progression by _relic_progression_map,
+            # and generate_early has already errored out on any mode/count
+            # combo that could not reach the goal.
             flag = self._add_goal_event(
                 "N. Oxide Garage", "N. Oxide's Final Challenge Cleared",
                 "has('Key', 4)")
             relic_rule = self._oxide_final_relic_rule()
-            mw.completion_condition[player] = (
+            predicates.append(
                 lambda state, f=flag, r=relic_rule:
                     state.has(f, player) and r(state))
-            # Issue #27: exclude the real Final Challenge location (see the oxide
-            # branch above for the full rationale).
+            # Issue #27: exclude the real Final Challenge location only -- when
+            # Oxide Goal is 'final' the FIRST Challenge is not this seed's goal
+            # location and stays a normal, fillable check (issue #152 C8).
             self._exclude_goal_location(
                 player, "N. Oxide Garage: N. Oxide's Final Challenge")
-        elif goal == Goal.option_allbosses:
+        # option_none: no Oxide predicate, nothing to lay.
+
+        if o.bosses_required_goal.value > 0:
             # Pair each real Boss Race location with a companion event of the same
             # reachability. The Boss Race location's own rule is "True"; the garage
             # door's trophy gate (add_boss_garage_rules 4/8/12/16) is what actually
             # gates reaching it, so a "True" event in the same region inherits that gate.
             # These per-boss "personally won" flags are also the machinery BUG-D's
             # future modes-0/1 reconciliation needs (see Options.BossGarageRequirements).
+            # Issue #152: the legacy All Bosses goal's all() becomes a tally
+            # compared against the configured count -- "any N", per the
+            # dossier's C11 ruling that N-of semantics must read identically
+            # on both sides of the contract (native mirrors this in
+            # AP_EvaluateGoal).
             boss_events = [
                 ("Ripper Roo Garage", "Ripper Roo Boss Race Won"),
                 ("Papu Papu Garage", "Papu Papu Boss Race Won"),
@@ -856,10 +925,24 @@ class ctrAPWorld(World):
                 ("Pinstripe Garage", "Pinstripe Boss Race Won"),
             ]
             flags = [self._add_goal_event(r, e, "True") for r, e in boss_events]
-            mw.completion_condition[player] = (
-                lambda state, fs=flags: all(state.has(f, player) for f in fs))
-        elif goal == Goal.option_allgemcups:
-            self.gemgoal(player)
+            n_bosses = o.bosses_required_goal.value
+            predicates.append(
+                lambda state, fs=flags, n=n_bosses:
+                    sum(state.has(f, player) for f in fs) >= n)
+
+        if o.gems_required_goal.value > 0:
+            self.gemgoal(player, o.gems_required_goal.value, predicates)
+
+        # generate_early's raise_if_composed_goal_is_empty already rejects the
+        # all-off combination, so this can never be empty here; the assert is
+        # a load-bearing guard against the guard drifting out of lockstep with
+        # this method, not a normal-path check.
+        assert predicates, (
+            "CTR: _install_goal found no active goal condition -- "
+            "raise_if_composed_goal_is_empty should already have rejected "
+            "this seed.")
+        mw.completion_condition[player] = (
+            lambda state, ps=tuple(predicates): all(p(state) for p in ps))
 
     def create_items(self):
         player = self.player
@@ -913,18 +996,26 @@ class ctrAPWorld(World):
         # enters the shuffled pool and its vanilla location becomes a normal check.
         # Track n_locked per item name so the general pool below creates
         # (count - n_locked) of it, keeping item count == location count.
-        _GEM_GOAL = self.options.goal.value == Goal.option_allgemcups
+        # Issue #152 C6 (drift fix, folded into the composition per the
+        # dossier's Q30 ruling): renamed from the legacy `goal ==
+        # option_allgemcups` check to the composed `gems_required_goal > 0`
+        # condition. Behaviourally identical for what used to be reachable
+        # (the old Choice's allgemcups value maps onto gems_required_goal ==
+        # 5), and now correctly fires for any active Gems Required Goal
+        # count, not just "all 5".
+        _GEM_GOAL = self.options.gems_required_goal.value > 0
         _gems_locked: Dict[str, int] = {}
         _keys_locked: Dict[str, int] = {}
         _vmap = json.loads(
             pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
         )["ShuffleOptions"]
 
-        # Gems: pin to gem-cup locations when shuffle_gems is OFF. For the All-Gems
-        # goal with shuffle off, gemgoal() already placed them (and
-        # place_locked_item on an already-filled location would raise), so skip the
-        # placement here for that goal -- the pool exclusion below still applies.
-        # All-Gems + shuffle ON pins nothing anywhere: the gems ride the pool.
+        # Gems: pin to gem-cup locations when shuffle_gems is OFF. When Gems
+        # Required Goal is active with shuffle off, gemgoal() already placed
+        # them (and place_locked_item on an already-filled location would
+        # raise), so skip the placement here for that goal -- the pool
+        # exclusion below still applies. Gems Required Goal + shuffle ON pins
+        # nothing anywhere: the gems ride the pool (2026-07-15 ruling).
         if not self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
                 mw.get_location(_loc_name, player).place_locked_item(
@@ -978,11 +1069,14 @@ class ctrAPWorld(World):
         #
         # The three sibling configs are already covered elsewhere and must NOT
         # double-pin (place_locked_item on a filled location raises):
-        #   - shuffle_gems OFF, non-goal: _gems_locked block (above) pinned them.
-        #   - shuffle_gems OFF, allgemcups: gemgoal() pinned them.
-        #   - shuffle_gems ON, allgemcups: forbidden in generate_early (the goal
-        #     Gems ride the pool, so pinning them onto opted-out cups would strand
-        #     the goal -- the _GEM_GOAL guard below is the belt-and-suspenders).
+        #   - shuffle_gems OFF, gems_required_goal == 0: _gems_locked block
+        #     (above) pinned them.
+        #   - shuffle_gems OFF, gems_required_goal > 0: gemgoal() pinned them.
+        #   - shuffle_gems ON, gems_required_goal > 0: forbidden in
+        #     generate_early (raise_if_gems_required_goal_needs_excluded_cups
+        #     -- the goal Gems ride the pool, so pinning them onto opted-out
+        #     cups would strand the goal; the _GEM_GOAL guard below is the
+        #     belt-and-suspenders).
         _cups_locked: Dict[str, int] = {}
         if not self.options.include_gem_cups.value \
                 and self.options.shuffle_gems.value and not _GEM_GOAL:
@@ -993,22 +1087,23 @@ class ctrAPWorld(World):
                 _cups_locked[_gem_name] = _cups_locked.get(_gem_name, 0) + 1
 
         # --- Create general item pool ---
-        # For the all-gem-cups goal, gemgoal() LOCKS the 5 gems at the gem-cup
-        # locations, so adding the same 5 gems from the item table again makes them
-        # redundant progression items: the pool then exceeds the available
-        # locations (gemgoal also consumes 5 cup locations) -> FillError ("N more
-        # progression items than locations") and an item/location count mismatch.
-        # Exclude the gems from the general pool for that goal (they are the goal
-        # items, placed at the cups). Other goals keep gems in the pool (Turbo Track's
-        # vanilla 5-gem gate needs them findable) UNLESS shuffle_gems pinned them, in
-        # which case _gems_locked subtracts them.
+        # When Gems Required Goal is active, gemgoal() LOCKS the 5 gems at the
+        # gem-cup locations, so adding the same 5 gems from the item table again
+        # makes them redundant progression items: the pool then exceeds the
+        # available locations (gemgoal also consumes 5 cup locations) -> FillError
+        # ("N more progression items than locations") and an item/location count
+        # mismatch. Exclude the gems from the general pool for that goal (they
+        # are the goal items, placed at the cups). Seeds without Gems Required
+        # Goal active keep gems in the pool (Turbo Track's vanilla 5-gem gate
+        # needs them findable) UNLESS shuffle_gems pinned them, in which case
+        # _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
         for item in load_item_table():
-            # All-Gems goal: exclude the gems from the general pool ONLY when
-            # gemgoal() locked them onto their cups (shuffle_gems off) -- adding
-            # them again would overflow the pool (see the note above). With
-            # shuffle_gems ON the gems stay in the pool: they are the goal items,
-            # hidden wherever the fill puts them (2026-07-15 ruling).
+            # Gems Required Goal: exclude the gems from the general pool ONLY
+            # when gemgoal() locked them onto their cups (shuffle_gems off) --
+            # adding them again would overflow the pool (see the note above).
+            # With shuffle_gems ON the gems stay in the pool: they are the goal
+            # items, hidden wherever the fill puts them (2026-07-15 ruling).
             if _GEM_GOAL and not self.options.shuffle_gems.value \
                     and item["name"] in _GEMS:
                 continue
@@ -1102,13 +1197,18 @@ class ctrAPWorld(World):
         # breadth -- all proven to fill 0/5000 randomized two-stage-active configs
         # while keeping real, distinct tier-2 gates on the great majority of pads.
 
-    def gemgoal(self, player):
-        """All-Gems goal: completion = own all 5 Gems. With Shuffle Gems OFF the
-        gems are additionally locked onto their own Gem Cup locations (win every
-        cup); with Shuffle Gems ON they stay in the multiworld pool and the goal
-        is a hunt for wherever the fill hid them (create_items keeps them in the
-        pool for this goal, and native's goal 4 already counts RECEIVED gems, so
-        both placements complete identically)."""
+    def gemgoal(self, player, n: int, predicates: List) -> None:
+        """Gems Required Goal (issue #152, generalized from the legacy
+        All-Gems goal): appends a "hold >= n of the 5 Gems" predicate to
+        `predicates` (composed with any Oxide/Bosses predicates by
+        _install_goal, which owns setting completion_condition). With
+        Shuffle Gems OFF the gems are additionally locked onto their own Gem
+        Cup locations (win enough cups); with Shuffle Gems ON they stay in
+        the multiworld pool and the goal is a hunt for wherever the fill hid
+        them (create_items keeps them in the pool for this goal, and
+        native's goal_gems field already counts RECEIVED gems, so both
+        placements complete identically). n == 5 is byte-equivalent to the
+        legacy All-Gems goal's own all()."""
         # Read via pkgutil so it works when the world is loaded from a zipped
         # .apworld (open()/os.path on __file__ raises NotADirectoryError inside a
         # zip -- the gem-cup goal crashed on every distributed seed). pkgutil is
@@ -1122,10 +1222,10 @@ class ctrAPWorld(World):
                 loc = mw.get_location(loc_name, player)
                 loc.place_locked_item(self.create_item(gem_name))
 
-        mw.completion_condition[player] = lambda state: all(
-            state.has(g, player, 1)
-            for g in ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
-        )
+        gems = ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
+        predicates.append(
+            lambda state, gems=gems, n=n:
+                state.has_from_list_unique(gems, player, n))
 
     # --- Native-randomization slot_data (Phase-2 MVP shared contract) ---
 
@@ -1331,7 +1431,22 @@ class ctrAPWorld(World):
             "schema_version": schema,
             "ctr_options": {
                 "schema_version": schema,
-                "goal": o.goal.value,
+                # Issue #152: composed goal conditions replace the single
+                # `goal` Choice. `goal` stays on the wire, best-effort, purely
+                # for spoiler-log / ap-state / debug readability -- a
+                # schema>=7-aware native reads ONLY goal_oxide/goal_bosses/
+                # goal_gems for evaluation and ignores `goal` entirely (issue
+                # #163 already gates ALL goal evaluation on schema_newer, and
+                # schema is unconditionally 7 on every 0.2.0 seed per Q28, so
+                # there is no compat direction left for `goal` to protect).
+                # Emitted as the exact legacy-equivalent int when the composed
+                # goal happens to match one of the four old single-condition
+                # goals, else -1 (no legacy analogue; never read as a real
+                # goal value by a schema-aware client).
+                "goal": self._legacy_goal_value(),
+                "goal_oxide": o.oxide_goal.value,
+                "goal_bosses": o.bosses_required_goal.value,
+                "goal_gems": o.gems_required_goal.value,
                 # relic_min_time / relics_require_perfect were dropped with their
                 # YAML options (2026-07-15 release polish): native parsed both but
                 # never enforced them. json_int defaults the absent keys to 0, the

@@ -82,46 +82,82 @@ def raise_if_custom_trophy_weight_is_zero(world):
                 "legal for every other item, including Key.")
 
 
-def raise_if_allgemcups_goal_needs_excluded_cups(world):
-    """Issue #50: the All-Gems goal's own races ARE the 5 Gem Cups. Turning
-    include_gem_cups OFF keeps those cups vanilla-fixed while shuffle_gems ON
-    scatters the 5 goal Gems anywhere in the multiworld -- so the goal's own
-    cup races are opted out of the seed and the create_items #50 pin (which
-    would put the Gems back on the cups) is intentionally skipped for the goal
-    (gems ride the pool, 2026-07-15 ruling). That leaves an unwinnable-by-design
-    combination, so forbid it here with a clear message rather than emit it.
-    shuffle_gems OFF is fine (gemgoal pins the gems onto the cups directly), so
-    this fires only on the shuffle-ON conflict."""
-    from .Options import Goal
-    if world.options.goal.value == Goal.option_allgemcups \
+def raise_if_composed_goal_is_empty(world):
+    """Issue #152 (dossier §2.2 C1): with three independent composable goal
+    conditions -- OxideGoal (weighted Choice, 'none' a legal roll),
+    BossesRequiredGoal and GemsRequiredGoal (both Range, 0 a legal roll) --
+    every one of them landing on its OFF value is a reachable YAML outcome
+    (e.g. Dex's weighted-per-option shape rolling 'none'/0/0 independently),
+    and nothing before this guard rejects it. An empty composed goal makes
+    completion_condition vacuously true (Rules.py `_install_goal` ANDs zero
+    active predicates), so the seed would be won at connect -- AP would emit
+    a world it considers already beaten. Reject clearly instead of shipping
+    that."""
+    o = world.options
+    from .Options import OxideGoal
+    if o.oxide_goal.value == OxideGoal.option_none \
+            and o.bosses_required_goal.value == 0 \
+            and o.gems_required_goal.value == 0:
+        raise OptionError(
+            "CTR: 'oxide_goal', 'bosses_required_goal' and "
+            "'gems_required_goal' are all off (none/0/0) -- the composed "
+            "goal (issue #152) has no active condition, so the seed would be "
+            "won the instant it connects. Set at least one of the three to a "
+            "non-off value.")
+
+
+def raise_if_gems_required_goal_needs_excluded_cups(world):
+    """Issue #50, generalized for #152's composed goal. When Gems Required
+    Goal is active, its Gems ARE (in part) the 5 Gem Cups' vanilla contents.
+    Turning include_gem_cups OFF keeps those cups vanilla-fixed while
+    shuffle_gems ON scatters the goal Gems anywhere in the multiworld -- so
+    the cups the goal's Gems would otherwise sit on are opted out of the
+    seed, and the create_items #50 pin (which would put the Gems back on the
+    cups) is intentionally skipped whenever gems_required_goal is active
+    (gems ride the pool, 2026-07-15 ruling). Each Gem is a singleton item, so
+    the required COUNT does not weaken this: needing N of 5 is still "N of
+    the 5 items that live on the opted-out cups". That leaves an
+    unwinnable-by-design combination, so forbid it here with a clear message
+    rather than emit it. shuffle_gems OFF is fine (the Gems are pinned onto
+    the cups directly, see create_items), so this fires only on the
+    shuffle-ON conflict."""
+    if world.options.gems_required_goal.value > 0 \
             and world.options.shuffle_gems.value \
             and not world.options.include_gem_cups.value:
         raise OptionError(
-            "CTR goal 'allgemcups' requires 'include_gem_cups: true' (the "
-            "goal lives in the gem cups; excluding them while shuffling gems "
-            "leaves the goal's own races out of the seed).")
+            "CTR 'gems_required_goal' > 0 requires 'include_gem_cups: true' "
+            "when 'shuffle_gems' is also on (the required Gems live in the "
+            "gem cups; excluding the cups while shuffling gems leaves the "
+            "goal's own Gems out of the seed).")
 
 
 def raise_if_oxidefinal_goal_has_no_progression_tier(world):
     """Generation-time progression + supply guard for the Oxide-final goal
-    (issue #23; extended by issue #171/#28 R5 for exact-count supply).
+    (issue #23; extended by issue #171/#28 R5 for exact-count supply; #152 C3
+    /C4: generalized from the legacy `goal == oxidefinal` value to the
+    composed `oxide_goal == final` condition, kept in lockstep with
+    `_relic_progression_map`'s own `oxide_goal == final` branch -- both must
+    move together, or a composed oxide-final seed either fails generation on
+    a slider the player never touched (map not updated) or ships a goal tier
+    that is never classified progression (guard not updated); see the #152
+    build note).
 
-    When the goal IS Oxide's Final Challenge, the relic tiers that satisfy the
-    configured mode+count must (a) be generated as PROGRESSION (visible to
-    fill / beatability) and (b), since issue #171 replaced the old
-    always-18-items pinning with exact-count removal, actually have enough
-    relics CREATED this seed to reach the configured count -- a tier at
-    'count 5' can never satisfy a request for 10, no matter how it is
-    classified. A tier whose count is 0 is opted fully out by the player; if
-    the goal can only be satisfied by such tiers (or by tiers with too few
-    created), the goal would be unreachable. Error clearly here instead of
-    emitting a world whose goal AP cannot see -- respecting the per-tier
-    counts rather than silently forcing a tier back on or (R5's alternative,
-    considered and rejected here for this specific guard -- see the build
-    note) silently clamping the player's own oxide_final_challenge_relic_count
-    down to whatever happened to be created."""
-    from .Options import Goal, FinalOxideUnlock
-    if world.options.goal.value != Goal.option_oxidefinal:
+    When Oxide Goal is 'final', the relic tiers that satisfy the configured
+    mode+count must (a) be generated as PROGRESSION (visible to fill /
+    beatability) and (b), since issue #171 replaced the old always-18-items
+    pinning with exact-count removal, actually have enough relics CREATED
+    this seed to reach the configured count -- a tier at 'count 5' can never
+    satisfy a request for 10, no matter how it is classified. A tier whose
+    count is 0 is opted fully out by the player; if the goal can only be
+    satisfied by such tiers (or by tiers with too few created), the goal
+    would be unreachable. Error clearly here instead of emitting a world
+    whose goal AP cannot see -- respecting the per-tier counts rather than
+    silently forcing a tier back on or (R5's alternative, considered and
+    rejected here for this specific guard -- see the build note) silently
+    clamping the player's own oxide_final_challenge_relic_count down to
+    whatever happened to be created."""
+    from .Options import OxideGoal, FinalOxideUnlock
+    if world.options.oxide_goal.value != OxideGoal.option_final:
         return
     n = world.options.oxide_final_challenge_relic_count.value
     tiers = world._oxide_goal_tiers()
@@ -212,7 +248,8 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
 
 def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
-    raise_if_allgemcups_goal_needs_excluded_cups(world)
+    raise_if_composed_goal_is_empty(world)
+    raise_if_gems_required_goal_needs_excluded_cups(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
 

@@ -56,7 +56,7 @@ class TestRaiseOxidefinalNoProgressionTier(unittest.TestCase):
     def test_vanilla_mode_goal_tier_count_at_zero_raises(self):
         with self.assertRaises(OptionError) as ctx:
             _early({
-                "goal": "oxidefinal",
+                "oxide_goal": "final",
                 "warppad_unlock_requirements": "vanilla",
                 "oxide_final_challenge_unlock": "gold_relics",
                 "gold_relic_count": 0,
@@ -67,7 +67,7 @@ class TestRaiseOxidefinalNoProgressionTier(unittest.TestCase):
         # Non-conflicting: the goal's own tier has a created count > 0, and the
         # default oxide_final_challenge_relic_count (18) is exactly met.
         _early({
-            "goal": "oxidefinal",
+            "oxide_goal": "final",
             "warppad_unlock_requirements": "vanilla",
             "oxide_final_challenge_unlock": "gold_relics",
             "gold_relic_count": 18,
@@ -86,7 +86,7 @@ class TestRaiseOxidefinalNoProgressionTier(unittest.TestCase):
         # to keep the assertion about mode-independent classification without
         # colliding with the new supply check).
         _early({
-            "goal": "oxidefinal",
+            "oxide_goal": "final",
             "warppad_unlock_requirements": "randomized",
             "oxide_final_challenge_unlock": "gold_relics",
             "oxide_final_challenge_relic_count": 1,

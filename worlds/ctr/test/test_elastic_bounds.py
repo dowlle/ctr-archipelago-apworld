@@ -241,8 +241,9 @@ class TestExcludedLocationReserve(unittest.TestCase):
         self.assertEqual(goal_excluded_location_reserve(world), 1)
 
     def test_allbosses_goal_excludes_no_location(self):
-        multiworld = setup_multiworld(ctrAPWorld, seed=1,
-                                      options={"goal": "allbosses"})
+        multiworld = setup_multiworld(
+            ctrAPWorld, seed=1,
+            options={"oxide_goal": "none", "bosses_required_goal": 4})
         world = multiworld.worlds[1]
         self.assertEqual(goal_excluded_location_reserve(world), 0)
 

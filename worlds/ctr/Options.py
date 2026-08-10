@@ -4,30 +4,51 @@ from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle
                      Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
 
-class Goal(Choice):
-    """Determines the player's end goal.
+class OxideGoal(Choice):
+    """Which of N. Oxide's Challenges must be beaten for the goal to be met.
 
-    - **oxide** (default): defeat N. Oxide's Challenge.
-    - **oxidefinal**: collect relics, then defeat N. Oxide's Final Challenge.
-    - **allbosses**: win all 4 boss races (Ripper Roo, Papu Papu, Komodo Joe, Pinstripe).
-    - **allgemcups**: collect all 5 Gems. Requires `Include Gem Cup Warp Pads` on:
-      with `Shuffle Gems` off the Gems sit on their own Gem Cups, with it on they
-      hide anywhere in the multiworld."""
-    # allgemcups + Shuffle Gems on + gem cups excluded would leave the goal's own
-    # races out of the seed; that combination fails generation with a clear message.
-    display_name = "Goal"
-    option_oxide = 0
-    option_oxidefinal = 1
-    # Value 2 ("everythingplusone" / 101%) was DROPPED: its implemented condition
-    # felt arbitrary and was not true vanilla 101%; goal 1 (Oxide-final) covers the
-    # "harder ending" niche. The numeric slot 2 is left as a
-    # DOCUMENTED GAP -- the surviving values keep their ints because `ctr_options.goal`
-    # is consumed natively by AP_EvaluateGoal (slot_data contract), so renumbering
-    # would be a cross-layer break. AP's Choice permits non-contiguous option values,
-    # and an old YAML with `goal: everythingplusone` now fails generation with AP's
-    # standard invalid-option error (the intended UX -- no silently-accepting alias).
-    option_allbosses = 3
-    option_allgemcups = 4
+    - **none**: no Oxide requirement. Combine with `Bosses Required Goal`
+      and/or `Gems Required Goal` instead.
+    - **first** (default): defeat N. Oxide's Challenge.
+    - **final**: collect relics, then defeat N. Oxide's Final Challenge.
+
+    Issue #152: composes with `Bosses Required Goal` and `Gems Required
+    Goal` as an AND of every condition set active (non-'none'/non-zero). At
+    least one of the three must be active; a YAML that sets all three to
+    their off value fails generation with a clear message."""
+    display_name = "Oxide Goal"
+    option_none = 0
+    option_first = 1
+    option_final = 2
+    default = 1
+
+
+class BossesRequiredGoal(Range):
+    """How many of the 4 boss races (Ripper Roo, Papu Papu, Komodo Joe,
+    Pinstripe) must be personally won for the goal to be met. 0 (default)
+    means this condition is off.
+
+    Issue #152: composes with `Oxide Goal` and `Gems Required Goal` as an AND
+    of every active condition. "Personally won" means the boss-race location
+    itself was checked, not merely holding N trophies or N boss-garage Keys."""
+    display_name = "Bosses Required Goal"
+    range_start = 0
+    range_end = 4
+    default = 0
+
+
+class GemsRequiredGoal(Range):
+    """How many of the 5 Gems must be held for the goal to be met. 0
+    (default) means this condition is off.
+
+    Issue #152: composes with `Oxide Goal` and `Bosses Required Goal` as an
+    AND of every active condition. When active (> 0) with `Shuffle Gems` on,
+    requires `Include Gem Cup Warp Pads` on too -- otherwise the Gems the
+    goal needs would sit on cups this seed excluded, generation raises a
+    clear message instead of shipping an unwinnable seed."""
+    display_name = "Gems Required Goal"
+    range_start = 0
+    range_end = 5
     default = 0
 
 
@@ -599,8 +620,10 @@ class PlatinumRelicCount(Range):
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
 
-    # goal & endgame
-    goal: Goal
+    # goal & endgame (issue #152: composed conditions, ANDed)
+    oxide_goal: OxideGoal
+    bosses_required_goal: BossesRequiredGoal
+    gems_required_goal: GemsRequiredGoal
     oxide_final_challenge_unlock: FinalOxideUnlock
     oxide_final_challenge_relic_count: FinalOxideRelicCount
     # items & pool
@@ -644,7 +667,8 @@ class ctrAPOptions(PerGameCommonOptions):
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
-    "Goal": [Goal, FinalOxideUnlock, FinalOxideRelicCount],
+    "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
+            FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
                      ShuffleKeys, TrapFillPercentage],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
