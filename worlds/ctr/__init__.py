@@ -1586,6 +1586,15 @@ class ctrAPWorld(World):
                 # and nothing in AP logic reads it, so two seeds differing only in
                 # this value are identical apart from the key itself.
                 "warp_pad_item_display": o.warp_pad_item_display.value,
+                # AP-logo marker colours (issue #212): on = item-classification
+                # tints, off = one uniform greyish-white colour. ADDITIVE key,
+                # no schema bump -- native json_int defaults the absent key to 1
+                # (colours enabled), the shipped behaviour, so an older client on
+                # a new seed and a new client on an old seed both render exactly
+                # as they do now. Display only: it tints no gate, no location, no
+                # item, and nothing in AP logic reads it, so two seeds differing
+                # only in this value are identical apart from the key itself.
+                "ap_item_type_colors": bool(o.ap_item_type_colors.value),
                 # QoL, additive (no schema bump): one-lap cup races. Native
                 # json_int defaults the absent key to 0, so a pre-one-lap-cups
                 # native (or an old seed on a new native) is exactly vanilla lap
