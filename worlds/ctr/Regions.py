@@ -408,6 +408,19 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
+    # Itemsanity is global: a player can fire a received weapon from any race,
+    # so its checks belong to the always-reachable Menu region rather than a
+    # track.  Their item ownership rules are installed in Rules.py after the
+    # JSON rules have been applied.
+    from .itemsanity import ITEMSANITY_CLASS
+    for _name, _code, _region_name in ITEMSANITY_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "itemsanity"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
     # --- Podium placement checks (position-rung rework, shipped 0.1.x) --------
     # Per adventure trophy race, a 5-rung superset split into held-position rungs
     # (Held 1st / Held 3rd / optional Held 5th) and finish-line rungs (Finish on

@@ -45,6 +45,7 @@ from ..podium import (NEW_RUNGS, PODIUM_CLASS, SHIPPED_RUNGS, SLOT_ORDER,
                       TROPHY_TRACKS, all_podium_locations,
                       created_rung_keys_from_options, location_name,
                       podium_slot_codes)
+from ..itemsanity import ITEMSANITY_CLASS
 
 FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
 FIXTURE_PATH = FIXTURE_DIR / "location_class_id_stability_v0_1_5.json"
@@ -408,19 +409,21 @@ class TestLocationNameGroups(unittest.TestCase):
         klass = _FakeClass("plain", _entries("A", 90100000, 2))
         self.assertEqual(klass.location_name_groups(), {})
 
-    def test_podium_declares_no_groups_so_the_datapackage_is_unchanged(self) -> None:
-        """#176 is behaviour-neutral. location_name_groups is part of the payload
-        AP checksums, so a group added here would move the datapackage checksum
-        and the #177 manifest with it."""
+    def test_podium_declares_no_groups(self) -> None:
+        """Podium's frozen surface remains group-free."""
         self.assertEqual(PODIUM_CLASS.location_name_groups(), {})
-        self.assertEqual(CTR_LOCATION_CLASSES.location_name_groups(), {})
-        # AP injects "Everywhere" itself (AutoWorld.py:70-72); CTR declares none
-        # of its own, and that is what must not move.
+        self.assertEqual(
+            CTR_LOCATION_CLASSES.location_name_groups(),
+            {"Itemsanity Checks": set(ITEMSANITY_CLASS.names())},
+        )
+        # AP injects "Everywhere" itself (AutoWorld.py:70-72).
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         declared = {name: group for name, group
                     in world_type.location_name_groups.items()
                     if name != "Everywhere"}
-        self.assertEqual(declared, {})
+        self.assertEqual(declared, {
+            "Itemsanity Checks": set(ITEMSANITY_CLASS.names()),
+        })
 
     def test_declared_groups_merge_into_the_registry(self) -> None:
         registry = LocationClassRegistry()

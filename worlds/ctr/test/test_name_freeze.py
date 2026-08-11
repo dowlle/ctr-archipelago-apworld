@@ -149,9 +149,9 @@ class TestNameFreezeCensus(unittest.TestCase):
 class TestNameFreezeInertness(unittest.TestCase):
     """Property 2: registered, creating nothing."""
 
-    def test_every_frozen_item_has_count_zero(self) -> None:
+    def test_unimplemented_frozen_items_have_count_zero(self) -> None:
         for item in load_item_table():
-            if item["code"] >= 35010095:
+            if item["code"] >= 35010095 and item["name"] not in itemsanity.ITEM_NAMES:
                 with self.subTest(item=item["name"]):
                     self.assertEqual(
                         item["count"], 0,
@@ -159,10 +159,10 @@ class TestNameFreezeInertness(unittest.TestCase):
                         "the count belongs to the feature's own build",
                     )
 
-    def test_every_new_location_class_creates_nothing(self) -> None:
+    def test_every_unimplemented_location_class_creates_nothing(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
-            if location_class.key == "podium":
-                continue  # shipped and genuinely option-driven
+            if location_class.key in {"podium", "itemsanity"}:
+                continue  # shipped / this build genuinely option-driven
             with self.subTest(location_class=location_class.key):
                 self.assertEqual(location_class.created_location_names(None), [])
                 self.assertFalse(location_class.is_enabled(None))

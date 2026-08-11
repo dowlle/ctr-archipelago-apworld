@@ -246,6 +246,17 @@ class TrapFillPercentage(Range):
     default = 10
 
 
+class Itemsanity(Toggle):
+    """Add the eleven received weapon items and their 22 use-time checks.
+
+    Each Adventure-reachable weapon has one ordinary check and one juiced check
+    (fired while holding at least ten Wumpa).  The native companion owns the
+    crate-roll filter and the use-time check hook; this option owns the AP item
+    pool, location set and additive wire declaration.
+    """
+    display_name = "Itemsanity"
+
+
 class OneLapCups(DefaultOnToggle):
     """Make Cup races one lap each instead of the usual three. On by default.
 
@@ -632,6 +643,7 @@ class ctrAPOptions(PerGameCommonOptions):
     randomize_gem_cup_tracks: RandomizeGemCupTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
+    itemsanity: Itemsanity
     # capability item packs (issues #12, #13)
     progressive_boost: ProgressiveBoostMode
     progressive_boost_blue_fire: ProgressiveBoostBlueFire
@@ -670,7 +682,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
             FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
-                     ShuffleKeys, TrapFillPercentage],
+                     ShuffleKeys, TrapFillPercentage, Itemsanity],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode],
     "Warp Pads": [
