@@ -421,6 +421,20 @@ def create_regions(world: "ctrAPWorld"):
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
 
+    # Item-box checks (#109) parent to their TRACK's region, which is what
+    # hands every box its track's pad-access rules for free (region
+    # membership). Which slots exist this seed is the seating decision in
+    # item_boxes.created_location_names (placed count + shortcut_knowledge
+    # tier); the per-slot item-term rules are installed in Rules.py.
+    from .item_boxes import ITEM_BOX_CLASS
+    for _name, _code, _region_name in ITEM_BOX_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "item_boxes"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
     # --- Podium placement checks (position-rung rework, shipped 0.1.x) --------
     # Per adventure trophy race, a 5-rung superset split into held-position rungs
     # (Held 1st / Held 3rd / optional Held 5th) and finish-line rungs (Finish on

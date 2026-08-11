@@ -176,9 +176,10 @@ class ProgressiveBoostMode(Choice):
       instead of silently overflowing or under-filling. The names and codes
       are already reserved on the datapackage so #71's landing does not need
       a second naming pass."""
-    # Logic is deliberately NOT gated on any tier yet (0.2.0 spine-1 order
-    # scope: pool/fill correctness only) -- these items ride as `useful`,
-    # never required by any location's access rule.
+    # Classification is per-seed: `useful` (the spine-1 shape) unless a logic
+    # reader is active. #145's Turbo checks and #109's boost-gated box slots
+    # both read the chain, and create_item upgrades it to `progression` in
+    # exactly those seeds (logic state never tracks useful items).
     display_name = "Progressive Boost"
     option_off = 0
     option_shared_global = 1
@@ -255,6 +256,47 @@ class Itemsanity(Toggle):
     pool, location set and additive wire declaration.
     """
     display_name = "Itemsanity"
+
+
+class BoxLocations(Toggle):
+    """Add the authored item-box checks (#109): one location per authored box
+    position, broken once per seed by driving through it in any Adventure race
+    mode on that track. 241 boxes are authored across all 18 tracks; how many
+    of them your seed creates depends on `shortcut_knowledge` (229 at easy /
+    236 at medium / 241 at hard).
+
+    Items seat freely in box locations, including progression. A box slot's
+    access logic mirrors its position: a handful need received Progressive
+    Boost tiers or stat chains when those packs are randomized, and the Tiger
+    Temple door box needs a door-opening weapon when Itemsanity is on.
+
+    REQUIRES the 0.2.0 native client, which spawns and breaks the AP crates.
+    On an older client these locations can never be checked, and any
+    progression seated in them makes the seed unfinishable.
+    """
+    display_name = "Item Box Locations"
+
+
+class ShortcutKnowledge(Choice):
+    """How much shortcut knowledge the seed's box logic may assume (#109).
+
+    - **easy** (default): no shortcut or respawn-trick boxes in the seed at
+      all -- every created box sits on the normal racing line.
+    - **medium**: adds boxes behind normal, non-technical shortcuts, plus the
+      two reached by deliberately respawning.
+    - **hard**: adds boxes behind technical/speedrunner shortcuts; these also
+      require one received copy of each stat chain when Progressive Stats is
+      randomized.
+
+    A box above your chosen tier is NOT created (removed from the seed, not
+    excluded), so no seed carries a location its player cannot in principle
+    reach. Mints no datapackage name.
+    """
+    display_name = "Shortcut Knowledge"
+    option_easy = 0
+    option_medium = 1
+    option_hard = 2
+    default = 0
 
 
 class OneLapCups(DefaultOnToggle):
@@ -644,6 +686,9 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     itemsanity: Itemsanity
+    # authored item-box checks (#109)
+    box_locations: BoxLocations
+    shortcut_knowledge: ShortcutKnowledge
     # capability item packs (issues #12, #13)
     progressive_boost: ProgressiveBoostMode
     progressive_boost_blue_fire: ProgressiveBoostBlueFire

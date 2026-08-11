@@ -73,6 +73,66 @@ def set_rules(world):
     add_boss_garage_rules(world, player)
     add_podium_placement_rules(world, player)
     add_itemsanity_rules(world, player)
+    add_item_box_rules(world, player)
+
+
+def add_item_box_rules(world, player):
+    """Per-slot item-term rules for the created #109 box locations.
+
+    The `shortcut_knowledge` tier is a CREATION decision (a slot above the
+    seed's tier is never created), so the only state terms here are item
+    terms, and each term is vacuous while the option that creates its items
+    is off (seating spec 2.2 -- a rule requiring an item that cannot exist
+    makes the seed unfillable, the #145 FillError class):
+
+    - `Progressive Boost >= n` binds only when `progressive_boost` is
+      randomized (with the pack off every kart has vanilla boost).
+    - "each stat chain >= 1" (the hard-tier general rule) binds only when
+      `progressive_stats` is randomized.
+    - The Tiger Temple door slot additionally needs one of the seven ledger
+      door-opener weapons, but only when `itemsanity` is on -- with it off,
+      weapon rolls are not modelled and any roll can open the door.
+
+    Like the itemsanity rules, every item term here reads items that
+    create_item upgrades to `progression` in exactly these seeds; a term on a
+    `useful` item would be permanently unsatisfiable in logic.
+    """
+    from .item_boxes import (BOX_RULES, ITEM_BOX_CLASS,
+                             TIGER_TEMPLE_DOOR_OPENERS)
+    from .progressive_capability import STAT_CHAINS
+
+    created = set(ITEM_BOX_CLASS.created_location_names(world.options))
+    if not created:
+        return
+
+    boost_on = bool(world.options.progressive_boost.value)
+    stats_on = bool(world.options.progressive_stats.value)
+    itemsanity_on = bool(world.options.itemsanity.value)
+
+    for (track, slot), (boost_min, needs_stats) in BOX_RULES.items():
+        name = ITEM_BOX_CLASS.location_name(track, slot)
+        if name not in created:
+            continue
+        need_boost = boost_min if boost_on else 0
+        need_stats = needs_stats and stats_on
+        door = (TIGER_TEMPLE_DOOR_OPENERS
+                if itemsanity_on and (track, slot) == ("Tiger Temple", 5)
+                else None)
+        if not need_boost and not need_stats and door is None:
+            continue
+
+        def _rule(state, p=player, need_boost=need_boost,
+                  need_stats=need_stats, door=door):
+            if need_boost and state.count("Progressive Boost", p) < need_boost:
+                return False
+            if need_stats and not all(state.has(chain, p)
+                                      for chain in STAT_CHAINS):
+                return False
+            if door is not None and not state.has_any(door, p):
+                return False
+            return True
+
+        world.multiworld.get_location(name, player).access_rule = _rule
 
 
 def add_itemsanity_rules(world, player):

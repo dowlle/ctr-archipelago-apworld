@@ -11,6 +11,8 @@ from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
+from . import item_boxes
+from .item_boxes import ITEM_BOX_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import progressive_capability
@@ -283,6 +285,14 @@ class ctrAPWorld(World):
         # value is the option value verbatim (0 off / 1 shared_global /
         # 2 per_character); absent on pre-#12 wires -> no-op.
         _restore("progressive_boost", "boost_mode")
+        # #109 box seeds: the toggle + knowledge tier decide which box slots
+        # exist and the stat chains join the boost chain as reachability
+        # inputs (hard-tier slots), so all three seed values must win over
+        # the tracking player's YAML. All raw scalars, absent on older wires.
+        _restore("progressive_stats", "stats_mode")
+        if "box_locations" in co:
+            o.box_locations.value = int(bool(co["box_locations"]))
+        _restore("shortcut_knowledge", "shortcut_knowledge")
 
         # Derive the two content-inclusion toggles from the pad gates: a cup /
         # crystal pad only carries a non-type-0 stage-1 requirement when its class
@@ -731,9 +741,20 @@ class ctrAPWorld(World):
         # forbids progression/useful there, which surfaced as FillErrors in
         # the 5,000-run default fuzz arm. Every other seed keeps the frozen
         # `useful` classification from data/items.json.
+        # #109 box slots are the second reader: boost-gated slots exist in
+        # every box seed, and the hard-knowledge slots additionally read the
+        # three stat chains (the hard-tier general rule), so those chains
+        # upgrade too -- but ONLY at hard, because no easier tier creates a
+        # stats-reading slot.
         if (name == progressive_capability.BOOST_CHAIN
-                and ITEMSANITY_CLASS.is_enabled(self.options)
-                and bool(self.options.progressive_boost.value)):
+                and bool(self.options.progressive_boost.value)
+                and (ITEMSANITY_CLASS.is_enabled(self.options)
+                     or ITEM_BOX_CLASS.is_enabled(self.options))):
+            classification = ItemClassification.progression
+        if (name in progressive_capability.STAT_CHAINS
+                and bool(self.options.progressive_stats.value)
+                and ITEM_BOX_CLASS.is_enabled(self.options)
+                and int(self.options.shortcut_knowledge.value) == item_boxes.SK_HARD):
             classification = ItemClassification.progression
         return ctrAPItem(
             name=name,
@@ -1636,6 +1657,16 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                # #109 box scalars, same convention: both always emitted raw
+                # (shortcut_knowledge even when box_locations is false, so
+                # trackers can read the tier without inferring it); the
+                # conditional item_box_checks block below is the feature.
+                # box_locations=true REQUIRES the 0.2.0 native that spawns the
+                # crates -- on an older client these locations can never be
+                # checked (seating spec 5.4); schema 7 + the #8 banner already
+                # cover the version direction, so no bump.
+                "box_locations": bool(o.box_locations.value),
+                "shortcut_knowledge": int(o.shortcut_knowledge.value),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
@@ -1654,6 +1685,15 @@ class ctrAPWorld(World):
             # Additive under schema 7.  Omitted when off, so disabled seeds do
             # not gain a dormant 22-slot feature block.
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        if o.box_locations.value:
+            # Additive under schema 7, same off-parity convention. The block
+            # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,
+            # plus the placement_counts desync guard) is built by the class
+            # so the wire and the created locations resolve through one
+            # seating decision. Slot order is the placement-file order
+            # COUNTED ACROSS THE FILE -- native must count the same way
+            # (item_boxes module docstring; Contract 7e).
+            slot_data["item_box_checks"] = ITEM_BOX_CLASS.wire_block(o)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:
