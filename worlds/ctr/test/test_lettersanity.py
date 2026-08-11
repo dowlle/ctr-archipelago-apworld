@@ -55,4 +55,3 @@ class TestLettersanityShapes(unittest.TestCase):
         self.assertEqual(len(block["locations"]), len(LETTER_TRACKS))
         self.assertTrue(all(len(codes) == len(LETTERS) and codes.count(-1) == 1
                             for codes in block["locations"].values()))
-
