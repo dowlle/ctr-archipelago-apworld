@@ -536,6 +536,12 @@ def fill_slot_data(world) -> Dict[str, object]:
     return {
         "starting_character": ROSTER_CHARACTER_ID[start],
         "starting_stat_class": int(world.options.starting_stat_class.value),
+        # Logic-relevant, and therefore load-bearing for Universal Tracker: it
+        # decides whether 15 unlock items exist at all. A UT re-generation that
+        # falls back to the tracking player's own default here rebuilds a
+        # DIFFERENT pool than the seed has -- and on a reduced seed it does not
+        # even fit, which is how the #54/#209 fuzz found this.
+        "character_unlocks": unlocks_enabled(world),
         "racer_locked_pads": racer_locks_enabled(world),
         "penta_stats": int(world.options.penta_stats.value),
         "editable_stats": int(world.options.editable_stats.value),

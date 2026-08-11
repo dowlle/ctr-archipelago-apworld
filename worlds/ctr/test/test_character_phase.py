@@ -501,9 +501,27 @@ class TestCharacterSlotData(unittest.TestCase):
     def test_every_scalar_is_emitted_unconditionally(self):
         options = _build(1).worlds[1].fill_slot_data()["ctr_options"]
         for key in ("starting_character", "starting_stat_class",
-                    "racer_locked_pads", "penta_stats", "editable_stats",
-                    "stat_source", "stat_owner", "stat_editing_allowed"):
+                    "character_unlocks", "racer_locked_pads", "penta_stats",
+                    "editable_stats", "stat_source", "stat_owner",
+                    "stat_editing_allowed"):
             self.assertIn(key, options)
+
+    def test_ut_restores_the_two_logic_relevant_character_options(self):
+        """Regression for the check-ut fuzz red: a UT re-generation that falls
+        back to the tracking player's own `character_unlocks` rebuilds a
+        different item pool than the seed has, and on a reduced seed the
+        re-generation raises outright."""
+        world = _build(1, podium_placement_checks=False,
+                       character_unlocks=False).worlds[1]
+        wire = world.fill_slot_data()["ctr_options"]
+        self.assertFalse(wire["character_unlocks"])
+
+        # Restore into a world whose own YAML says the opposite.
+        other = _build(2, character_unlocks=True,
+                       racer_locked_pads=True).worlds[1]
+        other._ut_restore_options({"ctr_options": wire})
+        self.assertFalse(other.options.character_unlocks.value)
+        self.assertFalse(other.options.racer_locked_pads.value)
 
     def test_starting_character_travels_as_an_engine_id(self):
         for seed in SEEDS:

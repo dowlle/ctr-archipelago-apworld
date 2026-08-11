@@ -295,11 +295,21 @@ class ctrAPWorld(World):
         if "box_locations" in co:
             o.box_locations.value = int(bool(co["box_locations"]))
         _restore("shortcut_knowledge", "shortcut_knowledge")
-        # Character phase (#54/#209). racer_locked_pads is the load-bearing one:
-        # it decides whether the 15 character unlock items are progression, and
-        # a progression/useful split UT gets wrong makes every downstream sphere
-        # wrong. The other character keys are cosmetic or native-only, so they
-        # are deliberately NOT restored (same reasoning as one_lap_cups).
+        # Character phase (#54/#209). Two logic-relevant keys, both of which UT
+        # gets wrong by default if it falls back to the tracking player's YAML:
+        #   character_unlocks decides whether 15 unlock items exist AT ALL, so
+        #     restoring it wrong rebuilds a different pool -- and on a reduced
+        #     seed the re-generation does not even FIT, which is exactly how
+        #     the fuzz matrix's check-ut arm caught this (6/500 seeds);
+        #   racer_locked_pads decides whether those items are progression, and
+        #     a progression/useful split UT gets wrong makes every downstream
+        #     sphere wrong.
+        # starting_stat_class / penta_stats / editable_stats are cosmetic or
+        # native-only and are deliberately NOT restored (same reasoning as
+        # one_lap_cups). The starting racer itself is restored separately in
+        # generate_early, because it is a per-seed draw, not an option value.
+        if "character_unlocks" in co:
+            o.character_unlocks.value = int(bool(co["character_unlocks"]))
         if "racer_locked_pads" in co:
             o.racer_locked_pads.value = int(bool(co["racer_locked_pads"]))
 
