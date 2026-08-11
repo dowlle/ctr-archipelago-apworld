@@ -8,8 +8,11 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
-from .Locations import get_location_names, get_total_locations
+from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
+from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
+from . import item_boxes
+from .item_boxes import ITEM_BOX_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import progressive_capability
@@ -130,6 +133,7 @@ class ctrAPWorld(World):
         name: item["code"] for name, item in _item_data_by_name.items()
     }
     location_name_to_id = get_location_names()
+    location_name_groups = CTR_LOCATION_CLASSES.location_name_groups()
 
     # Item groups (issue #167). Group names live in the SAME namespace as item
     # names (AutoWorld.AutoWorldRegister builds all_item_and_group_names from the
@@ -149,6 +153,7 @@ class ctrAPWorld(World):
         # freeze (the frozen set). All 16 are in the group; only the 5 buildable
         # ones are ever drawn into a pool.
         "Traps": set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES),
+        "Itemsanity Weapons": set(ITEM_NAMES),
     }
 
     def __init__(self, multiworld: "MultiWorld", player: int):
@@ -274,6 +279,21 @@ class ctrAPWorld(World):
         _restore("shuffle_keys", "shuffle_keys")
         _restore("oxide_final_challenge_unlock", "oxide_final_unlock")
         _restore("oxide_final_challenge_relic_count", "oxide_final_count")
+        # #145 made the boost chain a reachability input (the Itemsanity Turbo
+        # checks require one received Progressive Boost when the chain is
+        # randomized), so the seed's mode must override the tracking player's
+        # own YAML or UT's Turbo logic diverges from server truth. The wire
+        # value is the option value verbatim (0 off / 1 shared_global /
+        # 2 per_character); absent on pre-#12 wires -> no-op.
+        _restore("progressive_boost", "boost_mode")
+        # #109 box seeds: the toggle + knowledge tier decide which box slots
+        # exist and the stat chains join the boost chain as reachability
+        # inputs (hard-tier slots), so all three seed values must win over
+        # the tracking player's YAML. All raw scalars, absent on older wires.
+        _restore("progressive_stats", "stats_mode")
+        if "box_locations" in co:
+            o.box_locations.value = int(bool(co["box_locations"]))
+        _restore("shortcut_knowledge", "shortcut_knowledge")
 
         # Derive the two content-inclusion toggles from the pad gates: a cup /
         # crystal pad only carries a non-type-0 stage-1 requirement when its class
@@ -312,6 +332,14 @@ class ctrAPWorld(World):
         # block (gem_cup_legs.reconstruct_gem_cup_legs_from_wire); an absent
         # key (any pre-#166 seed) correctly restores to off + vanilla legs.
         o.randomize_gem_cup_tracks.value = int("gem_cup_legs" in passthrough)
+        # Itemsanity's block is conditional for off-toggle parity, while the
+        # raw scalar in ctr_options is always emitted.  Prefer that scalar for
+        # new seeds and retain block-presence fallback for the narrow interval
+        # where a candidate wire may have carried the block but no scalar.
+        if "itemsanity" in co:
+            o.itemsanity.value = int(bool(co["itemsanity"]))
+        else:
+            o.itemsanity.value = int("itemsanity_checks" in passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -705,6 +733,31 @@ class ctrAPWorld(World):
         relic_prog = getattr(self, "_ctr_relic_prog", None)
         if relic_prog is not None and relic_prog.get(name) is False:
             classification = ItemClassification.useful
+        # Honest per-seed BOOST classification, the same lever in the other
+        # direction. #145 Itemsanity is the first logic reader of a capability
+        # tier: its Turbo checks require one received Progressive Boost when
+        # the chain is randomized (Decision 2 ruling, 2026-08-10). Logic state
+        # only tracks progression items, so the gate is only real if the chain
+        # is progression in exactly those seeds -- left `useful` (the #12/#13
+        # shape), the Turbo checks sit permanently outside logic and fill
+        # forbids progression/useful there, which surfaced as FillErrors in
+        # the 5,000-run default fuzz arm. Every other seed keeps the frozen
+        # `useful` classification from data/items.json.
+        # #109 box slots are the second reader: boost-gated slots exist in
+        # every box seed, and the hard-knowledge slots additionally read the
+        # three stat chains (the hard-tier general rule), so those chains
+        # upgrade too -- but ONLY at hard, because no easier tier creates a
+        # stats-reading slot.
+        if (name == progressive_capability.BOOST_CHAIN
+                and bool(self.options.progressive_boost.value)
+                and (ITEMSANITY_CLASS.is_enabled(self.options)
+                     or ITEM_BOX_CLASS.is_enabled(self.options))):
+            classification = ItemClassification.progression
+        if (name in progressive_capability.STAT_CHAINS
+                and bool(self.options.progressive_stats.value)
+                and ITEM_BOX_CLASS.is_enabled(self.options)
+                and int(self.options.shortcut_knowledge.value) == item_boxes.SK_HARD):
+            classification = ItemClassification.progression
         return ctrAPItem(
             name=name,
             classification=classification,
@@ -1004,6 +1057,15 @@ class ctrAPWorld(World):
                 and self.options.shuffle_keys.value):
             mw.early_items.setdefault(player, {})["Key"] = 4
 
+        # Itemsanity's native crate filter returns Wumpa when the player has no
+        # received weapon.  Seed one or two distinct weapon types into early
+        # fill so an enabled seed has an opening weapon without granting it as
+        # starting inventory.  No RNG is consumed while the toggle is off.
+        if self.options.itemsanity.value:
+            early_count = self.random.randint(1, 2)
+            for weapon in self.random.sample(WEAPONS, early_count):
+                mw.early_items.setdefault(player, {})[weapon] = 1
+
         self._install_goal(player)
 
         # --- Relic-tier exact-count removal (issue #171 conversion; issue #28
@@ -1145,6 +1207,8 @@ class ctrAPWorld(World):
                     and item["name"] in _GEMS:
                 continue
             count = item["count"]
+            if self.options.itemsanity.value and item["name"] in ITEM_NAMES:
+                count = 1
             if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
             if item["name"] in _gems_locked:                          # gems pinned vanilla
@@ -1435,6 +1499,19 @@ class ctrAPWorld(World):
         block["locations"] = locations
         return block
 
+    def _resolve_itemsanity_checks(self) -> Dict[str, object]:
+        """Ordered 22-code fan-out for the native use-time hook (#145).
+
+        This is called only for an enabled seed.  Its order is the frozen
+        item-major class order, resolving through the class index rather than
+        rebuilding the code arithmetic at this second call site.
+        """
+        return {
+            "enabled": True,
+            "locations": [code for _name, code, _region in
+                          ITEMSANITY_CLASS.created_locations(self.options)],
+        }
+
     def fill_slot_data(self) -> Dict[str, object]:
         o = self.options
         # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -1578,6 +1655,20 @@ class ctrAPWorld(World):
                 # pre-this-feature native reads none of these three keys by
                 # explicit named lookup and is unaffected either way.
                 **progressive_capability.fill_slot_data(self),
+                # Always emit this scalar.  It is additive tracker/diagnostic
+                # metadata; option-off parity applies to generated content and
+                # to the conditional top-level feature block below.
+                "itemsanity": bool(o.itemsanity.value),
+                # #109 box scalars, same convention: both always emitted raw
+                # (shortcut_knowledge even when box_locations is false, so
+                # trackers can read the tier without inferring it); the
+                # conditional item_box_checks block below is the feature.
+                # box_locations=true REQUIRES the 0.2.0 native that spawns the
+                # crates -- on an older client these locations can never be
+                # checked (seating spec 5.4); schema 7 + the #8 banner already
+                # cover the version direction, so no bump.
+                "box_locations": bool(o.box_locations.value),
+                "shortcut_knowledge": int(o.shortcut_knowledge.value),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
@@ -1592,6 +1683,19 @@ class ctrAPWorld(World):
             # no-bump precedent: an old native keeps loading the vanilla legs
             # while this seed's podium logic follows the shuffled map.
             slot_data["gem_cup_legs"] = self._resolve_gem_cup_legs()
+        if o.itemsanity.value:
+            # Additive under schema 7.  Omitted when off, so disabled seeds do
+            # not gain a dormant 22-slot feature block.
+            slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        if o.box_locations.value:
+            # Additive under schema 7, same off-parity convention. The block
+            # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,
+            # plus the placement_counts desync guard) is built by the class
+            # so the wire and the created locations resolve through one
+            # seating decision. Slot order is the placement-file order
+            # COUNTED ACROSS THE FILE -- native must count the same way
+            # (item_boxes module docstring; Contract 7e).
+            slot_data["item_box_checks"] = ITEM_BOX_CLASS.wire_block(o)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:

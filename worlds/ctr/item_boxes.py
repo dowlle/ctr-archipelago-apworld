@@ -35,9 +35,18 @@ itemsanity 35016xxx family.
 FROZEN-NAME WARNING. These names ride the single 0.2.0 datapackage bump (#177).
 After that bump they are permanent, and their ids can never move.
 
-NAMES LAND INERT. `created_location_names` returns nothing, unconditionally,
-because no option creates these locations yet -- the 0.2.0 freeze mints names,
-not features.
+SEATING (#109 apworld half, 2026-08-11). `box_locations` on creates, per track,
+slots 1..placed (PLACED_COUNTS) minus the slots the seed's `shortcut_knowledge`
+tier removes (SK_REMOVED_AT). Slot N is defined as the Nth placement carrying
+that track in PLACEMENT-FILE ORDER, COUNTED ACROSS THE ENTIRE FILE -- five
+tracks are interleaved (two runs each: Crash Cove, Roo's Tubes, Hot Air Skyway,
+Mystery Caves, Oxide Station), so grouping-by-track-then-numbering mis-seats 27
+boxes. The table below was derived in the 2026-08-10 seating spec and
+independently re-verified against the FINAL placement file (counts, positions
+AND interleaving-aware slot numbers) before this build. Placement truth:
+`Development/Placement Backups/2026-08-10 154700 -- AP box placements -- FINAL
+241 across 18 tracks (logic survey complete).json` (vault). Native must count
+slots the same way; `placement_counts` on the wire is the desync guard.
 """
 import json
 import pkgutil
@@ -71,6 +80,130 @@ def _box_tracks():
 BOX_TRACKS = _box_tracks()
 
 
+def _track_level_ids():
+    """{track region name -> native LevelID} for the 18 box tracks, read from
+    data/warp_pad_ids.json (the single LevelID source) so the wire keys can
+    never drift from the pad canon."""
+    data = json.loads(
+        pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8")
+    )
+    return {pad_name[: -len(" Warp Pad")]: meta["level_id"]
+            for pad_name, meta in data["pads"].items()
+            if pad_name[: -len(" Warp Pad")] in set(BOX_TRACKS)}
+
+
+#: {track region name -> native LevelID}, 18 entries.
+TRACK_LEVEL_IDS = _track_level_ids()
+
+#: Authored placements per track (FINAL 241 file; re-verified 2026-08-11).
+#: Slots placed+1..15 stay inert this curation generation.
+PLACED_COUNTS = {
+    "Dingo Canyon": 15, "Dragon Mines": 13, "Blizzard Bluff": 14,
+    "Crash Cove": 10, "Tiger Temple": 10, "Papu's Pyramid": 12,
+    "Roo's Tubes": 11, "Hot Air Skyway": 15, "Sewer Speedway": 15,
+    "Mystery Caves": 13, "Cortex Castle": 14, "N. Gin Labs": 15,
+    "Polar Pass": 15, "Oxide Station": 14, "Coco Park": 10,
+    "Tiny Arena": 15, "Slide Coliseum": 15, "Turbo Track": 15,
+}
+assert sum(PLACED_COUNTS.values()) == 241
+
+#: `shortcut_knowledge` tiers (Choice values).
+SK_EASY, SK_MEDIUM, SK_HARD = 0, 1, 2
+
+#: Slots REMOVED below a knowledge tier, keyed (track, slot) -> minimum tier
+#: that creates the slot. easy removes all 12 (both respawn boxes ruled medium,
+#: 2026-08-10 15:00); medium additionally removes the 5 hard-tier slots (ruled
+#: 08-10 19:53: a hard slot left in a medium seed would be unreachable).
+SK_REQUIRED_TIER = {
+    ("Tiger Temple", 5): SK_MEDIUM,
+    ("Coco Park", 7): SK_MEDIUM,        # respawn box, ruled medium
+    ("Dragon Mines", 2): SK_MEDIUM,     # respawn box, ruled medium
+    ("Sewer Speedway", 2): SK_MEDIUM,
+    ("Sewer Speedway", 3): SK_MEDIUM,
+    ("Papu's Pyramid", 6): SK_MEDIUM,
+    ("Papu's Pyramid", 12): SK_MEDIUM,
+    ("Papu's Pyramid", 7): SK_HARD,
+    ("Papu's Pyramid", 10): SK_HARD,
+    ("Polar Pass", 9): SK_HARD,         # ruled hard TIER (Stef, 08-10 15:07)
+    ("Hot Air Skyway", 8): SK_HARD,
+    ("Oxide Station", 6): SK_HARD,
+}
+
+#: Item-term rules for gated slots, keyed (track, slot) -> (boost_min, stats).
+#: `boost_min` is the required received `Progressive Boost` count (0 = no boost
+#: term); `stats` = True requires one received copy of EACH stat chain (the
+#: hard-tier general rule). The `shortcut_knowledge` term is CREATION-side
+#: (SK_REQUIRED_TIER above), never a state term: a slot that exists in the seed
+#: already satisfies its knowledge tier. Every term is vacuous while the option
+#: that creates its items is off (spec 2.2) -- see Rules.add_item_box_rules.
+#: The Tiger Temple door's itemsanity-conditional weapon set is special-cased
+#: there, not here.
+#:
+#: ⚠ The three UNCAPTURED Hot Air Skyway slots (4, 6, 7) carry the ruled
+#: conservative `Progressive Boost >= 2` DEFAULT (re-arm amendment + 08-10
+#: 19:53 ruling), pending an in-game marking pass with exact evidence --
+#: over-restriction cannot create an unbeatable seed, free-reach could.
+BOX_RULES = {
+    ("Crash Cove", 4): (1, False),
+    ("Crash Cove", 9): (1, False),
+    ("Crash Cove", 10): (1, False),
+    ("Sewer Speedway", 2): (1, False),
+    ("Sewer Speedway", 3): (1, False),
+    ("Papu's Pyramid", 6): (1, False),
+    ("Papu's Pyramid", 12): (1, False),
+    ("Papu's Pyramid", 7): (1, True),
+    ("Papu's Pyramid", 10): (1, True),
+    ("Dragon Mines", 2): (0, False),    # respawn: SK creation term only
+    ("Coco Park", 7): (0, False),       # respawn: SK creation term only
+    ("Polar Pass", 14): (1, False),
+    ("Polar Pass", 15): (1, False),
+    ("Polar Pass", 9): (1, True),
+    ("Cortex Castle", 10): (1, False),
+    ("Cortex Castle", 11): (2, False),
+    ("N. Gin Labs", 4): (2, False),
+    ("N. Gin Labs", 5): (2, False),
+    ("N. Gin Labs", 6): (2, False),
+    ("N. Gin Labs", 7): (2, False),
+    ("N. Gin Labs", 8): (2, False),
+    ("N. Gin Labs", 9): (2, False),
+    ("N. Gin Labs", 14): (2, False),
+    ("N. Gin Labs", 15): (2, False),
+    ("Oxide Station", 6): (0, True),    # NO boost term: pads are ladder-exempt
+    ("Oxide Station", 13): (2, False),
+    ("Hot Air Skyway", 1): (2, False),
+    ("Hot Air Skyway", 2): (2, False),
+    ("Hot Air Skyway", 3): (2, False),
+    ("Hot Air Skyway", 4): (2, False),  # UNCAPTURED, ruled conservative default
+    ("Hot Air Skyway", 5): (2, False),
+    ("Hot Air Skyway", 6): (2, False),  # UNCAPTURED, ruled conservative default
+    ("Hot Air Skyway", 7): (2, False),  # UNCAPTURED, ruled conservative default
+    ("Hot Air Skyway", 8): (2, True),
+    ("Hot Air Skyway", 9): (2, False),
+    ("Hot Air Skyway", 13): (2, False),
+    ("Hot Air Skyway", 14): (2, False),
+    ("Hot Air Skyway", 15): (2, False),
+    ("Tiger Temple", 5): (0, False),    # itemsanity-conditional door, Rules.py
+}
+
+#: Slots the ledger EXPLICITLY cleared as no-gate (reachable backwards from the
+#: finish). Listed so nobody "fixes" them into gates later; carrying no rule is
+#: their ruled state, not an omission.
+EXPLICIT_NO_GATE = frozenset({
+    ("Cortex Castle", 12), ("Cortex Castle", 13),
+    ("Oxide Station", 4), ("Oxide Station", 7), ("Oxide Station", 14),
+    ("Hot Air Skyway", 10), ("Hot Air Skyway", 11), ("Hot Air Skyway", 12),
+})
+
+#: The seven Tiger Temple door openers (ledger set, verbatim): thrown-forward
+#: or protective weapons that can break the door. TNT is out (cannot be thrown
+#: forward); Warpball, Turbo and N. Tropy Clock are not openers. The x3
+#: variants count as their own names per the 08-10 family ruling.
+TIGER_TEMPLE_DOOR_OPENERS = (
+    "Bomb", "Bomb x3", "Missile", "Missile x3", "Beaker", "Shield Bubble",
+    "Mask",
+)
+
+
 class ItemBoxLocationClass(LocationClass):
     """The 270 authored item-box checks as a `LocationClass` (#176)."""
 
@@ -93,8 +226,51 @@ class ItemBoxLocationClass(LocationClass):
         return f"{track}: Item Box {slot}"
 
     def created_location_names(self, options):
-        """Nothing, until #109's option exists. See the module docstring."""
-        return []
+        """The active slots for this seed: per track, slots 1..placed, minus
+        the slots the seed's `shortcut_knowledge` tier removes (removal, not
+        exclusion -- a removed slot is never created, the #28/#171 shape).
+        229 at easy (default), 236 at medium, 241 at hard."""
+        toggle = getattr(options, "box_locations", None)
+        if toggle is None or not bool(toggle.value):
+            return []
+        tier = int(getattr(options, "shortcut_knowledge").value)
+        out = []
+        for track in BOX_TRACKS:
+            for slot in range(1, PLACED_COUNTS[track] + 1):
+                if SK_REQUIRED_TIER.get((track, slot), SK_EASY) > tier:
+                    continue
+                out.append(self.location_name(track, slot))
+        return out
+
+    def slot_code(self, track: str, slot: int) -> int:
+        """AP location code for a track's 1-based slot."""
+        return (ITEM_BOX_CODE_BASE
+                + BOX_TRACKS.index(track) * SLOTS_PER_TRACK + (slot - 1))
+
+    def wire_block(self, options):
+        """The `item_box_checks` slot_data block (call only when the toggle is
+        on). All 18 tracks always present, keyed by native LevelID as a decimal
+        string; each value a fixed 15-entry array of AP location codes with -1
+        for a slot not live this seed (beyond the placed count OR removed by
+        the knowledge tier -- native's behaviour is identical for both, so the
+        two causes are deliberately collapsed). `placement_counts` carries the
+        authored per-track counts so native can detect a placement-file desync
+        in one comparison at parse time instead of silently mis-seating every
+        rule after an off-by-one."""
+        created = set(self.created_location_names(options))
+        locations = {}
+        for track in BOX_TRACKS:
+            row = []
+            for slot in range(1, SLOTS_PER_TRACK + 1):
+                live = self.location_name(track, slot) in created
+                row.append(self.slot_code(track, slot) if live else -1)
+            locations[str(TRACK_LEVEL_IDS[track])] = row
+        return {
+            "enabled": True,
+            "placement_counts": {str(TRACK_LEVEL_IDS[t]): PLACED_COUNTS[t]
+                                 for t in BOX_TRACKS},
+            "locations": locations,
+        }
 
 
 #: The registered item-box class. `Locations.py` registers this instance.

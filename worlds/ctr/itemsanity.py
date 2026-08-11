@@ -36,10 +36,12 @@ a property of the ruled shape, not of this freeze.
 FROZEN-NAME WARNING. These names ride the single 0.2.0 datapackage bump (#177).
 After that bump they are permanent, and their ids can never move.
 
-NAMES LAND INERT. `created_location_names` returns nothing, unconditionally, and
-every weapon item carries `count: 0`, because no option creates either yet -- the
-0.2.0 freeze mints names, not features.
+The option is a single all-or-none toggle: all 22 names are created when it is
+on and none when it is off.  The items stay at `count: 0` in the frozen static
+table; `ctrAPWorld.create_items` activates exactly one of each per enabled seed.
 """
+from typing import Iterable, Sequence
+
 from .location_class import LocationClass
 
 # Additive block for the 22 itemsanity checks, stride 2 per weapon.
@@ -66,6 +68,30 @@ WEAPONS = (
 #: The 11 weapon item names, frozen order. Mirrors data/items.json indexes
 #: 95-105; asserted against the live item table by test_itemsanity.
 ITEM_NAMES = WEAPONS
+
+#: Distinct useful-item families for the pre-0.2.0 logic-difficulty build.
+#: This build deliberately does not attach these to any location.  The two x3
+#: variants share the missile/bomb family with their x1 counterparts, per the
+#: 2026-08-10 ruling.
+USEFUL_WEAPON_FAMILIES = (
+    ("Mask",),
+    ("Missile", "Missile x3"),
+    ("Bomb", "Bomb x3"),
+    ("Warpball",),
+    ("N. Tropy Clock",),
+)
+
+
+def family_count(state, player: int,
+                 families: Iterable[Sequence[str]]) -> int:
+    """Count distinct item families represented in ``state``.
+
+    A family contributes at most once even when several alternate items are
+    held.  It is intentionally generic and has no location-side caller yet:
+    the separate logic-difficulty build owns attachment to trophy wins.
+    """
+    return sum(any(state.has(item, player) for item in family)
+               for family in families)
 
 
 class ItemsanityLocationClass(LocationClass):
@@ -100,8 +126,15 @@ class ItemsanityLocationClass(LocationClass):
         return f"Itemsanity: {weapon}" + (" (Juiced)" if juiced else "")
 
     def created_location_names(self, options):
-        """Nothing, until #145's toggle exists. See the module docstring."""
-        return []
+        """All 22 checks when Itemsanity is on, otherwise none."""
+        toggle = getattr(options, "itemsanity", None)
+        if toggle is None or not bool(toggle.value):
+            return []
+        return list(self.names())
+
+    def location_name_groups(self):
+        """The frozen global check group, added before the 0.2.0 release."""
+        return {"Itemsanity Checks": set(self.names())}
 
 
 #: The registered itemsanity class. `Locations.py` registers this instance.
