@@ -13,6 +13,7 @@ from .Items import load_item_table
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import progressive_capability
+from . import rung_sizer
 from .Regions import create_regions
 from .relic_tiers import (
     RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
@@ -348,6 +349,7 @@ class ctrAPWorld(World):
         self._ctr_relic_keep, self._ctr_relic_created = draw_relic_tier_keep(self)
         from . import forced_options
         forced_options.apply(self)
+        rung_sizer.apply_rung_sizing(self)
         progressive_capability.raise_if_per_character_mode_selected(self)
 
     def create_regions(self):
