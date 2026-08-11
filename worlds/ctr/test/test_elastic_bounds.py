@@ -276,7 +276,16 @@ class TestExcludedLocationReserve(unittest.TestCase):
         multiworld = setup_multiworld(
             ctrAPWorld, seed=1,
             options={
-                "podium_placement_checks": False,
+                # #71 may not enable the master toggle, so a master-off seed
+                # with a conservative raw exclusion now correctly raises for
+                # capacity. Keep the master on and all held toggles off: the
+                # sizer can add its single finish category while Held 1st
+                # remains a registered-but-never-created name.
+                "podium_placement_checks": True,
+                "podium_held_rungs": False,
+                "podium_held_fifth_rung": False,
+                "podium_finish_rungs": False,
+                "podium_any_position_rung": False,
                 "exclude_locations": {never_created},
             })
         world = multiworld.worlds[1]

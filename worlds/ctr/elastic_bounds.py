@@ -85,12 +85,7 @@ logger = logging.getLogger(__name__)
 
 
 class CTRSettings(ap_settings.Group):
-    """CTR's host.yaml settings group (issue #179). Empty of per-option vetoes
-    today -- there is nothing elastic to veto yet -- but this is where a
-    future elastic option (#109, #148, ...) adds its own `AllowX: Bool`
-    entry alongside `enforce_friendly_options` below, exactly as Stardew
-    Valley's `StardewSettings` collects every `Allow*` veto in one group.
-    """
+    """CTR's host.yaml settings group (issue #179)."""
 
     class EnforceFriendlyOptions(ap_settings.Bool):
         """Clamp CTR's elastic per-seed counts (options whose value scales how
@@ -105,6 +100,17 @@ class CTRSettings(ap_settings.Group):
         description = "CTR Enforce Friendly Elastic-Option Bounds"
 
     enforce_friendly_options: "EnforceFriendlyOptions | bool" = True
+
+    class AllowRungSizing(ap_settings.Bool):
+        """Allow CTR to add podium *subcategories* when the generated pool
+        needs more capacity. This never enables the master Podium Placement
+        Checks toggle and never removes a player-selected rung. Disable it to
+        require the player to choose enough podium rungs explicitly; generation
+        then raises a clear OptionError instead of mutating the seed options.
+        """
+        description = "CTR Allow Adaptive Podium Rung Sizing"
+
+    allow_rung_sizing: "AllowRungSizing | bool" = True
 
 
 class ElasticCountOption(Range):
@@ -275,6 +281,18 @@ def goal_excluded_location_reserve(world) -> int:
     note's "the single excluded location" is the default-goal case, not a
     universal one -- verified against `_install_goal`'s four branches)."""
     return len(getattr(world, "_goal_excluded_location_names", ()))
+
+
+def predicted_goal_excluded_reserve(options) -> int:
+    """Goal-location filler reserve available during ``generate_early``.
+
+    ``goal_excluded_location_reserve`` intentionally reads the actual exclusion
+    list and is therefore correct only after ``_install_goal``. The rung sizer
+    runs before regions and items exist, so it needs this pure-options twin.
+    The composed goal model excludes exactly one real location when the Oxide
+    condition is ``first`` or ``final`` and none when it is ``none``.
+    """
+    return int(options.oxide_goal.value != 0)
 
 
 def player_exclude_locations_reserve(world) -> int:

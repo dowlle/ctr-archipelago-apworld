@@ -60,12 +60,11 @@ BOOST_COPIES_BLUE_FIRE = 3      # + blue fire capstone
 
 PER_CHARACTER_BLOCKED_MESSAGE = (
     "CTR '{option_name}' 'per_character' is not generatable yet: CTR's "
-    "current location supply (101 static + up to 80 podium rungs = 181; "
-    "already ~99 fixed progression items) cannot place the ~192-240 "
-    "additional per-character items the 2026-08-07 ruling specifies without "
-    "new locations. This is tracked as issue #71 (\"size the position-rung "
-    "location budget to the item pool\") and is not yet built. Use "
-    "'shared_global' instead, or wait for #71.")
+    "live location supply cannot place the 192-240 additional per-character "
+    "items without real item-box locations. Adaptive podium sizing is live, "
+    "but #109 must first seat box locations before this mode can be checked "
+    "against their per-seed supply. Use 'shared_global' instead, or wait for "
+    "#109.")
 
 
 def boost_item_name(character: str = None) -> str:
@@ -79,7 +78,7 @@ def stat_item_name(chain: str, character: str = None) -> str:
 
 def raise_if_per_character_mode_selected(world) -> None:
     """RAISE guard (issue #178 shape): reject `per_character` outright until
-    issue #71 exists. Runs in generate_early, before any pool math."""
+    #109 provides real item-box supply. Runs in generate_early, before pool math."""
     o = world.options
     if o.progressive_boost.value == 2:  # ProgressiveBoostMode.option_per_character
         raise OptionError(PER_CHARACTER_BLOCKED_MESSAGE.format(
