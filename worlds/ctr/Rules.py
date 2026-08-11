@@ -74,6 +74,22 @@ def set_rules(world):
     add_podium_placement_rules(world, player)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
+    add_lettersanity_rules(world, player)
+
+
+def add_lettersanity_rules(world, player):
+    from . import lettersanity
+    mode = int(world.options.lettersanity.value)
+    if mode not in (2, 3):
+        return
+    selected = world.options._lettersanity_selected
+    for track in lettersanity.LETTER_TRACKS:
+        required = (lettersanity.LETTERS if mode == 3 else selected[track])
+        names = tuple(lettersanity.item_name(track, letter) for letter in required)
+        loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
+        previous = loc.access_rule
+        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
+            previous(state) and all(state.has(name, p) for name in names)
 
 
 def add_item_box_rules(world, player):
