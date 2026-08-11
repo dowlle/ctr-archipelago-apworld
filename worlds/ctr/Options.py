@@ -397,6 +397,21 @@ class WarpPadItemDisplay(Choice):
     default = 0
 
 
+class ApItemTypeColors(DefaultOnToggle):
+    """Colour the Archipelago-logo warp-pad markers by item classification
+    (issue #212).
+
+    - **on** (default): each AP-logo marker uses the colour of its item's
+      classification.
+    - **off**: every AP-logo marker uses one uniform greyish-white colour.
+
+    A display setting only: original CTR rewards always show their real models
+    either way, so this never changes what a reward looks like. Needs a client
+    that supports it -- an older one shows classification colours whatever this
+    says."""
+    display_name = "AP Item Type Colours"
+
+
 class WarpPadUnlockRequirements(Choice):
     """How warp pads unlock -- the heart of the randomizer.
 
@@ -699,6 +714,8 @@ class ctrAPOptions(PerGameCommonOptions):
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     # warp pads: display (issue #59)
     warp_pad_item_display: WarpPadItemDisplay
+    # warp pads: AP-logo marker colours (issue #212)
+    ap_item_type_colors: ApItemTypeColors
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -735,6 +752,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         WarpPadShuffleCategories,
         WarpPadShuffleGrouping,
         WarpPadItemDisplay,
+        ApItemTypeColors,
         WarpPadUnlockRequirements,
         TwoStageDensity,
         RequirementVariety,
