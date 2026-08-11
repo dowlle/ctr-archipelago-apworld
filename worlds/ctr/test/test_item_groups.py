@@ -19,6 +19,7 @@ from worlds.AutoWorld import AutoWorldRegister
 
 from . import CTRTestBase
 from ..Items import load_item_table
+from ..itemsanity import ITEM_NAMES
 
 # The four groups exactly as issue #167 specifies them, with "Traps" extended by
 # the 0.2.0 name freeze (#177).
@@ -47,6 +48,7 @@ EXPECTED_GROUPS = {
         "Wireframe Trap", "Nitro Trap", "Reverse Controls Trap",
         "Red Potion Trap",
     },
+    "Itemsanity Weapons": set(ITEM_NAMES),
 }
 
 

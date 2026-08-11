@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.1.5",
-  "checksum": "a128f2f6fa29321903aefd9d84cffb21f086ba43",
+  "checksum": "09dafae50a4055cb098f944710de4a0d6809af8d",
   "item_name_to_id": {
     "Auto-Use Trap": 35010109,
     "Beaker": 35010099,
@@ -973,6 +973,19 @@
       "Red Gem",
       "Yellow Gem"
     ],
+    "Itemsanity Weapons": [
+      "Beaker",
+      "Bomb",
+      "Bomb x3",
+      "Mask",
+      "Missile",
+      "Missile x3",
+      "N. Tropy Clock",
+      "Shield Bubble",
+      "TNT",
+      "Turbo",
+      "Warpball"
+    ],
     "Relics": [
       "Gold Relic",
       "Platinum Relic",
@@ -1573,6 +1586,30 @@
       "Turbo Track: Trophy Race",
       "Wumpa: Reach 10 Wumpa",
       "Yellow Gem Cup: Gem"
+    ],
+    "Itemsanity Checks": [
+      "Itemsanity: Beaker",
+      "Itemsanity: Beaker (Juiced)",
+      "Itemsanity: Bomb",
+      "Itemsanity: Bomb (Juiced)",
+      "Itemsanity: Bomb x3",
+      "Itemsanity: Bomb x3 (Juiced)",
+      "Itemsanity: Mask",
+      "Itemsanity: Mask (Juiced)",
+      "Itemsanity: Missile",
+      "Itemsanity: Missile (Juiced)",
+      "Itemsanity: Missile x3",
+      "Itemsanity: Missile x3 (Juiced)",
+      "Itemsanity: N. Tropy Clock",
+      "Itemsanity: N. Tropy Clock (Juiced)",
+      "Itemsanity: Shield Bubble",
+      "Itemsanity: Shield Bubble (Juiced)",
+      "Itemsanity: TNT",
+      "Itemsanity: TNT (Juiced)",
+      "Itemsanity: Turbo",
+      "Itemsanity: Turbo (Juiced)",
+      "Itemsanity: Warpball",
+      "Itemsanity: Warpball (Juiced)"
     ]
   }
 }

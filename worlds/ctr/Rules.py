@@ -72,6 +72,43 @@ def set_rules(world):
         add_vanilla_floor_rules(world, player)
     add_boss_garage_rules(world, player)
     add_podium_placement_rules(world, player)
+    add_itemsanity_rules(world, player)
+
+
+def add_itemsanity_rules(world, player):
+    """Apply the received-weapon rules for Itemsanity's global checks.
+
+    ONLY Turbo additionally requires boost capability, and only when
+    Progressive Boost is randomized (#145 Decision 2 ruling, 2026-08-10) --
+    every other weapon fires regardless of boost tier, so attaching the term
+    to all eleven was a bug (it produced FillErrors once the pool held more
+    useful items than non-itemsanity slots).  With the pack off, vanilla
+    boost is available from the start, so the term is deliberately vacuous
+    instead of requiring a nonexistent Progressive Boost item.
+
+    The `state.has("Progressive Boost")` term is only meaningful because
+    `ctrAPWorld.create_item` upgrades the boost chain to `progression` in
+    exactly the seeds where this rule reads it; logic state never tracks
+    `useful` items, so without that upgrade the Turbo checks would be
+    permanently out of logic.
+    """
+    from .itemsanity import ITEMSANITY_CLASS, WEAPONS
+
+    if not ITEMSANITY_CLASS.is_enabled(world.options):
+        return
+
+    boost_randomized = bool(world.options.progressive_boost.value)
+    for weapon in WEAPONS:
+        need_boost = boost_randomized and weapon == "Turbo"
+
+        def _rule(state, weapon=weapon, p=player, need_boost=need_boost):
+            return (state.has(weapon, p)
+                    and (not need_boost or state.has("Progressive Boost", p)))
+
+        for juiced in (False, True):
+            world.multiworld.get_location(
+                ITEMSANITY_CLASS.location_name(weapon, juiced), player
+            ).access_rule = _rule
 
 
 # ITEM name resolver for a randomized requirement type code (see §0 contract).
