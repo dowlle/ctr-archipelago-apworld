@@ -23,6 +23,7 @@ from Options import OptionError
 from .Items import load_item_table
 from .Locations import CTR_LOCATION_CLASSES, _LOCATION_DATA
 from .elastic_bounds import predicted_goal_excluded_reserve
+from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES as ITEMSANITY_ITEM_NAMES
 from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
 from . import progressive_capability
@@ -151,6 +152,15 @@ def predicted_mandatory_pool(world) -> int:
         counts["Key"] = 0
     if not world.options.include_battle_arenas.value:
         counts["Purple CTR Token"] = max(0, counts["Purple CTR Token"] - 4)
+    # #145 itemsanity: the 11 weapon items are frozen at count 0 in the
+    # static table and create_items activates exactly one of each when the
+    # toggle is on. Without this mirror the predictor under-counts mandatory
+    # demand by 11 in exactly the seeds that also add 22 locations to supply,
+    # over-estimating slack -- the wrong direction, a sizer that fails to
+    # expand when it should (DeepSeek review F1, 2026-08-11).
+    if ITEMSANITY_CLASS.is_enabled(world.options):
+        for name in ITEMSANITY_ITEM_NAMES:
+            counts[name] = 1
 
     mandatory = sum(
         count for name, count in counts.items()

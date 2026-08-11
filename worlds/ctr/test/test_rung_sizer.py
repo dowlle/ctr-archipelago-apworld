@@ -112,6 +112,16 @@ class TestRungSizingGeneration(unittest.TestCase):
             {"progressive_boost": "shared_global",
              "progressive_boost_blue_fire": True,
              "progressive_stats": "shared_global"},
+            # DeepSeek review F1/F2 (2026-08-11): the shapes the merged
+            # #145/#109 features add. Itemsanity activates 11 frozen-at-zero
+            # weapon items; box locations add supply but no items; the
+            # combined shape exercises both sides of the ledger at once.
+            {"itemsanity": True},
+            {"box_locations": True, "shortcut_knowledge": "hard"},
+            {"itemsanity": True, "box_locations": True,
+             "shortcut_knowledge": "medium",
+             "progressive_boost": "shared_global",
+             "progressive_stats": "shared_global"},
         )
         for seed, options in enumerate(matrices, start=720):
             with self.subTest(options=options):
