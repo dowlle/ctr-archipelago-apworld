@@ -15,6 +15,7 @@ from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
+from . import characters
 from . import progressive_capability
 from . import rung_sizer
 from .Regions import create_regions
@@ -294,6 +295,13 @@ class ctrAPWorld(World):
         if "box_locations" in co:
             o.box_locations.value = int(bool(co["box_locations"]))
         _restore("shortcut_knowledge", "shortcut_knowledge")
+        # Character phase (#54/#209). racer_locked_pads is the load-bearing one:
+        # it decides whether the 15 character unlock items are progression, and
+        # a progression/useful split UT gets wrong makes every downstream sphere
+        # wrong. The other character keys are cosmetic or native-only, so they
+        # are deliberately NOT restored (same reasoning as one_lap_cups).
+        if "racer_locked_pads" in co:
+            o.racer_locked_pads.value = int(bool(co["racer_locked_pads"]))
 
         # Derive the two content-inclusion toggles from the pad gates: a cup /
         # crystal pad only carries a non-type-0 stage-1 requirement when its class
@@ -373,8 +381,19 @@ class ctrAPWorld(World):
             self._ctr_relic_keep, self._ctr_relic_created = \
                 restore_relic_tier_keep_from_wire(
                     self, passthrough.get("ctr_options", {}) or {})
+            # The starting racer is a per-seed DRAW, not an option value, so UT
+            # must take the connected seed's answer rather than re-rolling one
+            # (a re-roll would put a different 15 unlock items in the pool and
+            # desync every racer-lock rule). Absent on a pre-character-phase
+            # wire -> fall back to the normal resolution.
+            self.ctr_starting_character = characters.restore_starting_character(
+                self, passthrough.get("ctr_options", {}) or {})
             return
         self._ctr_relic_keep, self._ctr_relic_created = draw_relic_tier_keep(self)
+        # Drawn BEFORE forced_options so a constraint entry can read it, and
+        # before create_regions/create_items, both of which need to know which
+        # racer is already owned. See characters.resolve_starting_character.
+        self.ctr_starting_character = characters.resolve_starting_character(self)
         from . import forced_options
         forced_options.apply(self)
         rung_sizer.apply_rung_sizing(self)
@@ -504,10 +523,19 @@ class ctrAPWorld(World):
             }
             for p in players:
                 pmw.worlds[p].options = real.worlds[p].options
+            # State BEFORE the world steps, exactly as Main.py:51 orders it
+            # (`multiworld.state = CollectionState(multiworld)` runs before any
+            # `call_all`). The probe used to build it afterwards, which worked
+            # only for as long as no CTR step touched `multiworld.state`; the
+            # character phase's `push_precollected` in create_items does, and it
+            # made the probe fail open (returning None) on every seed instead of
+            # returning a verdict. Ordering it like the real generator is the
+            # fidelity fix, not a workaround: a probe that does not mirror
+            # Main.py cannot predict Main.py.
+            pmw.state = _CS(pmw)
             for step in ("generate_early", "create_regions", "create_items",
                          "set_rules", "connect_entrances", "generate_basic"):
                 _call_all(pmw, step)
-            pmw.state = _CS(pmw)
             _dist(pmw)
             return True
         except Exception as e:
@@ -758,6 +786,14 @@ class ctrAPWorld(World):
                 and ITEM_BOX_CLASS.is_enabled(self.options)
                 and int(self.options.shortcut_knowledge.value) == item_boxes.SK_HARD):
             classification = ItemClassification.progression
+        # Honest per-seed CHARACTER classification (R17), the same lever again.
+        # data/items.json freezes all 16 racers as `useful`; a racer-locked seed
+        # has pads whose access rule reads one, so in exactly those seeds the
+        # unlock items are genuine progression. Locks off leaves them `useful`,
+        # which is both the correct AP semantics for an item that gates nothing
+        # and a deliberate relaxation of an already ~98%-progression pool.
+        if name in characters.ROSTER_CHARACTER_ID:
+            classification = characters.unlock_classification(self)
         return ctrAPItem(
             name=name,
             classification=classification,
@@ -1223,6 +1259,23 @@ class ctrAPWorld(World):
                 for _ in range(count):
                     pool.append(self.create_item(item["name"]))
 
+        # --- Character unlocks (issues #54 / #209, R4). ALWAYS ON: the
+        # character phase is core 0.2.0 content, not a toggle, so every seed
+        # puts the 15 racers you did not start as into the pool and pushes the
+        # one you did start as as precollected. They add ZERO locations, so
+        # they are a straight +15 against this seed's supply -- which is why
+        # they go in BEFORE the comfort-pack trim below rather than after it,
+        # so a deliberately reduced seed frees the five optional #14/#15
+        # comfort items for them instead of overflowing.
+        #
+        # Classification is per-seed (R17) and lives in create_item: progression
+        # when racer-locked pads are on, useful when they are off.
+        _start_character = self.ctr_starting_character
+        mw.push_precollected(self.create_item(
+            characters.unlock_item_name(_start_character)))
+        for _unlock_name in characters.created_unlock_names(self):
+            pool.append(self.create_item(_unlock_name))
+
         # These five useful items spend spare slots supplied by optional
         # location classes (podium rungs by default). A deliberately reduced
         # seed can have fewer than five spare locations. Omit the whole comfort
@@ -1234,6 +1287,16 @@ class ctrAPWorld(World):
                                if item.name not in SURFACE_ITEM_NAMES]
             if len(without_surface) <= unfilled:
                 pool = without_surface
+        # If the seed STILL does not fit after the comfort pack has been given
+        # up, the character unlocks are the family that has to be named: they
+        # are the always-on addition that brings no locations of its own, and
+        # `character_unlocks: false` is the one-line fix. Computed against the
+        # supply that would remain WITHOUT them, so the message is honest about
+        # what is missing rather than blaming whatever happened to be appended
+        # last. No-op in all-unlocked mode and on every seed that fits.
+        characters.raise_if_unlocks_exceed_location_supply(
+            self, available_supply=unfilled - (
+                len(pool) - len(characters.created_unlock_names(self))))
 
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
         # #13). `useful`, not `progression` -- issue scope is pool/fill
@@ -1669,11 +1732,27 @@ class ctrAPWorld(World):
                 # cover the version direction, so no bump.
                 "box_locations": bool(o.box_locations.value),
                 "shortcut_knowledge": int(o.shortcut_knowledge.value),
+                # Character phase (#54/#209). Eight scalars, all emitted
+                # unconditionally so a tracker reads the seed's real character
+                # configuration without inferring it from block presence.
+                # `stat_source` / `stat_owner` / `stat_editing_allowed` are the
+                # RESOLVED outcome of the progressive-vs-editable precedence:
+                # native must read those and must NOT re-implement the rule
+                # (2026-08-08 ruling; the precedence lives in exactly one
+                # function, characters.effective_stat_config).
+                **characters.fill_slot_data(self),
             },
             "warp_pad_map": self._resolve_warp_pad_map(),
             "warp_pad_unlock": self._resolve_warp_pad_unlock(),
             "boss_garage_req": getattr(self, "boss_garage_req", {}),
             "podium_checks": self._resolve_podium_checks(),
+            # Racer-locked pads (#54/#209, R8). Top-level block rather than a
+            # 10th `Req` type on purpose -- a lock ANDs onto the pad's existing
+            # stage-1 requirement instead of replacing it, and a native that
+            # does not know this block simply never sees it rather than hitting
+            # a `switch` default on an unevaluable type. See the characters.py
+            # docstring and Contract 7h. Always present, `pads` empty when off.
+            "racer_locks": characters.racer_lock_slot_data(self),
         }
         if legs_randomized:
             # Issue #166: the five cups' leg tracks (see _resolve_gem_cup_legs).
@@ -1787,6 +1866,18 @@ class ctrAPWorld(World):
             return f"any {count} {label}"
         return f"{count}x {ITEM_BY_TYPE[t](colour if colour >= 0 else 0)}"
 
+    def post_fill(self) -> None:
+        """Prove the racer-lock self-lock invariant on the FILLED multiworld.
+
+        Issue #209 names "a fill can never place a character's own unlock item
+        behind a pad that requires that same character" as a thing that has to
+        be built and proven, not asserted. With the unlock items as progression
+        AP's fill already guarantees it; this re-derives it from the real
+        placements so a future change to the lock selection cannot quietly
+        break it. No-op when racer locks are off.
+        """
+        characters.verify_no_self_lock(self)
+
     def write_spoiler(self, spoiler_handle) -> None:
         """Record this seed's per-pad unlock requirements (stage 1 + stage 2) with
         tier-true item names. The spoiler previously logged NOTHING about pad
@@ -1797,6 +1888,21 @@ class ctrAPWorld(World):
         rescued seed is diagnosable. Written ONLY when the backstop fired: a
         non-fired seed adds nothing here, keeping it byte-identical to a build
         without the backstop (the fired: yes/no verdict is the line's presence)."""
+        # Character phase (#54/#209): which racer this seed starts you as, and
+        # which pads demand a specific racer. Both are per-seed DRAWS rather
+        # than option values, so without this a spoiler read cannot tell you
+        # what the seed actually decided.
+        _player_name = self.multiworld.player_name[self.player]
+        spoiler_handle.write(
+            f"\n\nCTR starting character ({_player_name}): "
+            f"{getattr(self, 'ctr_starting_character', '?')}\n")
+        _locks = getattr(self, "ctr_racer_locks", {}) or {}
+        if _locks:
+            spoiler_handle.write(
+                f"CTR racer-locked pads ({_player_name}):\n")
+            for _pad, _character in sorted(_locks.items()):
+                spoiler_handle.write(f"  {_pad}: requires {_character}\n")
+
         if getattr(self, "_ctr_backstop_fired", False):
             player_name = self.multiworld.player_name[self.player]
             items = getattr(self, "_ctr_backstop_items", [])
