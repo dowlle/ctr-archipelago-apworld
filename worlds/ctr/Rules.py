@@ -77,6 +77,41 @@ def set_rules(world):
     add_podium_placement_rules(world, player)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
+    add_lettersanity_rules(world, player)
+
+
+def add_lettersanity_rules(world, player):
+    from . import lettersanity
+    mode = int(world.options.lettersanity.value)
+    if mode not in (2, 3):
+        return
+    selected = world.options._lettersanity_selected
+    for track in lettersanity.LETTER_TRACKS:
+        required = (lettersanity.LETTERS if mode == 3 else selected[track])
+        names = tuple(lettersanity.item_name(track, letter) for letter in required)
+        loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
+        previous = loc.access_rule
+        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
+            previous(state) and all(state.has(name, p) for name in names)
+
+    # Mode 2 self-item access rule (dossier amendment, ruled 2026-08-10). In
+    # `locations_and_items` a letter item is progression and native gates the
+    # pickup until the item is received, so a letter seated at its OWN location
+    # is circular-unreachable and permanently locks that track's CTR Token.
+    # Each created letter location therefore requires its own letter item
+    # (`has` that letter), which AP's fill can never satisfy by seating the
+    # item at that same location. Inactive letter locations are never created,
+    # so they acquire no rule here; modes 0, 1 and 3 are untouched (mode 3 has
+    # no letter locations at all, mode 1 has locations but no items).
+    if mode == 2:
+        for track in lettersanity.LETTER_TRACKS:
+            for letter in selected[track]:
+                loc_name = lettersanity.LETTERSANITY_CLASS.location_name(track, letter)
+                own = lettersanity.item_name(track, letter)
+                loc = world.multiworld.get_location(loc_name, player)
+                previous = loc.access_rule
+                loc.access_rule = lambda state, previous=previous, own=own, p=player: \
+                    previous(state) and state.has(own, p)
 
 
 def add_racer_lock_rules(world, player):
@@ -452,6 +487,20 @@ def add_podium_placement_rules(world, player):
                 )
 
 
+def _created_letter_names_for(world, track):
+    """The seed's created letter location names on `track` (modes 1 and 2 both
+    create them; modes 0 and 3 create none, so this returns nothing there).
+
+    Filtered from LETTERSANITY_CLASS.created_location_names so the set matches
+    exactly what create_regions built from the same resolved per-track selection
+    (no name re-derivation that could drift from location creation).
+    """
+    from .lettersanity import LETTERSANITY_CLASS
+    prefix = f"{track}: Letter "
+    return [name for name in LETTERSANITY_CLASS.created_location_names(world.options)
+            if name.startswith(prefix)]
+
+
 def add_time_trial_and_ctr_requirements(world, player):
     """
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
@@ -514,3 +563,18 @@ def add_time_trial_and_ctr_requirements(world, player):
                 f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
         loc.access_rule = rule
+
+        # Tier-2 sharing for lettersanity (#148, parity audit family 2, ruling
+        # 2026-08-12). Native letters only collide inside the CTR Token
+        # Challenge (INSTANCE.c), and entering it requires the trophy race
+        # checked plus the pad's stage-2 (AH_WarpPad.c), so a letter location's
+        # real reachability is the token challenge's, regardless of mode. Every
+        # created letter location therefore carries the SAME rule object built
+        # here (BY REFERENCE, never an independently written stage-2 term), so
+        # any future change to token-challenge access carries the letters with it
+        # without a second edit site. Mode 2's self-item term is ANDed on top
+        # later in add_lettersanity_rules, exactly as reviewed; modes 0/3 create
+        # no letter locations, so this loop finds none for them.
+        if name.endswith("CTR Token Challenge"):
+            for letter_name in _created_letter_names_for(world, track_prefix):
+                mw.get_location(letter_name, player).access_rule = rule
