@@ -104,6 +104,11 @@ class TestPodiumSubtogglesInertness(unittest.TestCase):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             mw = _early({
                 "podium_placement_checks": False,
+                # All-unlocked mode: podium off has no room for the 15 always-on
+                # character unlock items (#54/#209) and generation raises before
+                # the warning under test can be observed. This fixture is about
+                # sub-toggle inertness, not the character item economy.
+                "character_unlocks": False,
                 "podium_finish_rungs": True,
                 "podium_any_position_rung": True,
                 "podium_held_rungs": True,
