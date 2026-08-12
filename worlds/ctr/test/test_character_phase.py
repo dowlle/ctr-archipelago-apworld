@@ -45,10 +45,15 @@ from ..characters import (
     STAT_SOURCE_VANILLA,
     effective_stat_config,
     eligible_lock_pads,
+    raise_if_unlocks_exceed_location_supply,
     reconstruct_racer_locks_from_wire,
     verify_no_self_lock,
 )
+from ..item_boxes import ITEM_BOX_CLASS
+from ..itemsanity import ITEMSANITY_CLASS
+from ..lettersanity import LETTERSANITY_CLASS
 from ..progressive_capability import ROSTER
+from ..relic_perfect import RELIC_PERFECT_CLASS
 from . import CTRTestBase
 
 # Seeds used wherever a property has to hold across draws rather than on one
@@ -557,6 +562,171 @@ class TestCharacterSlotData(unittest.TestCase):
         from ..characters import restore_starting_character
         world = _build(5).worlds[1]
         self.assertIn(restore_starting_character(world, {}), ROSTER)
+
+
+# ---------------------------------------------------------------------------
+# Net-capacity across every enabled location and item family (Stef's 00:51
+# ruling: "Count every location actually created by all enabled families
+# against the complete item demand; fail cleanly when demand exceeds supply;
+# fill surplus with normal filler.")
+# ---------------------------------------------------------------------------
+
+def _pool_supply(mw, player=1):
+    """(pool items, unfilled locations) for the player, both live counts."""
+    return len(mw.itempool), len(mw.get_unfilled_locations(player))
+
+
+class TestNetCapacityAcrossLocationAndItemFamilies(unittest.TestCase):
+    """The single authoritative accounting point in create_items must balance
+    pool == locations for every combination of enabled families, and the
+    character-supply guard must fire with needed/available counts and generic
+    guidance rather than pretending one family is mandatory.
+
+    Each family contributes BOTH sides of the ledger that the guard is
+    supposed to count exactly once:
+      * podium rungs   -- locations only (16 tracks x rung categories)
+      * #109 boxes     -- locations only (229 at easy knowledge)
+      * lettersanity   -- locations only, currently INERT (registered, not
+        created) in this branch
+      * relic-perfect  -- locations only, currently INERT
+      * itemsanity     -- 22 locations AND 11 weapon items
+      * progressive    -- items only (3 boost + 12 stats)
+      * character      -- 15 unlock items, ZERO locations
+    """
+
+    def test_default_balance(self):
+        mw = _build(1)
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_itemsanity_balance(self):
+        mw = _build(1, itemsanity=True)
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_box_locations_balance(self):
+        mw = _build(1, box_locations=True)
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_itemsanity_and_boxes_balance(self):
+        mw = _build(1, itemsanity=True, box_locations=True)
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_progressive_packs_balance(self):
+        mw = _build(1, progressive_boost="shared_global",
+                    progressive_boost_blue_fire=True,
+                    progressive_stats="shared_global")
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_everything_together_balance(self):
+        mw = _build(1, itemsanity=True, box_locations=True,
+                    progressive_boost="shared_global",
+                    progressive_boost_blue_fire=True,
+                    progressive_stats="shared_global")
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_everything_together_all_unlocked_balance(self):
+        mw = _build(1, itemsanity=True, box_locations=True,
+                    character_unlocks=False,
+                    progressive_boost="shared_global",
+                    progressive_boost_blue_fire=True,
+                    progressive_stats="shared_global")
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_itemsanity_adds_both_locations_and_items_and_balances(self):
+        """Itemsanity contributes 22 locations AND 11 weapon items; the pool
+        still balances (filler absorbs the +11 net supply)."""
+        base_pool, base_unfilled = _pool_supply(_build(1))
+        mw = _build(1, itemsanity=True)
+        pool, unfilled = _pool_supply(mw)
+        self.assertEqual(pool, unfilled)
+        created = len(ITEMSANITY_CLASS.created_locations(
+            mw.worlds[1].options))
+        self.assertEqual(created, 22)
+        # locations grew by the class's 22; items grew by the class's 11.
+        self.assertEqual(unfilled - base_unfilled, 22)
+        self.assertEqual(pool - base_pool, 22)
+
+    def test_boxes_add_locations_only(self):
+        base_pool, base_unfilled = _pool_supply(_build(1))
+        pool, unfilled = _pool_supply(_build(1, box_locations=True))
+        self.assertEqual(pool - base_pool, unfilled - base_unfilled)
+        self.assertEqual(unfilled - base_unfilled,
+                         len(ITEM_BOX_CLASS.created_locations(
+                             _build(1, box_locations=True).worlds[1].options)))
+
+    def test_lettersanity_and_relic_perfect_are_inert_this_branch(self):
+        """Both classes are registered but create no locations yet (#148,
+        #49 build); they must not disturb the pool balance."""
+        for cls in (LETTERSANITY_CLASS, RELIC_PERFECT_CLASS):
+            with self.subTest(cls=cls.key):
+                options = _build(1).worlds[1].options
+                self.assertEqual(cls.created_location_names(options), [])
+
+    def test_fill_surplus_with_filler_under_heavy_families(self):
+        """The pool/location balance survives a real fill, not just the
+        create_items arithmetic."""
+        from Fill import distribute_items_restrictive
+        mw = _build(1, itemsanity=True, box_locations=True,
+                    progressive_boost="shared_global",
+                    progressive_boost_blue_fire=True,
+                    progressive_stats="shared_global")
+        distribute_items_restrictive(mw)  # must not raise FillError
+
+    def test_exclusions_do_not_break_the_net_capacity_accounting(self):
+        """Excluding locations keeps pool == locations: the excluded slots are
+        still live unfilled locations that normal filler seats into, so the
+        single authoritative accounting point must still balance after
+        Main.py's exclusion_rules applies the player's set."""
+        from Fill import distribute_items_restrictive
+        from worlds.generic.Rules import exclusion_rules
+        mw = _build(1)
+        excluded = {loc.name for loc in mw.get_unfilled_locations(1)[:5]}
+        exclusion_rules(mw, 1, excluded)
+        pool, unfilled = _pool_supply(mw)
+        self.assertEqual(pool, unfilled)
+        distribute_items_restrictive(mw)  # must not raise FillError
+
+    def test_all_unlocked_with_exclusions_balances(self):
+        from worlds.generic.Rules import exclusion_rules
+        mw = _build(1, character_unlocks=False)
+        excluded = {loc.name for loc in mw.get_unfilled_locations(1)[:5]}
+        exclusion_rules(mw, 1, excluded)
+        self.assertEqual(*_pool_supply(mw))
+
+    def test_character_guard_reports_needed_and_available_counts(self):
+        world = _build(1).worlds[1]
+        needed = len(ROSTER) - 1  # 15
+        with self.assertRaises(OptionError) as ctx:
+            raise_if_unlocks_exceed_location_supply(
+                world, available_supply=needed - 1)
+        message = str(ctx.exception)
+        self.assertIn(str(needed), message)
+        self.assertIn(str(needed - 1), message)
+
+    def test_character_guard_does_not_pretend_one_family_is_mandatory(self):
+        world = _build(1).worlds[1]
+        with self.assertRaises(OptionError) as ctx:
+            raise_if_unlocks_exceed_location_supply(
+                world, available_supply=0)
+        message = str(ctx.exception)
+        # The old text forced Podium Placement Checks + all-unlocked as the
+        # ONLY fixes. The corrected text must not claim a single family is
+        # mandatory: it should offer both more location checks and fewer
+        # item-producing options, and name at least one non-podium family.
+        self.assertIn("location checks", message)
+        self.assertIn("item-producing options", message)
+        self.assertIn("Item Box Checks", message)
+        self.assertIn("character_unlocks", message)
+
+    def test_character_guard_is_a_noop_in_all_unlocked_mode(self):
+        world = _build(1, character_unlocks=False).worlds[1]
+        raise_if_unlocks_exceed_location_supply(world, available_supply=0)
+
+    def test_podium_off_shortfall_still_raises_cleanly(self):
+        """Regression for the reachable shortfall: a reduced seed raises a
+        clean OptionError (the rung sizer names Character Unlocks; the guard
+        names counts), never a raw FillError."""
+        with self.assertRaises(OptionError):
+            _build(1, podium_placement_checks=False)
 
 
 if __name__ == "__main__":

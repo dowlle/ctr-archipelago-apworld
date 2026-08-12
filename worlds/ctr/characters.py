@@ -255,10 +255,19 @@ def raise_if_unlocks_exceed_location_supply(world, *, available_supply: int) -> 
     The unlock items bring ZERO locations of their own, so on a deliberately
     reduced seed (Podium Placement Checks off, heavy `exclude_locations`) they
     genuinely do not fit -- the AP invariant the 2026-07-23 wayfarer restated
-    as "items == locations, in EVERY mode". Raise with the two concrete fixes
-    named rather than dropping items: silently shipping 9 of 15 racers would
-    be exactly the kind of unannounced cap this project forbids, and it would
-    also strand any racer lock pointing at a racer that never got created.
+    as "items == locations, in EVERY mode". Raise rather than dropping items:
+    silently shipping 9 of 15 racers would be exactly the kind of unannounced
+    cap this project forbids, and it would also strand any racer lock pointing
+    at a racer that never got created.
+
+    `available_supply` is the caller's LIVE net-capacity figure (the seed's
+    final post-creation unfilled count minus every non-unlock item in the
+    COMPLETE current pool -- character unlocks, the comfort pack, itemsanity
+    weapons and the progressive packs all included), never a predicted
+    constant. The message reports needed vs available and tells the player to
+    enable more location checks (ANY enabled location class can supply
+    capacity: podium rungs, item boxes, itemsanity checks, ...) or reduce
+    item-producing options, without pretending one family is mandatory.
     """
     needed = len(created_unlock_names(world))
     if needed <= 0:
@@ -269,10 +278,11 @@ def raise_if_unlocks_exceed_location_supply(world, *, available_supply: int) -> 
         f"CTR: the character phase adds {needed} character unlock item(s) to "
         f"the pool, but this seed has only {available_supply} unfilled "
         f"location(s) left for them. Character unlocks add no locations of "
-        f"their own. Either turn on Podium Placement Checks (adds up to 80 "
-        f"locations), or set 'character_unlocks' to false for all-unlocked "
-        f"mode, which makes every racer available from the start and creates "
-        f"no unlock items at all.")
+        f"their own. Enable more location checks (e.g. Podium Placement "
+        f"Checks, Item Box Checks, Itemsanity, or another location family) or "
+        f"reduce item-producing options (e.g. set 'character_unlocks' to "
+        f"false for all-unlocked mode, which makes every racer available "
+        f"from the start and creates no unlock items at all).")
 
 
 # ---------------------------------------------------------------------------

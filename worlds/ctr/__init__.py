@@ -1297,17 +1297,6 @@ class ctrAPWorld(World):
                                if item.name not in SURFACE_ITEM_NAMES]
             if len(without_surface) <= unfilled:
                 pool = without_surface
-        # If the seed STILL does not fit after the comfort pack has been given
-        # up, the character unlocks are the family that has to be named: they
-        # are the always-on addition that brings no locations of its own, and
-        # `character_unlocks: false` is the one-line fix. Computed against the
-        # supply that would remain WITHOUT them, so the message is honest about
-        # what is missing rather than blaming whatever happened to be appended
-        # last. No-op in all-unlocked mode and on every seed that fits.
-        characters.raise_if_unlocks_exceed_location_supply(
-            self, available_supply=unfilled - (
-                len(pool) - len(characters.created_unlock_names(self))))
-
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
         # #13). `useful`, not `progression` -- issue scope is pool/fill
         # correctness only, no track logic reads a tier yet. Empty dict when
@@ -1325,6 +1314,20 @@ class ctrAPWorld(World):
             for _cap_name, _cap_count in _capability_counts.items():
                 for _ in range(_cap_count):
                     pool.append(self.create_item(_cap_name))
+
+        # The single authoritative net-capacity check (issues #54/#209, R4).
+        # It runs AFTER every option-specific item family -- character
+        # unlocks, the #14/#15 comfort-pack trim, itemsanity weapons, and the
+        # progressive packs above -- is in the pool, so `len(pool)` is the
+        # COMPLETE current pool and `unfilled` is the live post-creation
+        # location count (never a predicted constant). Computed against the
+        # supply that would remain WITHOUT the unlocks, so the message is
+        # honest about what is missing rather than blaming whichever family
+        # happened to be appended last. No-op in all-unlocked mode and on
+        # every seed that fits.
+        characters.raise_if_unlocks_exceed_location_supply(
+            self, available_supply=unfilled - (
+                len(pool) - len(characters.created_unlock_names(self))))
 
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
