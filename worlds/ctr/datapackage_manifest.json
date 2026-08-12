@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.1.5",
-  "checksum": "39c76426343376931e785e40b3ba8cd56c6d70f6",
+  "checksum": "14ff728cd5772d8c8269678c3fdf9cb39f88fe2f",
   "item_name_to_id": {
     "Auto-Use Trap": 35010109,
     "Beaker": 35010099,
@@ -185,6 +185,7 @@
     "Tizi Helper": 35010188,
     "Trophy": 35010000,
     "Turbo": 35010095,
+    "Turbo Grant": 35010189,
     "Warpball": 35010103,
     "Weakened Kart Trap": 35010111,
     "Wireframe Trap": 35010113,
@@ -960,6 +961,7 @@
       "Tizi Helper",
       "Trophy",
       "Turbo",
+      "Turbo Grant",
       "Warpball",
       "Weakened Kart Trap",
       "Wireframe Trap",
@@ -1612,6 +1614,9 @@
       "Itemsanity: Turbo (Juiced)",
       "Itemsanity: Warpball",
       "Itemsanity: Warpball (Juiced)"
+    ],
+    "Wumpa Checks": [
+      "Wumpa: Reach 10 Wumpa"
     ]
   }
 }

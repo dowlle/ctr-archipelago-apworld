@@ -15,6 +15,8 @@ from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
 from . import tizi_helper
 from .tizi_helper import TIZI_HELPER_ITEM
+from . import h_dossier
+from .wumpa_checks import WUMPA_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
@@ -42,24 +44,38 @@ TRAP_ITEM_NAMES = [
 ]
 
 # The 11 trap names the 0.2.0 name freeze (#177) minted from the H-dossier
-# ruling (Stef, 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
-# and that is deliberate: TRAP_ITEM_NAMES is the BUILDABLE set -- it drives the
-# trap_fill_percentage draw and its order is pinned to native's AP_TrapEffect
-# enum, so a name whose native effect does not exist yet must stay out of it or
-# the fill would hand players a trap that does nothing. These names are inert
-# (count 0 in data/items.json, never drawn); each one joins TRAP_ITEM_NAMES, in
-# native enum order, in the build that implements its effect.
+# ruling (Stef, 2026-08-10 16:28/16:30). ORDER IS LOAD-BEARING, exactly like
+# TRAP_ITEM_NAMES above and for the same reason -- it is pinned to the SECOND
+# half of native's AP_TrapEffect enum (effects 5..15) -- but the two lists map
+# through DIFFERENT native item-index bases, because the freeze appended these
+# eleven after the itemsanity block rather than contiguously with the v1 five:
 #
-# They ARE in the "Traps" item name group below, because item_name_groups is
-# part of the datapackage payload AP checksums: adding a trap to its own group
-# later would be a SECOND datapackage churn, which is exactly what #177 spends
-# one bump to avoid. Group membership feeds !hint, item_links and
-# start_inventory_from_pool expansion; nothing in fill reads it, so this changes
-# no placement.
+#   TRAP_ITEM_NAMES        item indexes 16..20   -> AP_TrapEffect 0..4
+#   FROZEN_TRAP_ITEM_NAMES item indexes 106..116 -> AP_TrapEffect 5..15
+#
+# That discontinuity is why native carries two bases (AP_TRAP_ITEM_FIRST_INDEX
+# and AP_TRAP_H_ITEM_FIRST_INDEX) instead of one range test. Do not "tidy" the
+# two lists into one here: concatenating them would silently claim indexes
+# 21..31, which belong to the comfort pack and the capability chains.
+#
+# ALL SIXTEEN ARE NOW BUILDABLE. Until this build these eleven were deliberately
+# held out of the draw -- a name whose native effect does not exist yet must not
+# be drawn or the fill hands the player a trap that does nothing. The H-dossier
+# native half implements all eleven effects, so BUILDABLE_TRAP_ITEM_NAMES below
+# is the union and the trap_fill_percentage draw covers the whole set.
+#
+# They were already in the "Traps" item name group below, because
+# item_name_groups is part of the datapackage payload AP checksums: adding a
+# trap to its own group later would be a SECOND datapackage churn, which is
+# exactly what #177 spends one bump to avoid. Group membership feeds !hint,
+# item_links and start_inventory_from_pool expansion; nothing in fill reads it,
+# so this changes no placement.
 #
 # Trap registry capacity: 5 shipped + 11 = 16 effect types, exactly native's
-# AP_TRAP_REGISTRY_CAP. The native build that lands the last of these must bump
-# that constant or the final trap silently has no slot (flagged in the ruling).
+# pre-this-build AP_TRAP_REGISTRY_CAP. The native half of this build raises that
+# constant (it counts concurrent INSTANCES, not types, so 16 types would have
+# left no headroom for a second copy of anything) -- flagged in the ruling and
+# discharged there, not here.
 FROZEN_TRAP_ITEM_NAMES = [
     "Wumpa Reset Trap",
     "Flatten Trap",
@@ -73,6 +89,17 @@ FROZEN_TRAP_ITEM_NAMES = [
     "Reverse Controls Trap",
     "Red Potion Trap",
 ]
+
+# The draw list for trap_fill_percentage: every trap whose native effect exists.
+# Derived from the two constants above rather than restated, so the draw can
+# never disagree with either enum block (Lessons Learned #5).
+#
+# WHY THE DRAW IS UNIFORM ACROSS ALL SIXTEEN. v1 was uniform across five and the
+# ruling minted eleven more without ranking them, so weighting any of them now
+# would be inventing a balance decision nobody made. Per-trap weighting stays
+# the flagged v2 retune it already was; what changed is only the size of the
+# uniform set.
+BUILDABLE_TRAP_ITEM_NAMES = TRAP_ITEM_NAMES + FROZEN_TRAP_ITEM_NAMES
 
 # Comfort-only issues #14/#15 pack. It stays atomic when a reduced location
 # set cannot host all five, rather than emitting a seed-dependent subset.
@@ -366,6 +393,15 @@ class ctrAPWorld(World):
         # so this restore changes nothing a tracker computes -- it is here so the
         # restored option set is honest rather than silently defaulted.
         o.tizi_helper.value = int(bool(co.get("tizi_helper", 0)))
+        # H-dossier scalars, same always-emitted convention; absent keys are a
+        # pre-this-build seed and correctly restore to off / zero.
+        h_dossier.restore_slot_data(o, co)
+        # The wumpa check is a LOCATION toggle with no ctr_options scalar, so it
+        # restores from BLOCK PRESENCE, exactly like itemsanity's fallback arm.
+        # That is the honest source: the block is emitted if and only if the
+        # seed created the location, and an absent block on a pre-this-build
+        # wire correctly restores to off.
+        o.wumpa_check.value = int("wumpa_checks" in passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -1251,6 +1287,9 @@ class ctrAPWorld(World):
         # needs them findable) UNLESS shuffle_gems pinned them, in which case
         # _gems_locked subtracts them.
         _GEMS = {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"}
+        # Resolved once, outside the loop: created_item_counts reads options
+        # only, so re-deriving it per item would be 189 identical answers.
+        _h_dossier_counts = h_dossier.created_item_counts(self)
         for item in load_item_table():
             # Gems Required Goal: exclude the gems from the general pool ONLY
             # when gemgoal() locked them onto their cups (shuffle_gems off) --
@@ -1272,6 +1311,18 @@ class ctrAPWorld(World):
             # comfort slot for it instead of overflowing the pool.
             if item["name"] == TIZI_HELPER_ITEM:
                 count = tizi_helper.created_item_count(self)
+            # H-dossier grants + the progressive starting-wumpa ladder, same
+            # shape again: the entries ship count 0 in data/items.json and the
+            # options are what make them real. They add no locations, so they
+            # are a straight subtraction from this seed's supply, and being
+            # HERE (before the #14/#15 comfort-pack trim and the character
+            # supply check) is what lets a deliberately reduced seed free a
+            # comfort slot for them instead of overflowing the pool. The two
+            # wumpa BUNDLES are deliberately absent: they are filler
+            # substitutes drawn out of the filler budget further down, so
+            # creating them here would double-count them against supply.
+            if item["name"] in _h_dossier_counts:
+                count = _h_dossier_counts[item["name"]]
             if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
             if item["name"] in _gems_locked:                          # gems pinned vanilla
@@ -1364,22 +1415,36 @@ class ctrAPWorld(World):
         # (there len(pool) == len(mw.itempool)).
         n_filler = max(0, unfilled - len(pool))
         # Trap fill: replace trap_fill_percentage% of the filler slots with traps,
-        # drawn UNIFORMLY across the 5 trap effects. Traps are non-progression, so
+        # drawn UNIFORMLY across the 16 trap effects. Traps are non-progression, so
         # this never changes reachability at any value. DEFAULT 0 IS GENERATION-
-        # NEUTRAL BY CONSTRUCTION: the else branch is byte-identical to the old
-        # Wumpa-only fill and no world.random draw is taken, so a default seed's
-        # spoiler + slot_data are unchanged. (Per-trap weighting is a flagged v2
-        # retune -- v1 is uniform.)
+        # NEUTRAL BY CONSTRUCTION: the else branch takes no world.random draw for
+        # traps, so a default seed's spoiler + slot_data are unchanged by this
+        # block. (Per-trap weighting is a flagged v2 retune -- v1 is uniform, and
+        # the H-dossier's eleven joined that same uniform draw rather than
+        # inventing weights the ruling did not set.)
+        #
+        # NON-TRAP FILLER now goes through h_dossier.draw_filler_name instead of
+        # create_filler, so an enabled `wumpa_bundles` seed can roll a bundle
+        # into a filler slot. With the option OFF that helper returns the fixed
+        # "Wumpa Fruit" and takes no RNG draw, so a bundles-off seed is
+        # byte-identical to a pre-this-build one -- the same construction the
+        # trap slider's default-0 neutrality rests on. create_filler itself is
+        # deliberately NOT routed through the draw: AP core calls it with no
+        # arguments on the panic_method='start_inventory' path that the vanilla
+        # fill backstop's simulation exercises, and that simulation must consume
+        # no RNG or its replay fidelity against the real fill breaks.
         trap_pct = self.options.trap_fill_percentage.value
         if trap_pct > 0 and n_filler > 0:
             n_traps = (n_filler * trap_pct) // 100
             for _ in range(n_traps):
-                pool_item = self.create_item(self.random.choice(TRAP_ITEM_NAMES))
+                pool_item = self.create_item(
+                    self.random.choice(BUILDABLE_TRAP_ITEM_NAMES))
                 mw.itempool.append(pool_item)
-            mw.itempool += [self.create_filler()
+            mw.itempool += [self.create_item(h_dossier.draw_filler_name(self))
                             for _ in range(n_filler - n_traps)]
         else:
-            mw.itempool += [self.create_filler() for _ in range(n_filler)]
+            mw.itempool += [self.create_item(h_dossier.draw_filler_name(self))
+                            for _ in range(n_filler)]
 
         # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
         # is ~98% progression in EVERY config (only ~1 filler item), so a density
@@ -1761,6 +1826,15 @@ class ctrAPWorld(World):
                 # tracker and a Universal Tracker restore can see the option
                 # without inferring it from an item that may not have arrived yet.
                 "tizi_helper": bool(o.tizi_helper.value),
+                # H-dossier families + the #224 amendment. Three always-emitted
+                # scalars, same convention and the same DIAGNOSTIC / TRACKER
+                # ONLY status as `tizi_helper` above: native drives every one of
+                # these off received items, and reads "is itemsanity on" off
+                # server location membership, so it looks up none of these keys.
+                # `wumpa_check` is NOT here -- it is a location toggle, and its
+                # feature signal is membership of the 35016100 block, which
+                # native already reads the same way it reads itemsanity's.
+                **h_dossier.fill_slot_data(self),
                 # #109 box scalars, same convention: both always emitted raw
                 # (shortcut_knowledge even when box_locations is false, so
                 # trackers can read the tier without inferring it); the
@@ -1805,6 +1879,19 @@ class ctrAPWorld(World):
             # Additive under schema 7.  Omitted when off, so disabled seeds do
             # not gain a dormant 22-slot feature block.
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        if o.wumpa_check.value:
+            # Additive under schema 7, same off-parity convention as itemsanity
+            # above. One code, but emitted as a LIST rather than a scalar so the
+            # block has the same shape as every other location-class block and a
+            # future second wumpa check needs no wire rework. Native's emit hook
+            # reads the code out of here rather than hardcoding 35016100, and
+            # block presence is the "is the wumpa check on" signal -- the same
+            # membership-not-slot_data rule the Tizi gate follows.
+            slot_data["wumpa_checks"] = {
+                "enabled": True,
+                "locations": [code for _name, code, _region in
+                              WUMPA_CLASS.created_locations(self.options)],
+            }
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,

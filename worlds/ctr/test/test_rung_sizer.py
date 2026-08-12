@@ -10,7 +10,9 @@ import unittest
 from Options import OptionError
 from test.general import setup_multiworld
 
-from .. import ctrAPWorld, podium, progressive_capability, rung_sizer
+from .. import (BUILDABLE_TRAP_ITEM_NAMES, ctrAPWorld, podium,
+                progressive_capability, rung_sizer)
+from ..h_dossier import WUMPA_BUNDLE_ITEMS
 from ..elastic_bounds import (goal_excluded_location_reserve,
                                predicted_goal_excluded_reserve)
 
@@ -128,13 +130,21 @@ class TestRungSizingGeneration(unittest.TestCase):
                 mw = setup_multiworld(ctrAPWorld, seed=seed, options=options)
                 world = mw.worlds[1]
                 expected = rung_sizer.predicted_mandatory_pool(world)
+                # Everything the FILLER BUDGET pays for is excluded here: plain
+                # Wumpa Fruit, both wumpa bundles (filler substitutes drawn from
+                # the same budget), and every drawable trap. The trap set is
+                # taken from BUILDABLE_TRAP_ITEM_NAMES rather than spelled out,
+                # so a trap promoted from the frozen set to the draw cannot
+                # silently start counting as mandatory demand and turn this
+                # assertion into a false failure -- which is exactly what a
+                # hardcoded five-name set did when the H-dossier's eleven
+                # became buildable.
+                _filler_paid = ({"Wumpa Fruit"} | set(WUMPA_BUNDLE_ITEMS)
+                                | set(BUILDABLE_TRAP_ITEM_NAMES))
                 actual = sum(
                     1 for item in mw.itempool if item.player == world.player
-                    and item.name != "Wumpa Fruit"
-                    and item.name not in rung_sizer._SURFACE_ITEM_NAMES
-                    and item.name not in {"Icy Road Trap", "Low Gravity Trap",
-                                          "No Brakes Trap", "Forced Boost Trap",
-                                          "First Person Trap"})
+                    and item.name not in _filler_paid
+                    and item.name not in rung_sizer._SURFACE_ITEM_NAMES)
                 self.assertEqual(actual, expected)
 
     def test_predicted_goal_reserve_matches_installed_goal(self):

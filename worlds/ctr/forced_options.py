@@ -496,6 +496,45 @@ def warn_racer_locks_have_no_eligible_pads(world):
         f"unlock items still exist and are still playable racers.")
 
 
+def warn_wumpa_bundles_have_no_filler_slots(world):
+    """Wumpa bundles substitute into the FILLER budget, so a seed that turns
+    every filler slot into a trap leaves them nowhere to land.
+
+    `trap_fill_percentage` 100 makes `n_traps == n_filler` in create_items, and
+    the non-trap remainder that h_dossier.draw_filler_name would fill is then
+    empty. The option is not wrong and the seed is perfectly generatable -- it
+    simply cannot express the bundles -- which is exactly the downgrade-with-
+    warning shape rather than a raise."""
+    o = world.options
+    if not o.wumpa_bundles.value:
+        return
+    if o.trap_fill_percentage.value < 100:
+        return
+    logger.warning(
+        f"CTR: Trap Fill Percentage is 100 for {_who(world)}, so every filler "
+        f"slot becomes a trap and Wumpa Bundles has no effect this seed.")
+
+
+def warn_grants_gated_behind_unreceived_weapons(world):
+    """With Itemsanity ON, `Invincibility Mask` needs the separate `Mask` item
+    and `Turbo Grant` needs the separate `Turbo` item before either can be
+    delivered (2026-08-11 ruling).
+
+    This is NOT a solvability problem -- both weapon items always exist in an
+    itemsanity pool, the grants are `useful` and nothing in logic reads them, and
+    a grant that arrives early queues rather than being discarded. It is a
+    surprise problem: a player who receives a grant on sphere 1 and sees nothing
+    happen should have been told why in their generation log, not left to
+    discover the gate in-game."""
+    o = world.options
+    if not (o.useful_item_grants.value and o.itemsanity.value):
+        return
+    logger.warning(
+        f"CTR: Itemsanity is on for {_who(world)}, so Invincibility Mask waits "
+        f"for the Mask weapon item and Turbo Grant waits for the Turbo weapon "
+        f"item. Grants received before then are queued, never lost.")
+
+
 def apply_downgrade_warnings(world):
     warn_podium_subtoggles_without_master(world)
     warn_podium_any_position_without_finish(world)
@@ -509,6 +548,8 @@ def apply_downgrade_warnings(world):
     warn_penta_stats_without_vanilla_stats(world)
     warn_racer_locks_without_character_unlocks(world)
     warn_racer_locks_have_no_eligible_pads(world)
+    warn_wumpa_bundles_have_no_filler_slots(world)
+    warn_grants_gated_behind_unreceived_weapons(world)
 
 
 def apply(world):
