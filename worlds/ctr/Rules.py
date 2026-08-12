@@ -450,6 +450,20 @@ def add_podium_placement_rules(world, player):
                 )
 
 
+def _created_letter_names_for(world, track):
+    """The seed's created letter location names on `track` (modes 1 and 2 both
+    create them; modes 0 and 3 create none, so this returns nothing there).
+
+    Filtered from LETTERSANITY_CLASS.created_location_names so the set matches
+    exactly what create_regions built from the same resolved per-track selection
+    (no name re-derivation that could drift from location creation).
+    """
+    from .lettersanity import LETTERSANITY_CLASS
+    prefix = f"{track}: Letter "
+    return [name for name in LETTERSANITY_CLASS.created_location_names(world.options)
+            if name.startswith(prefix)]
+
+
 def add_time_trial_and_ctr_requirements(world, player):
     """
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
@@ -512,3 +526,18 @@ def add_time_trial_and_ctr_requirements(world, player):
                 f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
         loc.access_rule = rule
+
+        # Tier-2 sharing for lettersanity (#148, parity audit family 2, ruling
+        # 2026-08-12). Native letters only collide inside the CTR Token
+        # Challenge (INSTANCE.c), and entering it requires the trophy race
+        # checked plus the pad's stage-2 (AH_WarpPad.c), so a letter location's
+        # real reachability is the token challenge's, regardless of mode. Every
+        # created letter location therefore carries the SAME rule object built
+        # here (BY REFERENCE, never an independently written stage-2 term), so
+        # any future change to token-challenge access carries the letters with it
+        # without a second edit site. Mode 2's self-item term is ANDed on top
+        # later in add_lettersanity_rules, exactly as reviewed; modes 0/3 create
+        # no letter locations, so this loop finds none for them.
+        if name.endswith("CTR Token Challenge"):
+            for letter_name in _created_letter_names_for(world, track_prefix):
+                mw.get_location(letter_name, player).access_rule = rule
