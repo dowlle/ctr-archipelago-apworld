@@ -291,13 +291,26 @@ class TestRandomizedLegsIntegration(CTRTestBase):
             ["Green Gem Cup -> Hot Air Skyway: Podium"])
 
     def test_absent_track_podium_has_only_its_own_entrance(self):
-        # Coco Park legs no cup on this seed: its rungs hang off its own
-        # track region alone -- the additive-cup-path guarantee.
+        # A track that legs no cup on this seed has its rungs hanging off its
+        # own track region alone -- the additive-cup-path guarantee.
+        #
+        # The absent track is DERIVED rather than named. It used to be pinned
+        # to Coco Park, which made the assertion a hostage of the exact RNG
+        # stream: the character phase (#54/#209) draws the starting racer in
+        # generate_early, ahead of the cup-leg draw, so every seed's leg map
+        # shifted and Coco Park now legs a cup on this one. The property under
+        # test ("an absent track has exactly one podium entrance") is what
+        # matters, and the sibling test above already asserts that at least one
+        # absent track exists.
         flat = [t for v in self.world.gem_cup_legs.values() for t in v]
-        self.assertNotIn("Coco Park", flat)
-        podium = self.multiworld.get_region("Coco Park: Podium", self.player)
-        self.assertEqual(
-            {e.parent_region.name for e in podium.entrances}, {"Coco Park"})
+        absent = sorted(set(TROPHY_TRACKS) - set(flat))
+        self.assertTrue(absent, "expected at least one track absent from every cup")
+        for track in absent:
+            with self.subTest(track=track):
+                podium = self.multiworld.get_region(
+                    f"{track}: Podium", self.player)
+                self.assertEqual(
+                    {e.parent_region.name for e in podium.entrances}, {track})
 
 
 class TestUTRegenParity(CTRTestBase):

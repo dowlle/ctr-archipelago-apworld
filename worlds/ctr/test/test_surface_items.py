@@ -49,7 +49,11 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
     """A seed with no podium rungs has room for fewer than five comfort items."""
 
     run_default_tests = False
-    options = {"podium_placement_checks": False}
+    # See the character-phase note in test_location_class_infra: a podium-off
+    # seed has no room for the 15 always-on character unlocks, and
+    # all-unlocked mode is the named fix. Keeps this fixture about the
+    # comfort-pack trim rather than about the character item economy.
+    options = {"podium_placement_checks": False, "character_unlocks": False}
 
     def test_reduced_location_seed_omits_the_pack_atomically(self) -> None:
         pooled = {item.name for item in self.multiworld.itempool}
