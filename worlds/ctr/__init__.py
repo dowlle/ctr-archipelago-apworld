@@ -5,6 +5,7 @@ from typing import ClassVar, Dict, List
 import pkgutil
 
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
+from Options import OptionError
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
@@ -13,6 +14,8 @@ from .Items import load_item_table
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
+from . import lettersanity
+from .lettersanity import LETTERSANITY_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
@@ -358,6 +361,13 @@ class ctrAPWorld(World):
             o.itemsanity.value = int(bool(co["itemsanity"]))
         else:
             o.itemsanity.value = int("itemsanity_checks" in passthrough)
+        lb = passthrough.get("lettersanity_checks", {}) or {}
+        o.lettersanity.value = int(co.get("lettersanity", lb.get("mode", 0)))
+        o.letters_per_track.value = int(lb.get("letters_per_track", 3))
+        by_id = {v: k for k, v in lettersanity.TRACK_LEVEL_IDS.items()}
+        o._lettersanity_selected = {
+            by_id[int(lid)]: tuple(letter for letter, code in zip(lettersanity.LETTERS, codes) if code != -1)
+            for lid, codes in (lb.get("locations", {}) or {}).items() if int(lid) in by_id}
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -374,6 +384,17 @@ class ctrAPWorld(World):
         locations to build (R1: a below-count slot is never created), then
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
+        if not hasattr(self.options, "_lettersanity_selected"):
+            mode = int(self.options.lettersanity.value)
+            if mode in (1, 2):
+                count = int(self.options.letters_per_track.value)
+                self.options._lettersanity_selected = {
+                    track: tuple(self.random.sample(lettersanity.LETTERS, count))
+                    for track in lettersanity.LETTER_TRACKS}
+            else:
+                self.options._lettersanity_selected = {
+                    track: lettersanity.LETTERS for track in lettersanity.LETTER_TRACKS}
+
         # Comfort guard flags (Icebound force_vanilla_turbotrack): needed by
         # the relic draw below, ahead of when Regions.create_regions would
         # otherwise compute them. See relic_tiers.resolve_comfort_guards.
@@ -1255,6 +1276,11 @@ class ctrAPWorld(World):
             count = item["count"]
             if self.options.itemsanity.value and item["name"] in ITEM_NAMES:
                 count = 1
+            if int(self.options.lettersanity.value) in (2, 3) and item["name"] in lettersanity.ITEM_NAMES:
+                track = item["name"].rsplit("(", 1)[1][:-1]
+                letter = item["name"].split(" ", 2)[1]
+                count = int(int(self.options.lettersanity.value) == 3 or
+                            letter in self.options._lettersanity_selected[track])
             if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
             if item["name"] in _gems_locked:                          # gems pinned vanilla
@@ -1297,6 +1323,22 @@ class ctrAPWorld(World):
                                if item.name not in SURFACE_ITEM_NAMES]
             if len(without_surface) <= unfilled:
                 pool = without_surface
+        # COMPOSITION NOTE (test client only, not a merge decision): this
+        # Lettersanity items_only guard is kept exactly as PR #49 reviewed it,
+        # which means it reads `unfilled` and `len(pool)` BEFORE the progressive
+        # packs below are appended. PR #50's supply fix deliberately moved the
+        # character guard to run after every item family for that reason. The
+        # early position is conservative (it can only fire on a shortfall that
+        # the later packs would worsen), so composing them is safe, but when
+        # both land on main the two guards should be reconciled into the single
+        # authoritative accounting point.
+        if int(self.options.lettersanity.value) == 3 and len(pool) > unfilled:
+            raise OptionError(
+                f"CTR: Lettersanity 'items_only' needs 48 spare filler slots, but this "
+                f"option combination has only {max(0, unfilled - (len(pool) - 48))}. "
+                "Enable more location checks or reduce other item packs.")
+
+
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
         # #13). `useful`, not `progression` -- issue scope is pool/fill
         # correctness only, no track logic reads a tier yet. Empty dict when
@@ -1744,6 +1786,7 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                "lettersanity": int(o.lettersanity.value),
                 # #109 box scalars, same convention: both always emitted raw
                 # (shortcut_knowledge even when box_locations is false, so
                 # trackers can read the tier without inferring it); the
@@ -1788,6 +1831,8 @@ class ctrAPWorld(World):
             # Additive under schema 7.  Omitted when off, so disabled seeds do
             # not gain a dormant 22-slot feature block.
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        if int(o.lettersanity.value) != 0:
+            slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,

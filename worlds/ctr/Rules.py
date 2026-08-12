@@ -77,6 +77,41 @@ def set_rules(world):
     add_podium_placement_rules(world, player)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
+    add_lettersanity_rules(world, player)
+
+
+def add_lettersanity_rules(world, player):
+    from . import lettersanity
+    mode = int(world.options.lettersanity.value)
+    if mode not in (2, 3):
+        return
+    selected = world.options._lettersanity_selected
+    for track in lettersanity.LETTER_TRACKS:
+        required = (lettersanity.LETTERS if mode == 3 else selected[track])
+        names = tuple(lettersanity.item_name(track, letter) for letter in required)
+        loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
+        previous = loc.access_rule
+        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
+            previous(state) and all(state.has(name, p) for name in names)
+
+    # Mode 2 self-item access rule (dossier amendment, ruled 2026-08-10). In
+    # `locations_and_items` a letter item is progression and native gates the
+    # pickup until the item is received, so a letter seated at its OWN location
+    # is circular-unreachable and permanently locks that track's CTR Token.
+    # Each created letter location therefore requires its own letter item
+    # (`has` that letter), which AP's fill can never satisfy by seating the
+    # item at that same location. Inactive letter locations are never created,
+    # so they acquire no rule here; modes 0, 1 and 3 are untouched (mode 3 has
+    # no letter locations at all, mode 1 has locations but no items).
+    if mode == 2:
+        for track in lettersanity.LETTER_TRACKS:
+            for letter in selected[track]:
+                loc_name = lettersanity.LETTERSANITY_CLASS.location_name(track, letter)
+                own = lettersanity.item_name(track, letter)
+                loc = world.multiworld.get_location(loc_name, player)
+                previous = loc.access_rule
+                loc.access_rule = lambda state, previous=previous, own=own, p=player: \
+                    previous(state) and state.has(own, p)
 
 
 def add_racer_lock_rules(world, player):
