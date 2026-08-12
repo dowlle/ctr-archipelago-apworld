@@ -46,6 +46,7 @@ from ..podium import (NEW_RUNGS, PODIUM_CLASS, SHIPPED_RUNGS, SLOT_ORDER,
                       created_rung_keys_from_options, location_name,
                       podium_slot_codes)
 from ..itemsanity import ITEMSANITY_CLASS
+from ..wumpa_checks import WUMPA_CLASS
 
 FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
 FIXTURE_PATH = FIXTURE_DIR / "location_class_id_stability_v0_1_5.json"
@@ -410,20 +411,27 @@ class TestLocationNameGroups(unittest.TestCase):
         self.assertEqual(klass.location_name_groups(), {})
 
     def test_podium_declares_no_groups(self) -> None:
-        """Podium's frozen surface remains group-free."""
+        """Podium's frozen surface remains group-free, and the two classes that
+        DO declare a group declare exactly one each.
+
+        `Wumpa Checks` joined `Itemsanity Checks` in the H-dossier build. Group
+        names share the location-name namespace and ride the datapackage
+        checksum, so both are minted inside 0.2.0's single bump -- the same
+        reason the eleven H-dossier traps were put in the `Traps` ITEM group at
+        freeze time rather than when their effects landed."""
         self.assertEqual(PODIUM_CLASS.location_name_groups(), {})
+        expected_groups = {
+            "Itemsanity Checks": set(ITEMSANITY_CLASS.names()),
+            "Wumpa Checks": set(WUMPA_CLASS.names()),
+        }
         self.assertEqual(
-            CTR_LOCATION_CLASSES.location_name_groups(),
-            {"Itemsanity Checks": set(ITEMSANITY_CLASS.names())},
-        )
+            CTR_LOCATION_CLASSES.location_name_groups(), expected_groups)
         # AP injects "Everywhere" itself (AutoWorld.py:70-72).
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         declared = {name: group for name, group
                     in world_type.location_name_groups.items()
                     if name != "Everywhere"}
-        self.assertEqual(declared, {
-            "Itemsanity Checks": set(ITEMSANITY_CLASS.names()),
-        })
+        self.assertEqual(declared, expected_groups)
 
     def test_declared_groups_merge_into_the_registry(self) -> None:
         registry = LocationClassRegistry()

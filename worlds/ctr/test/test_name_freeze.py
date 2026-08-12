@@ -42,6 +42,7 @@ from .. import (
 from ..Items import load_item_table
 from ..Locations import CTR_LOCATION_CLASSES
 from ..tizi_helper import TIZI_HELPER_CODE, TIZI_HELPER_ITEM
+from ..h_dossier import TURBO_GRANT_CODE, TURBO_GRANT_ITEM
 
 #: (registry key, name count, code blocks) for every location class, in
 #: registration order. Registration order IS datapackage order.
@@ -71,6 +72,12 @@ EXPECTED_ITEM_BLOCKS = [
     # about what was signed off in #177 and what was added on top of it. The
     # second ruled amendment (`Turbo Grant`) takes 35010189 when it is built.
     ("223 tizi helper amendment", 35010188, 35010188, 1),
+    # The SECOND ruled amendment, and the last one 0.2.0 spends. The
+    # 2026-08-11 Mask/Turbo ruling is explicit that the ruled Mask filler IS the
+    # already-frozen `Invincibility Mask` and that no duplicate Mask-grant name
+    # may be minted, so #224 is exactly one name wide: the missing Turbo
+    # sibling, appended one past Tizi. Nothing in the manifest moves.
+    ("224 turbo grant amendment", 35010189, 35010189, 1),
 ]
 
 #: Every name the freeze appended to data/items.json, in append order.
@@ -85,7 +92,8 @@ FROZEN_ITEM_NAMES = (
        "Penta Penguin"]
     + list(lettersanity.ITEM_NAMES)
     + ["Gas Pedal"]
-    + [TIZI_HELPER_ITEM]  # #223 ruled amendment, appended after the freeze
+    + [TIZI_HELPER_ITEM]   # #223 ruled amendment, appended after the freeze
+    + [TURBO_GRANT_ITEM]   # #224 ruled amendment, appended after #223
 )
 
 
@@ -99,8 +107,8 @@ class TestNameFreezeCensus(unittest.TestCase):
 
     def test_total_registered_names(self) -> None:
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        # 188 frozen by #177, plus the one ruled #223 amendment.
-        self.assertEqual(len(world_type.item_name_to_id), 189)
+        # 188 frozen by #177, plus the two ruled amendments (#223, #224).
+        self.assertEqual(len(world_type.item_name_to_id), 190)
         self.assertEqual(len(world_type.location_name_to_id), 574)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
@@ -131,15 +139,17 @@ class TestNameFreezeCensus(unittest.TestCase):
                     if item["code"] >= 35010095]
         self.assertEqual(appended, FROZEN_ITEM_NAMES)
 
-    def test_the_ruled_amendment_sits_one_past_the_freeze(self) -> None:
-        """#223 reopened the namespace for exactly one name. Pin the boundary:
-        the frozen set still ends at Gas Pedal, and the amendment is the single
-        entry after it."""
+    def test_the_ruled_amendments_sit_past_the_freeze_in_order(self) -> None:
+        """#223 and #224 reopened the namespace for exactly one name each. Pin
+        the boundary: the frozen set still ends at Gas Pedal, Tizi is the first
+        entry after it, Turbo Grant is the second, and there is no third."""
         table = load_item_table()
         by_code = {item["code"]: item["name"] for item in table}
         self.assertEqual(by_code[35010187], "Gas Pedal")
         self.assertEqual(by_code[TIZI_HELPER_CODE], TIZI_HELPER_ITEM)
-        self.assertEqual(max(by_code), TIZI_HELPER_CODE)
+        self.assertEqual(by_code[TURBO_GRANT_CODE], TURBO_GRANT_ITEM)
+        self.assertEqual(TURBO_GRANT_CODE, TIZI_HELPER_CODE + 1)
+        self.assertEqual(max(by_code), TURBO_GRANT_CODE)
 
     def test_the_three_families_the_sweep_recovered_are_registered(self) -> None:
         """Character unlocks (#54/#209), the gas pedal (R-I) and the trial-track

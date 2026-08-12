@@ -32,7 +32,13 @@ class TestTiziHelperName(unittest.TestCase):
         self.assertEqual(TIZI_HELPER_CODE, 35010188)
         codes = [item["code"] for item in load_item_table()]
         self.assertEqual(codes, list(range(35010000, 35010000 + len(codes))))
-        self.assertEqual(max(codes), TIZI_HELPER_CODE)
+        # NOT `max(codes) == TIZI_HELPER_CODE` any more: #224 appended the
+        # second ruled amendment (`Turbo Grant`) one past this one. What #223
+        # actually forbids is a RENUMBER, and that is what the contiguity
+        # assertion above plus this exact-position assertion pin -- Tizi still
+        # sits at 35010188 and nothing was inserted before it.
+        self.assertEqual(codes.index(TIZI_HELPER_CODE),
+                         TIZI_HELPER_CODE - 35010000)
 
     def test_it_ships_inert_in_the_data_file(self) -> None:
         """count 0 in data/items.json: the option decides, not the table."""

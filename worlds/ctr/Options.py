@@ -235,16 +235,21 @@ class ProgressiveStatsMode(Choice):
 
 
 class TrapFillPercentage(Range):
-    """What percentage of this slot's filler items are replaced by traps (Icy
-    Road, Low Gravity, No Brakes, Forced Boost, First Person -- each equally
-    likely).
+    """What percentage of this slot's filler items are replaced by traps -- each
+    of the sixteen equally likely.
 
-      0             = no traps, filler stays Wumpa Fruit
+      0             = no traps, filler stays wumpa
       10  (default) = a taste of sabotage
       100           = every filler slot becomes a trap
 
+    The sixteen: Icy Road, Low Gravity, No Brakes, Forced Boost, First Person,
+    Wumpa Reset, Flatten, Item Reroll, Auto-Use, Empty Crates, Weakened Kart,
+    No Boost, Wireframe, Nitro, Reverse Controls and Red Potion.
+
     Traps never gate anything. A received trap arms silently and fires mid-race
-    on a later lap."""
+    on a later lap. REQUIRES the 0.2.0 native client for the eleven H-dossier
+    effects (everything after First Person above); on an older client those
+    eleven are received and do nothing."""
     # CTR's pool is almost entirely progression, so the filler pool this dial
     # replaces is small; traps substitute filler, never stack onto progression.
     display_name = "Trap Fill Percentage"
@@ -294,6 +299,85 @@ class TiziHelper(Toggle):
     forced Mask. On an older client the item is received and does nothing.
     """
     display_name = "Tizi Helper"
+
+
+class UsefulItemGrants(Toggle):
+    """Add the four ruled power-up grants: `Passive Shield`, `Invincibility
+    Mask`, `Invisibility` and `Turbo Grant`. One copy of each.
+
+    Each one is delivered into your weapon slot, ready to fire, rather than
+    being fired at you: the shield and the mask activate on receipt, the
+    invisibility grant works in every mode (not only Battle), and the Turbo
+    grant sits in your slot until you press the fire button.
+
+    With Itemsanity ON, `Invincibility Mask` additionally needs the separate
+    `Mask` weapon item and `Turbo Grant` needs the separate `Turbo` weapon
+    item; until the matching weapon has been received the grant waits. With
+    Itemsanity OFF no weapon-item gate applies.
+
+    A grant that arrives before its unlock, outside a race, or while your weapon
+    slot is already full is QUEUED, never discarded, and delivered at the first
+    legal moment.
+
+    These add NO locations -- four useful items spending four otherwise-filler
+    slots. Off by default. REQUIRES the 0.2.0 native client, which owns the
+    delivery; on an older client they are received and do nothing.
+    """
+    display_name = "Useful Item Grants"
+
+
+class WumpaBundles(Toggle):
+    """Let filler slots roll `Small Wumpa Bundle` (3 fruit) and `Big Wumpa
+    Bundle` (a full kart) as well as plain `Wumpa Fruit` (1).
+
+    Plain fruit stays the common case on purpose: bundles enrich the filler
+    pool, they do not replace it. A seed whose every filler slot handed you ten
+    fruit would make the 10-wumpa check and Itemsanity's juiced checks trivial.
+
+    Adds no items and no locations of its own -- it only changes WHICH filler
+    name lands in a slot the pool was already going to fill. Off by default, and
+    a seed with it off is generated exactly as it would have been before this
+    option existed.
+    """
+    display_name = "Wumpa Bundles"
+
+
+class ProgressiveStartingWumpa(Range):
+    """How many `Progressive Starting Wumpa` items to add. Each one you receive
+    permanently raises the fruit you begin every race holding, by one.
+
+      0 (default) = every race starts you at zero fruit, as vanilla
+      10          = the full ladder; the last copy starts you at a full kart
+
+    Ten is the ceiling because a kart cannot hold more than ten fruit, so an
+    eleventh copy could never be felt.
+
+    This is the one AP effect in the game that persists across a race boundary,
+    so it is `useful` and it is opt-in. It adds no locations, so every copy is
+    one otherwise-filler slot spent. REQUIRES the 0.2.0 native client.
+    """
+    display_name = "Progressive Starting Wumpa"
+    range_start = 0
+    range_end = 10
+    default = 0
+
+
+class WumpaCheck(Toggle):
+    """Add the global 10-wumpa check: one location per seed, sent the first time
+    you reach ten Wumpa Fruit in a race.
+
+    GLOBAL, not per track -- reaching ten fruit on Coco Park and on Oxide
+    Station are the same check, by the same reasoning that made Itemsanity's
+    juiced checks global.
+
+    Distinct from Itemsanity's `(Juiced)` checks even though both read the same
+    ten-fruit threshold: this one fires on REACHING ten, those fire on FIRING a
+    weapon while at ten. They coexist without double-counting.
+
+    Off by default. REQUIRES the 0.2.0 native client, which owns the emit; on an
+    older client this location can never be checked.
+    """
+    display_name = "Wumpa Check"
 
 
 class BoxLocations(Toggle):
@@ -902,6 +986,11 @@ class ctrAPOptions(PerGameCommonOptions):
     tizi_helper: TiziHelper
     lettersanity: Lettersanity
     letters_per_track: LettersPerTrack
+    # H-dossier families (2026-08-10 ruling) + the #224 Turbo Grant amendment
+    useful_item_grants: UsefulItemGrants
+    wumpa_bundles: WumpaBundles
+    progressive_starting_wumpa: ProgressiveStartingWumpa
+    wumpa_check: WumpaCheck
     # authored item-box checks (#109)
     box_locations: BoxLocations
     shortcut_knowledge: ShortcutKnowledge
@@ -952,7 +1041,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
             FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
-                     ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
+                     ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper,
+                     UsefulItemGrants, WumpaBundles, ProgressiveStartingWumpa],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode],
     # Grouped together on purpose: a player reads "who do I start as", "who can
@@ -972,7 +1062,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         RequirementWeights,
     ],
     "Extra Checks": [PodiumPlacementChecks, PodiumFinishRungs,
-                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
+                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung,
+                     WumpaCheck],
     "Quality of Life": [OneLapCups],
     "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
