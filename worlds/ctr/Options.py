@@ -258,6 +258,24 @@ class Itemsanity(Toggle):
     display_name = "Itemsanity"
 
 
+class TiziHelper(Toggle):
+    """Add the `Tizi Helper` item (#223): one received item that makes the first
+    row of four weapon boxes just past the Papu's Pyramid start line hand you a
+    Mask, for the Tiziano skip.
+
+    Adds NO location, and nothing in logic ever requires it -- it is one useful
+    item spending one otherwise-filler slot. Off by default.
+
+    With Itemsanity ON the helper needs the separate `Mask` weapon item as well,
+    and stays inert until both have been received. With Itemsanity off, the
+    helper item alone is enough.
+
+    REQUIRES the 0.2.0 native client, which owns the box identification and the
+    forced Mask. On an older client the item is received and does nothing.
+    """
+    display_name = "Tizi Helper"
+
+
 class BoxLocations(Toggle):
     """Add the authored item-box checks (#109): one location per authored box
     position, broken once per seed by driving through it in any Adventure race
@@ -845,6 +863,8 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     itemsanity: Itemsanity
+    # Papu's Pyramid mask helper (#223)
+    tizi_helper: TiziHelper
     # authored item-box checks (#109)
     box_locations: BoxLocations
     shortcut_knowledge: ShortcutKnowledge
@@ -893,7 +913,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
             FinalOxideUnlock, FinalOxideRelicCount],
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
-                     ShuffleKeys, TrapFillPercentage, Itemsanity],
+                     ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode],
     # Grouped together on purpose: a player reads "who do I start as", "who can
