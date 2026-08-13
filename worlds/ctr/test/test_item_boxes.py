@@ -143,12 +143,16 @@ class TestBoxAccessRules(unittest.TestCase):
                 self.assertTrue(rule(CollectionState(mw)))
 
     def test_boost_terms_bind_when_randomized(self):
-        mw, rule = self._rule("Crash Cove", 4,
-                              progressive_boost="shared_global")
-        state = CollectionState(mw)
-        self.assertFalse(rule(state))
-        _grant(state, self.PLAYER, "Progressive Boost")
-        self.assertTrue(rule(state))
+        # Tiny Arena 1 is the slot Stef found unbreakable-but-in-logic on
+        # 2026-08-12; it takes one boost copy, not USF.
+        for track, slot in (("Crash Cove", 4), ("Tiny Arena", 1)):
+            with self.subTest(track=track, slot=slot):
+                mw, rule = self._rule(track, slot,
+                                      progressive_boost="shared_global")
+                state = CollectionState(mw)
+                self.assertFalse(rule(state))
+                _grant(state, self.PLAYER, "Progressive Boost")
+                self.assertTrue(rule(state))
 
     def test_usf_slots_need_two_copies(self):
         mw, rule = self._rule("N. Gin Labs", 4,
