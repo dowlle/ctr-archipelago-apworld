@@ -182,6 +182,10 @@ BOX_RULES = {
     ("Hot Air Skyway", 13): (2, False),
     ("Hot Air Skyway", 14): (2, False),
     ("Hot Air Skyway", 15): (2, False),
+    # Slot 1 = level_id 15, pos (-7846, 390, -6907): unbreakable without boost,
+    # found in logic and stuck in the 2026-08-12 live session (Stef ruling
+    # 21:39). Boost, not USF -- his report says "boost".
+    ("Tiny Arena", 1): (1, False),
     ("Tiger Temple", 5): (0, False),    # itemsanity-conditional door, Rules.py
 }
 
