@@ -2,6 +2,7 @@ import logging
 from BaseClasses import CollectionState
 
 from .gem_cup_legs import resolved_gem_cup_legs, track_to_cups
+from .usf_finish import UsfFinishGate
 
 
 def make_rule(expr_text: str, player: int):
@@ -71,7 +72,13 @@ def set_rules(world):
     if world.options.warppad_unlock_requirements.value == 0:
         add_vanilla_floor_rules(world, player)
     add_boss_garage_rules(world, player)
-    add_podium_placement_rules(world, player)
+    # USF finish gate (Stef ruling 2026-08-12): built and installed BEFORE the
+    # rungs, because installing is what captures each gated Trophy Race's
+    # pre-gate rule -- which the held rungs then reuse. Passed as an argument
+    # rather than stashed on the world so that order stays visible.
+    usf_gate = UsfFinishGate(world)
+    usf_gate.install(world, player)
+    add_podium_placement_rules(world, player, usf_gate)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
 
@@ -344,7 +351,7 @@ def add_boss_garage_rules(world, player):
     # N. Oxide Garage Door keeps its has('Key', 4) text rule.
 
 
-def add_podium_placement_rules(world, player):
+def add_podium_placement_rules(world, player, usf_gate):
     """Podium placement rungs (position-rung rework, shipped 0.1.x) are reachable
     exactly when their destination track is RACEABLE.
 
@@ -376,10 +383,27 @@ def add_podium_placement_rules(world, player):
     cup), since trophyLoc reachability implies trackRegion. This rule is unchanged
     by the fix.
 
+    USF FINISH GATE (Stef ruling 2026-08-12, see usf_finish.py). A track whose
+    finish line needs USF splits "raceable" from "finishable", and the rungs are
+    the only place that split is visible:
+
+    * its FINISH rungs take the term on both branches -- the trophy branch gets
+      it for free (the Trophy Race location now carries it) and the cup branch
+      is one of the gated cups by construction;
+    * its HELD rungs keep the pre-gate meaning of raceable. They fire from the
+      live-position listener before the line, so they delegate to
+      `usf_gate.raceable_rule(track)` -- the Trophy Race's captured pre-gate
+      reachability -- instead of to the now-gated location;
+    * EVERY track's cup branch takes the term for a cup that legs a USF track,
+      because completing such a cup includes finishing that leg. Without this
+      the rungs are the leak: their cup OR bypasses the Trophy Race rule the
+      gate was installed on.
+
     No placement is ever logically required, so accessibility:full stays
     satisfiable whenever the trophy race is."""
     o = world.options
-    from .podium import TROPHY_TRACKS, created_rung_keys_from_options, location_name
+    from .podium import (FINISH_RUNG_KEYS, TROPHY_TRACKS,
+                         created_rung_keys_from_options, location_name)
     rung_keys = created_rung_keys_from_options(o)
     if not rung_keys:
         return
@@ -395,24 +419,41 @@ def add_podium_placement_rules(world, player):
         trophy_name = f"{track}: Trophy Race"
         if trophy_name not in all_names:
             continue
-        # Cups that leg this track AND actually exist as regions this seed.
+        # Cups that leg this track AND actually exist as regions this seed,
+        # split by whether completing them includes a USF-gated finish.
         cups = [c for c in track_cups.get(track, []) if c in all_regions]
+        plain_cups = tuple(c for c in cups if c not in usf_gate.cups)
+        gated_cups = tuple(c for c in cups if c in usf_gate.cups)
+        raceable = usf_gate.raceable_rule(track)
         for rung_key in rung_keys:
             name = location_name(track, rung_key)
             if name not in all_names:
                 continue
-            loc = mw.get_location(name, player)
-            if cups:
-                loc.access_rule = (
-                    lambda state, t=trophy_name, cs=tuple(cups), p=player:
-                    state.can_reach(t, "Location", p)
-                    or any(state.can_reach(c, "Region", p) for c in cs)
-                )
+            if raceable is not None and rung_key not in FINISH_RUNG_KEYS:
+                track_branch = raceable
             else:
-                loc.access_rule = (
+                track_branch = (
                     lambda state, t=trophy_name, p=player:
                     state.can_reach(t, "Location", p)
                 )
+            mw.get_location(name, player).access_rule = _rung_rule(
+                track_branch, plain_cups, gated_cups, usf_gate.term, player)
+
+
+def _rung_rule(track_branch, plain_cups, gated_cups, usf_term, player):
+    """One rung's OR: the track's own path, any ungated legging cup, or any
+    USF-gated legging cup once the USF term is met. `usf_term` is always-True in
+    a seed without a randomized boost chain, so the third branch collapses back
+    into the second there rather than being special-cased away."""
+    def rule(state):
+        if track_branch(state):
+            return True
+        if any(state.can_reach(c, "Region", player) for c in plain_cups):
+            return True
+        return (bool(gated_cups)
+                and usf_term(state, player)
+                and any(state.can_reach(c, "Region", player) for c in gated_cups))
+    return rule
 
 
 def add_time_trial_and_ctr_requirements(world, player):

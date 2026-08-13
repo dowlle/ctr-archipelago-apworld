@@ -748,10 +748,17 @@ class ctrAPWorld(World):
         # three stat chains (the hard-tier general rule), so those chains
         # upgrade too -- but ONLY at hard, because no easier tier creates a
         # stats-reading slot.
+        # The USF finish gate (usf_finish.py, Stef ruling 2026-08-12) is the
+        # third reader and the one that makes the boost upgrade UNCONDITIONAL:
+        # Hot Air Skyway's Trophy Race is a static location present in every
+        # seed, so every randomized-boost seed reads the chain now, whatever
+        # itemsanity and box locations are set to. Left `useful`, that track's
+        # finish -- and its time trials, token challenge and finish rungs --
+        # would sit permanently outside logic, the same FillError class the
+        # #145 upgrade was written for. The stat chains keep their narrower
+        # condition: no rule outside the hard box tier reads them.
         if (name == progressive_capability.BOOST_CHAIN
-                and bool(self.options.progressive_boost.value)
-                and (ITEMSANITY_CLASS.is_enabled(self.options)
-                     or ITEM_BOX_CLASS.is_enabled(self.options))):
+                and bool(self.options.progressive_boost.value)):
             classification = ItemClassification.progression
         if (name in progressive_capability.STAT_CHAINS
                 and bool(self.options.progressive_stats.value)
