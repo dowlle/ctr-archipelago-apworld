@@ -210,51 +210,79 @@ def raise_if_oxidefinal_goal_has_no_progression_tier(world):
             f"tiers progression), or change the goal or mode.")
 
 
-def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
-    """Issue #171/#28 R5: two FIXED (not YAML-driven) world.json location
-    gates name a Sapphire count -- 'Gem Stone Valley -> Slide Coliseum Warp
-    Pad' (has('Sapphire Relic', 10), vanilla warp-pad unlock only; randomized
-    unlock strips this exact exit rule in Regions.create_regions) and
-    'N. Oxide Garage: N. Oxide's Final Challenge' (has('Key', 4) and
-    has('Sapphire Relic', 18), present UNCONDITIONALLY in every warp-pad
-    unlock mode, independent of the goal or oxide_final_challenge_relic_count
-    -- verified at source, `data/world.json`, no other code path overrides
-    this location's own requires text).
+def _oxide_final_supply_shortfall(world):
+    """Shared arithmetic for the two Final Challenge supply checks below
+    (issue #53; kept in lockstep with `_relic_progression_map`'s access_full
+    block and with raise_if_oxidefinal_goal_has_no_progression_tier's mode
+    handling). The location's gate follows the CONFIGURED
+    oxide_final_challenge_unlock mode + count in every seed
+    (Rules.add_oxide_final_challenge_rule, native parity), so satisfiability
+    is against CREATED relics of the satisfying tiers: total_relics sums
+    them; every other mode needs one tier whose own created count reaches N.
+    Returns None when satisfiable, else a human-readable description."""
+    from .Options import FinalOxideUnlock
+    n = world.options.oxide_final_challenge_relic_count.value
+    tiers = world._oxide_goal_tiers()
+    created = world._ctr_relic_created
+    if world.options.oxide_final_challenge_unlock.value \
+            == FinalOxideUnlock.option_total_relics:
+        ok = sum(created.get(t, 0) for t in tiers) >= n
+    else:
+        ok = any(created.get(t, 0) >= n for t in tiers)
+    if ok:
+        return None
+    mode_key = world.options.oxide_final_challenge_unlock.current_key
+    counts = ", ".join(
+        f"{t} ({world._OXIDE_TIER_SLIDER[t]})={created.get(t, 0)} created"
+        for t in tiers)
+    return (
+        f"'N. Oxide Garage: N. Oxide's Final Challenge' needs {n} relic(s) "
+        f"under mode '{mode_key}' (this gate follows "
+        f"oxide_final_challenge_unlock/oxide_final_challenge_relic_count in "
+        f"every seed, whatever the goal), but the created supply cannot "
+        f"reach {n} ({counts})")
 
-    Pre-#171, both gates always had their full 18 Sapphire Relic items
-    available (pinned-vanilla or pool-placed, item existence was invariant).
-    Issue #171's exact-count removal breaks that invariant: if
-    sapphire_relic_count creates fewer than a gate's fixed threshold, that
-    gate can NEVER be satisfied by any state, no matter what the player
-    collects. Under accessibility 'full' every location must be reachable, so
-    this is a genuine, generation-aborting solvability break -- RAISE, not
-    clamp (clamping would mean silently overriding the player's own
-    sapphire_relic_count, in a case with no clear 'safe' direction to clamp
-    toward). See warn_relic_gates_may_be_permanently_unreachable for the
+
+def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
+    """Issue #171/#28 R5, generalized by issue #53: two relic-count location
+    gates exist -- 'Gem Stone Valley -> Slide Coliseum Warp Pad'
+    (has('Sapphire Relic', 10), FIXED, vanilla warp-pad unlock only;
+    randomized unlock strips this exact exit rule in Regions.create_regions)
+    and 'N. Oxide Garage: N. Oxide's Final Challenge', which since #53
+    follows the CONFIGURED oxide_final_challenge_unlock mode + count in
+    every warp-pad unlock mode and every goal
+    (Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire text
+    is legacy and overridden).
+
+    If the created relic supply cannot satisfy a gate, that gate can NEVER
+    be satisfied by any state, no matter what the player collects. Under
+    accessibility 'full' every location must be reachable, so this is a
+    genuine, generation-aborting solvability break -- RAISE, not clamp
+    (clamping would mean silently overriding the player's own relic counts,
+    in a case with no clear 'safe' direction to clamp toward). See
+    warn_relic_gates_may_be_permanently_unreachable for the
     non-full-accessibility case, where AP already tolerates an unreachable
     non-required location (see test_vanilla_floors.TestVanillaBadSeedClass)."""
     if world.options.accessibility.value != 0:  # Accessibility.option_full == 0
         return
-    created = world._ctr_relic_created.get("Sapphire Relic", 0)
+    sapphires = world._ctr_relic_created.get("Sapphire Relic", 0)
     problems = []
-    if world.options.warppad_unlock_requirements.value == 0 and created < 10:
+    if world.options.warppad_unlock_requirements.value == 0 and sapphires < 10:
         problems.append(
-            "'Gem Stone Valley -> Slide Coliseum Warp Pad' needs 10 (vanilla "
-            "warp-pad unlock keeps this world.json gate; randomized unlock "
-            "strips it)")
-    if created < 18:
-        problems.append(
-            "'N. Oxide Garage: N. Oxide's Final Challenge' needs 18 (this "
-            "world.json location gate is unconditional -- present in every "
-            "warp-pad unlock mode, independent of the goal or "
-            "oxide_final_challenge_relic_count)")
+            f"'Gem Stone Valley -> Slide Coliseum Warp Pad' needs 10 Sapphire "
+            f"Relics but only {sapphires} are created (vanilla warp-pad "
+            f"unlock keeps this world.json gate; randomized unlock strips it)")
+    shortfall = _oxide_final_supply_shortfall(world)
+    if shortfall:
+        problems.append(shortfall)
     if not problems:
         return
     raise OptionError(
-        f"CTR: accessibility 'full' requires every location reachable, but "
-        f"this seed creates only {created} Sapphire Relic(s) "
-        f"(sapphire_relic_count), and: " + "; ".join(problems) + ". Raise "
-        f"sapphire_relic_count, or switch accessibility away from 'full'.")
+        f"CTR: accessibility 'full' requires every location reachable, but: "
+        + "; ".join(problems) + ". Raise the relevant *_relic_count "
+        f"option(s), lower oxide_final_challenge_relic_count or change "
+        f"oxide_final_challenge_unlock, or switch accessibility away from "
+        f"'full'.")
 
 
 def apply_raise_guards(world):
@@ -434,24 +462,29 @@ def warn_relic_gates_may_be_permanently_unreachable(world):
     documented pre-existing in test_vanilla_floors.TestVanillaBadSeedClass),
     so this is a warning, not a generation-aborting error. Surfaced rather
     than left fully silent because issue #171 makes it newly reachable BY
-    PLAYER CHOICE -- pre-#171 these two fixed gates always had their full 18
-    Sapphires (pinned or not), so no YAML combination could permanently lock
-    them; now sapphire_relic_count alone can."""
+    PLAYER CHOICE -- pre-#171 these gates always had their full 18 Sapphires
+    (pinned or not), so no YAML combination could permanently lock them; now
+    the relic count sliders can, and since issue #53 the Final Challenge
+    check follows the configured mode/count (see
+    _oxide_final_supply_shortfall)."""
     if world.options.accessibility.value == 0:
         return
-    created = world._ctr_relic_created.get("Sapphire Relic", 0)
+    sapphires = world._ctr_relic_created.get("Sapphire Relic", 0)
     problems = []
-    if world.options.warppad_unlock_requirements.value == 0 and created < 10:
-        problems.append("'Gem Stone Valley -> Slide Coliseum Warp Pad' (needs 10)")
-    if created < 18:
-        problems.append("'N. Oxide Garage: N. Oxide's Final Challenge' (needs 18)")
+    if world.options.warppad_unlock_requirements.value == 0 and sapphires < 10:
+        problems.append(
+            f"'Gem Stone Valley -> Slide Coliseum Warp Pad' (needs 10 "
+            f"Sapphire Relics, {sapphires} created)")
+    shortfall = _oxide_final_supply_shortfall(world)
+    if shortfall:
+        problems.append(shortfall)
     if not problems:
         return
     logger.warning(
-        f"CTR: player {world.player} ({world.multiworld.player_name[world.player]}) "
-        f"created only {created} Sapphire Relic(s) this seed (sapphire_relic_count), "
-        f"so " + " and ".join(problems) + " can never be reached by any state -- "
-        f"permanently unreachable, but tolerated under this accessibility setting.")
+        f"CTR: player {world.player} ({world.multiworld.player_name[world.player]}): "
+        + " and ".join(problems) + " -- can never be reached by any state, "
+        f"permanently unreachable, but tolerated under this accessibility "
+        f"setting.")
 
 
 def warn_editable_stats_overridden_by_progressive(world):

@@ -264,6 +264,44 @@ class TestGateCountGuards(unittest.TestCase):
             "gold_relic_count": 10,
         })
 
+    def test_full_accessibility_raises_when_mode_supply_short(self):
+        # Issue #53's exact field repro (native verifier profile): non-final
+        # goal + platinum mode + count 10 with only 2 platinums created used
+        # to GENERATE (the location kept the legacy 18-Sapphire text rule and
+        # 18+ sapphires satisfied it), stranding a progression item on a
+        # natively-unreachable location. Must now raise instead.
+        with self.assertRaises(OptionError) as ctx:
+            _early({
+                "accessibility": "full",
+                "oxide_goal": "first",
+                "oxide_final_challenge_unlock": "platinum_relics",
+                "oxide_final_challenge_relic_count": 10,
+                "platinum_relic_count": 2,
+            })
+        self.assertIn("Final Challenge", str(ctx.exception))
+        self.assertIn("platinum", str(ctx.exception))
+
+    def test_full_accessibility_ok_when_mode_supply_meets(self):
+        _early({
+            "accessibility": "full",
+            "oxide_goal": "first",
+            "oxide_final_challenge_unlock": "platinum_relics",
+            "oxide_final_challenge_relic_count": 10,
+            "platinum_relic_count": 10,
+        })
+
+    def test_minimal_accessibility_mode_supply_short_warns_not_raises(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early({
+                "accessibility": "minimal",
+                "oxide_goal": "first",
+                "oxide_final_challenge_unlock": "platinum_relics",
+                "oxide_final_challenge_relic_count": 10,
+                "platinum_relic_count": 2,
+            })
+        self.assertTrue(
+            any("permanently unreachable" in line for line in cm.output))
+
     def test_oxidefinal_total_relics_sums_across_progression_tiers(self):
         # total_relics in randomized mode: all three tiers are progression, so
         # the guard must sum their CREATED counts (5+5+0=10), not just count
@@ -289,6 +327,35 @@ class TestGateCountGuards(unittest.TestCase):
                 "gold_relic_count": 5,
                 "platinum_relic_count": 0,
             })
+
+
+class TestOxideFinalLocationRuleFollowsMode(CTRTestBase):
+    """Issue #53: the Final Challenge LOCATION rule must read the configured
+    oxide_final_challenge_unlock mode + count in a NON-final-goal seed
+    (native parity with AP_VF_OXIDE_FIN), not data/world.json's legacy
+    18-Sapphire text."""
+
+    run_default_tests = False
+    options = {
+        "accessibility": "full",
+        "oxide_goal": "first",
+        "oxide_final_challenge_unlock": "platinum_relics",
+        "oxide_final_challenge_relic_count": 3,
+        "platinum_relic_count": 3,
+        "shuffle_keys": True,
+    }
+    LOC = "N. Oxide Garage: N. Oxide's Final Challenge"
+
+    def test_platinums_gate_the_location_not_sapphires(self):
+        # Everything except the platinums -- includes all 4 Keys and the full
+        # 18 Sapphire Relics, which satisfied the legacy text rule.
+        self.collect_all_but(["Platinum Relic"])
+        self.assertFalse(
+            self.can_reach_location(self.LOC),
+            "18 Sapphires + 4 Keys opened the Final Challenge: the legacy "
+            "world.json rule is still installed")
+        self.collect_by_name(["Platinum Relic"])
+        self.assertTrue(self.can_reach_location(self.LOC))
 
 
 class TestGeneralPoolSizing(CTRTestBase):
