@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.1.5",
-  "checksum": "09dafae50a4055cb098f944710de4a0d6809af8d",
+  "checksum": "39c76426343376931e785e40b3ba8cd56c6d70f6",
   "item_name_to_id": {
     "Auto-Use Trap": 35010109,
     "Beaker": 35010099,
@@ -182,6 +182,7 @@
     "Small Wumpa Bundle": 35010120,
     "TNT": 35010098,
     "Tiny Tiger": 35010134,
+    "Tizi Helper": 35010188,
     "Trophy": 35010000,
     "Turbo": 35010095,
     "Warpball": 35010103,
@@ -956,6 +957,7 @@
       "Small Wumpa Bundle",
       "TNT",
       "Tiny Tiger",
+      "Tizi Helper",
       "Trophy",
       "Turbo",
       "Warpball",
