@@ -42,13 +42,13 @@ def _fake_world(name="Tester", player=1):
 class WarningWording(unittest.TestCase):
 
     def test_names_the_player_the_collapse_and_the_reason(self):
-        world = _fake_world("Stef")
+        world = _fake_world("PlayerOne")
         with self.assertLogs(level=logging.WARNING) as cm:
             wpl.warn_stage2_collapsed(world, "geography", "best breadth was 3")
         self.assertEqual(len(cm.output), 1, "exactly one line per collapse")
         line = cm.output[0]
         self.assertIn("[CTR]", line)
-        self.assertIn("Stef", line)
+        self.assertIn("PlayerOne", line)
         self.assertIn(STABLE_PREFIX, line)
         self.assertIn("best breadth was 3", line)
 

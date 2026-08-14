@@ -56,7 +56,7 @@ EXPECTED_CLASSES = [
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
-#: in append order. The order of the first two is the ruled freeze order (Stef,
+#: in append order. The order of the first two is the ruled freeze order (ruled,
 #: 2026-08-10 11:38: itemsanity block first, the H-dossier families after it).
 EXPECTED_ITEM_BLOCKS = [
     ("itemsanity weapons", 35010095, 35010105, 11),

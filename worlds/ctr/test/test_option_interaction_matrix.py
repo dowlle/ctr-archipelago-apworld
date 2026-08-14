@@ -1,7 +1,7 @@
 """Tests for the option interaction / constraint matrix (issue #178,
 worlds/ctr/forced_options.py).
 
-Scope: the four already-shipping interaction groups named in the Atlas Run
+Scope: the four already-shipping interaction groups named in the build host run
 that built this (podium sub-toggle inertness, gem-cup/arena includes,
 two_stage_density, warp-pad modes), plus regression coverage for the three
 pre-existing RAISE guards (#87, #50, #23) that moved into forced_options.py

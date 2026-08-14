@@ -29,7 +29,7 @@ split by consequence.
   does NOT mean mutating the option's own stored value the way Stardew
   Valley's forced_options.py sometimes does -- `warp_pad_shuffle_categories`
   is deliberately emitted RAW, pre-collapse, on the wire (slot_data Contract
-  Sec.3, "Stef-acked known minor"), and rewriting the stored value here would
+  Sec.3, "ruling-acked known minor"), and rewriting the stored value here would
   fight that on-the-record choice for no behavioural gain, since every
   downstream reader already resolves the real, collapsed shape itself.
 

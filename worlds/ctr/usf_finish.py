@@ -1,6 +1,6 @@
 """Tracks whose FINISH LINE is gated behind Ultra Sacred Fire (USF).
 
-Stef ruling, 2026-08-12 21:33-21:36, from the live v3 test session on seed
+Ruling, 2026-08-12 21:33-21:36, from the live v3 test session on seed
 89642014421032427840: **Hot Air Skyway cannot be finished at all without USF**
 -- the mid-track climb is impassable on vanilla/level-1 boost, so the lap never
 completes. Before the ruling, logic and Universal Tracker put `Finish (Any

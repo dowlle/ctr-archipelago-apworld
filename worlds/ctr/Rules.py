@@ -75,7 +75,7 @@ def set_rules(world):
     # installed, so they must run after it (#54/#209, R8).
     add_racer_lock_rules(world, player)
     add_boss_garage_rules(world, player)
-    # USF finish gate (Stef ruling 2026-08-12): built and installed BEFORE the
+    # USF finish gate (ruled 2026-08-12): built and installed BEFORE the
     # rungs, because installing is what captures each gated Trophy Race's
     # pre-gate rule -- which the held rungs then reuse. Passed as an argument
     # rather than stashed on the world so that order stays visible.
@@ -455,7 +455,7 @@ def add_podium_placement_rules(world, player, usf_gate):
     cup), since trophyLoc reachability implies trackRegion. This rule is unchanged
     by the fix.
 
-    USF FINISH GATE (Stef ruling 2026-08-12, see usf_finish.py). A track whose
+    USF FINISH GATE (ruled 2026-08-12, see usf_finish.py). A track whose
     finish line needs USF splits "raceable" from "finishable", and the rungs are
     the only place that split is visible:
 

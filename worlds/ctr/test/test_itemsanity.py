@@ -136,7 +136,7 @@ class TestBoostChainClassification(unittest.TestCase):
 
     def test_progression_without_itemsanity_too(self):
         """The upgrade stopped being itemsanity's to grant. The USF finish gate
-        (Stef ruling 2026-08-12) reads the chain on Hot Air Skyway's Trophy
+        (ruled 2026-08-12) reads the chain on Hot Air Skyway's Trophy
         Race, a static location in every seed, so a randomized boost chain is
         progression whether or not itemsanity is on."""
         items = self._boost_items(itemsanity=False,

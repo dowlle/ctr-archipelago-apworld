@@ -1,4 +1,4 @@
-"""The Hot Air Skyway USF finish gate and its propagation (Stef ruling
+"""The Hot Air Skyway USF finish gate and its propagation (ruled
 2026-08-12 21:33-21:36, live v3 session on seed 89642014421032427840).
 
 Finishing Hot Air Skyway at all needs USF (two received `Progressive Boost`).

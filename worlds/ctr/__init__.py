@@ -45,7 +45,7 @@ TRAP_ITEM_NAMES = [
 ]
 
 # The 11 trap names the 0.2.0 name freeze (#177) minted from the H-dossier
-# ruling (Stef, 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
+# ruling (ruled 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
 # and that is deliberate: TRAP_ITEM_NAMES is the BUILDABLE set -- it drives the
 # trap_fill_percentage draw and its order is pinned to native's AP_TrapEffect
 # enum, so a name whose native effect does not exist yet must stay out of it or
@@ -815,7 +815,7 @@ class ctrAPWorld(World):
         # three stat chains (the hard-tier general rule), so those chains
         # upgrade too -- but ONLY at hard, because no easier tier creates a
         # stats-reading slot.
-        # The USF finish gate (usf_finish.py, Stef ruling 2026-08-12) is the
+        # The USF finish gate (usf_finish.py, ruled 2026-08-12) is the
         # third reader and the one that makes the boost upgrade UNCONDITIONAL:
         # Hot Air Skyway's Trophy Race is a static location present in every
         # seed, so every randomized-boost seed reads the chain now, whatever
@@ -1653,7 +1653,7 @@ class ctrAPWorld(World):
         derived_shuffle = bool(getattr(self, "shuffle_warp_pads", False))
         # schema_version 7 (0.2.0, issue #166): the top-level gem_cup_legs block.
         # The BUMP is unconditional (Q28 ruling, #152 dossier: "ALWAYS BUMP...no
-        # conditional emission" -- Stef, "they should just update the client to be
+        # conditional emission". "They should just update the client to be
         # honest. Keeps it simple."). The `gem_cup_legs` block ITSELF stays
         # conditional on the option actually randomizing the cups' legs -- only
         # then does a native need to parse it to load the same tracks the

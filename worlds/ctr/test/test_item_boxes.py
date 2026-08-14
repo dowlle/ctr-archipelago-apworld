@@ -49,7 +49,7 @@ class TestSeatingTables(unittest.TestCase):
         boost2 = [k for k, (b, s) in BOX_RULES.items() if b == 2 and not s]
         stats = [k for k, (b, s) in BOX_RULES.items() if s]
         sk_only = [k for k, (b, s) in BOX_RULES.items() if b == 0 and not s]
-        # 6 pure + 4 with a medium SK term + Tiny Arena 1 (Stef, 2026-08-12).
+        # 6 pure + 4 with a medium SK term + Tiny Arena 1 (ruled 2026-08-12).
         self.assertEqual(len(boost1), 11)
         self.assertIn(("Tiny Arena", 1), boost1)
         self.assertEqual(len(boost2), 21)   # 18 captured + 3 ruled HAS defaults
@@ -143,7 +143,7 @@ class TestBoxAccessRules(unittest.TestCase):
                 self.assertTrue(rule(CollectionState(mw)))
 
     def test_boost_terms_bind_when_randomized(self):
-        # Tiny Arena 1 is the slot Stef found unbreakable-but-in-logic on
+        # Tiny Arena 1 is the slot found unbreakable-but-in-logic on
         # 2026-08-12; it takes one boost copy, not USF.
         for track, slot in (("Crash Cove", 4), ("Tiny Arena", 1)):
             with self.subTest(track=track, slot=slot):
@@ -212,7 +212,7 @@ class TestBoxSeedClassification(unittest.TestCase):
         self.assertTrue(all(item.advancement for item in items))
 
     def test_boost_progression_without_boxes_or_itemsanity(self):
-        """No reader is optional any more: the USF finish gate (Stef ruling
+        """No reader is optional any more: the USF finish gate (ruled
         2026-08-12) reads the boost chain on Hot Air Skyway's Trophy Race in
         every seed, so the upgrade no longer depends on this feature at all.
         The stat chains below still do."""
