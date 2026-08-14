@@ -154,7 +154,11 @@ class TestGemCupFloorUnderTheCapacityInvariant(unittest.TestCase):
     disagreement shows up as a FillError rather than as a bad map."""
 
     def test_floor_holds_and_fill_succeeds_with_keys_off(self):
-        opts = {"shuffle_keys": False, "podium_placement_checks": False}
+        # character_unlocks off: a podium-off seed cannot hold the 15
+        # always-on character unlock items (#54/#209), and this test is
+        # about the cup floor under a tight map, not about that economy.
+        opts = {"shuffle_keys": False, "podium_placement_checks": False,
+                "character_unlocks": False}
         for seed in CAPACITY_SEEDS:
             multiworld = setup_multiworld(ctrAPWorld, seed=seed, options=opts)
             self.assertEqual(_cups_below_floor(multiworld.worlds[1]), [],
