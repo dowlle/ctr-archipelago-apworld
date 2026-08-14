@@ -72,6 +72,7 @@ def set_rules(world):
     if world.options.warppad_unlock_requirements.value == 0:
         add_vanilla_floor_rules(world, player)
     add_boss_garage_rules(world, player)
+    add_oxide_final_challenge_rule(world, player)
     # USF finish gate (ruled 2026-08-12): built and installed BEFORE the
     # rungs, because installing is what captures each gated Trophy Race's
     # pre-gate rule -- which the held rungs then reuse. Passed as an argument
@@ -349,6 +350,28 @@ def add_boss_garage_rules(world, player):
             lambda s, n=thr, p=player: s.has("Trophy", p, n)
         )
     # N. Oxide Garage Door keeps its has('Key', 4) text rule.
+
+
+def add_oxide_final_challenge_rule(world, player):
+    """Native-parity rule for 'N. Oxide Garage: N. Oxide's Final Challenge'
+    (issue #53). Native opens the Final Challenge in EVERY seed as the AND of
+    the fixed Oxide garage requirement (4 Keys -- Regions._resolve_boss_reqs:
+    'Oxide = 4 keys, fixed') and the CONFIGURED oxide_final_challenge_unlock
+    mode + count (ap_verify.c AP_VF_OXIDE_FIN, mirroring the runtime gate),
+    whatever the goal is. The data/world.json text rule on this location is
+    the legacy fixed 18-Sapphire gate, which misstates reachability whenever
+    the mode or count differ from that default -- in the native-stricter
+    direction fill could seat a progression item on a location no state can
+    ever reach. Replace the text rule outright: the Key-4 half is unchanged
+    (it is also the logic proxy for 'beat N. Oxide's Challenge first' -- the
+    sequencing prerequisite carries no item gate of its own, same modelling
+    as the goal event), and the relic half delegates to the same
+    _oxide_final_relic_rule() predicate the oxide-final goal uses."""
+    loc = world.multiworld.get_location(
+        "N. Oxide Garage: N. Oxide's Final Challenge", player)
+    relic_rule = world._oxide_final_relic_rule()
+    loc.access_rule = lambda state, r=relic_rule, p=player: \
+        state.has("Key", p, 4) and r(state)
 
 
 def add_podium_placement_rules(world, player, usf_gate):

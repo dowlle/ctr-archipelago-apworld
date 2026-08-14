@@ -785,19 +785,20 @@ class ctrAPWorld(World):
           requirement to ANY pad, so relics must remain orderable by fill; the
           randomized path's own pre_fill relax-not-pin guard handles fillability.
           No behavioural change from today.
-        * Vanilla mode (mode 0) -- from data/world.json, the ONLY vanilla gates that
-          name a relic are both Sapphire: the Slide Coliseum pad (has('Sapphire
-          Relic', 10)) and N. Oxide's Final Challenge (has('Sapphire Relic', 18)).
-          Gold/Platinum gate no location, and since goal 2 ("everythingplusone")
-          was dropped no surviving goal's completion_condition reads a
-          relic count above Sapphire either. So:
-            - Sapphire: progression iff accessibility == full (both Sapphire-gated
-              LOCATIONS must be reachable) OR the goal makes you reach + win Oxide's
-              Final Challenge (oxidefinal). Else useful.
-            - Gold: never progression in vanilla mode -- no location gates on it and,
-              with goal 2 dropped, no goal completion depends on it. Useful.
-            - Platinum: never progression in vanilla mode (no location, no goal
-              completion depends on it).
+        * Vanilla mode (mode 0) -- two relic-count gates exist: the FIXED Slide
+          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json) and
+          N. Oxide's Final Challenge, whose gate follows the CONFIGURED
+          oxide_final_challenge_unlock mode + count in every seed (issue #53,
+          Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire
+          text is legacy and overridden). So:
+            - Sapphire: progression iff accessibility == full (the fixed Slide
+              Coliseum gate must be reachable) OR the goal makes you reach + win
+              Oxide's Final Challenge (oxidefinal). Else useful, unless it is a
+              satisfying tier of the configured mode (next rule).
+            - Any tier satisfying the configured mode (created > 0): progression
+              iff accessibility == full (the Final Challenge location must be
+              reachable) OR oxide_goal == final. Else useful.
+            - A tier that is neither: useful.
         """
         o = self.options
         prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
@@ -827,13 +828,25 @@ class ctrAPWorld(World):
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
         access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
-        # Base vanilla-mode classification: the ONLY vanilla LOCATION gate that
+        # Base vanilla-mode classification: the fixed vanilla LOCATION gate that
         # names a relic is Sapphire (Slide Coliseum has('Sapphire Relic', 10)),
         # so Sapphire is progression exactly when every location must be reachable
-        # (accessibility: full). Gold/Platinum gate no vanilla location.
+        # (accessibility: full). Gold/Platinum gate no FIXED vanilla location.
         prog["Sapphire Relic"] = access_full
         prog["Gold Relic"] = False
         prog["Platinum Relic"] = False
+        # N. Oxide's Final Challenge (issue #53): the location's gate reads the
+        # CONFIGURED oxide_final_challenge_unlock mode + count in every seed
+        # (Rules.add_oxide_final_challenge_rule, native parity), so under
+        # accessibility 'full' the satisfying tiers must be progression for the
+        # location to be reachable -- the same created>0 respect as the goal
+        # branch below (a tier the player opted out of stays useful and the
+        # forced_options supply guard raises instead). Kept in lockstep with
+        # raise_if_full_accessibility_needs_more_sapphires_than_created.
+        if access_full:
+            for tier in self._oxide_goal_tiers():
+                if self._ctr_relic_created.get(tier, 0) > 0:
+                    prog[tier] = True
         # Oxide-final goal (issue #23; #152 C4: generalized from the legacy
         # `goal == oxidefinal` value to the composed `oxide_goal == final`
         # condition -- this branch and forced_options.py's
@@ -846,13 +859,14 @@ class ctrAPWorld(World):
         # satisfying tier with 0 created stays out and is caught by
         # generate_early's guard rather than silently forced.
         if o.oxide_goal.value == OxideGoal.option_final:
-            # Sapphire is progression on ANY oxide-final seed (mode-independent).
-            # The two vanilla relic-count LOCATION gates are BOTH sapphire (Slide
-            # Coliseum has('Sapphire Relic', 10); N. Oxide's Final Challenge has 18),
-            # so once the goal makes any relic tier progression, fill may place a
-            # progression relic behind the Slide Coliseum sapphire gate -- Sapphire
-            # must stay progression to keep those locations reachable. This mirrors
-            # the pre-#23 goal, which was itself 18 Sapphire and always set this.
+            # Sapphire is progression on ANY oxide-final seed (mode-independent):
+            # once the goal makes any relic tier progression, fill may place a
+            # progression relic behind the Slide Coliseum sapphire gate (the fixed
+            # has('Sapphire Relic', 10) vanilla exit rule) -- Sapphire must stay
+            # progression to keep those locations reachable. This mirrors the
+            # pre-#23 goal, which was itself 18 Sapphire and always set this.
+            # (The Final Challenge location gate itself is mode-aware since
+            # issue #53, see the access_full block above.)
             prog["Sapphire Relic"] = True
             for tier in self._oxide_goal_tiers():
                 if self._ctr_relic_created.get(tier, 0) > 0:
