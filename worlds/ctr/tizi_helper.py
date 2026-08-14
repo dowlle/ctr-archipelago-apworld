@@ -8,7 +8,7 @@ from the community Tiziano skip; Icebound's standalone randomizer ships the same
 idea as a `helper_tiziano` trick toggle, and #223 deliberately makes ours an AP
 ITEM rather than a YAML trick or a client-setting toggle.
 
-THE RULED ACTIVATION GATE (Stef, 2026-08-10, restated verbatim in the #223 body):
+THE RULED ACTIVATION GATE (ruled 2026-08-10, restated verbatim in the #223 body):
 
   * itemsanity OFF -> receiving `Tizi Helper` alone activates the helper.
   * itemsanity ON  -> the helper activates only after the slot has received BOTH
