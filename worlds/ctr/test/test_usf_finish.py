@@ -19,7 +19,8 @@ from .. import ctrAPWorld
 from ..gem_cup_legs import load_vanilla_cup_legs
 from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
-from ..usf_finish import USF_BOOST_COUNT, USF_FINISH_TRACKS, usf_finish_cups
+from ..usf_finish import (ALL_USF_FINISH_TRACKS, USF_BOOST_COUNT,
+                          USF_FINISH_TRACKS, cup_finish_term, usf_finish_cups)
 from . import CTRTestBase
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
@@ -109,7 +110,7 @@ class TestTrophyRaceGate(unittest.TestCase):
         mw = _build(progressive_boost="shared_global")
         state = _state(mw, boost=0)
         for track in TROPHY_TRACKS:
-            if track in USF_FINISH_TRACKS:
+            if track in ALL_USF_FINISH_TRACKS:
                 continue
             with self.subTest(track=track):
                 self.assertTrue(_reachable(mw, state, f"{track}: Trophy Race"))
@@ -208,6 +209,92 @@ class TestPodiumRungs(unittest.TestCase):
         self.assertTrue(rule(_FakeState([("Purple Gem Cup", "Region")])))
 
 
+class TestOxideStationGate(unittest.TestCase):
+    """Oxide Station (ruled 2026-08-14 17:15, live pre1 test session): finish
+    and Held 1st need USF OR hard shortcut knowledge; Held 3rd / Held 5th stay
+    free. Distinct from Hot Air Skyway on both counts: HAS has no knowledge
+    escape and its held rungs are all free."""
+
+    OXIDE = "Oxide Station"
+
+    def test_finish_gated_at_medium_knowledge(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="medium")
+        name = f"{self.OXIDE}: Trophy Race"
+        self.assertFalse(_reachable(mw, _state(mw, boost=0), name))
+        self.assertFalse(_reachable(mw, _state(mw, boost=1), name))
+        self.assertTrue(_reachable(mw, _state(mw, boost=USF_BOOST_COUNT), name))
+
+    def test_finish_gated_at_easy_knowledge_too(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="easy")
+        self.assertFalse(_reachable(mw, _state(mw, boost=0),
+                                    f"{self.OXIDE}: Trophy Race"))
+
+    def test_hard_knowledge_is_a_bare_escape(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="hard")
+        self.assertTrue(_reachable(mw, _state(mw, boost=0),
+                                   f"{self.OXIDE}: Trophy Race"))
+
+    def test_vacuous_when_the_boost_chain_is_not_randomized(self):
+        mw = _build(shortcut_knowledge="medium")
+        self.assertTrue(_reachable(mw, _state(mw),
+                                   f"{self.OXIDE}: Trophy Race"))
+
+    def test_held_first_gated_held_third_and_fifth_free(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="medium", podium_held_fifth_rung=True)
+        blocked = _state(mw, boost=0)
+        self.assertFalse(
+            _reachable(mw, blocked, location_name(self.OXIDE, "held_1st")))
+        self.assertTrue(
+            _reachable(mw, blocked, location_name(self.OXIDE, "held_3rd")))
+        self.assertTrue(
+            _reachable(mw, blocked, location_name(self.OXIDE, "held_5th")))
+        cleared = _state(mw, boost=USF_BOOST_COUNT)
+        self.assertTrue(
+            _reachable(mw, cleared, location_name(self.OXIDE, "held_1st")))
+
+    def test_held_first_free_at_hard_knowledge(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="hard")
+        self.assertTrue(_reachable(mw, _state(mw, boost=0),
+                                   location_name(self.OXIDE, "held_1st")))
+
+    def test_has_held_first_stays_free(self):
+        """The Held 1st gating is Oxide-only; Hot Air Skyway's empirical
+        bare-reachable held rungs must not regress."""
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="medium")
+        self.assertTrue(_reachable(mw, _state(mw, boost=0),
+                                   location_name(HAS, "held_1st")))
+
+    def test_finish_rungs_gated_at_medium(self):
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="medium")
+        blocked = _state(mw, boost=0)
+        cleared = _state(mw, boost=USF_BOOST_COUNT)
+        for key in sorted(FINISH_RUNG_KEYS):
+            with self.subTest(rung=key):
+                name = location_name(self.OXIDE, key)
+                self.assertFalse(_reachable(mw, blocked, name))
+                self.assertTrue(_reachable(mw, cleared, name))
+
+    def test_cup_term_composition(self):
+        """A cup legging only Oxide collapses to vacuous at hard knowledge; a
+        cup legging Oxide AND Hot Air Skyway keeps the USF term (HAS has no
+        escape)."""
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="hard")
+        opts = mw.worlds[PLAYER].options
+        oxide_only = cup_finish_term([self.OXIDE, "Crash Cove"], opts)
+        self.assertTrue(oxide_only(_FakeState(boost=0), PLAYER))
+        both = cup_finish_term([self.OXIDE, HAS], opts)
+        self.assertFalse(both(_FakeState(boost=0), PLAYER))
+        self.assertTrue(both(_FakeState(boost=USF_BOOST_COUNT), PLAYER))
+
+
 class TestGemCupCompletion(unittest.TestCase):
     """Completing a cup includes finishing every leg, so a cup that legs a
     USF track cannot pay out its Gem without USF."""
@@ -244,8 +331,11 @@ class TestGemCupCompletion(unittest.TestCase):
             for cup, cup_legs in legs.items():
                 with self.subTest(seed=seed, cup=cup):
                     name = f"{cup}: Gem"
-                    self.assertEqual(_reachable(mw, blocked, name),
-                                     HAS not in cup_legs)
+                    # Default (easy) shortcut knowledge, so Oxide Station legs
+                    # gate exactly like Hot Air Skyway legs (issue ruling
+                    # 2026-08-14; see TestOxideStationGate).
+                    gated = bool(ALL_USF_FINISH_TRACKS.intersection(cup_legs))
+                    self.assertEqual(_reachable(mw, blocked, name), not gated)
                     self.assertTrue(_reachable(mw, cleared, name))
 
 

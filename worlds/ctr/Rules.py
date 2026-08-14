@@ -520,34 +520,46 @@ def add_podium_placement_rules(world, player, usf_gate):
         plain_cups = tuple(c for c in cups if c not in usf_gate.cups)
         gated_cups = tuple(c for c in cups if c in usf_gate.cups)
         raceable = usf_gate.raceable_rule(track)
+        held1_term = usf_gate.held_first_term(track)
         for rung_key in rung_keys:
             name = location_name(track, rung_key)
             if name not in all_names:
                 continue
             if raceable is not None and rung_key not in FINISH_RUNG_KEYS:
-                track_branch = raceable
+                if rung_key == "held_1st" and held1_term is not None:
+                    # Oxide Station ruling (usf_finish, OXIDE STATION note):
+                    # holding 1st bare is out of logic there, while Held 3rd /
+                    # Held 5th keep the plain raceable path.
+                    track_branch = (
+                        lambda state, r=raceable, t=held1_term, p=player:
+                        r(state) and t(state, p)
+                    )
+                else:
+                    track_branch = raceable
             else:
                 track_branch = (
                     lambda state, t=trophy_name, p=player:
                     state.can_reach(t, "Location", p)
                 )
             mw.get_location(name, player).access_rule = _rung_rule(
-                track_branch, plain_cups, gated_cups, usf_gate.term, player)
+                track_branch, plain_cups,
+                tuple((c, usf_gate.cup_term(c)) for c in gated_cups), player)
 
 
-def _rung_rule(track_branch, plain_cups, gated_cups, usf_term, player):
+def _rung_rule(track_branch, plain_cups, gated_cup_terms, player):
     """One rung's OR: the track's own path, any ungated legging cup, or any
-    USF-gated legging cup once the USF term is met. `usf_term` is always-True in
-    a seed without a randomized boost chain, so the third branch collapses back
-    into the second there rather than being special-cased away."""
+    finish-gated legging cup once that cup's own term is met. Terms are
+    per-cup since the Oxide Station hard-knowledge escape means two gated cups
+    can carry different terms in one seed; a vacuous term collapses its cup
+    back into the plain branch rather than being special-cased away."""
     def rule(state):
         if track_branch(state):
             return True
         if any(state.can_reach(c, "Region", player) for c in plain_cups):
             return True
-        return (bool(gated_cups)
-                and usf_term(state, player)
-                and any(state.can_reach(c, "Region", player) for c in gated_cups))
+        return any(t(state, player)
+                   and state.can_reach(c, "Region", player)
+                   for c, t in gated_cup_terms)
     return rule
 
 
