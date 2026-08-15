@@ -1,7 +1,7 @@
 """Tests for the option interaction / constraint matrix (issue #178,
 worlds/ctr/forced_options.py).
 
-Scope: the four already-shipping interaction groups named in the Atlas Run
+Scope: the four already-shipping interaction groups named in the build host run
 that built this (podium sub-toggle inertness, gem-cup/arena includes,
 two_stage_density, warp-pad modes), plus regression coverage for the three
 pre-existing RAISE guards (#87, #50, #23) that moved into forced_options.py
@@ -321,6 +321,47 @@ class TestVanillaUnlockShuffleCollapse(unittest.TestCase):
     def test_randomized_mode_does_not_warn(self):
         with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
             _early({"warppad_unlock_requirements": "randomized"})
+
+
+class TestLettersPerTrackInertOutsideLocationModes(unittest.TestCase):
+    """#148 lettersanity row: `letters_per_track` only drives the per-track
+    count for the two location-bearing shapes (locations_only,
+    locations_and_items). In `off` and `items_only` the knob is silently
+    ignored, so a non-default count there is a DOWNGRADE-WITH-WARNING."""
+
+    def test_items_only_ignores_the_knob(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            mw = _early({
+                "lettersanity": "items_only",
+                "letters_per_track": 1,
+            })
+        world = mw.worlds[1]
+        self.assertTrue(any("Letters Per Track" in m for m in cm.output))
+        # Log-only: the stored count is untouched.
+        self.assertEqual(world.options.letters_per_track.value, 1)
+
+    def test_off_ignores_the_knob(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            mw = _early({
+                "lettersanity": "off",
+                "letters_per_track": 2,
+            })
+        world = mw.worlds[1]
+        self.assertTrue(any("Letters Per Track" in m for m in cm.output))
+        self.assertEqual(world.options.letters_per_track.value, 2)
+
+    def test_location_bearing_modes_do_not_warn(self):
+        for mode in ("locations_only", "locations_and_items"):
+            with self.subTest(mode=mode):
+                with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+                    _early({
+                        "lettersanity": mode,
+                        "letters_per_track": 1,
+                    })
+
+    def test_default_count_never_warns(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            _early({"lettersanity": "items_only"})  # default letters_per_track == 3
 
 
 # ---------------------------------------------------------------------------

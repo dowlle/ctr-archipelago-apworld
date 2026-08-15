@@ -167,7 +167,11 @@ class ProgressiveBoostMode(Choice):
       no self-earned boost at all (ordinary turbo pads still work; Super
       Turbo pads act as ordinary pads), 1 = Boost, 2 = USF-level speeds,
       and, only with `Progressive Boost: Blue Fire` also on, 3 = the Blue
-      Fire capstone.
+      Fire capstone. Logic follows the tier, so checks that genuinely need
+      boost wait for it -- most visibly Hot Air Skyway, whose climb cannot be
+      finished below USF: its trophy race, time trials, token challenge and
+      finish rungs, plus the Gem Cups that run it as a leg, all need the
+      second copy.
     - **per_character**: each of the 16 racers gets its own separate chain
       (16x the shared-global pool size), per the 2026-08-07 completability
       ruling. **Not yet generatable**: CTR's current location supply cannot
@@ -176,10 +180,12 @@ class ProgressiveBoostMode(Choice):
       instead of silently overflowing or under-filling. The names and codes
       are already reserved on the datapackage so #71's landing does not need
       a second naming pass."""
-    # Classification is per-seed: `useful` (the spine-1 shape) unless a logic
-    # reader is active. #145's Turbo checks and #109's boost-gated box slots
-    # both read the chain, and create_item upgrades it to `progression` in
-    # exactly those seeds (logic state never tracks useful items).
+    # Classification: `useful` (the spine-1 shape) while this option is off,
+    # `progression` in every seed that randomizes the chain. It started
+    # per-seed -- #145's Turbo checks and #109's boost-gated box slots were
+    # the only readers -- but the USF finish gate (usf_finish.py) reads it on
+    # a static location, so create_item now upgrades it unconditionally
+    # (logic state never tracks useful items).
     display_name = "Progressive Boost"
     option_off = 0
     option_shared_global = 1
@@ -256,6 +262,20 @@ class Itemsanity(Toggle):
     pool, location set and additive wire declaration.
     """
     display_name = "Itemsanity"
+
+class Lettersanity(Choice):
+    display_name = "Lettersanity"
+    option_off = 0
+    option_locations_only = 1
+    option_locations_and_items = 2
+    option_items_only = 3
+    default = 0
+
+class LettersPerTrack(Range):
+    display_name = "Letters Per Track"
+    range_start = 1
+    range_end = 3
+    default = 3
 
 
 class BoxLocations(Toggle):
@@ -395,6 +415,21 @@ class WarpPadItemDisplay(Choice):
     option_one_pile = 0
     option_by_reward_type = 1
     default = 0
+
+
+class ApItemTypeColors(DefaultOnToggle):
+    """Colour the Archipelago-logo warp-pad markers by item classification
+    (issue #212).
+
+    - **on** (default): each AP-logo marker uses the colour of its item's
+      classification.
+    - **off**: every AP-logo marker uses one uniform greyish-white colour.
+
+    A display setting only: original CTR rewards always show their real models
+    either way, so this never changes what a reward looks like. Needs a client
+    that supports it -- an older one shows classification colours whatever this
+    says."""
+    display_name = "AP Item Type Colours"
 
 
 class WarpPadUnlockRequirements(Choice):
@@ -845,6 +880,8 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     itemsanity: Itemsanity
+    lettersanity: Lettersanity
+    letters_per_track: LettersPerTrack
     # authored item-box checks (#109)
     box_locations: BoxLocations
     shortcut_knowledge: ShortcutKnowledge
@@ -865,6 +902,8 @@ class ctrAPOptions(PerGameCommonOptions):
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     # warp pads: display (issue #59)
     warp_pad_item_display: WarpPadItemDisplay
+    # warp pads: AP-logo marker colours (issue #212)
+    ap_item_type_colors: ApItemTypeColors
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -906,6 +945,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
         WarpPadShuffleCategories,
         WarpPadShuffleGrouping,
         WarpPadItemDisplay,
+        ApItemTypeColors,
         WarpPadUnlockRequirements,
         TwoStageDensity,
         RequirementVariety,

@@ -24,7 +24,7 @@ claimed for itemsanity by the #145 spec across three independent reads.
 
 The 11 weapon ITEMS are ordinary `data/items.json` entries at indexes 95-105
 (`35010095`-`35010105`), in WEAPONS order -- the first block of the 0.2.0 append,
-per the ruled freeze order (Stef, 08-10 11:38: itemsanity block first, H-dossier
+per the ruled freeze order (ruled 08-10 11:38: itemsanity block first, H-dossier
 families after it). They are items, not locations, so they are not this class's
 to register -- `ITEM_NAMES` below exists so the two orders provably cannot drift,
 and the tests assert it against the live item table.

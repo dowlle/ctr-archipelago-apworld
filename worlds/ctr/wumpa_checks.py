@@ -10,7 +10,7 @@ the cleanest signal in the whole R-H dossier.
 WHO OWNS THE SEMANTICS. The apworld owns the name, the option and the rule;
 native owns the emit call. Neither half is built here.
 
-GLOBAL, ONE LOCATION PER SEED (Stef, 2026-08-10 16:28 ruling). Not per-track. The
+GLOBAL, ONE LOCATION PER SEED (ruled 2026-08-10 16:28). Not per-track. The
 dossier recommended global by analogy to the ruled itemsanity precedent and
 flagged the analogy as inference; the ruling settled it directly, "by the same
 anti-per-track reasoning as the juiced-checks ruling". So this class is one name,

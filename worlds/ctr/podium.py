@@ -136,6 +136,18 @@ def created_rung_keys(finish_on: bool, any_on: bool,
     return keys
 
 
+#: The created rung keys that fire AT THE FINISH LINE, as opposed to the
+#: live-position "held" rungs the listener fires mid-race. Load-bearing for the
+#: USF finish gate (`usf_finish.py`): on a track that cannot be FINISHED without
+#: USF the held rungs are still earned without it (`Held 3rd` was checked on Hot
+#: Air Skyway with no boost, 2026-08-12 session), so only these two carry the
+#: term. The assert keeps the split total: every creatable key is held or finish.
+FINISH_RUNG_KEYS = frozenset({"finish_podium", "finish_any"})
+HELD_RUNG_KEYS = frozenset({"held_1st", "held_3rd", "held_5th"})
+assert set(created_rung_keys(True, True, True, True)) == (
+    FINISH_RUNG_KEYS | HELD_RUNG_KEYS)
+
+
 class PodiumLocationClass(LocationClass):
     """The podium rungs as a `LocationClass` (#176).
 

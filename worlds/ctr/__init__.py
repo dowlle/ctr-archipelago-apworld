@@ -5,6 +5,7 @@ from typing import ClassVar, Dict, List
 import pkgutil
 
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
+from Options import OptionError
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
@@ -13,6 +14,8 @@ from .Items import load_item_table
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
+from . import lettersanity
+from .lettersanity import LETTERSANITY_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
@@ -40,7 +43,7 @@ TRAP_ITEM_NAMES = [
 ]
 
 # The 11 trap names the 0.2.0 name freeze (#177) minted from the H-dossier
-# ruling (Stef, 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
+# ruling (ruled 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
 # and that is deliberate: TRAP_ITEM_NAMES is the BUILDABLE set -- it drives the
 # trap_fill_percentage draw and its order is pinned to native's AP_TrapEffect
 # enum, so a name whose native effect does not exist yet must stay out of it or
@@ -358,6 +361,13 @@ class ctrAPWorld(World):
             o.itemsanity.value = int(bool(co["itemsanity"]))
         else:
             o.itemsanity.value = int("itemsanity_checks" in passthrough)
+        lb = passthrough.get("lettersanity_checks", {}) or {}
+        o.lettersanity.value = int(co.get("lettersanity", lb.get("mode", 0)))
+        o.letters_per_track.value = int(lb.get("letters_per_track", 3))
+        by_id = {v: k for k, v in lettersanity.TRACK_LEVEL_IDS.items()}
+        o._lettersanity_selected = {
+            by_id[int(lid)]: tuple(letter for letter, code in zip(lettersanity.LETTERS, codes) if code != -1)
+            for lid, codes in (lb.get("locations", {}) or {}).items() if int(lid) in by_id}
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -374,6 +384,17 @@ class ctrAPWorld(World):
         locations to build (R1: a below-count slot is never created), then
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
+        if not hasattr(self.options, "_lettersanity_selected"):
+            mode = int(self.options.lettersanity.value)
+            if mode in (1, 2):
+                count = int(self.options.letters_per_track.value)
+                self.options._lettersanity_selected = {
+                    track: tuple(self.random.sample(lettersanity.LETTERS, count))
+                    for track in lettersanity.LETTER_TRACKS}
+            else:
+                self.options._lettersanity_selected = {
+                    track: lettersanity.LETTERS for track in lettersanity.LETTER_TRACKS}
+
         # Comfort guard flags (Icebound force_vanilla_turbotrack): needed by
         # the relic draw below, ahead of when Regions.create_regions would
         # otherwise compute them. See relic_tiers.resolve_comfort_guards.
@@ -786,10 +807,17 @@ class ctrAPWorld(World):
         # three stat chains (the hard-tier general rule), so those chains
         # upgrade too -- but ONLY at hard, because no easier tier creates a
         # stats-reading slot.
+        # The USF finish gate (usf_finish.py, ruled 2026-08-12) is the
+        # third reader and the one that makes the boost upgrade UNCONDITIONAL:
+        # Hot Air Skyway's Trophy Race is a static location present in every
+        # seed, so every randomized-boost seed reads the chain now, whatever
+        # itemsanity and box locations are set to. Left `useful`, that track's
+        # finish -- and its time trials, token challenge and finish rungs --
+        # would sit permanently outside logic, the same FillError class the
+        # #145 upgrade was written for. The stat chains keep their narrower
+        # condition: no rule outside the hard box tier reads them.
         if (name == progressive_capability.BOOST_CHAIN
-                and bool(self.options.progressive_boost.value)
-                and (ITEMSANITY_CLASS.is_enabled(self.options)
-                     or ITEM_BOX_CLASS.is_enabled(self.options))):
+                and bool(self.options.progressive_boost.value)):
             classification = ItemClassification.progression
         if (name in progressive_capability.STAT_CHAINS
                 and bool(self.options.progressive_stats.value)
@@ -824,19 +852,20 @@ class ctrAPWorld(World):
           requirement to ANY pad, so relics must remain orderable by fill; the
           randomized path's own pre_fill relax-not-pin guard handles fillability.
           No behavioural change from today.
-        * Vanilla mode (mode 0) -- from data/world.json, the ONLY vanilla gates that
-          name a relic are both Sapphire: the Slide Coliseum pad (has('Sapphire
-          Relic', 10)) and N. Oxide's Final Challenge (has('Sapphire Relic', 18)).
-          Gold/Platinum gate no location, and since goal 2 ("everythingplusone")
-          was dropped no surviving goal's completion_condition reads a
-          relic count above Sapphire either. So:
-            - Sapphire: progression iff accessibility == full (both Sapphire-gated
-              LOCATIONS must be reachable) OR the goal makes you reach + win Oxide's
-              Final Challenge (oxidefinal). Else useful.
-            - Gold: never progression in vanilla mode -- no location gates on it and,
-              with goal 2 dropped, no goal completion depends on it. Useful.
-            - Platinum: never progression in vanilla mode (no location, no goal
-              completion depends on it).
+        * Vanilla mode (mode 0) -- two relic-count gates exist: the FIXED Slide
+          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json) and
+          N. Oxide's Final Challenge, whose gate follows the CONFIGURED
+          oxide_final_challenge_unlock mode + count in every seed (issue #53,
+          Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire
+          text is legacy and overridden). So:
+            - Sapphire: progression iff accessibility == full (the fixed Slide
+              Coliseum gate must be reachable) OR the goal makes you reach + win
+              Oxide's Final Challenge (oxidefinal). Else useful, unless it is a
+              satisfying tier of the configured mode (next rule).
+            - Any tier satisfying the configured mode (created > 0): progression
+              iff accessibility == full (the Final Challenge location must be
+              reachable) OR oxide_goal == final. Else useful.
+            - A tier that is neither: useful.
         """
         o = self.options
         prog = {"Sapphire Relic": True, "Gold Relic": True, "Platinum Relic": True}
@@ -866,13 +895,25 @@ class ctrAPWorld(World):
         if o.warppad_unlock_requirements.value != 0:
             return prog  # randomized modes: any pad may gate on any relic tier
         access_full = o.accessibility.value == 0  # Accessibility.option_full == 0
-        # Base vanilla-mode classification: the ONLY vanilla LOCATION gate that
+        # Base vanilla-mode classification: the fixed vanilla LOCATION gate that
         # names a relic is Sapphire (Slide Coliseum has('Sapphire Relic', 10)),
         # so Sapphire is progression exactly when every location must be reachable
-        # (accessibility: full). Gold/Platinum gate no vanilla location.
+        # (accessibility: full). Gold/Platinum gate no FIXED vanilla location.
         prog["Sapphire Relic"] = access_full
         prog["Gold Relic"] = False
         prog["Platinum Relic"] = False
+        # N. Oxide's Final Challenge (issue #53): the location's gate reads the
+        # CONFIGURED oxide_final_challenge_unlock mode + count in every seed
+        # (Rules.add_oxide_final_challenge_rule, native parity), so under
+        # accessibility 'full' the satisfying tiers must be progression for the
+        # location to be reachable -- the same created>0 respect as the goal
+        # branch below (a tier the player opted out of stays useful and the
+        # forced_options supply guard raises instead). Kept in lockstep with
+        # raise_if_full_accessibility_needs_more_sapphires_than_created.
+        if access_full:
+            for tier in self._oxide_goal_tiers():
+                if self._ctr_relic_created.get(tier, 0) > 0:
+                    prog[tier] = True
         # Oxide-final goal (issue #23; #152 C4: generalized from the legacy
         # `goal == oxidefinal` value to the composed `oxide_goal == final`
         # condition -- this branch and forced_options.py's
@@ -885,13 +926,14 @@ class ctrAPWorld(World):
         # satisfying tier with 0 created stays out and is caught by
         # generate_early's guard rather than silently forced.
         if o.oxide_goal.value == OxideGoal.option_final:
-            # Sapphire is progression on ANY oxide-final seed (mode-independent).
-            # The two vanilla relic-count LOCATION gates are BOTH sapphire (Slide
-            # Coliseum has('Sapphire Relic', 10); N. Oxide's Final Challenge has 18),
-            # so once the goal makes any relic tier progression, fill may place a
-            # progression relic behind the Slide Coliseum sapphire gate -- Sapphire
-            # must stay progression to keep those locations reachable. This mirrors
-            # the pre-#23 goal, which was itself 18 Sapphire and always set this.
+            # Sapphire is progression on ANY oxide-final seed (mode-independent):
+            # once the goal makes any relic tier progression, fill may place a
+            # progression relic behind the Slide Coliseum sapphire gate (the fixed
+            # has('Sapphire Relic', 10) vanilla exit rule) -- Sapphire must stay
+            # progression to keep those locations reachable. This mirrors the
+            # pre-#23 goal, which was itself 18 Sapphire and always set this.
+            # (The Final Challenge location gate itself is mode-aware since
+            # issue #53, see the access_full block above.)
             prog["Sapphire Relic"] = True
             for tier in self._oxide_goal_tiers():
                 if self._ctr_relic_created.get(tier, 0) > 0:
@@ -1255,6 +1297,11 @@ class ctrAPWorld(World):
             count = item["count"]
             if self.options.itemsanity.value and item["name"] in ITEM_NAMES:
                 count = 1
+            if int(self.options.lettersanity.value) in (2, 3) and item["name"] in lettersanity.ITEM_NAMES:
+                track = item["name"].rsplit("(", 1)[1][:-1]
+                letter = item["name"].split(" ", 2)[1]
+                count = int(int(self.options.lettersanity.value) == 3 or
+                            letter in self.options._lettersanity_selected[track])
             if item["name"] in _relic_locked:                         # slider-pinned relics
                 count = max(0, count - _relic_locked[item["name"]])
             if item["name"] in _gems_locked:                          # gems pinned vanilla
@@ -1297,6 +1344,12 @@ class ctrAPWorld(World):
                                if item.name not in SURFACE_ITEM_NAMES]
             if len(without_surface) <= unfilled:
                 pool = without_surface
+        if int(self.options.lettersanity.value) == 3 and len(pool) > unfilled:
+            raise OptionError(
+                f"CTR: Lettersanity 'items_only' needs 48 spare filler slots, but this "
+                f"option combination has only {max(0, unfilled - (len(pool) - 48))}. "
+                "Enable more location checks or reduce other item packs.")
+
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
         # #13). `useful`, not `progression` -- issue scope is pool/fill
         # correctness only, no track logic reads a tier yet. Empty dict when
@@ -1597,7 +1650,7 @@ class ctrAPWorld(World):
         derived_shuffle = bool(getattr(self, "shuffle_warp_pads", False))
         # schema_version 7 (0.2.0, issue #166): the top-level gem_cup_legs block.
         # The BUMP is unconditional (Q28 ruling, #152 dossier: "ALWAYS BUMP...no
-        # conditional emission" -- Stef, "they should just update the client to be
+        # conditional emission". "They should just update the client to be
         # honest. Keeps it simple."). The `gem_cup_legs` block ITSELF stays
         # conditional on the option actually randomizing the cups' legs -- only
         # then does a native need to parse it to load the same tracks the
@@ -1662,6 +1715,15 @@ class ctrAPWorld(World):
                 # and nothing in AP logic reads it, so two seeds differing only in
                 # this value are identical apart from the key itself.
                 "warp_pad_item_display": o.warp_pad_item_display.value,
+                # AP-logo marker colours (issue #212): on = item-classification
+                # tints, off = one uniform greyish-white colour. ADDITIVE key,
+                # no schema bump -- native json_int defaults the absent key to 1
+                # (colours enabled), the shipped behaviour, so an older client on
+                # a new seed and a new client on an old seed both render exactly
+                # as they do now. Display only: it tints no gate, no location, no
+                # item, and nothing in AP logic reads it, so two seeds differing
+                # only in this value are identical apart from the key itself.
+                "ap_item_type_colors": bool(o.ap_item_type_colors.value),
                 # QoL, additive (no schema bump): one-lap cup races. Native
                 # json_int defaults the absent key to 0, so a pre-one-lap-cups
                 # native (or an old seed on a new native) is exactly vanilla lap
@@ -1735,6 +1797,7 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                "lettersanity": int(o.lettersanity.value),
                 # #109 box scalars, same convention: both always emitted raw
                 # (shortcut_knowledge even when box_locations is false, so
                 # trackers can read the tier without inferring it); the
@@ -1779,6 +1842,8 @@ class ctrAPWorld(World):
             # Additive under schema 7.  Omitted when off, so disabled seeds do
             # not gain a dormant 22-slot feature block.
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        if int(o.lettersanity.value) != 0:
+            slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,
