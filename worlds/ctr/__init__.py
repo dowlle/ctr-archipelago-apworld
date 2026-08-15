@@ -14,6 +14,8 @@ from .Items import load_item_table
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
+from . import tizi_helper
+from .tizi_helper import TIZI_HELPER_ITEM
 from . import lettersanity
 from .lettersanity import LETTERSANITY_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
@@ -361,6 +363,12 @@ class ctrAPWorld(World):
             o.itemsanity.value = int(bool(co["itemsanity"]))
         else:
             o.itemsanity.value = int("itemsanity_checks" in passthrough)
+        # Tizi Helper (#223): one always-emitted scalar, no conditional block to
+        # fall back on. An absent key is any pre-#223 seed, which correctly
+        # restores to off. The option creates one `useful` item and no location,
+        # so this restore changes nothing a tracker computes -- it is here so the
+        # restored option set is honest rather than silently defaulted.
+        o.tizi_helper.value = int(bool(co.get("tizi_helper", 0)))
         lb = passthrough.get("lettersanity_checks", {}) or {}
         o.lettersanity.value = int(co.get("lettersanity", lb.get("mode", 0)))
         o.letters_per_track.value = int(lb.get("letters_per_track", 3))
@@ -1297,6 +1305,15 @@ class ctrAPWorld(World):
             count = item["count"]
             if self.options.itemsanity.value and item["name"] in ITEM_NAMES:
                 count = 1
+            # Tizi Helper (#223): exactly one copy, only when the option is on.
+            # Same shape as the itemsanity line above -- the entry ships count 0
+            # in data/items.json and the option is what makes it real. It adds no
+            # location, so it is a straight +1 against this seed's supply; being
+            # here (before the #14/#15 comfort-pack trim and the character
+            # supply check) is what lets a deliberately reduced seed free a
+            # comfort slot for it instead of overflowing the pool.
+            if item["name"] == TIZI_HELPER_ITEM:
+                count = tizi_helper.created_item_count(self)
             if int(self.options.lettersanity.value) in (2, 3) and item["name"] in lettersanity.ITEM_NAMES:
                 track = item["name"].rsplit("(", 1)[1][:-1]
                 letter = item["name"].split(" ", 2)[1]
@@ -1797,6 +1814,15 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                # Tizi Helper (#223), same always-emitted scalar convention.
+                # DIAGNOSTIC / TRACKER ONLY: native does NOT read this key. The
+                # helper's runtime gate is "did this slot receive item 35010188"
+                # (plus, when itemsanity is on, the Mask item), which the client
+                # already knows from ReceivedItems, and itemsanity's own on/off
+                # is read off server location membership. The scalar exists so a
+                # tracker and a Universal Tracker restore can see the option
+                # without inferring it from an item that may not have arrived yet.
+                "tizi_helper": bool(o.tizi_helper.value),
                 "lettersanity": int(o.lettersanity.value),
                 # #109 box scalars, same convention: both always emitted raw
                 # (shortcut_knowledge even when box_locations is false, so

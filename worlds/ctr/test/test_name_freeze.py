@@ -41,6 +41,7 @@ from .. import (
 )
 from ..Items import load_item_table
 from ..Locations import CTR_LOCATION_CLASSES
+from ..tizi_helper import TIZI_HELPER_CODE, TIZI_HELPER_ITEM
 
 #: (registry key, name count, code blocks) for every location class, in
 #: registration order. Registration order IS datapackage order.
@@ -63,6 +64,13 @@ EXPECTED_ITEM_BLOCKS = [
     ("character unlocks", 35010123, 35010138, 16),
     ("lettersanity letters", 35010139, 35010186, 48),
     ("gas pedal", 35010187, 35010187, 1),
+    # #223, the FIRST ruled reopening of the frozen namespace. The freeze is
+    # still the freeze: this is an append-only amendment that renumbers and
+    # renames nothing, and it rides 0.2.0's single datapackage bump rather than
+    # buying a second one. Listed as its own block so the census stays honest
+    # about what was signed off in #177 and what was added on top of it. The
+    # second ruled amendment (`Turbo Grant`) takes 35010189 when it is built.
+    ("223 tizi helper amendment", 35010188, 35010188, 1),
 ]
 
 #: Every name the freeze appended to data/items.json, in append order.
@@ -77,6 +85,7 @@ FROZEN_ITEM_NAMES = (
        "Penta Penguin"]
     + list(lettersanity.ITEM_NAMES)
     + ["Gas Pedal"]
+    + [TIZI_HELPER_ITEM]  # #223 ruled amendment, appended after the freeze
 )
 
 
@@ -90,7 +99,8 @@ class TestNameFreezeCensus(unittest.TestCase):
 
     def test_total_registered_names(self) -> None:
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        self.assertEqual(len(world_type.item_name_to_id), 188)
+        # 188 frozen by #177, plus the one ruled #223 amendment.
+        self.assertEqual(len(world_type.item_name_to_id), 189)
         self.assertEqual(len(world_type.location_name_to_id), 574)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
@@ -120,6 +130,16 @@ class TestNameFreezeCensus(unittest.TestCase):
         appended = [item["name"] for item in table
                     if item["code"] >= 35010095]
         self.assertEqual(appended, FROZEN_ITEM_NAMES)
+
+    def test_the_ruled_amendment_sits_one_past_the_freeze(self) -> None:
+        """#223 reopened the namespace for exactly one name. Pin the boundary:
+        the frozen set still ends at Gas Pedal, and the amendment is the single
+        entry after it."""
+        table = load_item_table()
+        by_code = {item["code"]: item["name"] for item in table}
+        self.assertEqual(by_code[35010187], "Gas Pedal")
+        self.assertEqual(by_code[TIZI_HELPER_CODE], TIZI_HELPER_ITEM)
+        self.assertEqual(max(by_code), TIZI_HELPER_CODE)
 
     def test_the_three_families_the_sweep_recovered_are_registered(self) -> None:
         """Character unlocks (#54/#209), the gas pedal (R-I) and the trial-track
