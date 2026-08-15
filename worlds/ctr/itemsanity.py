@@ -94,6 +94,19 @@ def family_count(state, player: int,
                for family in families)
 
 
+def useful_weapon_family_count(state, player: int) -> int:
+    """Count the ruled useful families for trophy-win difficulty logic.
+
+    Turbo joins the five static families only when one Progressive Boost copy
+    has made the weapon functional. This is the 2026-08-09 21:47 amendment;
+    keeping it here gives every difficulty rule the same membership semantics.
+    """
+    count = family_count(state, player, USEFUL_WEAPON_FAMILIES)
+    if state.has("Turbo", player) and state.has("Progressive Boost", player):
+        count += 1
+    return count
+
+
 class ItemsanityLocationClass(LocationClass):
     """The 22 use-time weapon checks as a `LocationClass` (#176).
 

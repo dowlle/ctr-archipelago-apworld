@@ -203,6 +203,28 @@ class ProgressiveBoostBlueFire(Toggle):
     display_name = "Progressive Boost: Blue Fire"
 
 
+class LogicDifficulty(Choice):
+    """How much capability logic expects for demanding race checks.
+
+    - **easy**: use the conservative ruled gates. On the seven confirmed
+      easy-category tracks, the Trophy Race, Finish on Podium and Held 1st
+      require basic Boost or two useful weapon families.
+    - **medium** (default): apply that requirement to the Trophy Race only;
+      placement rungs remain available at the demonstrated floor.
+    - **hard**: expect the demonstrated floor win and add no capability gate
+      to those seven tracks.
+
+    Intrinsic geometry gates are independent of this preference. Cortex Castle
+    and Hot Air Skyway still need USF at every difficulty; Oxide Station still
+    needs USF unless Shortcut Knowledge is hard.
+    """
+    display_name = "Logic Difficulty"
+    option_easy = 0
+    option_medium = 1
+    option_hard = 2
+    default = 1
+
+
 class ProgressiveStatsMode(Choice):
     """Stage the Progressive Speed / Acceleration / Turning chains (issue
     #13, ruled 07-16 + the 07-26 update + the 2026-08-07 five-rank ladder
@@ -905,6 +927,7 @@ class ctrAPOptions(PerGameCommonOptions):
     progressive_boost: ProgressiveBoostMode
     progressive_boost_blue_fire: ProgressiveBoostBlueFire
     progressive_stats: ProgressiveStatsMode
+    logic_difficulty: LogicDifficulty
     # character phase (issues #54, #209)
     starting_character: StartingCharacter
     starting_stat_class: StartingStatClass
@@ -950,7 +973,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
                      ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
-                         ProgressiveStatsMode],
+                         ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can
     # I unlock", "can a pad demand a racer" and "who owns my stats" as one
     # decision, and the 2026-08-08 note asked for exactly this grouping.

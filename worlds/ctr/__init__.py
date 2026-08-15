@@ -292,6 +292,7 @@ class ctrAPWorld(World):
         # value is the option value verbatim (0 off / 1 shared_global /
         # 2 per_character); absent on pre-#12 wires -> no-op.
         _restore("progressive_boost", "boost_mode")
+        _restore("logic_difficulty", "logic_difficulty")
         # #109 box seeds: the toggle + knowledge tier decide which box slots
         # exist and the stat chains join the boost chain as reachability
         # inputs (hard-tier slots), so all three seed values must win over
@@ -1819,6 +1820,9 @@ class ctrAPWorld(World):
                 # pre-this-feature native reads none of these three keys by
                 # explicit named lookup and is unaffected either way.
                 **progressive_capability.fill_slot_data(self),
+                # Ruled capability-logic preference. Always emitted because
+                # Universal Tracker must rebuild the same seven-track gates.
+                "logic_difficulty": int(o.logic_difficulty.value),
                 # Always emit this scalar.  It is additive tracker/diagnostic
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.

@@ -62,6 +62,18 @@ def stat_item_name(chain: str, character: str = None) -> str:
     return chain if character is None else f"{chain} ({character})"
 
 
+def track_required_character(world, track: str):
+    """Return the racer lock for a trophy track, if this seed assigned one.
+
+    ``ctr_racer_locks`` is keyed by entrance names such as
+    ``Crash Cove Warp Pad``. Capability rules are keyed by region/track names,
+    so this conversion belongs in one shared helper rather than being
+    re-derived by each reader.
+    """
+    locks = getattr(world, "ctr_racer_locks", {}) or {}
+    return locks.get(f"{track} Warp Pad")
+
+
 def created_item_counts(world) -> Dict[str, int]:
     """{item name: count to create THIS seed} for both ownership modes."""
     o = world.options

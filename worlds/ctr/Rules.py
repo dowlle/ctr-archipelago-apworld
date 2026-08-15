@@ -83,9 +83,58 @@ def set_rules(world):
     usf_gate = UsfFinishGate(world)
     usf_gate.install(world, player)
     add_podium_placement_rules(world, player, usf_gate)
+    add_capability_difficulty_rules(world, player)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
     add_lettersanity_rules(world, player)
+
+
+def add_capability_difficulty_rules(world, player):
+    """Install the ruled option-aware gates for the seven easy tracks.
+
+    The rule is meaningful only when both item packs randomize the relevant
+    capabilities. With Progressive Boost off, vanilla boost satisfies it. With
+    Itemsanity off, vanilla weapon supply satisfies it. Medium gates only the
+    Trophy Race; easy also gates Finish on Podium and Held 1st; hard adds no
+    requirement. The confirmed track inventory lives in capability_contract.
+    """
+    from .capability_contract import EASY_TROPHY_GROUP
+    from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
+    from .podium import location_name
+    from .progressive_capability import gate_satisfied, track_required_character
+
+    difficulty = int(world.options.logic_difficulty.value)
+    if difficulty == 2:  # hard
+        return
+    if (not bool(world.options.progressive_boost.value)
+            or not bool(world.options.itemsanity.value)):
+        return
+
+    names = {loc.name for loc in world.multiworld.get_locations(player)}
+    for track in EASY_TROPHY_GROUP.tracks:
+        required_character = track_required_character(world, track)
+
+        def capability_rule(state, p=player, racer=required_character):
+            boost_ok = gate_satisfied(
+                world, state, p, boost_min=1, required_character=racer)
+            useful = family_count(state, p, USEFUL_WEAPON_FAMILIES)
+            if state.has("Turbo", p) and boost_ok:
+                useful += 1
+            return boost_ok or useful >= 2
+
+        gated = [f"{track}: Trophy Race"]
+        if difficulty == 0:  # easy
+            gated.extend((location_name(track, "finish_podium"),
+                          location_name(track, "held_1st")))
+        for name in gated:
+            if name not in names:
+                continue
+            loc = world.multiworld.get_location(name, player)
+            base = loc.access_rule
+            loc.access_rule = (
+                lambda state, b=base, gate=capability_rule:
+                b(state) and gate(state)
+            )
 
 
 def add_lettersanity_rules(world, player):
@@ -524,7 +573,8 @@ def add_podium_placement_rules(world, player, usf_gate):
         # split by whether completing them includes a USF-gated finish.
         cups = [c for c in track_cups.get(track, []) if c in all_regions]
         plain_cups = tuple(c for c in cups if c not in usf_gate.cups)
-        gated_cups = tuple(c for c in cups if c in usf_gate.cups)
+        gated_cups = tuple((c, usf_gate.cup_term(c))
+                           for c in cups if c in usf_gate.cups)
         raceable = usf_gate.raceable_rule(track)
         for rung_key in rung_keys:
             name = location_name(track, rung_key)
@@ -537,23 +587,25 @@ def add_podium_placement_rules(world, player, usf_gate):
                     lambda state, t=trophy_name, p=player:
                     state.can_reach(t, "Location", p)
                 )
+            held_term = (usf_gate.held_first_term(track)
+                         if rung_key == "held_1st" else None)
             mw.get_location(name, player).access_rule = _rung_rule(
-                track_branch, plain_cups, gated_cups, usf_gate.term, player)
+                track_branch, plain_cups, gated_cups, held_term, player)
 
 
-def _rung_rule(track_branch, plain_cups, gated_cups, usf_term, player):
+def _rung_rule(track_branch, plain_cups, gated_cups, held_term, player):
     """One rung's OR: the track's own path, any ungated legging cup, or any
     USF-gated legging cup once the USF term is met. `usf_term` is always-True in
     a seed without a randomized boost chain, so the third branch collapses back
     into the second there rather than being special-cased away."""
     def rule(state):
-        if track_branch(state):
-            return True
-        if any(state.can_reach(c, "Region", player) for c in plain_cups):
-            return True
-        return (bool(gated_cups)
-                and usf_term(state, player)
-                and any(state.can_reach(c, "Region", player) for c in gated_cups))
+        reachable = (track_branch(state)
+                     or any(state.can_reach(c, "Region", player)
+                            for c in plain_cups)
+                     or any(term(state, player)
+                            and state.can_reach(c, "Region", player)
+                            for c, term in gated_cups))
+        return reachable and (held_term is None or held_term(state, player))
     return rule
 
 
