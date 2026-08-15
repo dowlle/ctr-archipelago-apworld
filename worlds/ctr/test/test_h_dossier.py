@@ -29,6 +29,7 @@ apworld-side trace of the gate is the generation-log warning asserted in
 import unittest
 
 from BaseClasses import ItemClassification
+from Options import OptionError
 from test.general import setup_multiworld
 
 from .. import BUILDABLE_TRAP_ITEM_NAMES, FROZEN_TRAP_ITEM_NAMES, TRAP_ITEM_NAMES, ctrAPWorld
@@ -423,6 +424,59 @@ class TestSupplyInteractions(unittest.TestCase):
     when it is wrong, and the reason `created_item_counts` is consulted before
     the comfort-pack trim rather than after it.
     """
+
+    def test_supply_guard_accepts_exact_capacity_and_rejects_one_short(self) -> None:
+        class _Stub:
+            class options:
+                class useful_item_grants:
+                    value = 1
+
+                class progressive_starting_wumpa:
+                    value = 6
+
+        self.assertEqual(h_dossier.created_item_total(_Stub), 10)
+        h_dossier.raise_if_families_exceed_location_supply(
+            _Stub, available_supply=10)
+        with self.assertRaisesRegex(
+                OptionError,
+                r"would add 10 item\(s\).*only 9 unfilled location\(s\)"):
+            h_dossier.raise_if_families_exceed_location_supply(
+                _Stub, available_supply=9)
+
+    def test_supply_guard_is_inert_when_both_families_are_off(self) -> None:
+        class _Stub:
+            class options:
+                class useful_item_grants:
+                    value = 0
+
+                class progressive_starting_wumpa:
+                    value = 0
+
+        h_dossier.raise_if_families_exceed_location_supply(
+            _Stub, available_supply=-100)
+
+    def test_reduced_location_repro_raises_clean_option_error(self) -> None:
+        """Regression for the fuzz failure from the orphaned candidate.
+
+        Before the guard this configuration built a pool larger than its live
+        location set and AP's panic fallback silently precollected the surplus.
+        """
+        options = {
+            "accessibility": "minimal",
+            "character_unlocks": False,
+            "podium_placement_checks": False,
+            "include_gem_cups": False,
+            "include_battle_arenas": False,
+            "sapphire_relic_count": 14,
+            "gold_relic_count": 9,
+            "platinum_relic_count": 11,
+            "useful_item_grants": True,
+            "progressive_starting_wumpa": 6,
+        }
+        with self.assertRaisesRegex(
+                OptionError,
+                r"Useful Item Grants / Progressive Starting Wumpa would add 10"):
+            setup_multiworld(ctrAPWorld, seed=800071865, options=options)
 
     def test_a_fully_loaded_seed_still_generates(self) -> None:
         """Fourteen extra items with no extra locations, stacked on top of the

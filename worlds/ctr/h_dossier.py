@@ -55,6 +55,8 @@ count them against the supply check.
 """
 from typing import Dict, List
 
+from Options import OptionError
+
 #: The three ruled useful grants, frozen order (data/items.json indexes 117-119).
 #: Order is not load-bearing on the wire -- native dispatches these by item id,
 #: not by position in a block -- but it is the order the freeze minted and the
@@ -144,6 +146,30 @@ def created_item_total(world) -> int:
     """Total supply this module's families spend on this seed. One number so the
     capacity check does not have to re-sum the dict at its own call site."""
     return sum(created_item_counts(world).values())
+
+
+def raise_if_families_exceed_location_supply(
+        world, *, available_supply: int) -> None:
+    """Reject a seed when its grants and starting-Wumpa ladder do not fit.
+
+    These families add up to fourteen items and no locations. ``create_items``
+    calls this after its optional comfort-pack trim, passing the live capacity
+    left when the H-dossier items themselves are excluded. This mirrors the
+    capability and character guards and prevents AP's panic fallback from
+    silently moving the overflow into starting inventory.
+    """
+    counts = created_item_counts(world)
+    needed = sum(counts.values())
+    if needed <= 0 or available_supply >= needed:
+        return
+    detail = ", ".join(f"{count}x {name}"
+                       for name, count in counts.items())
+    raise OptionError(
+        f"CTR: Useful Item Grants / Progressive Starting Wumpa would add "
+        f"{needed} item(s) to the pool ({detail}), but this seed has only "
+        f"{max(0, available_supply)} unfilled location(s) left for them. "
+        f"Enable more location checks, turn off Useful Item Grants, or lower "
+        f"Progressive Starting Wumpa.")
 
 
 def filler_weights(world) -> Dict[str, int]:

@@ -1418,6 +1418,16 @@ class ctrAPWorld(World):
                 f"option combination has only {max(0, unfilled - (len(pool) - 48))}. "
                 "Enable more location checks or reduce other item packs.")
 
+        # The H-dossier grants and starting-Wumpa ladder are already present in
+        # ``pool`` above. Exclude exactly those items from the live remaining
+        # capacity before asking their family guard whether they fit. Run after
+        # the optional comfort-pack trim so those five genuinely freed slots
+        # count, and before later capability items can obscure which family
+        # caused the overflow.
+        _h_dossier_total = h_dossier.created_item_total(self)
+        h_dossier.raise_if_families_exceed_location_supply(
+            self, available_supply=unfilled - (len(pool) - _h_dossier_total))
+
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
         # #13). `useful`, not `progression` -- issue scope is pool/fill
         # correctness only, no track logic reads a tier yet. Empty dict when
