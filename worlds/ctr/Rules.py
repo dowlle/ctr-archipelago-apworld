@@ -179,7 +179,7 @@ def add_item_box_rules(world, player):
     """
     from .item_boxes import (BOX_RULES, ITEM_BOX_CLASS,
                              TIGER_TEMPLE_DOOR_OPENERS)
-    from .progressive_capability import STAT_CHAINS
+    from .progressive_capability import STAT_CHAINS, gate_satisfied
 
     created = set(ITEM_BOX_CLASS.created_location_names(world.options))
     if not created:
@@ -201,12 +201,16 @@ def add_item_box_rules(world, player):
         if not need_boost and not need_stats and door is None:
             continue
 
+        required_character = (getattr(world, "ctr_racer_locks", {}) or {}).get(track)
+        stat_mins = ({chain: 1 for chain in STAT_CHAINS} if need_stats else {})
+
         def _rule(state, p=player, need_boost=need_boost,
-                  need_stats=need_stats, door=door):
-            if need_boost and state.count("Progressive Boost", p) < need_boost:
-                return False
-            if need_stats and not all(state.has(chain, p)
-                                      for chain in STAT_CHAINS):
+                  stat_mins=stat_mins, door=door,
+                  required_character=required_character):
+            if not gate_satisfied(
+                    world, state, p, boost_min=need_boost,
+                    stat_mins=stat_mins,
+                    required_character=required_character):
                 return False
             if door is not None and not state.has_any(door, p):
                 return False
@@ -233,6 +237,7 @@ def add_itemsanity_rules(world, player):
     permanently out of logic.
     """
     from .itemsanity import ITEMSANITY_CLASS, WEAPONS
+    from .progressive_capability import gate_satisfied
 
     if not ITEMSANITY_CLASS.is_enabled(world.options):
         return
@@ -243,7 +248,8 @@ def add_itemsanity_rules(world, player):
 
         def _rule(state, weapon=weapon, p=player, need_boost=need_boost):
             return (state.has(weapon, p)
-                    and (not need_boost or state.has("Progressive Boost", p)))
+                    and (not need_boost or gate_satisfied(
+                        world, state, p, boost_min=1)))
 
         for juiced in (False, True):
             world.multiworld.get_location(

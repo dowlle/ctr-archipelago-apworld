@@ -151,12 +151,12 @@ class TestRungSizingGeneration(unittest.TestCase):
                 self.assertEqual(predicted_goal_excluded_reserve(world.options),
                                  goal_excluded_location_reserve(world))
 
-    def test_per_character_stays_blocked_with_the_109_message(self):
+    def test_supply_poor_per_character_gets_numeric_capability_error(self):
         with self.assertRaises(OptionError) as ctx:
             setup_multiworld(ctrAPWorld, seed=740,
                              options={"progressive_stats": "per_character"})
-        self.assertIn("#109", str(ctx.exception))
-        self.assertNotIn("wait for #71", str(ctx.exception))
+        self.assertIn("would add 192 item(s)", str(ctx.exception))
+        self.assertIn("stats=per_character", str(ctx.exception))
 
 
 if __name__ == "__main__":  # pragma: no cover

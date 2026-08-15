@@ -436,7 +436,6 @@ class ctrAPWorld(World):
         from . import forced_options
         forced_options.apply(self)
         rung_sizer.apply_rung_sizing(self)
-        progressive_capability.raise_if_per_character_mode_selected(self)
 
     def create_regions(self):
         create_regions(self)
@@ -824,11 +823,21 @@ class ctrAPWorld(World):
         # would sit permanently outside logic, the same FillError class the
         # #145 upgrade was written for. The stat chains keep their narrower
         # condition: no rule outside the hard box tier reads them.
-        if (name == progressive_capability.BOOST_CHAIN
-                and bool(self.options.progressive_boost.value)):
+        _boost_mode = int(self.options.progressive_boost.value)
+        _boost_names = ({progressive_capability.BOOST_CHAIN} if _boost_mode == 1
+                        else {progressive_capability.boost_item_name(c)
+                              for c in progressive_capability.ROSTER}
+                        if _boost_mode == 2 else set())
+        if name in _boost_names:
             classification = ItemClassification.progression
-        if (name in progressive_capability.STAT_CHAINS
-                and bool(self.options.progressive_stats.value)
+        _stats_mode = int(self.options.progressive_stats.value)
+        _stat_names = (set(progressive_capability.STAT_CHAINS)
+                       if _stats_mode == 1 else
+                       {progressive_capability.stat_item_name(chain, character)
+                        for character in progressive_capability.ROSTER
+                        for chain in progressive_capability.STAT_CHAINS}
+                       if _stats_mode == 2 else set())
+        if (name in _stat_names
                 and ITEM_BOX_CLASS.is_enabled(self.options)
                 and int(self.options.shortcut_knowledge.value) == item_boxes.SK_HARD):
             classification = ItemClassification.progression
@@ -1368,8 +1377,8 @@ class ctrAPWorld(World):
                 "Enable more location checks or reduce other item packs.")
 
         # --- Progressive Boost / Progressive Stats item packs (issues #12,
-        # #13). `useful`, not `progression` -- issue scope is pool/fill
-        # correctness only, no track logic reads a tier yet. Empty dict when
+        # #13/#252). Classification is resolved per seed in create_item from
+        # the live rule readers. Empty dict when
         # both packs are off, so this is a no-op (byte-identical to a
         # pre-#12/#13 seed, no RNG draw taken) in the default configuration.
         # Runs AFTER the #14/#15 comfort-pack trim above so a tight seed's
@@ -1801,10 +1810,10 @@ class ctrAPWorld(World):
                 # ADDITIVE keys, no schema bump (Q28 already makes schema 7
                 # unconditional on every 0.2.0 seed, so this feature rides
                 # that standing bump rather than needing its own). boost_mode
-                # / stats_mode: 0 off / 1 shared_global / 2 per_character
-                # (per_character never actually reaches here -- generate_early
-                # raises first -- but the wire shape reserves the value so a
-                # future native/#71 landing needs no contract rework).
+                # / stats_mode: 0 off / 1 shared_global / 2 per_character.
+                # Native and Universal Tracker consume the same scalar modes;
+                # per-racer ranks need no extra wire because ReceivedItems
+                # already carries the frozen per-character item names.
                 # boost_blue_fire only matters when boost_mode != 0. No
                 # native consumer exists yet (apworld-only order scope): a
                 # pre-this-feature native reads none of these three keys by

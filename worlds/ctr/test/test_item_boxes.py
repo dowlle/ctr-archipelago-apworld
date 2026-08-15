@@ -16,6 +16,7 @@ from ..item_boxes import (BOX_RULES, BOX_TRACKS, EXPLICIT_NO_GATE,
                           ITEM_BOX_CLASS, ITEM_BOX_CODE_BASE, PLACED_COUNTS,
                           SK_HARD, SK_MEDIUM, SK_REQUIRED_TIER, SLOTS_PER_TRACK,
                           TIGER_TEMPLE_DOOR_OPENERS, TRACK_LEVEL_IDS)
+from .. import progressive_capability
 from ..progressive_capability import STAT_CHAINS
 from . import CTRTestBase
 
@@ -171,6 +172,28 @@ class TestBoxAccessRules(unittest.TestCase):
         state = CollectionState(mw)
         self.assertFalse(rule(state))
         _grant(state, self.PLAYER, *STAT_CHAINS)
+        self.assertTrue(rule(state))
+
+    def test_private_boost_and_stats_must_belong_to_one_racer(self):
+        mw, rule = self._rule(
+            "Hot Air Skyway", 8, shortcut_knowledge="hard",
+            progressive_boost="per_character",
+            progressive_stats="per_character",
+            racer_locked_pads=False)
+        world = mw.worlds[self.PLAYER]
+        state = CollectionState(mw)
+        boost_racer = world.ctr_starting_character
+        stat_racer = next(c for c in progressive_capability.ROSTER
+                          if c != boost_racer)
+        state.add_item(progressive_capability.boost_item_name(boost_racer),
+                       self.PLAYER, 2)
+        for chain in STAT_CHAINS:
+            state.add_item(progressive_capability.stat_item_name(chain, stat_racer),
+                           self.PLAYER, 1)
+        self.assertFalse(rule(state))
+        for chain in STAT_CHAINS:
+            state.add_item(progressive_capability.stat_item_name(chain, boost_racer),
+                           self.PLAYER, 1)
         self.assertTrue(rule(state))
 
     def test_tiger_temple_door_reads_itemsanity(self):

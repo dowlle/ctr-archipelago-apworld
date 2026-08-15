@@ -60,7 +60,7 @@ rules are rebuilt, so a tracker session evaluates the identical gate.
 """
 from typing import Dict, List
 
-from .progressive_capability import BOOST_CHAIN
+from .progressive_capability import gate_satisfied
 
 #: Received `Progressive Boost` copies that put a player at the USF rank.
 USF_BOOST_COUNT = 2
@@ -71,15 +71,17 @@ USF_BOOST_COUNT = 2
 USF_FINISH_TRACKS = frozenset({"Hot Air Skyway"})
 
 
-def usf_term(options):
+def usf_term(world, required_character=None):
     """The `(state, player) -> bool` term for "can finish a USF-gated track".
 
     Always-True when the boost chain is not randomized (see VACUITY above), so
     callers can AND it unconditionally instead of branching on the option.
     """
-    if not bool(options.progressive_boost.value):
+    if not bool(world.options.progressive_boost.value):
         return lambda state, player: True
-    return lambda state, player: state.count(BOOST_CHAIN, player) >= USF_BOOST_COUNT
+    return lambda state, player: gate_satisfied(
+        world, state, player, boost_min=USF_BOOST_COUNT,
+        required_character=required_character)
 
 
 def usf_finish_cups(cup_legs: Dict[str, List[str]]) -> frozenset:
@@ -102,7 +104,7 @@ class UsfFinishGate:
 
     def __init__(self, world):
         from .gem_cup_legs import resolved_gem_cup_legs
-        self.term = usf_term(world.options)
+        self.term = usf_term(world)
         self.cups = usf_finish_cups(resolved_gem_cup_legs(world))
         self._raceable = {}
 
@@ -128,8 +130,10 @@ class UsfFinishGate:
             self._raceable[track] = (
                 lambda state, r=loc.parent_region, b=base: r.can_reach(state) and b(state)
             )
+            required_character = (getattr(world, "ctr_racer_locks", {}) or {}).get(track)
+            track_term = usf_term(world, required_character)
             loc.access_rule = (
-                lambda state, b=base, t=self.term, p=player: b(state) and t(state, p)
+                lambda state, b=base, t=track_term, p=player: b(state) and t(state, p)
             )
         for cup in sorted(self.cups):
             gem = f"{cup}: Gem"

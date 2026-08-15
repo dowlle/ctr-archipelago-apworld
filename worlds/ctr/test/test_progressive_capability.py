@@ -1,19 +1,22 @@
 """Progressive Boost / Progressive Stats item packs (issues #12, #13).
 
-Scope per the 0.2.0 spine-1 work order: pool/fill correctness only. No test
-here checks track logic gating on a tier -- there is none yet, by design
-(the capability matrix tiers are deliberately NOT encoded this order).
+Progressive capability pool, wire, classification and #252 gate semantics.
 
-Covers: item counts per mode (off / shared_global / per_character-raises),
+Covers: item counts per mode (off / shared_global / per_character),
 the blue-fire chain-length toggle, #168 code stability, the wire round-trip
 (ctr_options boost_mode / boost_blue_fire / stats_mode), the pool-overflow
 RAISE guard, and vanilla/off byte parity (no RNG draw, item pool unchanged).
 """
 import pkgutil
 import json
+import unittest
 
+from BaseClasses import CollectionState
 from Options import OptionError
+from test.general import setup_multiworld
 
+from .. import ctrAPWorld
+from .. import characters
 from .. import progressive_capability
 from . import CTRTestBase
 
@@ -21,6 +24,11 @@ CAPABILITY_ITEM_PREFIXES = (
     "Progressive Boost", "Progressive Top Speed",
     "Progressive Acceleration", "Progressive Turning",
 )
+STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
+
+
+def _build(seed=1, **options):
+    return setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
 
 
 def _pool_names(multiworld, player):
@@ -154,22 +162,24 @@ class TestCapabilityPoolOverflowRaises(CTRTestBase):
         self.assertIn("Progressive Boost", str(ctx.exception))
 
 
-class TestBoostPerCharacterBlocked(CTRTestBase):
-    """per_character is reserved (names minted, issue #71 not built) --
-    selecting it must raise, not silently generate an infeasible world."""
+class TestBoostPerCharacter(CTRTestBase):
+    """Two boost copies for each of the sixteen racers."""
 
-    auto_construct = False
+    run_default_tests = False
     options = {"progressive_boost": "per_character"}
 
-    def test_raises_option_error(self):
-        with self.assertRaises(OptionError) as ctx:
-            self.world_setup()
-        self.assertIn("progressive_boost", str(ctx.exception))
-        self.assertIn("per_character", str(ctx.exception))
+    def test_creates_sixteen_private_chains(self):
+        counts = _capability_counts(self.multiworld, self.player)
+        self.assertEqual(len(counts), 16)
+        self.assertEqual(set(counts.values()), {2})
+        self.assertEqual(sum(counts.values()), 32)
+        for character in progressive_capability.ROSTER:
+            self.assertEqual(counts[
+                progressive_capability.boost_item_name(character)], 2)
 
 
-class TestStatsPerCharacterBlocked(CTRTestBase):
-    """Sibling of TestBoostPerCharacterBlocked for progressive_stats."""
+class TestStatsPerCharacterSupplyPoor(CTRTestBase):
+    """The live supply guard replaces the old blanket mode ban."""
 
     auto_construct = False
     options = {"progressive_stats": "per_character"}
@@ -177,8 +187,154 @@ class TestStatsPerCharacterBlocked(CTRTestBase):
     def test_raises_option_error(self):
         with self.assertRaises(OptionError) as ctx:
             self.world_setup()
-        self.assertIn("progressive_stats", str(ctx.exception))
-        self.assertIn("per_character", str(ctx.exception))
+        self.assertIn("would add 192 item(s)", str(ctx.exception))
+        self.assertIn("stats=per_character", str(ctx.exception))
+
+
+class TestBothPacksPerCharacterRich(CTRTestBase):
+    """All 240 private capability items fit with authored box supply."""
+
+    run_default_tests = False
+    options = {
+        "progressive_boost": "per_character",
+        "progressive_boost_blue_fire": True,
+        "progressive_stats": "per_character",
+        "box_locations": True,
+        "shortcut_knowledge": "hard",
+    }
+
+    def test_creates_full_private_pool(self):
+        counts = _capability_counts(self.multiworld, self.player)
+        self.assertEqual(len(counts), 64)
+        self.assertEqual(sum(counts.values()), 240)
+
+    def test_wire_reports_private_modes(self):
+        co = self.world.fill_slot_data()["ctr_options"]
+        self.assertEqual(co["boost_mode"], 2)
+        self.assertEqual(co["stats_mode"], 2)
+
+
+class TestPerCharacterRichSeedGenerates(CTRTestBase):
+    """A maximal private-chain seed completes AP's real fill pipeline."""
+
+    options = {
+        "progressive_boost": "per_character",
+        "progressive_boost_blue_fire": True,
+        "progressive_stats": "per_character",
+        "box_locations": True,
+        "shortcut_knowledge": "hard",
+        "itemsanity": True,
+        "accessibility": "full",
+    }
+
+
+class TestPerCharacterGateSemantics(unittest.TestCase):
+    """The four binding #252 gate-semantics arms."""
+
+    PLAYER = 1
+
+    def _rich(self, **extra):
+        options = {
+            "progressive_boost": "per_character",
+            "progressive_stats": "per_character",
+            "box_locations": True,
+            "shortcut_knowledge": "hard",
+        }
+        options.update(extra)
+        mw = _build(**options)
+        return mw, mw.worlds[self.PLAYER], CollectionState(mw)
+
+    @staticmethod
+    def _other(world, excluded=()):
+        return next(c for c in progressive_capability.ROSTER
+                    if c != world.ctr_starting_character and c not in excluded)
+
+    def test_locked_gate_reads_only_the_required_racer(self):
+        mw, world, state = self._rich()
+        required = self._other(world)
+        start = world.ctr_starting_character
+        state.add_item(progressive_capability.boost_item_name(start), self.PLAYER, 2)
+        self.assertFalse(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2,
+            required_character=required))
+        state.add_item(characters.unlock_item_name(required), self.PLAYER, 1)
+        state.add_item(progressive_capability.boost_item_name(required), self.PLAYER, 2)
+        self.assertTrue(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2,
+            required_character=required))
+
+    def test_unlocked_gate_accepts_any_driveable_racer(self):
+        mw, world, state = self._rich()
+        racer = self._other(world)
+        state.add_item(progressive_capability.boost_item_name(racer), self.PLAYER, 2)
+        self.assertFalse(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2))
+        state.add_item(characters.unlock_item_name(racer), self.PLAYER, 1)
+        self.assertTrue(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2))
+
+    def test_requirements_cannot_split_across_racers(self):
+        mw, world, state = self._rich()
+        boost_racer = self._other(world)
+        stat_racer = self._other(world, {boost_racer})
+        for racer in (boost_racer, stat_racer):
+            state.add_item(characters.unlock_item_name(racer), self.PLAYER, 1)
+        state.add_item(progressive_capability.boost_item_name(boost_racer),
+                       self.PLAYER, 2)
+        for chain in progressive_capability.STAT_CHAINS:
+            state.add_item(progressive_capability.stat_item_name(chain, stat_racer),
+                           self.PLAYER, 1)
+        stats = {chain: 1 for chain in progressive_capability.STAT_CHAINS}
+        self.assertFalse(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2, stat_mins=stats))
+        for chain in progressive_capability.STAT_CHAINS:
+            state.add_item(progressive_capability.stat_item_name(chain, boost_racer),
+                           self.PLAYER, 1)
+        self.assertTrue(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2, stat_mins=stats))
+
+    def test_all_unlocked_mode_needs_no_unlock_item(self):
+        mw = _build(progressive_boost="per_character", character_unlocks=False)
+        world = mw.worlds[self.PLAYER]
+        state = CollectionState(mw)
+        racer = self._other(world)
+        state.add_item(progressive_capability.boost_item_name(racer), self.PLAYER, 2)
+        self.assertTrue(progressive_capability.gate_satisfied(
+            world, state, self.PLAYER, boost_min=2))
+
+    def test_unlock_items_are_progression_without_racer_locks(self):
+        mw = _build(progressive_boost="per_character",
+                    racer_locked_pads=False, character_unlocks=True)
+        world = mw.worlds[self.PLAYER]
+        unlocks = set(characters.created_unlock_names(world))
+        items = [item for item in mw.itempool if item.player == self.PLAYER
+                 and item.name in unlocks]
+        self.assertEqual(len(items), 15)
+        self.assertTrue(all(item.advancement for item in items))
+
+
+class TestPerCharacterUniversalTracker(unittest.TestCase):
+    """UT restores the two mode scalars that select private item names."""
+
+    def test_private_modes_override_tracking_yaml(self):
+        mw = _build(progressive_boost="off", progressive_stats="off")
+        world = mw.worlds[1]
+        world._ut_restore_options({
+            "ctr_options": {"boost_mode": 2, "stats_mode": 2},
+            "warp_pad_unlock": {},
+            "podium_checks": {},
+        })
+        self.assertEqual(world.options.progressive_boost.value, 2)
+        self.assertEqual(world.options.progressive_stats.value, 2)
+
+    def test_wire_needs_no_per_racer_rank_block(self):
+        mw = _build(progressive_boost="per_character",
+                    progressive_stats="per_character",
+                    box_locations=True, shortcut_knowledge="hard")
+        slot_data = mw.worlds[1].fill_slot_data()
+        self.assertEqual(slot_data["ctr_options"]["boost_mode"], 2)
+        self.assertEqual(slot_data["ctr_options"]["stats_mode"], 2)
+        self.assertNotIn("capability_ranks", slot_data)
 
 
 class TestItemCodeStability:

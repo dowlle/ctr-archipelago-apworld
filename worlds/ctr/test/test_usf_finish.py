@@ -68,6 +68,9 @@ class _FakeState:
     def count(self, item, player):
         return self.boost if item == BOOST else 0
 
+    def has(self, item, player, count=1):
+        return True
+
 
 class TestGatedCupSelection(unittest.TestCase):
     """Which cups the gate covers is a per-seed question about the leg map."""
