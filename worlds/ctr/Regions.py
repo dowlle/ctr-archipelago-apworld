@@ -2,6 +2,7 @@ import json
 import logging
 import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
+from . import characters
 from .Locations import create_location
 from .gem_cup_legs import (
     reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
@@ -753,6 +754,17 @@ def create_regions(world: "ctrAPWorld"):
                 old_target.entrances.remove(ret)
             ret.connected_region = None
             ret.connect(new_target)
+
+    # Racer-locked pads (#54/#209, R8). Drawn ONCE here, after the sphere
+    # search has settled world.warp_pad_unlock (the lock selection reads which
+    # pads this seed left free) and before set_rules installs them. Stored on
+    # the world so Rules.py, fill_slot_data and the spoiler all read the same
+    # decision -- the same "draw once, store, never recompute" discipline
+    # gem_cup_legs and the #109 box slots follow. Under UT the locks are pinned
+    # from the connected seed's wire rather than re-drawn, for the same reason.
+    world.ctr_racer_locks = (
+        characters.reconstruct_racer_locks_from_wire(world, ut_passthrough)
+        if ut_passthrough else characters.resolve_racer_locks(world))
 
     _log_never_created_excludes(world)
 

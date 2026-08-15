@@ -487,6 +487,83 @@ def warn_relic_gates_may_be_permanently_unreachable(world):
         f"setting.")
 
 
+def warn_editable_stats_overridden_by_progressive(world):
+    """characters.effective_stat_config resolves the ruled precedence in one
+    place: progressive stats non-off wins outright and the in-game stat panel
+    goes read-only with no edit control at all, whatever `editable_stats` says.
+    The 2026-08-08 ruling is explicit that this combination does NOT reject the
+    seed, so this is a downgrade-with-warning entry (#178 convention) rather
+    than a raise: the option is simply left with nothing to do."""
+    o = world.options
+    if not o.progressive_stats.value:
+        return
+    if not o.editable_stats.value:
+        return
+    logger.warning(
+        f"CTR: Progressive Stats is on for {_who(world)}, so Editable Stats "
+        f"has no effect -- progressive stats own the stat table and the "
+        f"in-game panel stays read-only with no edit control. Set Progressive "
+        f"Stats to 'off' if you want to tune stats yourself.")
+
+
+def warn_penta_stats_without_vanilla_stats(world):
+    """`penta_stats` picks between Penta's ordinary TURN-class table and the
+    PAL/JP MAX class, and both are VANILLA class tables. As soon as progressive
+    or editable stats own the stat package (characters.effective_stat_config
+    returns a non-vanilla source) Penta reads that package like every other
+    racer, so the selector has no gameplay effect. Warn rather than raise: the
+    seed is completely valid, the option just does nothing in it."""
+    from .characters import STAT_SOURCE_VANILLA, effective_stat_config
+    o = world.options
+    if not o.penta_stats.value:
+        return  # PAL is the default; a defaulted option needs no notice
+    source, _owner, _editable = effective_stat_config(world)
+    if source == STAT_SOURCE_VANILLA:
+        return
+    logger.warning(
+        f"CTR: Penta Penguin Stats is set to 'ntsc' for {_who(world)}, but "
+        f"this seed's stats are owned by Progressive Stats or Editable Stats, "
+        f"so Penta uses the AP-defined stats like every other racer and the "
+        f"selector has no gameplay effect.")
+
+
+def warn_racer_locks_without_character_unlocks(world):
+    """Racer locks gate a pad on holding a character unlock item. In
+    all-unlocked mode (`character_unlocks: false`) no such item is ever
+    created, so there is nothing a lock could gate --
+    characters.racer_locks_enabled resolves the pair to "off" and no pad is
+    locked. Downgrade-with-warning, not a raise: the seed is completely valid,
+    the toggle just has nothing to do in it."""
+    o = world.options
+    if not o.racer_locked_pads.value:
+        return
+    if o.character_unlocks.value:
+        return
+    logger.warning(
+        f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Character "
+        f"Unlocks is off (all-unlocked mode), so there are no character unlock "
+        f"items for a pad to require and no pad is locked to a racer. Turn "
+        f"Character Unlocks on to use racer locks.")
+
+
+def warn_racer_locks_have_no_eligible_pads(world):
+    """Racer locks can only be placed on a pad this seed randomized and left
+    non-free (characters.eligible_lock_pads). A vanilla-unlock seed randomizes
+    no pad at all, so the toggle silently produces zero locks -- and, through
+    R17, still keeps the 15 character unlocks as progression, which is a real
+    cost for no feature. Say so rather than leaving the player to wonder."""
+    o = world.options
+    if not o.racer_locked_pads.value:
+        return
+    if o.warppad_unlock_requirements.value != 0:
+        return
+    logger.warning(
+        f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Warp Pad "
+        f"Unlock Requirements is 'vanilla', so no pad carries a randomized "
+        f"requirement and no racer lock can be placed. The 15 character "
+        f"unlock items still exist and are still playable racers.")
+
+
 def apply_downgrade_warnings(world):
     warn_podium_subtoggles_without_master(world)
     warn_podium_any_position_without_finish(world)
@@ -497,6 +574,10 @@ def apply_downgrade_warnings(world):
     warn_vanilla_unlock_collapses_destination_shuffle(world)
     warn_letters_per_track_ignored_outside_location_modes(world)
     warn_relic_gates_may_be_permanently_unreachable(world)
+    warn_editable_stats_overridden_by_progressive(world)
+    warn_penta_stats_without_vanilla_stats(world)
+    warn_racer_locks_without_character_unlocks(world)
+    warn_racer_locks_have_no_eligible_pads(world)
 
 
 def apply(world):

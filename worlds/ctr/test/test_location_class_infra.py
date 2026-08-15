@@ -563,7 +563,13 @@ class TestGeneratedDefaults(_CreatedMatchesGenerationMixin, CTRTestBase):
 
 
 class TestGeneratedPodiumOff(_CreatedMatchesGenerationMixin, CTRTestBase):
-    options = {"podium_placement_checks": False}
+    # Character phase (#54/#209): the 15 character unlock items are always-on
+    # pool content that brings no locations of its own, so a podium-off seed
+    # (101 locations against ~99 fixed items) can no longer hold them and
+    # generation raises with the fix named. All-unlocked mode IS that fix, and
+    # it keeps this fixture testing what it is about -- that the created
+    # location set matches the generated world with no rungs at all.
+    options = {"podium_placement_checks": False, "character_unlocks": False}
     expected_rungs = False
 
 
@@ -581,7 +587,14 @@ class TestGeneratedAllRungs(_CreatedMatchesGenerationMixin, CTRTestBase):
 class TestGeneratedMasterOnNoSubToggles(_CreatedMatchesGenerationMixin,
                                         CTRTestBase):
     """The master toggle is on and every sub-toggle is off: the class registers
-    its 112 names but creates none of them, and must report itself inactive."""
+    its 112 names but creates none of them, and must report itself inactive.
+
+    `character_unlocks` is off here for the same reason the podium-off fixture
+    above turns it off: the 15 always-on character unlock items (#54/#209) are
+    real mandatory demand that brings no locations, so with them on the #71
+    adaptive sizer correctly raises the category count to cover them and the
+    class stops being inactive. That is the sizer doing its job, not a
+    regression, and this fixture is about the zero-created-locations state."""
 
     options = {
         "podium_placement_checks": True,
@@ -589,6 +602,7 @@ class TestGeneratedMasterOnNoSubToggles(_CreatedMatchesGenerationMixin,
         "podium_held_fifth_rung": False,
         "podium_finish_rungs": False,
         "podium_any_position_rung": False,
+        "character_unlocks": False,
     }
     expected_rungs = False
 

@@ -71,6 +71,9 @@ def set_rules(world):
     # vanilla floor on exactly one mode. Same slot as add_warp_pad_unlock_rules.
     if world.options.warppad_unlock_requirements.value == 0:
         add_vanilla_floor_rules(world, player)
+    # Racer locks AND on top of whatever add_warp_pad_unlock_rules just
+    # installed, so they must run after it (#54/#209, R8).
+    add_racer_lock_rules(world, player)
     add_boss_garage_rules(world, player)
     add_oxide_final_challenge_rule(world, player)
     # USF finish gate (ruled 2026-08-12): built and installed BEFORE the
@@ -117,6 +120,40 @@ def add_lettersanity_rules(world, player):
                 previous = loc.access_rule
                 loc.access_rule = lambda state, previous=previous, own=own, p=player: \
                     previous(state) and state.has(own, p)
+
+
+def add_racer_lock_rules(world, player):
+    """Install this seed's racer-locked pads (#54/#209, R8).
+
+    `world.ctr_racer_locks` is {pad exit name -> roster name}, drawn once in
+    Regions.create_regions. Each lock ANDs `state.has(<racer>)` onto the pad
+    entrance's EXISTING rule -- the one idiom this file uses everywhere else,
+    and the reason racer locks are a separate wire block rather than a 10th
+    `Req` type: a `Req` would REPLACE the stage-1 gate the sphere search
+    already proved reachable at that pad, whereas a lock has to sit on top of
+    it.
+
+    Empty dict when `racer_locked_pads` is off, so this is a no-op and no
+    access rule in the seed ever names a character -- which is exactly R17's
+    soundness condition for demoting the unlock items to `useful`.
+
+    Solvability: with locks on the unlock items are `progression`, so AP's own
+    fill only seats them in locations reachable from the current state, and a
+    pad requiring racer X is by construction unreachable until X is received.
+    `characters.verify_no_self_lock` re-derives that from the FILLED multiworld
+    in post_fill rather than leaving it as an argument.
+    """
+    locks = getattr(world, "ctr_racer_locks", {}) or {}
+    if not locks:
+        return
+    mw = world.multiworld
+    for pad_name, character in locks.items():
+        ent = mw.get_entrance(pad_name, player)
+        base_rule = ent.access_rule
+        ent.access_rule = (
+            lambda state, i=character, p=player, base=base_rule:
+            base(state) and state.has(i, p)
+        )
 
 
 def add_item_box_rules(world, player):

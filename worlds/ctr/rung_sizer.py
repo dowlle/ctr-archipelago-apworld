@@ -26,6 +26,7 @@ from .elastic_bounds import predicted_goal_excluded_reserve
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES as ITEMSANITY_ITEM_NAMES
 from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
+from . import characters
 from . import progressive_capability
 
 logger = logging.getLogger(__name__)
@@ -169,10 +170,25 @@ def predicted_mandatory_pool(world) -> int:
         # rung capacity here.
         if name != "Wumpa Fruit" and name not in _SURFACE_ITEM_NAMES and count > 0)
     mandatory += sum(progressive_capability.created_item_counts(world).values())
+    # Character unlocks (#54/#209, R4). ALWAYS ON: every seed pools the 15
+    # racers you did not start as, and they add ZERO locations, so they are
+    # straight mandatory demand the sizer has to cover. The 16 names are frozen
+    # at count 0 in data/items.json (registered in the #177 superset, created
+    # per seed), exactly like the itemsanity weapons above -- so without this
+    # mirror the predictor under-counts mandatory demand by 15 on EVERY seed,
+    # which is the same failure direction DeepSeek review F1 caught for #145.
+    mandatory += len(characters.created_unlock_names(world))
     return mandatory
 
 
 def _capability_packs_active(world) -> bool:
+    # Deliberately NOT extended to the character unlocks (#54/#209). Those 15
+    # items are always-on demand and are already counted in
+    # predicted_mandatory_pool, so `minimum` covers them exactly. The extra
+    # working margin and the floor of three exist for the capability packs
+    # specifically; widening them to "always" would silently raise every
+    # default seed to three rung categories, which is a behaviour change this
+    # feature has no reason to make.
     return bool(world.options.progressive_boost.value or world.options.progressive_stats.value)
 
 
@@ -240,8 +256,11 @@ def apply_rung_sizing(world) -> Optional[str]:
         raise OptionError(
             "CTR: this seed needs more Podium Rung capacity, but Podium Placement "
             "Checks is off. The adaptive sizer never enables that master toggle; "
-            "turn it on or reduce Progressive Boost / Progressive Stats and other "
-            "enabled item-pool options.")
+            "turn it on, or reduce the enabled item-pool options -- the usual "
+            "candidates are Character Unlocks (15 items, set 'character_unlocks' "
+            "to false for all-unlocked mode), Progressive Stats (12) and "
+            "Progressive Boost (2-3). All three add pool items without adding "
+            "any locations of their own.")
     if not bool(world.settings.allow_rung_sizing):
         raise OptionError(
             "CTR: this seed needs more Podium Rung capacity, but host.yaml "

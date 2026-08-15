@@ -705,6 +705,165 @@ class PlatinumRelicCount(Range):
     default = 0
 
 
+class StartingCharacter(Choice):
+    """Which of the 16 racers you start your Adventure as (issues #54 / #209,
+    ruling R2/R3).
+
+    In vanilla CTR only the eight original racers can be taken into Adventure
+    at all; this option moves the choice out of the Garage and into your YAML,
+    which is what makes the other eight selectable without any Garage-picker
+    work. The 15 racers you do NOT start as become multiworld unlock items.
+
+    - **random_starter** (default): a random pick from the eight vanilla
+      Adventure racers (Crash, Neo Cortex, Tiny Tiger, Coco, N. Gin,
+      Dingodile, Polar, Pura).
+    - **random_any**: a random pick from all sixteen, so a seed can start you
+      as Ripper Roo, Penta Penguin or Nitros Oxide.
+    - any named racer: exactly that one.
+
+    Whichever racer you start as is yours from the first frame -- it is never
+    an item, never placed in the pool, and logic always assumes you have it."""
+    display_name = "Starting Character"
+    option_random_starter = 0
+    option_random_any = 1
+    option_crash_bandicoot = 2
+    option_coco_bandicoot = 3
+    option_polar = 4
+    option_pura = 5
+    option_neo_cortex = 6
+    option_n_tropy = 7
+    option_ripper_roo = 8
+    option_papu_papu = 9
+    option_komodo_joe = 10
+    option_pinstripe = 11
+    option_dingodile = 12
+    option_tiny_tiger = 13
+    option_n_gin = 14
+    option_fake_crash = 15
+    option_nitros_oxide = 16
+    option_penta_penguin = 17
+    default = 0
+
+
+class StartingStatClass(Choice):
+    """Which engine/stat class your starting racer drives with (issue #209,
+    "a YAML option picks the starting character ... plus the starting
+    engine/stat class").
+
+    CTR gives every racer one of four classes, and the class -- not the racer
+    -- is what the physics actually reads (`VehBirth_SetConsts` indexes
+    `metaPhys[..].value[engineID]`).
+
+    - **vanilla** (default): each racer keeps the class the game gives them,
+      so Crash stays BALANCED, Tiny stays SPEED, and so on.
+    - **balanced / acceleration / speed / turning**: force your starting racer
+      onto that class instead, whoever they are.
+
+    This only ever affects the racer you START as. It has no effect while
+    Progressive Stats is active (those chains own the stats outright), and it
+    never affects reachability, so it cannot change what a seed requires."""
+    display_name = "Starting Stat Class"
+    option_vanilla = 0
+    option_balanced = 1
+    option_acceleration = 2
+    option_speed = 3
+    option_turning = 4
+    default = 0
+
+
+class CharacterUnlocks(DefaultOnToggle):
+    """Whether the other 15 racers have to be unlocked through the multiworld
+    (issues #54 / #209, R4; the "all-unlocked mode" comfort option ruled in the
+    2026-07-23 wayfarer's gap 7a).
+
+    - **on** (default): the 15 racers you did not start as enter the item pool
+      as unlock items. You play as your starting racer until their unlocks
+      arrive. This is the feature.
+    - **off**: every racer is available from the moment you start. No unlock
+      items are created at all, which frees 15 pool slots, and Racer-Locked
+      Warp Pads has nothing left to lock so it is forced off.
+
+    Turn this off if you want the roster without the item economy -- or if a
+    deliberately reduced seed (Podium Placement Checks off, heavy exclusions)
+    does not have 15 spare locations for the unlocks. Those 15 items bring no
+    locations of their own, so on a minimum-supply seed they genuinely do not
+    fit, and generation will tell you so rather than quietly dropping them."""
+    display_name = "Character Unlocks"
+
+
+class RacerLockedPads(Toggle):
+    """Let warp pads demand a specific racer before they will open (ruling R8).
+
+    - **off** (default): no pad ever names a racer. The 15 character unlock
+      items still exist and still unlock those racers to play as, but nothing
+      in logic requires one, so they are `useful` items rather than
+      progression and the seed only ever plans around the racer you start as.
+    - **on**: a small number of this seed's randomized pads additionally
+      require you to be a specific racer, on top of whatever trophies, keys,
+      tokens, relics or gems that pad already asked for. The character unlock
+      items become `progression` items, because a pad genuinely depends on
+      one.
+
+    You swap racer from the Adventure hub, so "unlocked" and "usable" mean the
+    same thing: walk into the hub, pick the racer the pad wants, drive in.
+
+    Never applied to the always-open starter pads or to any pad this seed left
+    free, so the opening of the seed is unchanged either way, and a racer's own
+    unlock item can never be placed behind a pad that requires that racer."""
+    display_name = "Racer-Locked Warp Pads"
+
+
+class PentaStats(Choice):
+    """Which stat table Penta Penguin drives with (ruling R15).
+
+    Penta is a cheat-code racer in retail, and the two regional releases give
+    him very different karts.
+
+    - **pal** (default): Penta drives with his ordinary TURN-class stats, the
+      fair, balanced version. This is the default because it is the one that
+      does not distort a seed's difficulty.
+    - **ntsc**: Penta drives the max-stat cheat version -- the fifth "MAX"
+      engine class that ships in the PAL/JP build and that the NTSC-U cheat
+      code produces. It is a best-of-each-axis cherry-pick of the four normal
+      classes (SPEED's top speed, ACCEL's acceleration, TURN's whole handling
+      group), so it is the best vanilla kart in the game but it invents no
+      numbers and goes nowhere above vanilla.
+
+    This only applies while VANILLA character stats are in play. As soon as
+    Progressive Stats or Editable Stats owns the stat table, Penta reads that
+    like every other racer and this option has no gameplay effect at all."""
+    display_name = "Penta Penguin Stats"
+    option_pal = 0
+    option_ntsc = 1
+    default = 0
+
+
+class EditableStats(Choice):
+    """Let you tune your kart's stats yourself, from the hub stat panel
+    (2026-08-08 ruling).
+
+    **Only available when `progressive_stats` is off.** If you enable both,
+    the seed still generates and Progressive Stats wins: the stat panel goes
+    read-only and no edit control appears at all. This is deliberate -- the
+    two are separate configuration concepts and the seed is never rejected for
+    setting both.
+
+    - **off** (default): no editing. The panel shows whatever owns your stats.
+    - **global**: one custom stat package shared by every racer.
+    - **per_character**: a separate custom package per racer, so each of the
+      sixteen can be tuned independently.
+
+    Edited values follow your slot on the Archipelago server rather than a
+    local save file, so they survive a reconnect and a change of machine.
+    Editing never affects reachability: no location's access rule reads a stat,
+    at any setting."""
+    display_name = "Editable Stats"
+    option_off = 0
+    option_global = 1
+    option_per_character = 2
+    default = 0
+
+
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
 
@@ -730,6 +889,13 @@ class ctrAPOptions(PerGameCommonOptions):
     progressive_boost: ProgressiveBoostMode
     progressive_boost_blue_fire: ProgressiveBoostBlueFire
     progressive_stats: ProgressiveStatsMode
+    # character phase (issues #54, #209)
+    starting_character: StartingCharacter
+    starting_stat_class: StartingStatClass
+    character_unlocks: CharacterUnlocks
+    racer_locked_pads: RacerLockedPads
+    penta_stats: PentaStats
+    editable_stats: EditableStats
     # warp pads: content & destination shuffle
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
@@ -769,6 +935,11 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                      ShuffleKeys, TrapFillPercentage, Itemsanity],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode],
+    # Grouped together on purpose: a player reads "who do I start as", "who can
+    # I unlock", "can a pad demand a racer" and "who owns my stats" as one
+    # decision, and the 2026-08-08 note asked for exactly this grouping.
+    "Characters": [StartingCharacter, StartingStatClass, CharacterUnlocks,
+                   RacerLockedPads, PentaStats, EditableStats],
     "Warp Pads": [
         ShuffleWarpPadsBattleArenas,
         WarpPadShuffleCategories,
