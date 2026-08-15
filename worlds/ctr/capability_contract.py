@@ -102,4 +102,3 @@ def held_first_gated_tracks() -> FrozenSet[str]:
         record.track for record in CONFIRMED_FINISH_CAPABILITIES
         if record.gate_held_first
     )
-
