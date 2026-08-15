@@ -5,7 +5,7 @@ race, earned by breaking every time crate in it. The engine already computes the
 signal: it counts a level's time crates into `gGT->timeCratesInLEV` at load and
 the driver's broken count into `driver->numTimeCrates` (it renders the "NN/MM"
 counter from them), so "broke every crate" is `numTimeCrates == timeCratesInLEV`
-at the end of a relic race. Per Stef's ruling (2026-07-20, Feature Triage
+at the end of a relic race. Per the ruling (2026-07-20, Feature Triage
 Register) this is a location class, NOT a reward gate: it never changes whether a
 relic is awarded. The stricter `rr_require_perfects` variant is a DIFFERENT
 mechanic, backlogged, and deliberately does not share a name with this one.

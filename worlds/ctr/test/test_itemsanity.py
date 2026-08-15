@@ -134,12 +134,15 @@ class TestBoostChainClassification(unittest.TestCase):
         self.assertTrue(items)
         self.assertTrue(all(item.advancement for item in items))
 
-    def test_useful_without_itemsanity(self):
+    def test_progression_without_itemsanity_too(self):
+        """The upgrade stopped being itemsanity's to grant. The USF finish gate
+        (ruled 2026-08-12) reads the chain on Hot Air Skyway's Trophy
+        Race, a static location in every seed, so a randomized boost chain is
+        progression whether or not itemsanity is on."""
         items = self._boost_items(itemsanity=False,
                                   progressive_boost="shared_global")
         self.assertTrue(items)
-        self.assertFalse(any(item.advancement for item in items))
-        self.assertTrue(all(item.useful for item in items))
+        self.assertTrue(all(item.advancement for item in items))
 
     def test_no_boost_items_when_pack_off(self):
         self.assertEqual(self._boost_items(itemsanity=True), [])

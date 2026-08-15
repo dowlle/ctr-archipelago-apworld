@@ -109,9 +109,24 @@ class LettersanityLocationClass(LocationClass):
         return f"{track}: Letter {letter}"
 
     def created_location_names(self, options):
-        """Nothing, until #148's option family exists. See the module docstring."""
-        return []
+        if options is None or not hasattr(options, "lettersanity") or int(options.lettersanity.value) not in (1, 2):
+            return []
+        selected = getattr(options, "_lettersanity_selected", {})
+        return [self.location_name(track, letter) for track in LETTER_TRACKS
+                for letter in LETTERS if letter in selected.get(track, ())]
+
+    def wire_block(self, options):
+        live = set(self.created_location_names(options))
+        return {"mode": int(options.lettersanity.value),
+                "letters_per_track": int(options.letters_per_track.value),
+                "locations": {str(TRACK_LEVEL_IDS[track]): [
+                    self.code_for(track, letter) if self.location_name(track, letter) in live else -1
+                    for letter in LETTERS] for track in LETTER_TRACKS}}
 
 
 #: The registered lettersanity class. `Locations.py` registers this instance.
 LETTERSANITY_CLASS = LettersanityLocationClass()
+
+_pads = json.loads(pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8"))["pads"]
+TRACK_LEVEL_IDS = {name[:-len(" Warp Pad")]: meta["level_id"] for name, meta in _pads.items()
+                   if name[:-len(" Warp Pad")] in set(LETTER_TRACKS)}

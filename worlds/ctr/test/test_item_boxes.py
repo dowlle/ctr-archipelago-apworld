@@ -41,14 +41,17 @@ class TestSeatingTables(unittest.TestCase):
         self.assertEqual(sorted(TRACK_LEVEL_IDS.values()), list(range(18)))
 
     def test_rule_census(self):
-        """Spec 2 census plus the three ruled Hot Air Skyway defaults: 39
-        gated slots, 8 explicit no-gate, 194 plain free-reach."""
-        self.assertEqual(len(BOX_RULES), 39)
+        """Spec 2 census plus the three ruled Hot Air Skyway defaults and the
+        live-session Tiny Arena 1 fix: 40 gated slots, 8 explicit no-gate, 193
+        plain free-reach."""
+        self.assertEqual(len(BOX_RULES), 40)
         boost1 = [k for k, (b, s) in BOX_RULES.items() if b == 1 and not s]
         boost2 = [k for k, (b, s) in BOX_RULES.items() if b == 2 and not s]
         stats = [k for k, (b, s) in BOX_RULES.items() if s]
         sk_only = [k for k, (b, s) in BOX_RULES.items() if b == 0 and not s]
-        self.assertEqual(len(boost1), 10)   # 6 pure + 4 with a medium SK term
+        # 6 pure + 4 with a medium SK term + Tiny Arena 1 (ruled 2026-08-12).
+        self.assertEqual(len(boost1), 11)
+        self.assertIn(("Tiny Arena", 1), boost1)
         self.assertEqual(len(boost2), 21)   # 18 captured + 3 ruled HAS defaults
         self.assertEqual(len(stats), 5)     # the 5 hard-tier slots
         # Dragon Mines 2 / Coco Park 7 (respawn) + the Tiger Temple door.
@@ -140,12 +143,16 @@ class TestBoxAccessRules(unittest.TestCase):
                 self.assertTrue(rule(CollectionState(mw)))
 
     def test_boost_terms_bind_when_randomized(self):
-        mw, rule = self._rule("Crash Cove", 4,
-                              progressive_boost="shared_global")
-        state = CollectionState(mw)
-        self.assertFalse(rule(state))
-        _grant(state, self.PLAYER, "Progressive Boost")
-        self.assertTrue(rule(state))
+        # Tiny Arena 1 is the slot found unbreakable-but-in-logic on
+        # 2026-08-12; it takes one boost copy, not USF.
+        for track, slot in (("Crash Cove", 4), ("Tiny Arena", 1)):
+            with self.subTest(track=track, slot=slot):
+                mw, rule = self._rule(track, slot,
+                                      progressive_boost="shared_global")
+                state = CollectionState(mw)
+                self.assertFalse(rule(state))
+                _grant(state, self.PLAYER, "Progressive Boost")
+                self.assertTrue(rule(state))
 
     def test_usf_slots_need_two_copies(self):
         mw, rule = self._rule("N. Gin Labs", 4,
@@ -204,11 +211,15 @@ class TestBoxSeedClassification(unittest.TestCase):
         self.assertTrue(items)
         self.assertTrue(all(item.advancement for item in items))
 
-    def test_boost_useful_when_no_reader_is_active(self):
+    def test_boost_progression_without_boxes_or_itemsanity(self):
+        """No reader is optional any more: the USF finish gate (ruled
+        2026-08-12) reads the boost chain on Hot Air Skyway's Trophy Race in
+        every seed, so the upgrade no longer depends on this feature at all.
+        The stat chains below still do."""
         items = self._pool("Progressive Boost",
                            progressive_boost="shared_global")
         self.assertTrue(items)
-        self.assertFalse(any(item.advancement for item in items))
+        self.assertTrue(all(item.advancement for item in items))
 
     def test_stats_progression_only_at_hard(self):
         for chain in STAT_CHAINS:
