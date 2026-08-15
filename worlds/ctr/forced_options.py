@@ -37,6 +37,17 @@ Every entry below is justified against a specific piece of already-shipping
 code or the Specification/Contract -- never against "this quiets the fuzzer"
 (briefing rule 7): none of these change what a seed generates, only what the
 player is told about their own YAML.
+
+LETTERSANITY ROW (#148, added with the feature). The frozen design's `#178`
+obligation ("the #178 constraint matrix should carry the row", dossier
+amendment ruled 2026-08-10) is the mode-2 self-item access rule: in
+`locations_and_items` every created letter location requires its own letter
+item, so fill can never seat a letter at its own location. That is enforced
+in `Rules.add_lettersanity_rules`, not here -- this module's row is the
+option-interaction consequence of the same option family: `Letters Per Track`
+only drives the per-track count for the two location-bearing shapes, so a
+non-default count is a silent no-op while Lettersanity is `off` or
+`items_only` (DOWNGRADE-WITH-WARNING, `warn_letters_per_track_ignored...`).
 """
 import logging
 
@@ -419,6 +430,30 @@ def warn_vanilla_unlock_collapses_destination_shuffle(world):
         f"matrix.")
 
 
+def warn_letters_per_track_ignored_outside_location_modes(world):
+    """The lettersanity count knob only ever drives generate_early's
+    `_lettersanity_selected` draw for the two location-bearing shapes
+    (locations_only and locations_and_items, __init__.generate_early). In
+    `off` nothing is created and in `items_only` the seed uses all three
+    letters regardless of the knob, so a non-default Letters Per Track is a
+    silent no-op in both. Log-only, matching the matrix convention: generation
+    elsewhere already resolves the real selection shape (and in `off` nothing
+    resolves at all)."""
+    o = world.options
+    if o.letters_per_track.value == 3:
+        return  # default; nothing unusual for the player to be told about
+    mode = int(o.lettersanity.value)
+    if mode in (1, 2):
+        return
+    logger.warning(
+        f"CTR: Letters Per Track is set to {o.letters_per_track.value} for "
+        f"{_who(world)}, but Lettersanity is "
+        f"{'off' if mode == 0 else 'items_only'}, so the count knob has no "
+        f"effect -- this seed uses "
+        f"{'no letters' if mode == 0 else 'all three letters per track'} "
+        f"regardless.")
+
+
 def warn_relic_gates_may_be_permanently_unreachable(world):
     """The non-full-accessibility counterpart of
     raise_if_full_accessibility_needs_more_sapphires_than_created (issue
@@ -460,6 +495,7 @@ def apply_downgrade_warnings(world):
     warn_shuffle_cups_without_include(world)
     warn_sphere_search_tuning_ignored_in_vanilla(world)
     warn_vanilla_unlock_collapses_destination_shuffle(world)
+    warn_letters_per_track_ignored_outside_location_modes(world)
     warn_relic_gates_may_be_permanently_unreachable(world)
 
 

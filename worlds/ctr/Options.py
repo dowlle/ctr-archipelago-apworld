@@ -263,6 +263,20 @@ class Itemsanity(Toggle):
     """
     display_name = "Itemsanity"
 
+class Lettersanity(Choice):
+    display_name = "Lettersanity"
+    option_off = 0
+    option_locations_only = 1
+    option_locations_and_items = 2
+    option_items_only = 3
+    default = 0
+
+class LettersPerTrack(Range):
+    display_name = "Letters Per Track"
+    range_start = 1
+    range_end = 3
+    default = 3
+
 
 class BoxLocations(Toggle):
     """Add the authored item-box checks (#109): one location per authored box
@@ -707,6 +721,8 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     itemsanity: Itemsanity
+    lettersanity: Lettersanity
+    letters_per_track: LettersPerTrack
     # authored item-box checks (#109)
     box_locations: BoxLocations
     shortcut_knowledge: ShortcutKnowledge
