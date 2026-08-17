@@ -16,6 +16,8 @@ from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
 from . import tizi_helper
 from .tizi_helper import TIZI_HELPER_ITEM
+from . import turbo_grant
+from .turbo_grant import TURBO_GRANT_ITEM
 from . import lettersanity
 from .lettersanity import LETTERSANITY_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
@@ -370,6 +372,9 @@ class ctrAPWorld(World):
         # so this restore changes nothing a tracker computes -- it is here so the
         # restored option set is honest rather than silently defaulted.
         o.tizi_helper.value = int(bool(co.get("tizi_helper", 0)))
+        # Turbo Grant (#224): identical scalar, identical reasoning. Absent key
+        # is any pre-#224 seed and correctly restores to off.
+        o.turbo_grant.value = int(bool(co.get("turbo_grant", 0)))
         lb = passthrough.get("lettersanity_checks", {}) or {}
         o.lettersanity.value = int(co.get("lettersanity", lb.get("mode", 0)))
         o.letters_per_track.value = int(lb.get("letters_per_track", 3))
@@ -1324,6 +1329,12 @@ class ctrAPWorld(World):
             # comfort slot for it instead of overflowing the pool.
             if item["name"] == TIZI_HELPER_ITEM:
                 count = tizi_helper.created_item_count(self)
+            # Turbo Grant (#224): same shape and the same supply reasoning as
+            # the helper above -- one copy when the option is on, no location of
+            # its own, and placed before the comfort-pack trim so a reduced seed
+            # frees a comfort slot for it rather than overflowing the pool.
+            if item["name"] == TURBO_GRANT_ITEM:
+                count = turbo_grant.created_item_count(self)
             if int(self.options.lettersanity.value) in (2, 3) and item["name"] in lettersanity.ITEM_NAMES:
                 track = item["name"].rsplit("(", 1)[1][:-1]
                 letter = item["name"].split(" ", 2)[1]
@@ -1836,6 +1847,15 @@ class ctrAPWorld(World):
                 # tracker and a Universal Tracker restore can see the option
                 # without inferring it from an item that may not have arrived yet.
                 "tizi_helper": bool(o.tizi_helper.value),
+                # Turbo Grant (#224), same always-emitted scalar convention and
+                # the same DIAGNOSTIC / TRACKER ONLY status: native does NOT read
+                # this key. Its runtime gate is "did this slot receive item
+                # 35010189" (plus, when itemsanity is on, the `Turbo` weapon
+                # item), both of which the client already knows from
+                # ReceivedItems, and itemsanity's own on/off is read off server
+                # location membership. Reading a config flag as well would add a
+                # second source of truth for one boolean.
+                "turbo_grant": bool(o.turbo_grant.value),
                 "lettersanity": int(o.lettersanity.value),
                 # #109 box scalars, same convention: both always emitted raw
                 # (shortcut_knowledge even when box_locations is false, so
