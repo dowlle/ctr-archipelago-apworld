@@ -25,7 +25,7 @@ class BossesRequiredGoal(Range):
     Ripper Roo, Papu Papu, Komodo Joe and Pinstripe. 0 (default) turns this
     condition off.
 
-    "Won" means you actually beat the boss -- holding trophies or garage Keys
+    "Won" means you actually beat the boss - holding trophies or garage Keys
     does not count. Combines with Oxide Goal and Gems Required; every
     condition you set must be met."""
     display_name = "Bosses Required Goal"
@@ -41,7 +41,7 @@ class GemsRequiredGoal(Range):
     Required; every condition you set must be met.
 
     If you ask for Gems with Shuffle Gems on, you also need Include Gem Cup
-    Warp Pads on -- otherwise the Gems would sit on cups the seed left out.
+    Warp Pads on - otherwise the Gems would sit on cups the seed left out.
     Generation says so rather than handing you an unwinnable seed."""
     display_name = "Gems Required Goal"
     range_start = 0
@@ -153,7 +153,7 @@ class ProgressiveBoostMode(Choice):
     Sacred Fire speeds, and one tier above that if Blue Fire is also on.
 
     Some checks genuinely need the speed and stay out of reach until it
-    arrives. Hot Air Skyway is the clearest case -- its mid-track climb
+    arrives. Hot Air Skyway is the clearest case - its mid-track climb
     cannot be cleared below USF.
 
     - **off** (default): every kart boosts normally, as in the retail game.
@@ -200,7 +200,7 @@ class LogicDifficulty(Choice):
       stay available.
     - **hard**: no extra requirement; you are expected to manage.
 
-    Tracks whose geometry genuinely demands speed ignore this setting --
+    Tracks whose geometry genuinely demands speed ignore this setting -
     Cortex Castle and Hot Air Skyway always need USF, and so does Oxide
     Station unless Shortcut Knowledge is set to hard."""
     display_name = "Logic Difficulty"
@@ -211,7 +211,7 @@ class LogicDifficulty(Choice):
 
 
 class ProgressiveStatsMode(Choice):
-    """Turn kart stats -- top speed, acceleration, turning -- into items.
+    """Turn your kart's top speed, acceleration and turning into items.
 
     Every kart starts at the bottom of all three and climbs as the stats
     arrive. The ladder reaches beyond the retail maximum at the top end.
@@ -229,7 +229,7 @@ class ProgressiveStatsMode(Choice):
 
 class TrapFillPercentage(Range):
     """What percentage of this slot's filler items are replaced by traps (Icy
-    Road, Low Gravity, No Brakes, Forced Boost, First Person -- each equally
+    Road, Low Gravity, No Brakes, Forced Boost, First Person - each equally
     likely).
 
       0             = no traps, filler stays Wumpa Fruit
@@ -250,7 +250,7 @@ class Itemsanity(Toggle):
     """Turn weapons into items you have to unlock.
 
     Until a weapon arrives from the multiworld you cannot get it from a crate
-    -- the roulette hands you Wumpa Fruit instead. Using each weapon for the
+    - the roulette hands you Wumpa Fruit instead. Using each weapon for the
     first time is itself a check, and using one while holding ten fruit is a
     second.
 
@@ -307,7 +307,7 @@ class BoxLocations(Toggle):
     Drive through one in any Adventure race on that track and it pays out.
 
     Boxes are the densest source of checks in the game, so this makes for a
-    much longer seed. Some sit past jumps or shortcuts you need boost for --
+    much longer seed. Some sit past jumps or shortcuts you need boost for -
     Shortcut Knowledge decides how much the logic expects of you there."""
     display_name = "Item Box Locations"
 
@@ -337,7 +337,7 @@ class OneLapCups(DefaultOnToggle):
 
     Only cup races shorten (including the Gem Cups); single races, boss races,
     relic time trials and CTR Token challenges keep their normal lap count.
-    Changes nothing about logic or which locations exist -- everything is just
+    Changes nothing about logic or which locations exist - everything is just
     faster."""
     # Reuses the engine's built-in one-lap mechanism (the vanilla one-lap
     # cheat), scoped to cups.
@@ -423,7 +423,7 @@ class ApItemTypeColors(DefaultOnToggle):
 
 
 class WarpPadUnlockRequirements(Choice):
-    """How warp pads unlock -- the heart of the randomizer.
+    """How warp pads unlock, the heart of the randomizer.
 
     - **randomized** (default): every warp pad gets a randomized entry
       requirement (trophies, tokens, relics, keys, gems...), always collectable
@@ -469,7 +469,7 @@ class RequirementVariety(Choice):
     """Weight preset for randomized warp-pad requirements (randomized modes
     only).
 
-    - **icebound_beta5** (default): Icebound's rebalanced weights -- still
+    - **icebound_beta5** (default): Icebound's rebalanced weights - still
       trophy-leaning, with more token, relic and key variety.
     - **trophy_heavy_legacy**: the previous, more trophy-dominated weights.
     - **custom**: use the weights from `Requirement Weights`."""
@@ -489,7 +489,7 @@ class RequirementVariety(Choice):
 
 class RequirementWeights(OptionDict):
     """Roll your own requirement mix. Used only when `Requirement Variety` =
-    custom. Each entry is `item name: weight` -- higher weight means picked more
+    custom. Each entry is `item name: weight` - higher weight means picked more
     often; 0 disables an item, except Trophy, which must stay above 0. Items you
     leave out keep their default weight.
 
@@ -578,7 +578,7 @@ class DeathLink(Choice):
 class DeathLinkAmnesty(Range):
     """How many of your deaths must pile up before one is actually sent. 1
     (default) sends every death; N sends one per N. Meant for the `any_hit`
-    tier. Incoming deaths are unaffected -- amnesty only throttles what you
+    tier. Incoming deaths are unaffected - amnesty only throttles what you
     send."""
     # Does nothing useful at mask_reset (those wipeouts are already rare) and
     # is inert while DeathLink is off.
@@ -638,7 +638,7 @@ class SapphireRelicCount(Range):
     Relics come from relic races. This sets how many of the sapphire tier are
     in the item pool, which is also the most you can be asked to collect.
 
-    Lower it for a shorter seed. Set it to 0 to remove the tier entirely --
+    Lower it for a shorter seed. Set it to 0 to remove the tier entirely -
     its races then hand out nothing and stop being checks."""
     display_name = "Sapphire Relic Count"
     range_start = 0
@@ -672,7 +672,7 @@ class PlatinumRelicCount(Range):
 class StartingCharacter(Choice):
     """Which racer you begin with.
 
-    Only matters when Character Unlocks is on -- otherwise you have the whole
+    Only matters when Character Unlocks is on - otherwise you have the whole
     roster from the start anyway.
 
     Leave it on **random** to have the seed pick for you, or name any of the
@@ -702,7 +702,7 @@ class StartingCharacter(Choice):
 class StartingStatClass(Choice):
     """Which stat class your starting kart uses.
 
-    The retail game gives each racer one of five handling classes -- balanced,
+    The retail game gives each racer one of five handling classes - balanced,
     speed, acceleration, turning or one of the two hidden sets. This picks
     which one you start with rather than taking it from your racer.
 
@@ -734,7 +734,7 @@ class RacerLockedPads(Toggle):
     need that character before you can play the track behind it. The pad
     tells you which racer it wants.
 
-    Never your starting racer -- a lock you already satisfy would be no lock
+    Never your starting racer - a lock you already satisfy would be no lock
     at all. Needs Character Unlocks to be on, since otherwise every racer is
     available from the start."""
     display_name = "Racer-Locked Warp Pads"
@@ -762,7 +762,7 @@ class EditableStats(Choice):
     - **global**: one custom setup shared by every racer.
     - **per_character**: a separate setup for each of the 16 racers.
 
-    Progressive Stats wins if you enable both -- the panel goes read-only and
+    Progressive Stats wins if you enable both - the panel goes read-only and
     no edit controls appear. The seed still generates; the two are simply
     different ways to decide the same numbers."""
     display_name = "Editable Stats"
