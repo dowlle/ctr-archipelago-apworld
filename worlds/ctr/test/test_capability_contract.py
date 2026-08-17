@@ -18,7 +18,8 @@ from ..capability_contract import (
     usf_or_hard_finish_tracks,
 )
 from ..itemsanity import ITEM_NAMES
-from ..podium import location_name
+from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS
+from ..podium import created_rung_keys_from_options, location_name
 from ..progressive_capability import ROSTER, boost_item_name
 from ..usf_finish import (
     USF_FINISH_TRACKS,
@@ -172,6 +173,71 @@ class TestDifficultyContract(unittest.TestCase):
         self.assertTrue(_state(
             mw, character_boosts=((required, 1),)).can_reach(
                 name, "Location", PLAYER))
+
+    def test_locked_track_item_box_gate_binds_its_racer(self):
+        """`add_item_box_rules` read the lock as `ctr_racer_locks.get(track)`.
+
+        That map is keyed by pad ENTRANCE name, so the lookup never matched and
+        every locked track's box gate fell through to the any-driveable-racer
+        arm -- logic believed a box was reachable on a racer the track will not
+        let you drive. The whole box-rule suite ran with `racer_locked_pads`
+        off, so nothing exercised the locked case. This test turns it on.
+        """
+        mw = track = slot = required = None
+        for seed in range(1, 65):
+            candidate = _build(
+                seed=seed, progressive_boost="per_character", itemsanity=True,
+                box_locations=True, racer_locked_pads=True)
+            locks = candidate.worlds[PLAYER].ctr_racer_locks
+            created = set(ITEM_BOX_CLASS.created_location_names(
+                candidate.worlds[PLAYER].options))
+            hits = [(t, s, locks[f"{t} Warp Pad"])
+                    for (t, s), (boost_min, _stats) in BOX_RULES.items()
+                    if boost_min >= 1 and f"{t} Warp Pad" in locks
+                    and ITEM_BOX_CLASS.location_name(t, s) in created]
+            if hits:
+                mw = candidate
+                track, slot, required = hits[0]
+                break
+        self.assertIsNotNone(
+            mw, "fixture seeds produced no racer-locked boost-gated box slot")
+        name = ITEM_BOX_CLASS.location_name(track, slot)
+        wrong = next(racer for racer in ROSTER if racer != required)
+        self.assertFalse(
+            _state(mw, character_boosts=((wrong, 3),)).can_reach(
+                name, "Location", PLAYER),
+            f"{name} is locked to {required} but cleared on {wrong}")
+        self.assertTrue(
+            _state(mw, character_boosts=((required, 3),)).can_reach(
+                name, "Location", PLAYER))
+
+    def test_medium_leaves_every_placement_rung_at_the_demonstrated_floor(self):
+        """`LogicDifficulty.medium` documents the requirement as applying to
+        the Trophy Race ONLY, with placement rungs staying at the demonstrated
+        floor. The rungs used to reach their own track through
+        `can_reach(<track>: Trophy Race)`, so they inherited that requirement
+        and the option contradicted itself.
+
+        Asserted across the WHOLE easy group, not one sample track: the earlier
+        difficulty coverage only ever checked Crash Cove, whose plain Red cup
+        gave the rungs a second reachable branch and hid the inheritance on the
+        tracks that have no plain legging cup (Roo's Tubes, Coco Park).
+        """
+        for track in sorted(EASY_TROPHY_GROUP.tracks):
+            mw = _build(progressive_boost="shared_global", itemsanity=True,
+                        logic_difficulty="medium")
+            bare = _state(mw)
+            names = {loc.name for loc in mw.get_locations(PLAYER)}
+            with self.subTest(track=track, spot="trophy race"):
+                self.assertFalse(bare.can_reach(
+                    f"{track}: Trophy Race", "Location", PLAYER))
+            for rung_key in sorted(created_rung_keys_from_options(
+                    mw.worlds[PLAYER].options)):
+                name = location_name(track, rung_key)
+                if name not in names:
+                    continue
+                with self.subTest(track=track, rung=rung_key):
+                    self.assertTrue(bare.can_reach(name, "Location", PLAYER))
 
     def test_option_vacuity_when_either_item_pack_is_off(self):
         for options in (

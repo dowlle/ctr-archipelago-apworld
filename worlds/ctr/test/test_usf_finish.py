@@ -9,6 +9,7 @@ Every path is exercised here, together with the two exemptions the session's own
 data forced -- the live-position held rungs, and the whole gate collapsing to
 vacuous when the boost chain is not randomized.
 """
+import collections
 import unittest
 
 from BaseClasses import CollectionState
@@ -58,9 +59,15 @@ class _FakeState:
     REAL installed rule be evaluated on a topology no option combination can
     produce (one cup reachable, the track's own pad shut)."""
 
-    def __init__(self, reachable=(), boost=0):
+    def __init__(self, reachable=(), boost=0, regions=()):
         self.reachable = set(reachable)
         self.boost = boost
+        # A rung's own-track branch is now the Trophy Race's captured pre-gate
+        # rule, which asks the REGION object directly rather than resolving a
+        # location name through the state. Same "exactly what is named is
+        # reachable" contract, expressed the way `Region.can_reach` reads it.
+        self.stale = collections.defaultdict(bool)
+        self.reachable_regions = collections.defaultdict(set, {PLAYER: set(regions)})
 
     def can_reach(self, spot, resolution_hint=None, player=None):
         return (spot, resolution_hint) in self.reachable
@@ -217,7 +224,7 @@ class TestPodiumRungs(unittest.TestCase):
         # The ungated cup and the track's own trophy path stay boost-free.
         self.assertTrue(rule(_FakeState(red, boost=0)))
         self.assertTrue(rule(_FakeState(
-            [("Papu's Pyramid: Trophy Race", "Location")], boost=0)))
+            boost=0, regions=[mw.get_region("Papu's Pyramid", PLAYER)])))
 
     def test_cup_branches_are_ungated_when_the_pack_is_off(self):
         mw = _build()
