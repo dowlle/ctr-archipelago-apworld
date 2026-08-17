@@ -16,20 +16,27 @@ from BaseClasses import CollectionState
 from test.general import setup_multiworld
 
 from .. import ctrAPWorld
+from ..capability_contract import (CONFIRMED_FINISH_BY_TRACK,
+                                   held_first_gated_tracks)
 from ..gem_cup_legs import load_vanilla_cup_legs
 from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
 from ..progressive_capability import boost_item_name
 from ..usf_finish import (ALL_USF_FINISH_TRACKS, USF_BOOST_COUNT,
-                          USF_FINISH_TRACKS, usf_finish_cups)
+                          USF_FINISH_TRACKS, USF_OR_HARD_SK_FINISH_TRACKS,
+                          cup_finish_term, usf_finish_cups)
 from . import CTRTestBase
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
 BOOST = "Progressive Boost"
 HAS = "Hot Air Skyway"
+OXIDE = "Oxide Station"
 #: Vanilla cups containing any track with a confirmed finish gate.
 VANILLA_GATED_CUPS = ("Green Gem Cup", "Yellow Gem Cup", "Purple Gem Cup")
+#: The one vanilla cup that legs BOTH gated tracks, so its composed term keeps
+#: a Hot Air Skyway half after the Oxide half goes vacuous at hard knowledge.
+OXIDE_AND_HAS_CUP = "Yellow Gem Cup"
 
 
 def _build(seed=1, **options):
@@ -273,6 +280,169 @@ class TestGemCupCompletion(unittest.TestCase):
                         _reachable(mw, blocked, name),
                         not ALL_USF_FINISH_TRACKS.intersection(cup_legs))
                     self.assertTrue(_reachable(mw, cleared, name))
+
+
+class TestOxideStationGate(unittest.TestCase):
+    """Oxide Station's finish gate and its `Held 1st` rung (issue #55).
+
+    Ruled 2026-08-14 17:15 from the live pre1 test session: on an empty
+    randomized boost chain Oxide Station is not realistically finishable at
+    easy or medium shortcut knowledge, and holding 1st is not realistic
+    either, but a player who declared HARD shortcut knowledge knows routes
+    that make both work bare. So this track differs from Hot Air Skyway in
+    exactly two ways -- the term is `USF OR shortcut_knowledge: hard` instead
+    of USF strictly, and `Held 1st` carries the term too while `Held 3rd` and
+    `Held 5th` stay free (holdable mid-race without finishing).
+
+    The game-side half is `AP_CapabilityFireGrant`
+    (ctr-native-ap `ap/ap_capability.c`): below `AP_CAP_BOOST_USF` a super
+    turbo pad is demoted to a normal pad's cap and reserves, so the super pad
+    cannot carry a bare kart across Oxide's finish -- while ordinary turbo
+    pads still grant at every tier, which is what leaves the hard-knowledge
+    route drivable with zero boost items. `AP_CAP_BOOST_USF` is the second
+    rank of that enum, matching `USF_BOOST_COUNT`.
+
+    The production rules landed with the confirmed-capability contract rather
+    than as a standalone rule, and arrived without tests of their own. These
+    pin the ruling so a later edit to `capability_contract` or to
+    `track_finish_term` cannot silently un-gate the track.
+    """
+
+    FINISH_NAMES = ("Oxide Station: Trophy Race",
+                    location_name(OXIDE, "finish_any"),
+                    location_name(OXIDE, "finish_podium"),
+                    location_name(OXIDE, "held_1st"))
+
+    def test_finish_and_held_first_need_usf_at_easy_and_medium(self):
+        for knowledge in ("easy", "medium"):
+            mw = _build(progressive_boost="shared_global",
+                        shortcut_knowledge=knowledge)
+            live = {loc.name for loc in mw.get_locations(PLAYER)}
+            for name in self.FINISH_NAMES:
+                if name not in live:
+                    continue
+                with self.subTest(knowledge=knowledge, location=name):
+                    self.assertFalse(_reachable(mw, _state(mw, boost=0), name))
+                    self.assertFalse(_reachable(mw, _state(mw, boost=1), name))
+                    self.assertTrue(_reachable(
+                        mw, _state(mw, boost=USF_BOOST_COUNT), name))
+
+    def test_held_third_and_fifth_stay_free_at_every_tier(self):
+        """The live-position listener fires before the line, so these rungs
+        never cross the gate -- the one asymmetry with `Held 1st`."""
+        for knowledge in ("easy", "medium", "hard"):
+            mw = _build(progressive_boost="shared_global",
+                        shortcut_knowledge=knowledge,
+                        podium_held_fifth_rung=True)
+            live = {loc.name for loc in mw.get_locations(PLAYER)}
+            blocked = _state(mw, boost=0)
+            for key in ("held_3rd", "held_5th"):
+                name = location_name(OXIDE, key)
+                if name not in live:
+                    continue
+                with self.subTest(knowledge=knowledge, rung=key):
+                    self.assertTrue(_reachable(mw, blocked, name))
+
+    def test_hard_knowledge_escapes_the_whole_gate(self):
+        """The escape is an OPTION, not a state term: at hard knowledge the
+        track's term is vacuous and zero boost items are required."""
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="hard")
+        live = {loc.name for loc in mw.get_locations(PLAYER)}
+        blocked = _state(mw, boost=0)
+        for name in self.FINISH_NAMES:
+            if name not in live:
+                continue
+            with self.subTest(location=name):
+                self.assertTrue(_reachable(mw, blocked, name))
+
+    def test_hard_knowledge_does_not_escape_hot_air_skyway(self):
+        """The escape is per TRACK, not per seed. Hot Air Skyway's record
+        carries no escape, so its finish stays gated at hard knowledge -- and
+        so does the Yellow Gem Cup, which legs both tracks."""
+        mw = _build(progressive_boost="shared_global",
+                    shortcut_knowledge="hard")
+        blocked = _state(mw, boost=0)
+        cleared = _state(mw, boost=USF_BOOST_COUNT)
+        for name in (f"{HAS}: Trophy Race",
+                     location_name(HAS, "finish_podium"),
+                     f"{OXIDE_AND_HAS_CUP}: Gem"):
+            with self.subTest(location=name):
+                self.assertFalse(_reachable(mw, blocked, name))
+                self.assertTrue(_reachable(mw, cleared, name))
+
+    def test_a_cup_composes_its_gated_legs_one_term_each(self):
+        """`cup_finish_term` ANDs one term per gated leg, so the hard-knowledge
+        escape can collapse Oxide's half of a cup without touching the other
+        half. Built from a synthetic leg list so the assertion does not depend
+        on which cups a seed happens to draw."""
+        for knowledge, both, oxide_only in (("easy", 2, 2), ("hard", 2, 0)):
+            world = _build(progressive_boost="shared_global",
+                           shortcut_knowledge=knowledge).worlds[PLAYER]
+            with self.subTest(knowledge=knowledge):
+                mixed = cup_finish_term([OXIDE, HAS, "Crash Cove"], world)
+                only = cup_finish_term([OXIDE, "Crash Cove"], world)
+                self.assertFalse(mixed(_FakeState(boost=both - 1), PLAYER))
+                self.assertTrue(mixed(_FakeState(boost=both), PLAYER))
+                self.assertTrue(only(_FakeState(boost=oxide_only), PLAYER))
+
+    def test_another_track_s_cup_branch_carries_the_composed_term(self):
+        """Dingo Canyon is a Yellow Gem Cup leg, and Yellow legs both gated
+        tracks. Its rung reached through that cup therefore needs the boost at
+        hard knowledge too -- the cup-branch leak this file exists to pin,
+        checked on the shape where the two terms differ."""
+        for knowledge in ("easy", "hard"):
+            mw = _build(progressive_boost="shared_global",
+                        shortcut_knowledge=knowledge)
+            rule = mw.get_location(
+                location_name("Dingo Canyon", "finish_podium"),
+                PLAYER).access_rule
+            cup = [(OXIDE_AND_HAS_CUP, "Region")]
+            with self.subTest(knowledge=knowledge):
+                self.assertFalse(rule(_FakeState(cup, boost=0)))
+                self.assertTrue(rule(_FakeState(cup, boost=USF_BOOST_COUNT)))
+
+    def test_vacuous_when_the_boost_chain_is_not_randomized(self):
+        """Seating spec 2.2: with the pack off no Progressive Boost item
+        exists and every kart already has USF, so the gate must resolve True
+        rather than to a requirement nothing in the seed can satisfy."""
+        mw = _build(shortcut_knowledge="easy")
+        live = {loc.name for loc in mw.get_locations(PLAYER)}
+        state = _state(mw)
+        for name in self.FINISH_NAMES:
+            if name not in live:
+                continue
+            with self.subTest(location=name):
+                self.assertTrue(_reachable(mw, state, name))
+
+    def test_per_character_usf_must_belong_to_one_driveable_racer(self):
+        """Two racers holding one copy each is not USF for anybody -- the
+        #252 single-racer ruling, on the escape-carrying track."""
+        mw = _build(progressive_boost="per_character",
+                    shortcut_knowledge="easy", character_unlocks=False)
+        name = f"{OXIDE}: Trophy Race"
+        state = _state(mw)
+        first = mw.worlds[PLAYER].ctr_starting_character
+        second = "Coco Bandicoot" if first != "Coco Bandicoot" else "Polar"
+        state.add_item(boost_item_name(first), PLAYER, 1)
+        state.add_item(boost_item_name(second), PLAYER, 1)
+        self.assertFalse(_reachable(mw, state, name))
+        state.add_item(boost_item_name(first), PLAYER, 1)
+        self.assertTrue(_reachable(mw, state, name))
+
+    def test_the_contract_row_is_what_production_reads(self):
+        """Parity between the field ruling and the sets the rules consume, so
+        the record cannot be edited without moving the gate with it."""
+        record = CONFIRMED_FINISH_BY_TRACK[OXIDE]
+        self.assertEqual(record.boost_count, USF_BOOST_COUNT)
+        self.assertTrue(record.hard_shortcut_escape)
+        self.assertTrue(record.gate_held_first)
+        self.assertIn(OXIDE, USF_OR_HARD_SK_FINISH_TRACKS)
+        self.assertIn(OXIDE, held_first_gated_tracks())
+        self.assertNotIn(OXIDE, USF_FINISH_TRACKS)
+        # Hot Air Skyway is the contrast the ruling is written against.
+        self.assertNotIn(HAS, held_first_gated_tracks())
+        self.assertIn(HAS, USF_FINISH_TRACKS)
 
 
 class TestBoostSeedGenerates(CTRTestBase):

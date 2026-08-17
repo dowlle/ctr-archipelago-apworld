@@ -55,8 +55,28 @@ upgrades the boost chain in every randomized-boost seed. That upgrade used to be
 conditional on itemsanity or box locations being on; this gate is the reader
 that made it unconditional.
 
+OXIDE STATION (ruling 2026-08-14 17:15, live pre1 test session; issue #55).
+On an empty boost chain at easy/medium shortcut knowledge, Oxide Station is
+not realistically finishable and holding 1st is not realistic either -- but a
+player who declared HARD shortcut knowledge knows routes that make both work
+bare. So this track's finish, and (unlike Hot Air Skyway) its `Held 1st` rung,
+carry `USF OR shortcut_knowledge == hard`, while `Held 3rd`/`Held 5th` stay
+free. The escape is an OPTION, not a state term: at hard knowledge the gate is
+vacuous for this track alone, so a cup that legs both tracks keeps its Hot Air
+Skyway half -- which is why the cup term is composed per LEG rather than being
+one term per cup.
+
+The game half of that ruling is `AP_CapabilityFireGrant`
+(ctr-native-ap `ap/ap_capability.c`): below `AP_CAP_BOOST_USF` a super turbo
+pad's grant is clamped to `AP_CAP_CAP_FIRELEVEL` and handed a normal pad's
+reserves, so the super pad cannot carry a bare kart across Oxide's finish;
+ordinary turbo pads still grant at every tier, which is what leaves the
+hard-knowledge route drivable with no boost items at all. `AP_CAP_BOOST_USF`
+is the second rank of that enum, which is `USF_BOOST_COUNT` here.
+
 UNIVERSAL TRACKER: the seed's `boost_mode` is restored from slot_data before
-rules are rebuilt, so a tracker session evaluates the identical gate.
+rules are rebuilt, so a tracker session evaluates the identical gate. The
+`shortcut_knowledge` escape is likewise restored (`_ut_restore_options`).
 """
 from typing import Dict, List
 
@@ -133,7 +153,11 @@ class UsfFinishGate:
     def __init__(self, world):
         from .gem_cup_legs import resolved_gem_cup_legs
         legs = resolved_gem_cup_legs(world)
-        self.term = usf_term(world)
+        # No seed-wide `term` attribute: since the Oxide Station ruling there
+        # is no single answer to "the finish term" for a seed, and the one
+        # this class used to publish was the bare USF term -- no
+        # hard-knowledge escape, no racer binding. Ask `cup_term` or
+        # `held_first_term`, both of which are keyed by what they gate.
         self.cups = usf_finish_cups(legs)
         self._track_terms = {track: track_finish_term(track, world)
                              for track in ALL_USF_FINISH_TRACKS}
