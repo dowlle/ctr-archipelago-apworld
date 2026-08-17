@@ -28,6 +28,7 @@ from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
 from .tizi_helper import TIZI_HELPER_ITEM
 from . import tizi_helper
+from . import turbo_grant
 from . import wumpa_family
 from . import characters
 from . import progressive_capability
@@ -179,6 +180,7 @@ def predicted_mandatory_pool(world) -> int:
     # Turbo Grant (#224) is the same shape and belongs here too; it is added on
     # its own branch, where the item exists.
     counts[TIZI_HELPER_ITEM] = tizi_helper.created_item_count(world)
+    counts[turbo_grant.TURBO_GRANT_ITEM] = turbo_grant.created_item_count(world)
 
     # The starting-wumpa ladder, same shape and same failure direction: up to
     # ten copies of one name, frozen at count 0 and created per option, adding
