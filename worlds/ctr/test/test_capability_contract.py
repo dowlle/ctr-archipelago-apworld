@@ -13,6 +13,10 @@ from .. import ctrAPWorld
 from ..capability_contract import (
     CONFIRMED_FINISH_CAPABILITIES,
     EASY_TROPHY_GROUP,
+    RULED_TROPHY_GROUP,
+    STATUS_CONFIRMED,
+    STATUS_RULED,
+    difficulty_gated_tracks,
     held_first_gated_tracks,
     unconditional_usf_finish_tracks,
     usf_or_hard_finish_tracks,
@@ -94,6 +98,53 @@ class TestConfirmedFinishBoundaries(unittest.TestCase):
                                  record.track not in held_first_gated_tracks())
 
 
+class TestRuledTrophyGroup(unittest.TestCase):
+    """The six tracks brought under the difficulty rule by ruling, not measurement.
+
+    Before this they carried no capability requirement at any difficulty, which
+    treated "nobody measured it" as "there is no requirement". Adding one can
+    only over-restrict, so a wrong ruling costs sphere depth rather than
+    stranding progression -- but it still has to actually bind, and nothing
+    covered these tracks before because every assertion iterated the easy group.
+    """
+
+    def test_every_trophy_track_is_now_gated_by_something(self):
+        from ..podium import TROPHY_TRACKS
+        from ..usf_finish import ALL_USF_FINISH_TRACKS
+        ungated = (set(TROPHY_TRACKS) - difficulty_gated_tracks()
+                   - set(ALL_USF_FINISH_TRACKS))
+        self.assertEqual(ungated, set(),
+                         f"trophy races with no capability gate at all: {sorted(ungated)}")
+
+    def test_the_two_groups_keep_their_provenance_apart(self):
+        self.assertEqual(EASY_TROPHY_GROUP.status, STATUS_CONFIRMED)
+        self.assertEqual(RULED_TROPHY_GROUP.status, STATUS_RULED)
+        self.assertFalse(EASY_TROPHY_GROUP.tracks & RULED_TROPHY_GROUP.tracks)
+        self.assertEqual(difficulty_gated_tracks(),
+                         EASY_TROPHY_GROUP.tracks | RULED_TROPHY_GROUP.tracks)
+
+    def test_ruled_tracks_gate_their_trophy_race_at_medium(self):
+        for track in sorted(RULED_TROPHY_GROUP.tracks):
+            mw = _build(progressive_boost="shared_global", itemsanity=True,
+                        logic_difficulty="medium")
+            name = f"{track}: Trophy Race"
+            with self.subTest(track=track, state="bare"):
+                self.assertFalse(_state(mw).can_reach(name, "Location", PLAYER))
+            with self.subTest(track=track, state="boost"):
+                self.assertTrue(_state(mw, boost=1).can_reach(name, "Location", PLAYER))
+            with self.subTest(track=track, state="weapons"):
+                self.assertTrue(_state(mw, held=("Mask", "Warpball")).can_reach(
+                    name, "Location", PLAYER))
+
+    def test_ruled_tracks_are_free_at_hard(self):
+        for track in sorted(RULED_TROPHY_GROUP.tracks):
+            mw = _build(progressive_boost="shared_global", itemsanity=True,
+                        logic_difficulty="hard")
+            with self.subTest(track=track):
+                self.assertTrue(_state(mw).can_reach(
+                    f"{track}: Trophy Race", "Location", PLAYER))
+
+
 class TestDifficultyContract(unittest.TestCase):
     def test_slot_data_round_trips_logic_difficulty_for_universal_tracker(self):
         source = _build(logic_difficulty="easy")
@@ -106,7 +157,7 @@ class TestDifficultyContract(unittest.TestCase):
                          0)
 
     def test_medium_trophy_requires_boost_or_two_useful_families(self):
-        for track in sorted(EASY_TROPHY_GROUP.tracks):
+        for track in sorted(difficulty_gated_tracks()):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
                         logic_difficulty="medium")
             name = f"{track}: Trophy Race"
@@ -158,7 +209,7 @@ class TestDifficultyContract(unittest.TestCase):
                 logic_difficulty="medium", racer_locked_pads=True)
             locks = candidate.worlds[PLAYER].ctr_racer_locks
             matches = [(t, locks[f"{t} Warp Pad"])
-                       for t in EASY_TROPHY_GROUP.tracks
+                       for t in difficulty_gated_tracks()
                        if f"{t} Warp Pad" in locks]
             if matches:
                 mw = candidate
@@ -223,7 +274,7 @@ class TestDifficultyContract(unittest.TestCase):
         gave the rungs a second reachable branch and hid the inheritance on the
         tracks that have no plain legging cup (Roo's Tubes, Coco Park).
         """
-        for track in sorted(EASY_TROPHY_GROUP.tracks):
+        for track in sorted(difficulty_gated_tracks()):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
                         logic_difficulty="medium")
             bare = _state(mw)
@@ -246,7 +297,7 @@ class TestDifficultyContract(unittest.TestCase):
         ):
             mw = _build(logic_difficulty="easy", **options)
             state = _state(mw)
-            for track in EASY_TROPHY_GROUP.tracks:
+            for track in difficulty_gated_tracks():
                 with self.subTest(options=options, track=track):
                     self.assertTrue(state.can_reach(
                         f"{track}: Trophy Race", "Location", PLAYER))

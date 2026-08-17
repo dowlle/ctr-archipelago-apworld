@@ -96,9 +96,14 @@ def add_capability_difficulty_rules(world, player):
     capabilities. With Progressive Boost off, vanilla boost satisfies it. With
     Itemsanity off, vanilla weapon supply satisfies it. Medium gates only the
     Trophy Race; easy also gates Finish on Podium and Held 1st; hard adds no
-    requirement. The confirmed track inventory lives in capability_contract.
+    requirement.
+
+    The track inventory lives in capability_contract and is the UNION of the
+    measured easy group and the ruled group -- read through
+    `difficulty_gated_tracks()` rather than either set, so a track cannot be
+    gated here and skipped by a parity test.
     """
-    from .capability_contract import EASY_TROPHY_GROUP
+    from .capability_contract import difficulty_gated_tracks
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
     from .podium import location_name
     from .progressive_capability import gate_satisfied, track_required_character
@@ -111,7 +116,7 @@ def add_capability_difficulty_rules(world, player):
         return
 
     names = {loc.name for loc in world.multiworld.get_locations(player)}
-    for track in EASY_TROPHY_GROUP.tracks:
+    for track in difficulty_gated_tracks():
         required_character = track_required_character(world, track)
 
         def capability_rule(state, p=player, racer=required_character):
