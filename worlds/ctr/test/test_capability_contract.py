@@ -24,7 +24,8 @@ from ..capability_contract import (
 from ..itemsanity import ITEM_NAMES
 from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS
 from ..podium import created_rung_keys_from_options, location_name
-from ..progressive_capability import ROSTER, boost_item_name
+from ..progressive_capability import (ROSTER, boost_item_name,
+                                      track_required_character)
 from ..usf_finish import (
     USF_FINISH_TRACKS,
     USF_OR_HARD_SK_FINISH_TRACKS,
@@ -96,6 +97,64 @@ class TestConfirmedFinishBoundaries(unittest.TestCase):
             with self.subTest(track=record.track):
                 self.assertEqual(actual,
                                  record.track not in held_first_gated_tracks())
+
+
+class TestRacerLockResolution(unittest.TestCase):
+    """The lock a capability rule reads must belong to the pad that LOADS the
+    track, not the pad that happens to share its name.
+
+    `ctr_racer_locks` is keyed by pad exit name, and create_regions keeps each
+    exit's physical name while retargeting it to a shuffled destination, so
+    under shuffle those are two different pads. This went uncaught because every
+    earlier fixture derived its expected racer from the same wrong key the code
+    used, so expectation and bug agreed.
+
+    The expectation here is therefore rebuilt from `warp_pad_map` and
+    `warp_pad_ids` directly -- the seed's own destination wiring -- and never
+    from the helper under test.
+    """
+
+    @staticmethod
+    def _expected_locks(world):
+        """{track -> racer} derived only from the seed's pad wiring."""
+        id_to_track = {
+            meta["level_id"]: pad[: -len(" Warp Pad")]
+            for pad, meta in getattr(world, "warp_pad_ids", {}).items()
+            if pad.endswith(" Warp Pad")
+        }
+        locks = world.ctr_racer_locks or {}
+        out = {}
+        for pad, dest_lid in getattr(world, "warp_pad_map", {}).items():
+            if not pad.endswith(" Warp Pad"):
+                continue
+            dest = id_to_track.get(dest_lid)
+            if dest is not None:
+                out[dest] = locks.get(pad)
+        return out
+
+    def test_resolver_matches_the_seed_wiring_on_shuffled_seeds(self):
+        compared = mismatches = 0
+        for seed in range(1, 30):
+            mw = _build(seed=seed, progressive_boost="per_character",
+                        itemsanity=True, racer_locked_pads=True,
+                        warp_pad_shuffle_categories=["tracks"])
+            w = mw.worlds[PLAYER]
+            expected = self._expected_locks(w)
+            if not expected or not (w.ctr_racer_locks or {}):
+                continue
+            for track, racer in expected.items():
+                got = track_required_character(w, track)
+                compared += 1
+                if got != racer:
+                    mismatches += 1
+                    if mismatches == 1:
+                        first = (seed, track, racer, got)
+        self.assertGreater(compared, 0, "no shuffled seed produced a pad map")
+        self.assertEqual(
+            mismatches, 0,
+            f"{mismatches}/{compared} tracks resolved to the wrong racer; "
+            f"first: seed {first[0]} track {first[1]!r} expected {first[2]!r} "
+            f"got {first[3]!r}" if mismatches else "")
 
 
 class TestRuledTrophyGroup(unittest.TestCase):
@@ -208,9 +267,13 @@ class TestDifficultyContract(unittest.TestCase):
                 seed=seed, progressive_boost="per_character", itemsanity=True,
                 logic_difficulty="medium", racer_locked_pads=True)
             locks = candidate.worlds[PLAYER].ctr_racer_locks
-            matches = [(t, locks[f"{t} Warp Pad"])
+            # Ask the production resolver rather than re-deriving the pad
+            # name. Deriving it here is what let the destination-shuffle bug
+            # pass its own test: the expectation was computed from the same
+            # wrong key as the code, so the two agreed while both were wrong.
+            matches = [(t, track_required_character(candidate.worlds[PLAYER], t))
                        for t in difficulty_gated_tracks()
-                       if f"{t} Warp Pad" in locks]
+                       if track_required_character(candidate.worlds[PLAYER], t)]
             if matches:
                 mw = candidate
                 track, required = matches[0]
@@ -242,9 +305,10 @@ class TestDifficultyContract(unittest.TestCase):
             locks = candidate.worlds[PLAYER].ctr_racer_locks
             created = set(ITEM_BOX_CLASS.created_location_names(
                 candidate.worlds[PLAYER].options))
-            hits = [(t, s, locks[f"{t} Warp Pad"])
+            w = candidate.worlds[PLAYER]
+            hits = [(t, s, track_required_character(w, t))
                     for (t, s), (boost_min, _stats) in BOX_RULES.items()
-                    if boost_min >= 1 and f"{t} Warp Pad" in locks
+                    if boost_min >= 1 and track_required_character(w, t)
                     and ITEM_BOX_CLASS.location_name(t, s) in created]
             if hits:
                 mw = candidate

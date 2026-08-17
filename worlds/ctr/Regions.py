@@ -89,6 +89,36 @@ def _build_reward_track_resolver(world):
     return resolve
 
 
+def _build_pad_by_destination(world):
+    """{destination track -> the PHYSICAL pad that loads it}.
+
+    The inverse of `_build_reward_track_resolver`, and the map any consumer
+    asking "which racer must I be driving on track T" actually needs.
+
+    `ctr_racer_locks` is keyed by pad EXIT name, and `create_regions` below
+    keeps each exit's physical name while retargeting it to the shuffled
+    destination. So the pad called "<T> Warp Pad" is NOT the pad that loads T
+    once destination shuffle is on, and a lock looked up by the track's own name
+    belongs to a different track's pad. Empty when shuffle is off, which is why
+    the mismatch was invisible in vanilla seeds and in every test that never
+    shuffled.
+    """
+    pad_ids = getattr(world, "warp_pad_ids", {})
+    id_to_track = {
+        meta["level_id"]: pad_name[: -len(" Warp Pad")]
+        for pad_name, meta in pad_ids.items()
+        if pad_name.endswith(" Warp Pad")
+    }
+    out = {}
+    for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
+        if not pad_name.endswith(" Warp Pad"):
+            continue
+        dest_track = id_to_track.get(dest_lid)
+        if dest_track is not None:
+            out[dest_track] = pad_name
+    return out
+
+
 def _track_dest_resolver(world):
     """Return f(track_levelID) -> the LevelID currently LOADED at that vanilla
     pad after destination shuffle (Icebound's level_links[original]==current).
@@ -765,6 +795,12 @@ def create_regions(world: "ctrAPWorld"):
     world.ctr_racer_locks = (
         characters.reconstruct_racer_locks_from_wire(world, ut_passthrough)
         if ut_passthrough else characters.resolve_racer_locks(world))
+
+    # Stored beside the locks, under the same "draw once, store, never
+    # recompute" rule, because every capability reader needs to go from a TRACK
+    # to the racer its pad demands and cannot do that from the lock map alone.
+    # Built after the pad map is final, so it reflects this seed's destinations.
+    world.ctr_pad_by_destination = _build_pad_by_destination(world)
 
     _log_never_created_excludes(world)
 
