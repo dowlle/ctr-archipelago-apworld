@@ -2,8 +2,7 @@
 
 Both packs are staged, ruled shape-for-shape: `off` (no items, byte-identical
 to a pre-#12/#13 seed) / `shared_global` (one set of chains for every
-character) / `per_character` (a separate set of chains per racer, issue #71
-blocked -- see PER_CHARACTER_BLOCKED_MESSAGE below).
+character) / `per_character` (a separate set of chains per racer).
 
 ROSTER is the 16 playable racers, source-verified against
 `ctr-native-ap`/`ctr-native-spike` decomp (`game/zGlobal_DATA.c`, the
@@ -14,11 +13,11 @@ roster anywhere else (the character-swap feature itself is still an unfiled
 parent issue), so this module is the first place one is written down; keep it
 in sync if that future work settles a different canonical list.
 
-ITEM SUPPLY (0.2.0 spine-1 order scope: apworld-only, pool/fill correctness
-only -- no track logic reads a tier yet, and none of these items are
-`progression`; they ride as `useful` filler-replacement content, the same
-classification shape trap items use, so a location's own access rule can
-never depend on receiving one).
+ITEM SUPPLY AND LOGIC
+---------------------
+The frozen table keeps these option-created items at count 0 and classification
+`useful`. `ctrAPWorld.create_item` upgrades exactly the active chains that a
+seed's capability rules read to `progression`.
 
   * shared_global: Progressive Boost (up to 3 copies) + 3 stat chains x4
     copies (12) = up to 15 new pool items. Verified against CTR's own
@@ -27,14 +26,10 @@ never depend on receiving one).
     101-location floor with podium fully off AND both packs maxed, so
     `raise_if_capability_items_exceed_location_supply` below guards that
     combination with a clean OptionError instead of a raw FillError.
-  * per_character: 16x the shared_global pool (Boost up to 48, stats 192) --
-    up to 240 new items against the SAME <=181-location ceiling. Structurally
-    infeasible without new locations (issue #71's own "size the rung budget
-    to the item pool" is exactly the unbuilt reconciliation this needs), so
-    `raise_if_per_character_mode_selected` rejects the option value outright
-    at generate_early rather than emitting a world that can never generate.
-    The item names + #168 codes are minted now anyway (data/items.json) so
-    the eventual #71 fix does not force a second naming/manifest pass.
+  * per_character: 16x the shared_global pool (Boost up to 48, stats 192),
+    up to 240 new items. Authored item-box locations now provide enough supply
+    for rich seeds; the same live per-seed supply guard rejects combinations
+    that still cannot seat the selected packs.
 """
 from typing import Dict, List, Tuple
 
@@ -58,15 +53,6 @@ BOOST_CHAIN = "Progressive Boost"
 BOOST_COPIES_NO_BLUE_FIRE = 2   # no boost / boost / USF
 BOOST_COPIES_BLUE_FIRE = 3      # + blue fire capstone
 
-PER_CHARACTER_BLOCKED_MESSAGE = (
-    "CTR '{option_name}' 'per_character' is not generatable yet: CTR's "
-    "live location supply cannot place the 192-240 additional per-character "
-    "items without real item-box locations. Adaptive podium sizing is live, "
-    "but #109 must first seat box locations before this mode can be checked "
-    "against their per-seed supply. Use 'shared_global' instead, or wait for "
-    "#109.")
-
-
 def boost_item_name(character: str = None) -> str:
     return BOOST_CHAIN if character is None else f"{BOOST_CHAIN} ({character})"
 
@@ -76,41 +62,142 @@ def stat_item_name(chain: str, character: str = None) -> str:
     return chain if character is None else f"{chain} ({character})"
 
 
-def raise_if_per_character_mode_selected(world) -> None:
-    """RAISE guard (issue #178 shape): reject `per_character` outright until
-    #109 provides real item-box supply. Runs in generate_early, before pool math."""
-    o = world.options
-    if o.progressive_boost.value == 2:  # ProgressiveBoostMode.option_per_character
-        raise OptionError(PER_CHARACTER_BLOCKED_MESSAGE.format(
-            option_name="progressive_boost"))
-    if o.progressive_stats.value == 2:  # ProgressiveStatsMode.option_per_character
-        raise OptionError(PER_CHARACTER_BLOCKED_MESSAGE.format(
-            option_name="progressive_stats"))
+# Per-character item names, built once. `gate_satisfied` runs inside AP's fill
+# sweep and re-derived these f-strings 14.3 million times on one archived
+# timing-out seed (2026-08-16 fuzz receipt, seed 1508); the tables make that a
+# dict lookup. Same strings as the two helpers above, which stay the public
+# spelling for every caller outside the hot loop.
+BOOST_NAME_BY_CHARACTER: Dict[str, str] = {
+    character: boost_item_name(character) for character in ROSTER
+}
+STAT_NAME_BY_CHARACTER: Dict[str, Dict[str, str]] = {
+    character: {chain: stat_item_name(chain, character) for chain in STAT_CHAINS}
+    for character in ROSTER
+}
+SHARED_STAT_NAME: Dict[str, str] = {chain: chain for chain in STAT_CHAINS}
+
+
+def track_required_character(world, track: str):
+    """Return the racer lock for a trophy track, if this seed assigned one.
+
+    ``ctr_racer_locks`` is keyed by entrance names such as
+    ``Crash Cove Warp Pad``. Capability rules are keyed by region/track names,
+    so this conversion belongs in one shared helper rather than being
+    re-derived by each reader.
+    """
+    locks = getattr(world, "ctr_racer_locks", {}) or {}
+    return locks.get(f"{track} Warp Pad")
 
 
 def created_item_counts(world) -> Dict[str, int]:
-    """{item name: count to create THIS seed} for both packs, shared_global
-    only (per_character never reaches here -- generate_early already raised).
-    Empty dict when both packs are off (byte-identical to a pre-#12/#13
-    seed: no entry means create_items adds nothing and takes no RNG draw for
-    this feature)."""
+    """{item name: count to create THIS seed} for both ownership modes."""
     o = world.options
     out: Dict[str, int] = {}
     if o.progressive_boost.value == 1:  # shared_global
         n = BOOST_COPIES_BLUE_FIRE if o.progressive_boost_blue_fire.value \
             else BOOST_COPIES_NO_BLUE_FIRE
         out[boost_item_name()] = n
+    elif o.progressive_boost.value == 2:  # per_character
+        n = BOOST_COPIES_BLUE_FIRE if o.progressive_boost_blue_fire.value \
+            else BOOST_COPIES_NO_BLUE_FIRE
+        for character in ROSTER:
+            out[boost_item_name(character)] = n
     if o.progressive_stats.value == 1:  # shared_global
         for chain in STAT_CHAINS:
             out[stat_item_name(chain)] = STAT_COPIES_PER_CHAIN
+    elif o.progressive_stats.value == 2:  # per_character
+        for character in ROSTER:
+            for chain in STAT_CHAINS:
+                out[stat_item_name(chain, character)] = STAT_COPIES_PER_CHAIN
     return out
 
 
+def gate_satisfied(world, state, player, *, boost_min: int = 0,
+                   stat_mins: Dict[str, int] = None,
+                   required_character: str = None) -> bool:
+    """Evaluate one capability gate under the #252 single-racer ruling.
+
+    A locked gate tests only its required racer. An unlocked gate existentially
+    tests every currently driveable racer. All boost and stat requirements are
+    checked inside that single racer iteration, so they cannot be split across
+    characters.
+
+    SHARED-MODE COLLAPSE. When neither pack is `per_character`, every candidate
+    reads the SAME item names, so the sixteen iterations are sixteen identical
+    evaluations. The existential then collapses to "the shared counts hold" AND
+    "some candidate is driveable" -- and the starting character is never skipped
+    by the unlock filter, so an unlocked gate always has one. Evaluating the
+    counts once is an identity, not a relaxation: the loop below returns exactly
+    the same answer. It matters because this function is on AP's fill sweep.
+    """
+    from . import characters
+
+    stat_mins = stat_mins or {}
+    boost_mode = int(world.options.progressive_boost.value)
+    stats_mode = int(world.options.progressive_stats.value)
+    check_boost = bool(boost_min and boost_mode)
+    check_stats = bool(stats_mode and stat_mins)
+
+    if not check_boost and not check_stats:
+        # Nothing to test per racer; the loop below would return True on its
+        # first driveable candidate, and the start racer always is one.
+        if required_character is None:
+            return True
+
+    unlocks_on = characters.unlocks_enabled(world)
+    start = world.ctr_starting_character
+
+    if required_character is None and boost_mode != 2 and stats_mode != 2:
+        if check_boost and state.count(BOOST_CHAIN, player) < boost_min:
+            return False
+        if check_stats:
+            for chain, minimum in stat_mins.items():
+                if state.count(SHARED_STAT_NAME[chain], player) < minimum:
+                    return False
+        return True
+
+    candidates = (required_character,) if required_character is not None else ROSTER
+    for character in candidates:
+        if unlocks_on and character != start \
+                and not state.has(characters.unlock_item_name(character), player):
+            continue
+
+        if check_boost:
+            boost_name = (BOOST_NAME_BY_CHARACTER[character]
+                          if boost_mode == 2 else BOOST_CHAIN)
+            if state.count(boost_name, player) < boost_min:
+                continue
+
+        stats_ok = True
+        if check_stats:
+            names = (STAT_NAME_BY_CHARACTER[character]
+                     if stats_mode == 2 else SHARED_STAT_NAME)
+            for chain, minimum in stat_mins.items():
+                if state.count(names[chain], player) < minimum:
+                    stats_ok = False
+                    break
+        if stats_ok:
+            return True
+    return False
+
+
+def unlock_items_are_logic_inputs(world) -> bool:
+    """Whether per-character gates can make racer ownership progression."""
+    if not getattr(world, "ctr_starting_character", None):
+        return False
+    if not bool(world.options.character_unlocks.value):
+        return False
+    if int(world.options.progressive_boost.value) == 2:
+        return True  # static USF finish gates always read boost
+    return (int(world.options.progressive_stats.value) == 2
+            and bool(world.options.box_locations.value)
+            and int(world.options.shortcut_knowledge.value) == 2)
+
+
 def raise_if_capability_items_exceed_location_supply(world, *, available_supply: int) -> None:
-    """RAISE guard: the shared_global pack(s) must fit in THIS seed's actual
+    """RAISE guard: the selected capability pack(s) must fit in THIS seed's actual
     location supply alongside everything else already in the pool. Scoped to
-    shared_global only (per_character already raises earlier). `available_supply`
-    is the caller's live count (mirrors elastic_bounds.py's own convention of
+    `available_supply` is the caller's live count (mirrors elastic_bounds.py's convention of
     never restating a location count as a local constant) -- pass the seed's
     real `len(mw.get_unfilled_locations(player))` from create_items."""
     counts = created_item_counts(world)
@@ -125,12 +212,14 @@ def raise_if_capability_items_exceed_location_supply(world, *, available_supply:
     # combination (arenas off, gems pinned, relic counts lowered, ...) instead
     # of restating CTR's ~99-fixed baseline here.
     if available_supply < added:
+        boost_mode = world.options.progressive_boost.current_key
+        stats_mode = world.options.progressive_stats.current_key
         raise OptionError(
             f"CTR: Progressive Boost / Progressive Stats would add {added} "
-            f"item(s) to the pool ({', '.join(f'{v}x {k}' for k, v in counts.items())}), "
+            f"item(s) to the pool (boost={boost_mode}, stats={stats_mode}), "
             f"but this seed has only {available_supply} unfilled location(s) "
-            f"left for them. Turn on Podium Placement Checks (adds up to 80 "
-            f"more locations), turn off Progressive Boost: Blue Fire, or set "
+            f"left for them. Turn on Item Box Locations or Podium Placement "
+            f"Checks, turn off Progressive Boost: Blue Fire, or set "
             f"Progressive Boost / Progressive Stats to 'off'.")
 
 
@@ -139,10 +228,8 @@ def fill_slot_data(world) -> Dict[str, object]:
     boost_blue_fire, stats_mode. No schema_version bump (Q28 standing
     ruling already makes 7 unconditional on every 0.2.0 seed regardless of
     any one feature's own needs); native ignores unknown keys by explicit
-    named lookup (slot_data Contract Sec.3), so a pre-this-feature native
-    simply never reads them -- no native consumer exists yet (apworld-only
-    order scope), which is honest and forward-compatible: the day a native
-    consumer lands it reads exactly these three keys, unchanged."""
+    named lookup (slot_data Contract Sec.3). The native per-character consumer
+    already reads these unchanged scalar modes, so no new wire field is needed."""
     o = world.options
     return {
         "boost_mode": o.progressive_boost.value,

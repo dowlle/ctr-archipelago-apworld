@@ -246,6 +246,16 @@ def apply_rung_sizing(world) -> Optional[str]:
     target = required_categories(world)
     current = category_count(world.options)
     if target is None:
+        capability_added = sum(
+            progressive_capability.created_item_counts(world).values())
+        if capability_added:
+            total_demand = predicted_mandatory_pool(world)
+            total_demand += predicted_goal_excluded_reserve(world.options)
+            total_demand += len(world.options.exclude_locations.value)
+            maximum_supply = _base_location_supply(world) + len(TROPHY_TRACKS) * 5
+            progressive_capability.raise_if_capability_items_exceed_location_supply(
+                world, available_supply=max(
+                    0, maximum_supply - (total_demand - capability_added)))
         raise OptionError(
             "CTR: the current mandatory item pool exceeds the full five-category "
             "Podium Rung ladder. Disable an item-pool option or add a live "

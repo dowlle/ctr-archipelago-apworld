@@ -60,7 +60,12 @@ rules are rebuilt, so a tracker session evaluates the identical gate.
 """
 from typing import Dict, List
 
-from .progressive_capability import BOOST_CHAIN
+from .capability_contract import (
+    held_first_gated_tracks,
+    unconditional_usf_finish_tracks,
+    usf_or_hard_finish_tracks,
+)
+from .progressive_capability import gate_satisfied, track_required_character
 
 #: Received `Progressive Boost` copies that put a player at the USF rank.
 USF_BOOST_COUNT = 2
@@ -68,25 +73,50 @@ USF_BOOST_COUNT = 2
 #: Track region names whose finish line needs USF. One entry today; the shape is
 #: a set because the marking pass may find more (N. Gin Labs is the standing
 #: suspect) and every consumer already iterates.
-USF_FINISH_TRACKS = frozenset({"Hot Air Skyway"})
+USF_FINISH_TRACKS = unconditional_usf_finish_tracks()
 
+#: Tracks whose finish needs USF UNLESS the seed declared hard shortcut
+#: knowledge (see OXIDE STATION above). These also gate their `Held 1st` rung.
+USF_OR_HARD_SK_FINISH_TRACKS = usf_or_hard_finish_tracks()
 
-def usf_term(options):
+#: Every finish-gated track, whatever the term shape.
+ALL_USF_FINISH_TRACKS = USF_FINISH_TRACKS | USF_OR_HARD_SK_FINISH_TRACKS
+
+def usf_term(world, required_character=None):
     """The `(state, player) -> bool` term for "can finish a USF-gated track".
 
     Always-True when the boost chain is not randomized (see VACUITY above), so
     callers can AND it unconditionally instead of branching on the option.
     """
-    if not bool(options.progressive_boost.value):
+    if not bool(world.options.progressive_boost.value):
         return lambda state, player: True
-    return lambda state, player: state.count(BOOST_CHAIN, player) >= USF_BOOST_COUNT
+    return lambda state, player: gate_satisfied(
+        world, state, player, boost_min=USF_BOOST_COUNT,
+        required_character=required_character)
+
+
+def track_finish_term(track, world):
+    """Return this track's option-aware and racer-aware finish term."""
+    from .item_boxes import SK_HARD
+    if (track in USF_OR_HARD_SK_FINISH_TRACKS
+            and int(world.options.shortcut_knowledge.value) == SK_HARD):
+        return lambda state, player: True
+    required_character = track_required_character(world, track)
+    return usf_term(world, required_character)
 
 
 def usf_finish_cups(cup_legs: Dict[str, List[str]]) -> frozenset:
     """The cup region names whose completion includes finishing a USF track,
     for this seed's resolved `gem_cup_legs` map."""
     return frozenset(cup for cup, legs in cup_legs.items()
-                     if USF_FINISH_TRACKS.intersection(legs))
+                     if ALL_USF_FINISH_TRACKS.intersection(legs))
+
+
+def cup_finish_term(legs, world):
+    """Compose the finish terms for every capability-gated leg in a cup."""
+    terms = [track_finish_term(track, world)
+             for track in legs if track in ALL_USF_FINISH_TRACKS]
+    return lambda state, player: all(term(state, player) for term in terms)
 
 
 class UsfFinishGate:
@@ -102,8 +132,13 @@ class UsfFinishGate:
 
     def __init__(self, world):
         from .gem_cup_legs import resolved_gem_cup_legs
-        self.term = usf_term(world.options)
-        self.cups = usf_finish_cups(resolved_gem_cup_legs(world))
+        legs = resolved_gem_cup_legs(world)
+        self.term = usf_term(world)
+        self.cups = usf_finish_cups(legs)
+        self._track_terms = {track: track_finish_term(track, world)
+                             for track in ALL_USF_FINISH_TRACKS}
+        self._cup_terms = {cup: cup_finish_term(legs[cup], world)
+                           for cup in self.cups}
         self._raceable = {}
 
     def install(self, world, player):
@@ -115,7 +150,7 @@ class UsfFinishGate:
         """
         mw = world.multiworld
         names = {loc.name for loc in mw.get_locations(player)}
-        for track in sorted(USF_FINISH_TRACKS):
+        for track in sorted(ALL_USF_FINISH_TRACKS):
             name = f"{track}: Trophy Race"
             if name not in names:
                 continue
@@ -129,7 +164,8 @@ class UsfFinishGate:
                 lambda state, r=loc.parent_region, b=base: r.can_reach(state) and b(state)
             )
             loc.access_rule = (
-                lambda state, b=base, t=self.term, p=player: b(state) and t(state, p)
+                lambda state, b=base, t=self._track_terms[track], p=player:
+                b(state) and t(state, p)
             )
         for cup in sorted(self.cups):
             gem = f"{cup}: Gem"
@@ -138,7 +174,8 @@ class UsfFinishGate:
             loc = mw.get_location(gem, player)
             base = loc.access_rule
             loc.access_rule = (
-                lambda state, b=base, t=self.term, p=player: b(state) and t(state, p)
+                lambda state, b=base, t=self._cup_terms[cup], p=player:
+                b(state) and t(state, p)
             )
 
     def raceable_rule(self, track):
@@ -146,3 +183,17 @@ class UsfFinishGate:
         this gate does not cover. Used by the held podium rungs, which fire
         during the race and so must not inherit the finish term."""
         return self._raceable.get(track)
+
+    def held_first_term(self, track):
+        """The extra term `Held 1st` carries on tracks where holding 1st bare
+        is ruled unrealistic (Oxide Station), or None everywhere else --
+        including Hot Air Skyway, whose held rungs are empirically bare-
+        reachable and stay free."""
+        if track in held_first_gated_tracks():
+            return self._track_terms[track]
+        return None
+
+    def cup_term(self, cup):
+        """The composed finish term for one gated cup (always-True callables
+        collapse the AND where terms are vacuous)."""
+        return self._cup_terms[cup]

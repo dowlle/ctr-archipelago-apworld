@@ -1,5 +1,4 @@
-"""The Hot Air Skyway USF finish gate and its propagation (ruled
-2026-08-12 21:33-21:36, live v3 session on seed 89642014421032427840).
+"""Confirmed USF finish gates and their propagation.
 
 Finishing Hot Air Skyway at all needs USF (two received `Progressive Boost`).
 The one-line version of that gate leaks, which is what these tests pin: the
@@ -10,6 +9,7 @@ Every path is exercised here, together with the two exemptions the session's own
 data forced -- the live-position held rungs, and the whole gate collapsing to
 vacuous when the boost chain is not randomized.
 """
+import collections
 import unittest
 
 from BaseClasses import CollectionState
@@ -19,16 +19,17 @@ from .. import ctrAPWorld
 from ..gem_cup_legs import load_vanilla_cup_legs
 from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
-from ..usf_finish import USF_BOOST_COUNT, USF_FINISH_TRACKS, usf_finish_cups
+from ..progressive_capability import boost_item_name
+from ..usf_finish import (ALL_USF_FINISH_TRACKS, USF_BOOST_COUNT,
+                          USF_FINISH_TRACKS, usf_finish_cups)
 from . import CTRTestBase
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
 BOOST = "Progressive Boost"
 HAS = "Hot Air Skyway"
-#: The two vanilla cups that run Hot Air Skyway as a leg. Asserted against the
-#: transcribed table in TestGatedCupSelection rather than trusted from here.
-VANILLA_GATED_CUPS = ("Yellow Gem Cup", "Purple Gem Cup")
+#: Vanilla cups containing any track with a confirmed finish gate.
+VANILLA_GATED_CUPS = ("Green Gem Cup", "Yellow Gem Cup", "Purple Gem Cup")
 
 
 def _build(seed=1, **options):
@@ -41,7 +42,7 @@ def _state(mw, boost=0):
     satisfied, so a False verdict can only come from the gate."""
     state = CollectionState(mw)
     for item in mw.worlds[PLAYER]._item_data_by_name:
-        if item != BOOST:
+        if item != BOOST and not item.startswith(f"{BOOST} ("):
             state.add_item(item, PLAYER, 99)
     if boost:
         state.add_item(BOOST, PLAYER, boost)
@@ -58,9 +59,15 @@ class _FakeState:
     REAL installed rule be evaluated on a topology no option combination can
     produce (one cup reachable, the track's own pad shut)."""
 
-    def __init__(self, reachable=(), boost=0):
+    def __init__(self, reachable=(), boost=0, regions=()):
         self.reachable = set(reachable)
         self.boost = boost
+        # A rung's own-track branch is now the Trophy Race's captured pre-gate
+        # rule, which asks the REGION object directly rather than resolving a
+        # location name through the state. Same "exactly what is named is
+        # reachable" contract, expressed the way `Region.can_reach` reads it.
+        self.stale = collections.defaultdict(bool)
+        self.reachable_regions = collections.defaultdict(set, {PLAYER: set(regions)})
 
     def can_reach(self, spot, resolution_hint=None, player=None):
         return (spot, resolution_hint) in self.reachable
@@ -68,15 +75,18 @@ class _FakeState:
     def count(self, item, player):
         return self.boost if item == BOOST else 0
 
+    def has(self, item, player, count=1):
+        return True
+
 
 class TestGatedCupSelection(unittest.TestCase):
     """Which cups the gate covers is a per-seed question about the leg map."""
 
-    def test_vanilla_legs_gate_exactly_yellow_and_purple(self):
+    def test_vanilla_legs_gate_exactly_confirmed_cups(self):
         legs = load_vanilla_cup_legs()
         self.assertEqual(usf_finish_cups(legs), frozenset(VANILLA_GATED_CUPS))
         for cup in VANILLA_GATED_CUPS:
-            self.assertIn(HAS, legs[cup])
+            self.assertTrue(ALL_USF_FINISH_TRACKS.intersection(legs[cup]))
 
     def test_a_synthetic_map_gates_by_membership_only(self):
         legs = {"Red Gem Cup": [HAS, HAS, HAS, HAS],
@@ -105,11 +115,24 @@ class TestTrophyRaceGate(unittest.TestCase):
         self.assertFalse(_reachable(mw, _state(mw, boost=1), name))
         self.assertTrue(_reachable(mw, _state(mw, boost=USF_BOOST_COUNT), name))
 
+    def test_per_character_usf_must_belong_to_one_driveable_racer(self):
+        mw = _build(progressive_boost="per_character",
+                    character_unlocks=False)
+        name = f"{HAS}: Trophy Race"
+        state = _state(mw)
+        first = mw.worlds[PLAYER].ctr_starting_character
+        second = "Coco Bandicoot" if first != "Coco Bandicoot" else "Polar"
+        state.add_item(boost_item_name(first), PLAYER, 1)
+        state.add_item(boost_item_name(second), PLAYER, 1)
+        self.assertFalse(_reachable(mw, state, name))
+        state.add_item(boost_item_name(first), PLAYER, 1)
+        self.assertTrue(_reachable(mw, state, name))
+
     def test_no_other_track_is_gated(self):
         mw = _build(progressive_boost="shared_global")
         state = _state(mw, boost=0)
         for track in TROPHY_TRACKS:
-            if track in USF_FINISH_TRACKS:
+            if track in ALL_USF_FINISH_TRACKS:
                 continue
             with self.subTest(track=track):
                 self.assertTrue(_reachable(mw, state, f"{track}: Trophy Race"))
@@ -185,21 +208,23 @@ class TestPodiumRungs(unittest.TestCase):
                     _reachable(mw, blocked, location_name("Crash Cove", key)))
 
     def test_cup_branch_of_a_leg_track_carries_the_term(self):
-        """A DIFFERENT track's rung reached only through a cup that also legs
-        Hot Air Skyway. Roo's Tubes is legged by Green (ungated) and Purple
-        (gated) in vanilla, so the two branches are separable."""
+        """A different track's rung reached through a gated or plain cup.
+
+        Papu's Pyramid is legged by Red (plain) and Purple (gated), so the two
+        branches remain separable after Cortex Castle gates Green.
+        """
         mw = _build(progressive_boost="shared_global")
         rule = mw.get_location(
-            location_name("Roo's Tubes", "finish_podium"), PLAYER).access_rule
+            location_name("Papu's Pyramid", "finish_podium"), PLAYER).access_rule
         purple = [("Purple Gem Cup", "Region")]
-        green = [("Green Gem Cup", "Region")]
+        red = [("Red Gem Cup", "Region")]
         self.assertFalse(rule(_FakeState(purple, boost=0)))
         self.assertFalse(rule(_FakeState(purple, boost=1)))
         self.assertTrue(rule(_FakeState(purple, boost=USF_BOOST_COUNT)))
         # The ungated cup and the track's own trophy path stay boost-free.
-        self.assertTrue(rule(_FakeState(green, boost=0)))
+        self.assertTrue(rule(_FakeState(red, boost=0)))
         self.assertTrue(rule(_FakeState(
-            [("Roo's Tubes: Trophy Race", "Location")], boost=0)))
+            boost=0, regions=[mw.get_region("Papu's Pyramid", PLAYER)])))
 
     def test_cup_branches_are_ungated_when_the_pack_is_off(self):
         mw = _build()
@@ -219,7 +244,7 @@ class TestGemCupCompletion(unittest.TestCase):
         for cup, legs in load_vanilla_cup_legs().items():
             with self.subTest(cup=cup):
                 name = f"{cup}: Gem"
-                if HAS in legs:
+                if ALL_USF_FINISH_TRACKS.intersection(legs):
                     self.assertFalse(_reachable(mw, blocked, name))
                     self.assertTrue(_reachable(mw, cleared, name))
                 else:
@@ -244,8 +269,9 @@ class TestGemCupCompletion(unittest.TestCase):
             for cup, cup_legs in legs.items():
                 with self.subTest(seed=seed, cup=cup):
                     name = f"{cup}: Gem"
-                    self.assertEqual(_reachable(mw, blocked, name),
-                                     HAS not in cup_legs)
+                    self.assertEqual(
+                        _reachable(mw, blocked, name),
+                        not ALL_USF_FINISH_TRACKS.intersection(cup_legs))
                     self.assertTrue(_reachable(mw, cleared, name))
 
 

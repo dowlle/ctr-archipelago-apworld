@@ -174,12 +174,10 @@ class ProgressiveBoostMode(Choice):
       second copy.
     - **per_character**: each of the 16 racers gets its own separate chain
       (16x the shared-global pool size), per the 2026-08-07 completability
-      ruling. **Not yet generatable**: CTR's current location supply cannot
-      place that many additional items without new locations (issue #71,
-      unbuilt), so this value raises a clear OptionError at generation
-      instead of silently overflowing or under-filling. The names and codes
-      are already reserved on the datapackage so #71's landing does not need
-      a second naming pass."""
+      ruling. Gates use the required racer on racer-locked tracks and any
+      currently driveable racer elsewhere. One racer must satisfy every
+      capability term on a gate. Rich item-box seeds can seat the private
+      pool; insufficient combinations raise a supply-specific OptionError."""
     # Classification: `useful` (the spine-1 shape) while this option is off,
     # `progression` in every seed that randomizes the chain. It started
     # per-seed -- #145's Turbo checks and #109's boost-gated box slots were
@@ -205,6 +203,28 @@ class ProgressiveBoostBlueFire(Toggle):
     display_name = "Progressive Boost: Blue Fire"
 
 
+class LogicDifficulty(Choice):
+    """How much capability logic expects for demanding race checks.
+
+    - **easy**: use the conservative ruled gates. On the seven confirmed
+      easy-category tracks, the Trophy Race, Finish on Podium and Held 1st
+      require basic Boost or two useful weapon families.
+    - **medium** (default): apply that requirement to the Trophy Race only;
+      placement rungs remain available at the demonstrated floor.
+    - **hard**: expect the demonstrated floor win and add no capability gate
+      to those seven tracks.
+
+    Intrinsic geometry gates are independent of this preference. Cortex Castle
+    and Hot Air Skyway still need USF at every difficulty; Oxide Station still
+    needs USF unless Shortcut Knowledge is hard.
+    """
+    display_name = "Logic Difficulty"
+    option_easy = 0
+    option_medium = 1
+    option_hard = 2
+    default = 1
+
+
 class ProgressiveStatsMode(Choice):
     """Stage the Progressive Speed / Acceleration / Turning chains (issue
     #13, ruled 07-16 + the 07-26 update + the 2026-08-07 five-rank ladder
@@ -222,11 +242,9 @@ class ProgressiveStatsMode(Choice):
       best vanilla character. Character choice becomes cosmetic for these
       three stats while this mode is active.
     - **per_character**: each of the 16 racers gets its own separate set of
-      three chains (192 items total), per the 2026-08-07 ruling. **Not yet
-      generatable**: see `Progressive Boost`'s per_character note -- same
-      issue #71 location-supply blocker, same reserved-names precedent."""
-    # Same deliberate non-gating as ProgressiveBoostMode: pool/fill
-    # correctness only, no track logic reads a stat tier yet.
+      three chains (192 items total), per the 2026-08-07 ruling. The same
+      single-driveable-racer semantics as Progressive Boost apply. Hard-tier
+      item-box gates read all three stat chains from that one racer."""
     display_name = "Progressive Stats"
     option_off = 0
     option_shared_global = 1
@@ -909,6 +927,7 @@ class ctrAPOptions(PerGameCommonOptions):
     progressive_boost: ProgressiveBoostMode
     progressive_boost_blue_fire: ProgressiveBoostBlueFire
     progressive_stats: ProgressiveStatsMode
+    logic_difficulty: LogicDifficulty
     # character phase (issues #54, #209)
     starting_character: StartingCharacter
     starting_stat_class: StartingStatClass
@@ -954,7 +973,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
                      ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
-                         ProgressiveStatsMode],
+                         ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can
     # I unlock", "can a pad demand a racer" and "who owns my stats" as one
     # decision, and the 2026-08-08 note asked for exactly this grouping.

@@ -5,6 +5,7 @@ from BaseClasses import CollectionState
 from test.general import setup_multiworld
 
 from .. import ctrAPWorld
+from .. import progressive_capability
 from ..itemsanity import (ITEMSANITY_CLASS, ITEMSANITY_CODE_BASE, ITEM_NAMES,
                           USEFUL_WEAPON_FAMILIES, WEAPONS, family_count)
 from . import CTRTestBase
@@ -92,6 +93,18 @@ class TestItemsanityAccessRules(unittest.TestCase):
         _grant(state, self.PLAYER, "Progressive Boost")
         self.assertTrue(state.can_reach("Itemsanity: Turbo", "Location", self.PLAYER))
         self.assertTrue(state.can_reach("Itemsanity: Turbo (Juiced)", "Location", self.PLAYER))
+
+    def test_turbo_reads_a_driveable_private_chain(self):
+        mw, state = self._state(progressive_boost="per_character")
+        world = mw.worlds[self.PLAYER]
+        racer = world.ctr_starting_character
+        _grant(state, self.PLAYER, "Turbo")
+        self.assertFalse(state.can_reach(
+            "Itemsanity: Turbo", "Location", self.PLAYER))
+        state.add_item(progressive_capability.boost_item_name(racer),
+                       self.PLAYER, 1)
+        self.assertTrue(state.can_reach(
+            "Itemsanity: Turbo", "Location", self.PLAYER))
 
     def test_every_non_turbo_pair_requires_its_weapon_only(self):
         for weapon in WEAPONS[1:]:

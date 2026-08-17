@@ -227,7 +227,10 @@ def unlock_classification(world) -> ItemClassification:
     a character still opens options (and, under per_character capability modes,
     access to that racer's chains), so it is not dead padding.
     """
-    return (ItemClassification.progression if racer_locks_enabled(world)
+    from . import progressive_capability
+    return (ItemClassification.progression
+            if (racer_locks_enabled(world)
+                or progressive_capability.unlock_items_are_logic_inputs(world))
             else ItemClassification.useful)
 
 
