@@ -115,12 +115,14 @@ def add_capability_difficulty_rules(world, player):
         required_character = track_required_character(world, track)
 
         def capability_rule(state, p=player, racer=required_character):
-            boost_ok = gate_satisfied(
-                world, state, p, boost_min=1, required_character=racer)
-            useful = family_count(state, p, USEFUL_WEAPON_FAMILIES)
-            if state.has("Turbo", p) and boost_ok:
-                useful += 1
-            return boost_ok or useful >= 2
+            # Boost first and alone: the Turbo bonus below only ever applied
+            # when `boost_ok` was already True, i.e. when the OR had already
+            # short-circuited, so counting weapon families in that branch was
+            # always dead work. Same answer, one term instead of two.
+            if gate_satisfied(world, state, p, boost_min=1,
+                              required_character=racer):
+                return True
+            return family_count(state, p, USEFUL_WEAPON_FAMILIES) >= 2
 
         gated = [f"{track}: Trophy Race"]
         if difficulty == 0:  # easy
@@ -228,7 +230,8 @@ def add_item_box_rules(world, player):
     """
     from .item_boxes import (BOX_RULES, ITEM_BOX_CLASS,
                              TIGER_TEMPLE_DOOR_OPENERS)
-    from .progressive_capability import STAT_CHAINS, gate_satisfied
+    from .progressive_capability import (STAT_CHAINS, gate_satisfied,
+                                         track_required_character)
 
     created = set(ITEM_BOX_CLASS.created_location_names(world.options))
     if not created:
@@ -250,7 +253,11 @@ def add_item_box_rules(world, player):
         if not need_boost and not need_stats and door is None:
             continue
 
-        required_character = (getattr(world, "ctr_racer_locks", {}) or {}).get(track)
+        # `ctr_racer_locks` is keyed by pad ENTRANCE name, not track name, so a
+        # bare `.get(track)` never matched and every locked track's box gate
+        # silently fell through to the any-driveable-racer arm. Route through
+        # the one shared converter, as usf_finish and the difficulty rule do.
+        required_character = track_required_character(world, track)
         stat_mins = ({chain: 1 for chain in STAT_CHAINS} if need_stats else {})
 
         def _rule(state, p=player, need_boost=need_boost,
@@ -576,17 +583,37 @@ def add_podium_placement_rules(world, player, usf_gate):
         gated_cups = tuple((c, usf_gate.cup_term(c))
                            for c in cups if c in usf_gate.cups)
         raceable = usf_gate.raceable_rule(track)
+        if raceable is None:
+            # Not a USF-gated track, so nothing captured its pre-gate rule yet.
+            # Capture it here, for the same reason UsfFinishGate does: the
+            # logic_difficulty gate installs AFTER this function and wraps the
+            # Trophy Race LOCATION, so a rung that reached the track through
+            # `can_reach(<track>: Trophy Race)` silently inherited a
+            # win-the-race requirement that `LogicDifficulty` documents as
+            # applying to the Trophy Race only.
+            trophy_loc = mw.get_location(trophy_name, player)
+            raceable = (
+                lambda state, r=trophy_loc.parent_region,
+                b=trophy_loc.access_rule: r.can_reach(state) and b(state)
+            )
+            gate_finish_rungs = False
+        else:
+            # USF track: its finish rungs DO cross the gated line, so they keep
+            # routing through the now-gated location. The easy-group difficulty
+            # set and the USF finish set are disjoint, so nothing here can pick
+            # up a difficulty gate by that route.
+            gate_finish_rungs = True
         for rung_key in rung_keys:
             name = location_name(track, rung_key)
             if name not in all_names:
                 continue
-            if raceable is not None and rung_key not in FINISH_RUNG_KEYS:
-                track_branch = raceable
-            else:
+            if gate_finish_rungs and rung_key in FINISH_RUNG_KEYS:
                 track_branch = (
                     lambda state, t=trophy_name, p=player:
                     state.can_reach(t, "Location", p)
                 )
+            else:
+                track_branch = raceable
             held_term = (usf_gate.held_first_term(track)
                          if rung_key == "held_1st" else None)
             mw.get_location(name, player).access_rule = _rung_rule(

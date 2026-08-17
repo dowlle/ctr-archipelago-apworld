@@ -62,6 +62,21 @@ def stat_item_name(chain: str, character: str = None) -> str:
     return chain if character is None else f"{chain} ({character})"
 
 
+# Per-character item names, built once. `gate_satisfied` runs inside AP's fill
+# sweep and re-derived these f-strings 14.3 million times on one archived
+# timing-out seed (2026-08-16 fuzz receipt, seed 1508); the tables make that a
+# dict lookup. Same strings as the two helpers above, which stay the public
+# spelling for every caller outside the hot loop.
+BOOST_NAME_BY_CHARACTER: Dict[str, str] = {
+    character: boost_item_name(character) for character in ROSTER
+}
+STAT_NAME_BY_CHARACTER: Dict[str, Dict[str, str]] = {
+    character: {chain: stat_item_name(chain, character) for chain in STAT_CHAINS}
+    for character in ROSTER
+}
+SHARED_STAT_NAME: Dict[str, str] = {chain: chain for chain in STAT_CHAINS}
+
+
 def track_required_character(world, track: str):
     """Return the racer lock for a trophy track, if this seed assigned one.
 
@@ -106,36 +121,59 @@ def gate_satisfied(world, state, player, *, boost_min: int = 0,
     tests every currently driveable racer. All boost and stat requirements are
     checked inside that single racer iteration, so they cannot be split across
     characters.
+
+    SHARED-MODE COLLAPSE. When neither pack is `per_character`, every candidate
+    reads the SAME item names, so the sixteen iterations are sixteen identical
+    evaluations. The existential then collapses to "the shared counts hold" AND
+    "some candidate is driveable" -- and the starting character is never skipped
+    by the unlock filter, so an unlocked gate always has one. Evaluating the
+    counts once is an identity, not a relaxation: the loop below returns exactly
+    the same answer. It matters because this function is on AP's fill sweep.
     """
     from . import characters
 
     stat_mins = stat_mins or {}
     boost_mode = int(world.options.progressive_boost.value)
     stats_mode = int(world.options.progressive_stats.value)
+    check_boost = bool(boost_min and boost_mode)
+    check_stats = bool(stats_mode and stat_mins)
 
-    if required_character is not None:
-        candidates = (required_character,)
-    else:
-        candidates = ROSTER
+    if not check_boost and not check_stats:
+        # Nothing to test per racer; the loop below would return True on its
+        # first driveable candidate, and the start racer always is one.
+        if required_character is None:
+            return True
 
     unlocks_on = characters.unlocks_enabled(world)
     start = world.ctr_starting_character
+
+    if required_character is None and boost_mode != 2 and stats_mode != 2:
+        if check_boost and state.count(BOOST_CHAIN, player) < boost_min:
+            return False
+        if check_stats:
+            for chain, minimum in stat_mins.items():
+                if state.count(SHARED_STAT_NAME[chain], player) < minimum:
+                    return False
+        return True
+
+    candidates = (required_character,) if required_character is not None else ROSTER
     for character in candidates:
         if unlocks_on and character != start \
                 and not state.has(characters.unlock_item_name(character), player):
             continue
 
-        boost_name = (boost_item_name(character)
-                      if boost_mode == 2 else boost_item_name())
-        if boost_min and boost_mode and state.count(boost_name, player) < boost_min:
-            continue
+        if check_boost:
+            boost_name = (BOOST_NAME_BY_CHARACTER[character]
+                          if boost_mode == 2 else BOOST_CHAIN)
+            if state.count(boost_name, player) < boost_min:
+                continue
 
         stats_ok = True
-        if stats_mode:
+        if check_stats:
+            names = (STAT_NAME_BY_CHARACTER[character]
+                     if stats_mode == 2 else SHARED_STAT_NAME)
             for chain, minimum in stat_mins.items():
-                name = (stat_item_name(chain, character)
-                        if stats_mode == 2 else stat_item_name(chain))
-                if state.count(name, player) < minimum:
+                if state.count(names[chain], player) < minimum:
                     stats_ok = False
                     break
         if stats_ok:
