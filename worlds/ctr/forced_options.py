@@ -168,7 +168,7 @@ def raise_if_oxidefinal_goal_has_no_progression_tier(world):
     clamping the player's own oxide_final_challenge_relic_count down to
     whatever happened to be created."""
     from .Options import OxideGoal, FinalOxideUnlock
-    if world.options.oxide_goal.value != OxideGoal.option_final:
+    if world.options.oxide_goal.value != OxideGoal.option_101_percent:
         return
     n = world.options.oxide_final_challenge_relic_count.value
     tiers = world._oxide_goal_tiers()

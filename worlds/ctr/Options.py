@@ -752,12 +752,13 @@ class PentaStats(Choice):
     Pura's turning class. The later PAL release finished him, with top values
     in every category, which makes him the strongest racer in the game.
 
-    - **pal** (default): the maxed-out version.
-    - **ntsc**: the turning-class version, same as Polar and Pura."""
+    - **ntsc** (default): the turning-class version, same as Polar and Pura.
+    - **pal**: the maxed-out version, which makes him the strongest racer in
+      the game."""
     display_name = "Penta Penguin Stats"
     option_pal = 0
     option_ntsc = 1
-    default = 0
+    default = 1
 
 
 class EditableStats(Choice):

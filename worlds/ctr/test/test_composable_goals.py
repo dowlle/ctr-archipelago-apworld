@@ -198,7 +198,7 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
     def test_default_matches_legacy_oxide_goal(self):
         mw = _build()  # shipped default: oxide_goal=first, bosses=0, gems=0
         world = mw.worlds[1]
-        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_first)
+        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_any_percent)
         self.assertEqual(world.options.bosses_required_goal.value, 0)
         self.assertEqual(world.options.gems_required_goal.value, 0)
         self.assertEqual(world._legacy_goal_value(), 0)
@@ -352,7 +352,7 @@ class TestComposedGoalWire(CTRTestBase):
     def test_wire_carries_composed_fields(self):
         sd = self.world.fill_slot_data()
         co = sd["ctr_options"]
-        self.assertEqual(co["goal_oxide"], OxideGoal.option_first)
+        self.assertEqual(co["goal_oxide"], OxideGoal.option_any_percent)
         self.assertEqual(co["goal_bosses"], 2)
         self.assertEqual(co["goal_gems"], 0)
         self.assertEqual(co["goal"], -1)  # no legacy analogue
