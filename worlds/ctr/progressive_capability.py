@@ -78,15 +78,30 @@ SHARED_STAT_NAME: Dict[str, str] = {chain: chain for chain in STAT_CHAINS}
 
 
 def track_required_character(world, track: str):
-    """Return the racer lock for a trophy track, if this seed assigned one.
+    """Return the racer a player must be driving to be ON `track`, or None.
 
-    ``ctr_racer_locks`` is keyed by entrance names such as
-    ``Crash Cove Warp Pad``. Capability rules are keyed by region/track names,
-    so this conversion belongs in one shared helper rather than being
-    re-derived by each reader.
+    ``ctr_racer_locks`` is keyed by pad EXIT name. The question every capability
+    rule is really asking is "which racer does the pad that LOADS this track
+    demand", and under destination shuffle that pad is not the one named after
+    the track: `create_regions` keeps each exit's physical name and retargets it
+    to a shuffled destination. So the lookup goes through
+    ``ctr_pad_by_destination``, the seed's destination -> physical pad map,
+    and only falls back to the same-name pad when there is no shuffle to
+    resolve (the map is empty in vanilla, where the two coincide).
+
+    Reading the lock by track name instead was wrong in all three directions at
+    once, and all three were live in one seed on 2026-08-17: it invented a
+    requirement on a track whose pad is free (over-restrictive), it named the
+    wrong racer where both pads were locked, and -- the dangerous one -- it
+    returned None for a track behind a locked pad, letting `gate_satisfied`
+    fall through to its any-driveable-racer arm.
     """
     locks = getattr(world, "ctr_racer_locks", {}) or {}
-    return locks.get(f"{track} Warp Pad")
+    if not locks:
+        return None
+    by_dest = getattr(world, "ctr_pad_by_destination", None) or {}
+    pad = by_dest.get(track, f"{track} Warp Pad")
+    return locks.get(pad)
 
 
 def created_item_counts(world) -> Dict[str, int]:
