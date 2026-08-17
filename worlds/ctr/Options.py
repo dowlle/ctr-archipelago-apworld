@@ -7,15 +7,20 @@ from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle
 class OxideGoal(Choice):
     """What finishing the game means.
 
-    Beating Oxide is the retail ending. This decides whether that is enough,
-    or whether the seed also wants bosses beaten and gems collected first.
+    - **any_percent** (default): beat Oxide, the retail ending.
+    - **101_percent**: beat Oxide's Final Challenge, the full-completion
+      ending.
+    - **none**: Oxide is not part of the goal at all.
 
     Combine it with Bosses Required and Gems Required to build the goal you
-    want; all the conditions you set must be met."""
+    want; every condition you set must be met."""
     display_name = "Oxide Goal"
     option_none = 0
-    option_first = 1
-    option_final = 2
+    option_any_percent = 1
+    option_101_percent = 2
+    # Old names kept working so YAMLs written before the rename still load.
+    alias_first = 1
+    alias_final = 2
     default = 1
 
 
@@ -190,17 +195,16 @@ class ProgressiveBoostBlueFire(Toggle):
 class LogicDifficulty(Choice):
     """How much the logic expects you to be able to do.
 
-    This only affects seven tracks the project has actually measured, and
-    only when both Progressive Boost and Itemsanity are randomizing your
-    capabilities.
+    It only applies while both Progressive Boost and Itemsanity are
+    randomizing your capabilities.
 
-    - **easy**: winning those races, finishing on the podium and holding
-      first all wait until you have boost or a couple of decent weapons.
+    - **easy**: winning a race, finishing on the podium and holding first
+      all wait until you have boost or a couple of decent weapons.
     - **medium** (default): only winning the race waits. Placement checks
       stay available.
     - **hard**: no extra requirement; you are expected to manage.
 
-    Tracks whose geometry genuinely demands speed ignore this setting -
+    Tracks whose geometry genuinely demands speed ignore this setting.
     Cortex Castle and Hot Air Skyway always need USF, and so does Oxide
     Station unless Shortcut Knowledge is set to hard."""
     display_name = "Logic Difficulty"
@@ -743,12 +747,13 @@ class RacerLockedPads(Toggle):
 class PentaStats(Choice):
     """Which version of Penta Penguin's stats to use.
 
-    Penta is a hidden racer whose stats differ between game regions: the NTSC
-    release gives him maximum everything, the PAL release gives him ordinary
-    balanced stats.
+    Penta is the one racer whose stats differ by region. He was added very
+    late and shipped unfinished in NTSC-U, where he simply reuses Polar and
+    Pura's turning class. The later PAL release finished him, with top values
+    in every category, which makes him the strongest racer in the game.
 
-    - **ntsc**: the overpowered version.
-    - **pal** (default): the balanced version."""
+    - **pal** (default): the maxed-out version.
+    - **ntsc**: the turning-class version, same as Polar and Pura."""
     display_name = "Penta Penguin Stats"
     option_pal = 0
     option_ntsc = 1
@@ -840,34 +845,42 @@ class ctrAPOptions(PerGameCommonOptions):
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
+    # Ordered the way a player fills a YAML: what am I trying to do, then how
+    # the randomizer works, then how big the seed is, then tuning, then
+    # cosmetics. Mechanics before decoration -- pad unlocking is the heart of
+    # this randomizer and used to sit BELOW the marker-colour options.
+    #
+    # Every option must appear in exactly one group. Anything left out lands in
+    # an unlabelled bucket at the bottom of the web page, which is where
+    # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
+    # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
-            FinalOxideUnlock, FinalOxideRelicCount],
-    "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
-                     ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
+             FinalOxideUnlock, FinalOxideRelicCount],
+    "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
+                           RequirementVariety, RequirementWeights,
+                           BossGarageRequirements],
+    "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
+                         ShuffleWarpPadsBattleArenas, ShuffleWarpPadsGemCups,
+                         RandomizeGemCupTracks],
+    # The "how long is this seed" decisions, together, because they are read
+    # against each other rather than one at a time.
+    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
+                     Lettersanity, LettersPerTrack,
+                     PodiumPlacementChecks, PodiumFinishRungs,
+                     PodiumAnyPositionRung, PodiumHeldRungs,
+                     PodiumHeldFifthRung],
+    "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TiziHelper],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can
     # I unlock", "can a pad demand a racer" and "who owns my stats" as one
-    # decision, and the 2026-08-08 note asked for exactly this grouping.
+    # decision.
     "Characters": [StartingCharacter, StartingStatClass, CharacterUnlocks,
                    RacerLockedPads, PentaStats, EditableStats],
-    "Warp Pads": [
-        ShuffleWarpPadsBattleArenas,
-        WarpPadShuffleCategories,
-        WarpPadShuffleGrouping,
-        WarpPadItemDisplay,
-        ApItemTypeColors,
-        WarpPadUnlockRequirements,
-        TwoStageDensity,
-        RequirementVariety,
-        RequirementWeights,
-    ],
-    "Extra Checks": [PodiumPlacementChecks, PodiumFinishRungs,
-                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
-    "Quality of Life": [OneLapCups],
-    "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
+    "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors],
+    "DeathLink": [DeathLink, DeathLinkAmnesty],
 }
 
 def create_option_groups() -> List[OptionGroup]:
