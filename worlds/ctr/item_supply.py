@@ -11,7 +11,23 @@ This module owns the other direction, which is rare and was wrong until
 THE ORDER IS RULED (Stef, 2026-08-18), not a preference:
 
   1. FILLER, because that is what filler is for. A comfort item is never
-     dropped while a filler item is still in the pool.
+     dropped while a SHEDDABLE filler item is still in the pool.
+
+     Not all filler is sheddable. Archipelago fills `EXCLUDED` locations from
+     the filler pool ALONE (`Fill.py`: excluded locations are filled from
+     `filleritempool`, and `usefulitempool` only joins for ordinary locations
+     afterwards), so a seed must keep at least one filler item per excluded
+     location or fill dies with "Not enough filler items for excluded
+     locations". CTR always has at least one: `_install_goal` marks the goal
+     location EXCLUDED (#27) so that no world's progression can land on it, and
+     a player's own `exclude_locations` adds more.
+
+     This was found the hard way on 2026-08-18: a first cut of this module shed
+     filler without a floor, passed its own 2000-seed item/location arm, and
+     then failed the matrix's default arm on two seeds out of five thousand
+     with exactly that FillError. Shedding the last filler in favour of keeping
+     comfort items is the one way to satisfy the item/location count and still
+     make the seed unfillable.
   2. The COMFORT PACK, whole. The 2026-08-10 ruling that it ships together or
      not at all stands, and costs nothing here: dropping five to cover an
      overflow of one leaves the pool four under, and `create_items`' top-up
@@ -43,8 +59,16 @@ from BaseClasses import Item, ItemClassification
 
 
 def shed_overflow(pool: Sequence[Item], unfilled: int,
-                  surface_item_names: Iterable[str]) -> List[Item]:
+                  surface_item_names: Iterable[str],
+                  filler_floor: int = 0) -> List[Item]:
     """Return the pool reduced toward `unfilled`, in the ruled order.
+
+    `filler_floor` is how many filler items this seed must KEEP for its
+    `EXCLUDED` locations, which only filler can fill. Callers pass
+    `elastic_bounds.estimated_filler_reserve`, which is the estimate rather than
+    the exact count on purpose: AP core applies a player's `exclude_locations`
+    as location progress state AFTER every world's `create_items`, so the exact
+    number is not knowable here.
 
     Returns the pool unchanged when it already fits. May return a pool that is
     still too big (tier 3 is the caller's refusal) or, after tier 2, one that is
@@ -55,12 +79,18 @@ def shed_overflow(pool: Sequence[Item], unfilled: int,
 
     surface_names = frozenset(surface_item_names)
 
-    # Tier 1: filler, exactly as much as the overflow needs and no more.
+    # Tier 1: filler, exactly as much as the overflow needs and no more, and
+    # never below the floor the excluded locations require.
     overflow = len(pool) - unfilled
+    total_filler = sum(1 for item in pool
+                       if item.classification == ItemClassification.filler)
+    sheddable = max(0, total_filler - max(0, filler_floor))
+    to_shed = min(overflow, sheddable)
+
     shed = 0
     kept: List[Item] = []
     for item in pool:
-        if shed < overflow and item.classification == ItemClassification.filler:
+        if shed < to_shed and item.classification == ItemClassification.filler:
             shed += 1
             continue
         kept.append(item)

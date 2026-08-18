@@ -7,7 +7,7 @@ import pkgutil
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from Options import OptionError
 from worlds.AutoWorld import World, CollectionState, WebWorld
-from .elastic_bounds import CTRSettings
+from .elastic_bounds import CTRSettings, estimated_filler_reserve
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
@@ -1385,7 +1385,9 @@ class ctrAPWorld(World):
         # it may still be LARGER, which the general capacity guard below
         # refuses.
         unfilled = len(mw.get_unfilled_locations(self.player))
-        pool = item_supply.shed_overflow(pool, unfilled, SURFACE_ITEM_NAMES)
+        pool = item_supply.shed_overflow(
+            pool, unfilled, SURFACE_ITEM_NAMES,
+            filler_floor=estimated_filler_reserve(self))
 
         if int(self.options.lettersanity.value) == 3 and len(pool) > unfilled:
             raise OptionError(

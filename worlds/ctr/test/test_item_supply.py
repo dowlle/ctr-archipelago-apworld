@@ -158,3 +158,33 @@ class TestTightSeedStillBalances(CTRTestBase):
         material: a seed that cannot fit it is refused instead."""
         names = [i.name for i in self.multiworld.itempool if i.player == self.player]
         self.assertIn("Tizi Helper", names)
+
+
+class TestFillerFloorForExcludedLocations(unittest.TestCase):
+    """Archipelago fills EXCLUDED locations from the filler pool ALONE, so a
+    seed must keep one filler per excluded location. Shedding the last filler
+    in favour of comfort items balances the counts and still makes the seed
+    unfillable -- found on 2026-08-18 when a floorless first cut passed its own
+    2000-seed item/location arm and then failed the matrix's default arm."""
+
+    def test_filler_at_the_floor_is_not_shed(self) -> None:
+        pool = _pool(progression=10, filler=1, surface=True)
+        result = shed_overflow(pool, len(pool) - 1, SURFACE_ITEM_NAMES,
+                               filler_floor=1)
+        self.assertIn("Wumpa 0", _names(result))
+
+    def test_only_filler_above_the_floor_is_shed(self) -> None:
+        pool = _pool(progression=10, filler=4, surface=True)
+        result = shed_overflow(pool, len(pool) - 3, SURFACE_ITEM_NAMES,
+                               filler_floor=2)
+        self.assertEqual(sum(1 for n in _names(result) if n.startswith("Wumpa")), 2)
+
+    def test_the_floor_pushes_the_overflow_down_to_the_comfort_pack(self) -> None:
+        """With the floor reached and the seed still over, tier 2 is what pays,
+        which is the correct order: the excluded locations keep their filler."""
+        pool = _pool(progression=10, filler=1, surface=True)
+        result = shed_overflow(pool, len(pool) - 5, SURFACE_ITEM_NAMES,
+                               filler_floor=1)
+        self.assertIn("Wumpa 0", _names(result))
+        for name in SURFACE_ITEM_NAMES:
+            self.assertNotIn(name, _names(result))
