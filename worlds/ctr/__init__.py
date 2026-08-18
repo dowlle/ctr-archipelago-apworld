@@ -11,6 +11,7 @@ from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
+from . import item_supply
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
@@ -1360,59 +1361,21 @@ class ctrAPWorld(World):
         for _unlock_name in characters.created_unlock_names(self):
             pool.append(self.create_item(_unlock_name))
 
-        # --- Overflow shedding (Stef's ruling, 2026-08-18): FILLER first, then the
-        # comfort pack, then refuse. A comfort item is never dropped while a
-        # filler item is still in the pool, because filler exists to be dropped
-        # and a comfort item does not.
+        # --- Overflow shedding (Stef's ruling, 2026-08-18): FILLER first, then
+        # the comfort pack, then refuse. The tiers, the reasoning and what is
+        # never shed all live in item_supply.shed_overflow, which is a pure
+        # function so every tier is reachable from a synthetic pool instead of
+        # only from a seed whose options happen to land on the right overflow.
+        # That testability is the point: the all-or-nothing behaviour this
+        # replaced survived because reaching it needed roughly a 1-in-500 seed.
         #
-        # WHY THIS REPLACED AN ALL-OR-NOTHING TRIM. The previous code considered
-        # only the comfort pack, and only dropped it when dropping all five was
-        # enough on its own. A seed six over therefore dropped NOTHING (five is
-        # not enough, so the guard failed and the whole overflow survived), which
-        # is the item/location mismatch the fuzzer caught at roughly one seed in
-        # five hundred once a second no-location item option existed. Measured:
-        # `main` passed 2000 seeds of check-item-location-count while the branch
-        # adding that option failed 4 of 2000, always by exactly six -- the five
-        # comfort items plus the one filler, none of which got shed.
-        #
-        # TIER 1 IS KEYED ON CLASSIFICATION, NOT ON A NAME. `Wumpa Fruit` is the
-        # only filler the static table creates today, but the frozen-but-inert
-        # `Small Wumpa Bundle` / `Big Wumpa Bundle` are filler too and join this
-        # tier automatically on the day an option creates them. Traps are absent
-        # here by construction: they are minted later, out of filler slots.
-        #
-        # WHAT IS NEVER SHED: progression (dropping it can make a seed
-        # unwinnable), and the option-created single items `Tizi Helper` and
-        # `Turbo Grant`. Those two are toggles the player switched on, so a seed
-        # that cannot fit them is refused rather than silently ignoring the
-        # option (ruled 2026-08-18). Their own option text already promised "one
-        # useful item spending one otherwise-filler slot"; spending the filler
-        # slot is what tier 1 finally implements.
+        # A returned pool may be SMALLER than `unfilled` (tier 2 drops the pack
+        # whole), which the filler top-up at the end of this method closes, and
+        # it may still be LARGER, which the general capacity guard below
+        # refuses.
         unfilled = len(mw.get_unfilled_locations(self.player))
+        pool = item_supply.shed_overflow(pool, unfilled, SURFACE_ITEM_NAMES)
 
-        if len(pool) > unfilled:
-            # Tier 1: shed filler, exactly as much as the overflow needs.
-            overflow = len(pool) - unfilled
-            shed_filler = []
-            kept = []
-            for item in pool:
-                if len(shed_filler) < overflow and \
-                        item.classification == ItemClassification.filler:
-                    shed_filler.append(item)
-                    continue
-                kept.append(item)
-            pool = kept
-
-        if len(pool) > unfilled:
-            # Tier 2: shed the comfort pack, whole (ruled 2026-08-10: the pack
-            # ships together or not at all). Dropping five to cover an overflow
-            # of one is not waste -- the filler top-up below immediately refills
-            # the freed slots, so the seed trades the comfort pack for filler,
-            # which is the trade the pack was designed to make.
-            without_surface = [item for item in pool
-                               if item.name not in SURFACE_ITEM_NAMES]
-            if len(without_surface) <= unfilled:
-                pool = without_surface
         if int(self.options.lettersanity.value) == 3 and len(pool) > unfilled:
             raise OptionError(
                 f"CTR: Lettersanity 'items_only' needs 48 spare filler slots, but this "
