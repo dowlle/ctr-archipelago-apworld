@@ -27,7 +27,9 @@ from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES as ITEMSANITY_ITEM_NAMES
 from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
 from .tizi_helper import TIZI_HELPER_ITEM
+from .turbo_grant import TURBO_GRANT_ITEM
 from . import tizi_helper
+from . import turbo_grant
 from . import characters
 from . import progressive_capability
 
@@ -175,9 +177,8 @@ def predicted_mandatory_pool(world) -> int:
     # function mirrors create_items is what makes the omission a defect rather
     # than a choice.
     #
-    # Turbo Grant (#224) is the same shape and belongs here too; it is added on
-    # its own branch, where the item exists.
     counts[TIZI_HELPER_ITEM] = tizi_helper.created_item_count(world)
+    counts[TURBO_GRANT_ITEM] = turbo_grant.created_item_count(world)
 
     mandatory = sum(
         count for name, count in counts.items()
