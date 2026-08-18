@@ -28,11 +28,20 @@ class TestTiziHelperName(unittest.TestCase):
 
     def test_it_is_appended_one_past_the_frozen_set(self) -> None:
         """35010187 (Gas Pedal) was the freeze's last entry, so the amendment is
-        35010188. Anything else means a renumber, which #223 forbids."""
+        35010188. Anything else means a renumber, which #223 forbids.
+
+        This originally also asserted that the helper was the HIGHEST code in
+        the table. #224 appended the second ruled amendment at 35010189, so that
+        is no longer true and asserting it would forbid the very append the
+        ruling allows. What #223 actually needs pinned is its own boundary:
+        Gas Pedal below it, the helper on it, and its code unmoved. Contiguity
+        still catches an insertion anywhere in the table."""
         self.assertEqual(TIZI_HELPER_CODE, 35010188)
         codes = [item["code"] for item in load_item_table()]
         self.assertEqual(codes, list(range(35010000, 35010000 + len(codes))))
-        self.assertEqual(max(codes), TIZI_HELPER_CODE)
+        by_code = {item["code"]: item["name"] for item in load_item_table()}
+        self.assertEqual(by_code[TIZI_HELPER_CODE - 1], "Gas Pedal")
+        self.assertEqual(by_code[TIZI_HELPER_CODE], TIZI_HELPER_ITEM)
 
     def test_it_ships_inert_in_the_data_file(self) -> None:
         """count 0 in data/items.json: the option decides, not the table."""

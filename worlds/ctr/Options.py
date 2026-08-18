@@ -368,6 +368,33 @@ class WumpaCheck(Toggle):
     display_name = "Wumpa Check"
 
 
+class TurboGrant(Toggle):
+    """Add the `Turbo Grant` item (#224): one received item that rolls a normal
+    Turbo straight into your weapon slot, with the usual item-pickup ping, and
+    fires on demand like any other Turbo.
+
+    Adds NO location, and nothing in logic ever requires it -- it is one useful
+    item spending one otherwise-filler slot. Off by default.
+
+    Received outside a race, before the Itemsanity unlock below, or while your
+    weapon slot is already full, it QUEUES and lands as soon as you are in a
+    race with an empty slot. A grant is never discarded.
+
+    With Itemsanity ON the grant additionally needs the separate `Turbo` weapon
+    item and stays queued until that has been received. With Itemsanity off, no
+    weapon-item gate applies.
+
+    Firing uses the ordinary Turbo path, so Progressive Boost still decides what
+    the boost does: at boost-off the Turbo is consumed and produces no boost, and
+    at higher tiers it produces only what that tier allows. It never bypasses or
+    upgrades your current tier.
+
+    REQUIRES the 0.2.0 native client, which owns the delivery, the queue and the
+    firing. On an older client the item is received and does nothing.
+    """
+    display_name = "Turbo Grant"
+
+
 class BoxLocations(Toggle):
     """Add the authored item-box checks (#109): one location per authored box
     position, broken once per seed by driving through it in any Adventure race
@@ -977,6 +1004,8 @@ class ctrAPOptions(PerGameCommonOptions):
     wumpa_bundles: WumpaBundles
     progressive_starting_wumpa: ProgressiveStartingWumpa
     wumpa_check: WumpaCheck
+    # in-race Turbo hand-out (#224), the second ruled namespace amendment
+    turbo_grant: TurboGrant
     lettersanity: Lettersanity
     letters_per_track: LettersPerTrack
     # authored item-box checks (#109)
