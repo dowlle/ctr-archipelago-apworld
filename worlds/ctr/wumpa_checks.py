@@ -29,11 +29,15 @@ neither can grow into the other.
 FROZEN-NAME WARNING. This name rides the single 0.2.0 datapackage bump (#177).
 After that bump it is permanent, and its id can never move.
 
-NAMES LAND INERT. `created_location_names` returns nothing, unconditionally,
-because no option creates this location yet -- the 0.2.0 freeze mints names, not
-features. The three wumpa ITEMS the same ruling adopted (Small Wumpa Bundle, Big
-Wumpa Bundle, Progressive Starting Wumpa) are ordinary data/items.json entries at
-indexes 120-122 and are not this class's to register.
+ACTIVATED BY `wumpa_check`. The name landed inert with the freeze --
+`created_location_names` returned nothing unconditionally, because the freeze
+mints names, not features. It now creates the single location when the
+`wumpa_check` toggle is on and nothing when it is off, which is the same
+all-or-none shape itemsanity has and for the same reason: one name has no
+per-seed subset to elastically size. The three wumpa ITEMS the same ruling
+adopted (Small Wumpa Bundle, Big Wumpa Bundle, Progressive Starting Wumpa) are
+ordinary data/items.json entries at indexes 120-122, owned by
+`wumpa_family.py`, and are not this class's to register.
 """
 from .location_class import LocationClass
 
@@ -64,8 +68,18 @@ class WumpaLocationClass(LocationClass):
         return WUMPA_TEN_LOCATION
 
     def created_location_names(self, options):
-        """Nothing, until the wumpa-check toggle exists. See the module docstring."""
-        return []
+        """The one check when `wumpa_check` is on, otherwise none.
+
+        Read defensively through `getattr` on the same convention itemsanity
+        uses: `LocationClass` instances are also driven by the location-class
+        infrastructure tests with stand-in option objects carrying only the
+        options under test, and an absent toggle must answer "off" rather than
+        raise.
+        """
+        toggle = getattr(options, "wumpa_check", None)
+        if toggle is None or not bool(toggle.value):
+            return []
+        return [WUMPA_TEN_LOCATION]
 
 
 #: The registered wumpa class. `Locations.py` registers this instance.

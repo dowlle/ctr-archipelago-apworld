@@ -314,6 +314,60 @@ class TiziHelper(Toggle):
     display_name = "Tizi Helper"
 
 
+class WumpaBundles(Toggle):
+    """Let filler slots roll `Small Wumpa Bundle` (3 fruit) and `Big Wumpa
+    Bundle` (a full kart) as well as plain `Wumpa Fruit` (1).
+
+    Plain fruit stays the common case on purpose: bundles enrich the filler
+    pool, they do not replace it. A seed whose every filler slot handed you ten
+    fruit would make the 10-wumpa check and Itemsanity's juiced checks trivial.
+
+    Adds no items and no locations of its own -- it only changes WHICH filler
+    name lands in a slot the pool was already going to fill. Off by default, and
+    a seed with it off is generated exactly as it would have been before this
+    option existed. REQUIRES the 0.2.0 native client, which owns the delivery.
+    """
+    display_name = "Wumpa Bundles"
+
+
+class ProgressiveStartingWumpa(Range):
+    """How many `Progressive Starting Wumpa` items to add. Each one you receive
+    permanently raises the fruit you begin every race holding, by one.
+
+      0 (default) = every race starts you at zero fruit, as vanilla
+      10          = the full ladder; the last copy starts you at a full kart
+
+    Ten is the ceiling because a kart cannot hold more than ten fruit, so an
+    eleventh copy could never be felt.
+
+    This is the one AP effect in the game that persists across a race boundary,
+    so it is `useful` and it is opt-in. It adds no locations, so every copy is
+    one otherwise-filler slot spent. REQUIRES the 0.2.0 native client.
+    """
+    display_name = "Progressive Starting Wumpa"
+    range_start = 0
+    range_end = 10
+    default = 0
+
+
+class WumpaCheck(Toggle):
+    """Add the global 10-wumpa check: one location per seed, sent the first time
+    you reach ten Wumpa Fruit in a race.
+
+    GLOBAL, not per track -- reaching ten fruit on Coco Park and on Oxide
+    Station are the same check, by the same reasoning that made Itemsanity's
+    juiced checks global.
+
+    Distinct from Itemsanity's `(Juiced)` checks even though both read the same
+    ten-fruit threshold: this one fires on REACHING ten, those fire on FIRING a
+    weapon while at ten. They coexist without double-counting.
+
+    Off by default. REQUIRES the 0.2.0 native client, which owns the emit; on an
+    older client this location can never be checked.
+    """
+    display_name = "Wumpa Check"
+
+
 class BoxLocations(Toggle):
     """Add the authored item-box checks (#109): one location per authored box
     position, broken once per seed by driving through it in any Adventure race
@@ -918,6 +972,11 @@ class ctrAPOptions(PerGameCommonOptions):
     itemsanity: Itemsanity
     # Papu's Pyramid mask helper (#223)
     tizi_helper: TiziHelper
+    # The wumpa family (2026-08-10 ruling): two bundle fillers, the starting
+    # ladder, and the one global check.
+    wumpa_bundles: WumpaBundles
+    progressive_starting_wumpa: ProgressiveStartingWumpa
+    wumpa_check: WumpaCheck
     lettersanity: Lettersanity
     letters_per_track: LettersPerTrack
     # authored item-box checks (#109)
