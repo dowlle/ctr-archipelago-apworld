@@ -1952,11 +1952,19 @@ class ctrAPWorld(World):
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         if o.wumpa_check.value:
             # Additive under schema 7, same off-parity convention as itemsanity.
-            # The codes are listed rather than implied, so a future second wumpa
-            # check needs no wire rework: native's emit hook reads the code out
-            # of here rather than hardcoding 35016100, and block presence is the
-            # "is the wumpa check on" signal -- the same membership-not-scalar
-            # rule the Tizi gate follows.
+            #
+            # NATIVE DOES NOT READ THIS BLOCK -- verified against the client's
+            # AP_EmitWumpaCheck, which hardcodes 35016100 and gates on
+            # ap_net_location_exists(code), i.e. on server location membership,
+            # the same membership-not-slot_data rule the Tizi gate follows. So
+            # this is tracker and diagnostic metadata, plus the signal this
+            # world's own Universal Tracker restore reads to recover the toggle
+            # (there is no scalar for it, because it is a location option).
+            #
+            # The codes are listed rather than implied anyway, so that a future
+            # second wumpa check is a data change here rather than a wire
+            # redesign, and so a tracker never has to hardcode what native
+            # currently does.
             slot_data["wumpa_checks"] = {
                 "enabled": True,
                 "locations": [code for _name, code, _region in

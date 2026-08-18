@@ -196,3 +196,29 @@ class TestWumpaCheck(CTRTestBase):
         items = [i for i in self.multiworld.itempool if i.player == self.player]
         locations = self.multiworld.get_unfilled_locations(self.player)
         self.assertEqual(len(items), len(locations))
+
+
+class TestNativeContract(unittest.TestCase):
+    """The apworld half is only correct if it matches what the client already
+    implements. These pin the three facts the native side reads.
+
+    Verified against the client's H-dossier wumpa commit: it dispatches the two
+    bundles and the ladder by ITEM TABLE INDEX (120, 121, 122), and its
+    AP_EmitWumpaCheck hardcodes 35016100 and gates on
+    `ap_net_location_exists`, i.e. on server location membership rather than on
+    anything in slot_data.
+    """
+
+    def test_the_three_names_sit_at_the_indexes_native_dispatches_on(self) -> None:
+        table = load_item_table()
+        self.assertEqual(table[120]["name"], "Small Wumpa Bundle")
+        self.assertEqual(table[121]["name"], "Big Wumpa Bundle")
+        self.assertEqual(table[122]["name"], PROGRESSIVE_WUMPA_ITEM)
+
+    def test_the_check_code_is_the_one_native_hardcodes(self) -> None:
+        self.assertEqual(WUMPA_CODE_BASE, 35016100)
+
+    def test_the_ladder_ceiling_matches_the_karts_own_cap(self) -> None:
+        """Native clamps its bank to ten because a kart holds ten fruit. An
+        eleventh copy could never be felt, so the option must not offer one."""
+        self.assertEqual(PROGRESSIVE_WUMPA_MAX, 10)
