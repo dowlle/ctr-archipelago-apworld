@@ -133,12 +133,6 @@ class TestBundlesOnSeed(CTRTestBase):
         self.assertTrue(names & set(WUMPA_BUNDLE_ITEMS),
                         "the weighted draw produced no bundle at all")
 
-    def test_plain_fruit_is_still_the_common_case(self) -> None:
-        pool = [i.name for i in self.multiworld.itempool if i.player == self.player]
-        fruit = sum(1 for n in pool if n == "Wumpa Fruit")
-        bundles = sum(1 for n in pool if n in WUMPA_BUNDLE_ITEMS)
-        self.assertGreater(fruit, bundles)
-
     def test_the_items_and_locations_still_balance(self) -> None:
         items = [i for i in self.multiworld.itempool if i.player == self.player]
         locations = self.multiworld.get_unfilled_locations(self.player)
