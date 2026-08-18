@@ -1360,13 +1360,55 @@ class ctrAPWorld(World):
         for _unlock_name in characters.created_unlock_names(self):
             pool.append(self.create_item(_unlock_name))
 
-        # These five useful items spend spare slots supplied by optional
-        # location classes (podium rungs by default). A deliberately reduced
-        # seed can have fewer than five spare locations. Omit the whole comfort
-        # pack there instead of overflowing the pool or choosing an arbitrary
-        # subset. Shipped defaults have ample room and always include all five.
+        # --- Overflow shedding (Stef's ruling, 2026-08-18): FILLER first, then the
+        # comfort pack, then refuse. A comfort item is never dropped while a
+        # filler item is still in the pool, because filler exists to be dropped
+        # and a comfort item does not.
+        #
+        # WHY THIS REPLACED AN ALL-OR-NOTHING TRIM. The previous code considered
+        # only the comfort pack, and only dropped it when dropping all five was
+        # enough on its own. A seed six over therefore dropped NOTHING (five is
+        # not enough, so the guard failed and the whole overflow survived), which
+        # is the item/location mismatch the fuzzer caught at roughly one seed in
+        # five hundred once a second no-location item option existed. Measured:
+        # `main` passed 2000 seeds of check-item-location-count while the branch
+        # adding that option failed 4 of 2000, always by exactly six -- the five
+        # comfort items plus the one filler, none of which got shed.
+        #
+        # TIER 1 IS KEYED ON CLASSIFICATION, NOT ON A NAME. `Wumpa Fruit` is the
+        # only filler the static table creates today, but the frozen-but-inert
+        # `Small Wumpa Bundle` / `Big Wumpa Bundle` are filler too and join this
+        # tier automatically on the day an option creates them. Traps are absent
+        # here by construction: they are minted later, out of filler slots.
+        #
+        # WHAT IS NEVER SHED: progression (dropping it can make a seed
+        # unwinnable), and the option-created single items `Tizi Helper` and
+        # `Turbo Grant`. Those two are toggles the player switched on, so a seed
+        # that cannot fit them is refused rather than silently ignoring the
+        # option (ruled 2026-08-18). Their own option text already promised "one
+        # useful item spending one otherwise-filler slot"; spending the filler
+        # slot is what tier 1 finally implements.
         unfilled = len(mw.get_unfilled_locations(self.player))
+
         if len(pool) > unfilled:
+            # Tier 1: shed filler, exactly as much as the overflow needs.
+            overflow = len(pool) - unfilled
+            shed_filler = []
+            kept = []
+            for item in pool:
+                if len(shed_filler) < overflow and \
+                        item.classification == ItemClassification.filler:
+                    shed_filler.append(item)
+                    continue
+                kept.append(item)
+            pool = kept
+
+        if len(pool) > unfilled:
+            # Tier 2: shed the comfort pack, whole (ruled 2026-08-10: the pack
+            # ships together or not at all). Dropping five to cover an overflow
+            # of one is not waste -- the filler top-up below immediately refills
+            # the freed slots, so the seed trades the comfort pack for filler,
+            # which is the trade the pack was designed to make.
             without_surface = [item for item in pool
                                if item.name not in SURFACE_ITEM_NAMES]
             if len(without_surface) <= unfilled:
@@ -1395,19 +1437,44 @@ class ctrAPWorld(World):
                 for _ in range(_cap_count):
                     pool.append(self.create_item(_cap_name))
 
-        # The single authoritative net-capacity check (issues #54/#209, R4).
-        # It runs AFTER every option-specific item family -- character
-        # unlocks, the #14/#15 comfort-pack trim, itemsanity weapons, and the
-        # progressive packs above -- is in the pool, so `len(pool)` is the
-        # COMPLETE current pool and `unfilled` is the live post-creation
-        # location count (never a predicted constant). Computed against the
-        # supply that would remain WITHOUT the unlocks, so the message is
-        # honest about what is missing rather than blaming whichever family
-        # happened to be appended last. No-op in all-unlocked mode and on
-        # every seed that fits.
+        # The character-unlock capacity check (issues #54/#209, R4). It runs
+        # AFTER every option-specific item family -- character unlocks, the
+        # shedding tiers, itemsanity weapons, and the progressive packs above --
+        # is in the pool, so `len(pool)` is the COMPLETE current pool and
+        # `unfilled` is the live post-creation location count (never a predicted
+        # constant). Computed against the supply that would remain WITHOUT the
+        # unlocks, so the message is honest about what is missing rather than
+        # blaming whichever family happened to be appended last. No-op in
+        # all-unlocked mode and on every seed that fits.
+        #
+        # It runs FIRST of the two capacity checks deliberately: when the
+        # unlocks are what does not fit, its message says so specifically, which
+        # is more useful than the general one below.
         characters.raise_if_unlocks_exceed_location_supply(
             self, available_supply=unfilled - (
                 len(pool) - len(characters.created_unlock_names(self))))
+
+        # THE general net-capacity check (2026-08-18). Every earlier guard is
+        # per-family and therefore silent outside its own feature: the
+        # lettersanity one covers only `items_only`, the capability one runs
+        # only with a pack enabled, and the character one is a no-op when the
+        # unlocks are off. A seed with all three inapplicable could reach fill
+        # with more items than locations and die inside Archipelago's filler
+        # stage with a message naming none of this -- which is exactly what the
+        # 2026-08-18 mismatch did. This is the backstop that makes the next
+        # no-location item family fail loudly at option-validation time instead
+        # of one seed in five hundred later.
+        #
+        # It is placed after the shedding tiers ON PURPOSE: shedding is the
+        # world's own attempt to fit, and only a seed that survives both tiers
+        # still over is genuinely unsatisfiable.
+        if len(pool) > unfilled:
+            raise OptionError(
+                f"CTR: this option combination creates {len(pool) - unfilled} more "
+                f"item(s) than it has locations to hold them ({len(pool)} items, "
+                f"{unfilled} locations). Enable more checks -- item boxes, itemsanity, "
+                "podium rungs or lettersanity locations -- or turn off one of the "
+                "options that add an item without adding a location.")
 
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
