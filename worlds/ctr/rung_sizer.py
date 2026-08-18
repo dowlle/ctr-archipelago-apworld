@@ -28,6 +28,7 @@ from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
 from .tizi_helper import TIZI_HELPER_ITEM
 from . import tizi_helper
+from . import wumpa_family
 from . import characters
 from . import progressive_capability
 
@@ -179,6 +180,18 @@ def predicted_mandatory_pool(world) -> int:
     # its own branch, where the item exists.
     counts[TIZI_HELPER_ITEM] = tizi_helper.created_item_count(world)
 
+    # The starting-wumpa ladder, same shape and same failure direction: up to
+    # ten copies of one name, frozen at count 0 and created per option, adding
+    # ZERO locations to supply. Without this mirror the predictor under-counts
+    # mandatory demand by up to ten on a fully-laddered seed, which
+    # over-estimates slack and makes the sizer decline to expand when it should.
+    #
+    # The two wumpa BUNDLES are deliberately not counted: they are filler
+    # substitutes, so they consume the filler budget this function sizes against
+    # rather than adding to mandatory demand. Traps are excluded for the
+    # identical reason and always have been.
+    mandatory_extra_wumpa = wumpa_family.created_item_total(world)
+
     mandatory = sum(
         count for name, count in counts.items()
         # Wumpa Fruit is CTR's generic filler. Its table entry supplies the
@@ -194,6 +207,7 @@ def predicted_mandatory_pool(world) -> int:
     # mirror the predictor under-counts mandatory demand by 15 on EVERY seed,
     # which is the same failure direction DeepSeek review F1 caught for #145.
     mandatory += len(characters.created_unlock_names(world))
+    mandatory += mandatory_extra_wumpa
     return mandatory
 
 

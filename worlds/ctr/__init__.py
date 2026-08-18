@@ -12,6 +12,8 @@ from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
 from . import item_supply
+from . import wumpa_family
+from .wumpa_checks import WUMPA_CLASS
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
@@ -371,6 +373,14 @@ class ctrAPWorld(World):
         # so this restore changes nothing a tracker computes -- it is here so the
         # restored option set is honest rather than silently defaulted.
         o.tizi_helper.value = int(bool(co.get("tizi_helper", 0)))
+        # The wumpa family's two scalars, same convention: absent keys are a
+        # pre-activation seed and restore to off / zero, which is honest --
+        # such a seed created none of these items.
+        wumpa_family.restore_slot_data(o, co)
+        # The wumpa CHECK is a location toggle with no scalar of its own, so it
+        # restores from the presence of its location block, exactly as
+        # itemsanity does above.
+        o.wumpa_check.value = int("wumpa_checks" in passthrough)
         lb = passthrough.get("lettersanity_checks", {}) or {}
         o.lettersanity.value = int(co.get("lettersanity", lb.get("mode", 0)))
         o.letters_per_track.value = int(lb.get("letters_per_track", 3))
@@ -1292,6 +1302,11 @@ class ctrAPWorld(World):
                 )
                 _cups_locked[_gem_name] = _cups_locked.get(_gem_name, 0) + 1
 
+        # Resolved once, before the pool loop reads it per item: how many copies
+        # of each supply-spending wumpa name this seed creates. Empty dict when
+        # the ladder is off, so the loop's lookup is a cheap miss.
+        _wumpa_counts = wumpa_family.created_item_counts(self)
+
         # --- Create general item pool ---
         # When Gems Required Goal is active, gemgoal() LOCKS the 5 gems at the
         # gem-cup locations, so adding the same 5 gems from the item table again
@@ -1325,6 +1340,17 @@ class ctrAPWorld(World):
             # comfort slot for it instead of overflowing the pool.
             if item["name"] == TIZI_HELPER_ITEM:
                 count = tizi_helper.created_item_count(self)
+            # The starting-wumpa ladder (2026-08-10 ruling): up to ten copies
+            # of ONE progressive name, per the #12/#13 convention. Like the
+            # helper above it carries no location of its own, so every copy is
+            # one otherwise-filler slot spent, and it sits here -- before the
+            # shedding tiers -- so a reduced seed can free a comfort slot for it
+            # rather than overflowing. The two wumpa BUNDLES are deliberately
+            # NOT here: they are filler substitutes drawn from the filler budget
+            # further down, so counting them as pool demand would double-count
+            # them against the supply check.
+            if item["name"] in _wumpa_counts:
+                count = _wumpa_counts[item["name"]]
             if int(self.options.lettersanity.value) in (2, 3) and item["name"] in lettersanity.ITEM_NAMES:
                 track = item["name"].rsplit("(", 1)[1][:-1]
                 letter = item["name"].split(" ", 2)[1]
@@ -1471,10 +1497,11 @@ class ctrAPWorld(World):
             for _ in range(n_traps):
                 pool_item = self.create_item(self.random.choice(TRAP_ITEM_NAMES))
                 mw.itempool.append(pool_item)
-            mw.itempool += [self.create_filler()
+            mw.itempool += [self.create_item(wumpa_family.draw_filler_name(self))
                             for _ in range(n_filler - n_traps)]
         else:
-            mw.itempool += [self.create_filler() for _ in range(n_filler)]
+            mw.itempool += [self.create_item(wumpa_family.draw_filler_name(self))
+                            for _ in range(n_filler)]
 
         # NOTE: an earlier density-adaptive force-collapse was removed -- CTR's pool
         # is ~98% progression in EVERY config (only ~1 filler item), so a density
@@ -1859,6 +1886,14 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                # The wumpa family's two scalars (2026-08-10 ruling). Always
+                # emitted, same convention as itemsanity and tizi_helper, and
+                # DIAGNOSTIC / TRACKER ONLY: native drives both from received
+                # items (a bundle hands over fruit on arrival, the ladder is the
+                # count of copies received) and reads neither key. `wumpa_check`
+                # is NOT here -- it is a location toggle, and its block presence
+                # below is the signal, exactly as itemsanity's is.
+                **wumpa_family.fill_slot_data(self),
                 # Tizi Helper (#223), same always-emitted scalar convention.
                 # DIAGNOSTIC / TRACKER ONLY: native does NOT read this key. The
                 # helper's runtime gate is "did this slot receive item 35010188"
@@ -1915,6 +1950,26 @@ class ctrAPWorld(World):
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
+        if o.wumpa_check.value:
+            # Additive under schema 7, same off-parity convention as itemsanity.
+            #
+            # NATIVE DOES NOT READ THIS BLOCK -- verified against the client's
+            # AP_EmitWumpaCheck, which hardcodes 35016100 and gates on
+            # ap_net_location_exists(code), i.e. on server location membership,
+            # the same membership-not-slot_data rule the Tizi gate follows. So
+            # this is tracker and diagnostic metadata, plus the signal this
+            # world's own Universal Tracker restore reads to recover the toggle
+            # (there is no scalar for it, because it is a location option).
+            #
+            # The codes are listed rather than implied anyway, so that a future
+            # second wumpa check is a data change here rather than a wire
+            # redesign, and so a tracker never has to hardcode what native
+            # currently does.
+            slot_data["wumpa_checks"] = {
+                "enabled": True,
+                "locations": [code for _name, code, _region in
+                              WUMPA_CLASS.created_locations(self.options)],
+            }
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,

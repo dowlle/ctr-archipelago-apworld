@@ -564,6 +564,25 @@ def warn_racer_locks_have_no_eligible_pads(world):
         f"unlock items still exist and are still playable racers.")
 
 
+def warn_wumpa_bundles_have_no_filler_slots(world):
+    """Wumpa bundles substitute into the FILLER budget, so a seed that turns
+    every filler slot into a trap leaves them nowhere to land.
+
+    `trap_fill_percentage` 100 makes `n_traps == n_filler` in create_items, and
+    the non-trap remainder the weighted draw would fill is then empty. The
+    option is not wrong and the seed is perfectly generatable -- it simply
+    cannot express the bundles -- which is exactly the downgrade-with-warning
+    shape rather than a raise."""
+    o = world.options
+    if not o.wumpa_bundles.value:
+        return
+    if o.trap_fill_percentage.value < 100:
+        return
+    logger.warning(
+        f"CTR: Trap Fill Percentage is 100 for {_who(world)}, so every filler "
+        f"slot becomes a trap and Wumpa Bundles has no effect this seed.")
+
+
 def apply_downgrade_warnings(world):
     warn_podium_subtoggles_without_master(world)
     warn_podium_any_position_without_finish(world)
@@ -578,6 +597,7 @@ def apply_downgrade_warnings(world):
     warn_penta_stats_without_vanilla_stats(world)
     warn_racer_locks_without_character_unlocks(world)
     warn_racer_locks_have_no_eligible_pads(world)
+    warn_wumpa_bundles_have_no_filler_slots(world)
 
 
 def apply(world):
