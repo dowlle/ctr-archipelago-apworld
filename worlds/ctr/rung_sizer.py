@@ -26,6 +26,8 @@ from .elastic_bounds import predicted_goal_excluded_reserve
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES as ITEMSANITY_ITEM_NAMES
 from .podium import PODIUM_CLASS, TROPHY_TRACKS, created_rung_keys
 from .relic_tiers import RELIC_TIERS
+from .tizi_helper import TIZI_HELPER_ITEM
+from . import tizi_helper
 from . import characters
 from . import progressive_capability
 
@@ -162,6 +164,20 @@ def predicted_mandatory_pool(world) -> int:
     if ITEMSANITY_CLASS.is_enabled(world.options):
         for name in ITEMSANITY_ITEM_NAMES:
             counts[name] = 1
+
+    # Tizi Helper (#223) ships count 0 in data/items.json and create_items
+    # activates exactly one copy when its option is on, and it carries no
+    # location of its own -- the same shape as the itemsanity weapons above and
+    # the character unlocks below, both of which are mirrored here. Without this
+    # mirror the predictor under-counts mandatory demand by one on exactly the
+    # tightest seeds, which is the sizer-fails-to-expand direction (DeepSeek
+    # review F1's lesson, 2026-08-11). The docstring's promise that this
+    # function mirrors create_items is what makes the omission a defect rather
+    # than a choice.
+    #
+    # Turbo Grant (#224) is the same shape and belongs here too; it is added on
+    # its own branch, where the item exists.
+    counts[TIZI_HELPER_ITEM] = tizi_helper.created_item_count(world)
 
     mandatory = sum(
         count for name, count in counts.items()

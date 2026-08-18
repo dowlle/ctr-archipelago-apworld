@@ -11,6 +11,7 @@ from .elastic_bounds import CTRSettings
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
+from . import item_supply
 from .itemsanity import ITEMSANITY_CLASS, ITEM_NAMES, WEAPONS
 from . import item_boxes
 from .item_boxes import ITEM_BOX_CLASS
@@ -1371,17 +1372,21 @@ class ctrAPWorld(World):
         for _unlock_name in characters.created_unlock_names(self):
             pool.append(self.create_item(_unlock_name))
 
-        # These five useful items spend spare slots supplied by optional
-        # location classes (podium rungs by default). A deliberately reduced
-        # seed can have fewer than five spare locations. Omit the whole comfort
-        # pack there instead of overflowing the pool or choosing an arbitrary
-        # subset. Shipped defaults have ample room and always include all five.
+        # --- Overflow shedding (Stef's ruling, 2026-08-18): FILLER first, then
+        # the comfort pack, then refuse. The tiers, the reasoning and what is
+        # never shed all live in item_supply.shed_overflow, which is a pure
+        # function so every tier is reachable from a synthetic pool instead of
+        # only from a seed whose options happen to land on the right overflow.
+        # That testability is the point: the all-or-nothing behaviour this
+        # replaced survived because reaching it needed roughly a 1-in-500 seed.
+        #
+        # A returned pool may be SMALLER than `unfilled` (tier 2 drops the pack
+        # whole), which the filler top-up at the end of this method closes, and
+        # it may still be LARGER, which the general capacity guard below
+        # refuses.
         unfilled = len(mw.get_unfilled_locations(self.player))
-        if len(pool) > unfilled:
-            without_surface = [item for item in pool
-                               if item.name not in SURFACE_ITEM_NAMES]
-            if len(without_surface) <= unfilled:
-                pool = without_surface
+        pool = item_supply.shed_overflow(pool, unfilled, SURFACE_ITEM_NAMES)
+
         if int(self.options.lettersanity.value) == 3 and len(pool) > unfilled:
             raise OptionError(
                 f"CTR: Lettersanity 'items_only' needs 48 spare filler slots, but this "
@@ -1406,19 +1411,44 @@ class ctrAPWorld(World):
                 for _ in range(_cap_count):
                     pool.append(self.create_item(_cap_name))
 
-        # The single authoritative net-capacity check (issues #54/#209, R4).
-        # It runs AFTER every option-specific item family -- character
-        # unlocks, the #14/#15 comfort-pack trim, itemsanity weapons, and the
-        # progressive packs above -- is in the pool, so `len(pool)` is the
-        # COMPLETE current pool and `unfilled` is the live post-creation
-        # location count (never a predicted constant). Computed against the
-        # supply that would remain WITHOUT the unlocks, so the message is
-        # honest about what is missing rather than blaming whichever family
-        # happened to be appended last. No-op in all-unlocked mode and on
-        # every seed that fits.
+        # The character-unlock capacity check (issues #54/#209, R4). It runs
+        # AFTER every option-specific item family -- character unlocks, the
+        # shedding tiers, itemsanity weapons, and the progressive packs above --
+        # is in the pool, so `len(pool)` is the COMPLETE current pool and
+        # `unfilled` is the live post-creation location count (never a predicted
+        # constant). Computed against the supply that would remain WITHOUT the
+        # unlocks, so the message is honest about what is missing rather than
+        # blaming whichever family happened to be appended last. No-op in
+        # all-unlocked mode and on every seed that fits.
+        #
+        # It runs FIRST of the two capacity checks deliberately: when the
+        # unlocks are what does not fit, its message says so specifically, which
+        # is more useful than the general one below.
         characters.raise_if_unlocks_exceed_location_supply(
             self, available_supply=unfilled - (
                 len(pool) - len(characters.created_unlock_names(self))))
+
+        # THE general net-capacity check (2026-08-18). Every earlier guard is
+        # per-family and therefore silent outside its own feature: the
+        # lettersanity one covers only `items_only`, the capability one runs
+        # only with a pack enabled, and the character one is a no-op when the
+        # unlocks are off. A seed with all three inapplicable could reach fill
+        # with more items than locations and die inside Archipelago's filler
+        # stage with a message naming none of this -- which is exactly what the
+        # 2026-08-18 mismatch did. This is the backstop that makes the next
+        # no-location item family fail loudly at option-validation time instead
+        # of one seed in five hundred later.
+        #
+        # It is placed after the shedding tiers ON PURPOSE: shedding is the
+        # world's own attempt to fit, and only a seed that survives both tiers
+        # still over is genuinely unsatisfiable.
+        if len(pool) > unfilled:
+            raise OptionError(
+                f"CTR: this option combination creates {len(pool) - unfilled} more "
+                f"item(s) than it has locations to hold them ({len(pool)} items, "
+                f"{unfilled} locations). Enable more checks -- item boxes, itemsanity, "
+                "podium rungs or lettersanity locations -- or turn off one of the "
+                "options that add an item without adding a location.")
 
         mw.itempool += pool
         # Size filler off the UNFILLED locations, i.e. total minus the locations
