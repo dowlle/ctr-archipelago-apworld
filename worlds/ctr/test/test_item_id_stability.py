@@ -15,11 +15,20 @@ fixtures/item_id_stability_v0_2_0.json, pinning every item name registered durin
 the 0.2.0 cycle -- the spine-1 capability names plus the 93 the freeze itself
 minted. It is a separate file rather than an extension of the v0.1.5 one so each
 fixture keeps saying honestly which release froze the ids it holds; both are read
-below and neither is ever edited in place.
+below. Ids are never edited in place; the one name-level exception is recorded next.
 
 Entries added AFTER the 0.2.0 freeze are covered by neither fixture and are meant
 to pass silently. Any release that spends a datapackage bump adds its own fixture
 here the same way.
+
+RENAME EXCEPTION, #280 (the 0.2.0 trap rework, ruled 2026-08-19). Both fixtures
+had 16 trap KEYS rewritten in place -- the only in-place fixture edit either file
+has taken -- because the rework renamed those items while 0.2.0 is still
+unpublished. Not one id moved, which is the property these fixtures exist to
+protect; a fixture keyed on a name that no longer exists would fail on the rename
+rather than on an id change and would stop guarding anything. The old-to-new name
+map is pinned in test_trap_rework.py, so the rename itself is still on the record
+in code.
 """
 import json
 import pathlib
@@ -71,7 +80,8 @@ class TestItemIdStability(unittest.TestCase):
                 overlap, set(),
                 f"{path.name} re-pins name(s) an earlier fixture already owns: "
                 f"{sorted(overlap)[:5]}. Each fixture owns its own release's "
-                "names and none is ever edited in place.",
+                "names; ids are never edited in place (names moved once, per the "
+                "RENAME EXCEPTION above).",
             )
             frozen.update(batch)
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]

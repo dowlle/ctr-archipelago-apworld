@@ -96,31 +96,31 @@
     "classification": "filler"
   },
   {
-    "name": "Icy Road Trap",
+    "name": "Icy Road",
     "code": 35010016,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Low Gravity Trap",
+    "name": "Low Gravity",
     "code": 35010017,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "No Brakes Trap",
+    "name": "Forced USF",
     "code": 35010018,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Forced Boost Trap",
+    "name": "Forced Boost",
     "code": 35010019,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "First Person Trap",
+    "name": "First Person",
     "code": 35010020,
     "count": 0,
     "classification": "trap"
@@ -636,67 +636,67 @@
     "classification": "progression"
   },
   {
-    "name": "Wumpa Reset Trap",
+    "name": "Wumpa Wipeout",
     "code": 35010106,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Flatten Trap",
+    "name": "Flatten",
     "code": 35010107,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Item Reroll Trap",
+    "name": "Item Reroll",
     "code": 35010108,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Auto-Use Trap",
+    "name": "Forced Use",
     "code": 35010109,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Empty Crates Trap",
+    "name": "Empty Crates",
     "code": 35010110,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Weakened Kart Trap",
+    "name": "Weakened Kart",
     "code": 35010111,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "No Boost Trap",
+    "name": "Boost Blocker",
     "code": 35010112,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Wireframe Trap",
+    "name": "Wireframe",
     "code": 35010113,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Nitro Trap",
+    "name": "Nitro",
     "code": 35010114,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Reverse Controls Trap",
+    "name": "Reverse Steering",
     "code": 35010115,
     "count": 0,
     "classification": "trap"
   },
   {
-    "name": "Red Potion Trap",
+    "name": "Red Potion",
     "code": 35010116,
     "count": 0,
     "classification": "trap"
@@ -1138,5 +1138,23 @@
     "code": 35010189,
     "count": 0,
     "classification": "useful"
+  },
+  {
+    "name": "Upside Down",
+    "code": 35010190,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Mirror Mode",
+    "code": 35010191,
+    "count": 0,
+    "classification": "trap"
+  },
+  {
+    "name": "Warpball Ambush",
+    "code": 35010192,
+    "count": 0,
+    "classification": "trap"
   }
 ]

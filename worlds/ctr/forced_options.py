@@ -93,6 +93,48 @@ def raise_if_custom_trophy_weight_is_zero(world):
                 "legal for every other item, including Key.")
 
 
+def raise_if_trap_weights_are_unusable(world):
+    """Trap-weight guards (issue #280), the trap-fill twin of the zero-Trophy
+    guard above.
+
+    Two failures, and the split between them is deliberate:
+
+    - AN UNKNOWN KEY OR AN OUT-OF-RANGE VALUE is always rejected, whatever trap
+      fill is set to. A misspelled key is a player believing they retuned an
+      effect they never touched, and no trap fill setting makes that true. A
+      rolled YAML already fails on this in Options.TrapWeights.verify_keys
+      (Generate.py verifies every option before generation); this call is what
+      makes a programmatically built world -- a test, the fuzzer, a custom
+      generator -- fail the same way instead of ignoring the key.
+    - AN ALL-ZERO EFFECTIVE TABLE is rejected ONLY while trap_fill_percentage
+      is above 0. That is exactly the config where create_items must draw a
+      trap and has nothing left to draw (random.choices would raise a bare
+      ValueError -- the #87 failure shape). With trap fill at 0 no draw ever
+      happens, so an all-zero table is harmless and legal there; it is how a
+      player parks their weights while traps are off.
+
+    "Effective" means the BUILDABLE traps only: a weight on a trap whose native
+    effect does not exist yet cannot rescue the draw, so a table that zeroes
+    the five buildable ones is all-zero in the only sense that matters here.
+    """
+    from .traps import (TRAP_ITEM_NAMES, effective_trap_weights,
+                        selectable_trap_weights)
+    effective_trap_weights(world)  # unknown key / bad value -> OptionError
+    if world.options.trap_fill_percentage.value <= 0:
+        return
+    if not selectable_trap_weights(world):
+        raise OptionError(
+            f"CTR 'trap_weights' sets every trap that has a working effect to 0 "
+            f"for {_who(world)}, but 'trap_fill_percentage' is "
+            f"{world.options.trap_fill_percentage.value}, so generation has to "
+            f"turn filler items into traps and has no trap left to pick. Give "
+            f"at least one of icy_road, low_gravity, forced_usf, forced_boost or "
+            f"first_person a weight above 0, or set trap_fill_percentage to 0 to "
+            f"play without traps. The other trap keys are accepted but pick "
+            f"nothing in this build -- only {len(TRAP_ITEM_NAMES)} trap effects "
+            f"exist so far.")
+
+
 def raise_if_composed_goal_is_empty(world):
     """Issue #152 (dossier §2.2 C1): with three independent composable goal
     conditions -- OxideGoal (weighted Choice, 'none' a legal roll),
@@ -307,6 +349,7 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
 
 def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
+    raise_if_trap_weights_are_unusable(world)
     raise_if_composed_goal_is_empty(world)
     raise_if_gems_required_goal_needs_excluded_cups(world)
     raise_if_oxide_final_count_exceeds_mode_capacity(world)

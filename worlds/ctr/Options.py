@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
+from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
+                    validate_trap_weights)
+
 
 class OxideGoal(Choice):
     """What finishing the game means.
@@ -236,13 +239,13 @@ class ProgressiveStatsMode(Choice):
 
 
 class TrapFillPercentage(Range):
-    """What percentage of this slot's filler items are replaced by traps (Icy
-    Road, Low Gravity, No Brakes, Forced Boost, First Person - each equally
-    likely).
+    """What percentage of this slot's filler items are replaced by traps.
 
       0             = no traps, filler stays Wumpa Fruit
       10  (default) = a taste of sabotage
       100           = every filler slot becomes a trap
+
+    Which trap you get is decided by `Trap Weights`.
 
     Traps never gate anything. A received trap arms silently and fires mid-race
     on a later lap."""
@@ -252,6 +255,64 @@ class TrapFillPercentage(Range):
     range_start = 0
     range_end = 100
     default = 10
+
+
+class TrapWeights(OptionDict):
+    """How often each trap is picked, once `Trap Fill Percentage` has decided
+    that a filler slot becomes a trap.
+
+    Each entry is `trap: weight`. Higher weight means picked more often, 0
+    means never picked. The numbers are relative and do not have to add up to
+    anything. Traps you leave out keep their default weight, so you only have
+    to list the ones you want to change.
+
+    This option is a mapping, not a single value, so you have to edit it by
+    hand. The Archipelago website's options pages cannot show a mapping: this
+    option does not appear on them at all, and a YAML you export from there
+    has no `trap_weights` block, which means every trap keeps its default
+    weight. The downloadable YAML template does contain the full block, so the
+    simplest route is to start from the template and edit the numbers.
+
+    Example - never pick first person, pick icy road twice as often as usual,
+    everything else default::
+
+        trap_fill_percentage: 10
+        trap_weights:
+          first_person: 0
+          icy_road: 10
+
+    Only five traps have a working effect in this build: icy_road,
+    low_gravity, forced_usf, forced_boost and first_person. Only those five
+    are ever picked. The other keys are accepted and kept now so your YAML
+    still works when those effects land, but their weights change nothing
+    yet. Setting all five working traps to 0 while `Trap Fill Percentage` is
+    above 0 is an error, because then no trap could be picked at all.
+
+    Valid keys: icy_road, low_gravity, forced_usf, forced_boost, first_person,
+    wumpa_wipeout, flatten, item_reroll, forced_use, empty_crates,
+    weakened_kart, boost_blocker, wireframe, nitro, reverse_steering,
+    red_potion, upside_down, mirror_mode, warpball_ambush."""
+    # Machine keys, not item names: the 0.2.0 rework renamed five traps, and a
+    # name-keyed option would have invalidated every YAML that mentioned one.
+    # The defaults live in traps.DEFAULT_TRAP_WEIGHTS (the reviewed table)
+    # rather than here, so one registry owns names, keys and weights together.
+    #
+    # default is the FULL table, not {}: OptionDict renders its default into
+    # the generated YAML template, and an empty default would document the
+    # option as "write your own" while hiding the numbers a player is actually
+    # editing away from.
+    display_name = "Trap Weights"
+    supports_weighting = False
+    default = dict(DEFAULT_TRAP_WEIGHTS)
+    valid_keys = list(TRAP_WEIGHT_KEYS)
+
+    def verify_keys(self) -> None:
+        # Core's VerifyKeys already rejects unknown keys, but with a message
+        # that only lists the allowed set. This one names the CTR option, says
+        # what the keys are, and range-checks the values -- and it is the same
+        # function generate_early calls, so a rolled YAML and a
+        # programmatically built world fail identically.
+        validate_trap_weights(self.value)
 
 
 class Itemsanity(Toggle):
@@ -841,6 +902,7 @@ class ctrAPOptions(PerGameCommonOptions):
     randomize_gem_cup_tracks: RandomizeGemCupTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
+    trap_weights: TrapWeights
     itemsanity: Itemsanity
     # Papu's Pyramid mask helper (#223)
     tizi_helper: TiziHelper
@@ -925,9 +987,9 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                      PodiumPlacementChecks, PodiumFinishRungs,
                      PodiumAnyPositionRung, PodiumHeldRungs,
                      PodiumHeldFifthRung],
-    "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TiziHelper,
-                     WumpaBundles, ProgressiveStartingWumpa, WumpaCheck,
-                     TurboGrant],
+    "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TrapWeights,
+                     TiziHelper, WumpaBundles, ProgressiveStartingWumpa,
+                     WumpaCheck, TurboGrant],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can

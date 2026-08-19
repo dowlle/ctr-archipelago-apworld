@@ -163,9 +163,9 @@ class TestRungSizingGeneration(unittest.TestCase):
                     1 for item in mw.itempool if item.player == world.player
                     and item.name != "Wumpa Fruit"
                     and item.name not in rung_sizer._SURFACE_ITEM_NAMES
-                    and item.name not in {"Icy Road Trap", "Low Gravity Trap",
-                                          "No Brakes Trap", "Forced Boost Trap",
-                                          "First Person Trap"})
+                    and item.name not in {"Icy Road", "Low Gravity",
+                                          "Forced USF", "Forced Boost",
+                                          "First Person"})
                 self.assertEqual(actual, expected)
 
     def test_predicted_goal_reserve_matches_installed_goal(self):

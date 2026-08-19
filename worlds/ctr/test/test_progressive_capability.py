@@ -365,7 +365,7 @@ class TestItemCodeStability:
             # Reserved (per_character) or option-driven (global) -- either
             # way the TABLE count is 0; actual per-seed counts are computed
             # in progressive_capability.created_item_counts, Trap-item
-            # precedent (data/items.json's Icy Road Trap etc. are also 0).
+            # precedent (data/items.json's Icy Road etc. are also 0).
             assert by_name[name]["count"] == 0
 
     def test_no_duplicate_codes_across_whole_table(self):

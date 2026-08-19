@@ -43,12 +43,22 @@ class TestTurboGrantName(unittest.TestCase):
     def test_it_is_appended_one_past_the_223_amendment(self) -> None:
         """35010188 (Tizi Helper) was the previous last entry, so this one is
         35010189 -- the code the Contract's #223 datapackage note reserved.
-        Anything else means a renumber, which #224 forbids."""
+        Anything else means a renumber, which #224 forbids.
+
+        Turbo Grant is no longer the LAST entry: #280 appended three trap
+        identities after it. That is append-only and renumbers nothing, so the
+        property this test guards is unchanged; it is spelled out here rather
+        than dropped, so a future entry that does renumber still fails."""
         self.assertEqual(TURBO_GRANT_CODE, 35010189)
         self.assertEqual(TURBO_GRANT_CODE, TIZI_HELPER_CODE + 1)
-        codes = [item["code"] for item in load_item_table()]
+        table = load_item_table()
+        codes = [item["code"] for item in table]
         self.assertEqual(codes, list(range(35010000, 35010000 + len(codes))))
-        self.assertEqual(max(codes), TURBO_GRANT_CODE)
+        after = [item["name"] for item in table
+                 if item["code"] > TURBO_GRANT_CODE]
+        # Literal on purpose: importing the module under test's own list would
+        # let any append that also updated the registry slip past this guard.
+        self.assertEqual(after, ["Upside Down", "Mirror Mode", "Warpball Ambush"])
 
     def test_it_ships_inert_in_the_data_file(self) -> None:
         """count 0 in data/items.json: the option decides, not the table. The

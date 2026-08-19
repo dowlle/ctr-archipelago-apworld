@@ -39,50 +39,36 @@ from .Rules import set_rules
 from .Types import ctrAPItem
 
 
-# The v1 trap set. ORDER IS LOAD-BEARING: it must match the native effect enum
-# (AP_TrapEffect in ap/ap_traps.h) so item-id N maps to effect N on receipt. These
-# names also define the trailing item ids in data/items.json (contiguous after
-# Wumpa Fruit); the native received-item loop maps those ids -> AP_TrapReceive.
-TRAP_ITEM_NAMES = [
-    "Icy Road Trap",      # AP_TRAP_ICY
-    "Low Gravity Trap",   # AP_TRAP_LOWGRAV
-    "No Brakes Trap",     # AP_TRAP_USF_NOBRAKE
-    "Forced Boost Trap",  # AP_TRAP_BOOST
-    "First Person Trap",  # AP_TRAP_FIRSTPERSON
-]
-
-# The 11 trap names the 0.2.0 name freeze (#177) minted from the H-dossier
-# ruling (ruled 2026-08-10 16:28/16:30). They are NOT in TRAP_ITEM_NAMES above
-# and that is deliberate: TRAP_ITEM_NAMES is the BUILDABLE set -- it drives the
-# trap_fill_percentage draw and its order is pinned to native's AP_TrapEffect
-# enum, so a name whose native effect does not exist yet must stay out of it or
-# the fill would hand players a trap that does nothing. These names are inert
-# (count 0 in data/items.json, never drawn); each one joins TRAP_ITEM_NAMES, in
-# native enum order, in the build that implements its effect.
+# The trap family now lives in traps.py, which owns the canonical names, the
+# `trap_weights` machine keys and the weighted draw as ONE table -- see that
+# module's docstring for the 0.2.0 renames (#280) and the buildable rule. The
+# three lists are re-exported here because they were importable from the
+# package before the move, and because everything else in this file reads them
+# by these names.
 #
-# They ARE in the "Traps" item name group below, because item_name_groups is
+# TRAP_ITEM_NAMES is the BUILDABLE set: it drives the trap_fill_percentage draw
+# and its order is pinned to native's AP_TrapEffect enum (ap/ap_traps.h), so a
+# name whose native effect does not exist yet must stay out of it or the fill
+# would hand players a trap that does nothing.
+#
+# FROZEN_TRAP_ITEM_NAMES (11 names, #177, ruled 2026-08-10 16:28/16:30) and
+# REWORK_TRAP_ITEM_NAMES (3 names, #280, ruled 2026-08-19) are inert: count 0 in
+# data/items.json, never drawn. Each joins TRAP_ITEM_NAMES, in native enum
+# order, in the build that implements its effect.
+#
+# They ARE all in the "Traps" item name group below, because item_name_groups is
 # part of the datapackage payload AP checksums: adding a trap to its own group
 # later would be a SECOND datapackage churn, which is exactly what #177 spends
 # one bump to avoid. Group membership feeds !hint, item_links and
 # start_inventory_from_pool expansion; nothing in fill reads it, so this changes
 # no placement.
 #
-# Trap registry capacity: 5 shipped + 11 = 16 effect types, exactly native's
-# AP_TRAP_REGISTRY_CAP. The native build that lands the last of these must bump
-# that constant or the final trap silently has no slot (flagged in the ruling).
-FROZEN_TRAP_ITEM_NAMES = [
-    "Wumpa Reset Trap",
-    "Flatten Trap",
-    "Item Reroll Trap",
-    "Auto-Use Trap",
-    "Empty Crates Trap",
-    "Weakened Kart Trap",
-    "No Boost Trap",
-    "Wireframe Trap",
-    "Nitro Trap",
-    "Reverse Controls Trap",
-    "Red Potion Trap",
-]
+# Trap registry capacity: 19 effect types now, above native's current
+# AP_TRAP_REGISTRY_CAP of 16. The native wave that lands these effects must
+# raise that constant or the last traps silently have no slot.
+from . import traps
+from .traps import (ALL_TRAP_ITEM_NAMES, FROZEN_TRAP_ITEM_NAMES,
+                    REWORK_TRAP_ITEM_NAMES, TRAP_ITEM_NAMES)
 
 # Comfort-only issues #14/#15 pack. It stays atomic when a reduced location
 # set cannot host all five, rather than emitting a seed-dependent subset.
@@ -161,11 +147,11 @@ class ctrAPWorld(World):
         "CTR Tokens": {"Red CTR Token", "Green CTR Token", "Blue CTR Token",
                        "Yellow CTR Token", "Purple CTR Token"},
         "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
-        # Sourced from the two trap constants above so the group cannot drift
-        # from either the native effect enum (the buildable set) or the #177
-        # freeze (the frozen set). All 16 are in the group; only the 5 buildable
-        # ones are ever drawn into a pool.
-        "Traps": set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES),
+        # Sourced from the trap registry so the group cannot drift from the
+        # native effect enum (the buildable set), the #177 freeze or the #280
+        # rework. All 19 are in the group; only the 5 buildable ones are ever
+        # drawn into a pool.
+        "Traps": set(ALL_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
     }
 
@@ -1510,18 +1496,18 @@ class ctrAPWorld(World):
         # (there len(pool) == len(mw.itempool)).
         n_filler = max(0, unfilled - len(pool))
         # Trap fill: replace trap_fill_percentage% of the filler slots with traps,
-        # drawn UNIFORMLY across the 5 trap effects. Traps are non-progression, so
-        # this never changes reachability at any value. DEFAULT 0 IS GENERATION-
-        # NEUTRAL BY CONSTRUCTION: the else branch is byte-identical to the old
-        # Wumpa-only fill and no world.random draw is taken, so a default seed's
-        # spoiler + slot_data are unchanged. (Per-trap weighting is a flagged v2
-        # retune -- v1 is uniform.)
+        # drawn against the player's trap_weights (#280 -- the uniform v1 draw is
+        # gone). Traps are non-progression, so this never changes reachability at
+        # any value. trap_fill_percentage 0 IS GENERATION-NEUTRAL BY
+        # CONSTRUCTION: the else branch is byte-identical to the old Wumpa-only
+        # fill and no world.random draw is taken, so such a seed's spoiler +
+        # slot_data are unchanged -- which is also why an all-zero weight table
+        # is only an error when the fill is above 0.
         trap_pct = self.options.trap_fill_percentage.value
         if trap_pct > 0 and n_filler > 0:
             n_traps = (n_filler * trap_pct) // 100
-            for _ in range(n_traps):
-                pool_item = self.create_item(self.random.choice(TRAP_ITEM_NAMES))
-                mw.itempool.append(pool_item)
+            for trap_name in traps.draw_trap_names(self, n_traps):
+                mw.itempool.append(self.create_item(trap_name))
             mw.itempool += [self.create_item(wumpa_family.draw_filler_name(self))
                             for _ in range(n_filler - n_traps)]
         else:

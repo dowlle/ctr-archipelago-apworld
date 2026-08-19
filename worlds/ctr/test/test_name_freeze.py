@@ -31,6 +31,7 @@ from worlds.AutoWorld import AutoWorldRegister
 
 from .. import (
     FROZEN_TRAP_ITEM_NAMES,
+    REWORK_TRAP_ITEM_NAMES,
     TRAP_ITEM_NAMES,
     item_boxes,
     itemsanity,
@@ -76,6 +77,12 @@ EXPECTED_ITEM_BLOCKS = [
     # nothing renumbered, nothing renamed, no second datapackage bump. Its own
     # block for the same reason as the one above.
     ("224 turbo grant amendment", 35010189, 35010189, 1),
+    # #280, the 0.2.0 trap rework. Three NEW trap identities (Upside Down,
+    # Mirror Mode, Warpball Ambush), appended on the same terms as the two
+    # amendments above: nothing renumbered, no second datapackage bump. The
+    # rework also RENAMED 16 existing traps in place; renames move no id and so
+    # add no block here -- test_trap_rework.py owns that half.
+    ("280 trap rework identities", 35010190, 35010192, 3),
 ]
 
 #: Every name the freeze appended to data/items.json, in append order.
@@ -92,6 +99,7 @@ FROZEN_ITEM_NAMES = (
     + ["Gas Pedal"]
     + [TIZI_HELPER_ITEM]   # #223 ruled amendment, appended after the freeze
     + [TURBO_GRANT_ITEM]   # #224 ruled amendment, appended after #223
+    + REWORK_TRAP_ITEM_NAMES  # #280 trap rework, appended after #224
 )
 
 
@@ -105,8 +113,9 @@ class TestNameFreezeCensus(unittest.TestCase):
 
     def test_total_registered_names(self) -> None:
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        # 188 frozen by #177, plus the two ruled amendments (#223, #224).
-        self.assertEqual(len(world_type.item_name_to_id), 190)
+        # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
+        # the three trap identities the rework minted (#280).
+        self.assertEqual(len(world_type.item_name_to_id), 193)
         self.assertEqual(len(world_type.location_name_to_id), 574)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
@@ -138,16 +147,19 @@ class TestNameFreezeCensus(unittest.TestCase):
         self.assertEqual(appended, FROZEN_ITEM_NAMES)
 
     def test_the_ruled_amendments_sit_one_past_the_freeze(self) -> None:
-        """#223 and #224 reopened the namespace for exactly one name each. Pin
-        the boundary: the frozen set still ends at Gas Pedal, and the two
-        amendments are the only entries after it, in ruling order."""
+        """#223 and #224 reopened the namespace for exactly one name each, and
+        #280 for three. Pin the boundary: the frozen set still ends at Gas
+        Pedal, and those five are the only entries after it, in ruling order."""
         table = load_item_table()
         by_code = {item["code"]: item["name"] for item in table}
         self.assertEqual(by_code[35010187], "Gas Pedal")
         self.assertEqual(by_code[TIZI_HELPER_CODE], TIZI_HELPER_ITEM)
         self.assertEqual(by_code[TURBO_GRANT_CODE], TURBO_GRANT_ITEM)
         self.assertEqual(TURBO_GRANT_CODE, TIZI_HELPER_CODE + 1)
-        self.assertEqual(max(by_code), TURBO_GRANT_CODE)
+        self.assertEqual(
+            [by_code[TURBO_GRANT_CODE + i] for i in (1, 2, 3)],
+            REWORK_TRAP_ITEM_NAMES)
+        self.assertEqual(max(by_code), TURBO_GRANT_CODE + 3)
 
     def test_the_three_families_the_sweep_recovered_are_registered(self) -> None:
         """Character unlocks (#54/#209), the gas pedal (R-I) and the trial-track
@@ -197,20 +209,25 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_frozen_traps_stay_out_of_the_buildable_draw_list(self) -> None:
         """TRAP_ITEM_NAMES drives the trap_fill_percentage draw and its order is
-        pinned to native's AP_TrapEffect enum. A frozen trap with no native
-        effect must not be drawable, or a player receives a trap that does
-        nothing."""
+        pinned to native's AP_TrapEffect enum. A trap with no native effect --
+        frozen by #177 or minted by #280 -- must not be drawable, or a player
+        receives a trap that does nothing."""
         self.assertEqual(len(TRAP_ITEM_NAMES), 5)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
-        self.assertEqual(set(TRAP_ITEM_NAMES) & set(FROZEN_TRAP_ITEM_NAMES), set())
+        self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 3)
+        unbuildable = set(FROZEN_TRAP_ITEM_NAMES) | set(REWORK_TRAP_ITEM_NAMES)
+        self.assertEqual(set(TRAP_ITEM_NAMES) & unbuildable, set())
 
     def test_frozen_traps_are_in_the_datapackage_group_anyway(self) -> None:
         """item_name_groups is part of the checksummed payload, so a trap added
         to its own group later would spend a second bump."""
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        traps = set(world_type.item_name_groups["Traps"])
-        self.assertEqual(traps, set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES))
-        self.assertEqual(len(traps), 16)
+        trap_group = set(world_type.item_name_groups["Traps"])
+        self.assertEqual(
+            trap_group,
+            set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
+            | set(REWORK_TRAP_ITEM_NAMES))
+        self.assertEqual(len(trap_group), 19)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):
