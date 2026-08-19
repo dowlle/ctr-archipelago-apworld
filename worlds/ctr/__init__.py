@@ -1086,10 +1086,22 @@ class ctrAPWorld(World):
         o = self.options
         predicates: List = []
 
+        # Both Oxide goal events inherit Oxide Station's confirmed finish
+        # capability (triage ruling 2026-08-19): the challenge is raced on
+        # Oxide Station, so the composed goal must not become true from Key 4
+        # alone while the ordinary Trophy Race logic still demands the finish
+        # term. track_finish_term carries the whole ruling -- two Progressive
+        # Boosts at easy/medium, vacuous at hard shortcut knowledge, vacuous
+        # when the chain is not randomized, racer-aware in per-character mode.
+        from .usf_finish import track_finish_term
+        oxide_finish = track_finish_term("Oxide Station", self)
+
         if o.oxide_goal.value == OxideGoal.option_first:
             flag = self._add_goal_event(
                 "N. Oxide Garage", "N. Oxide's Challenge Cleared", "has('Key', 4)")
-            predicates.append(lambda state, f=flag: state.has(f, player))
+            predicates.append(
+                lambda state, f=flag, ft=oxide_finish:
+                    state.has(f, player) and ft(state, player))
             # Issue #27: keep the real goal location as a check (the client sends it
             # in the same moment as the goal, so it is claimed by play), but mark it
             # EXCLUDED so fill only places filler there. No world's progression can
@@ -1111,8 +1123,8 @@ class ctrAPWorld(World):
                 "has('Key', 4)")
             relic_rule = self._oxide_final_relic_rule()
             predicates.append(
-                lambda state, f=flag, r=relic_rule:
-                    state.has(f, player) and r(state))
+                lambda state, f=flag, r=relic_rule, ft=oxide_finish:
+                    state.has(f, player) and r(state) and ft(state, player))
             # Issue #27: exclude the real Final Challenge location only -- when
             # Oxide Goal is 'final' the FIRST Challenge is not this seed's goal
             # location and stays a normal, fillable check (issue #152 C8).

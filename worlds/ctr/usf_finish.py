@@ -102,6 +102,16 @@ USF_OR_HARD_SK_FINISH_TRACKS = usf_or_hard_finish_tracks()
 #: Every finish-gated track, whatever the term shape.
 ALL_USF_FINISH_TRACKS = USF_FINISH_TRACKS | USF_OR_HARD_SK_FINISH_TRACKS
 
+#: Single LOCATIONS that need USF although their track's finish does not
+#: (triage ruling 2026-08-19). N. Gin Labs' Platinum Time Trial is the one
+#: entry: without USF two of its item boxes cannot be reached in a Relic
+#: Race, which removes the ten-second perfect-box bonus and USF speed
+#: together, so the Platinum time is not realistically achievable. The
+#: ruling is deliberately narrow -- the Trophy Race, Sapphire, Gold, CTR
+#: Token Challenge and cups of that track stay ungated. No hard-shortcut
+#: escape: route knowledge does not restore the unreachable boxes.
+PLATINUM_USF_LOCATIONS = frozenset({"N. Gin Labs: Platinum Time Trial"})
+
 def usf_term(world, required_character=None):
     """The `(state, player) -> bool` term for "can finish a USF-gated track".
 
