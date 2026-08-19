@@ -1,11 +1,13 @@
 """Adaptive podium-rung sizing (issue #71).
 
 Podium's four sub-toggles are a parent/child ladder, not a scalar.  This
-module chooses the smallest *upward-only* layout that gives the generated
-pool a spare location.  It deliberately does not implement the downward half
-of #71: until #109 supplies real item-box locations, no live seed can exercise
-that behaviour.  It also never enables the master ``podium_placement_checks``
-toggle, which is an explicit player opt-out rather than a sizing preference.
+module computes the smallest layout that would give the generated pool a spare
+location.  It never changes a player-selected subcategory: if the configured
+layout is too small, generation raises with the required category count.  This
+supersedes the earlier host-gated upward expansion because existing host files
+carried its old default-on value and could not distinguish that inherited value
+from informed consent to override a YAML.  It also never enables the master
+``podium_placement_checks`` toggle.
 
 The nine effective layouts are listed in ``RUNG_LADDER``.  When a YAML enables
 a child while its parent is off, candidate selection expands the current raw
@@ -229,8 +231,9 @@ def required_categories(world) -> Optional[int]:
 
     ``None`` means the full five-category ladder cannot satisfy the current
     live registry and item pool. The extra category above the arithmetic
-    minimum is the ruled working margin; the practical floor of three applies
-    only while either capability pack is enabled.
+    minimum is the ruled working margin. The pre-box practical floor of three
+    remains only when Item Box Locations are off; authored boxes provide the
+    live surplus that made lower player-selected rung layouts exercisable.
     """
     demand = predicted_mandatory_pool(world)
     demand += predicted_goal_excluded_reserve(world.options)
@@ -242,9 +245,15 @@ def required_categories(world) -> Optional[int]:
         return None
     if _capability_packs_active(world):
         # Capability packs are the only live consumers that need the ruled
-        # working margin. With them off, preserve a player's legal zero-rung
-        # seed when its mandatory pool already fits exactly.
-        return max(min(minimum + 1, 5), 3)
+        # working margin. Before authored boxes landed, a floor of three kept
+        # the tight C=2 boundary away from a one-location census discrepancy.
+        # Boxes are measured directly in `base`, so they make the downward half
+        # real: retain the one-category margin but do not force disabled rungs
+        # back into a box-backed seed.
+        margin = min(minimum + 1, 5)
+        if bool(world.options.box_locations.value):
+            return margin
+        return max(margin, 3)
     return minimum
 
 
@@ -303,25 +312,9 @@ def apply_rung_sizing(world) -> Optional[str]:
             "to false for all-unlocked mode), Progressive Stats (12) and "
             "Progressive Boost (2-3). All three add pool items without adding "
             "any locations of their own.")
-    if not bool(world.settings.allow_rung_sizing):
-        raise OptionError(
-            "CTR: this seed needs more Podium Rung capacity, but host.yaml "
-            "disables adaptive rung sizing. Enable ctr.allow_rung_sizing, turn on "
-            "more podium rung subcategories, or reduce the enabled item-pool options.")
-    selected = _select_layout(world.options, target)
-    if selected is None:
-        raise OptionError(
-            "CTR: no upward-only Podium Rung layout can satisfy this seed's "
-            "capacity requirement without disabling a player-selected toggle.")
-    previous = _raw_values(world.options)
-    for name, value in zip(_TOGGLE_NAMES, (selected.finish, selected.any_position,
-                                            selected.held, selected.held_fifth)):
-        if value:
-            getattr(world.options, name).value = True
-    current_names = category_count(world.options)
-    message = (
-        f"CTR: adaptive podium rung sizing raised player {world.player} from "
-        f"{current} to {current_names} category(s) (target {target}; raw "
-        f"subtoggles {previous} -> {_raw_values(world.options)}).")
-    logger.warning(message)
-    return message
+    raise OptionError(
+        f"CTR: this seed needs at least {target} Podium Rung categories, but "
+        f"the YAML selects {current}. CTR will not turn disabled rung options "
+        "back on. Enable more podium rung subcategories, enable another "
+        "location family such as Item Box Locations, or reduce item-pool "
+        "options such as Progressive Boost or Progressive Stats.")

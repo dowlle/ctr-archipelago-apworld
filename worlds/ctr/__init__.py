@@ -28,6 +28,8 @@ from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
 from . import characters
 from . import progressive_capability
 from . import rung_sizer
+from .spoiler_pad_map import changed_pad_destination_rows
+from . import version
 from .Regions import create_regions
 from .relic_tiers import (
     RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
@@ -1877,6 +1879,10 @@ class ctrAPWorld(World):
                 # steers no gate, no location, no item and no logic, so two seeds
                 # differing only in it are identical apart from the key.
                 "world_version": self.world_version.as_simple_string(),
+                # Human-facing prerelease identity. Archipelago requires the
+                # manifest world_version above to stay numeric. This additive
+                # diagnostic key never steers logic, gates, items or locations.
+                "build_version": version.BUILD_VERSION,
                 # Progressive Boost / Progressive Stats (issues #12, #13).
                 # ADDITIVE keys, no schema bump (Q28 already makes schema 7
                 # unconditional on every 0.2.0 seed, so this feature rides
@@ -2136,6 +2142,21 @@ class ctrAPWorld(World):
                 f"precollected {len(items)} progression item(s) into starting "
                 f"inventory so the greedy fill converges -- {', '.join(items)}. "
                 f"Seed stays fully reachable; this is a diagnosable rescue.\n")
+
+        # Issue #261: tell the player which destination each changed physical
+        # pad loads. Identity entries produce no section at all, preserving the
+        # exact spoiler output for seeds without an effective destination swap.
+        destination_rows = changed_pad_destination_rows(
+            self._resolve_warp_pad_map(),
+            getattr(self, "warp_pad_ids", {}),
+        )
+        if destination_rows:
+            spoiler_handle.write(
+                f"\n\nCTR shuffled warp-pad destinations ({_player_name}):\n")
+            for _, physical_name, destination_name in destination_rows:
+                spoiler_handle.write(
+                    f"  {physical_name}: loads {destination_name}\n")
+
         padgate = self._resolve_warp_pad_unlock()
         id_to_name = {
             meta["level_id"]: pad_name

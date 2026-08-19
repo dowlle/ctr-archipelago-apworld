@@ -47,23 +47,54 @@ class TestRungLadder(unittest.TestCase):
 
 
 class TestRungSizingGeneration(unittest.TestCase):
-    def test_capability_packs_raise_a_minimal_layout_to_the_conditional_floor(self):
+    def test_legacy_host_opt_in_cannot_override_yaml(self):
+        mw = setup_multiworld(ctrAPWorld, seed=711)
+        world = mw.worlds[1]
+        world.options.podium_finish_rungs.value = False
+        world.options.podium_any_position_rung.value = False
+        world.options.podium_held_rungs.value = False
+        world.options.podium_held_fifth_rung.value = False
+        world.options.progressive_boost.value = 1
+        world.settings.allow_rung_sizing = True
+        with self.assertRaises(OptionError) as ctx:
+            rung_sizer.apply_rung_sizing(world)
+        self.assertIn("will not turn disabled rung options back on", str(ctx.exception))
+        self.assertEqual(rung_sizer.category_count(world.options), 0)
+        self.assertFalse(world.options.podium_held_rungs.value)
+        self.assertFalse(world.options.podium_held_fifth_rung.value)
+        self.assertFalse(world.options.podium_finish_rungs.value)
+
+    def test_held_opt_out_fails_instead_of_silently_expanding(self):
+        for capability in ("progressive_boost", "progressive_stats"):
+            with self.subTest(capability=capability), self.assertRaises(OptionError) as ctx:
+                setup_multiworld(
+                    ctrAPWorld, seed=715,
+                    options={
+                        "podium_placement_checks": True,
+                        "podium_finish_rungs": True,
+                        "podium_any_position_rung": True,
+                        "podium_held_rungs": False,
+                        "podium_held_fifth_rung": False,
+                        capability: "shared_global",
+                    })
+            self.assertIn("will not turn disabled rung options back on", str(ctx.exception))
+
+    def test_box_supply_preserves_held_opt_out_under_capability_pressure(self):
         mw = setup_multiworld(
-            ctrAPWorld, seed=711,
+            ctrAPWorld, seed=716,
             options={
                 "podium_placement_checks": True,
-                "podium_finish_rungs": False,
-                "podium_any_position_rung": False,
+                "podium_finish_rungs": True,
+                "podium_any_position_rung": True,
                 "podium_held_rungs": False,
                 "podium_held_fifth_rung": False,
                 "progressive_boost": "shared_global",
+                "box_locations": True,
             })
         world = mw.worlds[1]
-        self.assertEqual(rung_sizer.category_count(world.options), 3)
-        # C=3 has two representations. The ruling chooses held-only first.
-        self.assertTrue(world.options.podium_held_rungs.value)
-        self.assertTrue(world.options.podium_held_fifth_rung.value)
-        self.assertFalse(world.options.podium_finish_rungs.value)
+        self.assertEqual(rung_sizer.category_count(world.options), 2)
+        self.assertFalse(world.options.podium_held_rungs.value)
+        self.assertFalse(world.options.podium_held_fifth_rung.value)
 
     def test_sufficient_default_layout_is_a_noop(self):
         mw = setup_multiworld(ctrAPWorld, seed=712)
@@ -98,7 +129,7 @@ class TestRungSizingGeneration(unittest.TestCase):
         world.settings.allow_rung_sizing = False
         with self.assertRaises(OptionError) as ctx:
             rung_sizer.apply_rung_sizing(world)
-        self.assertIn("host.yaml", str(ctx.exception))
+        self.assertIn("will not turn disabled rung options back on", str(ctx.exception))
         self.assertEqual(rung_sizer.category_count(world.options), 0)
 
     def test_prediction_matches_live_non_filler_pool_across_option_matrix(self):

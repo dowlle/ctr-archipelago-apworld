@@ -210,6 +210,26 @@ def raise_if_oxidefinal_goal_has_no_progression_tier(world):
             f"tiers progression), or change the goal or mode.")
 
 
+def raise_if_oxide_final_count_exceeds_mode_capacity(world):
+    """Only total_relics can use the extended 19-54 range.
+
+    Each specific tier contains at most 18 relics, and any_relic_type still
+    asks one individual tier to reach the threshold. Reject the mismatched
+    combination before supply and accessibility guards produce a less direct
+    error. The final-Oxide location uses this gate even when it is not the
+    selected goal, so the constraint is mode-based rather than goal-based.
+    """
+    from .Options import FinalOxideUnlock
+    count = world.options.oxide_final_challenge_relic_count.value
+    mode = world.options.oxide_final_challenge_unlock
+    if count > 18 and mode.value != FinalOxideUnlock.option_total_relics:
+        raise OptionError(
+            f"CTR: oxide_final_challenge_relic_count={count} exceeds the "
+            f"18-relic capacity of mode '{mode.current_key}'. Only "
+            f"oxide_final_challenge_unlock 'total_relics' supports counts "
+            f"from 19 through 54.")
+
+
 def _oxide_final_supply_shortfall(world):
     """Shared arithmetic for the two Final Challenge supply checks below
     (issue #53; kept in lockstep with `_relic_progression_map`'s access_full
@@ -289,6 +309,7 @@ def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
     raise_if_composed_goal_is_empty(world)
     raise_if_gems_required_goal_needs_excluded_cups(world)
+    raise_if_oxide_final_count_exceeds_mode_capacity(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
 

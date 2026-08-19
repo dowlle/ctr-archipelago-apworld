@@ -5,17 +5,15 @@ from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle
 
 
 class OxideGoal(Choice):
-    """Which of N. Oxide's Challenges must be beaten for the goal to be met.
+    """What finishing the game means.
 
-    - **none**: no Oxide requirement. Combine with `Bosses Required Goal`
-      and/or `Gems Required Goal` instead.
-    - **first** (default): defeat N. Oxide's Challenge.
-    - **final**: collect relics, then defeat N. Oxide's Final Challenge.
+    - **first** (default): beat Oxide, the retail ending.
+    - **final**: beat Oxide's Final Challenge, the full-completion
+      ending.
+    - **none**: Oxide is not part of the goal at all.
 
-    Issue #152: composes with `Bosses Required Goal` and `Gems Required
-    Goal` as an AND of every condition set active (non-'none'/non-zero). At
-    least one of the three must be active; a YAML that sets all three to
-    their off value fails generation with a clear message."""
+    Combine it with Bosses Required and Gems Required to build the goal you
+    want; every condition you set must be met."""
     display_name = "Oxide Goal"
     option_none = 0
     option_first = 1
@@ -24,13 +22,14 @@ class OxideGoal(Choice):
 
 
 class BossesRequiredGoal(Range):
-    """How many of the 4 boss races (Ripper Roo, Papu Papu, Komodo Joe,
-    Pinstripe) must be personally won for the goal to be met. 0 (default)
-    means this condition is off.
+    """How many of the 4 boss races you must win for the goal.
 
-    Issue #152: composes with `Oxide Goal` and `Gems Required Goal` as an AND
-    of every active condition. "Personally won" means the boss-race location
-    itself was checked, not merely holding N trophies or N boss-garage Keys."""
+    Ripper Roo, Papu Papu, Komodo Joe and Pinstripe. 0 (default) turns this
+    condition off.
+
+    "Won" means you actually beat the boss - holding trophies or garage Keys
+    does not count. Combines with Oxide Goal and Gems Required; every
+    condition you set must be met."""
     display_name = "Bosses Required Goal"
     range_start = 0
     range_end = 4
@@ -38,14 +37,14 @@ class BossesRequiredGoal(Range):
 
 
 class GemsRequiredGoal(Range):
-    """How many of the 5 Gems must be held for the goal to be met. 0
-    (default) means this condition is off.
+    """How many of the 5 Gems you must hold for the goal.
 
-    Issue #152: composes with `Oxide Goal` and `Bosses Required Goal` as an
-    AND of every active condition. When active (> 0) with `Shuffle Gems` on,
-    requires `Include Gem Cup Warp Pads` on too -- otherwise the Gems the
-    goal needs would sit on cups this seed excluded, generation raises a
-    clear message instead of shipping an unwinnable seed."""
+    0 (default) turns this condition off. Combines with Oxide Goal and Bosses
+    Required; every condition you set must be met.
+
+    If you ask for Gems with Shuffle Gems on, you also need Include Gem Cup
+    Warp Pads on - otherwise the Gems would sit on cups the seed left out.
+    Generation says so rather than handing you an unwinnable seed."""
     display_name = "Gems Required Goal"
     range_start = 0
     range_end = 5
@@ -62,8 +61,8 @@ class FinalOxideUnlock(Choice):
     - **total_relics**: all relics added together reach the count.
 
     Tiers are independent: a Platinum relic does not count toward a Gold
-    requirement. Requiring a tier whose progression option is `never` fails
-    generation. The old `18_gold_and_platinum_relics` value was removed."""
+    requirement. Requiring a tier whose relic count is 0 fails generation.
+    The old `18_gold_and_platinum_relics` value was removed."""
     # Item-side independence is unrelated to the location-side award-path
     # hierarchy (beating a Platinum time also sends that track's Gold and
     # Sapphire checks) -- that is about checks, not owned relic items.
@@ -84,13 +83,16 @@ class FinalOxideUnlock(Choice):
 
 
 class FinalOxideRelicCount(NamedRange):
-    """How many relics `Oxide's Final Challenge Unlock` requires (1-18). For
-    total_relics it is the summed total; for any_relic_type it is the threshold
-    any single tier must reach."""
-    # Totals above 18 are deliberately not offered (all-relics-slog territory).
+    """How many relics `Oxide's Final Challenge Unlock` requires.
+
+    - **total_relics** supports 1-54 by adding Sapphire, Gold and Platinum.
+    - Every other mode supports 1-18 because it checks one 18-item tier.
+
+    Values above 18 with a non-total mode fail generation clearly instead of
+    producing an impossible goal."""
     display_name = "Oxide's Final Challenge Relic Count"
     range_start = 1
-    range_end = 18
+    range_end = 54
     default = 18
     special_range_names = {"all": 18}
 
@@ -102,7 +104,7 @@ class ShuffleGems(DefaultOnToggle):
       become normal checks.
     - **off**: each Gem stays on its own Gem Cup reward (vanilla placement).
 
-    Works with every goal, including `All Gems`."""
+    Works with every goal, including a Gems Required goal."""
     display_name = "Shuffle Gems"
 
 
@@ -112,7 +114,8 @@ class ShuffleWarpPadsGemCups(DefaultOnToggle):
     randomized entry requirement.
 
     - Not the same as `Shuffle Gems`: that moves the Gem items around; this one
-      includes the cup races themselves. Must be on for the `All Gems` goal.
+      includes the cup races themselves. It must be on when a shuffled Gem is
+      required for your goal.
     - **off**: cups stay fully vanilla, and shuffled Gems are pinned back onto
       their own cups."""
     # The Key-2 Cups Room hub gate is always kept on top of a randomized cup
@@ -125,19 +128,13 @@ class ShuffleWarpPadsGemCups(DefaultOnToggle):
 
 
 class RandomizeGemCupTracks(Toggle):
-    """Randomize which tracks each Gem Cup runs.
+    """Shuffle which four tracks each Gem Cup runs.
 
-    - **off** (default): every Gem Cup runs its vanilla four tracks.
-    - **on**: every leg of every cup is drawn at random from the 16 trophy
-      tracks. A track can appear in several cups, several times in one cup,
-      or not at all. Slide Coliseum and Turbo Track are never drawn. The
-      Purple Gem Cup loses its vanilla all-boss-track line-up like any other
-      cup.
+    The retail Gem Cups always run the same four tracks. Turn this on and
+    every leg is drawn independently from the 16 trophy tracks. A track may
+    appear more than once, while Slide Coliseum and Turbo Track are not drawn.
 
-    A track's own warp pad always stays an independent way to race it, so no
-    draw can lock a check away. Seeds with this on are marked schema 7: an
-    older client warns that it is out of date instead of silently loading
-    the vanilla cup tracks."""
+    The cup still awards its Gem. Only the tracks change."""
     # Ruled 2026-08-07 (issue #166): exactly two states, vanilla or
     # completely random over the 16-trophy-track pool, repeats allowed; the
     # reporter's intermediate "shuffled" permutation mode was dropped. Wire:
@@ -155,29 +152,23 @@ class ShuffleKeys(DefaultOnToggle):
 
 
 class ProgressiveBoostMode(Choice):
-    """Stage the Progressive Boost chain (issue #12, ruled 07-16 + the 07-26
-    correction).
+    """Turn your kart's boost into something you have to find.
 
-    - **off** (default): no Progressive Boost items exist this seed. Every
-      kart keeps full self-earned boost (slides, hang time, reserve items)
-      and every turbo pad works at its vanilla strength -- byte-identical to
-      a pre-#12 seed, no RNG draw taken for this feature.
-    - **shared_global**: one Progressive Boost chain enters the pool. Its
-      received copies raise a single shared tier for every character: 0 =
-      no self-earned boost at all (ordinary turbo pads still work; Super
-      Turbo pads act as ordinary pads), 1 = Boost, 2 = USF-level speeds,
-      and, only with `Progressive Boost: Blue Fire` also on, 3 = the Blue
-      Fire capstone. Logic follows the tier, so checks that genuinely need
-      boost wait for it -- most visibly Hot Air Skyway, whose climb cannot be
-      finished below USF: its trophy race, time trials, token challenge and
-      finish rungs, plus the Gem Cups that run it as a leg, all need the
-      second copy.
-    - **per_character**: each of the 16 racers gets its own separate chain
-      (16x the shared-global pool size), per the 2026-08-07 completability
-      ruling. Gates use the required racer on racer-locked tracks and any
-      currently driveable racer elsewhere. One racer must satisfy every
-      capability term on a gate. Rich item-box seeds can seat the private
-      pool; insufficient combinations raise a supply-specific OptionError."""
+    Normally every kart can boost from the start. Switch this on and boost
+    arrives from the multiworld in stages: ordinary boost first, then Ultra
+    Sacred Fire. If Blue Fire is also on, one final Retro Fueled-style tier
+    turns turbo pads into Blue Fire pads, lets powerslides stack its reserves,
+    preserves reserves through U-turns, and turns the exhaust blue.
+
+    Some checks genuinely need the speed and stay out of reach until it
+    arrives. Hot Air Skyway is the clearest case - its mid-track climb
+    cannot be cleared below USF.
+
+    - **off** (default): every kart boosts normally, as in the retail game.
+    - **shared_global**: one boost ladder, shared by every character.
+    - **per_character**: each of the 16 racers has their own ladder. That is
+      sixteen times as many items, so the seed needs plenty of places to put
+      them; if there is not enough room, generation stops and says so."""
     # Classification: `useful` (the spine-1 shape) while this option is off,
     # `progression` in every seed that randomizes the chain. It started
     # per-seed -- #145's Turbo checks and #109's boost-gated box slots were
@@ -192,32 +183,34 @@ class ProgressiveBoostMode(Choice):
 
 
 class ProgressiveBoostBlueFire(Toggle):
-    """Add the Blue Fire capstone tier above USF to the Progressive Boost
-    chain (issue #12, 07-26 correction). Values sourced from CTR Unlimited's
-    Retro Fueled mode.
+    """Add a Retro Fueled-style Blue Fire tier after Ultra Sacred Fire.
 
-    - **off** (default): the chain caps at USF -- 3 tiers, 2 received copies.
-    - **on**: the chain gains a 4th tier -- 4 tiers, 3 received copies.
+    The final Progressive Boost turns turbo pads into Blue Fire pads with one
+    second of reserves. Powerslides can stack those reserves without losing
+    Blue Fire, U-turns retain reserves, and active Blue Fire exhaust is blue.
 
-    No effect while `Progressive Boost` is off."""
+    - **off** (default): the ladder stops at USF.
+    - **on**: one more tier, so one more Progressive Boost to find.
+
+    No effect while Progressive Boost is off."""
     display_name = "Progressive Boost: Blue Fire"
 
 
 class LogicDifficulty(Choice):
-    """How much capability logic expects for demanding race checks.
+    """How much the logic expects you to be able to do.
 
-    - **easy**: use the conservative ruled gates. On the seven confirmed
-      easy-category tracks, the Trophy Race, Finish on Podium and Held 1st
-      require basic Boost or two useful weapon families.
-    - **medium** (default): apply that requirement to the Trophy Race only;
-      placement rungs remain available at the demonstrated floor.
-    - **hard**: expect the demonstrated floor win and add no capability gate
-      to those seven tracks.
+    It only applies while both Progressive Boost and Itemsanity are
+    randomizing your capabilities.
 
-    Intrinsic geometry gates are independent of this preference. Cortex Castle
-    and Hot Air Skyway still need USF at every difficulty; Oxide Station still
-    needs USF unless Shortcut Knowledge is hard.
-    """
+    - **easy**: winning a race, finishing on the podium and holding first
+      all wait until you have boost or a couple of decent weapons.
+    - **medium** (default): only winning the race waits. Placement checks
+      stay available.
+    - **hard**: no extra requirement; you are expected to manage.
+
+    Tracks whose geometry genuinely demands speed ignore this setting.
+    Cortex Castle and Hot Air Skyway always need USF, and so does Oxide
+    Station unless Shortcut Knowledge is set to hard."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
@@ -226,25 +219,15 @@ class LogicDifficulty(Choice):
 
 
 class ProgressiveStatsMode(Choice):
-    """Stage the Progressive Speed / Acceleration / Turning chains (issue
-    #13, ruled 07-16 + the 07-26 update + the 2026-08-07 five-rank ladder
-    ruling).
+    """Turn your kart's top speed, acceleration and turning into items.
 
-    - **off** (default): no Progressive stat items exist this seed. Every
-      character keeps its normal vanilla stat table -- byte-identical to a
-      pre-#13 seed, no RNG draw taken for this feature.
-    - **shared_global**: three chains (Progressive Top Speed, Progressive
-      Acceleration, Progressive Turning) enter the pool, 4 copies each (12
-      items). While active every character starts at the ladder's bottom
-      rank (`VERY LOW`, the per-stat minimum across every vanilla engine
-      class) and received copies climb one shared rank per stat, per copy,
-      up through `LOW / MEDIUM / HIGH` to `VERY HIGH` -- a rank beyond the
-      best vanilla character. Character choice becomes cosmetic for these
-      three stats while this mode is active.
-    - **per_character**: each of the 16 racers gets its own separate set of
-      three chains (192 items total), per the 2026-08-07 ruling. The same
-      single-driveable-racer semantics as Progressive Boost apply. Hard-tier
-      item-box gates read all three stat chains from that one racer."""
+    Every kart starts at the bottom of all three and climbs as the stats
+    arrive. The ladder reaches beyond the retail maximum at the top end.
+
+    - **off** (default): karts keep their normal stats.
+    - **shared_global**: one set of stat ladders, shared by every character.
+    - **per_character**: a separate set for each of the 16 racers. Sixteen
+      times as many items, so the seed needs the room to hold them."""
     display_name = "Progressive Stats"
     option_off = 0
     option_shared_global = 1
@@ -254,7 +237,7 @@ class ProgressiveStatsMode(Choice):
 
 class TrapFillPercentage(Range):
     """What percentage of this slot's filler items are replaced by traps (Icy
-    Road, Low Gravity, No Brakes, Forced Boost, First Person -- each equally
+    Road, Low Gravity, No Brakes, Forced Boost, First Person - each equally
     likely).
 
       0             = no traps, filler stays Wumpa Fruit
@@ -272,16 +255,27 @@ class TrapFillPercentage(Range):
 
 
 class Itemsanity(Toggle):
-    """Add the eleven received weapon items and their 22 use-time checks.
+    """Turn weapons into items you have to unlock.
 
-    Each Adventure-reachable weapon has one ordinary check and one juiced check
-    (fired while holding at least ten Wumpa).  The native companion owns the
-    crate-roll filter and the use-time check hook; this option owns the AP item
-    pool, location set and additive wire declaration.
-    """
+    Until a weapon arrives from the multiworld you cannot get it from a crate
+    - the roulette hands you Wumpa Fruit instead. Using each weapon for the
+    first time is itself a check, and using one while holding ten fruit is a
+    second.
+
+    It changes how the whole game plays, not just what you collect."""
     display_name = "Itemsanity"
 
 class Lettersanity(Choice):
+    """Turn the C-T-R letters into checks, items, or both.
+
+    Every track hides the three letters that spell CTR. Normally collecting
+    all three wins you a token.
+
+    - **off** (default): letters work as they do in the retail game.
+    - **locations_only**: collecting a letter is a check.
+    - **locations_and_items**: collecting one is a check, and the letters
+      themselves also arrive from the multiworld.
+    - **items_only**: letters arrive as items and are not checks."""
     display_name = "Lettersanity"
     option_off = 0
     option_locations_only = 1
@@ -290,6 +284,13 @@ class Lettersanity(Choice):
     default = 0
 
 class LettersPerTrack(Range):
+    """How many of each track's three letters are used.
+
+    Lower it to shorten location-bearing Lettersanity modes. The seed randomly
+    chooses this many of each track's C, T, and R locations; at 3 all count.
+
+    This does not reduce **items_only**, which uses all 48 letter items and no
+    letter locations. It has no effect while Lettersanity is off."""
     display_name = "Letters Per Track"
     range_start = 1
     range_end = 3
@@ -297,53 +298,33 @@ class LettersPerTrack(Range):
 
 
 class TiziHelper(Toggle):
-    """Add the `Tizi Helper` item (#223): one received item that makes the first
-    row of four weapon boxes just past the Papu's Pyramid start line hand you a
-    Mask, for the Tiziano skip.
+    """Guarantee a Mask on the crate row before Papu's Pyramid's tricky jump.
 
-    Adds NO location, and nothing in logic ever requires it -- it is one useful
-    item spending one otherwise-filler slot. Off by default.
+    That jump is the single most common run-ender on the track. With this on,
+    the crate row just before it always contains an Aku Aku mask, so a clean
+    run is not decided by a coin flip.
 
-    With Itemsanity ON the helper needs the separate `Mask` weapon item as well,
-    and stays inert until both have been received. With Itemsanity off, the
-    helper item alone is enough.
-
-    REQUIRES the 0.2.0 native client, which owns the box identification and the
-    forced Mask. On an older client the item is received and does nothing.
-    """
+    With Itemsanity on you also need to have unlocked the Mask for it to
+    appear."""
     display_name = "Tizi Helper"
 
 
 class WumpaBundles(Toggle):
-    """Let filler slots roll `Small Wumpa Bundle` (3 fruit) and `Big Wumpa
-    Bundle` (a full kart) as well as plain `Wumpa Fruit` (1).
+    """Let filler contain bundles of Wumpa Fruit.
 
-    Plain fruit stays the common case on purpose: bundles enrich the filler
-    pool, they do not replace it. A seed whose every filler slot handed you ten
-    fruit would make the 10-wumpa check and Itemsanity's juiced checks trivial.
-
-    Adds no items and no locations of its own -- it only changes WHICH filler
-    name lands in a slot the pool was already going to fill. Off by default, and
-    a seed with it off is generated exactly as it would have been before this
-    option existed. REQUIRES the 0.2.0 native client, which owns the delivery.
-    """
+    Small bundles give 3 fruit and big bundles fill your kart to 10. Plain
+    single-fruit filler remains the most common result. This adds variety to
+    existing filler slots; it does not add items or locations."""
     display_name = "Wumpa Bundles"
 
 
 class ProgressiveStartingWumpa(Range):
-    """How many `Progressive Starting Wumpa` items to add. Each one you receive
-    permanently raises the fruit you begin every race holding, by one.
+    """How many Progressive Starting Wumpa items to add.
 
-      0 (default) = every race starts you at zero fruit, as vanilla
-      10          = the full ladder; the last copy starts you at a full kart
-
-    Ten is the ceiling because a kart cannot hold more than ten fruit, so an
-    eleventh copy could never be felt.
-
-    This is the one AP effect in the game that persists across a race boundary,
-    so it is `useful` and it is opt-in. It adds no locations, so every copy is
-    one otherwise-filler slot spent. REQUIRES the 0.2.0 native client.
-    """
+    Each one permanently raises the fruit you start every race with by one.
+    0 (default) keeps the retail zero-fruit start; 10 fills your kart at the
+    start of every race. These items use slots that would otherwise be
+    filler and add no locations of their own."""
     display_name = "Progressive Starting Wumpa"
     range_start = 0
     range_end = 10
@@ -351,84 +332,49 @@ class ProgressiveStartingWumpa(Range):
 
 
 class WumpaCheck(Toggle):
-    """Add the global 10-wumpa check: one location per seed, sent the first time
-    you reach ten Wumpa Fruit in a race.
+    """Add one check for reaching 10 Wumpa Fruit during a race.
 
-    GLOBAL, not per track -- reaching ten fruit on Coco Park and on Oxide
-    Station are the same check, by the same reasoning that made Itemsanity's
-    juiced checks global.
-
-    Distinct from Itemsanity's `(Juiced)` checks even though both read the same
-    ten-fruit threshold: this one fires on REACHING ten, those fire on FIRING a
-    weapon while at ten. They coexist without double-counting.
-
-    Off by default. REQUIRES the 0.2.0 native client, which owns the emit; on an
-    older client this location can never be checked.
-    """
+    This is one global location for the whole seed, not one per track. It is
+    separate from Itemsanity's juiced weapon checks: this pays out when you
+    reach 10 fruit, while those pay out when you fire a weapon at 10."""
     display_name = "Wumpa Check"
 
 
 class TurboGrant(Toggle):
-    """Add the `Turbo Grant` item (#224): one received item that rolls a normal
-    Turbo straight into your weapon slot, with the usual item-pickup ping, and
-    fires on demand like any other Turbo.
+    """Add one useful item that puts a Turbo into your weapon slot.
 
-    Adds NO location, and nothing in logic ever requires it -- it is one useful
-    item spending one otherwise-filler slot. Off by default.
-
-    Received outside a race, before the Itemsanity unlock below, or while your
-    weapon slot is already full, it QUEUES and lands as soon as you are in a
-    race with an empty slot. A grant is never discarded.
-
-    With Itemsanity ON the grant additionally needs the separate `Turbo` weapon
-    item and stays queued until that has been received. With Itemsanity off, no
-    weapon-item gate applies.
-
-    Firing uses the ordinary Turbo path, so Progressive Boost still decides what
-    the boost does: at boost-off the Turbo is consumed and produces no boost, and
-    at higher tiers it produces only what that tier allows. It never bypasses or
-    upgrades your current tier.
-
-    REQUIRES the 0.2.0 native client, which owns the delivery, the queue and the
-    firing. On an older client the item is received and does nothing.
-    """
+    If you are outside a race or your slot is occupied, it waits until it can
+    be delivered. With Itemsanity on, it also waits for the Turbo weapon to be
+    unlocked. Progressive Boost still controls how strong the fired Turbo is.
+    This uses one filler slot and adds no location."""
     display_name = "Turbo Grant"
 
 
 class BoxLocations(Toggle):
-    """Add the authored item-box checks (#109): one location per authored box
-    position, broken once per seed by driving through it in any Adventure race
-    mode on that track. 241 boxes are authored across all 18 tracks; how many
-    of them your seed creates depends on `shortcut_knowledge` (229 at easy /
-    236 at medium / 241 at hard).
+    """Turn item boxes on the track into checks.
 
-    Items seat freely in box locations, including progression. A box slot's
-    access logic mirrors its position: a handful need received Progressive
-    Boost tiers or stat chains when those packs are randomized, and the Tiger
-    Temple door box needs a door-opening weapon when Itemsanity is on.
+    Around 240 weapon crates across the game become Archipelago locations.
+    Drive through one in any Adventure race on that track and it pays out.
 
-    REQUIRES the 0.2.0 native client, which spawns and breaks the AP crates.
-    On an older client these locations can never be checked, and any
-    progression seated in them makes the seed unfinishable.
-    """
+    Boxes are the densest source of checks in the game, so this makes for a
+    much longer seed. Some sit past jumps or shortcuts you need boost for -
+    Shortcut Knowledge decides how much the logic expects of you there."""
     display_name = "Item Box Locations"
 
 
 class ShortcutKnowledge(Choice):
-    """How much shortcut knowledge the seed's box logic may assume (#109).
+    """How much shortcut skill the logic assumes you have.
 
-    - **easy** (default): no shortcut or respawn-trick boxes in the seed at
-      all -- every created box sits on the normal racing line.
-    - **medium**: adds boxes behind normal, non-technical shortcuts, plus the
-      two reached by deliberately respawning.
-    - **hard**: adds boxes behind technical/speedrunner shortcuts; these also
-      require one received copy of each stat chain when Progressive Stats is
-      randomized.
+    Higher settings expect you to take routes that need boost, precise jumps
+    or wall rides, so checks behind them come into reach sooner and the seed
+    asks more of you.
 
-    A box above your chosen tier is NOT created (removed from the seed, not
-    excluded), so no seed carries a location its player cannot in principle
-    reach. Mints no datapackage name.
-    """
+    - **easy** (default): only shortcuts anyone can take.
+    - **medium**: the well-known ones.
+    - **hard**: everything, including the routes that need Ultra Sacred Fire.
+
+    Mostly matters with Item Box Locations on, since that is where most of
+    the shortcut-gated checks live."""
     display_name = "Shortcut Knowledge"
     option_easy = 0
     option_medium = 1
@@ -441,7 +387,7 @@ class OneLapCups(DefaultOnToggle):
 
     Only cup races shorten (including the Gem Cups); single races, boss races,
     relic time trials and CTR Token challenges keep their normal lap count.
-    Changes nothing about logic or which locations exist -- everything is just
+    Changes nothing about logic or which locations exist - everything is just
     faster."""
     # Reuses the engine's built-in one-lap mechanism (the vanilla one-lap
     # cheat), scoped to cups.
@@ -449,15 +395,12 @@ class OneLapCups(DefaultOnToggle):
 
 
 class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
-    """Bring the 4 Battle Arenas and their Crystal Challenges into the seed:
-    their checks become normal locations and, in a randomized-unlock seed, their
-    warp pads get a randomized entry requirement.
+    """Include the 4 Battle Arenas and their Crystal Challenges.
 
-    - **off**: the arenas are fully out of the seed and never logically
-      required -- vanilla gates, vanilla Purple CTR Token rewards, and no
-      randomized requirement ever demands Purple tokens. They stay playable.
-    - Not the same as `crystals` in `Warp Pad Shuffle Categories`: this puts the
-      arenas in the seed at all; that category only shuffles destinations."""
+    Their checks become normal locations, and in a randomized-unlock seed
+    their warp pads get their own entry requirement.
+
+    Turn it off to leave the battle arenas out of the seed."""
     # The off guarantees, precisely: crystal pads vanilla-fixed and never
     # destination-shuffled; the four Crystal Bonus Round checks keep their
     # vanilla Purple CTR Tokens LOCKED (no other world's item can hide there);
@@ -486,20 +429,14 @@ class WarpPadShuffleCategories(OptionSet):
 
 
 class WarpPadShuffleGrouping(Choice):
-    """How the categories in `Warp Pad Shuffle Categories` are pooled for
-    destination shuffle.
+    """How warp-pad destinations are shuffled among each other.
 
-    - **merged** (default): one cross-category pool -- a track slot can load a
-      cup or crystal and vice versa. Needs a randomized unlock mode.
-    - **per_category**: each category shuffles only within itself.
+    - **per_category**: tracks swap with tracks, cups with cups,
+      arenas with arenas. Each pad still leads to the same kind of thing.
+    - **merged** (default): everything shuffles together, so a track pad can lead to a
+      Gem Cup and back again.
 
-    Has no effect when fewer than two categories participate.
-
-    Gem Cups are the one exception to `merged`: a cup is never placed on a pad that
-    opens before the Cups Room's own two-Key door, so a cup can never be one of the
-    pads you start with. An early cup also advertises the podium checks of the four
-    trophy tracks it runs as legs, which is a large opening handout on tracks whose
-    own pads are still shut."""
+    Only matters when Warp Pad Shuffle Categories has something in it."""
     display_name = "Warp Pad Shuffle Grouping"
     option_per_category = 0
     option_merged = 1
@@ -507,21 +444,14 @@ class WarpPadShuffleGrouping(Choice):
 
 
 class WarpPadItemDisplay(Choice):
-    """How a warp pad shows the items still waiting on its checks.
+    """How each warp pad shows the rewards still waiting behind it.
 
-    A pad advertises its destination's unclaimed rewards in three floating slots.
+    Pads use three floating slots and cycle through their remaining reward
+    models, including CTR rewards and Archipelago items.
 
-    - **one_pile** (default): every unclaimed item shares those slots and they
-      cycle through the whole pile together, so a pad with a race, a CTR
-      challenge, relics and podium rungs left mixes them all in one rotation.
-    - **by_reward_type**: each reward type keeps its own slot and only rotates
-      within it, so you can tell at a glance whether the relic you see is the
-      relic check or the CTR check. With the podium rungs on, the race slot can
-      cycle through five or six items.
-
-    Purely a display setting: it changes nothing about which checks exist, what
-    they hold, or how anything unlocks. Needs a client that supports it -- an
-    older one shows one pile whatever this says."""
+    - **one_pile** (default): every remaining reward shares the three slots.
+    - **by_reward_type**: each reward type keeps its own slot and rotates
+      within it, making the kinds of checks left easier to distinguish."""
     # Requested in issue #59 (thanks stroodlydoodles and MarioSpore), modelled on
     # Icebound's randomizer. The apworld half is this option plus its slot_data
     # mirror; the pad render itself is native's (its glow pass already enumerates
@@ -535,22 +465,16 @@ class WarpPadItemDisplay(Choice):
 
 
 class ApItemTypeColors(DefaultOnToggle):
-    """Colour the Archipelago-logo warp-pad markers by item classification
-    (issue #212).
+    """Colour the Archipelago markers by what kind of item is behind them.
 
-    - **on** (default): each AP-logo marker uses the colour of its item's
-      classification.
-    - **off**: every AP-logo marker uses one uniform greyish-white colour.
-
-    A display setting only: original CTR rewards always show their real models
-    either way, so this never changes what a reward looks like. Needs a client
-    that supports it -- an older one shows classification colours whatever this
-    says."""
+    On by default, so colour tells you whether a check holds progression,
+    something useful, filler or a trap. Turn it off to make every marker the
+    same greyish-white."""
     display_name = "AP Item Type Colours"
 
 
 class WarpPadUnlockRequirements(Choice):
-    """How warp pads unlock -- the heart of the randomizer.
+    """How warp pads unlock, the heart of the randomizer.
 
     - **randomized** (default): every warp pad gets a randomized entry
       requirement (trophies, tokens, relics, keys, gems...), always collectable
@@ -569,18 +493,16 @@ class WarpPadUnlockRequirements(Choice):
 
 
 class TwoStageDensity(Choice):
-    """How many trophy pads carry a real second-stage gate, meaning an extra
-    requirement on the pad's CTR Challenge and relic Time Trials on top of
-    winning the Trophy Race. Only affects the randomized warp pad modes.
+    """How often a warp pad asks for something twice.
 
-    - **off**: no second gates.
-    - **light**: a few per seed (up to 4).
-    - **standard**: a moderate spread (up to 6).
-    - **deep**: layered progression (up to 10).
-    - **full** (default): every pad that can carry one gets one (up to 16).
+    A two-stage pad opens for racing at the first requirement, then wants a
+    second before its time trials, token challenge, and letter locations
+    unlock. It spreads a track's checks across the seed instead of handing
+    them all over at once.
 
-    Also accepts `random`. The densest settings can generate slower on
-    maxed-out configs."""
+    - **off**: every pad opens fully at its first requirement.
+    - **light** / **standard** / **deep** / **full** (default): progressively more pads
+      get a second stage."""
     # Higher density puts more ordering pressure on AP's fill. Solo generation
     # is protected by the terminal rollback backstop. At non-standard densities
     # an internal diversity discount nudges repeat requirement families (mostly
@@ -599,7 +521,7 @@ class RequirementVariety(Choice):
     """Weight preset for randomized warp-pad requirements (randomized modes
     only).
 
-    - **icebound_beta5** (default): Icebound's rebalanced weights -- still
+    - **icebound_beta5** (default): Icebound's rebalanced weights - still
       trophy-leaning, with more token, relic and key variety.
     - **trophy_heavy_legacy**: the previous, more trophy-dominated weights.
     - **custom**: use the weights from `Requirement Weights`."""
@@ -619,7 +541,7 @@ class RequirementVariety(Choice):
 
 class RequirementWeights(OptionDict):
     """Roll your own requirement mix. Used only when `Requirement Variety` =
-    custom. Each entry is `item name: weight` -- higher weight means picked more
+    custom. Each entry is `item name: weight` - higher weight means picked more
     often; 0 disables an item, except Trophy, which must stay above 0. Items you
     leave out keep their default weight.
 
@@ -708,7 +630,7 @@ class DeathLink(Choice):
 class DeathLinkAmnesty(Range):
     """How many of your deaths must pile up before one is actually sent. 1
     (default) sends every death; N sends one per N. Meant for the `any_hit`
-    tier. Incoming deaths are unaffected -- amnesty only throttles what you
+    tier. Incoming deaths are unaffected - amnesty only throttles what you
     send."""
     # Does nothing useful at mask_reset (those wipeouts are already rare) and
     # is inert while DeathLink is off.
@@ -719,15 +641,13 @@ class DeathLinkAmnesty(Range):
 
 
 class PodiumPlacementChecks(DefaultOnToggle):
-    """Add finishing-position checks to the 16 adventure trophy races -- the
-    master switch for the podium-rung feature.
+    """Turn race placements into checks.
 
-    - Finish rungs (`Podium Finish Rungs`): earned by where you cross the line.
-    - Held rungs (`Held-Position Rungs`): earned by the best position you hold
-      during the race.
+    Each track can pay out for finishing, for finishing on the podium, and
+    for holding a position during the race. The four options below choose
+    which of those count.
 
-    A better result awards every rung at or below it. These checks make room
-    for more items in the pool; they never advance adventure progression."""
+    A generous source of checks that does not ask you to win everything."""
     # Up to five rungs per race across the two families. The pool room is what
     # traps live in today; future item packs lean on these harder.
     display_name = "Podium Placement Checks"
@@ -765,23 +685,13 @@ class PodiumHeldFifthRung(Toggle):
 
 
 class SapphireRelicCount(Range):
-    """How many of the 18 Sapphire Time Trials (the easiest relic tier) stay
-    in the seed. Exactly this many are created, drawn at random which ones;
-    the rest do not exist this seed at all (issue #171: replaces the old
-    0-100 percentage; issue #28: a removed Time Trial holds no check and no
-    pinned vanilla relic -- beating it in game still awards the relic exactly
-    like vanilla, it just is not part of this Archipelago seed). 0 = none,
-    18 = all (default).
+    """How many Sapphire Relics exist in the seed.
 
-    The three tiers are a skill ladder (sapphire easy, platinum hard); setting
-    an easier tier lower than a harder one gives inverted difficulty.
+    Relics come from relic races. This sets how many of the sapphire tier are
+    in the item pool, which is also the most you can be asked to collect.
 
-    Migration note: this replaces the removed `sapphire_relic_progression`
-    option (0-100 percentage). The two are not the same numbering (a percent
-    and a location count), so old YAMLs are not silently reinterpreted --
-    `sapphire_relic_progression` is gone, AP ignores the unrecognized key with
-    its standard notice, and this option starts from its own default (18,
-    the closest equivalent to the old option's own default of 100/full)."""
+    Lower it for a shorter seed. Set it to 0 to remove Sapphire checks and
+    items. Gold or Platinum checks on the same relic races can still exist."""
     display_name = "Sapphire Relic Count"
     range_start = 0
     range_end = 18
@@ -789,15 +699,10 @@ class SapphireRelicCount(Range):
 
 
 class GoldRelicCount(Range):
-    """How many of the 18 Gold Time Trials (the medium relic tier) stay in
-    the seed. Exactly this many are created, drawn at random which ones; the
-    rest do not exist this seed at all. See `Sapphire Relic Count` for the
-    full removal semantics and the skill-ladder note. 0 = none, 18 = all
-    (default).
+    """How many Gold Relics exist in the seed.
 
-    Migration note: replaces the removed `gold_relic_progression` percentage
-    option; see `Sapphire Relic Count`'s migration note -- the old key is
-    gone, not reinterpreted, and this option starts from its own default."""
+    Same idea as Sapphire, one tier up. Set it to 0 to remove the tier and
+    its checks entirely."""
     display_name = "Gold Relic Count"
     range_start = 0
     range_end = 18
@@ -805,17 +710,11 @@ class GoldRelicCount(Range):
 
 
 class PlatinumRelicCount(Range):
-    """How many of the 18 Platinum Time Trials (the hardest, expert-only
-    relic tier) stay in the seed. Exactly this many are created, drawn at
-    random which ones; the rest do not exist this seed at all. See
-    `Sapphire Relic Count` for the full removal semantics. 0 = none (default,
-    so a needed item never sits behind a platinum-only time), 18 = all.
+    """How many Platinum Relics exist in the seed.
 
-    Migration note: replaces the removed `platinum_relic_progression`
-    percentage option; see `Sapphire Relic Count`'s migration note -- the old
-    key is gone, not reinterpreted, and this option starts from its own
-    default (0, the closest equivalent to the old option's own default of
-    0/never)."""
+    The hardest relic tier. Set it to 0 to remove it and its checks entirely,
+    which is a reasonable choice if you do not intend to chase platinum
+    times."""
     display_name = "Platinum Relic Count"
     range_start = 0
     range_end = 18
@@ -823,23 +722,15 @@ class PlatinumRelicCount(Range):
 
 
 class StartingCharacter(Choice):
-    """Which of the 16 racers you start your Adventure as (issues #54 / #209,
-    ruling R2/R3).
+    """Which racer you begin with.
 
-    In vanilla CTR only the eight original racers can be taken into Adventure
-    at all; this option moves the choice out of the Garage and into your YAML,
-    which is what makes the other eight selectable without any Garage-picker
-    work. The 15 racers you do NOT start as become multiworld unlock items.
+    - **random_starter** (default): one of the 8 retail Adventure racers.
+    - **random_any**: any of the 16 playable racers.
+    - A racer's name: always begin as that racer.
 
-    - **random_starter** (default): a random pick from the eight vanilla
-      Adventure racers (Crash, Neo Cortex, Tiny Tiger, Coco, N. Gin,
-      Dingodile, Polar, Pura).
-    - **random_any**: a random pick from all sixteen, so a seed can start you
-      as Ripper Roo, Penta Penguin or Nitros Oxide.
-    - any named racer: exactly that one.
-
-    Whichever racer you start as is yours from the first frame -- it is never
-    an item, never placed in the pool, and logic always assumes you have it."""
+    With Character Unlocks on, the other 15 racers become items. With it off,
+    this still decides who is seated when Adventure starts, but the whole
+    roster is immediately available from the hub picker."""
     display_name = "Starting Character"
     option_random_starter = 0
     option_random_any = 1
@@ -863,22 +754,13 @@ class StartingCharacter(Choice):
 
 
 class StartingStatClass(Choice):
-    """Which engine/stat class your starting racer drives with (issue #209,
-    "a YAML option picks the starting character ... plus the starting
-    engine/stat class").
+    """Which stat class your starting kart uses.
 
-    CTR gives every racer one of four classes, and the class -- not the racer
-    -- is what the physics actually reads (`VehBirth_SetConsts` indexes
-    `metaPhys[..].value[engineID]`).
+    Leave it on **vanilla** to keep that racer's usual class, or override the
+    starting racer with balanced, acceleration, speed, or turning stats.
 
-    - **vanilla** (default): each racer keeps the class the game gives them,
-      so Crash stays BALANCED, Tiny stays SPEED, and so on.
-    - **balanced / acceleration / speed / turning**: force your starting racer
-      onto that class instead, whoever they are.
-
-    This only ever affects the racer you START as. It has no effect while
-    Progressive Stats is active (those chains own the stats outright), and it
-    never affects reachability, so it cannot change what a seed requires."""
+    This affects only the racer you start as. Progressive Stats overrides it,
+    and logic never requires a particular value."""
     display_name = "Starting Stat Class"
     option_vanilla = 0
     option_balanced = 1
@@ -889,66 +771,38 @@ class StartingStatClass(Choice):
 
 
 class CharacterUnlocks(DefaultOnToggle):
-    """Whether the other 15 racers have to be unlocked through the multiworld
-    (issues #54 / #209, R4; the "all-unlocked mode" comfort option ruled in the
-    2026-07-23 wayfarer's gap 7a).
+    """Make the roster something you unlock instead of something you start with.
 
-    - **on** (default): the 15 racers you did not start as enter the item pool
-      as unlock items. You play as your starting racer until their unlocks
-      arrive. This is the feature.
-    - **off**: every racer is available from the moment you start. No unlock
-      items are created at all, which frees 15 pool slots, and Racer-Locked
-      Warp Pads has nothing left to lock so it is forced off.
+    You begin with one racer and the rest arrive as items. Until then the
+    character select only offers who you actually have.
 
-    Turn this off if you want the roster without the item economy -- or if a
-    deliberately reduced seed (Podium Placement Checks off, heavy exclusions)
-    does not have 15 spare locations for the unlocks. Those 15 items bring no
-    locations of their own, so on a minimum-supply seed they genuinely do not
-    fit, and generation will tell you so rather than quietly dropping them."""
+    With this off, every racer is available from the start, as in the retail
+    game."""
     display_name = "Character Unlocks"
 
 
 class RacerLockedPads(Toggle):
-    """Let warp pads demand a specific racer before they will open (ruling R8).
+    """Lock some warp pads to a specific racer.
 
-    - **off** (default): no pad ever names a racer. The 15 character unlock
-      items still exist and still unlock those racers to play as, but nothing
-      in logic requires one, so they are `useful` items rather than
-      progression and the seed only ever plans around the racer you start as.
-    - **on**: a small number of this seed's randomized pads additionally
-      require you to be a specific racer, on top of whatever trophies, keys,
-      tokens, relics or gems that pad already asked for. The character unlock
-      items become `progression` items, because a pad genuinely depends on
-      one.
+    You need to have unlocked the racer a pad names. When you enter, the game
+    seats you as that racer for the destination and restores your previous
+    racer when you return to the hub. The pad shows who it needs.
 
-    You swap racer from the Adventure hub, so "unlocked" and "usable" mean the
-    same thing: walk into the hub, pick the racer the pad wants, drive in.
-
-    Never applied to the always-open starter pads or to any pad this seed left
-    free, so the opening of the seed is unchanged either way, and a racer's own
-    unlock item can never be placed behind a pad that requires that racer."""
+    Never your starting racer - a lock you already satisfy would be no lock
+    at all. Needs Character Unlocks to be on, since otherwise every racer is
+    available from the start."""
     display_name = "Racer-Locked Warp Pads"
 
 
 class PentaStats(Choice):
-    """Which stat table Penta Penguin drives with (ruling R15).
+    """Which version of Penta Penguin's stats to use.
 
-    Penta is a cheat-code racer in retail, and the two regional releases give
-    him very different karts.
+    Alpha 1 keeps its existing compatibility mapping:
 
-    - **pal** (default): Penta drives with his ordinary TURN-class stats, the
-      fair, balanced version. This is the default because it is the one that
-      does not distort a seed's difficulty.
-    - **ntsc**: Penta drives the max-stat cheat version -- the fifth "MAX"
-      engine class that ships in the PAL/JP build and that the NTSC-U cheat
-      code produces. It is a best-of-each-axis cherry-pick of the four normal
-      classes (SPEED's top speed, ACCEL's acceleration, TURN's whole handling
-      group), so it is the best vanilla kart in the game but it invents no
-      numbers and goes nowhere above vanilla.
+    - **pal** (default): the turning-class version, like Polar and Pura.
+    - **ntsc**: the max-stat version.
 
-    This only applies while VANILLA character stats are in play. As soon as
-    Progressive Stats or Editable Stats owns the stat table, Penta reads that
-    like every other racer and this option has no gameplay effect at all."""
+    Progressive Stats or Editable Stats overrides this choice."""
     display_name = "Penta Penguin Stats"
     option_pal = 0
     option_ntsc = 1
@@ -956,24 +810,15 @@ class PentaStats(Choice):
 
 
 class EditableStats(Choice):
-    """Let you tune your kart's stats yourself, from the hub stat panel
-    (2026-08-08 ruling).
+    """Tune your kart's stats yourself from the hub stat panel.
 
-    **Only available when `progressive_stats` is off.** If you enable both,
-    the seed still generates and Progressive Stats wins: the stat panel goes
-    read-only and no edit control appears at all. This is deliberate -- the
-    two are separate configuration concepts and the seed is never rejected for
-    setting both.
+    - **off** (default): no editing; the panel just shows what you have.
+    - **global**: one custom setup shared by every racer.
+    - **per_character**: a separate setup for each of the 16 racers.
 
-    - **off** (default): no editing. The panel shows whatever owns your stats.
-    - **global**: one custom stat package shared by every racer.
-    - **per_character**: a separate custom package per racer, so each of the
-      sixteen can be tuned independently.
-
-    Edited values follow your slot on the Archipelago server rather than a
-    local save file, so they survive a reconnect and a change of machine.
-    Editing never affects reachability: no location's access rule reads a stat,
-    at any setting."""
+    Progressive Stats wins if you enable both - the panel goes read-only and
+    no edit controls appear. The seed still generates; the two are simply
+    different ways to decide the same numbers."""
     display_name = "Editable Stats"
     option_off = 0
     option_global = 1
@@ -1056,34 +901,44 @@ class ctrAPOptions(PerGameCommonOptions):
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
+    # Ordered the way a player fills a YAML: what am I trying to do, then how
+    # the randomizer works, then how big the seed is, then tuning, then
+    # cosmetics. Mechanics before decoration -- pad unlocking is the heart of
+    # this randomizer and used to sit BELOW the marker-colour options.
+    #
+    # Every option must appear in exactly one group. Anything left out lands in
+    # an unlabelled bucket at the bottom of the web page, which is where
+    # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
+    # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, BossesRequiredGoal, GemsRequiredGoal,
-            FinalOxideUnlock, FinalOxideRelicCount],
-    "Items & Pool": [ShuffleGems, ShuffleWarpPadsGemCups, RandomizeGemCupTracks,
-                     ShuffleKeys, TrapFillPercentage, Itemsanity, TiziHelper],
+             FinalOxideUnlock, FinalOxideRelicCount],
+    "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
+                           RequirementVariety, RequirementWeights,
+                           BossGarageRequirements],
+    "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
+                         ShuffleWarpPadsBattleArenas, ShuffleWarpPadsGemCups,
+                         RandomizeGemCupTracks],
+    # The "how long is this seed" decisions, together, because they are read
+    # against each other rather than one at a time.
+    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
+                     Lettersanity, LettersPerTrack,
+                     PodiumPlacementChecks, PodiumFinishRungs,
+                     PodiumAnyPositionRung, PodiumHeldRungs,
+                     PodiumHeldFifthRung],
+    "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TiziHelper,
+                     WumpaBundles, ProgressiveStartingWumpa, WumpaCheck,
+                     TurboGrant],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can
     # I unlock", "can a pad demand a racer" and "who owns my stats" as one
-    # decision, and the 2026-08-08 note asked for exactly this grouping.
+    # decision.
     "Characters": [StartingCharacter, StartingStatClass, CharacterUnlocks,
                    RacerLockedPads, PentaStats, EditableStats],
-    "Warp Pads": [
-        ShuffleWarpPadsBattleArenas,
-        WarpPadShuffleCategories,
-        WarpPadShuffleGrouping,
-        WarpPadItemDisplay,
-        ApItemTypeColors,
-        WarpPadUnlockRequirements,
-        TwoStageDensity,
-        RequirementVariety,
-        RequirementWeights,
-    ],
-    "Extra Checks": [PodiumPlacementChecks, PodiumFinishRungs,
-                     PodiumAnyPositionRung, PodiumHeldRungs, PodiumHeldFifthRung],
-    "Quality of Life": [OneLapCups],
-    "DeathLink": [DeathLink, DeathLinkAmnesty],
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
+    "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors],
+    "DeathLink": [DeathLink, DeathLinkAmnesty],
 }
 
 def create_option_groups() -> List[OptionGroup]:

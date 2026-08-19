@@ -102,15 +102,13 @@ class CTRSettings(ap_settings.Group):
     enforce_friendly_options: "EnforceFriendlyOptions | bool" = True
 
     class AllowRungSizing(ap_settings.Bool):
-        """Allow CTR to add podium *subcategories* when the generated pool
-        needs more capacity. This never enables the master Podium Placement
-        Checks toggle and never removes a player-selected rung. Disable it to
-        require the player to choose enough podium rungs explicitly; generation
-        then raises a clear OptionError instead of mutating the seed options.
+        """Deprecated compatibility setting from the pre-0.2.0 adaptive rung
+        experiment. CTR 0.2.0 never overrides disabled player YAML options;
+        insufficient location capacity raises a clear OptionError instead.
         """
         description = "CTR Allow Adaptive Podium Rung Sizing"
 
-    allow_rung_sizing: "AllowRungSizing | bool" = True
+    allow_rung_sizing: "AllowRungSizing | bool" = False
 
 
 class ElasticCountOption(Range):
