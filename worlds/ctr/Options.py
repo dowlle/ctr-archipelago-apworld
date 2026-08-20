@@ -186,7 +186,7 @@ class ProgressiveBoostMode(Choice):
 
 
 class ProgressiveBoostBlueFire(Toggle):
-    """Add a Retro Fueled-style Blue Fire tier after Ultra Sacred Fire.
+    """Add a Retro Fueled-style Blue Fire tier after Ultimate Sacred Fire.
 
     The final Progressive Boost turns turbo pads into Blue Fire pads with one
     second of reserves. Powerslides can stack those reserves without losing
@@ -432,7 +432,7 @@ class ShortcutKnowledge(Choice):
 
     - **easy** (default): only shortcuts anyone can take.
     - **medium**: the well-known ones.
-    - **hard**: everything, including the routes that need Ultra Sacred Fire.
+    - **hard**: everything, including the routes that need Ultimate Sacred Fire.
 
     Mostly matters with Item Box Locations on, since that is where most of
     the shortcut-gated checks live."""
