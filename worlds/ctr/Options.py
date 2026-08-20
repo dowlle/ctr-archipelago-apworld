@@ -171,7 +171,15 @@ class ProgressiveBoostMode(Choice):
     - **shared_global**: one boost ladder, shared by every character.
     - **per_character**: each of the 16 racers has their own ladder. That is
       sixteen times as many items, so the seed needs plenty of places to put
-      them; if there is not enough room, generation stops and says so."""
+      them; if there is not enough room, generation stops and says so.
+
+    per_character means 16 racers x 2 copies (3 with Blue Fire) = 32 to 48
+    Progressive Boost items by itself; add per_character Progressive Stats
+    too and the two packs together reach up to 16 x (3 boost + 12 stat
+    copies) = 240 progressive items (224 without Blue Fire). A solo game
+    returns every pool item to you, so most of your checks in a
+    per_character seed will hand back a progressive item rather than
+    something else."""
     # Classification: `useful` (the spine-1 shape) while this option is off,
     # `progression` in every seed that randomizes the chain. It started
     # per-seed -- #145's Turbo checks and #109's boost-gated box slots were
@@ -230,7 +238,14 @@ class ProgressiveStatsMode(Choice):
     - **off** (default): karts keep their normal stats.
     - **shared_global**: one set of stat ladders, shared by every character.
     - **per_character**: a separate set for each of the 16 racers. Sixteen
-      times as many items, so the seed needs the room to hold them."""
+      times as many items, so the seed needs the room to hold them.
+
+    per_character means 16 racers x 3 chains x 4 copies = 192 Progressive
+    Stats items by itself; add per_character Progressive Boost too and the
+    two packs together reach up to 16 x (3 boost + 12 stat copies) = 240
+    progressive items (224 without Blue Fire). A solo game returns every
+    pool item to you, so most of your checks in a per_character seed will
+    hand back a progressive item rather than something else."""
     display_name = "Progressive Stats"
     option_off = 0
     option_shared_global = 1
