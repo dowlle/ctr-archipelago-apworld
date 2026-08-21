@@ -873,16 +873,20 @@ class RacerLockedPads(Toggle):
 class PentaStats(Choice):
     """Which version of Penta Penguin's stats to use.
 
-    Alpha 1 keeps its existing compatibility mapping:
+    Penta is the one racer whose stats differ by region. He was added very
+    late and shipped unfinished in NTSC-U, where he simply reuses Polar and
+    Pura's turning class. The later PAL release finished him, with top values
+    in every category, which makes him the strongest racer in the game.
 
-    - **pal** (default): the turning-class version, like Polar and Pura.
-    - **ntsc**: the max-stat version.
+    - **ntsc** (default): the turning-class version, same as Polar and Pura.
+    - **pal**: the maxed-out version, which makes him the strongest racer in
+      the game.
 
     Progressive Stats or Editable Stats overrides this choice."""
     display_name = "Penta Penguin Stats"
     option_pal = 0
     option_ntsc = 1
-    default = 0
+    default = 1
 
 
 class EditableStats(Choice):

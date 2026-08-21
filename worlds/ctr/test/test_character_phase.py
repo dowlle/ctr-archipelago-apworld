@@ -538,12 +538,19 @@ class TestCharacterSlotData(unittest.TestCase):
                     ROSTER_CHARACTER_ID[world.ctr_starting_character])
                 self.assertIn(options["starting_character"], range(16))
 
-    def test_penta_stats_defaults_to_pal(self):
+    def test_penta_stats_defaults_to_ntsc(self):
+        """NTSC-U is the default because it is the ORDINARY Penta.
+
+        The mapping was inverted until 2026-08-17: PAL is the maxed-out
+        version, and NTSC-U reuses Polar and Pura's turning class because
+        Penta shipped unfinished there. A default that hands every seed the
+        strongest racer in the game is the wrong default.
+        """
         options = _build(1).worlds[1].fill_slot_data()["ctr_options"]
-        self.assertEqual(options["penta_stats"], 0)
-        options = _build(1, penta_stats="ntsc").worlds[1] \
-            .fill_slot_data()["ctr_options"]
         self.assertEqual(options["penta_stats"], 1)
+        options = _build(1, penta_stats="pal").worlds[1] \
+            .fill_slot_data()["ctr_options"]
+        self.assertEqual(options["penta_stats"], 0)
 
     def test_no_schema_bump(self):
         """Every key here is additive under the already-unconditional schema 7
