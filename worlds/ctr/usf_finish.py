@@ -102,18 +102,51 @@ USF_OR_HARD_SK_FINISH_TRACKS = usf_or_hard_finish_tracks()
 #: Every finish-gated track, whatever the term shape.
 ALL_USF_FINISH_TRACKS = USF_FINISH_TRACKS | USF_OR_HARD_SK_FINISH_TRACKS
 
-#: Single LOCATIONS that need USF although their track's finish does not
-#: (triage ruling 2026-08-19). N. Gin Labs' Platinum Time Trial is the one
-#: entry: without USF two of its item boxes cannot be reached in a Relic
-#: Race, which removes the ten-second perfect-box bonus and USF speed
-#: together, so the Platinum time is not realistically achievable. The
-#: ruling is deliberately narrow -- the Trophy Race, Sapphire, Gold, CTR
-#: Token Challenge and cups of that track stay ungated. No hard-shortcut
-#: escape: route knowledge does not restore the unreachable boxes.
-PLATINUM_USF_LOCATIONS = frozenset({"N. Gin Labs: Platinum Time Trial"})
+#: Received `Progressive Boost` copies that put a player at the first boost
+#: rank (reserves at all; USF is the second rank above it).
+FIRST_BOOST_COUNT = 1
 
-def usf_term(world, required_character=None):
-    """The `(state, player) -> bool` term for "can finish a USF-gated track".
+#: RELIC TIER GATES (ruling 2026-08-21, posting-pack fixing-pass session).
+#: Every Gold and every Platinum Time Trial requires at least the first boost
+#: rank: the retail Gold and Platinum targets are set for a kart that can
+#: boost, so on an empty boost chain those times are not realistically
+#: achievable and a progression item placed there can strand a seed in
+#: practice. Sapphire stays free -- finishing the track is enough.
+#:
+#: On top of that floor, the USF-class tracks carry the full two-boost term:
+#: Hot Air Skyway and Oxide Station for BOTH tiers (their targets assume
+#: USF-grade pace; Hot Air Skyway's finish line needs USF anyway, and the
+#: explicit term here is belt and braces over that finish gate), and
+#: N. Gin Labs for Platinum only (the 2026-08-19 triage ruling, subsumed
+#: here: without USF two of its item boxes cannot be reached in a Relic Race,
+#: which removes the ten-second perfect-box bonus and USF speed together).
+#:
+#: NO tier gate has a hard-shortcut-knowledge escape, Oxide Station included,
+#: unlike Oxide's FINISH gate: route knowledge does not substitute for the
+#: missing boost reserves on a relic pace, and for N. Gin Labs it does not
+#: restore the unreachable boxes either.
+USF_RELIC_GOLD_TRACKS = frozenset({"Hot Air Skyway", "Oxide Station"})
+USF_RELIC_PLATINUM_TRACKS = frozenset(
+    {"Hot Air Skyway", "Oxide Station", "N. Gin Labs"})
+
+
+def relic_tier_boost_min(track, tier):
+    """Progressive Boost copies the `<tier> Time Trial` of `track` requires.
+
+    0 for Sapphire (and anything that is not a relic tier name), so callers
+    can feed every Time Trial location through without branching.
+    """
+    if tier == "Gold":
+        return (USF_BOOST_COUNT if track in USF_RELIC_GOLD_TRACKS
+                else FIRST_BOOST_COUNT)
+    if tier == "Platinum":
+        return (USF_BOOST_COUNT if track in USF_RELIC_PLATINUM_TRACKS
+                else FIRST_BOOST_COUNT)
+    return 0
+
+
+def boost_term(world, required_character=None, boost_min=USF_BOOST_COUNT):
+    """The `(state, player) -> bool` term for a boost-rank capability gate.
 
     Always-True when the boost chain is not randomized (see VACUITY above), so
     callers can AND it unconditionally instead of branching on the option.
@@ -121,8 +154,13 @@ def usf_term(world, required_character=None):
     if not bool(world.options.progressive_boost.value):
         return lambda state, player: True
     return lambda state, player: gate_satisfied(
-        world, state, player, boost_min=USF_BOOST_COUNT,
+        world, state, player, boost_min=boost_min,
         required_character=required_character)
+
+
+def usf_term(world, required_character=None):
+    """The `(state, player) -> bool` term for "can finish a USF-gated track"."""
+    return boost_term(world, required_character, USF_BOOST_COUNT)
 
 
 def track_finish_term(track, world):

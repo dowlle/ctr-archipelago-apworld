@@ -669,7 +669,7 @@ def add_time_trial_and_ctr_requirements(world, player):
     can_reach(Trophy Race), exactly as before.
     """
     from .progressive_capability import track_required_character
-    from .usf_finish import PLATINUM_USF_LOCATIONS, usf_term
+    from .usf_finish import boost_term, relic_tier_boost_min
 
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
@@ -719,19 +719,24 @@ def add_time_trial_and_ctr_requirements(world, player):
             logging.debug(
                 f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
-        # Perfect-box Platinum gate (usf_finish.PLATINUM_USF_LOCATIONS,
-        # triage ruling 2026-08-19): AND the racer-aware USF term onto exactly
-        # the listed locations, wrapping the rule built above so the Trophy
-        # prerequisite and any stage-2 gate are preserved. usf_term is
-        # always-True when the boost chain is not randomized, so no branch on
-        # the option is needed here. Deliberately NOT track_finish_term: this
-        # gate has no hard-shortcut escape.
-        if name in PLATINUM_USF_LOCATIONS:
-            _platinum_term = usf_term(
-                world, track_required_character(world, track_prefix))
-            def rule(state: CollectionState, base=rule, term=_platinum_term,
-                     p=player):
-                return base(state) and term(state, p)
+        # Relic tier boost gates (ruling 2026-08-21, superseding the narrow
+        # 2026-08-19 Labs-Platinum ruling): every Gold and Platinum Time Trial
+        # ANDs the racer-aware boost term at usf_finish.relic_tier_boost_min's
+        # rank, wrapping the rule built above so the Trophy prerequisite and
+        # any stage-2 gate are preserved. Sapphire returns rank 0 and stays
+        # free. boost_term is always-True when the boost chain is not
+        # randomized, so no branch on the option is needed here. Deliberately
+        # NOT track_finish_term: tier gates have no hard-shortcut escape.
+        if name.endswith(" Time Trial"):
+            _tier = name.rsplit(": ", 1)[1][:-len(" Time Trial")]
+            _tier_min = relic_tier_boost_min(track_prefix, _tier)
+            if _tier_min:
+                _tier_term = boost_term(
+                    world, track_required_character(world, track_prefix),
+                    _tier_min)
+                def rule(state: CollectionState, base=rule, term=_tier_term,
+                         p=player):
+                    return base(state) and term(state, p)
 
         loc.access_rule = rule
 

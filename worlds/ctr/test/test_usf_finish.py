@@ -22,9 +22,10 @@ from ..gem_cup_legs import load_vanilla_cup_legs
 from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
 from ..progressive_capability import boost_item_name
-from ..usf_finish import (ALL_USF_FINISH_TRACKS, USF_BOOST_COUNT,
-                          USF_FINISH_TRACKS, USF_OR_HARD_SK_FINISH_TRACKS,
-                          cup_finish_term, usf_finish_cups)
+from ..usf_finish import (ALL_USF_FINISH_TRACKS, FIRST_BOOST_COUNT,
+                          USF_BOOST_COUNT, USF_FINISH_TRACKS,
+                          USF_OR_HARD_SK_FINISH_TRACKS, cup_finish_term,
+                          usf_finish_cups)
 from . import CTRTestBase
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
@@ -160,6 +161,7 @@ class TestTimeTrialRipple(unittest.TestCase):
         # The seed's relic-count sliders can remove whole tiers (#171), so the
         # suffix list is a superset; assert the surviving ones and that the
         # sweep was not empty.
+        one_boost = _state(mw, boost=FIRST_BOOST_COUNT)
         checked = 0
         for suffix in self.SUFFIXES:
             if f"{HAS}: {suffix}" not in live:
@@ -168,9 +170,16 @@ class TestTimeTrialRipple(unittest.TestCase):
             with self.subTest(suffix=suffix):
                 self.assertFalse(_reachable(mw, blocked, f"{HAS}: {suffix}"))
                 self.assertTrue(_reachable(mw, cleared, f"{HAS}: {suffix}"))
-                # Control: the same check on an ungated track.
-                self.assertTrue(
-                    _reachable(mw, blocked, f"Crash Cove: {suffix}"))
+                # Control: the same check on a non-USF track. Gold and
+                # Platinum carry the 2026-08-21 first-boost floor everywhere,
+                # so their control opens at one boost rather than bare;
+                # Sapphire and the token challenge stay free.
+                control = f"Crash Cove: {suffix}"
+                if suffix in ("Gold Time Trial", "Platinum Time Trial"):
+                    self.assertFalse(_reachable(mw, blocked, control))
+                    self.assertTrue(_reachable(mw, one_boost, control))
+                else:
+                    self.assertTrue(_reachable(mw, blocked, control))
         self.assertGreaterEqual(checked, 2)
 
     def test_vanilla_warp_pad_mode(self):
