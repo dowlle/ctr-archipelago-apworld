@@ -536,9 +536,29 @@ class ctrAPWorld(World):
         with this world's own options, i.e. exactly the shipped probe. Verified as a
         byte-identical 10,000-seed arm, not just argued.
 
-        The probe deliberately does NOT call `pre_fill` on the mirror (that would
-        recurse into this method) and does not reproduce item links. It is a
-        fillability predictor, not a second generator; any error keeps two-stage."""
+        COMPANION PRE_FILL IS MIRRORED (Bethany/Dex CTR+KH2 report, 2026-08-21).
+        The probe used to skip the `pre_fill` step entirely, and that skew was a
+        systematic false-collapse source: a companion whose `pre_fill` locks
+        items into dedicated locations (KH2 places Donald, Goofy and keyblade
+        abilities into 66 of its own locations) leaves the REAL room's main fill
+        with matching item and location counts, while the mirror still showed
+        those locations as open with no items for them. The mirror's fill then
+        dead-ended on the phantom surplus and collapsed stage 2 on a room the
+        real generator fills without complaint (measured 6 of 6 collapses on
+        Dex's CTR+KH2 pair). The mirror now runs Main.py's `pre_fill` step via
+        the same `call_all`, with one exception: every CTR world instance on the
+        mirror has its `pre_fill` replaced by a no-op, because CTR's `pre_fill`
+        IS this method's caller (running it would recurse) and its only
+        multiworld-relevant action is the collapse decision this probe exists to
+        make -- the room state with CTR pre_fill skipped is exactly the
+        keep-two-stage room the probe is predicting. The exception keys on the
+        world CLASS, never on a game-name string, so it covers every CTR slot in
+        the room and no companion. Only the mirror's RNG streams are consumed;
+        `self.multiworld.random` is untouched, so backstop replay fidelity is
+        unaffected.
+
+        The probe does not reproduce item links. It is a fillability predictor,
+        not a second generator; any error keeps two-stage."""
         try:
             from BaseClasses import MultiWorld as _MW, CollectionState as _CS
             from worlds.AutoWorld import call_all as _call_all, AutoWorldRegister
@@ -579,6 +599,15 @@ class ctrAPWorld(World):
             for step in ("generate_early", "create_regions", "create_items",
                          "set_rules", "connect_entrances", "generate_basic"):
                 _call_all(pmw, step)
+            # Main.py's pre_fill step, with the mirror's CTR slots no-opped
+            # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
+            # assignment shadows the bound method for exactly these objects;
+            # call_all still walks every slot in real player order and still
+            # runs any stage_pre_fill class hooks.
+            for p in players:
+                if isinstance(pmw.worlds[p], ctrAPWorld):
+                    pmw.worlds[p].pre_fill = lambda: None
+            _call_all(pmw, "pre_fill")
             _dist(pmw)
             return True
         except Exception as e:
