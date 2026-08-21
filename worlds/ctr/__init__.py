@@ -259,8 +259,8 @@ class ctrAPWorld(World):
             _legacy = co["goal"]
             _LEGACY_GOAL_MAP = {
                 # legacy int -> (oxide_goal, bosses_required_goal, gems_required_goal)
-                0: (OxideGoal.option_first, 0, 0),
-                1: (OxideGoal.option_final, 0, 0),
+                0: (OxideGoal.option_any_percent, 0, 0),
+                1: (OxideGoal.option_101_percent, 0, 0),
                 3: (OxideGoal.option_none, 4, 0),
                 4: (OxideGoal.option_none, 0, 5),
             }
@@ -947,7 +947,7 @@ class ctrAPWorld(World):
         # #171: was a percentage slider, now a created-location count) -- a
         # satisfying tier with 0 created stays out and is caught by
         # generate_early's guard rather than silently forced.
-        if o.oxide_goal.value == OxideGoal.option_final:
+        if o.oxide_goal.value == OxideGoal.option_101_percent:
             # Sapphire is progression on ANY oxide-final seed (mode-independent):
             # once the goal makes any relic tier progression, fill may place a
             # progression relic behind the Slide Coliseum sapphire gate (the fixed
@@ -1034,9 +1034,9 @@ class ctrAPWorld(World):
         oxide = o.oxide_goal.value
         bosses = o.bosses_required_goal.value
         gems = o.gems_required_goal.value
-        if oxide == OxideGoal.option_first and bosses == 0 and gems == 0:
+        if oxide == OxideGoal.option_any_percent and bosses == 0 and gems == 0:
             return 0  # legacy option_oxide
-        if oxide == OxideGoal.option_final and bosses == 0 and gems == 0:
+        if oxide == OxideGoal.option_101_percent and bosses == 0 and gems == 0:
             return 1  # legacy option_oxidefinal
         if oxide == OxideGoal.option_none and bosses == 4 and gems == 0:
             return 3  # legacy option_allbosses
@@ -1082,7 +1082,7 @@ class ctrAPWorld(World):
         from .usf_finish import track_finish_term
         oxide_finish = track_finish_term("Oxide Station", self)
 
-        if o.oxide_goal.value == OxideGoal.option_first:
+        if o.oxide_goal.value == OxideGoal.option_any_percent:
             flag = self._add_goal_event(
                 "N. Oxide Garage", "N. Oxide's Challenge Cleared", "has('Key', 4)")
             predicates.append(
@@ -1094,7 +1094,7 @@ class ctrAPWorld(World):
             # sit on the finish line, and the player's own progression can't be
             # stranded on a location that is only reachable once the seed is won.
             self._exclude_goal_location(player, "N. Oxide Garage: N. Oxide's Challenge")
-        elif o.oxide_goal.value == OxideGoal.option_final:
+        elif o.oxide_goal.value == OxideGoal.option_101_percent:
             # The companion event is the seed's terminal win-flag; its win-trigger
             # is reaching Oxide's garage (Key 4). The relic requirement that turns
             # Oxide's Challenge into the FINAL Challenge (issue #23) is ANDed into

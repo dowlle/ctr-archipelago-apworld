@@ -10,8 +10,8 @@ from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
 class OxideGoal(Choice):
     """What finishing the game means.
 
-    - **first** (default): beat Oxide, the retail ending.
-    - **final**: beat Oxide's Final Challenge, the full-completion
+    - **any_percent** (default): beat Oxide, the retail ending.
+    - **101_percent**: beat Oxide's Final Challenge, the full-completion
       ending.
     - **none**: Oxide is not part of the goal at all.
 
@@ -19,8 +19,14 @@ class OxideGoal(Choice):
     want; every condition you set must be met."""
     display_name = "Oxide Goal"
     option_none = 0
-    option_first = 1
-    option_final = 2
+    option_any_percent = 1
+    option_101_percent = 2
+    # The old spellings keep working, so a YAML written before the rename
+    # loads unchanged. The integers are frozen: slot_data's goal_oxide and the
+    # native parser (ap_verify.c, ap_hooks.c) read the number, never the name,
+    # so renaming the values costs nothing on the wire.
+    alias_first = 1
+    alias_final = 2
     default = 1
 
 

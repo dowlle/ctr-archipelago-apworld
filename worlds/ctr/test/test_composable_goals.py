@@ -193,12 +193,39 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
         _grant(st, mw, self.PLAYER, ["Red Gem"])
         self.assertTrue(cc(st))
 
+    # -- the 2026-08-21 value rename --
+
+    def test_oxide_goal_integers_are_frozen_across_the_rename(self):
+        """`first`/`final` became `any_percent`/`101_percent`, NAMES ONLY.
+
+        slot_data's `goal_oxide` and the native parser (ap_verify.c line 598,
+        ap_hooks.c AP_EvaluateGoal) read the integer and never the name, so the
+        rename must not move one. This pins all three.
+        """
+        self.assertEqual(OxideGoal.option_none, 0)
+        self.assertEqual(OxideGoal.option_any_percent, 1)
+        self.assertEqual(OxideGoal.option_101_percent, 2)
+
+    def test_old_value_spellings_still_load(self):
+        """A YAML written before the rename keeps working, via the aliases."""
+        for old, new, expected in (("first", "any_percent", 1),
+                                   ("final", "101_percent", 2)):
+            with self.subTest(old=old):
+                old_world = _build(oxide_goal=old).worlds[1]
+                new_world = _build(oxide_goal=new).worlds[1]
+                self.assertEqual(old_world.options.oxide_goal.value, expected)
+                self.assertEqual(new_world.options.oxide_goal.value, expected)
+                # and the same integer reaches the wire either way
+                self.assertEqual(
+                    old_world.fill_slot_data()["ctr_options"]["goal_oxide"],
+                    new_world.fill_slot_data()["ctr_options"]["goal_oxide"])
+
     # -- the four legacy-equivalent single-condition combinations --
 
     def test_default_matches_legacy_oxide_goal(self):
-        mw = _build()  # shipped default: oxide_goal=first, bosses=0, gems=0
+        mw = _build()  # shipped default: oxide_goal=any_percent, bosses=0, gems=0
         world = mw.worlds[1]
-        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_first)
+        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_any_percent)
         self.assertEqual(world.options.bosses_required_goal.value, 0)
         self.assertEqual(world.options.gems_required_goal.value, 0)
         self.assertEqual(world._legacy_goal_value(), 0)
@@ -352,7 +379,7 @@ class TestComposedGoalWire(CTRTestBase):
     def test_wire_carries_composed_fields(self):
         sd = self.world.fill_slot_data()
         co = sd["ctr_options"]
-        self.assertEqual(co["goal_oxide"], OxideGoal.option_first)
+        self.assertEqual(co["goal_oxide"], OxideGoal.option_any_percent)
         self.assertEqual(co["goal_bosses"], 2)
         self.assertEqual(co["goal_gems"], 0)
         self.assertEqual(co["goal"], -1)  # no legacy analogue
