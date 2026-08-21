@@ -10,7 +10,8 @@ R15, R17), the 2026-08-08 picker clarification, and the #209 parent body:
     `progression` (a pad can demand one); locks OFF makes them `useful` and
     nothing in logic ever names a racer;
   * a fill can never place racer X's unlock item behind a pad requiring X;
-  * `penta_stats: pal | ntsc`, PAL default;
+  * `penta_stats: ntsc | pal`, NTSC default (labels corrected 2026-08-21;
+    the wire numbers 0 ordinary / 1 MAX did not move);
   * `editable_stats` is a separate option from `progressive_stats`, and when
     both are set progressive wins with no edit control, without rejecting the
     seed.
@@ -538,10 +539,22 @@ class TestCharacterSlotData(unittest.TestCase):
                     ROSTER_CHARACTER_ID[world.ctr_starting_character])
                 self.assertIn(options["starting_character"], range(16))
 
-    def test_penta_stats_defaults_to_pal(self):
+    def test_penta_stats_defaults_to_ntsc_the_ordinary_table(self):
+        """The DEFAULT SEED IS UNCHANGED ON THE WIRE by the 2026-08-21 relabel.
+
+        The labels were inverted until then: NTSC-U Penta reuses Polar and
+        Pura's ordinary TURN class, and the fifth MAX class is the PAL/JP one.
+        Only the names moved. 0 was and remains the ordinary table and the
+        default, 1 was and remains MAX, which is what native reads
+        (ap_charswap.c ap_cs_pentaUsesMaxClass). This test pins the numbers,
+        not the words, so it would fail if a future relabel moved them.
+        """
         options = _build(1).worlds[1].fill_slot_data()["ctr_options"]
         self.assertEqual(options["penta_stats"], 0)
         options = _build(1, penta_stats="ntsc").worlds[1] \
+            .fill_slot_data()["ctr_options"]
+        self.assertEqual(options["penta_stats"], 0)
+        options = _build(1, penta_stats="pal").worlds[1] \
             .fill_slot_data()["ctr_options"]
         self.assertEqual(options["penta_stats"], 1)
 

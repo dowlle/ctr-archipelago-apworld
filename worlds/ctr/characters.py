@@ -22,7 +22,11 @@ the public scope statement. Concretely:
            unlock items `progression` (a pad can demand one); locks OFF makes
            them `useful` and nothing in logic ever names a character, so the
            seed plans around the guaranteed starting character only.
-  * R15    `penta_stats: pal | ntsc`, PAL default.
+  * R15    `penta_stats: ntsc | pal`, NTSC default. The 2026-07-23 wayfarer
+           wrote the two labels the wrong way round; corrected 2026-08-21.
+           NTSC-U Penta reuses Polar and Pura's ordinary TURN class, and the
+           fifth MAX class is the PAL/JP one. The wire numbers did not move:
+           0 is still the ordinary table and 1 is still MAX.
 
 ROSTER ORDER IS THE WIRE ORDER, AND IT IS NOT THE ENGINE'S ORDER
 ----------------------------------------------------------------
@@ -501,8 +505,11 @@ STAT_OWNER_NONE = 0
 STAT_OWNER_GLOBAL = 1
 STAT_OWNER_PER_CHARACTER = 2
 
-PENTA_PAL = 0
-PENTA_NTSC = 1
+# 0 is the ordinary TURN-class table, 1 is the PAL/JP MAX table. The region
+# labels were inverted until 2026-08-21; these numbers were always correct and
+# are what native reads, so they did not move.
+PENTA_NTSC = 0
+PENTA_PAL = 1
 
 
 def effective_stat_config(world) -> Tuple[int, int, bool]:
