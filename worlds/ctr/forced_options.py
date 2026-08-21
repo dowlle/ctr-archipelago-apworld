@@ -580,12 +580,12 @@ def warn_penta_stats_without_vanilla_stats(world):
     from .characters import STAT_SOURCE_VANILLA, effective_stat_config
     o = world.options
     if not o.penta_stats.value:
-        return  # PAL is the default; a defaulted option needs no notice
+        return  # NTSC is the default; a defaulted option needs no notice
     source, _owner, _editable = effective_stat_config(world)
     if source == STAT_SOURCE_VANILLA:
         return
     logger.warning(
-        f"CTR: Penta Penguin Stats is set to 'ntsc' for {_who(world)}, but "
+        f"CTR: Penta Penguin Stats is set to 'pal' for {_who(world)}, but "
         f"this seed's stats are owned by Progressive Stats or Editable Stats, "
         f"so Penta uses the AP-defined stats like every other racer and the "
         f"selector has no gameplay effect.")
