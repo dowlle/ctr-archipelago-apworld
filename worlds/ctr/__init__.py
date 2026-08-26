@@ -1101,6 +1101,15 @@ class ctrAPWorld(World):
         o = self.options
         predicates: List = []
 
+        # Reused by Rules.add_oxide_access_contract (WO-A1 companion): the
+        # SAME "bosses won" / "gems held" predicates goal completion uses,
+        # so the Oxide garage door and the goal can never read a different
+        # answer to the same question. None when that companion condition is
+        # inactive (its value is 0), exactly like the goal's own predicates
+        # list above.
+        self._ctr_boss_won_predicate = None
+        self._ctr_gems_predicate = None
+
         # Both Oxide goal events inherit Oxide Station's confirmed finish
         # capability (triage ruling 2026-08-19): the challenge is raced on
         # Oxide Station, so the composed goal must not become true from Key 4
@@ -1167,12 +1176,15 @@ class ctrAPWorld(World):
             ]
             flags = [self._add_goal_event(r, e, "True") for r, e in boss_events]
             n_bosses = o.bosses_required_goal.value
-            predicates.append(
+            boss_predicate = (
                 lambda state, fs=flags, n=n_bosses:
                     sum(state.has(f, player) for f in fs) >= n)
+            predicates.append(boss_predicate)
+            self._ctr_boss_won_predicate = boss_predicate
 
         if o.gems_required_goal.value > 0:
-            self.gemgoal(player, o.gems_required_goal.value, predicates)
+            self._ctr_gems_predicate = self.gemgoal(
+                player, o.gems_required_goal.value, predicates)
 
         # generate_early's raise_if_composed_goal_is_empty already rejects the
         # all-off combination, so this can never be empty here; the assert is
@@ -1553,11 +1565,15 @@ class ctrAPWorld(World):
         # breadth -- all proven to fill 0/5000 randomized two-stage-active configs
         # while keeping real, distinct tier-2 gates on the great majority of pads.
 
-    def gemgoal(self, player, n: int, predicates: List) -> None:
+    def gemgoal(self, player, n: int, predicates: List):
         """Gems Required Goal (issue #152, generalized from the legacy
         All-Gems goal): appends a "hold >= n of the 5 Gems" predicate to
         `predicates` (composed with any Oxide/Bosses predicates by
-        _install_goal, which owns setting completion_condition). With
+        _install_goal, which owns setting completion_condition) AND returns
+        that same predicate so a caller that needs the identical answer
+        elsewhere (the Oxide access contract, Rules.add_oxide_access_contract)
+        can reuse it rather than re-deriving it (issue #WO-A1-companion: the
+        garage door must read the same truth as goal completion). With
         Shuffle Gems OFF the gems are additionally locked onto their own Gem
         Cup locations (win enough cups); with Shuffle Gems ON they stay in
         the multiworld pool and the goal is a hunt for wherever the fill hid
@@ -1579,9 +1595,11 @@ class ctrAPWorld(World):
                 loc.place_locked_item(self.create_item(gem_name))
 
         gems = ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
-        predicates.append(
+        predicate = (
             lambda state, gems=gems, n=n:
                 state.has_from_list_unique(gems, player, n))
+        predicates.append(predicate)
+        return predicate
 
     # --- Native-randomization slot_data (Phase-2 MVP shared contract) ---
 

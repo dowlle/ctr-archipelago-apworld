@@ -2,6 +2,7 @@ import logging
 from BaseClasses import CollectionState
 
 from .gem_cup_legs import resolved_gem_cup_legs, track_to_cups
+from .Options import OxideGoal
 from .usf_finish import UsfFinishGate
 
 
@@ -75,6 +76,7 @@ def set_rules(world):
     # installed, so they must run after it (#54/#209, R8).
     add_racer_lock_rules(world, player)
     add_boss_garage_rules(world, player)
+    add_oxide_access_contract(world, player)
     add_oxide_final_challenge_rule(world, player)
     # USF finish gate (ruled 2026-08-12): built and installed BEFORE the
     # rungs, because installing is what captures each gated Trophy Race's
@@ -488,7 +490,58 @@ def add_boss_garage_rules(world, player):
         ent.access_rule = (
             lambda s, n=thr, p=player: s.has("Trophy", p, n)
         )
-    # N. Oxide Garage Door keeps its has('Key', 4) text rule.
+    # N. Oxide Garage Door keeps its has('Key', 4) text rule as its base
+    # requirement; add_oxide_access_contract ANDs the composed-goal companion
+    # terms onto it below when Oxide is an active goal condition.
+
+
+def add_oxide_access_contract(world, player):
+    """Native-parity access contract for the 'N. Oxide Garage Door' entrance
+    (WO-A1 companion; native fix: composed Oxide entry, 2026-08-26).
+
+    Native's garage gate (ap/ap_oxide_entry.h, AP_OxideEntryReady) checks the
+    configured door requirement (Key x4 here) FIRST, unconditionally, and
+    then -- only when this seed's Oxide Goal is active -- ANDs every ACTIVE
+    companion goal term (bosses required, gems required) using the exact
+    same truth native's goal evaluator uses. Before this function, logic
+    believed four Keys alone reached both Oxide locations even in a seed
+    where the garage stays shut until bosses and/or gems are also satisfied,
+    so fill could seat a required progression item on a location no
+    reachable state could open -- the same failure mode
+    add_oxide_final_challenge_rule's docstring already names for the relic
+    half of the Final Challenge. This closes the entry half.
+
+    Reuses _install_goal's own predicates (world._ctr_boss_won_predicate,
+    world._ctr_gems_predicate) rather than re-deriving "bosses won" or "gems
+    held" a second way, so the door and the goal cannot drift apart -- the
+    same rule this subsystem's WO-A1 native fix enforces for
+    AP_ComposedBossesWon and the gem tally. Both Oxide locations inherit this
+    through the region: AP-core ANDs every entrance rule from spawn to a
+    location's parent region with the location's own rule, so changing only
+    the entrance (not the two locations) is sufficient and does not touch
+    add_oxide_final_challenge_rule's own relic-rule replacement.
+
+    When oxide_goal == none, no companion term is applied here, even if
+    bosses_required_goal / gems_required_goal are independently active for a
+    non-Oxide goal -- Oxide is then not the goal gate, so its garage stays an
+    ordinary four-Key door, unchanged from the pre-WO-A1 behaviour."""
+    if world.options.oxide_goal.value == OxideGoal.option_none:
+        return
+
+    companion_predicates = [
+        p for p in (getattr(world, "_ctr_boss_won_predicate", None),
+                   getattr(world, "_ctr_gems_predicate", None))
+        if p is not None
+    ]
+    if not companion_predicates:
+        return
+
+    mw = world.multiworld
+    door = mw.get_entrance("N. Oxide Garage Door", player)
+    base_rule = door.access_rule
+    door.access_rule = (
+        lambda state, base=base_rule, preds=tuple(companion_predicates):
+            base(state) and all(p(state) for p in preds))
 
 
 def add_oxide_final_challenge_rule(world, player):
