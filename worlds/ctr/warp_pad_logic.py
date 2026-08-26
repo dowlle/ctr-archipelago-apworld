@@ -1293,8 +1293,8 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     if shuffle_active:
         for _dest in s2_collapsed:
             if _dest in stage2_reqs:
-                stage2_reqs[_dest] = pad_reqs.get(
-                    dest_to_phys_real.get(_dest, _dest))
+                stage2_reqs[_dest] = deny_four_key_gate(
+                    pad_reqs.get(dest_to_phys_real.get(_dest, _dest)), mode)
         # Item types real fill CANNOT relocate this seed: their placement is
         # pinned to vanilla sources, so the synthetic sweep's model of them is
         # AUTHORITATIVE (a pinned-type requirement the sweep cannot validate may
@@ -1347,7 +1347,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
             dest_to_phys_real, start, allowed, keygate,
-            frozenset(pinned_items), critical_regions)
+            frozenset(pinned_items), critical_regions, mode)
         world._ctr_s2_relaxed_s1 = relaxed_s1
         world._ctr_s2_relaxed_s2 = relaxed_s2
 
@@ -1466,7 +1466,7 @@ def run_sphere_search(world, mode, reward_track_for=None,
 def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                                 dest_to_phys, start, allowed, keygate,
                                 pinned_items=frozenset(),
-                                critical_regions=frozenset()):
+                                critical_regions=frozenset(), mode=1):
     """Verify the identity-topology requirement DAG against the ACTUAL shuffled
     graph; relax ONLY the requirements that fail there.
 
@@ -1507,6 +1507,13 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     Bounded: relaxation is monotone (a weakened requirement only ever opens more
     of the graph, and the fixed-point inventory can only grow between
     iterations), each pad/dest relaxes at most once, one relaxation per sweep.
+
+    `mode` is the warppad_unlock_requirements mode. This pass runs AFTER
+    _post_process, so it owns the mode-2 (random_without_4_keys) invariant for
+    everything it writes: every re-drawn stage-1 requirement and every stage-2
+    collapse goes through deny_four_key_gate. Without that, a relaxation could
+    draw ("Key", 4) straight from the fixed-point inventory -- the exact gate
+    the option promises never to produce.
     Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
     relaxed_s1 = {}
     relaxed_s2 = {}
@@ -1558,6 +1565,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
             if (new is not None and new[0] != "Key"
                     and new[1] > _STAGE1_COUNT_CEILING):
                 new = (new[0], _STAGE1_COUNT_CEILING)
+            new = deny_four_key_gate(new, mode)
             relaxed_s1[track] = (pad_reqs.get(track), new)
             pad_reqs[track] = new
             continue
@@ -1569,8 +1577,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         if blocked_s2:
             dest = blocked_s2[0]
             phys = dest_to_phys.get(dest, dest)
-            relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
-            stage2_reqs[dest] = pad_reqs.get(phys)
+            collapsed = deny_four_key_gate(pad_reqs.get(phys), mode)
+            relaxed_s2[dest] = (stage2_reqs.get(dest), collapsed)
+            stage2_reqs[dest] = collapsed
             continue
 
         # "Proven-open": the sweep actually validated this pad at the fixed
@@ -1612,6 +1621,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 if (new_req is not None and new_req[0] != "Key"
                         and new_req[1] > _STAGE1_COUNT_CEILING):
                     new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
                 continue
@@ -1623,8 +1633,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
             if pinned_s2:
                 dest = pinned_s2[0]
                 phys = dest_to_phys.get(dest, dest)
-                relaxed_s2[dest] = (stage2_reqs.get(dest), pad_reqs.get(phys))
-                stage2_reqs[dest] = pad_reqs.get(phys)
+                collapsed = deny_four_key_gate(pad_reqs.get(phys), mode)
+                relaxed_s2[dest] = (stage2_reqs.get(dest), collapsed)
+                stage2_reqs[dest] = collapsed
                 continue
 
         # Critical-region completeness (see docstring): while a region holding
@@ -1643,11 +1654,32 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 if (new_req is not None and new_req[0] != "Key"
                         and new_req[1] > _STAGE1_COUNT_CEILING):
                     new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
                 continue
         break
     return relaxed_s1, relaxed_s2
+
+
+def deny_four_key_gate(req, mode):
+    """The random_without_4_keys (mode 2) invariant, in ONE place.
+
+    A ("Key", 4) requirement is lowered to ("Key", 3); everything else passes
+    through untouched. Lowering (never raising) is what keeps the
+    solvable-by-construction DAG intact: any state that satisfied Key x4
+    satisfies Key x3, so no gate this module already proved reachable can close.
+
+    Call this at EVERY site that writes a stage-1 or stage-2 requirement, not
+    only in _post_process. The post-pass runs before _revalidate_against_shuffle,
+    and that pass re-draws stage-1 requirements from the live inventory and
+    collapses stage-2 requirements onto them -- so a post-pass-only guard leaves
+    the shuffled-seed relaxation path free to reintroduce exactly the gate the
+    option promises never to produce (reproduced on the shipped Alpha 4 package;
+    see the 2026-08-26 stage-2 regression note)."""
+    if mode == 2 and req is not None and req[0] == "Key" and req[1] >= 4:
+        return ("Key", 3)
+    return req
 
 
 def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
@@ -1665,9 +1697,11 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
             if cnt != 0:
                 cnt = max(1, math.ceil(cnt * 0.6))
                 pad_reqs[track] = (item, cnt)
-        elif mode == 2 and item == "Key" and cnt == 4:
-            pad_reqs[track] = ("Key", 3)
-            cnt = 3
+        else:
+            lowered = deny_four_key_gate((item, cnt), mode)
+            if lowered != (item, cnt):
+                pad_reqs[track] = lowered
+                item, cnt = lowered
         if count_ceiling is not None and item != "Key" and cnt > count_ceiling:
             pad_reqs[track] = (item, count_ceiling)
 
