@@ -78,7 +78,7 @@ class TestValidCustomWeightsGenerate(unittest.TestCase):
     SEEDS = (1, 2, 3)
 
     def test_mode2_custom_key_zero_only(self):
-        # Key=0 alone is provably safe: Trophy stays at its default 100.
+        # Key=0 alone is provably safe: Trophy stays at its default 90.
         for seed in self.SEEDS:
             with self.subTest(seed=seed):
                 setup_multiworld(
@@ -86,8 +86,9 @@ class TestValidCustomWeightsGenerate(unittest.TestCase):
                     options=_options("random_without_4_keys",
                                      weights={"Key": 0}))
 
-    def test_mode2_custom_empty_dict_uses_legacy_defaults(self):
-        # Empty dict = legacy defaults (Trophy 100), so the guard passes.
+    def test_mode2_custom_empty_dict_uses_default_weights(self):
+        # Empty dict = icebound_beta5 defaults for every item (Trophy 90), so
+        # the guard passes.
         for seed in self.SEEDS:
             with self.subTest(seed=seed):
                 setup_multiworld(

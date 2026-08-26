@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
+from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
 
@@ -612,7 +613,7 @@ class RequirementVariety(Choice):
     # (cap 16), Relic x0.5 (cap 27), Gem capped at 5 (no -1 reduction).
     # trophy_heavy_legacy = Trophy 100, Token 15 (Purple 10), Relic 20, Key 25,
     # Gem 2; Any* collapse Token x0.6, Relic x0.3, Gem -1 (no caps). custom
-    # falls back to trophy_heavy_legacy weights for unlisted items and uses the
+    # falls back to icebound_beta5 weights for unlisted items and uses the
     # legacy Any* collapse.
     display_name = "Requirement Variety"
     option_icebound_beta5 = 0
@@ -624,8 +625,9 @@ class RequirementVariety(Choice):
 class RequirementWeights(OptionDict):
     """Roll your own requirement mix. Used only when `Requirement Variety` =
     custom. Each entry is `item name: weight` - higher weight means picked more
-    often; 0 disables an item, except Trophy, which must stay above 0. Items you
-    leave out keep their default weight.
+    often; 0 disables an item, except Trophy, which must stay above 0. The
+    pre-filled values are the icebound_beta5 weights - tweak from there. Items
+    you leave out keep their icebound_beta5 default weight.
 
     Example:
 
@@ -638,11 +640,14 @@ class RequirementWeights(OptionDict):
     Valid keys: Trophy, Key, the five CTR Token colours, the three Relic tiers,
     and the five Gem colours."""
     # Trophy must stay above 0 because it bootstraps the randomized warp-pad
-    # requirements. Unlisted items fall back to their trophy_heavy_legacy
-    # weight (see RequirementVariety's comment for the tables).
+    # requirements. Unlisted items fall back to their icebound_beta5 weight
+    # (see RequirementVariety's comment for the tables).
     display_name = "Requirement Weights"
     supports_weighting = False
-    default = {}
+    # Pre-filled with the icebound_beta5 table (single source: warp_pad_logic)
+    # so the YAML template and options page show real numbers to tweak from
+    # instead of an empty dict.
+    default = dict(DEFAULT_REQUIREMENT_WEIGHTS)
     valid_keys = [
         "Trophy", "Key",
         "Red CTR Token", "Green CTR Token", "Blue CTR Token",

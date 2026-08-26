@@ -88,7 +88,7 @@ def raise_if_custom_trophy_weight_is_zero(world):
                 "randomized warp-pad requirements are drawn, so with Trophy at 0 "
                 "the candidate weights sum to zero and generation cannot pick a "
                 "requirement. In your YAML either set 'Trophy' above 0 (the "
-                "default is 100), remove the 'Trophy' entry to keep that default, "
+                "default is 90), remove the 'Trophy' entry to keep that default, "
                 "or switch requirement_variety to a preset. Weight 0 remains "
                 "legal for every other item, including Key.")
 
@@ -455,7 +455,9 @@ def warn_sphere_search_tuning_ignored_in_vanilla(world):
         return
     parts = [f"Two-Stage Gate Density ('{o.two_stage_density.current_key}')",
              f"Requirement Variety ('{o.requirement_variety.current_key}')"]
-    if o.requirement_variety.current_key == "custom" and o.requirement_weights.value:
+    # No .value truthiness check: the option's default is now the pre-filled
+    # icebound_beta5 table, so in custom mode the weights are always in play.
+    if o.requirement_variety.current_key == "custom":
         parts.append("Requirement Weights")
     logger.warning(
         f"CTR: Warp Pad Unlock Requirements 'vanilla' never runs the "

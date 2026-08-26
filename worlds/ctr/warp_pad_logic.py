@@ -393,6 +393,11 @@ _REQ_WEIGHTS_ICEBOUND_BETA5 = {
     "Red Gem": 4, "Green Gem": 4, "Blue Gem": 4, "Yellow Gem": 4, "Purple Gem": 4,
 }
 
+# Public alias for Options.RequirementWeights: its pre-filled YAML default (and
+# the fallback for keys a custom YAML leaves out) is the icebound_beta5 table,
+# so players tweak from the real default numbers instead of an empty dict.
+DEFAULT_REQUIREMENT_WEIGHTS = _REQ_WEIGHTS_ICEBOUND_BETA5
+
 # Any* collapse parameters per preset. Tuple layout:
 #   (token_chance, token_scale, token_cap,
 #    relic_chance, relic_scale, relic_cap,
@@ -435,13 +440,13 @@ GEM_ITEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
 
 
 def effective_custom_weights(world):
-    """The requirement-weight table for requirement_variety=custom: the legacy
-    defaults overlaid with the player's requirement_weights, keeping only valid
-    keys so the key universe stays stable. Pure -- reads options, mutates no
+    """The requirement-weight table for requirement_variety=custom: the
+    icebound_beta5 defaults overlaid with the player's requirement_weights,
+    keeping only valid keys so the key universe stays stable. Pure -- reads options, mutates no
     module state. Shared by _load_requirement_preset (the live weight loader) and
     __init__.generate_early's zero-Trophy guard (issue #87) so both read the exact
     same effective weights."""
-    weights = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)  # fallback for omitted keys
+    weights = dict(_REQ_WEIGHTS_ICEBOUND_BETA5)  # fallback for omitted keys
     custom = getattr(getattr(world.options, "requirement_weights", None),
                      "value", None) or {}
     for k, v in custom.items():
@@ -462,10 +467,10 @@ def _load_requirement_preset(world):
     - icebound_beta5 (default): beta5 weights + retuned collapse (Token x0.8 cap 16,
       Relic x0.5 cap 27, Gem cap 5, no -1).
     - trophy_heavy_legacy: original weights + original collapse (x0.6 / x0.3 / -1).
-    - custom: start from the legacy weights, then overlay requirement_weights; any
-      omitted item keeps its legacy weight. Unrecognised custom keys are ignored
-      (OptionDict.valid_keys already constrains them at parse time). custom uses the
-      legacy collapse row.
+    - custom: start from the icebound_beta5 weights (the pre-filled YAML default),
+      then overlay requirement_weights; any omitted item keeps its icebound_beta5
+      weight. Unrecognised custom keys are ignored (OptionDict.valid_keys already
+      constrains them at parse time). custom uses the legacy collapse row.
 
     A missing requirement_variety option (e.g. an old YAML) safely falls back to the
     legacy preset.
