@@ -303,14 +303,14 @@ class TrapWeights(OptionDict):
           first_person: 0
           icy_road: 10
 
-    All 19 listed traps have a working native effect in this build and can be
+    All 20 listed traps have a working native effect in this build and can be
     picked. Setting every trap to 0 while `Trap Fill Percentage` is above 0
     is an error, because then no trap could be picked at all.
 
     Valid keys: icy_road, low_gravity, forced_usf, forced_boost, first_person,
     wumpa_wipeout, flatten, item_reroll, forced_use, empty_crates,
     weakened_kart, boost_blocker, wireframe, nitro, reverse_steering,
-    red_potion, upside_down, mirror_mode, warpball_ambush."""
+    red_potion, upside_down, mirror_mode, warpball_ambush, demo_camera."""
     # Machine keys, not item names: the 0.2.0 rework renamed five traps, and a
     # name-keyed option would have invalidated every YAML that mentioned one.
     # The defaults live in traps.DEFAULT_TRAP_WEIGHTS (the reviewed table)

@@ -1156,5 +1156,11 @@
     "code": 35010192,
     "count": 0,
     "classification": "trap"
+  },
+  {
+    "name": "Demo Camera",
+    "code": 35010193,
+    "count": 0,
+    "classification": "trap"
   }
 ]

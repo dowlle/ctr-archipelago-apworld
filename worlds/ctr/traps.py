@@ -79,12 +79,11 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("nitro",            "Nitro",            5, True, "freeze"),
     TrapEntry("reverse_steering", "Reverse Steering", 4, True, "freeze"),
     TrapEntry("red_potion",       "Red Potion",       3, True, "freeze"),
-    # Native AP_TrapEffect 16-18, minted by #280, ids 35010190-35010192.
-    # Demo Camera is deliberately NOT here: it is prototype-gated and gets its
-    # identity only if it earns inclusion.
+    # Native AP_TrapEffect 16-19, minted by #280, ids 35010190-35010193.
     TrapEntry("upside_down",      "Upside Down",      2, True, "rework"),
     TrapEntry("mirror_mode",      "Mirror Mode",      3, True, "rework"),
     TrapEntry("warpball_ambush",  "Warpball Ambush",  3, True, "rework"),
+    TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
 )
 
 #: The BUILDABLE draw list, pinned to native's AP_TrapEffect enum order.
@@ -94,7 +93,7 @@ TRAP_ITEM_NAMES: List[str] = [e.name for e in TRAP_REGISTRY if e.buildable]
 FROZEN_TRAP_ITEM_NAMES: List[str] = [e.name for e in TRAP_REGISTRY
                                      if e.origin == "freeze"]
 
-#: The 3 names #280 minted, in items.json append order.
+#: The 4 names #280 minted, in items.json append order.
 REWORK_TRAP_ITEM_NAMES: List[str] = [e.name for e in TRAP_REGISTRY
                                      if e.origin == "rework"]
 

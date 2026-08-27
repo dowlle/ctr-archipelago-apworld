@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.2.0",
-  "checksum": "603c9304119460d97508c61a4bac7e3521f2c801",
+  "checksum": "1dc39b2e6d6d821b20d7a7266a7aa1027d62af30",
   "item_name_to_id": {
     "Beaker": 35010099,
     "Big Wumpa Bundle": 35010121,
@@ -12,6 +12,7 @@
     "Boost Blocker": 35010112,
     "Coco Bandicoot": 35010124,
     "Crash Bandicoot": 35010123,
+    "Demo Camera": 35010193,
     "Dingodile": 35010133,
     "Empty Crates": 35010110,
     "Fake Crash": 35010136,
@@ -791,6 +792,7 @@
       "Boost Blocker",
       "Coco Bandicoot",
       "Crash Bandicoot",
+      "Demo Camera",
       "Dingodile",
       "Empty Crates",
       "Fake Crash",
@@ -1003,6 +1005,7 @@
     ],
     "Traps": [
       "Boost Blocker",
+      "Demo Camera",
       "Empty Crates",
       "First Person",
       "Flatten",

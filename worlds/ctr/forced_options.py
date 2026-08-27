@@ -113,7 +113,7 @@ def raise_if_trap_weights_are_unusable(world):
       happens, so an all-zero table is harmless and legal there; it is how a
       player parks their weights while traps are off.
 
-    "Effective" means the BUILDABLE traps only. All 19 registered traps are
+    "Effective" means the BUILDABLE traps only. All 20 registered traps are
     buildable in this release, while the gate remains explicit for future
     additions whose native effect has not landed yet.
     """

@@ -77,12 +77,12 @@ EXPECTED_ITEM_BLOCKS = [
     # nothing renumbered, nothing renamed, no second datapackage bump. Its own
     # block for the same reason as the one above.
     ("224 turbo grant amendment", 35010189, 35010189, 1),
-    # #280, the 0.2.0 trap rework. Three NEW trap identities (Upside Down,
-    # Mirror Mode, Warpball Ambush), appended on the same terms as the two
+    # #280, the 0.2.0 trap rework. Four NEW trap identities (Upside Down,
+    # Mirror Mode, Warpball Ambush, Demo Camera), appended on the same terms as the two
     # amendments above: nothing renumbered, no second datapackage bump. The
     # rework also RENAMED 16 existing traps in place; renames move no id and so
     # add no block here -- test_trap_rework.py owns that half.
-    ("280 trap rework identities", 35010190, 35010192, 3),
+    ("280 trap rework identities", 35010190, 35010193, 4),
 ]
 
 #: Every name the freeze appended to data/items.json, in append order.
@@ -115,7 +115,7 @@ class TestNameFreezeCensus(unittest.TestCase):
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
         # the three trap identities the rework minted (#280).
-        self.assertEqual(len(world_type.item_name_to_id), 193)
+        self.assertEqual(len(world_type.item_name_to_id), 194)
         self.assertEqual(len(world_type.location_name_to_id), 574)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
@@ -148,8 +148,8 @@ class TestNameFreezeCensus(unittest.TestCase):
 
     def test_the_ruled_amendments_sit_one_past_the_freeze(self) -> None:
         """#223 and #224 reopened the namespace for exactly one name each, and
-        #280 for three. Pin the boundary: the frozen set still ends at Gas
-        Pedal, and those five are the only entries after it, in ruling order."""
+        #280 for four. Pin the boundary: the frozen set still ends at Gas
+        Pedal, and those six are the only entries after it, in ruling order."""
         table = load_item_table()
         by_code = {item["code"]: item["name"] for item in table}
         self.assertEqual(by_code[35010187], "Gas Pedal")
@@ -157,9 +157,9 @@ class TestNameFreezeCensus(unittest.TestCase):
         self.assertEqual(by_code[TURBO_GRANT_CODE], TURBO_GRANT_ITEM)
         self.assertEqual(TURBO_GRANT_CODE, TIZI_HELPER_CODE + 1)
         self.assertEqual(
-            [by_code[TURBO_GRANT_CODE + i] for i in (1, 2, 3)],
+            [by_code[TURBO_GRANT_CODE + i] for i in (1, 2, 3, 4)],
             REWORK_TRAP_ITEM_NAMES)
-        self.assertEqual(max(by_code), TURBO_GRANT_CODE + 3)
+        self.assertEqual(max(by_code), TURBO_GRANT_CODE + 4)
 
     def test_the_three_families_the_sweep_recovered_are_registered(self) -> None:
         """Character unlocks (#54/#209), the gas pedal (R-I) and the trial-track
@@ -209,9 +209,9 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
         """The completed native roster activates every reserved identity."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 19)
+        self.assertEqual(len(TRAP_ITEM_NAMES), 20)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
-        self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 3)
+        self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 4)
         newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)
                            | set(REWORK_TRAP_ITEM_NAMES))
         self.assertTrue(newly_buildable <= set(TRAP_ITEM_NAMES))
@@ -225,7 +225,7 @@ class TestNameFreezeInertness(unittest.TestCase):
             trap_group,
             set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
             | set(REWORK_TRAP_ITEM_NAMES))
-        self.assertEqual(len(trap_group), 19)
+        self.assertEqual(len(trap_group), 20)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):

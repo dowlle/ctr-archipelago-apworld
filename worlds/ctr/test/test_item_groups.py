@@ -50,7 +50,7 @@ EXPECTED_GROUPS = {
         "Weakened Kart", "Boost Blocker", "Wireframe", "Nitro",
         "Reverse Steering", "Red Potion",
         # minted by #280, now buildable
-        "Upside Down", "Mirror Mode", "Warpball Ambush",
+        "Upside Down", "Mirror Mode", "Warpball Ambush", "Demo Camera",
     },
     "Itemsanity Weapons": set(ITEM_NAMES),
 }

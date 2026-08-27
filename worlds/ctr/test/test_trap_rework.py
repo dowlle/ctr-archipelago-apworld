@@ -40,7 +40,7 @@ EARLY = ("generate_early",)
 #: Every trap name the datapackage registers after the rework, with the id it
 #: carries, in id order. The five renamed shipped traps keep the ids v0.1.5
 #: published; the eleven renamed frozen traps keep the ids #177 minted; only
-#: the three new identities take new codes.
+#: the four new identities take new codes.
 EXPECTED_TRAP_IDS = {
     # native AP_TrapEffect 0-4
     "Icy Road": 35010016,
@@ -64,6 +64,7 @@ EXPECTED_TRAP_IDS = {
     "Upside Down": 35010190,
     "Mirror Mode": 35010191,
     "Warpball Ambush": 35010192,
+    "Demo Camera": 35010193,
 }
 
 #: What #280 renamed, old -> new. Every one of these keeps the id the old name
@@ -94,6 +95,7 @@ BUILDABLE_KEYS = (
     "forced_use", "empty_crates", "weakened_kart", "boost_blocker",
     "wireframe", "nitro", "reverse_steering", "red_potion",
     "upside_down", "mirror_mode", "warpball_ambush",
+    "demo_camera",
 )
 
 
@@ -149,17 +151,17 @@ class TestTrapNames(unittest.TestCase):
                 self.assertEqual(by_name[name]["classification"].name, "trap")
                 self.assertIn(name, traps.TRAP_ITEM_NAMES)
 
-    def test_demo_camera_has_no_identity_yet(self):
-        """Accepted into the design registry but prototype-gated: minting its
-        name now would spend a datapackage id on an effect that may never
-        ship."""
-        names = {item["name"] for item in load_item_table()}
-        self.assertNotIn("Demo Camera", names)
-        self.assertNotIn("demo_camera", traps.TRAP_WEIGHT_KEYS)
+    def test_demo_camera_is_registered_and_buildable(self):
+        by_name = {item["name"]: item for item in load_item_table()}
+        self.assertEqual(by_name["Demo Camera"]["code"], 35010193)
+        self.assertEqual(by_name["Demo Camera"]["count"], 0)
+        self.assertEqual(by_name["Demo Camera"]["classification"].name, "trap")
+        self.assertIn("Demo Camera", traps.TRAP_ITEM_NAMES)
+        self.assertIn("demo_camera", traps.TRAP_WEIGHT_KEYS)
 
     def test_the_weight_keys_cover_every_trap_exactly_once(self):
-        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 19)
-        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 19)
+        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 20)
+        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 20)
         self.assertEqual(set(traps.DEFAULT_TRAP_WEIGHTS),
                          set(traps.TRAP_WEIGHT_KEYS))
         self.assertEqual(sorted(traps.ALL_TRAP_ITEM_NAMES),
@@ -214,7 +216,7 @@ class TestWeightedDraw(unittest.TestCase):
         return {name: hits / len(drawn) for name, hits in counted.items()}
 
     def test_default_weights_produce_their_documented_ratios(self):
-        # The reviewed 19-effect table totals 72 relative-weight points.
+        # The reviewed 20-effect table totals 75 relative-weight points.
         world = _world(seed=280)
         shares = self._shares(world)
         expected_weights = {
@@ -225,8 +227,9 @@ class TestWeightedDraw(unittest.TestCase):
             "Wireframe": 2, "Nitro": 5, "Reverse Steering": 4,
             "Red Potion": 3, "Upside Down": 2, "Mirror Mode": 3,
             "Warpball Ambush": 3,
+            "Demo Camera": 3,
         }
-        expected = {name: weight / 72
+        expected = {name: weight / 75
                     for name, weight in expected_weights.items()}
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
