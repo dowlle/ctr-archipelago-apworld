@@ -45,11 +45,11 @@ EXPECTED_GROUPS = {
     "Traps": {
         # shipped, buildable (native AP_TrapEffect 0-4)
         "Icy Road", "Low Gravity", "Forced USF", "Forced Boost", "First Person",
-        # frozen by #177, not yet buildable
+        # frozen by #177, now buildable
         "Wumpa Wipeout", "Flatten", "Item Reroll", "Forced Use", "Empty Crates",
         "Weakened Kart", "Boost Blocker", "Wireframe", "Nitro",
         "Reverse Steering", "Red Potion",
-        # minted by #280, not yet buildable
+        # minted by #280, now buildable
         "Upside Down", "Mirror Mode", "Warpball Ambush",
     },
     "Itemsanity Weapons": set(ITEM_NAMES),

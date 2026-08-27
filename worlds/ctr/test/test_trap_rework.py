@@ -42,13 +42,13 @@ EARLY = ("generate_early",)
 #: published; the eleven renamed frozen traps keep the ids #177 minted; only
 #: the three new identities take new codes.
 EXPECTED_TRAP_IDS = {
-    # buildable, native AP_TrapEffect 0-4
+    # native AP_TrapEffect 0-4
     "Icy Road": 35010016,
     "Low Gravity": 35010017,
     "Forced USF": 35010018,
     "Forced Boost": 35010019,
     "First Person": 35010020,
-    # frozen by #177, no native effect yet
+    # native AP_TrapEffect 5-15, frozen by #177
     "Wumpa Wipeout": 35010106,
     "Flatten": 35010107,
     "Item Reroll": 35010108,
@@ -60,7 +60,7 @@ EXPECTED_TRAP_IDS = {
     "Nitro": 35010114,
     "Reverse Steering": 35010115,
     "Red Potion": 35010116,
-    # minted by #280, no native effect yet
+    # native AP_TrapEffect 16-18, minted by #280
     "Upside Down": 35010190,
     "Mirror Mode": 35010191,
     "Warpball Ambush": 35010192,
@@ -87,9 +87,14 @@ RENAMED_BY_280 = {
     "Red Potion Trap": "Red Potion",
 }
 
-#: The five keys with a working native effect, in AP_TrapEffect order.
-BUILDABLE_KEYS = ("icy_road", "low_gravity", "forced_usf", "forced_boost",
-                  "first_person")
+#: Every key with a working native effect, in AP_TrapEffect order.
+BUILDABLE_KEYS = (
+    "icy_road", "low_gravity", "forced_usf", "forced_boost",
+    "first_person", "wumpa_wipeout", "flatten", "item_reroll",
+    "forced_use", "empty_crates", "weakened_kart", "boost_blocker",
+    "wireframe", "nitro", "reverse_steering", "red_potion",
+    "upside_down", "mirror_mode", "warpball_ambush",
+)
 
 
 def _world(seed=1, weights=None, trap_fill=10, steps=EARLY):
@@ -135,15 +140,14 @@ class TestTrapNames(unittest.TestCase):
             with self.subTest(renamed=old):
                 self.assertEqual(EXPECTED_TRAP_IDS[RENAMED_BY_280[old]], code)
 
-    def test_the_three_new_identities_are_registered_and_inert(self):
-        """Registered names with count 0: real datapackage identities that fill
-        never draws, exactly like the #177 freeze's own names."""
+    def test_the_three_new_identities_are_registered_and_buildable(self):
+        """Their authored count stays 0 because weighted fill creates them."""
         by_name = {item["name"]: item for item in load_item_table()}
         for name in ("Upside Down", "Mirror Mode", "Warpball Ambush"):
             with self.subTest(item=name):
                 self.assertEqual(by_name[name]["count"], 0)
                 self.assertEqual(by_name[name]["classification"].name, "trap")
-                self.assertNotIn(name, traps.TRAP_ITEM_NAMES)
+                self.assertIn(name, traps.TRAP_ITEM_NAMES)
 
     def test_demo_camera_has_no_identity_yet(self):
         """Accepted into the design registry but prototype-gated: minting its
@@ -185,12 +189,12 @@ class TestTrapWeightResolution(unittest.TestCase):
                 with self.subTest(key=key):
                     self.assertEqual(effective[key], default)
 
-    def test_weights_on_traps_without_a_native_effect_never_reach_the_draw(self):
-        """The 14 registered-but-inert traps are filtered out before the draw,
-        so no weight on one of them can put it in a pool."""
-        world = _world(weights={"flatten": 100, "warpball_ambush": 100})
+    def test_every_registered_trap_can_reach_the_draw(self):
+        weights = {key: 0 for key in BUILDABLE_KEYS}
+        weights.update({"flatten": 100, "warpball_ambush": 100})
+        world = _world(weights=weights)
         self.assertEqual(set(traps.selectable_trap_weights(world)),
-                         set(BUILDABLE_KEYS))
+                         {"flatten", "warpball_ambush"})
 
 
 class TestWeightedDraw(unittest.TestCase):
@@ -210,12 +214,20 @@ class TestWeightedDraw(unittest.TestCase):
         return {name: hits / len(drawn) for name, hits in counted.items()}
 
     def test_default_weights_produce_their_documented_ratios(self):
-        # icy 5, lowgrav 5, USF 2, boost 4, first person 3 -> 19 total.
+        # The reviewed 19-effect table totals 72 relative-weight points.
         world = _world(seed=280)
         shares = self._shares(world)
-        expected = {"Icy Road": 5 / 19, "Low Gravity": 5 / 19,
-                    "Forced USF": 2 / 19, "Forced Boost": 4 / 19,
-                    "First Person": 3 / 19}
+        expected_weights = {
+            "Icy Road": 5, "Low Gravity": 5, "Forced USF": 2,
+            "Forced Boost": 4, "First Person": 3, "Wumpa Wipeout": 4,
+            "Flatten": 6, "Item Reroll": 5, "Forced Use": 4,
+            "Empty Crates": 3, "Weakened Kart": 3, "Boost Blocker": 3,
+            "Wireframe": 2, "Nitro": 5, "Reverse Steering": 4,
+            "Red Potion": 3, "Upside Down": 2, "Mirror Mode": 3,
+            "Warpball Ambush": 3,
+        }
+        expected = {name: weight / 72
+                    for name, weight in expected_weights.items()}
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
             with self.subTest(trap=name):
@@ -225,9 +237,9 @@ class TestWeightedDraw(unittest.TestCase):
     def test_custom_weights_renormalize_over_the_traps_left_enabled(self):
         """Weights are relative and need no total: 30/10 over two enabled traps
         is 75/25 of the draw, not 30% and 10% of something."""
-        world = _world(seed=281, weights={
-            "icy_road": 30, "low_gravity": 10, "forced_usf": 0,
-            "forced_boost": 0, "first_person": 0})
+        weights = {key: 0 for key in BUILDABLE_KEYS}
+        weights.update({"icy_road": 30, "low_gravity": 10})
+        world = _world(seed=281, weights=weights)
         shares = self._shares(world)
         self.assertEqual(set(shares), {"Icy Road", "Low Gravity"})
         self.assertAlmostEqual(shares["Icy Road"], 0.75, delta=self.TOLERANCE)
@@ -239,7 +251,8 @@ class TestWeightedDraw(unittest.TestCase):
         drawn = set(traps.draw_trap_names(world, self.SAMPLE))
         self.assertNotIn("First Person", drawn)
         self.assertNotIn("Forced USF", drawn)
-        self.assertEqual(drawn, {"Icy Road", "Low Gravity", "Forced Boost"})
+        self.assertEqual(drawn, set(traps.TRAP_ITEM_NAMES)
+                         - {"First Person", "Forced USF"})
 
     def test_one_enabled_trap_fills_every_trap_slot(self):
         world = _world(seed=283, weights={
@@ -297,13 +310,12 @@ class TestTrapWeightsRejected(unittest.TestCase):
             _world(trap_fill=10, weights={key: 0 for key in BUILDABLE_KEYS})
         self.assertIn("trap_fill_percentage", str(caught.exception))
 
-    def test_zeroing_only_the_buildable_traps_is_still_all_zero(self):
-        """Weights on the 14 traps without a native effect cannot rescue the
-        draw, so the guard reads the buildable five, not the whole table."""
+    def test_one_nonzero_shipped_trap_rescues_the_draw(self):
         weights = {key: 0 for key in BUILDABLE_KEYS}
         weights["warpball_ambush"] = 50
-        with self.assertRaises(OptionError):
-            _world(trap_fill=10, weights=weights)
+        world = _world(trap_fill=10, weights=weights)
+        self.assertEqual(traps.selectable_trap_weights(world),
+                         {"warpball_ambush": 50})
 
     def test_all_zero_with_trap_fill_zero_is_harmless(self):
         """No draw ever happens, so an all-zero table is a legal way to park
@@ -317,7 +329,8 @@ class TestTrapFillUsesTheWeights(unittest.TestCase):
     """The end-to-end half: a real generation, not just the draw helper."""
 
     def test_a_generated_pool_holds_only_enabled_traps(self):
-        weights = {"first_person": 0, "forced_usf": 0, "forced_boost": 0}
+        weights = {key: 0 for key in BUILDABLE_KEYS}
+        weights.update({"icy_road": 5, "low_gravity": 5})
         multiworld = setup_multiworld(
             ctrAPWorld, seed=286,
             options={"trap_fill_percentage": 100, "trap_weights": weights})

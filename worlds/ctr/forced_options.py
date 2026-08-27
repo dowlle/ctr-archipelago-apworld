@@ -113,9 +113,9 @@ def raise_if_trap_weights_are_unusable(world):
       happens, so an all-zero table is harmless and legal there; it is how a
       player parks their weights while traps are off.
 
-    "Effective" means the BUILDABLE traps only: a weight on a trap whose native
-    effect does not exist yet cannot rescue the draw, so a table that zeroes
-    the five buildable ones is all-zero in the only sense that matters here.
+    "Effective" means the BUILDABLE traps only. All 19 registered traps are
+    buildable in this release, while the gate remains explicit for future
+    additions whose native effect has not landed yet.
     """
     from .traps import (TRAP_ITEM_NAMES, effective_trap_weights,
                         selectable_trap_weights)
@@ -128,11 +128,8 @@ def raise_if_trap_weights_are_unusable(world):
             f"for {_who(world)}, but 'trap_fill_percentage' is "
             f"{world.options.trap_fill_percentage.value}, so generation has to "
             f"turn filler items into traps and has no trap left to pick. Give "
-            f"at least one of icy_road, low_gravity, forced_usf, forced_boost or "
-            f"first_person a weight above 0, or set trap_fill_percentage to 0 to "
-            f"play without traps. The other trap keys are accepted but pick "
-            f"nothing in this build -- only {len(TRAP_ITEM_NAMES)} trap effects "
-            f"exist so far.")
+            f"at least one of the {len(TRAP_ITEM_NAMES)} trap weights a value "
+            f"above 0, or set trap_fill_percentage to 0 to play without traps.")
 
 
 def raise_if_composed_goal_is_empty(world):

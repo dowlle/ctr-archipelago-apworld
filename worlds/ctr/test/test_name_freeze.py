@@ -207,16 +207,14 @@ class TestNameFreezeInertness(unittest.TestCase):
                 self.assertEqual(location_class.created_location_names(None), [])
                 self.assertFalse(location_class.is_enabled(None))
 
-    def test_frozen_traps_stay_out_of_the_buildable_draw_list(self) -> None:
-        """TRAP_ITEM_NAMES drives the trap_fill_percentage draw and its order is
-        pinned to native's AP_TrapEffect enum. A trap with no native effect --
-        frozen by #177 or minted by #280 -- must not be drawable, or a player
-        receives a trap that does nothing."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 5)
+    def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
+        """The completed native roster activates every reserved identity."""
+        self.assertEqual(len(TRAP_ITEM_NAMES), 19)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
         self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 3)
-        unbuildable = set(FROZEN_TRAP_ITEM_NAMES) | set(REWORK_TRAP_ITEM_NAMES)
-        self.assertEqual(set(TRAP_ITEM_NAMES) & unbuildable, set())
+        newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)
+                           | set(REWORK_TRAP_ITEM_NAMES))
+        self.assertTrue(newly_buildable <= set(TRAP_ITEM_NAMES))
 
     def test_frozen_traps_are_in_the_datapackage_group_anyway(self) -> None:
         """item_name_groups is part of the checksummed payload, so a trap added

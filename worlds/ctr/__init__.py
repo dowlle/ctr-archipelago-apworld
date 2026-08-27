@@ -47,14 +47,13 @@ from .Types import ctrAPItem
 # by these names.
 #
 # TRAP_ITEM_NAMES is the BUILDABLE set: it drives the trap_fill_percentage draw
-# and its order is pinned to native's AP_TrapEffect enum (ap/ap_traps.h), so a
-# name whose native effect does not exist yet must stay out of it or the fill
-# would hand players a trap that does nothing.
+# and its order is pinned to native's AP_TrapEffect enum (ap/ap_traps.h). All
+# 19 registered traps are buildable in this release.
 #
 # FROZEN_TRAP_ITEM_NAMES (11 names, #177, ruled 2026-08-10 16:28/16:30) and
-# REWORK_TRAP_ITEM_NAMES (3 names, #280, ruled 2026-08-19) are inert: count 0 in
-# data/items.json, never drawn. Each joins TRAP_ITEM_NAMES, in native enum
-# order, in the build that implements its effect.
+# REWORK_TRAP_ITEM_NAMES (3 names, #280, ruled 2026-08-19) retain count 0 in
+# data/items.json because trap fill creates them dynamically. They now all join
+# TRAP_ITEM_NAMES in native enum order.
 #
 # They ARE all in the "Traps" item name group below, because item_name_groups is
 # part of the datapackage payload AP checksums: adding a trap to its own group
@@ -149,8 +148,7 @@ class ctrAPWorld(World):
         "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
         # Sourced from the trap registry so the group cannot drift from the
         # native effect enum (the buildable set), the #177 freeze or the #280
-        # rework. All 19 are in the group; only the 5 buildable ones are ever
-        # drawn into a pool.
+        # rework. All 19 are in the group and buildable.
         "Traps": set(ALL_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
     }

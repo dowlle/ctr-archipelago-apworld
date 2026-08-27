@@ -303,12 +303,9 @@ class TrapWeights(OptionDict):
           first_person: 0
           icy_road: 10
 
-    Only five traps have a working effect in this build: icy_road,
-    low_gravity, forced_usf, forced_boost and first_person. Only those five
-    are ever picked. The other keys are accepted and kept now so your YAML
-    still works when those effects land, but their weights change nothing
-    yet. Setting all five working traps to 0 while `Trap Fill Percentage` is
-    above 0 is an error, because then no trap could be picked at all.
+    All 19 listed traps have a working native effect in this build and can be
+    picked. Setting every trap to 0 while `Trap Fill Percentage` is above 0
+    is an error, because then no trap could be picked at all.
 
     Valid keys: icy_road, low_gravity, forced_usf, forced_boost, first_person,
     wumpa_wipeout, flatten, item_reroll, forced_use, empty_crates,

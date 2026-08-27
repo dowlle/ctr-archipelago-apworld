@@ -12,9 +12,7 @@ between them is a player-visible bug:
      `trap_weights`. It is deliberately independent of the item name, so a
      later name cleanup cannot silently invalidate everyone's YAML.
   3. THE BUILDABLE FLAG. Whether native has an effect for this identity in the
-     shipped build. Only buildable traps are ever drawn into a pool -- a
-     drawn name whose native effect does not exist would hand the player a
-     trap that does nothing.
+     shipped build. Only buildable traps are ever drawn into a pool.
 
 The buildable entries are ORDER-LOAD-BEARING: their order is native's
 AP_TrapEffect enum order (ap/ap_traps.h), and native maps the received item
@@ -53,9 +51,7 @@ class TrapEntry(NamedTuple):
     #: Reviewed default draw weight (notebook table, 2026-08-19). 1 = very
     #: rare ... 6 = most frequent. Relative only; no total is required.
     weight: int
-    #: True when native has a working effect for this identity today. False
-    #: entries are registered names with count 0: real datapackage identities
-    #: that fill never draws until their native effect lands.
+    #: True when native has a working effect for this identity today.
     buildable: bool
     #: Which datapackage block minted the id, for the name-freeze census.
     #: "shipped" = v0.1.5, "freeze" = the #177 0.2.0 name freeze,
@@ -63,33 +59,32 @@ class TrapEntry(NamedTuple):
     origin: str
 
 
-#: Every trap identity, in datapackage id order. The first five are the
-#: buildable set in AP_TrapEffect order; the rest are registered and inert.
+#: Every trap identity, in datapackage id order and native AP_TrapEffect order.
 TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
-    # Buildable, native AP_TrapEffect 0-4, ids 35010016-35010020.
+    # Native AP_TrapEffect 0-4, ids 35010016-35010020.
     TrapEntry("icy_road",         "Icy Road",         5, True,  "shipped"),
     TrapEntry("low_gravity",      "Low Gravity",      5, True,  "shipped"),
     TrapEntry("forced_usf",       "Forced USF",       2, True,  "shipped"),
     TrapEntry("forced_boost",     "Forced Boost",     4, True,  "shipped"),
     TrapEntry("first_person",     "First Person",     3, True,  "shipped"),
-    # Minted by the #177 name freeze, ids 35010106-35010116. No native effect.
-    TrapEntry("wumpa_wipeout",    "Wumpa Wipeout",    4, False, "freeze"),
-    TrapEntry("flatten",          "Flatten",          6, False, "freeze"),
-    TrapEntry("item_reroll",      "Item Reroll",      5, False, "freeze"),
-    TrapEntry("forced_use",       "Forced Use",       4, False, "freeze"),
-    TrapEntry("empty_crates",     "Empty Crates",     3, False, "freeze"),
-    TrapEntry("weakened_kart",    "Weakened Kart",    3, False, "freeze"),
-    TrapEntry("boost_blocker",    "Boost Blocker",    3, False, "freeze"),
-    TrapEntry("wireframe",        "Wireframe",        2, False, "freeze"),
-    TrapEntry("nitro",            "Nitro",            5, False, "freeze"),
-    TrapEntry("reverse_steering", "Reverse Steering", 4, False, "freeze"),
-    TrapEntry("red_potion",       "Red Potion",       3, False, "freeze"),
-    # New identities minted by #280, ids 35010190-35010192. No native effect.
+    # Native AP_TrapEffect 5-15, minted by #177, ids 35010106-35010116.
+    TrapEntry("wumpa_wipeout",    "Wumpa Wipeout",    4, True, "freeze"),
+    TrapEntry("flatten",          "Flatten",          6, True, "freeze"),
+    TrapEntry("item_reroll",      "Item Reroll",      5, True, "freeze"),
+    TrapEntry("forced_use",       "Forced Use",       4, True, "freeze"),
+    TrapEntry("empty_crates",     "Empty Crates",     3, True, "freeze"),
+    TrapEntry("weakened_kart",    "Weakened Kart",    3, True, "freeze"),
+    TrapEntry("boost_blocker",    "Boost Blocker",    3, True, "freeze"),
+    TrapEntry("wireframe",        "Wireframe",        2, True, "freeze"),
+    TrapEntry("nitro",            "Nitro",            5, True, "freeze"),
+    TrapEntry("reverse_steering", "Reverse Steering", 4, True, "freeze"),
+    TrapEntry("red_potion",       "Red Potion",       3, True, "freeze"),
+    # Native AP_TrapEffect 16-18, minted by #280, ids 35010190-35010192.
     # Demo Camera is deliberately NOT here: it is prototype-gated and gets its
     # identity only if it earns inclusion.
-    TrapEntry("upside_down",      "Upside Down",      2, False, "rework"),
-    TrapEntry("mirror_mode",      "Mirror Mode",      3, False, "rework"),
-    TrapEntry("warpball_ambush",  "Warpball Ambush",  3, False, "rework"),
+    TrapEntry("upside_down",      "Upside Down",      2, True, "rework"),
+    TrapEntry("mirror_mode",      "Mirror Mode",      3, True, "rework"),
+    TrapEntry("warpball_ambush",  "Warpball Ambush",  3, True, "rework"),
 )
 
 #: The BUILDABLE draw list, pinned to native's AP_TrapEffect enum order.
@@ -174,9 +169,9 @@ def selectable_trap_weights(world) -> Dict[str, int]:
     restricted to buildable traps, with the zero-weight ones dropped.
 
     This is the "renormalize over the enabled effects" step. Two filters, one
-    result: a weight of 0 is the player disabling an effect, and a
-    non-buildable entry is native not having the effect yet. Neither is
-    compensated for elsewhere -- what is left simply shares 100% of the draw,
+    result: a weight of 0 is the player disabling an effect, and buildable is
+    the native-side availability gate. Neither is compensated for elsewhere.
+    What is left simply shares 100% of the draw,
     which random.choices does by normalizing whatever relative weights it is
     handed.
     """
