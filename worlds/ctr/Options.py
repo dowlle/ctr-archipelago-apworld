@@ -6,6 +6,7 @@ from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle
 from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
+from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 
 
 class OxideGoal(Choice):
@@ -150,6 +151,78 @@ class RandomizeGemCupTracks(Toggle):
     # reporter's intermediate "shuffled" permutation mode was dropped. Wire:
     # top-level `gem_cup_legs` block, emitted only when on.
     display_name = "Randomize Gem Cup Tracks"
+
+
+class CustomTracks(OptionDict):
+    """Play a community custom track in place of a Gem Cup.
+
+    Leave this out (the default) and nothing changes: the seed is exactly the
+    seed you would get from a build without this option.
+
+    Fill it in and the Gem Cup you name stops running its four retail tracks.
+    Its warp pad still asks for the same four CTR Tokens and it still awards
+    the same Gem, but behind the pad is a single race on the custom track, and
+    winning that race is what awards the Gem. The retail version of that cup
+    is not in the seed at all.
+
+    You describe the track yourself, which is why this is a mapping rather
+    than an on/off switch. The entry carries the SHA-256 of each of the
+    track's two files and the capabilities the track was measured to have.
+    The game hashes the real files before it loads anything and refuses to
+    race on a mismatch, so a wrong digest is a loud error rather than a
+    silently wrong track.
+
+    You also need the track's files and a game build that can load them. This
+    option only tells the seed what to expect.
+
+    Example - Baby T Park in place of the Purple Gem Cup::
+
+        custom_tracks:
+          baby-t-park:
+            lev_sha256: 96ad9f74f51a02eafcc207cd02c97052d674c950e0f24b6440a227494a705fe8
+            vrm_sha256: 2dcaa0fe93359c7ae00fb93842a581210e0dcc2db73f4de43508375834092e83
+            laps: 7
+            replaces: purple_gem_cup
+            flags:
+              crates: true
+              ctr_letters: true
+              relic_crates: true
+              ai_nav: true
+              minimap: false
+              ghosts: false
+              spawns: 8
+              checkpoints: 35
+
+    Every key above is required. Two more are optional: `host_level_id`
+    (0-17, which retail track slot the custom track borrows, default 6) and
+    `boxes` (whether item-box checks are allowed on the race, default true).
+
+    Known track ids: baby-t-park. The only cup that can be replaced is
+    purple_gem_cup. One track per seed.
+
+    This option is a mapping, so the Archipelago website's options pages
+    cannot show it and a YAML exported from there will not contain it. Start
+    from the downloadable YAML template instead."""
+    # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
+    # `custom_tracks` descriptor rather than a throwaway toggle, and full
+    # DISPLACEMENT of the replaced cup's destination. Shape, validation,
+    # displacement and wire block all live in custom_tracks.py.
+    #
+    # default is {} rather than a rendered example, unlike TrapWeights: an
+    # example default would put digests a player has not verified into every
+    # generated template, and this option is off unless someone means it.
+    display_name = "Custom Tracks"
+    supports_weighting = False
+    default = {}
+    valid_keys = list(KNOWN_TRACK_IDS)
+
+    def verify_keys(self) -> None:
+        # Core's VerifyKeys would only reject an unknown top-level id, with a
+        # message that lists the allowed set and says nothing about the body.
+        # This is the same function generate_early calls, so a rolled YAML and
+        # a programmatically built world fail identically (the TrapWeights
+        # precedent).
+        validate_custom_tracks(self.value)
 
 
 class ShuffleKeys(DefaultOnToggle):
@@ -933,6 +1006,9 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
     randomize_gem_cup_tracks: RandomizeGemCupTracks
+    # community custom tracks (Baby T Park event spike): a self-describing
+    # descriptor that DISPLACES the cup destination it names
+    custom_tracks: CustomTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     trap_weights: TrapWeights
@@ -1012,7 +1088,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                            BossGarageRequirements],
     "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
                          ShuffleWarpPadsBattleArenas, ShuffleWarpPadsGemCups,
-                         RandomizeGemCupTracks],
+                         RandomizeGemCupTracks, CustomTracks],
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,

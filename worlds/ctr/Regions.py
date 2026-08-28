@@ -7,6 +7,10 @@ from .Locations import create_location
 from .gem_cup_legs import (
     reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
 )
+from .custom_tracks import (
+    apply_displacement, reconstruct_custom_tracks_from_wire,
+    resolve_custom_tracks,
+)
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
     _COLOURS, _RELIC_TIERS,
@@ -391,9 +395,33 @@ def create_regions(world: "ctrAPWorld"):
     # option on -> 20 independent draws from trophy tracks 0..15 (repeats
     # allowed). UT re-generation pins the connected seed's map from
     # slot_data instead of re-drawing (issue #29's re-roll divergence class).
-    world.gem_cup_legs = (
+    world.gem_cup_legs_table = (
         reconstruct_gem_cup_legs_from_wire(ut_passthrough)
         if ut_passthrough else resolve_gem_cup_legs(world))
+
+    # Custom tracks (Baby T Park spike): a descriptor entry DISPLACES the cup
+    # destination it names -- that cup stops running four retail legs and
+    # becomes one race on the custom track. Resolved here, beside the leg map
+    # it filters, and pinned from the wire under UT for the same reason the
+    # leg map is. Consumes no RNG either way, so an option-off seed keeps the
+    # identical stream.
+    world.custom_tracks = (
+        reconstruct_custom_tracks_from_wire(ut_passthrough)
+        if ut_passthrough else resolve_custom_tracks(world))
+
+    # Two maps, deliberately: `gem_cup_legs_table` is the COMPLETE five-cup
+    # table native's advCupTrackIDs holds and fill_slot_data serializes, and
+    # `gem_cup_legs` is the LOGIC map with every displaced cup emptied. A
+    # displaced cup legs no trophy track, so it justifies no trophy track's
+    # podium rungs (the entrances below and Rules.add_podium_placement_rules),
+    # and it is no longer a USF-gated cup (usf_finish.UsfFinishGate) because
+    # its one race is the custom track, not a boost-gated retail leg. Emptying
+    # legs is always safe: a cup leg is only ever an ADDITIVE path to a rung
+    # (2026-08-07 dossier section 3), so removing one can never orphan it.
+    # With no custom track the two maps are the same content, and every
+    # consumer behaves exactly as it did before this option existed.
+    world.gem_cup_legs = apply_displacement(world.gem_cup_legs_table,
+                                            world.custom_tracks)
 
     # Boss-garage requirements, resolved to flat {type,count} (+ 'tracks' for
     # modes 0/1). warp_pad_map (above) is read for SameHubTracks, so resolve here.
