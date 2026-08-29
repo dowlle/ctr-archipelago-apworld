@@ -1,16 +1,17 @@
-"""Custom-track descriptors (Baby T Park event spike, rung 2b).
+"""Custom-track descriptors and Alpha6 placement policy.
 
 Ruled 2026-08-28 (Wayfinder session): the option shape is an early instance of
 the self-describing `custom_tracks` descriptor -- id, per-file SHA-256s and
 the track's MEASURED capability flags -- not a throwaway toggle. When the
-option is active, the Purple Gem Cup DESTINATION is displaced: instead of
-four retail leg tracks it becomes a single 7-lap race on the custom track,
-and winning that race awards the Purple Gem through the cup's own gem path
-(native does the awarding). The retail Purple cup experience is absent from
-such a seed. Option off is the default and leaves the block absent. Alpha6
-nevertheless declares slot-data schema 8 on every seed, per the standing
-unconditional-bump rule, so clients make one compatibility decision for the
-release.
+option is active, the Purple Gem Cup DESTINATION is displaced: instead of four
+retail leg tracks it becomes a single 7-lap race on the custom track. Its AP
+check is the frozen generic `Custom Track 1: Trophy Race` identity, plus the
+seed's enabled podium rungs. The removed retail `Purple Gem Cup: Gem` identity
+never coexists with it. Native still records the cup's ordinary adventure Gem
+bit for presentation and progression bookkeeping, but sends the generic Trophy
+location; therefore `shuffle_gems: true` leaves the Purple Gem in the normal
+item pool. Option off is the default and leaves the block absent. Alpha6 still
+declares slot-data schema 8 on every seed.
 
 WHAT THIS MODULE OWNS
 
@@ -35,9 +36,10 @@ WHAT IT DELIBERATELY DOES NOT OWN
     in the same seed. `host_level_id` is a vehicle, not a destination, and
     it is a FIXED default rather than an RNG draw precisely so that turning
     this option on cannot disturb any other seed decision;
-  * AP boxes, CTR letters and relic checks ON the custom track. The event
-    seed's check set is the Purple Gem alone -- see `boxes` below and
-    docs/SLOT_DATA_CUSTOM_TRACKS_DRAFT.md for why the box rung is blocked.
+  * AP boxes, CTR letters and relic checks ON the custom track. This Alpha6
+    slice creates the geometry-independent Trophy and podium family only; see
+    `boxes` below and docs/SLOT_DATA_CUSTOM_TRACKS_DRAFT.md for why the box rung
+    remains blocked.
 
 DISPLACEMENT AND THE LEG MAP
 
@@ -83,7 +85,11 @@ logger = logging.getLogger(__name__)
 #: entry carries no such measurement, and per-track Wumpa checks must never guess
 #: one, so an Alpha6 client reading a version-2 block and a version-3 build
 #: reading a version-2 block both refuse rather than default the flag.
-CUSTOM_TRACKS_WIRE_VERSION = 3
+#: 4 (2026-08-30) composes that flag with the frozen generic custom slot and
+#: exact Trophy/podium location codes. Native must know which stable AP
+#: identities the selected package serves; neither field may be inferred from
+#: a mutable title or array position.
+CUSTOM_TRACKS_WIRE_VERSION = 4
 
 #: Track ids this build knows how to bind. Each id selects one complete,
 #: release-approved identity below. Native independently enforces the same
@@ -329,9 +335,13 @@ def validate_custom_tracks(mapping) -> None:
     """Reject an unusable `custom_tracks` descriptor with a clear OptionError.
 
     An empty mapping is the option being off and is always valid. Anything
-    else must be exactly ONE known entry with a complete, well-typed body: a
-    partly-described custom track is not a smaller feature, it is a seed whose
-    generation logic and whose game disagree about what the Purple Gem Cup is.
+    else may contain entries up to the frozen 32-slot datapackage capacity, but
+    every entry must be known to this build and complete. Alpha6's approved
+    registry currently contains only Baby T Park and only the Purple cup
+    assignment; accepting more packages and destination roles is later policy,
+    not something the generic identity reservation silently enables. A partly
+    described custom track is not a smaller feature, it is a seed whose
+    generation logic and whose game disagree about its assigned destination.
 
     Called on every generation path: the YAML roll reaches it through
     `Options.CustomTracks.verify_keys`, and `generate_early` calls it again
@@ -344,16 +354,23 @@ def validate_custom_tracks(mapping) -> None:
               f"without custom tracks.")
     if not mapping:
         return
-    if len(mapping) > 1:
-        _fail(f"has {len(mapping)} entries "
-              f"({', '.join(sorted(repr(k) for k in mapping))}). This build "
-              f"binds exactly one custom track per seed, because exactly one "
-              f"destination can be handed over.")
-    (track_id, entry), = mapping.items()
-    if track_id not in KNOWN_TRACK_IDS:
-        _fail(f"has unknown track id {track_id!r}. This build knows: "
-              f"{', '.join(KNOWN_TRACK_IDS)}.")
-    _validate_entry(track_id, entry)
+    from .custom_track_locations import CUSTOM_TRACK_SLOT_COUNT
+    if len(mapping) > CUSTOM_TRACK_SLOT_COUNT:
+        _fail(f"has {len(mapping)} entries, but the frozen datapackage reserves "
+              f"{CUSTOM_TRACK_SLOT_COUNT} generic custom-track slots.")
+    claimed_destinations = {}
+    for track_id, entry in mapping.items():
+        if track_id not in KNOWN_TRACK_IDS:
+            _fail(f"has unknown track id {track_id!r}. This build knows: "
+                  f"{', '.join(KNOWN_TRACK_IDS)}.")
+        _validate_entry(track_id, entry)
+        replaces = entry["replaces"]
+        prior = claimed_destinations.get(replaces)
+        if prior is not None:
+            _fail(f"entries '{prior}' and '{track_id}' both replace "
+                  f"{replaces!r}. Custom packages need distinct destination "
+                  f"assignments.")
+        claimed_destinations[replaces] = track_id
 
 
 def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
@@ -368,9 +385,11 @@ def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
     validate_custom_tracks(mapping)
     if not mapping:
         return {}
-    (track_id, entry), = mapping.items()
-    return {
-        track_id: {
+    normalized = {}
+    for slot, track_id in enumerate(sorted(mapping), start=1):
+        entry = mapping[track_id]
+        normalized[track_id] = {
+            "slot": slot,
             "package_uuid": entry["package_uuid"].lower(),
             "package_version": entry["package_version"],
             "minimum_client_version": entry["minimum_client_version"],
@@ -393,7 +412,7 @@ def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
                 **{k: int(entry["flags"][k]) for k in COUNT_FLAGS},
             },
         }
-    }
+    return normalized
 
 
 def resolve_custom_tracks(world) -> Dict[str, Dict[str, object]]:
@@ -427,6 +446,22 @@ def displaced_cups(tracks: Mapping[str, Mapping]) -> Dict[str, str]:
             for track_id, entry in tracks.items()}
 
 
+def replacement_trophy_location(tracks: Mapping[str, Mapping],
+                                vanilla_location: str) -> str:
+    """Return the generic custom Trophy identity replacing a cup Gem check.
+
+    Non-displaced names pass through unchanged.  This lets every pinned-Gem
+    path share one redirect and prevents a removed ``<Colour> Gem Cup: Gem``
+    Location from being looked up after custom-region creation.
+    """
+    from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
+    for cup_region, track_id in displaced_cups(tracks).items():
+        if vanilla_location == f"{cup_region}: Gem":
+            return CUSTOM_TRACK_LOCATION_CLASS.trophy_name(
+                int(tracks[track_id]["slot"]))
+    return vanilla_location
+
+
 def apply_displacement(cup_legs: Dict[str, List[str]],
                        tracks: Mapping[str, Mapping]) -> Dict[str, List[str]]:
     """The LOGIC leg map: the complete table with each displaced cup emptied.
@@ -441,7 +476,7 @@ def apply_displacement(cup_legs: Dict[str, List[str]],
             for cup, legs in cup_legs.items()}
 
 
-def custom_tracks_to_wire(tracks: Mapping[str, Mapping]) -> Dict[str, object]:
+def custom_tracks_to_wire(tracks: Mapping[str, Mapping], options=None) -> Dict[str, object]:
     """Serialize the normalized descriptor for slot_data.
 
     A LIST of self-describing entries rather than an id-keyed object: native's
@@ -451,12 +486,17 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping]) -> Dict[str, object]:
     `warp_pad_map`, `warp_pad_unlock` and `gem_cup_legs` already use, rather
     than the YAML's human-facing `replaces` word.
     """
+    from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
+    from .podium import created_rung_keys_from_options
+    created_rungs = (created_rung_keys_from_options(options)
+                     if options is not None else [])
     return {
         "enabled": True,
         "version": CUSTOM_TRACKS_WIRE_VERSION,
         "tracks": [
             {
                 "id": track_id,
+                "slot": entry["slot"],
                 "package_uuid": entry["package_uuid"],
                 "package_version": entry["package_version"],
                 "minimum_client_version": entry["minimum_client_version"],
@@ -470,6 +510,12 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping]) -> Dict[str, object]:
                     REPLACEABLE_DESTINATIONS[entry["replaces"]][1],
                 "boxes": entry["boxes"],
                 "flags": dict(entry["flags"]),
+                "locations": {
+                    "trophy": CUSTOM_TRACK_LOCATION_CLASS.code_for(
+                        entry["slot"], "trophy"),
+                    "podium": CUSTOM_TRACK_LOCATION_CLASS.slot_codes(
+                        entry["slot"], created_rungs),
+                },
             }
             for track_id, entry in sorted(tracks.items())
         ],
@@ -516,21 +562,29 @@ def reconstruct_custom_tracks_from_wire(
         return _give_up(f"carries version {version!r}, and this build reads "
                         f"version {CUSTOM_TRACKS_WIRE_VERSION}")
     entries = block.get("tracks")
-    if not isinstance(entries, (list, tuple)) or len(entries) != 1:
-        return _give_up("does not hold exactly one track entry")
-    (wire_entry,) = entries
-    if not isinstance(wire_entry, Mapping):
-        return _give_up("holds a track entry that is not an object")
-    track_id = wire_entry.get("id")
-    cup_lid = wire_entry.get("replaces_cup_level_id")
-    if track_id not in KNOWN_TRACK_IDS or cup_lid not in _CUP_LID_TO_REPLACES:
-        return _give_up(f"names track {track_id!r} replacing cup {cup_lid!r}, "
-                        f"which this build does not know")
-    flags = wire_entry.get("flags")
-    if not isinstance(flags, Mapping):
-        return _give_up("holds a track entry without a flags object")
-    rebuilt = {
-        track_id: {
+    from .custom_track_locations import CUSTOM_TRACK_SLOT_COUNT
+    if (not isinstance(entries, (list, tuple)) or not entries
+            or len(entries) > CUSTOM_TRACK_SLOT_COUNT):
+        return _give_up("does not hold between one and 32 track entries")
+    rebuilt = {}
+    seen_slots = set()
+    for wire_entry in entries:
+        if not isinstance(wire_entry, Mapping):
+            return _give_up("holds a track entry that is not an object")
+        track_id = wire_entry.get("id")
+        cup_lid = wire_entry.get("replaces_cup_level_id")
+        slot = wire_entry.get("slot")
+        if track_id not in KNOWN_TRACK_IDS or cup_lid not in _CUP_LID_TO_REPLACES:
+            return _give_up(f"names track {track_id!r} replacing cup {cup_lid!r}, "
+                            f"which this build does not know")
+        if (not isinstance(slot, int) or isinstance(slot, bool)
+                or not 1 <= slot <= CUSTOM_TRACK_SLOT_COUNT or slot in seen_slots):
+            return _give_up(f"assigns invalid or duplicate generic slot {slot!r}")
+        seen_slots.add(slot)
+        flags = wire_entry.get("flags")
+        if not isinstance(flags, Mapping):
+            return _give_up("holds a track entry without a flags object")
+        rebuilt[track_id] = {
             "package_uuid": wire_entry.get("package_uuid"),
             "package_version": wire_entry.get("package_version"),
             "minimum_client_version": wire_entry.get("minimum_client_version"),
@@ -544,12 +598,16 @@ def reconstruct_custom_tracks_from_wire(
             "boxes": wire_entry.get("boxes"),
             "flags": dict(flags),
         }
-    }
     try:
         # Re-run the option validator on the rebuilt descriptor. The wire and
         # the YAML then have exactly one definition of "well formed", so a
         # tracker can never reconstruct a seed shape generation would have
         # refused.
-        return normalize_custom_tracks(rebuilt)
+        normalized = normalize_custom_tracks(rebuilt)
+        if any(normalized[k]["slot"] != next(
+                int(e["slot"]) for e in entries if e.get("id") == k)
+               for k in normalized):
+            return _give_up("does not use the canonical sorted generic-slot assignment")
+        return normalized
     except OptionError as exc:
         return _give_up(f"fails descriptor validation ({exc})")

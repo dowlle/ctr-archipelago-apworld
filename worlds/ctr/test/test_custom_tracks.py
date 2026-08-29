@@ -1,17 +1,17 @@
 """Tests for the `custom_tracks` descriptor (Baby T Park event spike, rung 2b).
 
-Ruled behaviour (Wayfinder session, 2026-08-28): the option is an early instance
-of the self-describing `custom_tracks` descriptor -- id, per-file SHA-256s and
-the track's measured capability flags -- and it DISPLACES the destination it
-names. Option on, the Purple Gem Cup keeps its region, its single
-"Purple Gem Cup: Gem" location and its four-Purple-CTR-Token pad rule, but it
-no longer runs four retail leg tracks: it is one 7-lap race on the custom
-track, and winning that race awards the Gem. Option off leaves the block absent
-while Alpha6's unconditional schema 8 declaration remains.
+Ruled behaviour (corrected 2026-08-30): the option is an early instance of the
+self-describing `custom_tracks` descriptor and it DISPLACES the destination it
+names. The Alpha6 placement is the Purple Gem Cup, but the AP identity is the
+frozen generic `Custom Track 1: Trophy Race` plus enabled podium rungs, not the
+retail `Purple Gem Cup: Gem` location and not the mutable package title. The cup
+keeps its four-Purple-CTR-Token pad rule but runs one 7-lap custom race instead
+of four retail legs. Option off leaves the block absent while Alpha6's
+unconditional schema 8 declaration remains.
 
 These tests lock in the apworld half:
 
-- descriptor validation: exactly one known entry, every field present and
+- descriptor validation: every selected known entry is complete and
   well-typed, a clean OptionError on everything else, reached identically from
   a rolled YAML and from a programmatically built world;
 - normalization: defaults filled once, digests case-folded once;
@@ -105,12 +105,12 @@ class TestDescriptorValidation(unittest.TestCase):
     def test_the_event_descriptor_is_valid(self):
         validate_custom_tracks(BABY_T_PARK)
 
-    def test_two_entries_are_refused(self):
+    def test_an_additional_unknown_package_is_refused_by_the_alpha6_registry(self):
         two = dict(BABY_T_PARK)
         two["some-other-track"] = copy.deepcopy(BABY_T_PARK_EXAMPLE)
         with self.assertRaises(OptionError) as ctx:
             validate_custom_tracks(two)
-        self.assertIn("exactly one custom track", str(ctx.exception))
+        self.assertIn("unknown track id", str(ctx.exception))
 
     def test_unknown_track_id_is_refused(self):
         with self.assertRaises(OptionError) as ctx:
@@ -256,7 +256,8 @@ class TestDescriptorValidation(unittest.TestCase):
 
     def test_every_measured_flag_is_required(self):
         for key in ("crates", "ctr_letters", "relic_crates", "ai_nav",
-                    "minimap", "ghosts", "spawns", "checkpoints"):
+                    "minimap", "ghosts", "wumpa_collectible", "spawns",
+                    "checkpoints"):
             with self.subTest(key=key):
                 with self.assertRaises(OptionError) as ctx:
                     validate_custom_tracks(_flags(**{key: None}))
@@ -270,7 +271,7 @@ class TestDescriptorValidation(unittest.TestCase):
 
     def test_boolean_flags_reject_non_booleans(self):
         for key in ("crates", "ctr_letters", "relic_crates", "ai_nav",
-                    "minimap", "ghosts"):
+                    "minimap", "ghosts", "wumpa_collectible"):
             for bad in (1, 0, "true", []):
                 with self.subTest(key=key, bad=bad):
                     with self.assertRaises(OptionError) as ctx:
@@ -532,21 +533,16 @@ class TestOptionOffIsIdenticalToNoDescriptor(unittest.TestCase):
         self.assertEqual(absent_wire, empty_wire)
         self.assertEqual(absent_placements, empty_placements)
 
-    def test_turning_the_option_on_consumes_no_rng(self):
-        # Displacement is a pure filter over an already-drawn map, so the
-        # world RNG must be in the identical state after every generation
-        # step whether the option is on or off. Measured per step rather than
-        # once at the end: an off-by-one draw that cancelled out later would
-        # pass an end-state check and still mean the graph was built from a
-        # different stream. Only the fill step legitimately diverges, which is
-        # why the trace stops before it -- a different logic graph really does
-        # make fill take different decisions.
+    def test_descriptor_resolution_itself_consumes_no_rng(self):
+        # Adding real locations legitimately changes later fill decisions. The
+        # descriptor and generic-slot assignment themselves remain pure; the
+        # first generation phase therefore ends on the identical RNG state.
         base = {"podium_placement_checks": True, "include_gem_cups": True,
                 "randomize_gem_cup_tracks": True}
         off = self._rng_trace(SEED, base)
         on = self._rng_trace(
             SEED, {**base, "custom_tracks": copy.deepcopy(BABY_T_PARK)})
-        self.assertEqual(off, on)
+        self.assertEqual(off[0], on[0])
 
     def _rng_trace(self, seed, options):
         multiworld = MultiWorld(1)
@@ -588,8 +584,10 @@ class TestDisplacementIntegration(CTRTestBase):
     run_default_tests = False
     auto_construct = False
     options = {
+        "oxide_goal": "any_percent",
         "podium_placement_checks": True,
         "include_gem_cups": True,
+        "shuffle_gems": False,
         "custom_tracks": copy.deepcopy(BABY_T_PARK),
     }
 
@@ -605,18 +603,26 @@ class TestDisplacementIntegration(CTRTestBase):
         self.assertEqual(self.world.gem_cup_legs_table["Purple Gem Cup"],
                          list(PURPLE_LEGS))
 
-    def test_the_cup_keeps_its_identity_and_its_one_reward(self):
-        # The ruling displaces the DESTINATION, not the cup: the region and
-        # its single Gem check are untouched. The pad RULE is checked
-        # separately, in TestDisplacedCupKeepsItsVanillaPadRule, where the
-        # vanilla unlock mode makes the rule a fixed, readable requirement
-        # instead of this seed's randomized draw.
+    def test_the_cup_is_replaced_by_a_generic_trophy_and_podium_region(self):
         region = self.multiworld.get_region("Purple Gem Cup", self.player)
-        self.assertEqual([loc.name for loc in region.locations],
-                         ["Purple Gem Cup: Gem"])
+        self.assertEqual([loc.name for loc in region.locations], [])
         self.assertEqual(
             len([e for e in self.multiworld.get_entrances(self.player)
                  if e.connected_region is region]), 1)
+        custom = self.multiworld.get_region("Custom Track 1", self.player)
+        self.assertEqual(
+            [loc.name for loc in custom.locations],
+            ["Custom Track 1: Trophy Race", "Custom Track 1: Held 1st",
+             "Custom Track 1: Held 3rd", "Custom Track 1: Finish on Podium",
+             "Custom Track 1: Finish (Any Position)"])
+        self.assertEqual({e.parent_region.name for e in custom.entrances},
+                         {"Purple Gem Cup"})
+
+    def test_unshuffled_purple_gem_is_pinned_to_the_custom_trophy(self):
+        trophy = self.multiworld.get_location(
+            "Custom Track 1: Trophy Race", self.player)
+        self.assertTrue(trophy.locked)
+        self.assertEqual(trophy.item.name, "Purple Gem")
 
     def test_no_podium_region_is_entered_from_the_displaced_cup(self):
         for track in TROPHY_TRACKS:
@@ -651,7 +657,7 @@ class TestDisplacementIntegration(CTRTestBase):
         self.assertEqual(
             slot_data["custom_tracks"],
             json.loads(json.dumps(custom_tracks_to_wire(
-                normalize_custom_tracks(BABY_T_PARK)))))
+                normalize_custom_tracks(BABY_T_PARK), self.world.options))))
 
     def test_the_gem_cup_legs_block_is_absent_without_leg_randomization(self):
         # Displacement is not leg randomization: with randomize_gem_cup_tracks
@@ -660,6 +666,35 @@ class TestDisplacementIntegration(CTRTestBase):
         # custom_tracks block told it that cup was handed over.
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("gem_cup_legs", slot_data)
+
+
+class TestShuffledGemDisplacement(CTRTestBase):
+    """Appie's policy: the custom race is a Trophy check, while the Purple Gem
+    remains a normal shuffled item and is not secretly pinned back to it."""
+
+    run_default_tests = False
+    auto_construct = False
+    options = {
+        "oxide_goal": "any_percent",
+        "podium_placement_checks": True,
+        "include_gem_cups": True,
+        "shuffle_gems": True,
+        "custom_tracks": copy.deepcopy(BABY_T_PARK),
+    }
+
+    def setUp(self):
+        self.world_setup(seed=SEED)
+
+    def test_custom_trophy_is_not_a_locked_purple_gem(self):
+        trophy = self.multiworld.get_location(
+            "Custom Track 1: Trophy Race", self.player)
+        self.assertFalse(trophy.locked)
+        self.assertNotIn("Purple Gem Cup: Gem",
+                         self.multiworld.regions.location_cache[self.player])
+
+        purple_items = [item for item in self.multiworld.itempool
+                        if item.player == self.player and item.name == "Purple Gem"]
+        self.assertEqual(len(purple_items), 1)
 
 
 class TestDisplacedCupKeepsItsVanillaPadRule(CTRTestBase):

@@ -8,8 +8,8 @@ from .gem_cup_legs import (
     reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
 )
 from .custom_tracks import (
-    apply_displacement, reconstruct_custom_tracks_from_wire,
-    resolve_custom_tracks,
+    REPLACEABLE_DESTINATIONS, apply_displacement, displaced_cups,
+    reconstruct_custom_tracks_from_wire, resolve_custom_tracks,
 )
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
@@ -455,17 +455,64 @@ def create_regions(world: "ctrAPWorld"):
         _keep = world._ctr_relic_keep.get(_relic_item, frozenset(_pool))
         _relic_removed_names |= (_pool - _keep)
 
+    _displaced_cup_regions = set(displaced_cups(world.custom_tracks))
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for loc_data in reg.get("locations", []):
             name = loc_data["name"]
             if name in _relic_removed_names:
                 continue
+            # A selected custom race replaces the cup's AP check identity, not
+            # merely its bytes.  The cup's Gem item may still be shuffled into
+            # the pool, but the removed retail location must not coexist with
+            # the generic custom Trophy check.
+            if (reg["name"] in _displaced_cup_regions
+                    and name == f'{reg["name"]}: Gem'):
+                continue
             location = create_location(player, name, region)
             location.type = loc_data.get("type", "default")
             location.logic_text = loc_data.get("requires", "True")
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
+
+    # Custom packages use frozen generic identities, never creator/title names.
+    # The dedicated dead-end region inherits reachability from the destination
+    # surface it replaces.  For Alpha6 that surface is a Gem Cup, so winning the
+    # one custom race is the surface's sole check and no absent retail leg can
+    # leak reachability into it.
+    if world.custom_tracks:
+        from .custom_track_locations import (
+            CUSTOM_TRACK_LOCATION_CLASS, slot_region,
+        )
+        from .podium import created_rung_keys_from_options
+        _custom_rungs = created_rung_keys_from_options(opts)
+        for _track_id, _entry in sorted(world.custom_tracks.items()):
+            _slot = int(_entry["slot"])
+            _custom = Region(slot_region(_slot), player, mw)
+            _custom.type = "custom_track"
+            mw.regions.append(_custom)
+            regions.append(_custom)
+            region_lookup[_custom.name] = _custom
+
+            _custom_names = [CUSTOM_TRACK_LOCATION_CLASS.trophy_name(_slot)]
+            _custom_names += [CUSTOM_TRACK_LOCATION_CLASS.location_name(_slot, rung)
+                              for rung in _custom_rungs]
+            for _name in _custom_names:
+                _loc = create_location(player, _name, _custom)
+                _loc.type = ("custom_track_trophy" if _name.endswith(": Trophy Race")
+                             else "custom_track_podium")
+                _loc.logic_text = "True"
+                _custom.locations.append(_loc)
+                mw.regions.location_cache[player][_name] = _loc
+
+            _destination_region = REPLACEABLE_DESTINATIONS[_entry["replaces"]][0]
+            _source = region_lookup[_destination_region]
+            _ent = Entrance(player=player,
+                            name=f"{_source.name} -> {_custom.name}",
+                            parent=_source)
+            _ent.connect(_custom)
+            _source.exits.append(_ent)
+            mw.regions.entrance_cache[player][_ent.name] = _ent
 
     # Itemsanity is global: a player can fire a received weapon from any race,
     # so its checks belong to the always-reachable Menu region rather than a

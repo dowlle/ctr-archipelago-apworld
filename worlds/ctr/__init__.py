@@ -12,6 +12,7 @@ from .gem_cup_legs import (cup_legs_to_wire, resolved_gem_cup_legs,
                            resolved_gem_cup_legs_table)
 from .custom_tracks import (custom_tracks_to_wire,
                             reconstruct_custom_tracks_from_wire,
+                            replacement_trophy_location,
                             resolved_custom_tracks)
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
@@ -1324,6 +1325,8 @@ class ctrAPWorld(World):
         # nothing anywhere: the gems ride the pool (2026-07-15 ruling).
         if not self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
+                _loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), _loc_name)
                 mw.get_location(_loc_name, player).place_locked_item(
                     self.create_item(_gem_name)
                 )
@@ -1387,6 +1390,8 @@ class ctrAPWorld(World):
         if not self.options.include_gem_cups.value \
                 and self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
+                _loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), _loc_name)
                 mw.get_location(_loc_name, player).place_locked_item(
                     self.create_item(_gem_name)
                 )
@@ -1635,6 +1640,8 @@ class ctrAPWorld(World):
                 pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
             )
             for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
+                loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), loc_name)
                 loc = mw.get_location(loc_name, player)
                 loc.place_locked_item(self.create_item(gem_name))
 
@@ -2122,7 +2129,8 @@ class ctrAPWorld(World):
             # schema 8 bump above -- the schema number gates whether a native
             # may trust this seed at all, the block version gates whether it
             # understands this block's shape as it evolves.
-            slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks)
+            slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks,
+                                                                self.options)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:

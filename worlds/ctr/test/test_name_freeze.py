@@ -58,6 +58,7 @@ EXPECTED_CLASSES = [
     # destination-slot block. See wumpa_checks.py for the block layout.
     ("wumpa", 20, (35016100, 35016101, 35016120)),
     ("trial_trophy", 2, (35016200,)),
+    ("custom_track_race", 192, (35016300, 35016400, 35016500)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -120,9 +121,9 @@ class TestNameFreezeCensus(unittest.TestCase):
         # the three trap identities the rework minted (#280).
         self.assertEqual(len(world_type.item_name_to_id), 194)
         # 574 through the trap rework, plus the 19 names the approved
-        # 2026-08-29 Wumpa unfreeze appended (18 retail destinations + 1
-        # custom destination slot).
-        self.assertEqual(len(world_type.location_name_to_id), 593)
+        # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
+        # race slots with one Trophy and five podium identities apiece.
+        self.assertEqual(len(world_type.location_name_to_id), 785)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
@@ -207,7 +208,7 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_unimplemented_location_class_creates_nothing(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
-            if location_class.key in {"podium", "itemsanity"}:
+            if location_class.key in {"podium", "itemsanity", "custom_track_race"}:
                 continue  # shipped / this build genuinely option-driven
             with self.subTest(location_class=location_class.key):
                 self.assertEqual(location_class.created_location_names(None), [])
