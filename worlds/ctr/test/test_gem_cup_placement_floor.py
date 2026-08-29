@@ -215,8 +215,8 @@ class TestGemCupFloorIsGenerationSideOnly(CTRTestBase):
         # Baseline is 7, the unconditional #166 bump (Q28 ruling); this
         # feature itself contributes no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 7)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
+        self.assertEqual(slot_data["schema_version"], 8)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 8)
 
     def test_warp_pad_map_still_spans_the_contract_range(self):
         # Contract §5: {"<physicalPadLevelID>": <targetTrackID>}, both sides in

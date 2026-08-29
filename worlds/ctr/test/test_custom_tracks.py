@@ -6,8 +6,8 @@ the track's measured capability flags -- and it DISPLACES the destination it
 names. Option on, the Purple Gem Cup keeps its region, its single
 "Purple Gem Cup: Gem" location and its four-Purple-CTR-Token pad rule, but it
 no longer runs four retail leg tracks: it is one 7-lap race on the custom
-track, and winning that race awards the Gem. Option off, the seed is exactly
-the seed a build without this module would produce.
+track, and winning that race awards the Gem. Option off leaves the block absent
+while Alpha6's unconditional schema 8 declaration remains.
 
 These tests lock in the apworld half:
 
@@ -19,15 +19,14 @@ These tests lock in the apworld half:
   five-cup table the wire serializes stays intact, and the podium-rung
   entrances follow;
 - option-off neutrality and determinism: no RNG is consumed either way, and an
-  option-off seed's slot_data and placements are identical to a seed generated
-  with no descriptor at all;
-- the `custom_tracks` slot_data block: shape, the conditional schema 8 gate,
+  option-off seed has no custom_tracks block or displaced destination;
+- the `custom_tracks` slot_data block: shape, the unconditional schema 8 gate,
   and a round trip through AP's real wire pipeline;
 - Universal Tracker: an option-on seed's displacement is pinned from the wire
   rather than re-read from the tracking player's own YAML.
 
-The native half -- loading the bytes, hashing them, redirecting the cup -- is
-a separate package on the native spike branch.
+The paired native candidate independently checks the same registry, manages and
+hashes the local files, gates cup entry, and redirects the displaced cup.
 """
 
 import copy
@@ -126,7 +125,10 @@ class TestDescriptorValidation(unittest.TestCase):
                     validate_custom_tracks(bad)
 
     def test_missing_required_entry_key_is_refused(self):
-        for key in ("lev_sha256", "vrm_sha256", "laps", "replaces", "flags"):
+        for key in ("package_uuid", "package_version",
+                    "minimum_client_version", "minimum_apworld_version",
+                    "lev_sha256", "vrm_sha256", "navigation", "laps",
+                    "replaces", "flags"):
             with self.subTest(key=key):
                 with self.assertRaises(OptionError) as ctx:
                     validate_custom_tracks(_entry(**{key: None}))
@@ -153,6 +155,51 @@ class TestDescriptorValidation(unittest.TestCase):
         self.assertEqual(resolved["baby-t-park"]["lev_sha256"],
                          BABY_T_PARK_EXAMPLE["lev_sha256"])
 
+    def test_package_and_navigation_identity_shape_is_strict(self):
+        cases = (
+            ("package_uuid", "not-a-uuid", "canonical UUID"),
+            ("package_version", "", "version string"),
+            ("minimum_client_version", 'alpha6"bad', "version string"),
+            ("minimum_apworld_version", 6, "version string"),
+            ("navigation", {}, "exactly 'uuid' and 'revision'"),
+            ("navigation", {"uuid": "bad", "revision": 1},
+             "canonical UUID"),
+            ("navigation", {
+                "uuid": BABY_T_PARK_EXAMPLE["navigation"]["uuid"],
+                "revision": 0}, "positive whole number"),
+        )
+        for key, bad, expected in cases:
+            with self.subTest(key=key, bad=bad):
+                with self.assertRaises(OptionError) as ctx:
+                    validate_custom_tracks(_entry(**{key: bad}))
+                self.assertIn(expected, str(ctx.exception))
+
+    def test_alpha6_registry_rejects_well_formed_identity_drift(self):
+        cases = (
+            ("package_uuid", "00000000-0000-4000-8000-000000000000"),
+            ("package_version", "1.0.1"),
+            ("minimum_client_version", "0.2.0-alpha7"),
+            ("minimum_apworld_version", "0.2.0-alpha7"),
+            ("lev_sha256", "0" * 64),
+            ("vrm_sha256", "0" * 64),
+            ("navigation", {
+                "uuid": BABY_T_PARK_EXAMPLE["navigation"]["uuid"],
+                "revision": 2}),
+        )
+        for key, bad in cases:
+            with self.subTest(key=key):
+                with self.assertRaises(OptionError) as ctx:
+                    validate_custom_tracks(_entry(**{key: bad}))
+                self.assertIn("Alpha6 package registry", str(ctx.exception))
+
+    def test_alpha6_registry_rejects_capability_drift(self):
+        for key, bad in (("crates", False), ("minimap", True),
+                         ("spawns", 7), ("checkpoints", 34)):
+            with self.subTest(key=key):
+                with self.assertRaises(OptionError) as ctx:
+                    validate_custom_tracks(_flags(**{key: bad}))
+                self.assertIn("Alpha6 package registry", str(ctx.exception))
+
     def test_lap_count_out_of_range_is_refused(self):
         for bad in (0, 8, -1, 7.0, "7", True):
             with self.subTest(bad=bad):
@@ -160,12 +207,15 @@ class TestDescriptorValidation(unittest.TestCase):
                     validate_custom_tracks(_entry(laps=bad))
                 self.assertIn("'laps'", str(ctx.exception))
 
-    def test_every_lap_count_in_range_is_accepted(self):
-        for laps in range(1, 8):
+    def test_only_the_registry_lap_count_is_accepted(self):
+        self.assertEqual(
+            normalize_custom_tracks(_entry(laps=7))["baby-t-park"]["laps"],
+            7)
+        for laps in range(1, 7):
             with self.subTest(laps=laps):
-                self.assertEqual(
+                with self.assertRaises(OptionError) as ctx:
                     normalize_custom_tracks(_entry(laps=laps))
-                    ["baby-t-park"]["laps"], laps)
+                self.assertIn("package registry", str(ctx.exception))
 
     def test_unsupported_replaces_target_is_refused(self):
         for bad in ("red_gem_cup", "purple gem cup", "purple_gem_cup ", 104,
@@ -192,15 +242,17 @@ class TestDescriptorValidation(unittest.TestCase):
             normalize_custom_tracks(_entry(host_level_id=17))["baby-t-park"]
             ["host_level_id"], 17)
 
-    def test_boxes_defaults_on_and_must_be_a_boolean(self):
+    def test_boxes_default_off_and_alpha6_refuses_on(self):
         self.assertIs(
-            normalize_custom_tracks(BABY_T_PARK)["baby-t-park"]["boxes"], True)
+            normalize_custom_tracks(BABY_T_PARK)["baby-t-park"]["boxes"], False)
         self.assertIs(
             normalize_custom_tracks(_entry(boxes=False))["baby-t-park"]
             ["boxes"], False)
-        with self.assertRaises(OptionError) as ctx:
-            validate_custom_tracks(_entry(boxes=1))
-        self.assertIn("'boxes'", str(ctx.exception))
+        for bad in (True, 1):
+            with self.subTest(bad=bad):
+                with self.assertRaises(OptionError) as ctx:
+                    validate_custom_tracks(_entry(boxes=bad))
+                self.assertIn("boxes", str(ctx.exception))
 
     def test_every_measured_flag_is_required(self):
         for key in ("crates", "ctr_letters", "relic_crates", "ai_nav",
@@ -316,6 +368,11 @@ class TestWireBlock(unittest.TestCase):
         self.assertEqual(len(wire["tracks"]), 1)
         entry, = wire["tracks"]
         self.assertEqual(entry["id"], "baby-t-park")
+        self.assertEqual(entry["package_uuid"],
+                         BABY_T_PARK_EXAMPLE["package_uuid"])
+        self.assertEqual(entry["package_version"], "1.0.0")
+        self.assertEqual(entry["navigation"],
+                         BABY_T_PARK_EXAMPLE["navigation"])
         self.assertEqual(entry["lev_sha256"],
                          BABY_T_PARK_EXAMPLE["lev_sha256"])
         self.assertEqual(entry["vrm_sha256"],
@@ -325,7 +382,7 @@ class TestWireBlock(unittest.TestCase):
         # The cup travels as a LevelID, the currency warp_pad_map,
         # warp_pad_unlock and gem_cup_legs already use.
         self.assertEqual(entry["replaces_cup_level_id"], 104)
-        self.assertIs(entry["boxes"], True)
+        self.assertIs(entry["boxes"], False)
         self.assertEqual(entry["flags"], BABY_T_PARK_EXAMPLE["flags"])
 
     def test_round_trips_back_to_the_descriptor(self):
@@ -376,6 +433,12 @@ class TestWireBlock(unittest.TestCase):
             _mangled(tracks="baby-t-park"),
             _mangled(tracks=["baby-t-park"]),
             _entry_mangled(id="not-a-track"),
+            _entry_mangled(package_uuid="00000000-0000-4000-8000-000000000000"),
+            _entry_mangled(package_version="1.0.1"),
+            _entry_mangled(minimum_client_version="0.2.0-alpha7"),
+            _entry_mangled(navigation={
+                "uuid": BABY_T_PARK_EXAMPLE["navigation"]["uuid"],
+                "revision": 2}),
             _entry_mangled(replaces_cup_level_id=100),
             _entry_mangled(flags=None),
             _entry_mangled(laps=99),
@@ -407,11 +470,11 @@ class TestOptionOffNeutrality(CTRTestBase):
         self.assertEqual(self.world.gem_cup_legs, load_vanilla_cup_legs())
         self.assertEqual(self.world.gem_cup_legs_table, load_vanilla_cup_legs())
 
-    def test_schema_stays_7_and_no_block_is_emitted(self):
+    def test_schema_is_8_and_no_block_is_emitted(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("custom_tracks", slot_data)
-        self.assertEqual(slot_data["schema_version"], 7)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
+        self.assertEqual(slot_data["schema_version"], 8)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 8)
 
     def test_purple_still_legs_its_four_retail_tracks(self):
         for track in PURPLE_LEGS:

@@ -559,10 +559,10 @@ class TestCharacterSlotData(unittest.TestCase):
         self.assertEqual(options["penta_stats"], 1)
 
     def test_no_schema_bump(self):
-        """Every key here is additive under the already-unconditional schema 7
+        """Every key here is additive under the current unconditional schema 8
         (Q28), and native reads ctr_options by explicit named key."""
         self.assertEqual(_build(1).worlds[1].fill_slot_data()["ctr_options"]
-                         ["schema_version"], 7)
+                         ["schema_version"], 8)
 
     def test_ut_restores_the_starting_character_rather_than_redrawing(self):
         from ..characters import restore_starting_character

@@ -368,9 +368,7 @@ class TestUTRestoreComposedGoal(unittest.TestCase):
 
 class TestComposedGoalWire(CTRTestBase):
     """fill_slot_data emits the three composed fields plus the best-effort
-    legacy `goal` int, and schema_version is unconditionally 7 (Q28 ruling,
-    unaffected by whether the goal is composed -- #166 already made 7
-    unconditional for every 0.2.0 seed)."""
+    legacy `goal` int, under the current unconditional schema 8 pair gate."""
 
     run_default_tests = False
     options = {"oxide_goal": "first", "bosses_required_goal": 2,
@@ -383,8 +381,8 @@ class TestComposedGoalWire(CTRTestBase):
         self.assertEqual(co["goal_bosses"], 2)
         self.assertEqual(co["goal_gems"], 0)
         self.assertEqual(co["goal"], -1)  # no legacy analogue
-        self.assertEqual(co["schema_version"], 7)
-        self.assertEqual(sd["schema_version"], 7)
+        self.assertEqual(co["schema_version"], 8)
+        self.assertEqual(sd["schema_version"], 8)
 
 
 if __name__ == "__main__":

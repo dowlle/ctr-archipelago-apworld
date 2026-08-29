@@ -363,8 +363,13 @@ class ctrAPWorld(World):
         # correctly restores to off.
         o.custom_tracks.value = {
             track_id: {
+                "package_uuid": entry["package_uuid"],
+                "package_version": entry["package_version"],
+                "minimum_client_version": entry["minimum_client_version"],
+                "minimum_apworld_version": entry["minimum_apworld_version"],
                 "lev_sha256": entry["lev_sha256"],
                 "vrm_sha256": entry["vrm_sha256"],
+                "navigation": dict(entry["navigation"]),
                 "laps": entry["laps"],
                 "replaces": entry["replaces"],
                 "host_level_id": entry["host_level_id"],
@@ -1838,18 +1843,10 @@ class ctrAPWorld(World):
         # destination, so a native that cannot serve the custom track would
         # run the retail four-leg cup while this seed's logic says that cup
         # legs nothing -- the same reachability-desync class as the v3 cup
-        # destination keys, which is exactly when the Contract says the schema
-        # number must move. So an option-ON seed declares 8.
-        #
-        # DELIBERATE DEVIATION from the standing Q28 "always bump, never
-        # conditionally" ruling, flagged for the coordinator rather than taken
-        # quietly: this rung has to PROVE that an option-off seed is byte-
-        # identical to one generated without this module at all, and an
-        # unconditional bump would change every seed on the branch and make
-        # that proof impossible. Landing the feature for real should make the
-        # bump unconditional at the next release's schema number.
+        # destination keys. Schema 8 is unconditional for the public Alpha6
+        # pair, following the standing "always bump, never conditionally" rule.
         custom_tracks = resolved_custom_tracks(self)
-        schema = 8 if custom_tracks else 7
+        schema = 8
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -1862,8 +1859,8 @@ class ctrAPWorld(World):
             # this is a native-version GATE (schema_version >= 6), shipped with the
             # #8 newer-schema warn/refuse. (v5 = oxide-final relic-goal mode/count;
             # v4 = relic-tier colour + goal-rework; v3 = podium + stage-2 padgate;
-            # v2 = two-stage contract. v7 = gem_cup_legs, unconditional bump, the
-            # block itself conditional, see above.)
+            # v2 = two-stage contract; v7 = gem_cup_legs; v8 = custom_tracks
+            # support and the public Alpha6 pair gate, both unconditional.)
             "schema_version": schema,
             "ctr_options": {
                 "schema_version": schema,
@@ -1873,7 +1870,7 @@ class ctrAPWorld(World):
                 # schema>=7-aware native reads ONLY goal_oxide/goal_bosses/
                 # goal_gems for evaluation and ignores `goal` entirely (issue
                 # #163 already gates ALL goal evaluation on schema_newer, and
-                # schema is unconditionally 7 on every 0.2.0 seed per Q28, so
+                # schema is unconditionally 8 on every Alpha6 seed per Q28, so
                 # there is no compat direction left for `goal` to protect).
                 # Emitted as the exact legacy-equivalent int when the composed
                 # goal happens to match one of the four old single-condition

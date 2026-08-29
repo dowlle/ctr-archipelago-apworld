@@ -7,8 +7,10 @@ option is active, the Purple Gem Cup DESTINATION is displaced: instead of
 four retail leg tracks it becomes a single 7-lap race on the custom track,
 and winning that race awards the Purple Gem through the cup's own gem path
 (native does the awarding). The retail Purple cup experience is absent from
-such a seed. Option off (the default, an empty descriptor) leaves generation
-byte-identical to a build without this module.
+such a seed. Option off is the default and leaves the block absent. Alpha6
+nevertheless declares slot-data schema 8 on every seed, per the standing
+unconditional-bump rule, so clients make one compatibility decision for the
+release.
 
 WHAT THIS MODULE OWNS
 
@@ -24,12 +26,10 @@ WHAT THIS MODULE OWNS
 WHAT IT DELIBERATELY DOES NOT OWN
 
   * asset delivery and hash VERIFICATION. The apworld never sees the files;
-    it carries the descriptor's digests to native, which hashes the real
-    bytes and refuses to arm on any mismatch. The descriptor is therefore
-    the authority on what the seed expects, which is exactly what makes it
-    self-describing -- a retuned v1.0.1 of a track needs a new YAML, not a
-    new apworld release. The apworld validates SHAPE (64 hex digits), never
-    content;
+    it carries the approved registry descriptor to native, which hashes the
+    real bytes and refuses to arm on any mismatch. Alpha6 accepts only the
+    compiled Baby T Park package identity. A retuned package therefore needs
+    coordinated apworld and client support rather than an arbitrary YAML edit;
   * the host arcade slot's own race. Native serves the custom bytes only for
     the redirected cup race, so the host slot's retail track is unaffected
     in the same seed. `host_level_id` is a vehicle, not a destination, and
@@ -78,12 +78,11 @@ logger = logging.getLogger(__name__)
 #: Wire-block version, independent of the seed's `schema_version`. Bump this
 #: when the SHAPE of an entry changes; native refuses a version it does not
 #: know rather than reading fields it cannot interpret.
-CUSTOM_TRACKS_WIRE_VERSION = 1
+CUSTOM_TRACKS_WIRE_VERSION = 2
 
-#: Track ids this build knows how to bind. An id is an allowlist entry, not a
-#: content claim: the descriptor still carries every fact about the track, and
-#: native still verifies the bytes. The allowlist exists so a typo becomes a
-#: clean generation error instead of a seed nothing can play.
+#: Track ids this build knows how to bind. Each id selects one complete,
+#: release-approved identity below. Native independently enforces the same
+#: registry before it arms any files.
 KNOWN_TRACK_IDS: Tuple[str, ...] = ("baby-t-park",)
 
 #: The destinations a descriptor entry may claim, and what claiming one means:
@@ -126,22 +125,36 @@ COUNT_FLAGS: Dict[str, Tuple[int, int]] = {
     "checkpoints": (1, 255),
 }
 
-_REQUIRED_ENTRY_KEYS: FrozenSet[str] = frozenset(
-    {"lev_sha256", "vrm_sha256", "laps", "replaces", "flags"})
+_REQUIRED_ENTRY_KEYS: FrozenSet[str] = frozenset({
+    "package_uuid", "package_version", "minimum_client_version",
+    "minimum_apworld_version", "lev_sha256", "vrm_sha256", "navigation",
+    "laps", "replaces", "flags",
+})
 _OPTIONAL_ENTRY_KEYS: FrozenSet[str] = frozenset({"host_level_id", "boxes"})
 _ALL_ENTRY_KEYS: FrozenSet[str] = _REQUIRED_ENTRY_KEYS | _OPTIONAL_ENTRY_KEYS
 
 _SHA256_RE = re.compile(r"\A[0-9a-fA-F]{64}\Z")
+_UUID_RE = re.compile(
+    r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
-#: The measured Baby T Park descriptor (evidence note 2026-08-27, the actual
-#: downloaded v1.0.0 files). Not used to validate a player's descriptor -- the
-#: descriptor is the authority -- but it IS the option's documented example and
-#: the value the tests and the event YAML use.
+#: The measured and release-approved Baby T Park descriptor (evidence note
+#: 2026-08-27, the actual downloaded v1.0.0 files). Alpha6 validates every
+#: generation-affecting field against this registry entry. This keeps the
+#: apworld and native acceptance sets identical.
 BABY_T_PARK_EXAMPLE: Dict[str, object] = {
+    "package_uuid": "60d5a8a8-b69a-4f6a-a0d8-9a43d91e3f2e",
+    "package_version": "1.0.0",
+    "minimum_client_version": "0.2.0-alpha6",
+    "minimum_apworld_version": "0.2.0-alpha6",
     "lev_sha256":
         "96ad9f74f51a02eafcc207cd02c97052d674c950e0f24b6440a227494a705fe8",
     "vrm_sha256":
         "2dcaa0fe93359c7ae00fb93842a581210e0dcc2db73f4de43508375834092e83",
+    "navigation": {
+        "uuid": "898a9315-693f-4ed3-b6a0-fbe50db8bc40",
+        "revision": 1,
+    },
     "laps": 7,
     "replaces": "purple_gem_cup",
     "flags": {
@@ -154,6 +167,7 @@ BABY_T_PARK_EXAMPLE: Dict[str, object] = {
         "spawns": 8,
         "checkpoints": 35,
     },
+    "boxes": False,
 }
 
 
@@ -219,6 +233,28 @@ def _validate_entry(track_id: str, entry) -> None:
                   f"apworld never reads the files -- it carries this digest to "
                   f"the game, which hashes the real bytes and refuses to load "
                   f"the track on any mismatch.")
+    for key in ("package_uuid",):
+        value = entry[key]
+        if not isinstance(value, str) or not _UUID_RE.match(value):
+            _fail(f"entry '{track_id}' key '{key}' is {value!r}. It must be "
+                  f"a canonical UUID.")
+    for key in ("package_version", "minimum_client_version",
+                "minimum_apworld_version"):
+        value = entry[key]
+        if not isinstance(value, str) or not value or any(
+                ord(ch) < 0x20 or ch in '\"\\' for ch in value):
+            _fail(f"entry '{track_id}' key '{key}' is not a plain non-empty "
+                  f"version string.")
+    navigation = entry["navigation"]
+    if not isinstance(navigation, Mapping) or set(navigation) != {"uuid", "revision"}:
+        _fail(f"entry '{track_id}' key 'navigation' must contain exactly "
+              f"'uuid' and 'revision'.")
+    if (not isinstance(navigation["uuid"], str)
+            or not _UUID_RE.match(navigation["uuid"])):
+        _fail(f"entry '{track_id}' navigation.uuid must be a canonical UUID.")
+    if not _is_int(navigation["revision"]) or navigation["revision"] < 1:
+        _fail(f"entry '{track_id}' navigation.revision must be a positive "
+              f"whole number.")
     laps = entry["laps"]
     if not _is_int(laps) or not LAP_RANGE[0] <= laps <= LAP_RANGE[1]:
         _fail(f"entry '{track_id}' key 'laps' is {laps!r}. It must be a whole "
@@ -243,7 +279,25 @@ def _validate_entry(track_id: str, entry) -> None:
     if "boxes" in entry and not isinstance(entry["boxes"], bool):
         _fail(f"entry '{track_id}' key 'boxes' is {entry['boxes']!r}. It must "
               f"be true or false.")
+    if entry.get("boxes", False):
+        _fail(f"entry '{track_id}' enables AP boxes, but Alpha6 has no "
+              f"package-bound AP-box placement identity. Use boxes: false.")
     _validate_flags(track_id, entry["flags"])
+
+    # Alpha6 ships one release-owned package registry entry. Generation must
+    # never create a seed that a matching Alpha6 client will correctly refuse.
+    expected = BABY_T_PARK_EXAMPLE
+    for key in ("package_uuid", "package_version", "minimum_client_version",
+                "minimum_apworld_version", "lev_sha256", "vrm_sha256",
+                "navigation", "laps", "flags"):
+        actual = entry[key]
+        wanted = expected[key]
+        if key in ("lev_sha256", "vrm_sha256"):
+            actual = actual.lower()
+            wanted = wanted.lower()
+        if actual != wanted:
+            _fail(f"entry '{track_id}' key '{key}' does not match the "
+                  f"Alpha6 package registry.")
 
 
 def validate_custom_tracks(mapping) -> None:
@@ -292,17 +346,23 @@ def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
     (track_id, entry), = mapping.items()
     return {
         track_id: {
+            "package_uuid": entry["package_uuid"].lower(),
+            "package_version": entry["package_version"],
+            "minimum_client_version": entry["minimum_client_version"],
+            "minimum_apworld_version": entry["minimum_apworld_version"],
             "lev_sha256": entry["lev_sha256"].lower(),
             "vrm_sha256": entry["vrm_sha256"].lower(),
+            "navigation": {
+                "uuid": entry["navigation"]["uuid"].lower(),
+                "revision": int(entry["navigation"]["revision"]),
+            },
             "laps": int(entry["laps"]),
             "replaces": entry["replaces"],
             "host_level_id": int(entry.get("host_level_id",
                                            DEFAULT_HOST_LEVEL_ID)),
-            # Ruled default: the event race allows AP boxes. See
-            # docs/SLOT_DATA_CUSTOM_TRACKS_DRAFT.md -- the placement data
-            # behind that permission does not exist yet, so this is a policy
-            # bit travelling ahead of its content.
-            "boxes": bool(entry.get("boxes", True)),
+            # Fail closed until a package-bound AP-box placement identity is
+            # part of the same descriptor contract.
+            "boxes": bool(entry.get("boxes", False)),
             "flags": {
                 **{k: bool(entry["flags"][k]) for k in BOOLEAN_FLAGS},
                 **{k: int(entry["flags"][k]) for k in COUNT_FLAGS},
@@ -372,8 +432,13 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping]) -> Dict[str, object]:
         "tracks": [
             {
                 "id": track_id,
+                "package_uuid": entry["package_uuid"],
+                "package_version": entry["package_version"],
+                "minimum_client_version": entry["minimum_client_version"],
+                "minimum_apworld_version": entry["minimum_apworld_version"],
                 "lev_sha256": entry["lev_sha256"],
                 "vrm_sha256": entry["vrm_sha256"],
+                "navigation": dict(entry["navigation"]),
                 "laps": entry["laps"],
                 "host_level_id": entry["host_level_id"],
                 "replaces_cup_level_id":
@@ -441,8 +506,13 @@ def reconstruct_custom_tracks_from_wire(
         return _give_up("holds a track entry without a flags object")
     rebuilt = {
         track_id: {
+            "package_uuid": wire_entry.get("package_uuid"),
+            "package_version": wire_entry.get("package_version"),
+            "minimum_client_version": wire_entry.get("minimum_client_version"),
+            "minimum_apworld_version": wire_entry.get("minimum_apworld_version"),
             "lev_sha256": wire_entry.get("lev_sha256"),
             "vrm_sha256": wire_entry.get("vrm_sha256"),
+            "navigation": wire_entry.get("navigation"),
             "laps": wire_entry.get("laps"),
             "replaces": _CUP_LID_TO_REPLACES[cup_lid],
             "host_level_id": wire_entry.get("host_level_id"),
