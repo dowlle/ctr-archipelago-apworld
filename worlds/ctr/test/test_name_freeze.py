@@ -53,7 +53,10 @@ EXPECTED_CLASSES = [
     ("lettersanity", 48, (35012500,)),
     ("item_boxes", 270, (35014000,)),
     ("itemsanity", 22, (35016000,)),
-    ("wumpa", 1, (35016100,)),
+    # WIDENED by the approved 2026-08-29 unfreeze: the permanent global
+    # code, the 18 retail destination codes behind it, and the custom
+    # destination-slot block. See wumpa_checks.py for the block layout.
+    ("wumpa", 20, (35016100, 35016101, 35016120)),
     ("trial_trophy", 2, (35016200,)),
 ]
 
@@ -116,7 +119,10 @@ class TestNameFreezeCensus(unittest.TestCase):
         # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
         # the three trap identities the rework minted (#280).
         self.assertEqual(len(world_type.item_name_to_id), 194)
-        self.assertEqual(len(world_type.location_name_to_id), 574)
+        # 574 through the trap rework, plus the 19 names the approved
+        # 2026-08-29 Wumpa unfreeze appended (18 retail destinations + 1
+        # custom destination slot).
+        self.assertEqual(len(world_type.location_name_to_id), 593)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
@@ -280,6 +286,39 @@ class TestNameFreezeCrossSideConsistency(unittest.TestCase):
                     item_boxes.ITEM_BOX_CLASS.location_name(track, 1),
                     f"{track}: Item Box 1")
 
-    def test_the_wumpa_check_is_global_and_singular(self) -> None:
-        """Ruled 2026-08-10 16:28: one location per seed, not one per track."""
-        self.assertEqual(len(wumpa_checks.WUMPA_CLASS.all_locations()), 1)
+    def test_the_wumpa_block_is_the_approved_unfreeze_layout(self) -> None:
+        """The 2026-08-29 approved unfreeze, pinned entry by entry.
+
+        The 2026-08-10 16:28 ruling made this family one global location. The
+        2026-08-29 specification widened it to a three-way mode, and the
+        permanent codes were approved the same day: the global code stays
+        exactly where it was, the 18 retail destinations sit contiguously behind it in
+        the canonical retail track order, and the custom DESTINATION SLOTS start
+        at a spaced base so a future role appends rather than collides.
+        """
+        entries = wumpa_checks.WUMPA_CLASS.all_locations()
+        self.assertEqual(len(entries), 20)
+
+        # The global check never moves, and it is still first.
+        self.assertEqual(entries[0],
+                         ("Wumpa: Reach 10 Wumpa", 35016100, "Menu"))
+
+        # The 18 retail destinations, in the SAME order as the Sapphire relic
+        # canon and the item-box track mapping, each parented to its own track
+        # region so it inherits that track's pad access.
+        self.assertEqual(list(wumpa_checks.WUMPA_RETAIL_TRACKS),
+                         item_boxes.BOX_TRACKS)
+        self.assertEqual(
+            entries[1:19],
+            [(f"{track}: Reach 10 Wumpa", 35016101 + index, track)
+             for index, track in enumerate(item_boxes.BOX_TRACKS)])
+
+        # One custom destination SLOT, named for the destination ROLE rather
+        # than for whichever package currently occupies it.
+        self.assertEqual(
+            entries[19],
+            ("Purple Gem Cup Custom Race: Reach 10 Wumpa", 35016120,
+             "Purple Gem Cup"))
+
+        # The whole family stays clear of trial_trophy at 35016200.
+        self.assertTrue(all(code < 35016200 for _n, code, _r in entries))

@@ -78,7 +78,12 @@ logger = logging.getLogger(__name__)
 #: Wire-block version, independent of the seed's `schema_version`. Bump this
 #: when the SHAPE of an entry changes; native refuses a version it does not
 #: know rather than reading fields it cannot interpret.
-CUSTOM_TRACKS_WIRE_VERSION = 2
+#:
+#: 3 (2026-08-29) adds the required measured `wumpa_collectible` flag. A version-2
+#: entry carries no such measurement, and per-track Wumpa checks must never guess
+#: one, so an Alpha6 client reading a version-2 block and a version-3 build
+#: reading a version-2 block both refuse rather than default the flag.
+CUSTOM_TRACKS_WIRE_VERSION = 3
 
 #: Track ids this build knows how to bind. Each id selects one complete,
 #: release-approved identity below. Native independently enforces the same
@@ -110,12 +115,25 @@ HOST_LEVEL_ID_RANGE = (0, 17)
 #: every exit; its own config clamps to 1..7.
 LAP_RANGE = (1, 7)
 
+#: The measured capability that decides whether a bound custom destination earns
+#: a per-track Reach 10 Wumpa check (spec 2026-08-29, Lane A). Named here rather
+#: than spelled out at each use site because four layers read it: manager-light
+#: measures and exports it, this module validates it, `wumpa_checks` gates
+#: creation on it, and native verifies it against the installed package.
+#:
+#: It is DELIBERATELY not derived from `crates`. A track can carry crate
+#: instances -- weapon boxes, TNT, relic time crates -- without offering any
+#: route to ten fruit, and the descriptor contract requires measured
+#: capabilities rather than optimistic inference.
+WUMPA_COLLECTIBLE_FLAG = "wumpa_collectible"
+
 #: Measured capability flags, the describe-step output. Every one is REQUIRED:
 #: a descriptor that omits a flag is not self-describing, and a silently
 #: defaulted flag is exactly the "plausible but wrong" state hash verification
 #: exists to prevent.
 BOOLEAN_FLAGS: Tuple[str, ...] = (
     "crates", "ctr_letters", "relic_crates", "ai_nav", "minimap", "ghosts",
+    WUMPA_COLLECTIBLE_FLAG,
 )
 #: Counted flags -> their inclusive legal range. `spawns` is the populated
 #: driver-spawn count (8 is a full grid); `checkpoints` is the restart-point
@@ -164,6 +182,13 @@ BABY_T_PARK_EXAMPLE: Dict[str, object] = {
         "ai_nav": True,
         "minimap": False,
         "ghosts": False,
+        # MEASURED against the v1.0.0 LEV whose digest is above (2026-08-29):
+        # its instance table carries 8 instances of modelID 7 (PU_FRUIT_CRATE)
+        # and 0 loose PU_WUMPA_FRUIT. RB_Crate.c pays a fruit crate 5..8 fruit,
+        # so the guaranteed floor is 40 in one lap of a 7-lap race -- far above
+        # the 10 this capability asks about. Manager-light derives the same
+        # answer from the same bytes; see native_custom_track_manager.c.
+        "wumpa_collectible": True,
         "spawns": 8,
         "checkpoints": 35,
     },

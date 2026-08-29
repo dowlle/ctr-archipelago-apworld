@@ -480,13 +480,18 @@ def create_regions(world: "ctrAPWorld"):
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
 
-    # The 10-wumpa check (2026-08-10 ruling) is global for the same reason
-    # itemsanity is -- fruit are collected wherever you race -- so it hangs off
-    # Menu too, and it needs no rule of its own: reaching ten fruit is possible
-    # in any race from sphere 0, so `True` is the honest access rule rather than
-    # a placeholder. One location per seed, never one per track: the ruling
-    # settled that directly, by the same anti-per-track reasoning as the
-    # juiced-checks ruling.
+    # The 10-wumpa checks (2026-08-10 ruling, widened by the 2026-08-29 spec).
+    # In `global` mode the single check hangs off Menu for the same reason
+    # itemsanity does -- fruit are collected wherever you race -- and needs no
+    # rule of its own, because reaching ten fruit is possible in any race from
+    # sphere 0, so `True` is the honest access rule rather than a placeholder.
+    # In `per_track` mode each check instead parents to its DESTINATION's
+    # region: a retail track's own region, or the cup region a custom track's
+    # destination role occupies. That region membership IS the access rule,
+    # exactly as it is for the item-box checks below, and it is what makes a Gem
+    # Cup leg obey the individual-pad rule without a second policy -- a leg
+    # reaching a track whose own physical pad is shut does not make that track's
+    # region reachable, so it cannot award that track's Wumpa check.
     from .wumpa_checks import WUMPA_CLASS
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
         _region = region_lookup[_region_name]
