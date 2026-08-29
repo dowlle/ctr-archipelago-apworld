@@ -8,7 +8,11 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from Options import OptionError
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings, estimated_filler_reserve
-from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
+from .gem_cup_legs import (cup_legs_to_wire, resolved_gem_cup_legs,
+                           resolved_gem_cup_legs_table)
+from .custom_tracks import (custom_tracks_to_wire,
+                            reconstruct_custom_tracks_from_wire,
+                            resolved_custom_tracks)
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
 from . import item_supply
@@ -347,6 +351,29 @@ class ctrAPWorld(World):
         # block (gem_cup_legs.reconstruct_gem_cup_legs_from_wire); an absent
         # key (any pre-#166 seed) correctly restores to off + vanilla legs.
         o.randomize_gem_cup_tracks.value = int("gem_cup_legs" in passthrough)
+        # Custom tracks: the descriptor itself is pinned from the wire in
+        # create_regions (custom_tracks.reconstruct_custom_tracks_from_wire),
+        # which is what actually steers the graph. The option VALUE is
+        # restored here too so the tracking player's own YAML can never
+        # contribute a track the seed does not have, and so the restored
+        # option set is honest rather than silently defaulted. Reconstructed
+        # rather than copied verbatim: the wire is LevelID-keyed and the
+        # option is word-keyed, and the reconstruction is the one place that
+        # translation lives. An absent block is any pre-custom-tracks seed and
+        # correctly restores to off.
+        o.custom_tracks.value = {
+            track_id: {
+                "lev_sha256": entry["lev_sha256"],
+                "vrm_sha256": entry["vrm_sha256"],
+                "laps": entry["laps"],
+                "replaces": entry["replaces"],
+                "host_level_id": entry["host_level_id"],
+                "boxes": entry["boxes"],
+                "flags": dict(entry["flags"]),
+            }
+            for track_id, entry in
+            reconstruct_custom_tracks_from_wire(passthrough).items()
+        }
         # Itemsanity's block is conditional for off-toggle parity, while the
         # raw scalar in ctr_options is always emitted.  Prefer that scalar for
         # new seeds and retain block-presence fallback for the narrow interval
@@ -1640,15 +1667,24 @@ class ctrAPWorld(World):
         """{"<cupLevelID 100..104>": [trackLevelID x4]} -- the gem_cup_legs block
         (issue #166, schema 7).
 
-        Serializes world.gem_cup_legs (resolved in create_regions) as LevelIDs,
+        Serializes the seed's leg map (resolved in create_regions) as LevelIDs,
         always all five cups: the smallest COMPLETE mapping -- a partial map
         would force native to guess the missing cups, and the whole block is
         simply omitted when the option is off (native then keeps its vanilla
         advCupTrackIDs table, which is exactly what an option-off seed uses).
         Fails loudly rather than silently falling back to vanilla if
         create_regions never ran (N3, Opus review).
+
+        The map it reads is the COMPLETE table (`world.gem_cup_legs_table`),
+        not the logic map: a cup displaced by a custom track legs nothing in
+        LOGIC,
+        but its native table row still has to be four real LevelIDs or the
+        wire stops being the complete mapping every consumer relies on. Which
+        cup is displaced travels in the `custom_tracks` block, where native
+        reads it before it ever loads a leg, so the displaced row is simply
+        never used rather than being ambiguous.
         """
-        return cup_legs_to_wire(resolved_gem_cup_legs(self))
+        return cup_legs_to_wire(resolved_gem_cup_legs_table(self))
 
     def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, Dict[str, int]]]:
         """{"<padLevelID>": {"stage1": {type,count,colour},
@@ -1798,7 +1834,22 @@ class ctrAPWorld(World):
         # then does a native need to parse it to load the same tracks the
         # generation logic used. Every 0.2.0 seed, on or off, now declares 7.
         legs_randomized = bool(o.randomize_gem_cup_tracks.value)
-        schema = 7
+        # Custom tracks (Baby T Park spike). A descriptor DISPLACES a cup
+        # destination, so a native that cannot serve the custom track would
+        # run the retail four-leg cup while this seed's logic says that cup
+        # legs nothing -- the same reachability-desync class as the v3 cup
+        # destination keys, which is exactly when the Contract says the schema
+        # number must move. So an option-ON seed declares 8.
+        #
+        # DELIBERATE DEVIATION from the standing Q28 "always bump, never
+        # conditionally" ruling, flagged for the coordinator rather than taken
+        # quietly: this rung has to PROVE that an option-off seed is byte-
+        # identical to one generated without this module at all, and an
+        # unconditional bump would change every seed on the branch and make
+        # that proof impossible. Landing the feature for real should make the
+        # bump unconditional at the next release's schema number.
+        custom_tracks = resolved_custom_tracks(self)
+        schema = 8 if custom_tracks else 7
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -2048,6 +2099,19 @@ class ctrAPWorld(World):
             # COUNTED ACROSS THE FILE -- native must count the same way
             # (item_boxes module docstring; Contract 7e).
             slot_data["item_box_checks"] = ITEM_BOX_CLASS.wire_block(o)
+        if custom_tracks:
+            # The custom-track descriptor, forwarded verbatim from the YAML
+            # (normalized) plus the resolved bindings. This is what replaces
+            # the native loader's config.ini section: the seed, not a file
+            # sitting next to the executable, is what says which track is
+            # loaded, which cup it takes over and which digests must match.
+            #
+            # Emitted only when a track is bound, so an option-off seed's wire
+            # is untouched. Carries its OWN `version` as well as riding the
+            # schema 8 bump above -- the schema number gates whether a native
+            # may trust this seed at all, the block version gates whether it
+            # understands this block's shape as it evolves.
+            slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:

@@ -136,6 +136,26 @@ def resolved_gem_cup_legs(world) -> Dict[str, List[str]]:
         ) from None
 
 
+def resolved_gem_cup_legs_table(world) -> Dict[str, List[str]]:
+    """world.gem_cup_legs_table -- the COMPLETE five-cup table, before any
+    custom-track displacement empties a cup.
+
+    Same "resolved once in create_regions, raise rather than guess" contract
+    as `resolved_gem_cup_legs`. The two differ only when a custom track has
+    displaced a cup: the TABLE is what native's advCupTrackIDs holds and what
+    the wire serializes, while the logic map is what justifies podium rungs.
+    See custom_tracks.apply_displacement for why they are kept apart.
+    """
+    try:
+        return world.gem_cup_legs_table
+    except AttributeError:
+        raise RuntimeError(
+            "world.gem_cup_legs_table read before Regions.create_regions "
+            "resolved it for this seed -- call order bug, not a "
+            "missing-option case"
+        ) from None
+
+
 def cup_legs_to_wire(cup_legs: Dict[str, List[str]]) -> Dict[str, List[int]]:
     """Serialize the map for slot_data: {"<cupLevelID>": [trackLevelID x4]}.
     Always all five cups -- the smallest COMPLETE mapping (a partial map

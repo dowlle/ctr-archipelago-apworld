@@ -93,6 +93,29 @@ def raise_if_custom_trophy_weight_is_zero(world):
                 "legal for every other item, including Key.")
 
 
+def raise_if_custom_tracks_descriptor_is_unusable(world):
+    """Custom-track descriptor guard, the mapping-option twin of the trap
+    weights guard below.
+
+    `Options.CustomTracks.verify_keys` already validates a rolled YAML, but a
+    world built programmatically -- the tests, the fuzzer, a plando -- never
+    goes through the roll. Re-running the same validator here is the
+    `raise_if_trap_weights_are_unusable` pattern exactly: one definition of
+    "well formed", reached from every generation path, so the two can never
+    drift apart.
+
+    A malformed descriptor is a raise rather than a downgrade because there is
+    no smaller correct seed hiding inside it. Every field decides something
+    the game must agree with -- which cup is handed over, which bytes may be
+    served, how many laps that race runs -- so an entry that is wrong in any
+    part describes a seed whose logic and whose game disagree about what a Gem
+    Cup is."""
+    from .custom_tracks import validate_custom_tracks
+    validate_custom_tracks(
+        getattr(getattr(world.options, "custom_tracks", None), "value", None)
+        or {})
+
+
 def raise_if_trap_weights_are_unusable(world):
     """Trap-weight guards (issue #280), the trap-fill twin of the zero-Trophy
     guard above.
@@ -347,6 +370,7 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
 def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
     raise_if_trap_weights_are_unusable(world)
+    raise_if_custom_tracks_descriptor_is_unusable(world)
     raise_if_composed_goal_is_empty(world)
     raise_if_gems_required_goal_needs_excluded_cups(world)
     raise_if_oxide_final_count_exceeds_mode_capacity(world)
@@ -419,6 +443,30 @@ def warn_shuffle_crystals_without_include(world):
         f"CTR: Include Battle Arena Warp Pads is off for {_who(world)}, so "
         f"the 'crystals' entry in Warp Pad Shuffle Categories has no effect "
         f"-- the arenas stay out of the seed and never destination-shuffle.")
+
+
+def warn_custom_track_displaces_a_randomized_cup(world):
+    """A cup handed to a custom track no longer runs any leg tracks, so the
+    four legs `randomize_gem_cup_tracks` drew for it are never raced.
+
+    Worth saying out loud because both options are about which tracks a cup
+    runs, and a player who set both will otherwise wonder why the spoiler
+    shows Purple legs they never see. It is a warning rather than a raise: the
+    other four cups still randomize normally, so the combination is completely
+    valid and only one cup's draw goes unused. The draw itself is deliberately
+    still made -- dropping it would move the RNG stream and change every later
+    per-seed decision."""
+    from .custom_tracks import displaced_cups, resolve_custom_tracks
+    if not world.options.randomize_gem_cup_tracks.value:
+        return
+    cups = sorted(displaced_cups(resolve_custom_tracks(world)))
+    if not cups:
+        return
+    logger.warning(
+        f"CTR: {', '.join(cups)} is replaced by a custom track for "
+        f"{_who(world)}, so the legs Randomize Gem Cup Tracks drew for it are "
+        f"never raced -- that cup is one race on the custom track. The other "
+        f"cups randomize normally.")
 
 
 def warn_shuffle_cups_without_include(world):
@@ -652,6 +700,7 @@ def apply_downgrade_warnings(world):
     warn_podium_held_fifth_without_held(world)
     warn_shuffle_crystals_without_include(world)
     warn_shuffle_cups_without_include(world)
+    warn_custom_track_displaces_a_randomized_cup(world)
     warn_sphere_search_tuning_ignored_in_vanilla(world)
     warn_vanilla_unlock_collapses_destination_shuffle(world)
     warn_letters_per_track_ignored_outside_location_modes(world)
