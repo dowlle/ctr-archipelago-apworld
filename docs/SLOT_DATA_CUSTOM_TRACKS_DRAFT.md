@@ -12,7 +12,7 @@ Every Alpha6 seed declares `schema_version: 8` regardless of block presence.
 ```jsonc
 "custom_tracks": {
   "enabled": true,
-  "version": 2,
+  "version": 3,
   "tracks": [
     {
       "id": "baby-t-park",
@@ -37,6 +37,7 @@ Every Alpha6 seed declares `schema_version: 8` regardless of block presence.
         "ai_nav": true,
         "minimap": false,
         "ghosts": false,
+        "wumpa_collectible": true,
         "spawns": 8,
         "checkpoints": 35
       }
@@ -55,6 +56,25 @@ the shipped client does not recognize.
 `host_level_id` defaults to 6 and remains a loading vehicle rather than a
 logical destination. `boxes` defaults to false and true is rejected. Custom AP
 box identities and placements do not exist in Alpha6.
+
+### `wumpa_collectible` (block version 3, 2026-08-29)
+
+`wumpa_collectible` is a REQUIRED measured capability, added with the per-track
+Reach 10 Wumpa checks. It answers one question: can the local player actually
+reach ten Wumpa Fruit on this track? It is deliberately not inferred from the
+broad `crates` flag, because a track can carry crate instances -- weapon boxes,
+TNT, relic time crates -- with no route to ten fruit.
+
+Manager-light measures it from the hash-verified LEV: it walks the level's
+instance table and counts `PU_FRUIT_CRATE` (modelID 7) and loose
+`PU_WUMPA_FRUIT` (modelID 2) instances, then takes the guaranteed floor, five
+fruit per fruit crate (`RB_Crate.c` pays 5..8) plus one per loose fruit. Ten or
+more is `true`.
+
+The version moved from 2 to 3 because the entry gained a required field. A
+version-2 entry carries no such measurement, and a per-track Wumpa check must
+never guess one, so a build that reads version 3 refuses a version-2 block
+rather than defaulting the flag either way.
 
 ## Manager and preflight
 
@@ -88,7 +108,7 @@ vehicle. Genuine custom-track rungs require future datapackage identities.
 |---|---|
 | Validate and normalize | `worlds/ctr/custom_tracks.py` |
 | Emit and UT restore | `worlds/ctr/__init__.py`, `worlds/ctr/custom_tracks.py` |
-| Native parse | `ap/ap_seedcfg.cpp`, wire version 2 |
+| Native parse | `ap/ap_seedcfg.cpp`, wire version 3 |
 | Package preflight | `platform/native_custom_track_manager.c`, `ap/ap_hooks.c` |
 | Event-entry gate | `game/232/AH_WarpPad.c`, `ap/ap_hooks.c` |
 | Manager screen | `game/230/MM_ConfigMenu.c` |

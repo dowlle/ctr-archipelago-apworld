@@ -49,13 +49,17 @@ from ..itemsanity import ITEMSANITY_CLASS
 
 FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
 FIXTURE_PATH = FIXTURE_DIR / "location_class_id_stability_v0_1_5.json"
-#: One entry per release that spent a datapackage bump. Append-only. The 0.2.0
-#: file holds the 361 class-owned names the #177 freeze minted (relic perfects,
-#: lettersanity, item boxes, itemsanity, the wumpa check, the trial trophy
-#: races); the v0.1.5 file keeps the 112 podium rungs and is never edited.
+#: One entry per release or approved unfreeze that minted permanent location
+#: names. Append-only, and no existing file is ever edited. The v0.1.5 file keeps
+#: the 112 podium rungs; the 0.2.0 file holds the 361 class-owned names the #177
+#: freeze minted (relic perfects, lettersanity, item boxes, itemsanity, the
+#: global wumpa check, the trial trophy races); the 2026-08-29 file holds the 19
+#: names the approved per-track Wumpa unfreeze appended (18 retail destinations
+#: plus one custom destination slot).
 FIXTURE_PATHS = (
     FIXTURE_PATH,
     FIXTURE_DIR / "location_class_id_stability_v0_2_0.json",
+    FIXTURE_DIR / "location_class_id_stability_2026_08_29_wumpa.json",
 )
 
 PODIUM_TOGGLES = (
@@ -481,7 +485,9 @@ class TestLocationClassIdStability(unittest.TestCase):
 
     def test_fixture_covers_every_class_owned_location(self) -> None:
         frozen = self._frozen()
-        self.assertEqual(len(frozen), 473)  # 112 podium + 361 frozen by #177
+        # 112 podium + 361 frozen by #177 + 19 from the approved 2026-08-29
+        # per-track Wumpa unfreeze.
+        self.assertEqual(len(frozen), 492)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(
@@ -511,12 +517,39 @@ class TestLocationClassIdStability(unittest.TestCase):
     def test_frozen_locations_keep_their_relative_datapackage_order(self) -> None:
         """Registration order is datapackage order. Reordering would not renumber
         anything (codes are explicit), but it would churn a manifest diff (#177)
-        for no reason, so it is pinned."""
-        frozen = self._frozen()
+        for no reason, so it is pinned.
+
+        Pinned PER FIXTURE rather than across the concatenation. A fixture is one
+        mint event, and datapackage order is registration order -- so an approved
+        unfreeze that widens an EXISTING class (the 2026-08-29 per-track Wumpa
+        block widened `wumpa`, which sits between `itemsanity` and
+        `trial_trophy`) lands in the middle of an earlier fixture's span, not
+        after it. Concatenating the files would assert an ordering the freeze
+        never promised. Within one mint event the order is still exact, and the
+        cross-event anchor -- the whole v0.1.5 podium block precedes everything
+        0.2.0 minted -- is asserted separately below.
+        """
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        live_order = [name for name in world_type.location_name_to_id
-                      if name in frozen]
-        self.assertEqual(live_order, list(frozen))
+        live_index = {name: index for index, name
+                      in enumerate(world_type.location_name_to_id)}
+        for path in FIXTURE_PATHS:
+            with self.subTest(fixture=path.name):
+                batch = json.loads(path.read_text(encoding="utf-8"))
+                live_order = sorted(batch, key=lambda n: live_index[n])
+                self.assertEqual(live_order, list(batch))
+
+    def test_the_podium_block_still_precedes_everything_the_freeze_minted(
+            self) -> None:
+        """The one cross-fixture ordering the registry does promise: `podium` is
+        registered first, so every v0.1.5 rung sorts ahead of every name a later
+        mint event added."""
+        world_type = AutoWorldRegister.world_types["Crash Team Racing"]
+        live_index = {name: index for index, name
+                      in enumerate(world_type.location_name_to_id)}
+        podium_names = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        later = set(self._frozen()) - set(podium_names)
+        self.assertLess(max(live_index[n] for n in podium_names),
+                        min(live_index[n] for n in later))
 
 
 class _CreatedMatchesGenerationMixin:

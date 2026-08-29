@@ -484,13 +484,43 @@ class ProgressiveStartingWumpa(Range):
     default = 0
 
 
-class WumpaCheck(Toggle):
-    """Add one check for reaching 10 Wumpa Fruit during a race.
+class WumpaCheck(Choice):
+    """Add checks for reaching 10 Wumpa Fruit during a race.
 
-    This is one global location for the whole seed, not one per track. It is
-    separate from Itemsanity's juiced weapon checks: this pays out when you
-    reach 10 fruit, while those pay out when you fire a weapon at 10."""
+    - **off** (default): no Wumpa checks.
+    - **global**: one location for the whole seed, paid the first time you
+      reach 10 fruit in any race.
+    - **per_track**: one location for every race track where you can collect
+      fruit, paid the first time you reach 10 fruit on that track. This
+      replaces the global check rather than adding to it.
+
+    An older YAML still reads correctly: `false` is off and `true` is global.
+
+    This is separate from Itemsanity's juiced weapon checks: this pays out when
+    you reach 10 fruit, while those pay out when you fire a weapon at 10."""
     display_name = "Wumpa Check"
+    option_off = 0
+    option_global = 1
+    option_per_track = 2
+    default = 0
+
+    @classmethod
+    def from_any(cls, data: Any) -> "WumpaCheck":
+        """Accept the retired Boolean spelling.
+
+        This option shipped in Alpha 6 as a `Toggle`, so an existing YAML holds
+        `wumpa_check: true` or `false`. AP's `Choice.from_any` cannot take those:
+        its integer branch tests `type(data) == int`, which a real `bool` fails,
+        and the text branch then looks for an option literally named "true".
+
+        The mapping is silent rather than warned, unlike the racer-lock
+        compatibility path, because nothing about the player's seed changes:
+        false meant no Wumpa check and true meant the single global check, which
+        are exactly `off` and `global`.
+        """
+        if isinstance(data, bool):
+            return cls(cls.option_global if data else cls.option_off)
+        return super().from_any(data)
 
 
 class TurboGrant(Toggle):

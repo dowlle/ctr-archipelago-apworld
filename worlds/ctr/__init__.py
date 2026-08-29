@@ -397,10 +397,14 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
-        # The wumpa CHECK is a location toggle with no scalar of its own, so it
-        # restores from the presence of its location block, exactly as
-        # itemsanity does above.
-        o.wumpa_check.value = int("wumpa_checks" in passthrough)
+        # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
+        # always-emitted scalar. Prefer the scalar; fall back to block presence
+        # for a pre-widening seed, where a present block always meant the single
+        # global check -- which is exactly mode 1.
+        if "wumpa_check" in co:
+            o.wumpa_check.value = int(co["wumpa_check"])
+        else:
+            o.wumpa_check.value = int("wumpa_checks" in passthrough)
         # Turbo Grant (#224): identical scalar, identical reasoning. Absent key
         # is any pre-#224 seed and correctly restores to off.
         o.turbo_grant.value = int(bool(co.get("turbo_grant", 0)))
@@ -1998,10 +2002,17 @@ class ctrAPWorld(World):
                 # emitted, same convention as itemsanity and tizi_helper, and
                 # DIAGNOSTIC / TRACKER ONLY: native drives both from received
                 # items (a bundle hands over fruit on arrival, the ladder is the
-                # count of copies received) and reads neither key. `wumpa_check`
-                # is NOT here -- it is a location toggle, and its block presence
-                # below is the signal, exactly as itemsanity's is.
+                # count of copies received) and reads neither key.
                 **wumpa_family.fill_slot_data(self),
+                # The wumpa CHECK mode (2026-08-29 spec). Always emitted as a raw
+                # scalar even when off, unlike the pre-widening arrangement where
+                # block presence was the only signal. Block presence can say
+                # "some Wumpa check exists"; it cannot distinguish `global` from
+                # `per_track` without a tracker re-deriving a three-way setting
+                # from block shape, which is exactly the inference the standing
+                # convention exists to avoid. The conditional block below carries
+                # the resolved code mapping.
+                "wumpa_check": int(o.wumpa_check.value),
                 # Tizi Helper (#223), same always-emitted scalar convention.
                 # DIAGNOSTIC / TRACKER ONLY: native does NOT read this key. The
                 # helper's runtime gate is "did this slot receive item 35010188"
@@ -2067,26 +2078,19 @@ class ctrAPWorld(World):
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
-        if o.wumpa_check.value:
-            # Additive under schema 7, same off-parity convention as itemsanity.
+        if int(o.wumpa_check.value) != 0:
+            # Additive under schema 7, same off-parity convention as itemsanity:
+            # omitted entirely when the mode is off, while the raw scalar above
+            # is always emitted.
             #
-            # NATIVE DOES NOT READ THIS BLOCK -- verified against the client's
-            # AP_EmitWumpaCheck, which hardcodes 35016100 and gates on
-            # ap_net_location_exists(code), i.e. on server location membership,
-            # the same membership-not-slot_data rule the Tizi gate follows. So
-            # this is tracker and diagnostic metadata, plus the signal this
-            # world's own Universal Tracker restore reads to recover the toggle
-            # (there is no scalar for it, because it is a location option).
-            #
-            # The codes are listed rather than implied anyway, so that a future
-            # second wumpa check is a data change here rather than a wire
-            # redesign, and so a tracker never has to hardcode what native
-            # currently does.
-            slot_data["wumpa_checks"] = {
-                "enabled": True,
-                "locations": [code for _name, code, _region in
-                              WUMPA_CLASS.created_locations(self.options)],
-            }
+            # NATIVE READS THIS BLOCK from the 2026-08-29 spec onwards. Before it,
+            # the client hardcoded 35016100 and gated purely on server location
+            # membership; per-track checks make that impossible, because the seed
+            # decides which of the 19 destination codes exist and which custom
+            # destination (if any) is live. The wire is now the authority on which
+            # codes exist, and native must never hardcode the new ranges. Location
+            # membership remains the final send gate on top of it.
+            slot_data["wumpa_checks"] = WUMPA_CLASS.wire_block(o)
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,
