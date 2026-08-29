@@ -18,10 +18,13 @@ the public scope statement. Concretely:
            one you start as, defaulting to a random pick from the 8 vanilla
            Adventure starters.
   * R4     the other 15 are multiworld unlock items. They add ZERO locations.
-  * R8/R17 a YAML toggle turns on racer-locked warp pads. Locks ON makes the
-           unlock items `progression` (a pad can demand one); locks OFF makes
-           them `useful` and nothing in logic ever names a character, so the
-           seed plans around the guaranteed starting character only.
+  * R8/R17 a YAML option asks for AT MOST N racer-locked warp pads, 0 being
+           off (the 2026-08-29 Lane B specification replaced the Alpha 6
+           toggle with this count). Locks ON -- meaning the seed's resolved
+           pad map is non-empty, not merely that the count is positive --
+           makes the unlock items `progression` (a pad can demand one); locks
+           OFF makes them `useful` and nothing in logic ever names a
+           character, so the seed plans around the starting character only.
   * R15    `penta_stats: ntsc | pal`, NTSC default. The 2026-07-23 wayfarer
            wrote the two labels the wrong way round; corrected 2026-08-21.
            NTSC-U Penta reuses Polar and Pura's ordinary TURN class, and the
@@ -78,6 +81,8 @@ constructed. That is an argument, not a proof, so `verify_no_self_lock` below
 re-derives it from the FILLED multiworld and raises if it is ever false. It is
 wired into `post_fill`, and the test suite drives it directly.
 """
+import json
+import pkgutil
 from typing import Dict, List, Optional, Tuple
 
 from BaseClasses import ItemClassification
@@ -207,16 +212,37 @@ def unlocks_enabled(world) -> bool:
     return bool(world.options.character_unlocks.value)
 
 
-def racer_locks_enabled(world) -> bool:
-    """Racer locks require the unlock items to exist.
+def racer_locks_requested(world) -> bool:
+    """Whether this seed ASKED for racer locks, after the all-unlocked AND.
+
+    Requesting is not the same as getting: the request is a maximum, and a seed
+    whose eligible pad set is empty carries no lock at all. Ask
+    `racer_locks_effective` for what the seed actually has -- this predicate is
+    for the option-level warnings only.
 
     With all-unlocked mode on there is no item that could gate a pad, so a lock
     would either be unsatisfiable or trivially free. `forced_options` logs the
-    downgrade; this is the single place that resolves it, so Rules.py,
-    create_item and fill_slot_data cannot disagree about whether locks are
-    live.
+    downgrade; this is the single place that resolves it, so nothing else in
+    the world re-derives the pair.
     """
-    return bool(world.options.racer_locked_pads.value) and unlocks_enabled(world)
+    if not unlocks_enabled(world):
+        return False
+    return legacy_boolean_request(world) or bool(
+        world.options.racer_locked_pads.value)
+
+
+def racer_locks_effective(world) -> bool:
+    """Whether this seed actually carries locks: the resolved pad map is
+    non-empty.
+
+    This, not the requested count, is what every consumer must read. A positive
+    request against an empty eligible set produces no lock, and treating it as
+    "on" would inflate the unlock items to progression for a feature that is
+    not in the seed. Reads the map `Regions.create_regions` stored, so it is
+    only meaningful from `create_items` onwards -- which is where all of its
+    callers live.
+    """
+    return bool(getattr(world, "ctr_racer_locks", {}))
 
 
 def unlock_classification(world) -> ItemClassification:
@@ -227,13 +253,18 @@ def unlock_classification(world) -> ItemClassification:
     items gate nothing and `useful` is the correct AP semantics: it relaxes the
     ordered fill instead of inflating an already ~98%-progression pool.
 
+    "ON" means the RESOLVED pad map is non-empty, not that the requested count
+    is positive. A request the seed could not satisfy (no eligible pad) leaves
+    no rule naming a racer, so promoting the 15 items there would pay the
+    fill cost of a feature the seed does not have.
+
     `useful` rather than pure `filler` is deliberate and is R17's own caveat:
     a character still opens options (and, under per_character capability modes,
     access to that racer's chains), so it is not dead padding.
     """
     from . import progressive_capability
     return (ItemClassification.progression
-            if (racer_locks_enabled(world)
+            if (racer_locks_effective(world)
                 or progressive_capability.unlock_items_are_logic_inputs(world))
             else ItemClassification.useful)
 
@@ -296,16 +327,61 @@ def raise_if_unlocks_exceed_location_supply(world, *, available_supply: int) -> 
 # Racer-locked warp pads
 # ---------------------------------------------------------------------------
 
-# How many of the eligible pads get a racer lock, as a fraction of the eligible
-# set. Deliberately conservative and deliberately NOT a YAML knob: the ruled
-# surface is one toggle (R8), and CTR's item pool is ~98% progression in every
-# config, so an aggressive lock density is exactly the #75-class fill-fragility
-# the project has already been bitten by. One extra unique, single-copy
-# progression gate per ~4 eligible pads keeps the frontier wide while still
-# making the feature visible on every seed that enables it.
-_LOCK_FRACTION = 0.25
-_LOCK_MIN = 1
-_LOCK_MAX = 6
+# The complete supported physical-pad census: every pad exit data/warp_pad_ids
+# .json knows about, race, crystal, trial and cup alike. It is the ceiling of
+# the `racer_locked_pads` range, because no seed can ever carry more locks than
+# it has physical pads, and reading it from the JSON rather than typing a
+# literal is what keeps the option ceiling from drifting when a pad is added.
+# A lock is placed on a PHYSICAL pad, so destination shuffle cannot change this
+# number. `test_character_phase` pins it against the same file.
+PHYSICAL_PAD_COUNT: int = len(json.loads(
+    pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8")
+)["pads"])
+
+# The Alpha 6 automatic density, kept ONLY as the compatibility meaning of the
+# old Boolean `racer_locked_pads: true`. Up to and including Alpha 6 the option
+# was a toggle and this was the density it chose: a quarter of the eligible
+# pads, clamped to 1..6. It is no longer the default behaviour of the option --
+# the player now names a maximum and 0 is the default -- but a YAML written
+# against Alpha 6 must keep meaning what it meant, so `true` normalizes to this
+# policy with a logged message rather than being silently read as the integer 1.
+# See forced_options.warn_racer_locked_pads_boolean_normalized.
+_LEGACY_AUTO_FRACTION = 0.25
+_LEGACY_AUTO_MIN = 1
+_LEGACY_AUTO_MAX = 6
+
+
+def legacy_boolean_request(world) -> bool:
+    """Whether this seed's YAML wrote the Alpha 6 Boolean `true` rather than a
+    count. `Options.RacerLockedPads.from_any` sets the flag; nothing else may
+    infer it, because a Range cannot tell the integer 1 from `True` after the
+    fact (`bool` is an `int` subclass, which is exactly the ambiguity the
+    normalization exists to remove)."""
+    return bool(getattr(world.options.racer_locked_pads,
+                        "legacy_boolean_auto", False))
+
+
+def requested_lock_count(world, eligible_count: int) -> int:
+    """The requested MAXIMUM number of racer locks for this seed.
+
+    Zero whenever the unlock items do not exist: with all-unlocked mode on
+    there is no item a lock could gate, so the request is inert no matter what
+    the YAML asked for (`forced_options` logs that downgrade).
+
+    `eligible_count` is only read on the Alpha 6 Boolean-compatibility path,
+    where the request IS the old automatic density and therefore a function of
+    the eligible set. A modern integer request is independent of it; the
+    eligible set only ever clamps the request in `resolve_racer_locks`.
+    """
+    if not unlocks_enabled(world):
+        return 0
+    if legacy_boolean_request(world):
+        if eligible_count <= 0:
+            return 0
+        return max(_LEGACY_AUTO_MIN,
+                   min(_LEGACY_AUTO_MAX,
+                       int(eligible_count * _LEGACY_AUTO_FRACTION)))
+    return int(world.options.racer_locked_pads.value)
 
 
 def _pad_is_free(req: Optional[dict]) -> bool:
@@ -369,17 +445,33 @@ def resolve_racer_locks(world) -> Dict[str, str]:
     The required racer is never the starting character. A lock on the racer you
     already have would be satisfied at spawn and would spend an eligible pad on
     nothing.
+
+    The player's `racer_locked_pads` count is a MAXIMUM: the seed takes
+    `min(requested, eligible)`, so an ambitious request on a seed with few
+    randomized pads quietly produces fewer locks rather than failing. Both
+    counts are stored on the world here (`ctr_racer_lock_counts`) under the
+    same draw-once rule as the map itself, because slot data reports them and
+    must not recompute an eligible set that has since been overwritten.
     """
-    if not racer_locks_enabled(world):
+    pads = eligible_lock_pads(world) if unlocks_enabled(world) else []
+    requested = requested_lock_count(world, len(pads))
+    world.ctr_racer_lock_counts = {
+        "requested": requested, "eligible": len(pads)}
+    n = min(requested, len(pads))
+    if n <= 0:
         return {}
-    pads = eligible_lock_pads(world)
-    if not pads:
-        return {}
-    n = max(_LOCK_MIN, min(_LOCK_MAX, int(len(pads) * _LOCK_FRACTION)))
-    n = min(n, len(pads))
     chosen_pads = world.random.sample(pads, n)
     candidates = [c for c in ROSTER if c != world.ctr_starting_character]
     return {pad: world.random.choice(candidates) for pad in sorted(chosen_pads)}
+
+
+def racer_lock_counts(world) -> Tuple[int, int]:
+    """(requested maximum, eligible pad count) for this seed, as resolved once
+    by `resolve_racer_locks` or pinned from the wire by
+    `reconstruct_racer_locks_from_wire`. Diagnostics and slot data read this
+    rather than re-deriving, so support logs and the wire cannot disagree."""
+    counts = getattr(world, "ctr_racer_lock_counts", None) or {}
+    return int(counts.get("requested", 0)), int(counts.get("eligible", 0))
 
 
 def reconstruct_racer_locks_from_wire(world, passthrough: Dict[str, object]
@@ -395,6 +487,7 @@ def reconstruct_racer_locks_from_wire(world, passthrough: Dict[str, object]
     block = (passthrough or {}).get("racer_locks") or {}
     pads = block.get("pads") or {}
     if not isinstance(pads, dict) or not pads:
+        world.ctr_racer_lock_counts = {"requested": 0, "eligible": 0}
         return {}
     pad_ids = getattr(world, "warp_pad_ids", {}) or {}
     by_level_id = {str(meta["level_id"]): name
@@ -405,6 +498,16 @@ def reconstruct_racer_locks_from_wire(world, passthrough: Dict[str, object]
         name = CHARACTER_ID_TO_NAME.get(int(character_id))
         if pad_name is not None and name is not None:
             out[pad_name] = name
+    # The counts ride the wire too, so UT reports the connected seed's numbers
+    # instead of the tracking player's YAML. A seed generated before the count
+    # metadata existed carries neither key; fall back to what the restored pad
+    # data can prove -- the locks that are actually on the wire, and this
+    # seed's own eligible set -- rather than to a default the seed never had.
+    world.ctr_racer_lock_counts = {
+        "requested": int(block.get("requested_count", len(out))),
+        "eligible": int(block.get("eligible_count",
+                                  len(eligible_lock_pads(world)))),
+    }
     return out
 
 
@@ -420,7 +523,14 @@ def racer_lock_slot_data(world) -> Dict[str, object]:
     `enabled` is emitted even when the option is off (with an empty `pads`), so
     a tracker can tell "locks off" from "old seed" without inferring from block
     absence -- the same reason `itemsanity` and `shortcut_knowledge` are always
-    emitted as raw scalars.
+    emitted as raw scalars. It reports the EFFECTIVE feature: a request that
+    found no eligible pad is off, which is the same reading `unlock_
+    classification` takes.
+
+    `requested_count` and `eligible_count` are diagnostics for trackers and
+    support logs -- "you asked for 8, this seed only had 5 pads that could take
+    one". Native reads neither; it enforces the resolved `pads` map and nothing
+    else, so it never re-derives a selection.
     """
     pad_ids = getattr(world, "warp_pad_ids", {}) or {}
     locks = getattr(world, "ctr_racer_locks", {}) or {}
@@ -430,7 +540,13 @@ def racer_lock_slot_data(world) -> Dict[str, object]:
         if meta is None:
             continue
         pads[str(meta["level_id"])] = ROSTER_CHARACTER_ID[character]
-    return {"enabled": racer_locks_enabled(world), "pads": pads}
+    requested, eligible = racer_lock_counts(world)
+    return {
+        "enabled": bool(pads),
+        "requested_count": requested,
+        "eligible_count": eligible,
+        "pads": pads,
+    }
 
 
 def verify_no_self_lock(world) -> None:
@@ -485,7 +601,8 @@ def verify_no_self_lock(world) -> None:
                 f"'{loc.name}', which is not reachable without '{item_name}' "
                 f"itself -- the pad '{pad_name}' requires that racer. This is "
                 f"the self-lock deadlock issue #209 names; the seed would be "
-                f"unfinishable. Re-roll, or set 'racer_locked_pads' to false.")
+                f"unfinishable. Re-roll, or lower 'racer_locked_pads' (0 turns "
+                f"racer locks off).")
 
 
 # ---------------------------------------------------------------------------
@@ -562,7 +679,12 @@ def fill_slot_data(world) -> Dict[str, object]:
         # DIFFERENT pool than the seed has -- and on a reduced seed it does not
         # even fit, which is how the #54/#209 fuzz found this.
         "character_unlocks": unlocks_enabled(world),
-        "racer_locked_pads": racer_locks_enabled(world),
+        # The REQUESTED maximum, as an integer, after the all-unlocked-mode
+        # AND and the Alpha 6 Boolean normalization. A native or tracker that
+        # still reads this key as a Boolean is not broken by the change: 0 is
+        # false and any positive count is true. The resolved `racer_locks`
+        # block above it stays authoritative for what is actually locked.
+        "racer_locked_pads": racer_lock_counts(world)[0],
         "penta_stats": int(world.options.penta_stats.value),
         "editable_stats": int(world.options.editable_stats.value),
         # The RESOLVED outcome. Native reads these three and never re-derives

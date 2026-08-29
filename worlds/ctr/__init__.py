@@ -302,9 +302,10 @@ class ctrAPWorld(World):
         #     restoring it wrong rebuilds a different pool -- and on a reduced
         #     seed the re-generation does not even FIT, which is exactly how
         #     the fuzz matrix's check-ut arm caught this (6/500 seeds);
-        #   racer_locked_pads decides whether those items are progression, and
-        #     a progression/useful split UT gets wrong makes every downstream
-        #     sphere wrong.
+        #   racer_locked_pads carries the requested lock COUNT, which is what a
+        #     support log reports back; the locks themselves are pinned from
+        #     the racer_locks block rather than re-drawn, and the
+        #     progression/useful split follows that pinned map.
         # starting_stat_class / penta_stats / editable_stats are cosmetic or
         # native-only and are deliberately NOT restored (same reasoning as
         # one_lap_cups). The starting racer itself is restored separately in
@@ -312,7 +313,16 @@ class ctrAPWorld(World):
         if "character_unlocks" in co:
             o.character_unlocks.value = int(bool(co["character_unlocks"]))
         if "racer_locked_pads" in co:
-            o.racer_locked_pads.value = int(bool(co["racer_locked_pads"]))
+            # An Alpha 6 seed put a Boolean here, a 0.2.0 seed puts the
+            # requested maximum. `int(True)` is 1, which is the honest reading
+            # of the old wire: it said "on", and the pad map says the rest.
+            _requested = co["racer_locked_pads"]
+            o.racer_locked_pads.value = max(
+                0, min(int(_requested),
+                       type(o.racer_locked_pads).range_end))
+            # A restored count is already a number, so the Alpha 6 YAML
+            # normalization must not also fire on top of it.
+            o.racer_locked_pads.legacy_boolean_auto = False
 
         # Derive the two content-inclusion toggles from the pad gates: a cup /
         # crystal pad only carries a non-type-0 stage-1 requirement when its class

@@ -53,11 +53,33 @@ import logging
 
 from Options import OptionError
 
+from . import characters
+
 logger = logging.getLogger(__name__)
 
 
 def _who(world):
     return f"player {world.player} ({world.multiworld.player_name[world.player]})"
+
+
+def _say_once(option, flag: str, message: str) -> None:
+    """Log `message` once per option object.
+
+    `__init__._probe_two_stage_fillable` builds a mirror multiworld for the
+    fill probe and hands its slots the REAL option objects, then runs
+    `generate_early` on them -- so a seed that runs the probe reaches every
+    warning in this module twice. The player generated one seed and asked one
+    question; telling them the same thing twice reads like two different
+    problems. The option object is the right carrier for the latch precisely
+    because the probe shares it with the world it is predicting.
+
+    Only the racer-lock warnings use this so far; the rest of the module still
+    logs per pass.
+    """
+    if getattr(option, flag, False):
+        return
+    setattr(option, flag, True)
+    logger.warning(message)
 
 
 # ---------------------------------------------------------------------------
@@ -638,19 +660,41 @@ def warn_penta_stats_without_vanilla_stats(world):
         f"selector has no gameplay effect.")
 
 
+def warn_racer_locked_pads_boolean_normalized(world):
+    """`racer_locked_pads` was a toggle up to and including Alpha 6 and is now
+    a maximum lock COUNT. A YAML that still says `true` cannot be read as a
+    number without changing what it asked for: `bool` is an `int` subclass, so
+    it would land on 1 -- a single lock, where Alpha 6 gave a quarter of the
+    eligible pads. The 2026-08-29 ruling forbids that silent reinterpretation,
+    so `true` keeps its Alpha 6 meaning and says so, exactly once.
+    Not a downgrade: nothing is lost, the old spelling is simply translated."""
+    if not characters.legacy_boolean_request(world):
+        return
+    _say_once(
+        world.options.racer_locked_pads, "_ctr_said_boolean_normalized",
+        f"CTR: Racer-Locked Warp Pads is now a maximum lock COUNT, not a "
+        f"toggle, but {_who(world)}'s YAML still sets it to 'true'. Reading it "
+        f"the Alpha 6 way -- a quarter of this seed's eligible pads, at least "
+        f"1 and at most 6 -- rather than as the number 1. Write a number "
+        f"instead: 0 turns racer locks off, and any higher value is the most "
+        f"pads that may be locked.")
+
+
 def warn_racer_locks_without_character_unlocks(world):
     """Racer locks gate a pad on holding a character unlock item. In
     all-unlocked mode (`character_unlocks: false`) no such item is ever
     created, so there is nothing a lock could gate --
-    characters.racer_locks_enabled resolves the pair to "off" and no pad is
+    characters.racer_locks_requested resolves the pair to "off" and no pad is
     locked. Downgrade-with-warning, not a raise: the seed is completely valid,
-    the toggle just has nothing to do in it."""
+    the option just has nothing to do in it."""
     o = world.options
-    if not o.racer_locked_pads.value:
+    if not (o.racer_locked_pads.value
+            or characters.legacy_boolean_request(world)):
         return
     if o.character_unlocks.value:
         return
-    logger.warning(
+    _say_once(
+        o.racer_locked_pads, "_ctr_said_without_character_unlocks",
         f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Character "
         f"Unlocks is off (all-unlocked mode), so there are no character unlock "
         f"items for a pad to require and no pad is locked to a racer. Turn "
@@ -660,15 +704,18 @@ def warn_racer_locks_without_character_unlocks(world):
 def warn_racer_locks_have_no_eligible_pads(world):
     """Racer locks can only be placed on a pad this seed randomized and left
     non-free (characters.eligible_lock_pads). A vanilla-unlock seed randomizes
-    no pad at all, so the toggle silently produces zero locks -- and, through
-    R17, still keeps the 15 character unlocks as progression, which is a real
-    cost for no feature. Say so rather than leaving the player to wonder."""
+    no pad at all, so the request silently produces zero locks. R17 no longer
+    charges the seed for that -- an empty pad map leaves the 15 unlocks
+    `useful` -- but the player still asked for a feature they will not see, so
+    say so rather than leaving them to wonder."""
     o = world.options
-    if not o.racer_locked_pads.value:
+    if not (o.racer_locked_pads.value
+            or characters.legacy_boolean_request(world)):
         return
     if o.warppad_unlock_requirements.value != 0:
         return
-    logger.warning(
+    _say_once(
+        o.racer_locked_pads, "_ctr_said_no_eligible_pads",
         f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Warp Pad "
         f"Unlock Requirements is 'vanilla', so no pad carries a randomized "
         f"requirement and no racer lock can be placed. The 15 character "
@@ -707,6 +754,7 @@ def apply_downgrade_warnings(world):
     warn_relic_gates_may_be_permanently_unreachable(world)
     warn_editable_stats_overridden_by_progressive(world)
     warn_penta_stats_without_vanilla_stats(world)
+    warn_racer_locked_pads_boolean_normalized(world)
     warn_racer_locks_without_character_unlocks(world)
     warn_racer_locks_have_no_eligible_pads(world)
     warn_wumpa_bundles_have_no_filler_slots(world)

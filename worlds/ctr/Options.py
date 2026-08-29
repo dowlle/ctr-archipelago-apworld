@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
+from . import characters
 from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
@@ -938,17 +939,73 @@ class CharacterUnlocks(DefaultOnToggle):
     display_name = "Character Unlocks"
 
 
-class RacerLockedPads(Toggle):
-    """Lock some warp pads to a specific racer.
+class RacerLockedPads(Range):
+    """The most warp pads that may be locked to a specific racer.
 
     You need to have unlocked the racer a pad names. When you enter, the game
     seats you as that racer for the destination and restores your previous
     racer when you return to the hub. The pad shows who it needs.
 
+    0 (default) turns racer locks off. Any higher value is a MAXIMUM, not a
+    promise: a pad can only take a lock if this seed randomized it and did not
+    leave it open from the start, so a seed with few randomized pads gives you
+    fewer locks than you asked for rather than failing to generate. The
+    always-open N. Sanity Beach starter pads are never locked.
+
     Never your starting racer - a lock you already satisfy would be no lock
     at all. Needs Character Unlocks to be on, since otherwise every racer is
     available from the start."""
     display_name = "Racer-Locked Warp Pads"
+    range_start = 0
+    # The complete supported physical-pad census. No seed has more pads than
+    # this to lock, so no larger request could mean anything. Read from the pad
+    # data rather than typed here so the ceiling cannot drift when a pad is
+    # added; `test_character_phase` pins it against the same file.
+    range_end = characters.PHYSICAL_PAD_COUNT
+    default = 0
+
+    # Set by `from_any` when the YAML wrote the Alpha 6 Boolean instead of a
+    # count. Read by characters.legacy_boolean_request.
+    legacy_boolean_auto = False
+
+    # Up to Alpha 6 this option was a toggle, and `bool` is an `int` subclass,
+    # so `racer_locked_pads: true` would otherwise quietly become "at most one
+    # lock" -- a different seed than the player asked for, with nothing said
+    # about it. During the Alpha 6 compatibility window `true` normalizes to
+    # the automatic density that toggle chose (a quarter of the eligible pads,
+    # clamped 1..6) and forced_options logs it once. `false` is 0, which needs
+    # no message because off means the same thing in both spellings. Dropping
+    # this path is a later major option cleanup, not a silent removal.
+    _TRUE_TEXT = frozenset(("true", "yes", "on"))
+    _FALSE_TEXT = frozenset(("false", "no", "off"))
+
+    @classmethod
+    def _legacy_true(cls) -> "RacerLockedPads":
+        option = cls(0)
+        option.legacy_boolean_auto = True
+        return option
+
+    @classmethod
+    def from_any(cls, data: Any) -> "RacerLockedPads":
+        if isinstance(data, bool):
+            return cls._legacy_true() if data else cls(0)
+        # `isinstance` rather than Range's `type(data) == int` only because the
+        # bool branch above has already taken the one case they differ on.
+        if isinstance(data, int):
+            return cls(data)
+        return cls.from_text(str(data))
+
+    @classmethod
+    def from_text(cls, text: str) -> "RacerLockedPads":
+        # A quoted `"true"` never reaches `from_any` as a bool, and Range's own
+        # true/false spelling is disabled for an option whose default is 0, so
+        # the normalization has to be reachable from text as well.
+        lowered = text.strip().lower()
+        if lowered in cls._TRUE_TEXT:
+            return cls._legacy_true()
+        if lowered in cls._FALSE_TEXT:
+            return cls(0)
+        return super().from_text(text)
 
 
 class PentaStats(Choice):
