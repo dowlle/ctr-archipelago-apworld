@@ -11,6 +11,7 @@ from .elastic_bounds import CTRSettings, estimated_filler_reserve
 from .gem_cup_legs import (cup_legs_to_wire, resolved_gem_cup_legs,
                            resolved_gem_cup_legs_table)
 from .custom_tracks import (custom_tracks_to_wire,
+                            effective_custom_destinations,
                             reconstruct_custom_tracks_from_wire,
                             replacement_trophy_location,
                             resolved_custom_tracks)
@@ -2272,9 +2273,15 @@ class ctrAPWorld(World):
         # Issue #261: tell the player which destination each changed physical
         # pad loads. Identity entries produce no section at all, preserving the
         # exact spoiler output for seeds without an effective destination swap.
+        # A pad whose resolved destination is a cup a custom track displaced
+        # reports the custom track as the effective load, with the displaced
+        # cup retained for auditability (H6-01).
+        _pad_ids = getattr(self, "warp_pad_ids", {})
         destination_rows = changed_pad_destination_rows(
             self._resolve_warp_pad_map(),
-            getattr(self, "warp_pad_ids", {}),
+            _pad_ids,
+            effective_custom_destinations(
+                getattr(self, "custom_tracks", {}) or {}),
         )
         if destination_rows:
             spoiler_handle.write(

@@ -96,6 +96,15 @@ CUSTOM_TRACKS_WIRE_VERSION = 4
 #: registry before it arms any files.
 KNOWN_TRACK_IDS: Tuple[str, ...] = ("baby-t-park",)
 
+#: Player-facing package titles for the spoiler, keyed by the same stable
+#: track id the registry uses. Package titles are mutable community metadata,
+#: so they live in this presentation-only table rather than in the descriptor
+#: or on the wire; the spoiler reads them by resolved track id and nothing
+#: else does.
+TRACK_DISPLAY_NAMES: Dict[str, str] = {
+    "baby-t-park": "Baby T Park",
+}
+
 #: The destinations a descriptor entry may claim, and what claiming one means:
 #: `replaces` value -> (cup region name, cup LevelID). The binding is EXPLICIT
 #: in the YAML rather than implied by the track id, so a second custom track
@@ -444,6 +453,31 @@ def displaced_cups(tracks: Mapping[str, Mapping]) -> Dict[str, str]:
     """cup region name -> the track id that took its destination over."""
     return {REPLACEABLE_DESTINATIONS[entry["replaces"]][0]: track_id
             for track_id, entry in tracks.items()}
+
+
+def effective_custom_destinations(tracks: Mapping[str, Mapping],
+                                  titles: Mapping[str, str] = None
+                                  ) -> Dict[int, Tuple[str, str]]:
+    """{displaced cup LevelID: (track id, track title)}.
+
+    This is the spoiler's effective-destination representation for a custom
+    replacement. A displaced cup's destination still reads as the cup LevelID
+    on the wire -- native serves the custom bytes for that race -- so the
+    spoiler translates every resolved cup destination back into the custom
+    track the player actually loads. Keying by cup LevelID keeps each physical
+    pad honest independently: two packages displacing two different cups can
+    never collapse onto the wrong track.
+
+    ``titles`` defaults to the compiled ``TRACK_DISPLAY_NAMES`` and is
+    overridable so spoiler fixtures can exercise generic entries without
+    touching the registry.
+    """
+    resolved_titles = titles if titles is not None else TRACK_DISPLAY_NAMES
+    out: Dict[int, Tuple[str, str]] = {}
+    for track_id, entry in tracks.items():
+        _cup_region, cup_lid = REPLACEABLE_DESTINATIONS[entry["replaces"]]
+        out[cup_lid] = (track_id, resolved_titles.get(track_id, track_id))
+    return out
 
 
 def replacement_trophy_location(tracks: Mapping[str, Mapping],
