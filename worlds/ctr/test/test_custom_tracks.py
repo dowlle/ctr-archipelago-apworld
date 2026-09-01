@@ -190,7 +190,7 @@ class TestDescriptorValidation(unittest.TestCase):
             with self.subTest(key=key):
                 with self.assertRaises(OptionError) as ctx:
                     validate_custom_tracks(_entry(**{key: bad}))
-                self.assertIn("Alpha6 package registry", str(ctx.exception))
+                self.assertIn("current release package registry", str(ctx.exception))
 
     def test_alpha6_registry_rejects_capability_drift(self):
         for key, bad in (("crates", False), ("minimap", True),
@@ -198,7 +198,7 @@ class TestDescriptorValidation(unittest.TestCase):
             with self.subTest(key=key):
                 with self.assertRaises(OptionError) as ctx:
                     validate_custom_tracks(_flags(**{key: bad}))
-                self.assertIn("Alpha6 package registry", str(ctx.exception))
+                self.assertIn("current release package registry", str(ctx.exception))
 
     def test_lap_count_out_of_range_is_refused(self):
         for bad in (0, 8, -1, 7.0, "7", True):

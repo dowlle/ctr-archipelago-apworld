@@ -320,7 +320,7 @@ def _validate_entry(track_id: str, entry) -> None:
         _fail(f"entry '{track_id}' key 'boxes' is {entry['boxes']!r}. It must "
               f"be true or false.")
     if entry.get("boxes", False):
-        _fail(f"entry '{track_id}' enables AP boxes, but Alpha6 has no "
+        _fail(f"entry '{track_id}' enables AP boxes, but the current preview has no "
               f"package-bound AP-box placement identity. Use boxes: false.")
     _validate_flags(track_id, entry["flags"])
 
@@ -337,7 +337,7 @@ def _validate_entry(track_id: str, entry) -> None:
             wanted = wanted.lower()
         if actual != wanted:
             _fail(f"entry '{track_id}' key '{key}' does not match the "
-                  f"Alpha6 package registry.")
+                  f"current release package registry.")
 
 
 def validate_custom_tracks(mapping) -> None:
