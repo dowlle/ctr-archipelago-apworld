@@ -1,8 +1,11 @@
-blank_issues_enabled: true
+# This repository holds the CTR world code only. Issues for the whole project,
+# including generation, options and logic, are filed on the game client
+# repository so players have one place to look. Blank issues are off here.
+blank_issues_enabled: false
 contact_links:
-  - name: A problem with the game itself
+  - name: Report a bug, a stuck seed or an idea
     url: https://github.com/dowlle/ctr-native-ap/issues/new/choose
-    about: Crashes, display, controls, audio, Linux and Steam Deck problems belong with the game client. If you are unsure, file here anyway and it will be moved.
+    about: One issue tracker for the whole project. Generation, option and logic problems use the "Stuck or impossible seed" form there and are labelled apworld.
   - name: Setup and troubleshooting guide
     url: https://github.com/dowlle/ctr-native-ap/blob/main/SETUP.md
     about: Installing, extracting your disc, connecting to a room, and the common fixes.
