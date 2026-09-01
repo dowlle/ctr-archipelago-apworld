@@ -38,12 +38,12 @@ from ..wumpa_checks import (
     WUMPA_GLOBAL,
     WUMPA_OFF,
     WUMPA_PER_TRACK,
-    WUMPA_RETAIL_CODE_BASE,
-    WUMPA_RETAIL_TRACKS,
     WUMPA_TEN_LOCATION,
     eligible_custom_roles,
+    eligible_retail_tracks,
     retail_location_name,
 )
+from ..trial_trophy import TRIAL_TROPHY_CLASS
 from . import CTRTestBase
 
 #: The generation steps a UT restore needs run before it: options exist after
@@ -166,11 +166,13 @@ class TestCreationCounts(unittest.TestCase):
             WUMPA_CLASS.created_location_names(_FakeOptions(WUMPA_GLOBAL)),
             [WUMPA_TEN_LOCATION])
 
-    def test_per_track_creates_exactly_the_eighteen_retail_destinations(self):
+    def test_per_track_creates_the_sixteen_regular_trophy_destinations(self):
         names = WUMPA_CLASS.created_location_names(_FakeOptions(WUMPA_PER_TRACK))
-        self.assertEqual(len(names), 18)
+        self.assertEqual(len(names), 16)
         self.assertEqual(names,
-                         [retail_location_name(t) for t in WUMPA_RETAIL_TRACKS])
+                         [retail_location_name(t)
+                          for t in eligible_retail_tracks(
+                              _FakeOptions(WUMPA_PER_TRACK))])
 
     def test_per_track_does_not_also_create_the_global_check(self):
         """The modes are alternatives, not layers: the specification rules out
@@ -179,17 +181,61 @@ class TestCreationCounts(unittest.TestCase):
             WUMPA_TEN_LOCATION,
             WUMPA_CLASS.created_location_names(_FakeOptions(WUMPA_PER_TRACK)))
 
-    def test_the_two_trial_tracks_are_included(self):
-        """Slide Coliseum and Turbo Track are race destinations with fruit, so
-        they are in, exactly as they are for the item-box block."""
+    def test_the_two_relic_only_trial_tracks_are_not_created(self):
+        """Their registered identities are not enough: the retail Adventure
+        pads still launch relic races, which cannot award these checks."""
         names = WUMPA_CLASS.created_location_names(_FakeOptions(WUMPA_PER_TRACK))
+        self.assertNotIn(retail_location_name("Slide Coliseum"), names)
+        self.assertNotIn(retail_location_name("Turbo Track"), names)
+
+    def test_a_trial_track_joins_when_its_trophy_race_is_in_the_seed(self):
+        """#203's future option is the proof of an AI/arcade race surface. The
+        two trial tracks activate independently rather than as an assumed pair."""
+        slide_trophy = TRIAL_TROPHY_CLASS.location_name("Slide Coliseum")
+        with mock.patch.object(
+                TRIAL_TROPHY_CLASS, "created_location_names",
+                return_value=[slide_trophy]):
+            names = WUMPA_CLASS.created_location_names(
+                _FakeOptions(WUMPA_PER_TRACK))
+        self.assertEqual(len(names), 17)
         self.assertIn(retail_location_name("Slide Coliseum"), names)
-        self.assertIn(retail_location_name("Turbo Track"), names)
+        self.assertNotIn(retail_location_name("Turbo Track"), names)
+
+    def test_the_wire_joins_the_same_trial_track_and_no_other(self):
+        slide_trophy = TRIAL_TROPHY_CLASS.location_name("Slide Coliseum")
+        options = _FakeOptions(WUMPA_PER_TRACK)
+        with mock.patch.object(
+                TRIAL_TROPHY_CLASS, "created_location_names",
+                return_value=[slide_trophy]):
+            mapping = WUMPA_CLASS.wire_block(options)["retail_tracks"]
+        self.assertIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]), mapping)
+        self.assertNotIn(str(TRACK_LEVEL_IDS["Turbo Track"]), mapping)
+
+    def test_trial_and_custom_track_eligibility_are_additive(self):
+        """A bound custom race neither enables nor suppresses a trial race.
+
+        Each contributes its own destination check when its own capability is
+        present in the seed.
+        """
+        slide_trophy = TRIAL_TROPHY_CLASS.location_name("Slide Coliseum")
+        options = _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK)
+        with mock.patch.object(
+                TRIAL_TROPHY_CLASS, "created_location_names",
+                return_value=[slide_trophy]):
+            names = WUMPA_CLASS.created_location_names(options)
+            block = WUMPA_CLASS.wire_block(options)
+        self.assertEqual(len(names), 18)
+        self.assertIn(retail_location_name("Slide Coliseum"), names)
+        self.assertIn(CUSTOM_LOCATION, names)
+        self.assertNotIn(retail_location_name("Turbo Track"), names)
+        self.assertIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]),
+                      block["retail_tracks"])
+        self.assertIn(CUSTOM_ROLE, block["custom_destinations"])
 
     def test_an_eligible_custom_track_adds_exactly_one_location(self):
         names = WUMPA_CLASS.created_location_names(
             _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK))
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 17)
         self.assertEqual(names[-1], CUSTOM_LOCATION)
 
     def test_a_custom_track_adds_nothing_in_global_mode(self):
@@ -223,7 +269,7 @@ class TestCustomEligibility(unittest.TestCase):
         with _registry_measuring_no_wumpa():
             names = WUMPA_CLASS.created_location_names(
                 _FakeOptions(WUMPA_PER_TRACK, _no_wumpa_collectible()))
-        self.assertEqual(len(names), 18)
+        self.assertEqual(len(names), 16)
         self.assertNotIn(CUSTOM_LOCATION, names)
 
     def test_it_is_not_inferred_from_the_broad_crates_flag(self):
@@ -298,15 +344,17 @@ class TestPerTrackSeed(CTRTestBase):
     run_default_tests = False
     options = {"wumpa_check": "per_track"}
 
-    def test_eighteen_locations_exist_and_the_global_one_does_not(self):
+    def test_sixteen_locations_exist_and_the_global_one_does_not(self):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
-        for track in BOX_TRACKS:
+        for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 self.assertIn(retail_location_name(track), names)
+        for track in ("Slide Coliseum", "Turbo Track"):
+            self.assertNotIn(retail_location_name(track), names)
         self.assertNotIn(WUMPA_TEN_LOCATION, names)
 
     def test_each_location_is_parented_to_its_track_region(self):
-        for track in BOX_TRACKS:
+        for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 location = self.multiworld.get_location(
                     retail_location_name(track), self.player)
@@ -323,9 +371,14 @@ class TestPerTrackSeed(CTRTestBase):
         self.assertEqual(block["global"], -1)
         self.assertEqual(
             block["retail_tracks"],
-            {str(TRACK_LEVEL_IDS[track]): WUMPA_RETAIL_CODE_BASE + index
-             for index, track in enumerate(WUMPA_RETAIL_TRACKS)})
+            {str(TRACK_LEVEL_IDS[track]): WUMPA_CLASS.retail_code(track)
+             for track in eligible_retail_tracks(self.world.options)})
         self.assertEqual(block["custom_destinations"], {})
+
+    def test_the_wire_omits_the_two_relic_only_destinations(self):
+        mapping = self.world.fill_slot_data()["wumpa_checks"]["retail_tracks"]
+        self.assertNotIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]), mapping)
+        self.assertNotIn(str(TRACK_LEVEL_IDS["Turbo Track"]), mapping)
 
     def test_the_scalar_is_emitted_alongside_the_block(self):
         slot_data = self.world.fill_slot_data()
@@ -366,7 +419,7 @@ class TestPerTrackGemCupSeed(CTRTestBase):
                         "the track's own pad being accessible")
 
     def test_a_track_wumpa_check_is_only_in_its_track_region(self):
-        for track in BOX_TRACKS:
+        for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 location = self.multiworld.get_location(
                     retail_location_name(track), self.player)
@@ -411,7 +464,7 @@ class TestPerTrackWithCustomTrack(CTRTestBase):
 
     def test_the_retail_mapping_is_unchanged_by_the_custom_binding(self):
         block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(len(block["retail_tracks"]), 18)
+        self.assertEqual(len(block["retail_tracks"]), 16)
 
 
 class TestPerTrackWithIneligibleCustomTrack(CTRTestBase):
@@ -420,7 +473,8 @@ class TestPerTrackWithIneligibleCustomTrack(CTRTestBase):
     The registry patch is what makes this reachable: with the real Alpha6
     registry a descriptor like this is refused at option validation, so the seed
     below stands in for the release where a second package genuinely measures
-    false. Everything else -- the 18 retail checks, the cup, the fill -- is
+    false. Everything else -- the 16 currently raceable retail checks, the cup,
+    the fill -- is
     unaffected, which is the property that matters.
     """
 
@@ -441,16 +495,16 @@ class TestPerTrackWithIneligibleCustomTrack(CTRTestBase):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
         self.assertNotIn(CUSTOM_LOCATION, names)
 
-    def test_the_eighteen_retail_locations_are_unaffected(self):
+    def test_the_sixteen_retail_locations_are_unaffected(self):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
-        for track in BOX_TRACKS:
+        for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 self.assertIn(retail_location_name(track), names)
 
     def test_the_wire_carries_no_custom_destination(self):
         block = self.world.fill_slot_data()["wumpa_checks"]
         self.assertEqual(block["custom_destinations"], {})
-        self.assertEqual(len(block["retail_tracks"]), 18)
+        self.assertEqual(len(block["retail_tracks"]), 16)
 
 
 class TestOffSeed(CTRTestBase):
@@ -520,7 +574,7 @@ class TestUniversalTrackerReconstruction(_RestoreCase):
     def test_per_track_round_trips(self):
         original, rebuilt = self._round_trip(_FakeOptions(WUMPA_PER_TRACK))
         self.assertEqual(original, rebuilt)
-        self.assertEqual(len(rebuilt["retail_tracks"]), 18)
+        self.assertEqual(len(rebuilt["retail_tracks"]), 16)
 
     def test_per_track_with_a_custom_destination_round_trips(self):
         original, rebuilt = self._round_trip(

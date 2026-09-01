@@ -15,9 +15,17 @@ GLOBAL OR PER-TRACK (ruled 2026-08-10 16:28, WIDENED 2026-08-29). The original
 ruling made this one global location per seed. The 2026-08-29 specification
 keeps that mode and adds a second one: `wumpa_check` is now a three-way choice,
 `off` / `global` / `per_track`. `per_track` creates one check per selected RACE
-DESTINATION -- the 18 retail race destinations plus one destination-slot check
-for an eligible bound custom track -- and does NOT also create the global one.
-The two modes are alternatives, not layers.
+DESTINATION where the seed actually provides a race that can award it, plus one
+destination-slot check for an eligible bound custom track, and does NOT also
+create the global one. The two modes are alternatives, not layers.
+
+TRIAL TRACKS NEED A RACE SURFACE. Slide Coliseum and Turbo Track are registered
+retail identities, but their ordinary Adventure pads are relic-only. A relic
+race has no supported route to this check, so those two names stay uncreated
+until the same seed activates their optional Trophy/arcade-style race locations
+through `TRIAL_TROPHY_CLASS`. This deliberately follows location membership
+rather than a second option guess: once #203 activates either race, its Wumpa
+check and wire code become live in the same seed automatically.
 
 RELATIONSHIP TO ITEMSANITY. Both this check and itemsanity's juiced checks read
 the same `numWumpas >= 10` signal, but they are different events -- this one
@@ -66,6 +74,7 @@ from .custom_tracks import (REPLACEABLE_DESTINATIONS, WUMPA_COLLECTIBLE_FLAG,
                             normalize_custom_tracks)
 from .item_boxes import BOX_TRACKS, TRACK_LEVEL_IDS
 from .location_class import LocationClass
+from .trial_trophy import TRIAL_TRACKS, TRIAL_TROPHY_CLASS
 
 # ── option modes ────────────────────────────────────────────────────────────
 #: `wumpa_check` Choice values. The order preserves the retired Boolean
@@ -92,6 +101,13 @@ WUMPA_TEN_LOCATION = "Wumpa: Reach 10 Wumpa"
 #: rather than re-derived so this block's order can never drift from the
 #: Sapphire-relic / item-box canon it was minted against.
 WUMPA_RETAIL_TRACKS: Tuple[str, ...] = tuple(BOX_TRACKS)
+
+#: The ordinary trophy tracks always have a race surface. The two trial-track
+#: identities are frozen in ``WUMPA_RETAIL_TRACKS`` too, but are created only
+#: when their optional Trophy/arcade-style race is active in this seed.
+WUMPA_ALWAYS_RACEABLE_TRACKS: Tuple[str, ...] = tuple(
+    track for track in WUMPA_RETAIL_TRACKS if track not in TRIAL_TRACKS
+)
 
 #: Supported custom destination roles, in code order:
 #: `(replaces word, datapackage label, AP region)`.
@@ -120,6 +136,22 @@ def retail_location_name(track: str) -> str:
 
 def custom_location_name(label: str) -> str:
     return f"{label}: Reach 10 Wumpa"
+
+
+def eligible_retail_tracks(options) -> Tuple[str, ...]:
+    """Retail destinations with a supported Wumpa-awarding race this seed.
+
+    The 16 ordinary trophy tracks always qualify. Slide Coliseum and Turbo
+    Track qualify independently only when the seed creates their optional
+    Trophy Race location. That location is the apworld-owned proof that native
+    exposes the AI/arcade-style race instead of the retail relic-only launch.
+    """
+    trial_trophies = set(TRIAL_TROPHY_CLASS.created_location_names(options))
+    return tuple(
+        track for track in WUMPA_RETAIL_TRACKS
+        if (track in WUMPA_ALWAYS_RACEABLE_TRACKS
+            or TRIAL_TROPHY_CLASS.location_name(track) in trial_trophies)
+    )
 
 
 def _mode(options) -> int:
@@ -228,15 +260,17 @@ class WumpaLocationClass(LocationClass):
         return WUMPA_TEN_LOCATION
 
     def created_location_names(self, options):
-        """Off: nothing. Global: the one global check. Per-track: the 18 retail
-        destination checks plus one per eligible custom destination role, and
-        NOT the global one -- the modes are alternatives, not layers."""
+        """Off: nothing. Global: the one global check. Per-track: each retail
+        destination with a supported race this seed plus one per eligible custom
+        destination role, and NOT the global one -- the modes are alternatives,
+        not layers."""
         mode = _mode(options)
         if mode == WUMPA_GLOBAL:
             return [WUMPA_TEN_LOCATION]
         if mode != WUMPA_PER_TRACK:
             return []
-        names = [retail_location_name(track) for track in WUMPA_RETAIL_TRACKS]
+        names = [retail_location_name(track)
+                 for track in eligible_retail_tracks(options)]
         names += [custom_location_name(label)
                   for _role, label, _region, _entry
                   in eligible_custom_roles(options)]
@@ -276,7 +310,7 @@ class WumpaLocationClass(LocationClass):
             return block
         block["retail_tracks"] = {
             str(TRACK_LEVEL_IDS[track]): self.retail_code(track)
-            for track in WUMPA_RETAIL_TRACKS
+            for track in eligible_retail_tracks(options)
         }
         block["custom_destinations"] = {
             role: {

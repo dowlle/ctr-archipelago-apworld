@@ -491,9 +491,11 @@ class WumpaCheck(Choice):
     - **off** (default): no Wumpa checks.
     - **global**: one location for the whole seed, paid the first time you
       reach 10 fruit in any race.
-    - **per_track**: one location for every race track where you can collect
-      fruit, paid the first time you reach 10 fruit on that track. This
-      replaces the global check rather than adding to it.
+    - **per_track**: one location for every race track where this seed provides
+      a race in which you can collect fruit, paid the first time you reach 10
+      fruit on that track. Slide Coliseum and Turbo Track participate only when
+      their optional Trophy/arcade-style races are in the seed. This replaces
+      the global check rather than adding to it.
 
     An older YAML still reads correctly: `false` is off and `true` is global.
 
