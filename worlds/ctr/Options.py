@@ -3,9 +3,11 @@ from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
+from . import characters
 from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
+from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 
 
 class OxideGoal(Choice):
@@ -150,6 +152,78 @@ class RandomizeGemCupTracks(Toggle):
     # reporter's intermediate "shuffled" permutation mode was dropped. Wire:
     # top-level `gem_cup_legs` block, emitted only when on.
     display_name = "Randomize Gem Cup Tracks"
+
+
+class CustomTracks(OptionDict):
+    """Play a community custom track in place of a Gem Cup.
+
+    Leave this out (the default) and nothing changes: the seed is exactly the
+    seed you would get from a build without this option.
+
+    Fill it in and the Gem Cup you name stops running its four retail tracks.
+    Its warp pad still asks for the same four CTR Tokens and it still awards
+    the same Gem, but behind the pad is a single race on the custom track, and
+    winning that race is what awards the Gem. The retail version of that cup
+    is not in the seed at all.
+
+    You describe the track yourself, which is why this is a mapping rather
+    than an on/off switch. The entry carries the SHA-256 of each of the
+    track's two files and the capabilities the track was measured to have.
+    The game hashes the real files before it loads anything and refuses to
+    race on a mismatch, so a wrong digest is a loud error rather than a
+    silently wrong track.
+
+    You also need the track's files and a game build that can load them. This
+    option only tells the seed what to expect.
+
+    Example - Baby T Park in place of the Purple Gem Cup::
+
+        custom_tracks:
+          baby-t-park:
+            lev_sha256: 96ad9f74f51a02eafcc207cd02c97052d674c950e0f24b6440a227494a705fe8
+            vrm_sha256: 2dcaa0fe93359c7ae00fb93842a581210e0dcc2db73f4de43508375834092e83
+            laps: 7
+            replaces: purple_gem_cup
+            flags:
+              crates: true
+              ctr_letters: true
+              relic_crates: true
+              ai_nav: true
+              minimap: false
+              ghosts: false
+              spawns: 8
+              checkpoints: 35
+
+    Every key above is required. Two more are optional: `host_level_id`
+    (0-17, which retail track slot the custom track borrows, default 6) and
+    `boxes` (whether item-box checks are allowed on the race, default true).
+
+    Known track ids: baby-t-park. The only cup that can be replaced is
+    purple_gem_cup. One track per seed.
+
+    This option is a mapping, so the Archipelago website's options pages
+    cannot show it and a YAML exported from there will not contain it. Start
+    from the downloadable YAML template instead."""
+    # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
+    # `custom_tracks` descriptor rather than a throwaway toggle, and full
+    # DISPLACEMENT of the replaced cup's destination. Shape, validation,
+    # displacement and wire block all live in custom_tracks.py.
+    #
+    # default is {} rather than a rendered example, unlike TrapWeights: an
+    # example default would put digests a player has not verified into every
+    # generated template, and this option is off unless someone means it.
+    display_name = "Custom Tracks"
+    supports_weighting = False
+    default = {}
+    valid_keys = list(KNOWN_TRACK_IDS)
+
+    def verify_keys(self) -> None:
+        # Core's VerifyKeys would only reject an unknown top-level id, with a
+        # message that lists the allowed set and says nothing about the body.
+        # This is the same function generate_early calls, so a rolled YAML and
+        # a programmatically built world fail identically (the TrapWeights
+        # precedent).
+        validate_custom_tracks(self.value)
 
 
 class ShuffleKeys(DefaultOnToggle):
@@ -303,17 +377,14 @@ class TrapWeights(OptionDict):
           first_person: 0
           icy_road: 10
 
-    Only five traps have a working effect in this build: icy_road,
-    low_gravity, forced_usf, forced_boost and first_person. Only those five
-    are ever picked. The other keys are accepted and kept now so your YAML
-    still works when those effects land, but their weights change nothing
-    yet. Setting all five working traps to 0 while `Trap Fill Percentage` is
-    above 0 is an error, because then no trap could be picked at all.
+    All 20 listed traps have a working native effect in this build and can be
+    picked. Setting every trap to 0 while `Trap Fill Percentage` is above 0
+    is an error, because then no trap could be picked at all.
 
     Valid keys: icy_road, low_gravity, forced_usf, forced_boost, first_person,
     wumpa_wipeout, flatten, item_reroll, forced_use, empty_crates,
     weakened_kart, boost_blocker, wireframe, nitro, reverse_steering,
-    red_potion, upside_down, mirror_mode, warpball_ambush."""
+    red_potion, upside_down, mirror_mode, warpball_ambush, demo_camera."""
     # Machine keys, not item names: the 0.2.0 rework renamed five traps, and a
     # name-keyed option would have invalidated every YAML that mentioned one.
     # The defaults live in traps.DEFAULT_TRAP_WEIGHTS (the reviewed table)
@@ -414,13 +485,45 @@ class ProgressiveStartingWumpa(Range):
     default = 0
 
 
-class WumpaCheck(Toggle):
-    """Add one check for reaching 10 Wumpa Fruit during a race.
+class WumpaCheck(Choice):
+    """Add checks for reaching 10 Wumpa Fruit during a race.
 
-    This is one global location for the whole seed, not one per track. It is
-    separate from Itemsanity's juiced weapon checks: this pays out when you
-    reach 10 fruit, while those pay out when you fire a weapon at 10."""
+    - **off** (default): no Wumpa checks.
+    - **global**: one location for the whole seed, paid the first time you
+      reach 10 fruit in any race.
+    - **per_track**: one location for every race track where this seed provides
+      a race in which you can collect fruit, paid the first time you reach 10
+      fruit on that track. Slide Coliseum and Turbo Track participate only when
+      their optional Trophy/arcade-style races are in the seed. This replaces
+      the global check rather than adding to it.
+
+    An older YAML still reads correctly: `false` is off and `true` is global.
+
+    This is separate from Itemsanity's juiced weapon checks: this pays out when
+    you reach 10 fruit, while those pay out when you fire a weapon at 10."""
     display_name = "Wumpa Check"
+    option_off = 0
+    option_global = 1
+    option_per_track = 2
+    default = 0
+
+    @classmethod
+    def from_any(cls, data: Any) -> "WumpaCheck":
+        """Accept the retired Boolean spelling.
+
+        This option shipped in Alpha 6 as a `Toggle`, so an existing YAML holds
+        `wumpa_check: true` or `false`. AP's `Choice.from_any` cannot take those:
+        its integer branch tests `type(data) == int`, which a real `bool` fails,
+        and the text branch then looks for an option literally named "true".
+
+        The mapping is silent rather than warned, unlike the racer-lock
+        compatibility path, because nothing about the player's seed changes:
+        false meant no Wumpa check and true meant the single global check, which
+        are exactly `off` and `global`.
+        """
+        if isinstance(data, bool):
+            return cls(cls.option_global if data else cls.option_off)
+        return super().from_any(data)
 
 
 class TurboGrant(Toggle):
@@ -868,17 +971,73 @@ class CharacterUnlocks(DefaultOnToggle):
     display_name = "Character Unlocks"
 
 
-class RacerLockedPads(Toggle):
-    """Lock some warp pads to a specific racer.
+class RacerLockedPads(Range):
+    """The most warp pads that may be locked to a specific racer.
 
     You need to have unlocked the racer a pad names. When you enter, the game
     seats you as that racer for the destination and restores your previous
     racer when you return to the hub. The pad shows who it needs.
 
+    0 (default) turns racer locks off. Any higher value is a MAXIMUM, not a
+    promise: a pad can only take a lock if this seed randomized it and did not
+    leave it open from the start, so a seed with few randomized pads gives you
+    fewer locks than you asked for rather than failing to generate. The
+    always-open N. Sanity Beach starter pads are never locked.
+
     Never your starting racer - a lock you already satisfy would be no lock
     at all. Needs Character Unlocks to be on, since otherwise every racer is
     available from the start."""
     display_name = "Racer-Locked Warp Pads"
+    range_start = 0
+    # The complete supported physical-pad census. No seed has more pads than
+    # this to lock, so no larger request could mean anything. Read from the pad
+    # data rather than typed here so the ceiling cannot drift when a pad is
+    # added; `test_character_phase` pins it against the same file.
+    range_end = characters.PHYSICAL_PAD_COUNT
+    default = 0
+
+    # Set by `from_any` when the YAML wrote the Alpha 6 Boolean instead of a
+    # count. Read by characters.legacy_boolean_request.
+    legacy_boolean_auto = False
+
+    # Up to Alpha 6 this option was a toggle, and `bool` is an `int` subclass,
+    # so `racer_locked_pads: true` would otherwise quietly become "at most one
+    # lock" -- a different seed than the player asked for, with nothing said
+    # about it. During the Alpha 6 compatibility window `true` normalizes to
+    # the automatic density that toggle chose (a quarter of the eligible pads,
+    # clamped 1..6) and forced_options logs it once. `false` is 0, which needs
+    # no message because off means the same thing in both spellings. Dropping
+    # this path is a later major option cleanup, not a silent removal.
+    _TRUE_TEXT = frozenset(("true", "yes", "on"))
+    _FALSE_TEXT = frozenset(("false", "no", "off"))
+
+    @classmethod
+    def _legacy_true(cls) -> "RacerLockedPads":
+        option = cls(0)
+        option.legacy_boolean_auto = True
+        return option
+
+    @classmethod
+    def from_any(cls, data: Any) -> "RacerLockedPads":
+        if isinstance(data, bool):
+            return cls._legacy_true() if data else cls(0)
+        # `isinstance` rather than Range's `type(data) == int` only because the
+        # bool branch above has already taken the one case they differ on.
+        if isinstance(data, int):
+            return cls(data)
+        return cls.from_text(str(data))
+
+    @classmethod
+    def from_text(cls, text: str) -> "RacerLockedPads":
+        # A quoted `"true"` never reaches `from_any` as a bool, and Range's own
+        # true/false spelling is disabled for an option whose default is 0, so
+        # the normalization has to be reachable from text as well.
+        lowered = text.strip().lower()
+        if lowered in cls._TRUE_TEXT:
+            return cls._legacy_true()
+        if lowered in cls._FALSE_TEXT:
+            return cls(0)
+        return super().from_text(text)
 
 
 class PentaStats(Choice):
@@ -933,6 +1092,9 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
     randomize_gem_cup_tracks: RandomizeGemCupTracks
+    # community custom tracks (Baby T Park event spike): a self-describing
+    # descriptor that DISPLACES the cup destination it names
+    custom_tracks: CustomTracks
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     trap_weights: TrapWeights
@@ -1012,7 +1174,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                            BossGarageRequirements],
     "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
                          ShuffleWarpPadsBattleArenas, ShuffleWarpPadsGemCups,
-                         RandomizeGemCupTracks],
+                         RandomizeGemCupTracks, CustomTracks],
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,

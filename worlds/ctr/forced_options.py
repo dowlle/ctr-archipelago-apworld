@@ -53,11 +53,33 @@ import logging
 
 from Options import OptionError
 
+from . import characters
+
 logger = logging.getLogger(__name__)
 
 
 def _who(world):
     return f"player {world.player} ({world.multiworld.player_name[world.player]})"
+
+
+def _say_once(option, flag: str, message: str) -> None:
+    """Log `message` once per option object.
+
+    `__init__._probe_two_stage_fillable` builds a mirror multiworld for the
+    fill probe and hands its slots the REAL option objects, then runs
+    `generate_early` on them -- so a seed that runs the probe reaches every
+    warning in this module twice. The player generated one seed and asked one
+    question; telling them the same thing twice reads like two different
+    problems. The option object is the right carrier for the latch precisely
+    because the probe shares it with the world it is predicting.
+
+    Only the racer-lock warnings use this so far; the rest of the module still
+    logs per pass.
+    """
+    if getattr(option, flag, False):
+        return
+    setattr(option, flag, True)
+    logger.warning(message)
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +115,29 @@ def raise_if_custom_trophy_weight_is_zero(world):
                 "legal for every other item, including Key.")
 
 
+def raise_if_custom_tracks_descriptor_is_unusable(world):
+    """Custom-track descriptor guard, the mapping-option twin of the trap
+    weights guard below.
+
+    `Options.CustomTracks.verify_keys` already validates a rolled YAML, but a
+    world built programmatically -- the tests, the fuzzer, a plando -- never
+    goes through the roll. Re-running the same validator here is the
+    `raise_if_trap_weights_are_unusable` pattern exactly: one definition of
+    "well formed", reached from every generation path, so the two can never
+    drift apart.
+
+    A malformed descriptor is a raise rather than a downgrade because there is
+    no smaller correct seed hiding inside it. Every field decides something
+    the game must agree with -- which cup is handed over, which bytes may be
+    served, how many laps that race runs -- so an entry that is wrong in any
+    part describes a seed whose logic and whose game disagree about what a Gem
+    Cup is."""
+    from .custom_tracks import validate_custom_tracks
+    validate_custom_tracks(
+        getattr(getattr(world.options, "custom_tracks", None), "value", None)
+        or {})
+
+
 def raise_if_trap_weights_are_unusable(world):
     """Trap-weight guards (issue #280), the trap-fill twin of the zero-Trophy
     guard above.
@@ -113,9 +158,9 @@ def raise_if_trap_weights_are_unusable(world):
       happens, so an all-zero table is harmless and legal there; it is how a
       player parks their weights while traps are off.
 
-    "Effective" means the BUILDABLE traps only: a weight on a trap whose native
-    effect does not exist yet cannot rescue the draw, so a table that zeroes
-    the five buildable ones is all-zero in the only sense that matters here.
+    "Effective" means the BUILDABLE traps only. All 20 registered traps are
+    buildable in this release, while the gate remains explicit for future
+    additions whose native effect has not landed yet.
     """
     from .traps import (TRAP_ITEM_NAMES, effective_trap_weights,
                         selectable_trap_weights)
@@ -128,11 +173,8 @@ def raise_if_trap_weights_are_unusable(world):
             f"for {_who(world)}, but 'trap_fill_percentage' is "
             f"{world.options.trap_fill_percentage.value}, so generation has to "
             f"turn filler items into traps and has no trap left to pick. Give "
-            f"at least one of icy_road, low_gravity, forced_usf, forced_boost or "
-            f"first_person a weight above 0, or set trap_fill_percentage to 0 to "
-            f"play without traps. The other trap keys are accepted but pick "
-            f"nothing in this build -- only {len(TRAP_ITEM_NAMES)} trap effects "
-            f"exist so far.")
+            f"at least one of the {len(TRAP_ITEM_NAMES)} trap weights a value "
+            f"above 0, or set trap_fill_percentage to 0 to play without traps.")
 
 
 def raise_if_composed_goal_is_empty(world):
@@ -350,6 +392,7 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
 def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
     raise_if_trap_weights_are_unusable(world)
+    raise_if_custom_tracks_descriptor_is_unusable(world)
     raise_if_composed_goal_is_empty(world)
     raise_if_gems_required_goal_needs_excluded_cups(world)
     raise_if_oxide_final_count_exceeds_mode_capacity(world)
@@ -422,6 +465,30 @@ def warn_shuffle_crystals_without_include(world):
         f"CTR: Include Battle Arena Warp Pads is off for {_who(world)}, so "
         f"the 'crystals' entry in Warp Pad Shuffle Categories has no effect "
         f"-- the arenas stay out of the seed and never destination-shuffle.")
+
+
+def warn_custom_track_displaces_a_randomized_cup(world):
+    """A cup handed to a custom track no longer runs any leg tracks, so the
+    four legs `randomize_gem_cup_tracks` drew for it are never raced.
+
+    Worth saying out loud because both options are about which tracks a cup
+    runs, and a player who set both will otherwise wonder why the spoiler
+    shows Purple legs they never see. It is a warning rather than a raise: the
+    other four cups still randomize normally, so the combination is completely
+    valid and only one cup's draw goes unused. The draw itself is deliberately
+    still made -- dropping it would move the RNG stream and change every later
+    per-seed decision."""
+    from .custom_tracks import displaced_cups, resolve_custom_tracks
+    if not world.options.randomize_gem_cup_tracks.value:
+        return
+    cups = sorted(displaced_cups(resolve_custom_tracks(world)))
+    if not cups:
+        return
+    logger.warning(
+        f"CTR: {', '.join(cups)} is replaced by a custom track for "
+        f"{_who(world)}, so the legs Randomize Gem Cup Tracks drew for it are "
+        f"never raced -- that cup is one race on the custom track. The other "
+        f"cups randomize normally.")
 
 
 def warn_shuffle_cups_without_include(world):
@@ -593,19 +660,41 @@ def warn_penta_stats_without_vanilla_stats(world):
         f"selector has no gameplay effect.")
 
 
+def warn_racer_locked_pads_boolean_normalized(world):
+    """`racer_locked_pads` was a toggle up to and including Alpha 6 and is now
+    a maximum lock COUNT. A YAML that still says `true` cannot be read as a
+    number without changing what it asked for: `bool` is an `int` subclass, so
+    it would land on 1 -- a single lock, where Alpha 6 gave a quarter of the
+    eligible pads. The 2026-08-29 ruling forbids that silent reinterpretation,
+    so `true` keeps its Alpha 6 meaning and says so, exactly once.
+    Not a downgrade: nothing is lost, the old spelling is simply translated."""
+    if not characters.legacy_boolean_request(world):
+        return
+    _say_once(
+        world.options.racer_locked_pads, "_ctr_said_boolean_normalized",
+        f"CTR: Racer-Locked Warp Pads is now a maximum lock COUNT, not a "
+        f"toggle, but {_who(world)}'s YAML still sets it to 'true'. Reading it "
+        f"the Alpha 6 way -- a quarter of this seed's eligible pads, at least "
+        f"1 and at most 6 -- rather than as the number 1. Write a number "
+        f"instead: 0 turns racer locks off, and any higher value is the most "
+        f"pads that may be locked.")
+
+
 def warn_racer_locks_without_character_unlocks(world):
     """Racer locks gate a pad on holding a character unlock item. In
     all-unlocked mode (`character_unlocks: false`) no such item is ever
     created, so there is nothing a lock could gate --
-    characters.racer_locks_enabled resolves the pair to "off" and no pad is
+    characters.racer_locks_requested resolves the pair to "off" and no pad is
     locked. Downgrade-with-warning, not a raise: the seed is completely valid,
-    the toggle just has nothing to do in it."""
+    the option just has nothing to do in it."""
     o = world.options
-    if not o.racer_locked_pads.value:
+    if not (o.racer_locked_pads.value
+            or characters.legacy_boolean_request(world)):
         return
     if o.character_unlocks.value:
         return
-    logger.warning(
+    _say_once(
+        o.racer_locked_pads, "_ctr_said_without_character_unlocks",
         f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Character "
         f"Unlocks is off (all-unlocked mode), so there are no character unlock "
         f"items for a pad to require and no pad is locked to a racer. Turn "
@@ -615,15 +704,18 @@ def warn_racer_locks_without_character_unlocks(world):
 def warn_racer_locks_have_no_eligible_pads(world):
     """Racer locks can only be placed on a pad this seed randomized and left
     non-free (characters.eligible_lock_pads). A vanilla-unlock seed randomizes
-    no pad at all, so the toggle silently produces zero locks -- and, through
-    R17, still keeps the 15 character unlocks as progression, which is a real
-    cost for no feature. Say so rather than leaving the player to wonder."""
+    no pad at all, so the request silently produces zero locks. R17 no longer
+    charges the seed for that -- an empty pad map leaves the 15 unlocks
+    `useful` -- but the player still asked for a feature they will not see, so
+    say so rather than leaving them to wonder."""
     o = world.options
-    if not o.racer_locked_pads.value:
+    if not (o.racer_locked_pads.value
+            or characters.legacy_boolean_request(world)):
         return
     if o.warppad_unlock_requirements.value != 0:
         return
-    logger.warning(
+    _say_once(
+        o.racer_locked_pads, "_ctr_said_no_eligible_pads",
         f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Warp Pad "
         f"Unlock Requirements is 'vanilla', so no pad carries a randomized "
         f"requirement and no racer lock can be placed. The 15 character "
@@ -655,12 +747,14 @@ def apply_downgrade_warnings(world):
     warn_podium_held_fifth_without_held(world)
     warn_shuffle_crystals_without_include(world)
     warn_shuffle_cups_without_include(world)
+    warn_custom_track_displaces_a_randomized_cup(world)
     warn_sphere_search_tuning_ignored_in_vanilla(world)
     warn_vanilla_unlock_collapses_destination_shuffle(world)
     warn_letters_per_track_ignored_outside_location_modes(world)
     warn_relic_gates_may_be_permanently_unreachable(world)
     warn_editable_stats_overridden_by_progressive(world)
     warn_penta_stats_without_vanilla_stats(world)
+    warn_racer_locked_pads_boolean_normalized(world)
     warn_racer_locks_without_character_unlocks(world)
     warn_racer_locks_have_no_eligible_pads(world)
     warn_wumpa_bundles_have_no_filler_slots(world)

@@ -15,6 +15,7 @@ from .podium import PODIUM_CLASS
 from .relic_perfect import RELIC_PERFECT_CLASS
 from .trial_trophy import TRIAL_TROPHY_CLASS
 from .wumpa_checks import WUMPA_CLASS
+from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
 
 # The registered optional location classes (#176), in registration order.
 #
@@ -51,6 +52,7 @@ CTR_LOCATION_CLASSES.register(ITEM_BOX_CLASS)
 CTR_LOCATION_CLASSES.register(ITEMSANITY_CLASS)
 CTR_LOCATION_CLASSES.register(WUMPA_CLASS)
 CTR_LOCATION_CLASSES.register(TRIAL_TROPHY_CLASS)
+CTR_LOCATION_CLASSES.register(CUSTOM_TRACK_LOCATION_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")

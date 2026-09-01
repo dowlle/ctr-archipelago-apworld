@@ -21,7 +21,7 @@ Native parsing, cup loading and the native verifier are a separate package;
 these tests lock in the apworld half:
 
 - vanilla parity: option off reproduces the static table exactly, draws no
-  RNG, emits no key, and schema is still 7 (the unconditional bump);
+  RNG, emits no key, and schema is 8 (the current unconditional pair gate);
 - determinism: same seed, same map;
 - the draw's ruled properties: repeats, all-same-track, absent tracks,
   Purple without boss tracks, pool clamped to the 16 trophy tracks;
@@ -211,11 +211,11 @@ class TestVanillaLegParity(CTRTestBase):
     def test_world_map_is_the_vanilla_table(self):
         self.assertEqual(self.world.gem_cup_legs, load_vanilla_cup_legs())
 
-    def test_no_wire_key_but_schema_bumps_to_7(self):
+    def test_no_wire_key_but_current_schema_is_unconditional(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("gem_cup_legs", slot_data)
-        self.assertEqual(slot_data["schema_version"], 7)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
+        self.assertEqual(slot_data["schema_version"], 8)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 8)
 
     def test_podium_wiring_matches_vanilla_legs(self):
         # Hot Air Skyway legs the Yellow and Purple cups in vanilla; its
@@ -253,10 +253,10 @@ class TestRandomizedLegsIntegration(CTRTestBase):
                 self.assertIn(lid, ID_TRACKS)
         self.assertEqual(wire, cup_legs_to_wire(self.world.gem_cup_legs))
 
-    def test_schema_bumped_to_7(self):
+    def test_current_schema_is_8(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
-        self.assertEqual(slot_data["schema_version"], 7)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 7)
+        self.assertEqual(slot_data["schema_version"], 8)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 8)
 
     def test_seed_exhibits_repeats_and_absent_tracks(self):
         # Documents the LEGS_SEED choice: if generation-internal RNG
@@ -355,7 +355,7 @@ class TestUTRegenParity(CTRTestBase):
         self.assertEqual(ut_world.options.randomize_gem_cup_tracks.value, 1)
         ut_slot_data = json.loads(json.dumps(ut_world.fill_slot_data()))
         self.assertEqual(ut_slot_data["gem_cup_legs"], slot_data["gem_cup_legs"])
-        self.assertEqual(ut_slot_data["schema_version"], 7)
+        self.assertEqual(ut_slot_data["schema_version"], 8)
 
         # The re-generated reachability graph follows the pinned map too.
         t2c = track_to_cups(server_legs)

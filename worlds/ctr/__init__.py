@@ -8,7 +8,13 @@ from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
 from Options import OptionError
 from worlds.AutoWorld import World, CollectionState, WebWorld
 from .elastic_bounds import CTRSettings, estimated_filler_reserve
-from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs
+from .gem_cup_legs import (cup_legs_to_wire, resolved_gem_cup_legs,
+                           resolved_gem_cup_legs_table)
+from .custom_tracks import (custom_tracks_to_wire,
+                            effective_custom_destinations,
+                            reconstruct_custom_tracks_from_wire,
+                            replacement_trophy_location,
+                            resolved_custom_tracks)
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
 from . import item_supply
@@ -47,14 +53,13 @@ from .Types import ctrAPItem
 # by these names.
 #
 # TRAP_ITEM_NAMES is the BUILDABLE set: it drives the trap_fill_percentage draw
-# and its order is pinned to native's AP_TrapEffect enum (ap/ap_traps.h), so a
-# name whose native effect does not exist yet must stay out of it or the fill
-# would hand players a trap that does nothing.
+# and its order is pinned to native's AP_TrapEffect enum (ap/ap_traps.h). All
+# 20 registered traps are buildable in this release.
 #
 # FROZEN_TRAP_ITEM_NAMES (11 names, #177, ruled 2026-08-10 16:28/16:30) and
-# REWORK_TRAP_ITEM_NAMES (3 names, #280, ruled 2026-08-19) are inert: count 0 in
-# data/items.json, never drawn. Each joins TRAP_ITEM_NAMES, in native enum
-# order, in the build that implements its effect.
+# REWORK_TRAP_ITEM_NAMES (4 names, #280, ruled 2026-08-19) retain count 0 in
+# data/items.json because trap fill creates them dynamically. They now all join
+# TRAP_ITEM_NAMES in native enum order.
 #
 # They ARE all in the "Traps" item name group below, because item_name_groups is
 # part of the datapackage payload AP checksums: adding a trap to its own group
@@ -149,8 +154,7 @@ class ctrAPWorld(World):
         "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
         # Sourced from the trap registry so the group cannot drift from the
         # native effect enum (the buildable set), the #177 freeze or the #280
-        # rework. All 19 are in the group; only the 5 buildable ones are ever
-        # drawn into a pool.
+        # rework. All 20 are in the group and buildable.
         "Traps": set(ALL_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
     }
@@ -300,9 +304,10 @@ class ctrAPWorld(World):
         #     restoring it wrong rebuilds a different pool -- and on a reduced
         #     seed the re-generation does not even FIT, which is exactly how
         #     the fuzz matrix's check-ut arm caught this (6/500 seeds);
-        #   racer_locked_pads decides whether those items are progression, and
-        #     a progression/useful split UT gets wrong makes every downstream
-        #     sphere wrong.
+        #   racer_locked_pads carries the requested lock COUNT, which is what a
+        #     support log reports back; the locks themselves are pinned from
+        #     the racer_locks block rather than re-drawn, and the
+        #     progression/useful split follows that pinned map.
         # starting_stat_class / penta_stats / editable_stats are cosmetic or
         # native-only and are deliberately NOT restored (same reasoning as
         # one_lap_cups). The starting racer itself is restored separately in
@@ -310,7 +315,16 @@ class ctrAPWorld(World):
         if "character_unlocks" in co:
             o.character_unlocks.value = int(bool(co["character_unlocks"]))
         if "racer_locked_pads" in co:
-            o.racer_locked_pads.value = int(bool(co["racer_locked_pads"]))
+            # An Alpha 6 seed put a Boolean here, a 0.2.0 seed puts the
+            # requested maximum. `int(True)` is 1, which is the honest reading
+            # of the old wire: it said "on", and the pad map says the rest.
+            _requested = co["racer_locked_pads"]
+            o.racer_locked_pads.value = max(
+                0, min(int(_requested),
+                       type(o.racer_locked_pads).range_end))
+            # A restored count is already a number, so the Alpha 6 YAML
+            # normalization must not also fire on top of it.
+            o.racer_locked_pads.legacy_boolean_auto = False
 
         # Derive the two content-inclusion toggles from the pad gates: a cup /
         # crystal pad only carries a non-type-0 stage-1 requirement when its class
@@ -349,6 +363,34 @@ class ctrAPWorld(World):
         # block (gem_cup_legs.reconstruct_gem_cup_legs_from_wire); an absent
         # key (any pre-#166 seed) correctly restores to off + vanilla legs.
         o.randomize_gem_cup_tracks.value = int("gem_cup_legs" in passthrough)
+        # Custom tracks: the descriptor itself is pinned from the wire in
+        # create_regions (custom_tracks.reconstruct_custom_tracks_from_wire),
+        # which is what actually steers the graph. The option VALUE is
+        # restored here too so the tracking player's own YAML can never
+        # contribute a track the seed does not have, and so the restored
+        # option set is honest rather than silently defaulted. Reconstructed
+        # rather than copied verbatim: the wire is LevelID-keyed and the
+        # option is word-keyed, and the reconstruction is the one place that
+        # translation lives. An absent block is any pre-custom-tracks seed and
+        # correctly restores to off.
+        o.custom_tracks.value = {
+            track_id: {
+                "package_uuid": entry["package_uuid"],
+                "package_version": entry["package_version"],
+                "minimum_client_version": entry["minimum_client_version"],
+                "minimum_apworld_version": entry["minimum_apworld_version"],
+                "lev_sha256": entry["lev_sha256"],
+                "vrm_sha256": entry["vrm_sha256"],
+                "navigation": dict(entry["navigation"]),
+                "laps": entry["laps"],
+                "replaces": entry["replaces"],
+                "host_level_id": entry["host_level_id"],
+                "boxes": entry["boxes"],
+                "flags": dict(entry["flags"]),
+            }
+            for track_id, entry in
+            reconstruct_custom_tracks_from_wire(passthrough).items()
+        }
         # Itemsanity's block is conditional for off-toggle parity, while the
         # raw scalar in ctr_options is always emitted.  Prefer that scalar for
         # new seeds and retain block-presence fallback for the narrow interval
@@ -367,10 +409,14 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
-        # The wumpa CHECK is a location toggle with no scalar of its own, so it
-        # restores from the presence of its location block, exactly as
-        # itemsanity does above.
-        o.wumpa_check.value = int("wumpa_checks" in passthrough)
+        # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
+        # always-emitted scalar. Prefer the scalar; fall back to block presence
+        # for a pre-widening seed, where a present block always meant the single
+        # global check -- which is exactly mode 1.
+        if "wumpa_check" in co:
+            o.wumpa_check.value = int(co["wumpa_check"])
+        else:
+            o.wumpa_check.value = int("wumpa_checks" in passthrough)
         # Turbo Grant (#224): identical scalar, identical reasoning. Absent key
         # is any pre-#224 seed and correctly restores to off.
         o.turbo_grant.value = int(bool(co.get("turbo_grant", 0)))
@@ -1280,6 +1326,8 @@ class ctrAPWorld(World):
         # nothing anywhere: the gems ride the pool (2026-07-15 ruling).
         if not self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
+                _loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), _loc_name)
                 mw.get_location(_loc_name, player).place_locked_item(
                     self.create_item(_gem_name)
                 )
@@ -1343,6 +1391,8 @@ class ctrAPWorld(World):
         if not self.options.include_gem_cups.value \
                 and self.options.shuffle_gems.value and not _GEM_GOAL:
             for _loc_name, _gem_name in _vmap["Gems"].items():
+                _loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), _loc_name)
                 mw.get_location(_loc_name, player).place_locked_item(
                     self.create_item(_gem_name)
                 )
@@ -1591,6 +1641,8 @@ class ctrAPWorld(World):
                 pkgutil.get_data(__package__, "data/vanilla_mapping.json").decode("utf-8")
             )
             for loc_name, gem_name in _mapping["ShuffleOptions"]["Gems"].items():
+                loc_name = replacement_trophy_location(
+                    resolved_custom_tracks(self), loc_name)
                 loc = mw.get_location(loc_name, player)
                 loc.place_locked_item(self.create_item(gem_name))
 
@@ -1642,15 +1694,24 @@ class ctrAPWorld(World):
         """{"<cupLevelID 100..104>": [trackLevelID x4]} -- the gem_cup_legs block
         (issue #166, schema 7).
 
-        Serializes world.gem_cup_legs (resolved in create_regions) as LevelIDs,
+        Serializes the seed's leg map (resolved in create_regions) as LevelIDs,
         always all five cups: the smallest COMPLETE mapping -- a partial map
         would force native to guess the missing cups, and the whole block is
         simply omitted when the option is off (native then keeps its vanilla
         advCupTrackIDs table, which is exactly what an option-off seed uses).
         Fails loudly rather than silently falling back to vanilla if
         create_regions never ran (N3, Opus review).
+
+        The map it reads is the COMPLETE table (`world.gem_cup_legs_table`),
+        not the logic map: a cup displaced by a custom track legs nothing in
+        LOGIC,
+        but its native table row still has to be four real LevelIDs or the
+        wire stops being the complete mapping every consumer relies on. Which
+        cup is displaced travels in the `custom_tracks` block, where native
+        reads it before it ever loads a leg, so the displaced row is simply
+        never used rather than being ambiguous.
         """
-        return cup_legs_to_wire(resolved_gem_cup_legs(self))
+        return cup_legs_to_wire(resolved_gem_cup_legs_table(self))
 
     def _resolve_warp_pad_unlock(self) -> Dict[str, Dict[str, Dict[str, int]]]:
         """{"<padLevelID>": {"stage1": {type,count,colour},
@@ -1800,7 +1861,14 @@ class ctrAPWorld(World):
         # then does a native need to parse it to load the same tracks the
         # generation logic used. Every 0.2.0 seed, on or off, now declares 7.
         legs_randomized = bool(o.randomize_gem_cup_tracks.value)
-        schema = 7
+        # Custom tracks (Baby T Park spike). A descriptor DISPLACES a cup
+        # destination, so a native that cannot serve the custom track would
+        # run the retail four-leg cup while this seed's logic says that cup
+        # legs nothing -- the same reachability-desync class as the v3 cup
+        # destination keys. Schema 8 is unconditional for the public Alpha6
+        # pair, following the standing "always bump, never conditionally" rule.
+        custom_tracks = resolved_custom_tracks(self)
+        schema = 8
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -1813,8 +1881,8 @@ class ctrAPWorld(World):
             # this is a native-version GATE (schema_version >= 6), shipped with the
             # #8 newer-schema warn/refuse. (v5 = oxide-final relic-goal mode/count;
             # v4 = relic-tier colour + goal-rework; v3 = podium + stage-2 padgate;
-            # v2 = two-stage contract. v7 = gem_cup_legs, unconditional bump, the
-            # block itself conditional, see above.)
+            # v2 = two-stage contract; v7 = gem_cup_legs; v8 = custom_tracks
+            # support and the public Alpha6 pair gate, both unconditional.)
             "schema_version": schema,
             "ctr_options": {
                 "schema_version": schema,
@@ -1824,7 +1892,7 @@ class ctrAPWorld(World):
                 # schema>=7-aware native reads ONLY goal_oxide/goal_bosses/
                 # goal_gems for evaluation and ignores `goal` entirely (issue
                 # #163 already gates ALL goal evaluation on schema_newer, and
-                # schema is unconditionally 7 on every 0.2.0 seed per Q28, so
+                # schema is unconditionally 8 on every Alpha6 seed per Q28, so
                 # there is no compat direction left for `goal` to protect).
                 # Emitted as the exact legacy-equivalent int when the composed
                 # goal happens to match one of the four old single-condition
@@ -1952,10 +2020,17 @@ class ctrAPWorld(World):
                 # emitted, same convention as itemsanity and tizi_helper, and
                 # DIAGNOSTIC / TRACKER ONLY: native drives both from received
                 # items (a bundle hands over fruit on arrival, the ladder is the
-                # count of copies received) and reads neither key. `wumpa_check`
-                # is NOT here -- it is a location toggle, and its block presence
-                # below is the signal, exactly as itemsanity's is.
+                # count of copies received) and reads neither key.
                 **wumpa_family.fill_slot_data(self),
+                # The wumpa CHECK mode (2026-08-29 spec). Always emitted as a raw
+                # scalar even when off, unlike the pre-widening arrangement where
+                # block presence was the only signal. Block presence can say
+                # "some Wumpa check exists"; it cannot distinguish `global` from
+                # `per_track` without a tracker re-deriving a three-way setting
+                # from block shape, which is exactly the inference the standing
+                # convention exists to avoid. The conditional block below carries
+                # the resolved code mapping.
+                "wumpa_check": int(o.wumpa_check.value),
                 # Tizi Helper (#223), same always-emitted scalar convention.
                 # DIAGNOSTIC / TRACKER ONLY: native does NOT read this key. The
                 # helper's runtime gate is "did this slot receive item 35010188"
@@ -2021,26 +2096,19 @@ class ctrAPWorld(World):
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
-        if o.wumpa_check.value:
-            # Additive under schema 7, same off-parity convention as itemsanity.
+        if int(o.wumpa_check.value) != 0:
+            # Additive under schema 7, same off-parity convention as itemsanity:
+            # omitted entirely when the mode is off, while the raw scalar above
+            # is always emitted.
             #
-            # NATIVE DOES NOT READ THIS BLOCK -- verified against the client's
-            # AP_EmitWumpaCheck, which hardcodes 35016100 and gates on
-            # ap_net_location_exists(code), i.e. on server location membership,
-            # the same membership-not-slot_data rule the Tizi gate follows. So
-            # this is tracker and diagnostic metadata, plus the signal this
-            # world's own Universal Tracker restore reads to recover the toggle
-            # (there is no scalar for it, because it is a location option).
-            #
-            # The codes are listed rather than implied anyway, so that a future
-            # second wumpa check is a data change here rather than a wire
-            # redesign, and so a tracker never has to hardcode what native
-            # currently does.
-            slot_data["wumpa_checks"] = {
-                "enabled": True,
-                "locations": [code for _name, code, _region in
-                              WUMPA_CLASS.created_locations(self.options)],
-            }
+            # NATIVE READS THIS BLOCK from the 2026-08-29 spec onwards. Before it,
+            # the client hardcoded 35016100 and gated purely on server location
+            # membership; per-track checks make that impossible, because the seed
+            # decides which of the 19 destination codes exist and which custom
+            # destination (if any) is live. The wire is now the authority on which
+            # codes exist, and native must never hardcode the new ranges. Location
+            # membership remains the final send gate on top of it.
+            slot_data["wumpa_checks"] = WUMPA_CLASS.wire_block(o)
         if o.box_locations.value:
             # Additive under schema 7, same off-parity convention. The block
             # (18 tracks x fixed 15-entry code arrays, -1 = slot not live,
@@ -2050,6 +2118,20 @@ class ctrAPWorld(World):
             # COUNTED ACROSS THE FILE -- native must count the same way
             # (item_boxes module docstring; Contract 7e).
             slot_data["item_box_checks"] = ITEM_BOX_CLASS.wire_block(o)
+        if custom_tracks:
+            # The custom-track descriptor, forwarded verbatim from the YAML
+            # (normalized) plus the resolved bindings. This is what replaces
+            # the native loader's config.ini section: the seed, not a file
+            # sitting next to the executable, is what says which track is
+            # loaded, which cup it takes over and which digests must match.
+            #
+            # Emitted only when a track is bound, so an option-off seed's wire
+            # is untouched. Carries its OWN `version` as well as riding the
+            # schema 8 bump above -- the schema number gates whether a native
+            # may trust this seed at all, the block version gates whether it
+            # understands this block's shape as it evolves.
+            slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks,
+                                                                self.options)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:
@@ -2191,9 +2273,15 @@ class ctrAPWorld(World):
         # Issue #261: tell the player which destination each changed physical
         # pad loads. Identity entries produce no section at all, preserving the
         # exact spoiler output for seeds without an effective destination swap.
+        # A pad whose resolved destination is a cup a custom track displaced
+        # reports the custom track as the effective load, with the displaced
+        # cup retained for auditability (H6-01).
+        _pad_ids = getattr(self, "warp_pad_ids", {})
         destination_rows = changed_pad_destination_rows(
             self._resolve_warp_pad_map(),
-            getattr(self, "warp_pad_ids", {}),
+            _pad_ids,
+            effective_custom_destinations(
+                getattr(self, "custom_tracks", {}) or {}),
         )
         if destination_rows:
             spoiler_handle.write(

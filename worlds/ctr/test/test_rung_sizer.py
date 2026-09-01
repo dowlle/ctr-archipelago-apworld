@@ -10,7 +10,7 @@ import unittest
 from Options import OptionError
 from test.general import setup_multiworld
 
-from .. import ctrAPWorld, podium, progressive_capability, rung_sizer
+from .. import ctrAPWorld, podium, progressive_capability, rung_sizer, traps
 from ..elastic_bounds import (goal_excluded_location_reserve,
                                predicted_goal_excluded_reserve)
 
@@ -163,9 +163,7 @@ class TestRungSizingGeneration(unittest.TestCase):
                     1 for item in mw.itempool if item.player == world.player
                     and item.name != "Wumpa Fruit"
                     and item.name not in rung_sizer._SURFACE_ITEM_NAMES
-                    and item.name not in {"Icy Road", "Low Gravity",
-                                          "Forced USF", "Forced Boost",
-                                          "First Person"})
+                    and item.name not in traps.ALL_TRAP_ITEM_NAMES)
                 self.assertEqual(actual, expected)
 
     def test_predicted_goal_reserve_matches_installed_goal(self):
