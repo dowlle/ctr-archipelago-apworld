@@ -49,10 +49,13 @@ class TestFrozenNames(unittest.TestCase):
         self.assertEqual(table[PROGRESSIVE_WUMPA_ITEM]["classification"],
                          ItemClassification.useful)
 
-    def test_the_location_name_sits_at_its_frozen_code(self) -> None:
-        self.assertEqual(
-            [(WUMPA_TEN_LOCATION, WUMPA_CODE_BASE)],
-            [(n, c) for n, c, _r in WUMPA_CLASS.all_locations()])
+    def test_the_global_location_name_sits_at_its_frozen_code(self) -> None:
+        """The 2026-08-29 approved unfreeze appended 19 destination names to this
+        class. The global check is untouched by that: same name, same code, still
+        the first entry of the superset. The appended block is pinned entry by
+        entry in test_name_freeze.py; this is the "nothing moved" half."""
+        self.assertEqual(WUMPA_CLASS.all_locations()[0],
+                         (WUMPA_TEN_LOCATION, WUMPA_CODE_BASE, "Menu"))
 
 
 class TestBundleWeights(unittest.TestCase):
@@ -171,6 +174,14 @@ class TestLadder(CTRTestBase):
 
 
 class TestWumpaCheck(CTRTestBase):
+    """A seed rolled from an Alpha6 YAML: `wumpa_check: true`.
+
+    Kept spelled as the Boolean deliberately. The option is a three-way Choice
+    since 2026-08-29, and this arm is the compatibility gate -- an old YAML must
+    still produce exactly the seed it produced before, which is the single global
+    check and nothing else.
+    """
+
     run_default_tests = False
     options = {"wumpa_check": True}
 
@@ -180,11 +191,14 @@ class TestWumpaCheck(CTRTestBase):
         self.assertEqual(len(names), 1)
 
     def test_the_wire_block_carries_the_frozen_code(self) -> None:
-        """Native reads the code out of the block rather than hardcoding it, so
-        a future second wumpa check needs no wire rework."""
+        """Native reads the codes out of the block rather than hardcoding them,
+        so which destination codes a seed carries is a wire fact, not a client
+        constant."""
         block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertTrue(block["enabled"])
-        self.assertEqual(block["locations"], [WUMPA_CODE_BASE])
+        self.assertEqual(block["mode"], 1)
+        self.assertEqual(block["global"], WUMPA_CODE_BASE)
+        self.assertEqual(block["retail_tracks"], {})
+        self.assertEqual(block["custom_destinations"], {})
 
     def test_it_supplies_a_location_rather_than_spending_one(self) -> None:
         items = [i for i in self.multiworld.itempool if i.player == self.player]
@@ -197,10 +211,11 @@ class TestNativeContract(unittest.TestCase):
     implements. These pin the three facts the native side reads.
 
     Verified against the client's H-dossier wumpa commit: it dispatches the two
-    bundles and the ladder by ITEM TABLE INDEX (120, 121, 122), and its
-    AP_EmitWumpaCheck hardcodes 35016100 and gates on
-    `ap_net_location_exists`, i.e. on server location membership rather than on
-    anything in slot_data.
+    bundles and the ladder by ITEM TABLE INDEX (120, 121, 122). Its
+    `AP_WumpaReachedTen` used to hardcode 35016100 as well; since the 2026-08-29
+    per-track work it resolves every code out of the `wumpa_checks` block, and
+    still gates the send on `ap_net_location_exists`, i.e. on server location
+    membership rather than on slot_data alone.
     """
 
     def test_the_three_names_sit_at_the_indexes_native_dispatches_on(self) -> None:
@@ -209,7 +224,9 @@ class TestNativeContract(unittest.TestCase):
         self.assertEqual(table[121]["name"], "Big Wumpa Bundle")
         self.assertEqual(table[122]["name"], PROGRESSIVE_WUMPA_ITEM)
 
-    def test_the_check_code_is_the_one_native_hardcodes(self) -> None:
+    def test_the_global_check_code_never_moves(self) -> None:
+        """35016100 is permanent. A pre-per-track client that still hardcodes it
+        keeps working on a `global` seed for exactly this reason."""
         self.assertEqual(WUMPA_CODE_BASE, 35016100)
 
     def test_the_ladder_ceiling_matches_the_karts_own_cap(self) -> None:

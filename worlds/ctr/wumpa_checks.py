@@ -7,79 +7,321 @@ race. `RB_Player_ModifyWumpa` already has an exact, named transition for it --
 slots into that existing branch with no new engine state and no new hook. It is
 the cleanest signal in the whole R-H dossier.
 
-WHO OWNS THE SEMANTICS. The apworld owns the name, the option and the rule;
-native owns the emit call. Neither half is built here.
+WHO OWNS THE SEMANTICS. The apworld owns the names, the codes, the option, the
+per-seed subset and the resolved wire mapping; native owns the emit call and the
+runtime destination identity. Neither half is built here.
 
-GLOBAL, ONE LOCATION PER SEED (ruled 2026-08-10 16:28). Not per-track. The
-dossier recommended global by analogy to the ruled itemsanity precedent and
-flagged the analogy as inference; the ruling settled it directly, "by the same
-anti-per-track reasoning as the juiced-checks ruling". So this class is one name,
-not sixteen or eighteen.
+GLOBAL OR PER-TRACK (ruled 2026-08-10 16:28, WIDENED 2026-08-29). The original
+ruling made this one global location per seed. The 2026-08-29 specification
+keeps that mode and adds a second one: `wumpa_check` is now a three-way choice,
+`off` / `global` / `per_track`. `per_track` creates one check per selected RACE
+DESTINATION where the seed actually provides a race that can award it, plus one
+destination-slot check for an eligible bound custom track, and does NOT also
+create the global one. The two modes are alternatives, not layers.
+
+TRIAL TRACKS NEED A RACE SURFACE. Slide Coliseum and Turbo Track are registered
+retail identities, but their ordinary Adventure pads are relic-only. A relic
+race has no supported route to this check, so those two names stay uncreated
+until the same seed activates their optional Trophy/arcade-style race locations
+through `TRIAL_TROPHY_CLASS`. This deliberately follows location membership
+rather than a second option guess: once #203 activates either race, its Wumpa
+check and wire code become live in the same seed automatically.
 
 RELATIONSHIP TO ITEMSANITY. Both this check and itemsanity's juiced checks read
 the same `numWumpas >= 10` signal, but they are different events -- this one
 fires on REACHING 10, itemsanity's fire on FIRING a weapon while at 10 -- so they
 coexist without double-counting. Informational #178 row, not a conflict.
 
-DATAPACKAGE STABILITY. This class claims the additive block 35016100 (one code)
-and registers its single name UNCONDITIONALLY. It sits in the 35016xxx family
-alongside itemsanity's 35016000-021, deliberately spaced a full hundred clear so
-neither can grow into the other.
+DATAPACKAGE STABILITY. This class claims three additive blocks in the 35016xxx
+family and registers every name UNCONDITIONALLY:
 
-FROZEN-NAME WARNING. This name rides the single 0.2.0 datapackage bump (#177).
-After that bump it is permanent, and its id can never move.
+  * 35016100          the global check, permanently `Wumpa: Reach 10 Wumpa`.
+                      Never renamed, moved or reinterpreted.
+  * 35016101..118     the 18 retail race destinations, one code per destination
+                      in the canonical retail track order -- the Sapphire Time
+                      Trial code order that `item_boxes.BOX_TRACKS` already reads
+                      out of `data/locations.json`, which is also the order the
+                      item-box track mapping uses. Contiguous behind the global
+                      code so the family reads as one block.
+  * 35016120+         the custom DESTINATION SLOTS, one per supported custom
+                      destination role. Alpha6 supports exactly one role,
+                      `purple_gem_cup`, at 35016120. Future roles take 35016121
+                      and up; a new PACKAGE in an already-supported role needs no
+                      code at all, which is the point of keying the identity to
+                      the destination slot rather than to a package id or title.
 
-ACTIVATED BY `wumpa_check`. The name landed inert with the freeze --
-`created_location_names` returned nothing unconditionally, because the freeze
-mints names, not features. It now creates the single location when the
-`wumpa_check` toggle is on and nothing when it is off, which is the same
-all-or-none shape itemsanity has and for the same reason: one name has no
-per-seed subset to elastically size. The three wumpa ITEMS the same ruling
-adopted (Small Wumpa Bundle, Big Wumpa Bundle, Progressive Starting Wumpa) are
-ordinary data/items.json entries at indexes 120-122, owned by
-`wumpa_family.py`, and are not this class's to register.
+The gap between 118 and 120 is deliberate slack, and 35016200 (trial_trophy)
+bounds the family from above.
+
+APPROVED UNFREEZE (2026-08-29). The 18 retail names and the custom-slot name were
+minted through the considered-datapackage-unfreeze process and approved on
+2026-08-29. They are permanent from that point exactly as the 0.2.0
+freeze names are: the manifest, the stability fixture and the name-freeze census
+all carry them, and none of these ids can ever move.
+
+CUSTOM DESTINATION ELIGIBILITY. A custom track earns its destination-slot check
+only when all four of the specification's conditions hold: the track is present
+in the submitted `custom_tracks` descriptor, generation accepted its destination
+binding, its MEASURED descriptor declares `wumpa_collectible` true, and the
+destination role provides a race mode in which reaching 10 wumpa is possible.
+`wumpa_collectible` is its own required measured capability -- deliberately NOT
+inferred from the broad `crates` flag, because a track can carry crate instances
+without offering a real path to ten fruit.
 """
-from .location_class import LocationClass
+from typing import Dict, List, Tuple
 
-# Additive single-code block for the 10-wumpa check.
+from .custom_tracks import (REPLACEABLE_DESTINATIONS, WUMPA_COLLECTIBLE_FLAG,
+                            normalize_custom_tracks)
+from .item_boxes import BOX_TRACKS, TRACK_LEVEL_IDS
+from .location_class import LocationClass
+from .trial_trophy import TRIAL_TRACKS, TRIAL_TROPHY_CLASS
+
+# ── option modes ────────────────────────────────────────────────────────────
+#: `wumpa_check` Choice values. The order preserves the retired Boolean
+#: naturally: false == 0 == off, true == 1 == global.
+WUMPA_OFF, WUMPA_GLOBAL, WUMPA_PER_TRACK = 0, 1, 2
+
+# ── code blocks ─────────────────────────────────────────────────────────────
+#: The original single-code block. Permanent, never moves.
 WUMPA_CODE_BASE = 35016100
 
-#: The one location name. Spelled out rather than clever: a player reading it in
-#: a tracker with itemsanity switched off has no "(Juiced)" vocabulary to lean
-#: on, so the name says what to do.
+#: The 18 retail race destinations, contiguous behind the global code, in
+#: `BOX_TRACKS` order.
+WUMPA_RETAIL_CODE_BASE = 35016101
+
+#: The custom destination slots. One per supported destination role.
+WUMPA_CUSTOM_CODE_BASE = 35016120
+
+#: The one global location name. Spelled out rather than clever: a player reading
+#: it in a tracker with itemsanity switched off has no "(Juiced)" vocabulary to
+#: lean on, so the name says what to do.
 WUMPA_TEN_LOCATION = "Wumpa: Reach 10 Wumpa"
+
+#: The 18 retail race destinations, in canonical order. Read from `item_boxes`
+#: rather than re-derived so this block's order can never drift from the
+#: Sapphire-relic / item-box canon it was minted against.
+WUMPA_RETAIL_TRACKS: Tuple[str, ...] = tuple(BOX_TRACKS)
+
+#: The ordinary trophy tracks always have a race surface. The two trial-track
+#: identities are frozen in ``WUMPA_RETAIL_TRACKS`` too, but are created only
+#: when their optional Trophy/arcade-style race is active in this seed.
+WUMPA_ALWAYS_RACEABLE_TRACKS: Tuple[str, ...] = tuple(
+    track for track in WUMPA_RETAIL_TRACKS if track not in TRIAL_TRACKS
+)
+
+#: Supported custom destination roles, in code order:
+#: `(replaces word, datapackage label, AP region)`.
+#:
+#: The datapackage label is the DESTINATION's name, not the package's. Slot data
+#: and the client may present the selected package's title (Baby T Park), but the
+#: registered location name and its code stay put when a different package later
+#: occupies the same role -- which is what lets a creator ship a package without
+#: waiting for an apworld release.
+CUSTOM_DESTINATION_ROLES: Tuple[Tuple[str, str, str], ...] = (
+    ("purple_gem_cup", "Purple Gem Cup Custom Race", "Purple Gem Cup"),
+)
+
+#: Roles whose race mode can actually reach ten fruit. The Purple Gem Cup's
+#: custom binding runs a full multi-lap race, so it can. A future role that is,
+#: say, a single-lap time trial would be listed false here and would create no
+#: check however the package's own capability reads.
+ROLE_OFFERS_TEN_WUMPA: Dict[str, bool] = {
+    "purple_gem_cup": True,
+}
+
+
+def retail_location_name(track: str) -> str:
+    return f"{track}: Reach 10 Wumpa"
+
+
+def custom_location_name(label: str) -> str:
+    return f"{label}: Reach 10 Wumpa"
+
+
+def eligible_retail_tracks(options) -> Tuple[str, ...]:
+    """Retail destinations with a supported Wumpa-awarding race this seed.
+
+    The 16 ordinary trophy tracks always qualify. Slide Coliseum and Turbo
+    Track qualify independently only when the seed creates their optional
+    Trophy Race location. That location is the apworld-owned proof that native
+    exposes the AI/arcade-style race instead of the retail relic-only launch.
+    """
+    trial_trophies = set(TRIAL_TROPHY_CLASS.created_location_names(options))
+    return tuple(
+        track for track in WUMPA_RETAIL_TRACKS
+        if (track in WUMPA_ALWAYS_RACEABLE_TRACKS
+            or TRIAL_TROPHY_CLASS.location_name(track) in trial_trophies)
+    )
+
+
+def _mode(options) -> int:
+    """This seed's `wumpa_check` mode, read defensively.
+
+    `LocationClass` instances are also driven by the location-class
+    infrastructure tests with stand-in option objects carrying only the options
+    under test, so an absent toggle must answer "off" rather than raise. A plain
+    Boolean-valued stand-in still reads correctly: `int(False)` is off and
+    `int(True)` is global, which is the retired option's meaning.
+    """
+    toggle = getattr(options, "wumpa_check", None)
+    if toggle is None:
+        return WUMPA_OFF
+    try:
+        value = int(toggle.value)
+    except (AttributeError, TypeError, ValueError):
+        return WUMPA_OFF
+    if value not in (WUMPA_OFF, WUMPA_GLOBAL, WUMPA_PER_TRACK):
+        return WUMPA_OFF
+    return value
+
+
+def _descriptor(options) -> Dict[str, Dict[str, object]]:
+    """This seed's normalized `custom_tracks` descriptor, or `{}`.
+
+    Normalized through the option validator rather than read raw, so the
+    eligibility question below and the rest of generation are looking at exactly
+    the same descriptor. A stand-in options object without the key answers `{}`.
+    """
+    raw = getattr(getattr(options, "custom_tracks", None), "value", None)
+    if not raw:
+        return {}
+    return normalize_custom_tracks(raw)
+
+
+def eligible_custom_roles(options) -> List[Tuple[str, str, str, Dict[str, object]]]:
+    """The custom destination roles that earn a Wumpa check this seed.
+
+    Returns `(role, label, region, entry)` per eligible role, in
+    `CUSTOM_DESTINATION_ROLES` order. Every one of the specification's four
+    conditions is checked here, in one place, so creation, logic, the wire and
+    the tests can never disagree about which roles are live.
+    """
+    tracks = _descriptor(options)
+    if not tracks:
+        return []
+    # `replaces` -> the entry that claimed it. Validation already guarantees at
+    # most one entry and a known destination, but resolving through the map
+    # rather than assuming keeps this honest if that ever widens.
+    by_role: Dict[str, Dict[str, object]] = {}
+    for entry in tracks.values():
+        role = entry.get("replaces")
+        if role in REPLACEABLE_DESTINATIONS:
+            by_role[role] = entry
+
+    out = []
+    for role, label, region in CUSTOM_DESTINATION_ROLES:
+        entry = by_role.get(role)
+        if entry is None:
+            continue  # not present in the descriptor, or bound elsewhere
+        if not ROLE_OFFERS_TEN_WUMPA.get(role, False):
+            continue  # the role's race mode cannot reach ten fruit
+        flags = entry.get("flags") or {}
+        if not bool(flags.get(WUMPA_COLLECTIBLE_FLAG, False)):
+            continue  # the package measured NO wumpa route
+        out.append((role, label, region, entry))
+    return out
 
 
 class WumpaLocationClass(LocationClass):
-    """The single 10-wumpa check as a `LocationClass` (#176)."""
+    """The 10-wumpa checks as a `LocationClass` (#176)."""
 
     key = "wumpa"
     display_name = "Wumpa Checks"
-    code_blocks = (WUMPA_CODE_BASE,)
+    code_blocks = (WUMPA_CODE_BASE, WUMPA_RETAIL_CODE_BASE,
+                   WUMPA_CUSTOM_CODE_BASE)
 
-    #: Global, like itemsanity: wumpa are collected wherever you race, so the
-    #: check hangs off the world's root region rather than any track's.
+    #: The global check hangs off the world's root region: wumpa are collected
+    #: wherever you race, so it belongs to no track.
     REGION = "Menu"
 
     def all_locations(self):
-        return [(WUMPA_TEN_LOCATION, WUMPA_CODE_BASE, self.REGION)]
+        entries = [(WUMPA_TEN_LOCATION, WUMPA_CODE_BASE, self.REGION)]
+        # The catalogue records the retail destination as its base region.
+        # Regions.create_regions moves each created retail check into a dedicated
+        # dead-end Wumpa region reached from the track and every Cup that legs it,
+        # so all real race routes are alternatives without exposing the track's
+        # relic/token families through the Cup.
+        entries += [(retail_location_name(track),
+                     WUMPA_RETAIL_CODE_BASE + index,
+                     track)
+                    for index, track in enumerate(WUMPA_RETAIL_TRACKS)]
+        # A custom destination's check belongs to the DESTINATION's region and
+        # inherits that destination's actual access rule.
+        entries += [(custom_location_name(label),
+                     WUMPA_CUSTOM_CODE_BASE + index,
+                     region)
+                    for index, (_role, label, region)
+                    in enumerate(CUSTOM_DESTINATION_ROLES)]
+        return entries
 
     def location_name(self) -> str:
+        """The global check's name. Kept for callers that predate the widening;
+        the per-destination names come from `retail_location_name` /
+        `custom_location_name`, which take a key."""
         return WUMPA_TEN_LOCATION
 
     def created_location_names(self, options):
-        """The one check when `wumpa_check` is on, otherwise none.
-
-        Read defensively through `getattr` on the same convention itemsanity
-        uses: `LocationClass` instances are also driven by the location-class
-        infrastructure tests with stand-in option objects carrying only the
-        options under test, and an absent toggle must answer "off" rather than
-        raise.
-        """
-        toggle = getattr(options, "wumpa_check", None)
-        if toggle is None or not bool(toggle.value):
+        """Off: nothing. Global: the one global check. Per-track: each retail
+        destination with a supported race this seed plus one per eligible custom
+        destination role, and NOT the global one -- the modes are alternatives,
+        not layers."""
+        mode = _mode(options)
+        if mode == WUMPA_GLOBAL:
+            return [WUMPA_TEN_LOCATION]
+        if mode != WUMPA_PER_TRACK:
             return []
-        return [WUMPA_TEN_LOCATION]
+        names = [retail_location_name(track)
+                 for track in eligible_retail_tracks(options)]
+        names += [custom_location_name(label)
+                  for _role, label, _region, _entry
+                  in eligible_custom_roles(options)]
+        return names
+
+    # ------------------------------------------------------------------- wire
+
+    def retail_code(self, track: str) -> int:
+        return WUMPA_RETAIL_CODE_BASE + WUMPA_RETAIL_TRACKS.index(track)
+
+    def custom_code(self, role: str) -> int:
+        for index, (candidate, _label, _region) in enumerate(
+                CUSTOM_DESTINATION_ROLES):
+            if candidate == role:
+                return WUMPA_CUSTOM_CODE_BASE + index
+        raise KeyError(f"no custom Wumpa destination slot for role {role!r}")
+
+    def wire_block(self, options) -> Dict[str, object]:
+        """The self-describing `wumpa_checks` slot_data block (call only when the
+        mode is not off).
+
+        Native parses this rather than hardcoding the new range: the wire is the
+        authority on which codes exist in this seed. `global` is -1 when the
+        global check is not live, matching the -1 = absent sentinel the podium
+        and item-box blocks already use. `retail_tracks` is keyed by engine
+        LevelID as a decimal string, the same currency `warp_pad_map`,
+        `gem_cup_legs` and `item_box_checks` use.
+        """
+        mode = _mode(options)
+        block: Dict[str, object] = {
+            "mode": mode,
+            "global": WUMPA_CODE_BASE if mode == WUMPA_GLOBAL else -1,
+            "retail_tracks": {},
+            "custom_destinations": {},
+        }
+        if mode != WUMPA_PER_TRACK:
+            return block
+        block["retail_tracks"] = {
+            str(TRACK_LEVEL_IDS[track]): self.retail_code(track)
+            for track in eligible_retail_tracks(options)
+        }
+        block["custom_destinations"] = {
+            role: {
+                "code": self.custom_code(role),
+                "package_uuid": entry["package_uuid"],
+                WUMPA_COLLECTIBLE_FLAG: True,
+            }
+            for role, _label, _region, entry in eligible_custom_roles(options)
+        }
+        return block
 
 
 #: The registered wumpa class. `Locations.py` registers this instance.

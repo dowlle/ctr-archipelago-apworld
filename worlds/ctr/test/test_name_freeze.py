@@ -53,8 +53,12 @@ EXPECTED_CLASSES = [
     ("lettersanity", 48, (35012500,)),
     ("item_boxes", 270, (35014000,)),
     ("itemsanity", 22, (35016000,)),
-    ("wumpa", 1, (35016100,)),
+    # WIDENED by the approved 2026-08-29 unfreeze: the permanent global
+    # code, the 18 retail destination codes behind it, and the custom
+    # destination-slot block. See wumpa_checks.py for the block layout.
+    ("wumpa", 20, (35016100, 35016101, 35016120)),
     ("trial_trophy", 2, (35016200,)),
+    ("custom_track_race", 192, (35016300, 35016400, 35016500)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -77,12 +81,12 @@ EXPECTED_ITEM_BLOCKS = [
     # nothing renumbered, nothing renamed, no second datapackage bump. Its own
     # block for the same reason as the one above.
     ("224 turbo grant amendment", 35010189, 35010189, 1),
-    # #280, the 0.2.0 trap rework. Three NEW trap identities (Upside Down,
-    # Mirror Mode, Warpball Ambush), appended on the same terms as the two
+    # #280, the 0.2.0 trap rework. Four NEW trap identities (Upside Down,
+    # Mirror Mode, Warpball Ambush, Demo Camera), appended on the same terms as the two
     # amendments above: nothing renumbered, no second datapackage bump. The
     # rework also RENAMED 16 existing traps in place; renames move no id and so
     # add no block here -- test_trap_rework.py owns that half.
-    ("280 trap rework identities", 35010190, 35010192, 3),
+    ("280 trap rework identities", 35010190, 35010193, 4),
 ]
 
 #: Every name the freeze appended to data/items.json, in append order.
@@ -115,8 +119,11 @@ class TestNameFreezeCensus(unittest.TestCase):
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
         # the three trap identities the rework minted (#280).
-        self.assertEqual(len(world_type.item_name_to_id), 193)
-        self.assertEqual(len(world_type.location_name_to_id), 574)
+        self.assertEqual(len(world_type.item_name_to_id), 194)
+        # 574 through the trap rework, plus the 19 names the approved
+        # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
+        # race slots with one Trophy and five podium identities apiece.
+        self.assertEqual(len(world_type.location_name_to_id), 785)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
@@ -148,8 +155,8 @@ class TestNameFreezeCensus(unittest.TestCase):
 
     def test_the_ruled_amendments_sit_one_past_the_freeze(self) -> None:
         """#223 and #224 reopened the namespace for exactly one name each, and
-        #280 for three. Pin the boundary: the frozen set still ends at Gas
-        Pedal, and those five are the only entries after it, in ruling order."""
+        #280 for four. Pin the boundary: the frozen set still ends at Gas
+        Pedal, and those six are the only entries after it, in ruling order."""
         table = load_item_table()
         by_code = {item["code"]: item["name"] for item in table}
         self.assertEqual(by_code[35010187], "Gas Pedal")
@@ -157,9 +164,9 @@ class TestNameFreezeCensus(unittest.TestCase):
         self.assertEqual(by_code[TURBO_GRANT_CODE], TURBO_GRANT_ITEM)
         self.assertEqual(TURBO_GRANT_CODE, TIZI_HELPER_CODE + 1)
         self.assertEqual(
-            [by_code[TURBO_GRANT_CODE + i] for i in (1, 2, 3)],
+            [by_code[TURBO_GRANT_CODE + i] for i in (1, 2, 3, 4)],
             REWORK_TRAP_ITEM_NAMES)
-        self.assertEqual(max(by_code), TURBO_GRANT_CODE + 3)
+        self.assertEqual(max(by_code), TURBO_GRANT_CODE + 4)
 
     def test_the_three_families_the_sweep_recovered_are_registered(self) -> None:
         """Character unlocks (#54/#209), the gas pedal (R-I) and the trial-track
@@ -201,22 +208,20 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_unimplemented_location_class_creates_nothing(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
-            if location_class.key in {"podium", "itemsanity"}:
+            if location_class.key in {"podium", "itemsanity", "custom_track_race"}:
                 continue  # shipped / this build genuinely option-driven
             with self.subTest(location_class=location_class.key):
                 self.assertEqual(location_class.created_location_names(None), [])
                 self.assertFalse(location_class.is_enabled(None))
 
-    def test_frozen_traps_stay_out_of_the_buildable_draw_list(self) -> None:
-        """TRAP_ITEM_NAMES drives the trap_fill_percentage draw and its order is
-        pinned to native's AP_TrapEffect enum. A trap with no native effect --
-        frozen by #177 or minted by #280 -- must not be drawable, or a player
-        receives a trap that does nothing."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 5)
+    def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
+        """The completed native roster activates every reserved identity."""
+        self.assertEqual(len(TRAP_ITEM_NAMES), 20)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
-        self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 3)
-        unbuildable = set(FROZEN_TRAP_ITEM_NAMES) | set(REWORK_TRAP_ITEM_NAMES)
-        self.assertEqual(set(TRAP_ITEM_NAMES) & unbuildable, set())
+        self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 4)
+        newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)
+                           | set(REWORK_TRAP_ITEM_NAMES))
+        self.assertTrue(newly_buildable <= set(TRAP_ITEM_NAMES))
 
     def test_frozen_traps_are_in_the_datapackage_group_anyway(self) -> None:
         """item_name_groups is part of the checksummed payload, so a trap added
@@ -227,7 +232,7 @@ class TestNameFreezeInertness(unittest.TestCase):
             trap_group,
             set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
             | set(REWORK_TRAP_ITEM_NAMES))
-        self.assertEqual(len(trap_group), 19)
+        self.assertEqual(len(trap_group), 20)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):
@@ -282,6 +287,39 @@ class TestNameFreezeCrossSideConsistency(unittest.TestCase):
                     item_boxes.ITEM_BOX_CLASS.location_name(track, 1),
                     f"{track}: Item Box 1")
 
-    def test_the_wumpa_check_is_global_and_singular(self) -> None:
-        """Ruled 2026-08-10 16:28: one location per seed, not one per track."""
-        self.assertEqual(len(wumpa_checks.WUMPA_CLASS.all_locations()), 1)
+    def test_the_wumpa_block_is_the_approved_unfreeze_layout(self) -> None:
+        """The 2026-08-29 approved unfreeze, pinned entry by entry.
+
+        The 2026-08-10 16:28 ruling made this family one global location. The
+        2026-08-29 specification widened it to a three-way mode, and the
+        permanent codes were approved the same day: the global code stays
+        exactly where it was, the 18 retail destinations sit contiguously behind it in
+        the canonical retail track order, and the custom DESTINATION SLOTS start
+        at a spaced base so a future role appends rather than collides.
+        """
+        entries = wumpa_checks.WUMPA_CLASS.all_locations()
+        self.assertEqual(len(entries), 20)
+
+        # The global check never moves, and it is still first.
+        self.assertEqual(entries[0],
+                         ("Wumpa: Reach 10 Wumpa", 35016100, "Menu"))
+
+        # The 18 retail destinations, in the SAME order as the Sapphire relic
+        # canon and the item-box track mapping, each parented to its own track
+        # region so it inherits that track's pad access.
+        self.assertEqual(list(wumpa_checks.WUMPA_RETAIL_TRACKS),
+                         item_boxes.BOX_TRACKS)
+        self.assertEqual(
+            entries[1:19],
+            [(f"{track}: Reach 10 Wumpa", 35016101 + index, track)
+             for index, track in enumerate(item_boxes.BOX_TRACKS)])
+
+        # One custom destination SLOT, named for the destination ROLE rather
+        # than for whichever package currently occupies it.
+        self.assertEqual(
+            entries[19],
+            ("Purple Gem Cup Custom Race: Reach 10 Wumpa", 35016120,
+             "Purple Gem Cup"))
+
+        # The whole family stays clear of trial_trophy at 35016200.
+        self.assertTrue(all(code < 35016200 for _n, code, _r in entries))

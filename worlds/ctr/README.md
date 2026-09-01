@@ -1,12 +1,22 @@
 # Crash Team Racing (CTR Archipelago)
 
-An [Archipelago](https://archipelago.gg) Multiworld world for **Crash Team Racing (PSX, 1999)**.
+An [Archipelago](https://archipelago.gg) world for **Crash Team Racing (PSX, 1999)**.
 
 This world targets the native PC client [`ctr-native-ap`](https://github.com/dowlle/ctr-native-ap), a build of the CTR-tools decompilation that connects to Archipelago directly, in-process. No emulator, no ROM patching. The world handles all randomization (warp-pad requirements and destination shuffle, two-stage requirements, boss/door/gem-cup gating, goals) and hands the client a per-seed configuration through slot data.
 
 The randomization design builds on Icebound777's CTR randomizer (MIT), and this project carries the native path forward with his blessing. The foundational work, and the credit for it, stays with him and Taor.
 
 Releases ship as a pair (client + `ctr.apworld`) on the [client's releases page](https://github.com/dowlle/ctr-native-ap/releases).
+
+## Playing and creating a YAML
+
+- [CTR overview and player resources](https://ap-pie.com/ctr)
+- [CTR setup guide](https://ap-pie.com/guides/ctr)
+- [CTR YAML Builder](https://ap-pie.com/apworlds?build=ctr)
+
+The YAML Builder creates one player's configuration file. It does not generate the seed or host the playable Archipelago server. Give the downloaded YAML to the person generating the room. That person installs the matching `ctr.apworld`; players install the client from the same release and connect with the slot name assigned in the YAML.
+
+Always keep the client and `ctr.apworld` on the same release. Development source in this repository may be newer than the latest published player package.
 
 **Found a bug?** Please report it on the [client repo's issue tracker](https://github.com/dowlle/ctr-native-ap/issues), whichever half seems at fault - that is the single intake for the whole project. Issues that turn out to be purely generation-side get transferred here, and the link you posted keeps working.
 

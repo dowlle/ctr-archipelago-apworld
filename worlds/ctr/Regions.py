@@ -7,6 +7,10 @@ from .Locations import create_location
 from .gem_cup_legs import (
     reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
 )
+from .custom_tracks import (
+    REPLACEABLE_DESTINATIONS, apply_displacement, displaced_cups,
+    reconstruct_custom_tracks_from_wire, resolve_custom_tracks,
+)
 from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
     _COLOURS, _RELIC_TIERS,
@@ -391,9 +395,33 @@ def create_regions(world: "ctrAPWorld"):
     # option on -> 20 independent draws from trophy tracks 0..15 (repeats
     # allowed). UT re-generation pins the connected seed's map from
     # slot_data instead of re-drawing (issue #29's re-roll divergence class).
-    world.gem_cup_legs = (
+    world.gem_cup_legs_table = (
         reconstruct_gem_cup_legs_from_wire(ut_passthrough)
         if ut_passthrough else resolve_gem_cup_legs(world))
+
+    # Custom tracks (Baby T Park spike): a descriptor entry DISPLACES the cup
+    # destination it names -- that cup stops running four retail legs and
+    # becomes one race on the custom track. Resolved here, beside the leg map
+    # it filters, and pinned from the wire under UT for the same reason the
+    # leg map is. Consumes no RNG either way, so an option-off seed keeps the
+    # identical stream.
+    world.custom_tracks = (
+        reconstruct_custom_tracks_from_wire(ut_passthrough)
+        if ut_passthrough else resolve_custom_tracks(world))
+
+    # Two maps, deliberately: `gem_cup_legs_table` is the COMPLETE five-cup
+    # table native's advCupTrackIDs holds and fill_slot_data serializes, and
+    # `gem_cup_legs` is the LOGIC map with every displaced cup emptied. A
+    # displaced cup legs no trophy track, so it justifies no trophy track's
+    # podium rungs (the entrances below and Rules.add_podium_placement_rules),
+    # and it is no longer a USF-gated cup (usf_finish.UsfFinishGate) because
+    # its one race is the custom track, not a boost-gated retail leg. Emptying
+    # legs is always safe: a cup leg is only ever an ADDITIVE path to a rung
+    # (2026-08-07 dossier section 3), so removing one can never orphan it.
+    # With no custom track the two maps are the same content, and every
+    # consumer behaves exactly as it did before this option existed.
+    world.gem_cup_legs = apply_displacement(world.gem_cup_legs_table,
+                                            world.custom_tracks)
 
     # Boss-garage requirements, resolved to flat {type,count} (+ 'tracks' for
     # modes 0/1). warp_pad_map (above) is read for SameHubTracks, so resolve here.
@@ -427,17 +455,64 @@ def create_regions(world: "ctrAPWorld"):
         _keep = world._ctr_relic_keep.get(_relic_item, frozenset(_pool))
         _relic_removed_names |= (_pool - _keep)
 
+    _displaced_cup_regions = set(displaced_cups(world.custom_tracks))
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for loc_data in reg.get("locations", []):
             name = loc_data["name"]
             if name in _relic_removed_names:
                 continue
+            # A selected custom race replaces the cup's AP check identity, not
+            # merely its bytes.  The cup's Gem item may still be shuffled into
+            # the pool, but the removed retail location must not coexist with
+            # the generic custom Trophy check.
+            if (reg["name"] in _displaced_cup_regions
+                    and name == f'{reg["name"]}: Gem'):
+                continue
             location = create_location(player, name, region)
             location.type = loc_data.get("type", "default")
             location.logic_text = loc_data.get("requires", "True")
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
+
+    # Custom packages use frozen generic identities, never creator/title names.
+    # The dedicated dead-end region inherits reachability from the destination
+    # surface it replaces.  For Alpha6 that surface is a Gem Cup, so winning the
+    # one custom race is the surface's sole check and no absent retail leg can
+    # leak reachability into it.
+    if world.custom_tracks:
+        from .custom_track_locations import (
+            CUSTOM_TRACK_LOCATION_CLASS, slot_region,
+        )
+        from .podium import created_rung_keys_from_options
+        _custom_rungs = created_rung_keys_from_options(opts)
+        for _track_id, _entry in sorted(world.custom_tracks.items()):
+            _slot = int(_entry["slot"])
+            _custom = Region(slot_region(_slot), player, mw)
+            _custom.type = "custom_track"
+            mw.regions.append(_custom)
+            regions.append(_custom)
+            region_lookup[_custom.name] = _custom
+
+            _custom_names = [CUSTOM_TRACK_LOCATION_CLASS.trophy_name(_slot)]
+            _custom_names += [CUSTOM_TRACK_LOCATION_CLASS.location_name(_slot, rung)
+                              for rung in _custom_rungs]
+            for _name in _custom_names:
+                _loc = create_location(player, _name, _custom)
+                _loc.type = ("custom_track_trophy" if _name.endswith(": Trophy Race")
+                             else "custom_track_podium")
+                _loc.logic_text = "True"
+                _custom.locations.append(_loc)
+                mw.regions.location_cache[player][_name] = _loc
+
+            _destination_region = REPLACEABLE_DESTINATIONS[_entry["replaces"]][0]
+            _source = region_lookup[_destination_region]
+            _ent = Entrance(player=player,
+                            name=f"{_source.name} -> {_custom.name}",
+                            parent=_source)
+            _ent.connect(_custom)
+            _source.exits.append(_ent)
+            mw.regions.entrance_cache[player][_ent.name] = _ent
 
     # Itemsanity is global: a player can fire a received weapon from any race,
     # so its checks belong to the always-reachable Menu region rather than a
@@ -452,16 +527,47 @@ def create_regions(world: "ctrAPWorld"):
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
 
-    # The 10-wumpa check (2026-08-10 ruling) is global for the same reason
-    # itemsanity is -- fruit are collected wherever you race -- so it hangs off
-    # Menu too, and it needs no rule of its own: reaching ten fruit is possible
-    # in any race from sphere 0, so `True` is the honest access rule rather than
-    # a placeholder. One location per seed, never one per track: the ruling
-    # settled that directly, by the same anti-per-track reasoning as the
-    # juiced-checks ruling.
-    from .wumpa_checks import WUMPA_CLASS
+    # The 10-wumpa checks (2026-08-10 ruling, widened by the 2026-08-29 spec).
+    # In `global` mode the single check hangs off Menu for the same reason
+    # itemsanity does -- fruit are collected wherever you race -- and needs no
+    # rule of its own, because reaching ten fruit is possible in any race from
+    # sphere 0, so `True` is the honest access rule rather than a placeholder.
+    # In `per_track` mode a retail check is track-owned but can fire through
+    # either its standalone race or any Gem Cup that legs the track. AP-core
+    # ANDs a location with its parent region, so the same joint dead-end-region
+    # shape used by podium rungs is required here: connect the track region and
+    # each legging Cup to "<track>: Wumpa", then put only that Wumpa location
+    # inside it. A Cup therefore exposes the one check it can genuinely emit,
+    # never the track's relic/token/Trophy families. Repeated Cup occurrences
+    # are alternative routes to the same track-owned location. The current Cup
+    # model is whole-Cup reachability; the 0.3 occurrence model will refine this
+    # to ordered leg prefixes without changing the ownership rule.
+    #
+    # Global Wumpa remains on Menu. A custom direct destination remains in its
+    # resolved destination region because that region is already the sole race
+    # route for the Alpha6 package.
+    from .wumpa_checks import WUMPA_CLASS, WUMPA_RETAIL_TRACKS
+    _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
-        _region = region_lookup[_region_name]
+        if _region_name in WUMPA_RETAIL_TRACKS:
+            _region = Region(f"{_region_name}: Wumpa", player, mw)
+            _region.type = "wumpa"
+            mw.regions.append(_region)
+            regions.append(_region)
+            region_lookup[_region.name] = _region
+            _sources = [region_lookup[_region_name]]
+            _sources += [region_lookup[_cup]
+                         for _cup in _wumpa_track_cups.get(_region_name, [])
+                         if _cup in region_lookup]
+            for _source in _sources:
+                _ent = Entrance(player=player,
+                                name=f"{_source.name} -> {_region.name}",
+                                parent=_source)
+                _ent.connect(_region)
+                _source.exits.append(_ent)
+                mw.regions.entrance_cache[player][_ent.name] = _ent
+        else:
+            _region = region_lookup[_region_name]
         _loc = create_location(player, _name, _region)
         _loc.type = "wumpa"
         _loc.logic_text = "True"

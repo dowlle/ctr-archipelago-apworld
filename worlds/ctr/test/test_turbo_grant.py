@@ -45,7 +45,7 @@ class TestTurboGrantName(unittest.TestCase):
         35010189 -- the code the Contract's #223 datapackage note reserved.
         Anything else means a renumber, which #224 forbids.
 
-        Turbo Grant is no longer the LAST entry: #280 appended three trap
+        Turbo Grant is no longer the LAST entry: #280 appended four trap
         identities after it. That is append-only and renumbers nothing, so the
         property this test guards is unchanged; it is spelled out here rather
         than dropped, so a future entry that does renumber still fails."""
@@ -58,7 +58,8 @@ class TestTurboGrantName(unittest.TestCase):
                  if item["code"] > TURBO_GRANT_CODE]
         # Literal on purpose: importing the module under test's own list would
         # let any append that also updated the registry slip past this guard.
-        self.assertEqual(after, ["Upside Down", "Mirror Mode", "Warpball Ambush"])
+        self.assertEqual(after, ["Upside Down", "Mirror Mode", "Warpball Ambush",
+                                 "Demo Camera"])
 
     def test_it_ships_inert_in_the_data_file(self) -> None:
         """count 0 in data/items.json: the option decides, not the table. The

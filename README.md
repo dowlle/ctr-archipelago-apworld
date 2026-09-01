@@ -1,7 +1,7 @@
 > [!NOTE]
-> **This is the Crash Team Racing (CTR) Archipelago fork.** The CTR world lives at [`worlds/ctr/`](worlds/ctr/) — see the [CTR world README](worlds/ctr/README.md) for the project introduction, credits, and the AI usage disclosure. The companion game client is [`dowlle/ctr-native-ap`](https://github.com/dowlle/ctr-native-ap), a native CTR PC build that connects to Archipelago in-process (no emulator, no ROM patching).
+> **This is the Crash Team Racing (CTR) Archipelago fork.** The CTR world lives at [`worlds/ctr/`](worlds/ctr/). See the [CTR world README](worlds/ctr/README.md) for the project introduction, player links, credits and AI usage disclosure. The companion game client is [`dowlle/ctr-native-ap`](https://github.com/dowlle/ctr-native-ap), a native CTR PC build that connects to Archipelago in-process with no emulator or ROM patching.
 >
-> **Status: in development, not yet released.** The code is public for collaboration and transparency; there is no supported player-facing release yet. Everything below this note is the upstream Archipelago README.
+> **Status:** supported player releases are published as matched client and `ctr.apworld` pairs on the [client release page](https://github.com/dowlle/ctr-native-ap/releases). Development branches in this fork may be ahead of the latest player release. Everything below this note is the upstream Archipelago README.
 
 ---
 
