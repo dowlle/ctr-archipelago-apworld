@@ -1,0 +1,157 @@
+name: CTR world
+
+# The CTR world's own checks. The inherited upstream Archipelago workflows stay
+# disabled on this fork; this one runs only what the world needs: its pytest
+# suite, and the same eleven-arm fuzz matrix the Archipelago-index runs at
+# publication time, against a .apworld packed from this commit.
+
+on:
+  pull_request:
+    paths:
+      - 'worlds/ctr/**'
+      - '.github/workflows/ctr-world.yml'
+  push:
+    branches: [main, 'release/**', 'ci/**']
+    paths:
+      - 'worlds/ctr/**'
+      - '.github/workflows/ctr-world.yml'
+
+permissions:
+  contents: read
+
+env:
+  AP_VERSION: '0.6.7'
+  PYTHON_VERSION: '3.12'
+  # Pinned to the same commits as dowlle/Archipelago-index fuzz.yml so a PR here
+  # and the publication gate cannot disagree on verdict semantics.
+  FUZZ_HOOKS_REPO: dowlle/apworld-fuzz-hooks
+  FUZZ_HOOKS_REF: 38215940cb45a9258bc1e205de0240ea3f92b471
+  FUZZER_COMMIT: acc0a12309bdd9b5d58f97ab5c3cfb8bc258525e
+
+jobs:
+  tests:
+    name: pytest worlds/ctr
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ci-requirements.txt
+          python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
+          python Launcher.py --update_settings
+      - name: Run the CTR suite
+        run: pytest worlds/ctr -n auto -q
+
+  pack:
+    name: pack ctr.apworld
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack
+        id: pack
+        run: |
+          set -euo pipefail
+          out="$(python3 worlds/ctr/tools/build_apworld.py "$PWD/ctr.apworld")"
+          echo "$out"
+          echo "sha256=$(echo "$out" | cut -f2)" >> "$GITHUB_OUTPUT"
+          unzip -l ctr.apworld | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ctr.apworld
+          path: ctr.apworld
+          retention-days: 7
+
+  fuzz:
+    name: fuzz / ${{ matrix.check_name }}
+    needs: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
+          - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz}
+          - {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz}
+          - {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz}
+          - {check_name: check-collect-accessibility, check_runs: 500,  check_hook: 'hooks.collect_accessibility_test:Hook',                     check_mode: fuzz}
+          - {check_name: check-item-location-count,   check_runs: 500,  check_hook: 'hooks.item_location_count:Hook',                            check_mode: fuzz}
+          - {check_name: check-placement-refs,        check_runs: 500,  check_hook: 'hooks.check_placement_item_location_references:Hook',       check_mode: fuzz}
+          - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz}
+          - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz}
+          - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz}
+          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.with_empty:Hook',                                     check_mode: fuzz}
+    steps:
+      - name: Checkout index repo scripts (canonical generation check)
+        uses: actions/checkout@v4
+        with:
+          repository: dowlle/Archipelago-index
+          path: index-repo
+      - name: Checkout fuzz hooks
+        if: matrix.check_mode == 'fuzz'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FUZZ_HOOKS_REPO }}
+          ref: ${{ env.FUZZ_HOOKS_REF }}
+          path: fuzz-hooks
+      - name: Setup Archipelago
+        uses: Eijebong/ap-actions/setup-ap@main
+        with:
+          version: ${{ env.AP_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Stage hooks, empty.apworld and fuzz.py
+        if: matrix.check_mode == 'fuzz'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -r fuzz-hooks/hooks archipelago/hooks
+          cp fuzz-hooks/empty.apworld archipelago/custom_worlds/empty.apworld
+          curl -SsL --fail -o archipelago/fuzz.py \
+            "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/${FUZZER_COMMIT}/fuzz.py"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ctr.apworld
+          path: packed
+      - name: Install the packed apworld
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp packed/ctr.apworld archipelago/custom_worlds/ctr.apworld
+          echo "sha256 $(sha256sum archipelago/custom_worlds/ctr.apworld | cut -d' ' -f1) (pack job said ${{ needs.pack.outputs.sha256 }})"
+      - name: Run generation check
+        shell: bash
+        working-directory: archipelago
+        env:
+          CHECK_NAME: ${{ matrix.check_name }}
+          CHECK_RUNS: ${{ matrix.check_runs }}
+          CHECK_HOOK: ${{ matrix.check_hook }}
+          CHECK_MODE: ${{ matrix.check_mode }}
+        run: |
+          set -euo pipefail
+          echo "=== ${CHECK_NAME} (${CHECK_RUNS} runs) ==="
+          if [ "$CHECK_MODE" = "canonical" ]; then
+            uv run python ../index-repo/.github/scripts/check_canonical_generation.py \
+              --module ctr --artifact-dir canonical_output --seed 0
+          elif [ -z "$CHECK_HOOK" ]; then
+            uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120
+          else
+            uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 --hook "$CHECK_HOOK"
+          fi
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failure-${{ matrix.check_name }}
+          path: |
+            archipelago/fuzz_output
+            archipelago/canonical_output
+          if-no-files-found: ignore
+          retention-days: 14
