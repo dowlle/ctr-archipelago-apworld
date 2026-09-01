@@ -1,9 +1,59 @@
 import logging
+import re
 from BaseClasses import CollectionState
 
 from .gem_cup_legs import resolved_gem_cup_legs, track_to_cups
 from .Options import OxideGoal
 from .usf_finish import UsfFinishGate
+
+
+_HAS_SEGMENT = re.compile(
+    r'''has\s*\(\s*(?:"([^"]*)"|'([^']*)')\s*(?:,\s*([^,()]*)\s*)?\)'''
+)
+
+
+def _rule_error(expr_text: str, segment: str, reason: str) -> ValueError:
+    return ValueError(
+        f"Invalid CTR rule expression {expr_text!r}, segment {segment!r}: {reason}"
+    )
+
+
+def _split_rule_segments(expr_text: str):
+    """Split top-level ``and`` tokens without splitting quoted item names."""
+    segments = []
+    start = 0
+    depth = 0
+    quote = None
+    index = 0
+
+    while index < len(expr_text):
+        char = expr_text[index]
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                segment = expr_text[start:index + 1].strip()
+                raise _rule_error(expr_text, segment, "unbalanced parentheses")
+        elif (depth == 0 and expr_text.startswith("and", index)
+              and (index == 0 or not expr_text[index - 1].isalnum())
+              and (index + 3 == len(expr_text)
+                   or not expr_text[index + 3].isalnum())):
+            segments.append(expr_text[start:index].strip())
+            start = index + 3
+            index += 2
+        index += 1
+
+    segment = expr_text[start:].strip()
+    if depth:
+        raise _rule_error(expr_text, segment, "unbalanced parentheses")
+    segments.append(segment)
+    return segments
 
 
 def make_rule(expr_text: str, player: int):
@@ -17,25 +67,33 @@ def make_rule(expr_text: str, player: int):
     if not expr_text or expr_text.lower() in ("true", "always"):
         return lambda state: True
 
-    parts = [p.strip() for p in expr_text.split("and")]
+    requirements = []
+    for segment in _split_rule_segments(expr_text):
+        match = _HAS_SEGMENT.fullmatch(segment)
+        if not match:
+            if re.fullmatch(r"has\s*\(\s*\)", segment):
+                raise _rule_error(expr_text, segment, "missing item")
+            raise _rule_error(expr_text, segment, "unsupported syntax")
+
+        item = (match.group(1) if match.group(1) is not None
+                else match.group(2))
+        if not item:
+            raise _rule_error(expr_text, segment, "missing item")
+
+        count_text = match.group(3)
+        if count_text is None:
+            count = 1
+        else:
+            try:
+                count = int(count_text)
+            except ValueError:
+                raise _rule_error(expr_text, segment, "count must be an integer")
+            if count < 0:
+                raise _rule_error(expr_text, segment, "count must not be negative")
+        requirements.append((item, count))
 
     def rule(state: CollectionState):
-        for part in parts:
-            if not part.startswith("has("):
-                logging.warning(f"[CTR Rules] Unsupported rule segment '{part}' in '{expr_text}'")
-                return False
-
-            # Parse has('Item', N)
-            inner = part[4:-1]  # remove has( ... )
-            args = [x.strip().strip("'\"") for x in inner.split(",")]
-
-            if not args:
-                logging.warning(f"[CTR Rules] Empty has() in '{expr_text}'")
-                return False
-
-            item = args[0]
-            count = int(args[1]) if len(args) > 1 else 1
-
+        for item, count in requirements:
             if not state.has(item, player, count):
                 return False
         return True
