@@ -236,10 +236,11 @@ class WumpaLocationClass(LocationClass):
 
     def all_locations(self):
         entries = [(WUMPA_TEN_LOCATION, WUMPA_CODE_BASE, self.REGION)]
-        # A retail destination's check belongs to that destination's TRACK
-        # region, which is what hands it the track's own pad-access rule for
-        # free -- the same region-membership mechanism the item-box checks use,
-        # and therefore the same individual-pad rule a Gem Cup leg must obey.
+        # The catalogue records the retail destination as its base region.
+        # Regions.create_regions moves each created retail check into a dedicated
+        # dead-end Wumpa region reached from the track and every Cup that legs it,
+        # so all real race routes are alternatives without exposing the track's
+        # relic/token families through the Cup.
         entries += [(retail_location_name(track),
                      WUMPA_RETAIL_CODE_BASE + index,
                      track)

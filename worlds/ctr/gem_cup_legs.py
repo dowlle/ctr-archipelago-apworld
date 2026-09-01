@@ -17,19 +17,21 @@ The resolved map is stashed on the world as `world.gem_cup_legs`
 three consumers:
 
   * Regions.create_regions -- a "<track>: Podium" dead-end region gets a
-    rule-True entrance from every cup that legs the track (issue #86);
+    rule-True entrance from every cup that legs the track (issue #86), and the
+    same source set feeds the separate "<track>: Wumpa" dead-end region;
   * Rules.add_podium_placement_rules -- the rung OR rule (the track's Trophy
     Race reachable OR a legging cup reachable);
   * ctrAPWorld.fill_slot_data -- the top-level `gem_cup_legs` wire block,
     keyed by cup LevelID "100".."104" with the four leg track LevelIDs.
 
-Solvability (dossier 2026-08-07, section 3): a cup leg is only ever an
-ADDITIVE path to a track's podium rungs -- the track's own warp pad stays an
-independent path regardless of the draw -- so no leg map can orphan a rung,
-including the degenerate all-same-track and absent-track draws. The Purple
-Gem Cup is deliberately NOT special-cased: its vanilla all-boss-track
-line-up is a content fact, not a mechanism, and dissolves into the random
-pool like any other cup.
+Solvability (dossier 2026-08-07, section 3): a cup leg is an ADDITIVE path to
+a track's podium rungs and per-track Wumpa location. The track's own warp pad
+stays an independent path regardless of the draw, and each Cup source exposes
+only the specific dead-end location families it can emit. No leg map can orphan
+or duplicate a track-owned location, including the degenerate all-same-track
+and absent-track draws. The Purple Gem Cup is deliberately NOT special-cased:
+its vanilla all-boss-track line-up is a content fact, not a mechanism, and
+dissolves into the random pool like any other cup.
 
 Universal Tracker: the draw is re-pinned from the seed's slot_data during
 re-generation (reconstruct_gem_cup_legs_from_wire), the same divergence

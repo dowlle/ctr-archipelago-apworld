@@ -532,16 +532,42 @@ def create_regions(world: "ctrAPWorld"):
     # itemsanity does -- fruit are collected wherever you race -- and needs no
     # rule of its own, because reaching ten fruit is possible in any race from
     # sphere 0, so `True` is the honest access rule rather than a placeholder.
-    # In `per_track` mode each check instead parents to its DESTINATION's
-    # region: a retail track's own region, or the cup region a custom track's
-    # destination role occupies. That region membership IS the access rule,
-    # exactly as it is for the item-box checks below, and it is what makes a Gem
-    # Cup leg obey the individual-pad rule without a second policy -- a leg
-    # reaching a track whose own physical pad is shut does not make that track's
-    # region reachable, so it cannot award that track's Wumpa check.
-    from .wumpa_checks import WUMPA_CLASS
+    # In `per_track` mode a retail check is track-owned but can fire through
+    # either its standalone race or any Gem Cup that legs the track. AP-core
+    # ANDs a location with its parent region, so the same joint dead-end-region
+    # shape used by podium rungs is required here: connect the track region and
+    # each legging Cup to "<track>: Wumpa", then put only that Wumpa location
+    # inside it. A Cup therefore exposes the one check it can genuinely emit,
+    # never the track's relic/token/Trophy families. Repeated Cup occurrences
+    # are alternative routes to the same track-owned location. The current Cup
+    # model is whole-Cup reachability; the 0.3 occurrence model will refine this
+    # to ordered leg prefixes without changing the ownership rule.
+    #
+    # Global Wumpa remains on Menu. A custom direct destination remains in its
+    # resolved destination region because that region is already the sole race
+    # route for the Alpha6 package.
+    from .wumpa_checks import WUMPA_CLASS, WUMPA_RETAIL_TRACKS
+    _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
-        _region = region_lookup[_region_name]
+        if _region_name in WUMPA_RETAIL_TRACKS:
+            _region = Region(f"{_region_name}: Wumpa", player, mw)
+            _region.type = "wumpa"
+            mw.regions.append(_region)
+            regions.append(_region)
+            region_lookup[_region.name] = _region
+            _sources = [region_lookup[_region_name]]
+            _sources += [region_lookup[_cup]
+                         for _cup in _wumpa_track_cups.get(_region_name, [])
+                         if _cup in region_lookup]
+            for _source in _sources:
+                _ent = Entrance(player=player,
+                                name=f"{_source.name} -> {_region.name}",
+                                parent=_source)
+                _ent.connect(_region)
+                _source.exits.append(_ent)
+                mw.regions.entrance_cache[player][_ent.name] = _ent
+        else:
+            _region = region_lookup[_region_name]
         _loc = create_location(player, _name, _region)
         _loc.type = "wumpa"
         _loc.logic_text = "True"

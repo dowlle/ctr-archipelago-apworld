@@ -3,21 +3,18 @@
 The specification's acceptance list, one test per line, plus the identity
 properties the approved datapackage unfreeze rests on.
 
-What is deliberately NOT tested here: the crossing signal itself, the runtime
-destination identity, and the Gem Cup pad gate at emission time. Those are
-native's half and are pinned in the paired client candidate. What IS tested is
-everything the apworld owns -- the mode, which locations a seed creates, which
-region each one hangs off, custom-destination eligibility, the resolved wire
-mapping, and Universal Tracker's reconstruction of it.
+What is deliberately NOT tested here: the crossing signal, runtime destination
+identity and pad re-entry lifecycle. Those are native's half and are pinned in
+the paired client candidate. What IS tested is everything the apworld owns: the
+mode, which locations a seed creates, every standalone/Cup route to them,
+custom-destination eligibility, the resolved wire mapping and Universal
+Tracker reconstruction.
 
-THE GEM CUP RULE IS STRUCTURAL, NOT A RULE TERM. A retail track's check parents
-to that track's own region, so AP-core ANDs the track region's reachability onto
-it exactly as it does for the item-box checks. A Gem Cup leg does not make a
-track region reachable -- the cup's podium entrances lead to the dead-end
-"<track>: Podium" region and nothing else -- so cup access alone can never award
-a track's Wumpa check. That is asserted below rather than described, because it
-is the one place a future refactor could quietly hand a cup the track's whole
-region and break the ruling without touching this file.
+THE GEM CUP RULE IS STRUCTURAL, NOT A LOCATION RULE TERM. A retail track's check
+lives in a dead-end "<track>: Wumpa" region reached from its track region and
+every Gem Cup that legs it. The region holds only that one track-owned location,
+so Cup access can emit Wumpa without exposing the track's Trophy, relic, token
+or box families. Repeated occurrences remain alternative routes to one check.
 """
 import copy
 import unittest
@@ -353,12 +350,12 @@ class TestPerTrackSeed(CTRTestBase):
             self.assertNotIn(retail_location_name(track), names)
         self.assertNotIn(WUMPA_TEN_LOCATION, names)
 
-    def test_each_location_is_parented_to_its_track_region(self):
+    def test_each_location_is_parented_to_its_joint_wumpa_region(self):
         for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 location = self.multiworld.get_location(
                     retail_location_name(track), self.player)
-                self.assertEqual(location.parent_region.name, track)
+                self.assertEqual(location.parent_region.name, f"{track}: Wumpa")
 
     def test_it_supplies_locations_rather_than_spending_them(self):
         items = [i for i in self.multiworld.itempool if i.player == self.player]
@@ -387,12 +384,10 @@ class TestPerTrackSeed(CTRTestBase):
 
 
 class TestPerTrackGemCupSeed(CTRTestBase):
-    """The Gem Cup individual-pad rule, asserted structurally.
+    """Standalone races and Gem Cups are alternative Wumpa routes.
 
-    A cup that legs a track must not expose that track's Wumpa check. The
-    mechanism is region membership: a cup's entrances reach the dead-end
-    "<track>: Podium" region, never the track region itself, so a track's Wumpa
-    check is reachable only through the track's own pad.
+    The joint dead-end region must expose only the Wumpa location. A Cup must
+    never gain a direct entrance to the whole track region.
     """
 
     run_default_tests = False
@@ -418,12 +413,27 @@ class TestPerTrackGemCupSeed(CTRTestBase):
                         "would hand the cup that track's Wumpa check without "
                         "the track's own pad being accessible")
 
-    def test_a_track_wumpa_check_is_only_in_its_track_region(self):
+    def test_every_track_and_legging_cup_reaches_the_joint_wumpa_region(self):
+        from ..gem_cup_legs import track_to_cups
+
+        track_cups = track_to_cups(self.world.gem_cup_legs)
         for track in eligible_retail_tracks(self.world.options):
             with self.subTest(track=track):
                 location = self.multiworld.get_location(
                     retail_location_name(track), self.player)
-                self.assertEqual(location.parent_region.name, track)
+                region = location.parent_region
+                self.assertEqual(region.name, f"{track}: Wumpa")
+                sources = {entrance.parent_region.name
+                           for entrance in region.entrances}
+                self.assertIn(track, sources)
+                self.assertEqual(sources - {track}, set(track_cups.get(track, [])))
+
+    def test_joint_wumpa_region_contains_only_its_track_check(self):
+        for track in eligible_retail_tracks(self.world.options):
+            region = self.multiworld.get_region(f"{track}: Wumpa", self.player)
+            with self.subTest(track=track):
+                self.assertEqual([loc.name for loc in region.locations],
+                                 [retail_location_name(track)])
 
 
 class TestPerTrackWithCustomTrack(CTRTestBase):
