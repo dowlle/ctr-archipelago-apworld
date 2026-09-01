@@ -43,7 +43,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r ci-requirements.txt
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
-          python Launcher.py --update_settings
+          # ModuleUpdate above already installed everything. Launcher would run the
+          # requirement check again and, on a pinned-version mismatch left by pip's
+          # resolver, prompt on stdin, which has no terminal here (EOFError seen on
+          # 2 of the first 4 runs). SKIP_REQUIREMENTS_UPDATE is ModuleUpdate's own
+          # opt-out for exactly this.
+          SKIP_REQUIREMENTS_UPDATE=1 python Launcher.py --update_settings
       - name: Run the CTR suite
         run: pytest worlds/ctr -n auto -q
 
