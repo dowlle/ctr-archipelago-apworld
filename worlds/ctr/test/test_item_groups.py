@@ -47,7 +47,7 @@ EXPECTED_GROUPS = {
         "Icy Road", "Low Gravity", "Forced USF", "Forced Boost", "First Person",
         # frozen by #177, now buildable
         "Wumpa Wipeout", "Flatten", "Item Reroll", "Forced Use", "Empty Crates",
-        "Weakened Kart", "Boost Blocker", "Wireframe", "Nitro",
+        "Weakened Kart", "Boost Blocker", "Wireframe", "Nitro Drop",
         "Reverse Steering", "Red Potion",
         # minted by #280, now buildable
         "Upside Down", "Mirror Mode", "Warpball Ambush", "Demo Camera",

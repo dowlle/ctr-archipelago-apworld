@@ -21,14 +21,15 @@ Entries added AFTER the 0.2.0 freeze are covered by neither fixture and are mean
 to pass silently. Any release that spends a datapackage bump adds its own fixture
 here the same way.
 
-RENAME EXCEPTION, #280 (the 0.2.0 trap rework, ruled 2026-08-19). Both fixtures
-had 16 trap KEYS rewritten in place -- the only in-place fixture edit either file
-has taken -- because the rework renamed those items while 0.2.0 is still
+RENAME EXCEPTIONS. #280 (the 0.2.0 trap rework, ruled 2026-08-19) rewrote 16
+trap keys in place. The approved 2026-09-02 datapackage unfreeze then rewrote
+`Nitro` to `Nitro Drop` in the v0.2.0 fixture. These are the only in-place
+fixture edits either file has taken, because the rework renamed those items while 0.2.0 is still
 unpublished. Not one id moved, which is the property these fixtures exist to
 protect; a fixture keyed on a name that no longer exists would fail on the rename
 rather than on an id change and would stop guarding anything. The old-to-new name
-map is pinned in test_trap_rework.py, so the rename itself is still on the record
-in code.
+maps are pinned in test_trap_rework.py, so each approved rename remains on the
+record in code.
 """
 import json
 import pathlib

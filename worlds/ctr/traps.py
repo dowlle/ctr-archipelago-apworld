@@ -76,7 +76,7 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("weakened_kart",    "Weakened Kart",    3, True, "freeze"),
     TrapEntry("boost_blocker",    "Boost Blocker",    3, True, "freeze"),
     TrapEntry("wireframe",        "Wireframe",        2, True, "freeze"),
-    TrapEntry("nitro",            "Nitro",            5, True, "freeze"),
+    TrapEntry("nitro",            "Nitro Drop",       5, True, "freeze"),
     TrapEntry("reverse_steering", "Reverse Steering", 4, True, "freeze"),
     TrapEntry("red_potion",       "Red Potion",       3, True, "freeze"),
     # Native AP_TrapEffect 16-19, minted by #280, ids 35010190-35010193.
