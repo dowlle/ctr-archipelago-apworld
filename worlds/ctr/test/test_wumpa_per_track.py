@@ -17,13 +17,16 @@ so Cup access can emit Wumpa without exposing the track's Trophy, relic, token
 or box families. Repeated occurrences remain alternative routes to one check.
 """
 import copy
+import json
 import unittest
 from unittest import mock
 
+from BaseClasses import CollectionState
 from Options import OptionError
 from test.general import setup_multiworld
 
 from .. import ctrAPWorld, custom_tracks
+from ..Regions import BOSS_WUMPA_TRACKS
 
 from ..custom_tracks import BABY_T_PARK_EXAMPLE, WUMPA_COLLECTIBLE_FLAG
 from ..item_boxes import BOX_TRACKS, TRACK_LEVEL_IDS
@@ -426,7 +429,11 @@ class TestPerTrackGemCupSeed(CTRTestBase):
                 sources = {entrance.parent_region.name
                            for entrance in region.entrances}
                 self.assertIn(track, sources)
-                self.assertEqual(sources - {track}, set(track_cups.get(track, [])))
+                boss_sources = {garage for garage, boss_track
+                                in BOSS_WUMPA_TRACKS.items()
+                                if boss_track == track}
+                self.assertEqual(sources - {track},
+                                 set(track_cups.get(track, [])) | boss_sources)
 
     def test_joint_wumpa_region_contains_only_its_track_check(self):
         for track in eligible_retail_tracks(self.world.options):
@@ -434,6 +441,85 @@ class TestPerTrackGemCupSeed(CTRTestBase):
             with self.subTest(track=track):
                 self.assertEqual([loc.name for loc in region.locations],
                                  [retail_location_name(track)])
+
+
+class TestBossGarageRoutes(unittest.TestCase):
+    """Boss races are additional routes to their destination Wumpa check."""
+
+    def test_retail_boss_track_table_is_exact(self):
+        self.assertEqual(BOSS_WUMPA_TRACKS, {
+            "Ripper Roo Garage": "Roo's Tubes",
+            "Papu Papu Garage": "Papu's Pyramid",
+            "Komodo Joe Garage": "Dragon Mines",
+            "Pinstripe Garage": "Hot Air Skyway",
+            "N. Oxide Garage": "Oxide Station",
+        })
+
+    def test_boss_garage_reaches_wumpa_while_destination_pad_is_locked(self):
+        """Seed 1 deals Dragon Mines to the Purple Cup pad, behind Key 2 and
+        a racer lock. Twelve Trophies open Komodo Joe's garage without opening
+        that pad, so only the boss route can reach Dragon Mines' Wumpa check.
+        """
+        mw = setup_multiworld(ctrAPWorld, seed=1, options={
+            "wumpa_check": "per_track",
+            "warppad_unlock_requirements": "randomized",
+            "racer_locked_pads": 4,
+            "character_unlocks": True,
+        })
+        state = CollectionState(mw)
+        world = mw.worlds[1]
+        for _ in range(12):
+            state.collect(world.create_item("Trophy"))
+        for _ in range(2):
+            state.collect(world.create_item("Key"))
+
+        self.assertTrue(state.can_reach("Komodo Joe Garage", "Region", 1))
+        self.assertFalse(state.can_reach("Dragon Mines", "Region", 1))
+        self.assertTrue(state.can_reach(
+            retail_location_name("Dragon Mines"), "Location", 1))
+
+    def test_unreachable_boss_garages_do_not_change_standalone_reachability(self):
+        mw = setup_multiworld(ctrAPWorld, seed=20260902, options={
+            "wumpa_check": "per_track",
+            "include_gem_cups": False,
+        })
+        state = CollectionState(mw)
+        for garage in BOSS_WUMPA_TRACKS:
+            with self.subTest(garage=garage):
+                self.assertFalse(state.can_reach(garage, "Region", 1))
+        for track in BOSS_WUMPA_TRACKS.values():
+            with self.subTest(track=track):
+                self.assertEqual(
+                    state.can_reach(track, "Region", 1),
+                    state.can_reach(retail_location_name(track), "Location", 1),
+                )
+
+    def test_global_mode_region_graph_is_byte_identical(self):
+        """The new table is consulted only while per-track regions exist."""
+        options = {"wumpa_check": "global"}
+        current = setup_multiworld(ctrAPWorld, seed=20260902, options=options)
+        with mock.patch.dict(BOSS_WUMPA_TRACKS, {}, clear=True):
+            legacy = setup_multiworld(ctrAPWorld, seed=20260902, options=options)
+
+        def graph_bytes(mw):
+            rows = []
+            for region in mw.get_regions(1):
+                rows.append({
+                    "name": region.name,
+                    "type": getattr(region, "type", None),
+                    "locations": [location.name for location in region.locations],
+                    "exits": [
+                        [entrance.name,
+                         entrance.connected_region.name
+                         if entrance.connected_region else None,
+                         getattr(entrance, "access_rule_text", None)]
+                        for entrance in region.exits
+                    ],
+                })
+            return json.dumps(rows, sort_keys=True,
+                              separators=(",", ":")).encode("utf-8")
+
+        self.assertEqual(graph_bytes(current), graph_bytes(legacy))
 
 
 class TestPerTrackWithCustomTrack(CTRTestBase):
