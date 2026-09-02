@@ -57,7 +57,7 @@ EXPECTED_TRAP_IDS = {
     "Weakened Kart": 35010111,
     "Boost Blocker": 35010112,
     "Wireframe": 35010113,
-    "Nitro": 35010114,
+    "Nitro Drop": 35010114,
     "Reverse Steering": 35010115,
     "Red Potion": 35010116,
     # native AP_TrapEffect 16-18, minted by #280
@@ -83,9 +83,16 @@ RENAMED_BY_280 = {
     "Weakened Kart Trap": "Weakened Kart",
     "No Boost Trap": "Boost Blocker",
     "Wireframe Trap": "Wireframe",
-    "Nitro Trap": "Nitro",
+    "Nitro Trap": "Nitro Drop",
     "Reverse Controls Trap": "Reverse Steering",
     "Red Potion Trap": "Red Potion",
+}
+
+#: Approved after the 0.2.0 name freeze by the 2026-09-02 datapackage-unfreeze
+#: ruling. The identity keeps its frozen code; this explicit map records the
+#: one permitted post-freeze rename instead of weakening the freeze tests.
+RENAMED_AFTER_FREEZE = {
+    "Nitro": "Nitro Drop",
 }
 
 #: Every key with a working native effect, in AP_TrapEffect order.
@@ -141,6 +148,15 @@ class TestTrapNames(unittest.TestCase):
         for old, code in old_ids.items():
             with self.subTest(renamed=old):
                 self.assertEqual(EXPECTED_TRAP_IDS[RENAMED_BY_280[old]], code)
+
+    def test_the_approved_post_freeze_rename_moved_no_id(self):
+        old_ids = {"Nitro": 35010114}
+        names = {item["name"] for item in load_item_table()}
+        for old, new in RENAMED_AFTER_FREEZE.items():
+            with self.subTest(renamed=old):
+                self.assertNotIn(old, names)
+                self.assertIn(new, names)
+                self.assertEqual(EXPECTED_TRAP_IDS[new], old_ids[old])
 
     def test_the_three_new_identities_are_registered_and_buildable(self):
         """Their authored count stays 0 because weighted fill creates them."""
@@ -224,7 +240,7 @@ class TestWeightedDraw(unittest.TestCase):
             "Forced Boost": 4, "First Person": 3, "Wumpa Wipeout": 4,
             "Flatten": 6, "Item Reroll": 5, "Forced Use": 4,
             "Empty Crates": 3, "Weakened Kart": 3, "Boost Blocker": 3,
-            "Wireframe": 2, "Nitro": 5, "Reverse Steering": 4,
+            "Wireframe": 2, "Nitro Drop": 5, "Reverse Steering": 4,
             "Red Potion": 3, "Upside Down": 2, "Mirror Mode": 3,
             "Warpball Ambush": 3,
             "Demo Camera": 3,
