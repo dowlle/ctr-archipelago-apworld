@@ -8,6 +8,7 @@ from .. import ctrAPWorld
 from .. import lettersanity
 from ..lettersanity import (LETTERSANITY_CLASS, ITEM_NAMES, LETTER_TRACKS,
                             LETTERS, item_name)
+from ..item_boxes import TIGER_TEMPLE_DOOR_OPENERS
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 
@@ -32,11 +33,13 @@ def _letter_pairs(mw, world):
 
 def _collect_all(mw, exclude=None):
     """A CollectionState holding every item in the itempool, optionally minus
-    `exclude` (an item NAME). Used to build a full-collection state for the
-    tier-2 composition tests without running a real fill."""
+    one excluded item name or a collection of names. Used to build a full-
+    collection state for rule-composition tests without running a real fill."""
+    excluded = ({exclude} if isinstance(exclude, str)
+                else set(exclude or ()))
     st = CollectionState(mw)
     for item in mw.itempool:
-        if exclude and item.name == exclude:
+        if item.name in excluded:
             continue
         st.add_item(item.name, 1, 1)
     return st
@@ -139,6 +142,78 @@ class TestLettersanityUTRestoreParity(unittest.TestCase):
         # carried, which for mode 3 carries no locations).
         self.assertTrue(all(sel == () for sel in selected.values()))
 
+
+class TestTigerTempleLetterRDoorRule(unittest.TestCase):
+    """Issue #323: Tiger Temple R shares Item Box 5's shortcut door."""
+
+    @staticmethod
+    def _rule(mw, letter):
+        name = LETTERSANITY_CLASS.location_name("Tiger Temple", letter)
+        return mw.get_location(name, 1).access_rule
+
+    @staticmethod
+    def _without_openers(mw, *also_excluded):
+        return _collect_all(
+            mw, exclude=set(TIGER_TEMPLE_DOOR_OPENERS) | set(also_excluded))
+
+    def test_itemsanity_requires_any_one_door_opener(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=True)
+        rule = self._rule(mw, "R")
+        self.assertFalse(rule(self._without_openers(mw)))
+
+        for opener in TIGER_TEMPLE_DOOR_OPENERS:
+            with self.subTest(opener=opener):
+                state = self._without_openers(mw)
+                state.add_item(opener, 1, 1)
+                self.assertTrue(rule(state))
+
+    def test_c_and_t_are_not_door_gated(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=True)
+        state = self._without_openers(mw)
+        self.assertTrue(self._rule(mw, "C")(state))
+        self.assertTrue(self._rule(mw, "T")(state))
+        self.assertFalse(self._rule(mw, "R")(state))
+
+    def test_itemsanity_off_keeps_existing_reachability(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=False)
+        self.assertTrue(self._rule(mw, "R")(_collect_all(mw)))
+
+    def test_mode_2_composes_own_letter_and_door_opener(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    itemsanity=True)
+        rule = self._rule(mw, "R")
+        own = item_name("Tiger Temple", "R")
+
+        state = self._without_openers(mw)
+        self.assertFalse(rule(state))
+        state.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+        self.assertTrue(rule(state))
+
+        missing_own = self._without_openers(mw, own)
+        missing_own.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+        self.assertFalse(rule(missing_own))
+
+    def test_universal_tracker_regeneration_has_the_same_gate(self):
+        source = _build(lettersanity="locations_only", letters_per_track=3,
+                        itemsanity=True)
+        wire = source.worlds[1].fill_slot_data()
+
+        from worlds.AutoWorld import call_all
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=20260903)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        for step in STEPS:
+            call_all(tracker, step)
+
+        for label, mw in (("source", source), ("tracker", tracker)):
+            with self.subTest(world=label):
+                rule = self._rule(mw, "R")
+                state = self._without_openers(mw)
+                self.assertFalse(rule(state))
+                state.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+                self.assertTrue(rule(state))
 
 class TestLettersanityMode2SelfItemRules(unittest.TestCase):
     """The frozen mode-2 self-item access rule (dossier amendment, ruled
