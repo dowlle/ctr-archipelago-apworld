@@ -543,8 +543,7 @@ class ctrAPWorld(World):
                 # stage 2. This re-install only reassigns loc.access_rule closures
                 # and consumes no multiworld.random (verified) -- so the terminal
                 # backstop's replay fidelity survives it.
-                from .Rules import (add_lettersanity_rules,
-                                    add_time_trial_and_ctr_requirements)
+                from .Rules import add_lettersanity_rules, add_time_trial_and_ctr_requirements
                 add_time_trial_and_ctr_requirements(self, self.player)
                 # The reinstall above deliberately replaces the CTR Token and
                 # created letter rules. Restore every Lettersanity layer after
