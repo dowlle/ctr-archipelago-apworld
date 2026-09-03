@@ -313,6 +313,41 @@ class TestPapuPyramidLetterCapabilityRules(unittest.TestCase):
                     state.add_item("Turbo", 1, 1)
                     self.assertTrue(rule(state))
 
+    def test_prefill_stage2_collapse_restores_every_lettersanity_layer(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=True,
+                    warppad_unlock_requirements="randomized")
+        world = mw.worlds[1]
+        world._ctr_two_stage_active = True
+        world._ctr_force_collapse_stage2 = False
+        world._probe_two_stage_fillable = lambda: False
+        world._rollback_precollect_backstop = lambda _mode: None
+
+        world.pre_fill()
+        self.assertTrue(world._ctr_force_collapse_stage2)
+
+        # _rule is Papu-specific, so address Tiger R directly here.
+        tiger_r = mw.get_location(
+            LETTERSANITY_CLASS.location_name("Tiger Temple", "R"),
+            1).access_rule
+        self.assertFalse(tiger_r(_collect_all(
+            mw, exclude=TIGER_TEMPLE_DOOR_OPENERS)))
+
+        papu_c = self._rule(mw, "C")
+        self.assertFalse(papu_c(self._without_routes(mw)))
+        own_c = item_name("Papu's Pyramid", "C")
+        mask_without_own = self._without_routes(mw, own_c)
+        mask_without_own.add_item("Mask", 1, 1)
+        self.assertFalse(papu_c(mask_without_own))
+
+        token = mw.get_location("Papu's Pyramid: CTR Token Challenge", 1)
+        papu_letters = {
+            item_name("Papu's Pyramid", letter) for letter in LETTERS
+        }
+        self.assertFalse(token.access_rule(
+            _collect_all(mw, exclude=papu_letters)))
+
 
 class TestLettersanityMode2SelfItemRules(unittest.TestCase):
     """The frozen mode-2 self-item access rule (dossier amendment, ruled
