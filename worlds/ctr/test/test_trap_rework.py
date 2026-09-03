@@ -385,5 +385,36 @@ class TestNonStringTrapWeightKeys(unittest.TestCase):
             TrapWeights(value).verify_keys()
 
 
+class TestTrapWeightsAccessibilityHelpText(unittest.TestCase):
+    """Issue #280 follow-up (pause accessibility): the native side now lets a
+    pause menu suspend five camera/visual traps' effects while paused. This
+    apworld's only stake in that is the generated `trap_weights` help text,
+    which should tell a player up front that those five traps can be visually
+    intense and that a weight of 0 turns one off entirely. Pinned verbatim so
+    a future edit to the docstring cannot silently drop the warning; no
+    option semantics/values are touched or asserted here."""
+
+    def test_help_text_names_the_camera_and_visual_traps(self):
+        self.assertIn(
+            "Five traps change the camera or the screen itself and may be "
+            "visually\n    intense or uncomfortable: First Person, "
+            "Wireframe, Upside Down, Mirror\n    Mode, and Demo Camera.",
+            TrapWeights.__doc__)
+
+    def test_help_text_says_weight_zero_disables_the_effect(self):
+        self.assertIn(
+            "Set an individual trap's weight to 0 to disable\n    that "
+            "effect entirely -- it becomes unpickable while every other "
+            "trap\n    keeps its own weight.",
+            TrapWeights.__doc__)
+
+    def test_manual_yaml_limitation_note_is_still_present(self):
+        # This warning predates #280; the accessibility text must not have
+        # displaced or reworded it.
+        self.assertIn(
+            "The Archipelago website's options pages cannot show a mapping",
+            TrapWeights.__doc__)
+
+
 if __name__ == "__main__":
     unittest.main()
