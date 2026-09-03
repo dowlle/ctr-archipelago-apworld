@@ -8,6 +8,7 @@ from .. import ctrAPWorld
 from .. import lettersanity
 from ..lettersanity import (LETTERSANITY_CLASS, ITEM_NAMES, LETTER_TRACKS,
                             LETTERS, item_name)
+from ..item_boxes import TIGER_TEMPLE_DOOR_OPENERS
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 
@@ -32,11 +33,13 @@ def _letter_pairs(mw, world):
 
 def _collect_all(mw, exclude=None):
     """A CollectionState holding every item in the itempool, optionally minus
-    `exclude` (an item NAME). Used to build a full-collection state for the
-    tier-2 composition tests without running a real fill."""
+    one excluded item name or a collection of names. Used to build a full-
+    collection state for rule-composition tests without running a real fill."""
+    excluded = ({exclude} if isinstance(exclude, str)
+                else set(exclude or ()))
     st = CollectionState(mw)
     for item in mw.itempool:
-        if exclude and item.name == exclude:
+        if item.name in excluded:
             continue
         st.add_item(item.name, 1, 1)
     return st
@@ -138,6 +141,212 @@ class TestLettersanityUTRestoreParity(unittest.TestCase):
         # selection is all-empty (the restore mirrors exactly what the wire
         # carried, which for mode 3 carries no locations).
         self.assertTrue(all(sel == () for sel in selected.values()))
+
+
+class TestTigerTempleLetterRDoorRule(unittest.TestCase):
+    """Issue #323: Tiger Temple R shares Item Box 5's shortcut door."""
+
+    @staticmethod
+    def _rule(mw, letter):
+        name = LETTERSANITY_CLASS.location_name("Tiger Temple", letter)
+        return mw.get_location(name, 1).access_rule
+
+    @staticmethod
+    def _without_openers(mw, *also_excluded):
+        return _collect_all(
+            mw, exclude=set(TIGER_TEMPLE_DOOR_OPENERS) | set(also_excluded))
+
+    def test_itemsanity_requires_any_one_door_opener(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=True)
+        rule = self._rule(mw, "R")
+        self.assertFalse(rule(self._without_openers(mw)))
+
+        for opener in TIGER_TEMPLE_DOOR_OPENERS:
+            with self.subTest(opener=opener):
+                state = self._without_openers(mw)
+                state.add_item(opener, 1, 1)
+                self.assertTrue(rule(state))
+
+    def test_c_and_t_are_not_door_gated(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=True)
+        state = self._without_openers(mw)
+        self.assertTrue(self._rule(mw, "C")(state))
+        self.assertTrue(self._rule(mw, "T")(state))
+        self.assertFalse(self._rule(mw, "R")(state))
+
+    def test_itemsanity_off_keeps_existing_reachability(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    itemsanity=False)
+        self.assertTrue(self._rule(mw, "R")(_collect_all(mw)))
+
+    def test_mode_2_composes_own_letter_and_door_opener(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    itemsanity=True)
+        rule = self._rule(mw, "R")
+        own = item_name("Tiger Temple", "R")
+
+        state = self._without_openers(mw)
+        self.assertFalse(rule(state))
+        state.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+        self.assertTrue(rule(state))
+
+        missing_own = self._without_openers(mw, own)
+        missing_own.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+        self.assertFalse(rule(missing_own))
+
+    def test_universal_tracker_regeneration_has_the_same_gate(self):
+        source = _build(lettersanity="locations_only", letters_per_track=3,
+                        itemsanity=True)
+        wire = source.worlds[1].fill_slot_data()
+
+        from worlds.AutoWorld import call_all
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=20260903)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        for step in STEPS:
+            call_all(tracker, step)
+
+        for label, mw in (("source", source), ("tracker", tracker)):
+            with self.subTest(world=label):
+                rule = self._rule(mw, "R")
+                state = self._without_openers(mw)
+                self.assertFalse(rule(state))
+                state.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
+                self.assertTrue(rule(state))
+
+
+class TestPapuPyramidLetterCapabilityRules(unittest.TestCase):
+    """Papu's Pyramid C and T need boost, Turbo, or Mask."""
+
+    @staticmethod
+    def _rule(mw, letter):
+        name = LETTERSANITY_CLASS.location_name("Papu's Pyramid", letter)
+        return mw.get_location(name, 1).access_rule
+
+    @staticmethod
+    def _without_routes(mw, *also_excluded):
+        return _collect_all(
+            mw, exclude={"Progressive Boost", "Turbo", "Mask",
+                         *also_excluded})
+
+    @staticmethod
+    def _world(**options):
+        defaults = {
+            "lettersanity": "locations_only",
+            "letters_per_track": 3,
+            "logic_difficulty": "hard",
+            "progressive_boost": "shared_global",
+            "itemsanity": True,
+        }
+        defaults.update(options)
+        return _build(**defaults)
+
+    def test_c_and_t_each_accept_boost_turbo_or_mask(self):
+        for difficulty in ("easy", "medium", "hard"):
+            mw = self._world(logic_difficulty=difficulty)
+            for letter in ("C", "T"):
+                rule = self._rule(mw, letter)
+                self.assertFalse(rule(self._without_routes(mw)))
+                for route in ("Progressive Boost", "Turbo", "Mask"):
+                    with self.subTest(difficulty=difficulty, letter=letter,
+                                      route=route):
+                        state = self._without_routes(mw)
+                        state.add_item(route, 1, 1)
+                        self.assertTrue(rule(state))
+
+    def test_r_is_not_given_the_c_and_t_gate(self):
+        mw = self._world()
+        self.assertTrue(self._rule(mw, "R")(self._without_routes(mw)))
+
+    def test_itemsanity_off_leaves_only_randomized_boost_arm(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=False)
+        for letter in ("C", "T"):
+            rule = self._rule(mw, letter)
+            state = _collect_all(mw, exclude="Progressive Boost")
+            self.assertFalse(rule(state))
+            state.add_item("Progressive Boost", 1, 1)
+            self.assertTrue(rule(state))
+
+    def test_progressive_boost_off_uses_vanilla_boost(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="off", itemsanity=True)
+        state = _collect_all(mw, exclude={"Turbo", "Mask"})
+        self.assertTrue(self._rule(mw, "C")(state))
+        self.assertTrue(self._rule(mw, "T")(state))
+
+    def test_mode_2_composes_own_letter_and_route(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=True)
+        for letter in ("C", "T"):
+            own = item_name("Papu's Pyramid", letter)
+            rule = self._rule(mw, letter)
+
+            route_without_own = self._without_routes(mw, own)
+            route_without_own.add_item("Mask", 1, 1)
+            self.assertFalse(rule(route_without_own))
+
+            route_with_own = self._without_routes(mw)
+            route_with_own.add_item("Mask", 1, 1)
+            self.assertTrue(rule(route_with_own))
+
+    def test_universal_tracker_regeneration_has_the_same_gates(self):
+        source = self._world()
+        wire = source.worlds[1].fill_slot_data()
+
+        from worlds.AutoWorld import call_all
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=20260903)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        for step in STEPS:
+            call_all(tracker, step)
+
+        for label, mw in (("source", source), ("tracker", tracker)):
+            for letter in ("C", "T"):
+                with self.subTest(world=label, letter=letter):
+                    rule = self._rule(mw, letter)
+                    state = self._without_routes(mw)
+                    self.assertFalse(rule(state))
+                    state.add_item("Turbo", 1, 1)
+                    self.assertTrue(rule(state))
+
+    def test_prefill_stage2_collapse_restores_every_lettersanity_layer(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=True,
+                    warppad_unlock_requirements="randomized")
+        world = mw.worlds[1]
+        world._ctr_two_stage_active = True
+        world._ctr_force_collapse_stage2 = False
+        world._probe_two_stage_fillable = lambda: False
+        world._rollback_precollect_backstop = lambda _mode: None
+
+        world.pre_fill()
+        self.assertTrue(world._ctr_force_collapse_stage2)
+
+        # _rule is Papu-specific, so address Tiger R directly here.
+        tiger_r = mw.get_location(
+            LETTERSANITY_CLASS.location_name("Tiger Temple", "R"),
+            1).access_rule
+        self.assertFalse(tiger_r(_collect_all(
+            mw, exclude=TIGER_TEMPLE_DOOR_OPENERS)))
+
+        papu_c = self._rule(mw, "C")
+        self.assertFalse(papu_c(self._without_routes(mw)))
+        own_c = item_name("Papu's Pyramid", "C")
+        mask_without_own = self._without_routes(mw, own_c)
+        mask_without_own.add_item("Mask", 1, 1)
+        self.assertFalse(papu_c(mask_without_own))
+
+        token = mw.get_location("Papu's Pyramid: CTR Token Challenge", 1)
+        papu_letters = {
+            item_name("Papu's Pyramid", letter) for letter in LETTERS
+        }
+        self.assertFalse(token.access_rule(
+            _collect_all(mw, exclude=papu_letters)))
 
 
 class TestLettersanityMode2SelfItemRules(unittest.TestCase):

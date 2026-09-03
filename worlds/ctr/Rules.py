@@ -206,17 +206,67 @@ def add_capability_difficulty_rules(world, player):
 
 def add_lettersanity_rules(world, player):
     from . import lettersanity
+    from .item_boxes import TIGER_TEMPLE_DOOR_OPENERS
+    from .progressive_capability import gate_satisfied, track_required_character
     mode = int(world.options.lettersanity.value)
-    if mode not in (2, 3):
+    if mode not in (1, 2, 3):
         return
     selected = world.options._lettersanity_selected
-    for track in lettersanity.LETTER_TRACKS:
-        required = (lettersanity.LETTERS if mode == 3 else selected[track])
-        names = tuple(lettersanity.item_name(track, letter) for letter in required)
-        loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
+    if mode in (2, 3):
+        for track in lettersanity.LETTER_TRACKS:
+            required = (lettersanity.LETTERS if mode == 3 else selected[track])
+            names = tuple(lettersanity.item_name(track, letter) for letter in required)
+            loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
+            previous = loc.access_rule
+            loc.access_rule = lambda state, previous=previous, names=names, p=player: \
+                previous(state) and all(state.has(name, p) for name in names)
+
+    # Tiger Temple's R sits behind the same stone shortcut door as Item Box 5.
+    # When Itemsanity models weapon ownership, reaching that letter therefore
+    # needs one deterministic player-owned opener as well as the shared token-
+    # challenge rule installed above. C and T stay on the shared rule. With
+    # Itemsanity off, weapon rolls are not represented and the term is absent.
+    tiger_r = lettersanity.LETTERSANITY_CLASS.location_name(
+        "Tiger Temple", "R")
+    if (world.options.itemsanity.value
+            and "R" in selected.get("Tiger Temple", ())
+            and tiger_r in world.multiworld.regions.location_cache[player]):
+        loc = world.multiworld.get_location(tiger_r, player)
         previous = loc.access_rule
-        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
-            previous(state) and all(state.has(name, p) for name in names)
+        loc.access_rule = (
+            lambda state, previous=previous,
+                   openers=TIGER_TEMPLE_DOOR_OPENERS, p=player:
+            previous(state) and state.has_any(openers, p)
+        )
+
+    # Papu's Pyramid C and T each sit on a route that needs either boost or a
+    # usable shortcut weapon. This gate is needed only while Progressive Boost
+    # is randomized; otherwise every racer retains vanilla boost. Turbo and
+    # Mask are valid alternate arms only while Itemsanity models received
+    # weapon ownership.
+    papu_alternatives = ("Turbo", "Mask")
+    papu_required_character = track_required_character(
+        world, "Papu's Pyramid")
+    for letter in ("C", "T"):
+        name = lettersanity.LETTERSANITY_CLASS.location_name(
+            "Papu's Pyramid", letter)
+        if (not bool(world.options.progressive_boost.value)
+                or letter not in selected.get("Papu's Pyramid", ())
+                or name not in world.multiworld.regions.location_cache[player]):
+            continue
+        loc = world.multiworld.get_location(name, player)
+        previous = loc.access_rule
+
+        def _papu_rule(state, previous=previous, p=player,
+                       alternatives=papu_alternatives,
+                       racer=papu_required_character):
+            boost_ok = gate_satisfied(
+                world, state, p, boost_min=1, required_character=racer)
+            weapon_ok = (bool(world.options.itemsanity.value)
+                         and state.has_any(alternatives, p))
+            return previous(state) and (boost_ok or weapon_ok)
+
+        loc.access_rule = _papu_rule
 
     # Mode 2 self-item access rule (dossier amendment, ruled 2026-08-10). In
     # `locations_and_items` a letter item is progression and native gates the
