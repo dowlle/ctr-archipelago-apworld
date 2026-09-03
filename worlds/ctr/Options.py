@@ -362,6 +362,12 @@ class TrapWeights(OptionDict):
     anything. Traps you leave out keep their default weight, so you only have
     to list the ones you want to change.
 
+    Five traps change the camera or the screen itself and may be visually
+    intense or uncomfortable: First Person, Wireframe, Upside Down, Mirror
+    Mode, and Demo Camera. Set an individual trap's weight to 0 to disable
+    that effect entirely -- it becomes unpickable while every other trap
+    keeps its own weight.
+
     This option is a mapping, not a single value, so you have to edit it by
     hand. The Archipelago website's options pages cannot show a mapping: this
     option does not appear on them at all, and a YAML you export from there
