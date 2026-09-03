@@ -207,6 +207,7 @@ def add_capability_difficulty_rules(world, player):
 def add_lettersanity_rules(world, player):
     from . import lettersanity
     from .item_boxes import TIGER_TEMPLE_DOOR_OPENERS
+    from .progressive_capability import gate_satisfied, track_required_character
     mode = int(world.options.lettersanity.value)
     if mode not in (1, 2, 3):
         return
@@ -237,6 +238,35 @@ def add_lettersanity_rules(world, player):
                    openers=TIGER_TEMPLE_DOOR_OPENERS, p=player:
             previous(state) and state.has_any(openers, p)
         )
+
+    # Papu's Pyramid C and T each sit on a route that needs either boost or a
+    # usable shortcut weapon. This gate is needed only while Progressive Boost
+    # is randomized; otherwise every racer retains vanilla boost. Turbo and
+    # Mask are valid alternate arms only while Itemsanity models received
+    # weapon ownership.
+    papu_alternatives = ("Turbo", "Mask")
+    papu_required_character = track_required_character(
+        world, "Papu's Pyramid")
+    for letter in ("C", "T"):
+        name = lettersanity.LETTERSANITY_CLASS.location_name(
+            "Papu's Pyramid", letter)
+        if (not bool(world.options.progressive_boost.value)
+                or letter not in selected.get("Papu's Pyramid", ())
+                or name not in world.multiworld.regions.location_cache[player]):
+            continue
+        loc = world.multiworld.get_location(name, player)
+        previous = loc.access_rule
+
+        def _papu_rule(state, previous=previous, p=player,
+                       alternatives=papu_alternatives,
+                       racer=papu_required_character):
+            boost_ok = gate_satisfied(
+                world, state, p, boost_min=1, required_character=racer)
+            weapon_ok = (bool(world.options.itemsanity.value)
+                         and state.has_any(alternatives, p))
+            return previous(state) and (boost_ok or weapon_ok)
+
+        loc.access_rule = _papu_rule
 
     # Mode 2 self-item access rule (dossier amendment, ruled 2026-08-10). In
     # `locations_and_items` a letter item is progression and native gates the

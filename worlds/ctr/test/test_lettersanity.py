@@ -215,6 +215,105 @@ class TestTigerTempleLetterRDoorRule(unittest.TestCase):
                 state.add_item(TIGER_TEMPLE_DOOR_OPENERS[0], 1, 1)
                 self.assertTrue(rule(state))
 
+
+class TestPapuPyramidLetterCapabilityRules(unittest.TestCase):
+    """Papu's Pyramid C and T need boost, Turbo, or Mask."""
+
+    @staticmethod
+    def _rule(mw, letter):
+        name = LETTERSANITY_CLASS.location_name("Papu's Pyramid", letter)
+        return mw.get_location(name, 1).access_rule
+
+    @staticmethod
+    def _without_routes(mw, *also_excluded):
+        return _collect_all(
+            mw, exclude={"Progressive Boost", "Turbo", "Mask",
+                         *also_excluded})
+
+    @staticmethod
+    def _world(**options):
+        defaults = {
+            "lettersanity": "locations_only",
+            "letters_per_track": 3,
+            "logic_difficulty": "hard",
+            "progressive_boost": "shared_global",
+            "itemsanity": True,
+        }
+        defaults.update(options)
+        return _build(**defaults)
+
+    def test_c_and_t_each_accept_boost_turbo_or_mask(self):
+        for difficulty in ("easy", "medium", "hard"):
+            mw = self._world(logic_difficulty=difficulty)
+            for letter in ("C", "T"):
+                rule = self._rule(mw, letter)
+                self.assertFalse(rule(self._without_routes(mw)))
+                for route in ("Progressive Boost", "Turbo", "Mask"):
+                    with self.subTest(difficulty=difficulty, letter=letter,
+                                      route=route):
+                        state = self._without_routes(mw)
+                        state.add_item(route, 1, 1)
+                        self.assertTrue(rule(state))
+
+    def test_r_is_not_given_the_c_and_t_gate(self):
+        mw = self._world()
+        self.assertTrue(self._rule(mw, "R")(self._without_routes(mw)))
+
+    def test_itemsanity_off_leaves_only_randomized_boost_arm(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=False)
+        for letter in ("C", "T"):
+            rule = self._rule(mw, letter)
+            state = _collect_all(mw, exclude="Progressive Boost")
+            self.assertFalse(rule(state))
+            state.add_item("Progressive Boost", 1, 1)
+            self.assertTrue(rule(state))
+
+    def test_progressive_boost_off_uses_vanilla_boost(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="off", itemsanity=True)
+        state = _collect_all(mw, exclude={"Turbo", "Mask"})
+        self.assertTrue(self._rule(mw, "C")(state))
+        self.assertTrue(self._rule(mw, "T")(state))
+
+    def test_mode_2_composes_own_letter_and_route(self):
+        mw = _build(lettersanity="locations_and_items", letters_per_track=3,
+                    logic_difficulty="hard",
+                    progressive_boost="shared_global", itemsanity=True)
+        for letter in ("C", "T"):
+            own = item_name("Papu's Pyramid", letter)
+            rule = self._rule(mw, letter)
+
+            route_without_own = self._without_routes(mw, own)
+            route_without_own.add_item("Mask", 1, 1)
+            self.assertFalse(rule(route_without_own))
+
+            route_with_own = self._without_routes(mw)
+            route_with_own.add_item("Mask", 1, 1)
+            self.assertTrue(rule(route_with_own))
+
+    def test_universal_tracker_regeneration_has_the_same_gates(self):
+        source = self._world()
+        wire = source.worlds[1].fill_slot_data()
+
+        from worlds.AutoWorld import call_all
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=20260903)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        for step in STEPS:
+            call_all(tracker, step)
+
+        for label, mw in (("source", source), ("tracker", tracker)):
+            for letter in ("C", "T"):
+                with self.subTest(world=label, letter=letter):
+                    rule = self._rule(mw, letter)
+                    state = self._without_routes(mw)
+                    self.assertFalse(rule(state))
+                    state.add_item("Turbo", 1, 1)
+                    self.assertTrue(rule(state))
+
+
 class TestLettersanityMode2SelfItemRules(unittest.TestCase):
     """The frozen mode-2 self-item access rule (dossier amendment, ruled
     2026-08-10), now ANDed onto the tier-2 term (parity audit family 2, ruled
