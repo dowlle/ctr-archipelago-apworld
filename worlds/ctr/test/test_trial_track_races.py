@@ -43,7 +43,7 @@ class TestTrialTrackRacesOff(CTRTestBase):
         self.assertFalse(set(TRIAL_TROPHY_CLASS.names()) & names)
         wire = self.world.fill_slot_data()
         self.assertNotIn("trial_track_checks", wire)
-        self.assertEqual(wire["schema_version"], 15)
+        self.assertEqual(wire["schema_version"], 16)
         self.assertEqual(wire["ctr_options"]["slide_coliseum_races"], 0)
         self.assertEqual(wire["ctr_options"]["turbo_track_races"], 0)
 

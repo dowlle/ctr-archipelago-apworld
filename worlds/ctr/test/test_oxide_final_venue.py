@@ -12,7 +12,7 @@ STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 class TestOxideFinalVenue(CTRTestBase):
     def test_default_is_exact_cortex_vortex_pair(self):
         wire = self.world.fill_slot_data()
-        self.assertEqual(wire["schema_version"], 15)
+        self.assertEqual(wire["schema_version"], 16)
         self.assertEqual(wire["ctr_options"]["oxide_final_track"], 0)
         self.assertEqual(wire["oxide_final_venue"], {
             "version": 1,

@@ -649,6 +649,19 @@ def create_regions(world: "ctrAPWorld"):
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
 
+    # Hit Character checks (0.2.1 candidate) are global like itemsanity: a hit
+    # can land in any race, so the sixteen checks hang off the always-reachable
+    # Menu region. Native dispatch and the reachability proof are later work;
+    # this ticket only creates the registered locations and emits the wire data.
+    from .hit_character import HIT_CHARACTER_CLASS
+    for _name, _code, _region_name in HIT_CHARACTER_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "hit_character"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
     # The 10-wumpa checks (2026-08-10 ruling, widened by the 2026-08-29 spec).
     # In `global` mode the single check hangs off Menu for the same reason
     # itemsanity does -- fruit are collected wherever you race -- and needs no

@@ -18,6 +18,7 @@ from .wumpa_checks import WUMPA_CLASS
 from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS, CUSTOM_CTR_CHALLENGE_CLASS
 from .cortex_vortex_track import CORTEX_VORTEX_TRACK_CLASS
+from .hit_character import HIT_CHARACTER_CLASS
 
 # The registered optional location classes (#176), in registration order.
 #
@@ -60,6 +61,10 @@ CTR_LOCATION_CLASSES.register(CUSTOM_TRACK_LOCATION_CLASS)
 CTR_LOCATION_CLASSES.register(CUSTOM_LETTERSANITY_CLASS)
 CTR_LOCATION_CLASSES.register(CUSTOM_CTR_CHALLENGE_CLASS)
 CTR_LOCATION_CLASSES.register(CORTEX_VORTEX_TRACK_CLASS)
+# Hit Character encounter checks (0.2.1 candidate): appended LAST, after the
+# Cortex Vortex pad track, so every earlier class keeps its datapackage order.
+# Global Menu checks like itemsanity.
+CTR_LOCATION_CLASSES.register(HIT_CHARACTER_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")

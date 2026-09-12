@@ -509,8 +509,8 @@ class TestOptionOffNeutrality(CTRTestBase):
     def test_schema_is_current_and_no_block_is_emitted(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("custom_tracks", slot_data)
-        self.assertEqual(slot_data["schema_version"], 15)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 15)
+        self.assertEqual(slot_data["schema_version"], 16)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
 
     def test_purple_still_legs_its_four_retail_tracks(self):
         for track in PURPLE_LEGS:
@@ -771,8 +771,8 @@ class TestDisplacementIntegration(CTRTestBase):
 
     def test_schema_is_current_and_the_block_is_emitted(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
-        self.assertEqual(slot_data["schema_version"], 15)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 15)
+        self.assertEqual(slot_data["schema_version"], 16)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
         self.assertEqual(
             slot_data["custom_tracks"],
             json.loads(json.dumps(custom_tracks_to_wire(
@@ -935,7 +935,7 @@ class TestUTPinsTheDisplacement(CTRTestBase):
         ut_slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertEqual(ut_slot_data["custom_tracks"],
                          slot_data["custom_tracks"])
-        self.assertEqual(ut_slot_data["schema_version"], 15)
+        self.assertEqual(ut_slot_data["schema_version"], 16)
 
     def test_regen_pins_it_through_aps_real_wire_pipeline(self):
         self.world_setup(seed=SEED)

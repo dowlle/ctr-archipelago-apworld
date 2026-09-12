@@ -420,6 +420,29 @@ def apply_raise_guards(world):
     raise_if_oxide_final_count_exceeds_mode_capacity(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
+    raise_if_hit_character_needs_trial_trophy_modes(world)
+    raise_if_hit_character_needs_oxide_boss_route(world)
+
+
+def raise_if_hit_character_needs_trial_trophy_modes(world):
+    """Hit Character encounters (0.2.1 candidate). N. Tropy's guaranteed pins
+    are the Slide Coliseum and Turbo Track Trophy Races, so an enabled seed
+    with either trial mode off would advertise an unreachable opportunity.
+    Delegated to the feature module so the pin/trigger knowledge lives in one
+    place; it is a RAISE guard because no silent re-roll or auto-enable is an
+    acceptable resolution (the contract forbids modifying other options)."""
+    from . import hit_character
+    hit_character.raise_if_required_trial_modes_disabled(world)
+
+
+def raise_if_hit_character_needs_oxide_boss_route(world):
+    """Hit Character encounters. `oxide_goal: disabled` removes both N. Oxide
+    races, leaving Nitros Oxide's mandatory Hit check with no trigger and no
+    boss encounter. Delegated to the feature module for the same reason as the
+    trial-mode guard; the `set_rules` structural error remains the backstop for
+    the lock-based impossibilities only `create_regions` can decide."""
+    from . import hit_character
+    hit_character.raise_if_required_boss_encounters_disabled(world)
 
 
 # ---------------------------------------------------------------------------

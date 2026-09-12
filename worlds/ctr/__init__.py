@@ -35,6 +35,7 @@ from .lettersanity import LETTERSANITY_CLASS
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
+from . import hit_character
 from . import progressive_capability
 from . import rung_sizer
 from .spoiler_pad_map import changed_pad_destination_rows
@@ -474,6 +475,12 @@ class ctrAPWorld(World):
         if cortex_vortex_track.track_on(o):
             selected[cortex_vortex_track.CORTEX_VORTEX] = o._cortex_vortex_letters
         o._lettersanity_selected = selected
+        # Hit Character encounters (0.2.1 candidate): pin the connected seed's
+        # block verbatim (refusing a malformed/conflicting wire), then restore
+        # the always-emitted scalar. The restore validates the raw boolean type
+        # and never redraws the seed or the candidate arrays.
+        hit_character.restore_from_wire(self, passthrough)
+        o.hit_character.value = int(bool(co.get("hit_character", 0)))
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -547,6 +554,11 @@ class ctrAPWorld(World):
         from . import forced_options
         forced_options.apply(self)
         rung_sizer.apply_rung_sizing(self)
+        # Hit Character encounters (0.2.1 candidate): draw the single roster
+        # seed and cache the resolved block. No-op (and no RNG draw) when the
+        # option is off. The trial-Trophy requirement is enforced by
+        # forced_options.raise_if_required_trial_modes_disabled above.
+        hit_character.resolve_for_generation(self)
 
     def create_regions(self):
         create_regions(self)
@@ -2011,11 +2023,15 @@ class ctrAPWorld(World):
         # not silently discard required trial letter items/checks.
         # Schema 13: encounter priority can skip Oxide 1 and a final win
         # collects both checks. Old clients cannot enforce that contract.
-        # Schema 15 (2026-09-13 contract; 14 is claimed by Hit Character):
-        # the Cortex Vortex pad track puts destination 110 in warp_pad_map and
-        # gem_cup_legs and removes a destination's checks. Unconditional, per
-        # the standing Q28 rule.
-        schema = 15
+        # Schema 15 (2026-09-13 contract): the Cortex Vortex pad track puts
+        # destination 110 in warp_pad_map and gem_cup_legs and removes a
+        # destination's checks. Unconditional, per the standing Q28 rule.
+        # Schema 16: the top-level `hit_character_encounters` block (schema 1)
+        # plus the always-emitted `ctr_options.hit_character` scalar. Hit
+        # Character integrated after Cortex Vortex, so it takes 16, not the 14
+        # it was drafted against; a schema-15 client reports the newer seed
+        # instead of silently ignoring the encounter data.
+        schema = 16
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -2172,6 +2188,11 @@ class ctrAPWorld(World):
                 # metadata; option-off parity applies to generated content and
                 # to the conditional top-level feature block below.
                 "itemsanity": bool(o.itemsanity.value),
+                # Hit Character encounters (0.2.1 candidate). Always emitted as
+                # a boolean, on or off, so a tracker reads the seed's real
+                # configuration; the conditional top-level block below carries
+                # the resolved encounter data and is present only when enabled.
+                "hit_character": bool(o.hit_character.value),
                 # The wumpa family's two scalars (2026-08-10 ruling). Always
                 # emitted, same convention as itemsanity and tizi_helper, and
                 # DIAGNOSTIC / TRACKER ONLY: native drives both from received
@@ -2285,6 +2306,12 @@ class ctrAPWorld(World):
             # Additive under schema 7.  Omitted when off, so disabled seeds do
             # not gain a dormant 22-slot feature block.
             slot_data["itemsanity_checks"] = self._resolve_itemsanity_checks()
+        hit_character_block = hit_character.slot_data(self)
+        if hit_character_block is not None:
+            # Conditional on enabled, matching the scalar's always-emit
+            # convention. The block is fully resolved in generate_early (seed
+            # drawn once, cached); UT pins the connected seed's block verbatim.
+            slot_data["hit_character_encounters"] = hit_character_block
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         custom_letters = CUSTOM_LETTERSANITY_CLASS.wire_block(o)
