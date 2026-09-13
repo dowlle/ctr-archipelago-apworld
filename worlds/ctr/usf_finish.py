@@ -173,6 +173,12 @@ def track_finish_term(track, world):
     return usf_term(world, required_character)
 
 
+def oxide_final_track_name(world):
+    """The track Oxide's Final Challenge is raced on this seed."""
+    return ("Cortex Vortex" if int(world.options.oxide_final_track.value) == 0
+            else "Oxide Station")
+
+
 def usf_finish_cups(cup_legs: Dict[str, List[str]]) -> frozenset:
     """The cup region names whose completion includes finishing a USF track,
     for this seed's resolved `gem_cup_legs` map."""

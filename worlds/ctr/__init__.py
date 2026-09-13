@@ -1206,8 +1206,11 @@ class ctrAPWorld(World):
         # term. track_finish_term carries the whole ruling -- two Progressive
         # Boosts at easy/medium, vacuous at hard shortcut knowledge, vacuous
         # when the chain is not randomized, racer-aware in per-character mode.
-        from .usf_finish import track_finish_term
+        # The Final Challenge takes its venue's record instead: Cortex Vortex
+        # needs USF with no hard-shortcut escape.
+        from .usf_finish import oxide_final_track_name, track_finish_term
         oxide_finish = track_finish_term("Oxide Station", self)
+        final_finish = track_finish_term(oxide_final_track_name(self), self)
 
         if o.oxide_goal.value == OxideGoal.option_any_percent:
             flag = self._add_goal_event(
@@ -1236,7 +1239,7 @@ class ctrAPWorld(World):
                 "has('Key', 4)")
             relic_rule = self._oxide_final_relic_rule()
             predicates.append(
-                lambda state, f=flag, r=relic_rule, ft=oxide_finish:
+                lambda state, f=flag, r=relic_rule, ft=final_finish:
                     state.has(f, player) and r(state) and ft(state, player))
             # Issue #27: exclude the real Final Challenge location only -- when
             # Oxide Goal is 'final' the FIRST Challenge is not this seed's goal
