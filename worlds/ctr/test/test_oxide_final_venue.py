@@ -1,6 +1,12 @@
+import unittest
+
+from BaseClasses import CollectionState
+
 from . import CTRTestBase
 from test.general import setup_multiworld
 from .. import ctrAPWorld
+
+STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 
 
 class TestOxideFinalVenue(CTRTestBase):
@@ -101,3 +107,45 @@ class TestOxideFinalVenueGenerationMatrix(CTRTestBase):
                                              venue)
                             self.assertEqual(wire["oxide_final_venue"]["location"],
                                              35011105)
+
+
+class TestCortexVortexWumpaFollowsFinalChallenge(unittest.TestCase):
+    """The check fires only during the Final Challenge race, so it must not be
+    in logic at Oxide 1 access (four Keys) before the Final Challenge is."""
+
+    VORTEX = "Cortex Vortex: Reach 10 Wumpa"
+    FINAL = "N. Oxide Garage: N. Oxide's Final Challenge"
+    BOSS_FLAGS = ("Ripper Roo Boss Race Won", "Papu Papu Boss Race Won",
+                  "Komodo Joe Boss Race Won", "Pinstripe Boss Race Won")
+
+    def _reach(self, mw, items):
+        state = CollectionState(mw)
+        for name in items:
+            state.add_item(name, 1, 1)
+        state.stale[1] = True
+        return (mw.get_location(self.VORTEX, 1).can_reach(state),
+                mw.get_location(self.FINAL, 1).can_reach(state))
+
+    def test_keys_alone_do_not_reach_the_check(self):
+        mw = setup_multiworld(ctrAPWorld, STEPS, seed=1,
+                              options={"wumpa_check": "per_track"})
+        self.assertEqual(self._reach(mw, ["Key"] * 4), (False, False))
+        self.assertEqual(self._reach(mw, ["Key"] * 4 + ["Sapphire Relic"] * 18),
+                         (True, True))
+
+    def test_matches_the_final_challenge_in_every_goal_mode(self):
+        for goal in ("none", "any_percent", "101_percent"):
+            mw = setup_multiworld(ctrAPWorld, STEPS, seed=1, options={
+                "wumpa_check": "per_track", "oxide_goal": goal,
+                "bosses_required_goal": 1,
+                "oxide_final_challenge_relic_count": 3})
+            bosses = [mw.get_location(name, 1).item.name
+                      for name in self.BOSS_FLAGS]
+            for items in (["Key"] * 4,
+                          ["Key"] * 4 + ["Sapphire Relic"] * 2,
+                          ["Key"] * 4 + ["Sapphire Relic"] * 3,
+                          ["Key"] * 4 + ["Sapphire Relic"] * 3 + bosses,
+                          ["Key"] * 3 + ["Sapphire Relic"] * 3 + bosses):
+                with self.subTest(goal=goal, items=len(items)):
+                    vortex, final = self._reach(mw, items)
+                    self.assertEqual(vortex, final)

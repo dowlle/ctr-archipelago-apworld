@@ -748,6 +748,17 @@ def add_oxide_access_contract(world, player):
     _and_onto(world, player, OXIDE_FINAL_LOCATION, final_rule, replace=True)
     _and_onto(world, player, OXIDE_FINAL_EVENT, final_rule)
 
+    # The Cortex Vortex Wumpa check can only fire during the Final Challenge
+    # race, so its entrance takes the same rule (the four Keys come from the
+    # garage door, as for the Final Challenge location).
+    from .Regions import CORTEX_VORTEX_WUMPA_ENTRANCE
+    try:
+        vortex = world.multiworld.get_entrance(
+            CORTEX_VORTEX_WUMPA_ENTRANCE, player)
+    except KeyError:
+        return  # not per-track Wumpa, or Oxide Station is the venue
+    vortex.access_rule = final_rule
+
 
 def _and_onto(world, player, location_name, extra, replace=False):
     """AND `extra` onto a location's existing access rule, or replace it.

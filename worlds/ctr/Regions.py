@@ -47,6 +47,11 @@ BOSS_WUMPA_TRACKS = {
     "N. Oxide Garage": "Oxide Station",
 }
 
+# Cortex Vortex as Oxide's Final Challenge venue races outside that table: only
+# the Final Challenge loads it, so its Wumpa check has its own dead-end region.
+CORTEX_VORTEX_WUMPA_REGION = "Cortex Vortex: Wumpa"
+CORTEX_VORTEX_WUMPA_ENTRANCE = "N. Oxide Garage -> Cortex Vortex: Wumpa"
+
 # Vanilla race-track LevelIDs that belong to each boss's hub, in the same
 # 0..15 numbering native + Icebound use (verified against
 # icebound-standalone LevelID enum and data/warp_pad_ids.json):
@@ -597,10 +602,29 @@ def create_regions(world: "ctrAPWorld"):
     # Global Wumpa remains on Menu. A custom direct destination remains in its
     # resolved destination region because that region is already the sole race
     # route for the Alpha6 package.
-    from .wumpa_checks import WUMPA_CLASS, WUMPA_RETAIL_TRACKS
+    #
+    # Cortex Vortex gets the same dead-end shape. Its only race today is Oxide's
+    # Final Challenge, so its one entrance comes from the garage and
+    # add_oxide_access_contract gives it the Final Challenge rule; the garage
+    # door alone is only the Oxide 1 requirement. A future pad, Cup-leg or
+    # destination route onto Cortex Vortex adds another entrance to this region.
+    from .wumpa_checks import (WUMPA_CLASS, WUMPA_CORTEX_VORTEX_LOCATION,
+                               WUMPA_RETAIL_TRACKS)
     _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
-        if _region_name in WUMPA_RETAIL_TRACKS:
+        if _name == WUMPA_CORTEX_VORTEX_LOCATION:
+            _region = Region(CORTEX_VORTEX_WUMPA_REGION, player, mw)
+            _region.type = "wumpa"
+            mw.regions.append(_region)
+            regions.append(_region)
+            region_lookup[_region.name] = _region
+            _source = region_lookup[_region_name]
+            _ent = Entrance(player=player, name=CORTEX_VORTEX_WUMPA_ENTRANCE,
+                            parent=_source)
+            _ent.connect(_region)
+            _source.exits.append(_ent)
+            mw.regions.entrance_cache[player][_ent.name] = _ent
+        elif _region_name in WUMPA_RETAIL_TRACKS:
             _region = Region(f"{_region_name}: Wumpa", player, mw)
             _region.type = "wumpa"
             mw.regions.append(_region)
