@@ -30,6 +30,8 @@ shipped, so this module registers the FULL superset unconditionally:
   * the 4 genuinely-new names -- "Held 1st", "Held 3rd", "Held 5th", "Finish on
     Podium" -- get an additive new base block (35015100, stride 4). Nothing
     shipped is renumbered (the 35015000 precedent: additive blocks never move).
+  * the trial tracks' rows at 35015200 (#203) and the Cortex Vortex pad track's
+    row at 35026010 (2026-09-13 unfreeze), each five codes in SLOT_ORDER.
 
 This module is the single source of the podium layout (names, codes, slot order,
 creation subset) and is consumed by Locations.py (datapackage), Regions.py
@@ -48,6 +50,8 @@ slot_data block stay HERE, because they are podium's, not the family's.
 import json
 import pkgutil
 
+from .cortex_vortex_track import CORTEX_VORTEX
+from .cortex_vortex_track import PODIUM_CODE_BASE as CORTEX_VORTEX_PODIUM_CODE_BASE
 from .location_class import LocationClass
 
 # v0.1.x block (retired-but-registered names + the still-created finish_any).
@@ -102,14 +106,26 @@ def _trophy_tracks():
 TROPHY_TRACKS = _trophy_tracks()
 TRIAL_TRACKS = ("Slide Coliseum", "Turbo Track")
 TRIAL_PODIUM_CODE_BASE = 35015200
+#: Cortex Vortex as a pad track (2026-09-13 contract): one five-rung row in
+#: SLOT_ORDER at 35026010..014 (CORTEX_VORTEX_PODIUM_CODE_BASE, imported from
+#: its module), beside the track's own block at 35026000.
 
 
 def enabled_trophy_tracks(options):
+    """Every track whose podium rungs this seed can create: the 16 trophy
+    tracks, the trial tracks whose Trophy Race is on, and Cortex Vortex when
+    it is a pad track -- minus the destination the Cortex Vortex track
+    dropped, whose checks leave the seed."""
+    from .cortex_vortex_track import dropped_track, track_on
     pinned = getattr(options, "_trial_podium_wire", None)
-    return TROPHY_TRACKS + [track for track, name in zip(
+    tracks = TROPHY_TRACKS + [track for track, name in zip(
         TRIAL_TRACKS, ("slide_coliseum_races", "turbo_track_races"))
         if int(getattr(getattr(options, name, 0), "value", 0)) >= 1
         and (pinned is None or any(code > 0 for code in pinned.get(track, [])))]
+    if not track_on(options):
+        return tracks
+    dropped = dropped_track(options)
+    return [track for track in tracks if track != dropped] + [CORTEX_VORTEX]
 
 
 def track_rung_keys(options, track):
@@ -177,7 +193,8 @@ class PodiumLocationClass(LocationClass):
 
     key = "podium"
     display_name = "Podium Placement Rungs"
-    code_blocks = (PODIUM_CODE_BASE, HELD_CODE_BASE, TRIAL_PODIUM_CODE_BASE)
+    code_blocks = (PODIUM_CODE_BASE, HELD_CODE_BASE, TRIAL_PODIUM_CODE_BASE,
+                   CORTEX_VORTEX_PODIUM_CODE_BASE)
 
     def all_locations(self):
         """Every possible podium rung as (name, code, region) for the DATAPACKAGE
@@ -196,6 +213,9 @@ class PodiumLocationClass(LocationClass):
             for ri, key in enumerate(SLOT_ORDER):
                 out.append((self.location_name(track, key),
                             TRIAL_PODIUM_CODE_BASE + ti * 5 + ri, track))
+        for ri, key in enumerate(SLOT_ORDER):
+            out.append((self.location_name(CORTEX_VORTEX, key),
+                        CORTEX_VORTEX_PODIUM_CODE_BASE + ri, CORTEX_VORTEX))
         return out
 
     def location_name(self, track: str, rung_key: str) -> str:

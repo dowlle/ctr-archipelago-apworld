@@ -58,7 +58,22 @@ CONFIRMED_FINISH_CAPABILITIES = (
         gate_held_first=True,
         source="Live pre1 test session, 2026-08-14 17:15 CEST",
     ),
+    # Cortex Vortex has a Trophy Race only when the `cortex_vortex_track`
+    # option is on; the same record also gates its Oxide 2 venue. Consumers
+    # must not assume every record's Trophy Race exists in every seed.
+    FinishCapability(
+        track="Cortex Vortex",
+        boost_count=2,
+        hard_shortcut_escape=False,
+        gate_held_first=False,
+        source="Oxide 2 play, confirmed 2026-09-13 09:04 CEST: several jumps "
+               "need USF",
+    ),
 )
+
+#: Records whose track is not a retail trophy track, so its Trophy Race exists
+#: only when an option creates it.
+OPTIONAL_TROPHY_TRACKS = frozenset({"Cortex Vortex"})
 
 CONFIRMED_FINISH_BY_TRACK = {
     record.track: record for record in CONFIRMED_FINISH_CAPABILITIES

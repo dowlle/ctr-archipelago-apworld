@@ -132,8 +132,13 @@ def _base_location_supply(world) -> int:
     than their frozen full table. Any optional class that becomes live before
     #71's next touch contributes automatically through the #176 registry.
     """
+    from .cortex_vortex_track import dropped_region
+    # A destination the Cortex Vortex pad track dropped creates none of its
+    # static checks (its Time Trials are already out of the relic counts).
+    dropped = dropped_region(world.options)
     static_without_trials = sum(
-        1 for loc in _LOCATION_DATA if not loc["name"].endswith(" Time Trial"))
+        1 for loc in _LOCATION_DATA if not loc["name"].endswith(" Time Trial")
+        and loc["region"] != dropped)
     relics = sum(world._ctr_relic_created.values())
     other_classes = sum(
         len(location_class.created_locations(world.options))
@@ -239,6 +244,9 @@ def predicted_mandatory_pool(world) -> int:
     if mode in (2, 3):
         mandatory += len(_custom_ctr_slots(world)) * (
             3 if mode == 3 else int(world.options.letters_per_track.value))
+    # The Cortex Vortex pad track's letter items, outside the item table.
+    from .cortex_vortex_track import created_letter_item_names
+    mandatory += len(created_letter_item_names(world.options))
     return mandatory
 
 

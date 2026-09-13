@@ -212,8 +212,11 @@ def add_lettersanity_rules(world, player):
     mode = int(world.options.lettersanity.value)
     # Token completion needs physical R except when mode 2 excludes it.
     # Install after the entry rule was shared with individual letters, so
-    # collecting C or T does not require opening R's shortcut door.
+    # collecting C or T does not require opening R's shortcut door. Skipped
+    # when the Cortex Vortex track dropped Tiger Temple: its token is gone.
     if (world.options.itemsanity.value
+            and "Tiger Temple: CTR Token Challenge"
+            in world.multiworld.regions.location_cache[player]
             and (mode != 2 or "R" in world.options._lettersanity_selected.get(
                 "Tiger Temple", ()))):
         token = world.multiworld.get_location(
@@ -226,6 +229,7 @@ def add_lettersanity_rules(world, player):
         )
     if mode not in (1, 2, 3):
         return
+    _add_cortex_vortex_letter_rules(world, player, mode)
     selected = world.options._lettersanity_selected
     if mode in (2, 3):
         for track in lettersanity.eligible_letter_tracks(world.options):
@@ -311,6 +315,34 @@ def add_lettersanity_rules(world, player):
                 previous = loc.access_rule
                 loc.access_rule = lambda state, previous=previous, own=own, p=player: \
                     previous(state) and state.has(own, p)
+
+
+def _add_cortex_vortex_letter_rules(world, player, mode):
+    """Lettersanity on the Cortex Vortex pad track, the retail rules on the
+    track's own identities: in modes 2 and 3 its CTR Token Challenge needs the
+    letter items the seed pools for it, and in mode 2 each letter location
+    also needs its own item (the self-item rule). Its letter locations already
+    share the token-challenge rule, finish term included
+    (add_time_trial_and_ctr_requirements)."""
+    from .cortex_vortex_track import (
+        CORTEX_VORTEX_TRACK_CLASS, CTR_TOKEN_NAME, letter_item_name,
+        required_letter_item_names, track_on)
+    if not track_on(world.options):
+        return
+    cache = world.multiworld.regions.location_cache[player]
+    if mode in (2, 3) and CTR_TOKEN_NAME in cache:
+        names = tuple(required_letter_item_names(world.options))
+        loc = cache[CTR_TOKEN_NAME]
+        previous = loc.access_rule
+        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
+            previous(state) and all(state.has(name, p) for name in names)
+    if mode == 2:
+        for name in CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options):
+            own = letter_item_name(name.rsplit(" ", 1)[1])
+            loc = cache[name]
+            previous = loc.access_rule
+            loc.access_rule = lambda state, previous=previous, own=own, p=player: \
+                previous(state) and state.has(own, p)
 
 
 def add_custom_ctr_challenge_rules(world, player):
@@ -744,17 +776,18 @@ def add_oxide_access_contract(world, player):
                       f(state) and r(state))
 
     # Winning on Cortex Vortex needs USF with no hard-shortcut escape (from
-    # Oxide 2 play: several jumps need USF, 2026-09-13). It has no
-    # capability_contract record yet because those records assume a Trophy
-    # Race; it moves there when Cortex Vortex becomes a pad track. The Oxide
-    # Station venue keeps its earlier behaviour: only the 101% goal predicate
-    # in _install_goal carries its finish term.
+    # Oxide 2 play: several jumps need USF, 2026-09-13). The term comes from
+    # the Cortex Vortex record in capability_contract, which the pad track
+    # shares. It is not bound to a pad's racer lock: this race starts in the
+    # garage, not on the pad that carries the Cortex Vortex pad track. The
+    # Oxide Station venue keeps its earlier behaviour: only the 101% goal
+    # predicate in _install_goal carries its finish term.
     from .usf_finish import oxide_final_track_name, track_finish_term
     final_win_rule = final_rule
     if oxide_final_track_name(world) == "Cortex Vortex":
         final_win_rule = (
             lambda state, r=final_rule,
-            t=track_finish_term("Cortex Vortex", world):
+            t=track_finish_term("Cortex Vortex", world, bind_racer=False):
             r(state) and t(state, player))
 
     _and_onto(world, player, OXIDE_FIRST_LOCATION, first_rule)
@@ -762,10 +795,11 @@ def add_oxide_access_contract(world, player):
     _and_onto(world, player, OXIDE_FINAL_LOCATION, final_win_rule, replace=True)
     _and_onto(world, player, OXIDE_FINAL_EVENT, final_win_rule)
 
-    # The Cortex Vortex Wumpa check can only fire during the Final Challenge
-    # race, so its entrance takes the same rule (the four Keys come from the
-    # garage door, as for the Final Challenge location). It fires mid-race, so
-    # like the held podium rungs it does not take the finish term.
+    # From the garage, the Cortex Vortex Wumpa check can only fire during the
+    # Final Challenge race, so that entrance takes the same rule (the four Keys
+    # come from the garage door, as for the Final Challenge location). It
+    # fires mid-race, so like the held podium rungs it does not take the
+    # finish term. The pad-track and Cup-leg routes are separate entrances.
     from .Regions import CORTEX_VORTEX_WUMPA_ENTRANCE
     try:
         vortex = world.multiworld.get_entrance(
@@ -960,6 +994,9 @@ def _created_letter_names_for(world, track):
     (no name re-derivation that could drift from location creation).
     """
     from .lettersanity import LETTERSANITY_CLASS
+    from .cortex_vortex_track import CORTEX_VORTEX, CORTEX_VORTEX_TRACK_CLASS
+    if track == CORTEX_VORTEX:
+        return CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options)
     prefix = f"{track}: Letter "
     return [name for name in LETTERSANITY_CLASS.created_location_names(world.options)
             if name.startswith(prefix)]

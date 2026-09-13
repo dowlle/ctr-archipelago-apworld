@@ -48,7 +48,7 @@ from ..turbo_grant import TURBO_GRANT_CODE, TURBO_GRANT_ITEM
 #: (registry key, name count, code blocks) for every location class, in
 #: registration order. Registration order IS datapackage order.
 EXPECTED_CLASSES = [
-    ("podium", 122, (35015000, 35015100, 35015200)),
+    ("podium", 127, (35015000, 35015100, 35015200, 35026010)),
     ("relic_perfect", 18, (35012400,)),
     ("lettersanity", 54, (35012500,)),
     ("item_boxes", 270, (35014000,)),
@@ -61,6 +61,10 @@ EXPECTED_CLASSES = [
     ("custom_track_race", 192, (35016300, 35016400, 35016500)),
     ("custom_lettersanity", 396, (35020000,)),
     ("custom_ctr_challenge", 132, (35023000, 35023100)),
+    # The approved 2026-09-13 Cortex Vortex pad-track unfreeze: Trophy, three
+    # Time Trials, CTR Token Challenge and three letters at 35026000..008
+    # (35026005 reserved, not minted). Its five rungs are podium's, above.
+    ("cortex_vortex_track", 8, (35026000,)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -123,11 +127,13 @@ class TestNameFreezeCensus(unittest.TestCase):
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
         # the three trap identities the rework minted (#280).
-        self.assertEqual(len(world_type.item_name_to_id), 596)
+        # + the three Cortex Vortex pad-track letter items (2026-09-13).
+        self.assertEqual(len(world_type.item_name_to_id), 599)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
-        self.assertEqual(len(world_type.location_name_to_id), 1332)
+        # + 13 Cortex Vortex pad-track names (2026-09-13 unfreeze).
+        self.assertEqual(len(world_type.location_name_to_id), 1345)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:

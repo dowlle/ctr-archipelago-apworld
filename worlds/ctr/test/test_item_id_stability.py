@@ -76,7 +76,15 @@ class TestItemIdStability(unittest.TestCase):
         self.assertEqual(len(custom), 396)
         self.assertFalse(set(custom).intersection(explicit))
         self.assertFalse(set(custom.values()).intersection(explicit.values()))
-        self.assertEqual(world_type.item_name_to_id, {**explicit, **custom})
+        # The 2026-09-13 Cortex Vortex pad-track letters: approved codes right
+        # after the positional table, kept out of it (closed 0..199 range).
+        vortex = {"Letter C (Cortex Vortex)": 35010200,
+                  "Letter T (Cortex Vortex)": 35010201,
+                  "Letter R (Cortex Vortex)": 35010202}
+        self.assertFalse(set(vortex.values()).intersection(explicit.values()))
+        self.assertFalse(set(vortex.values()).intersection(custom.values()))
+        self.assertEqual(world_type.item_name_to_id,
+                         {**explicit, **custom, **vortex})
 
     def test_existing_items_keep_their_frozen_id(self) -> None:
         frozen: dict = {}

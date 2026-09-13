@@ -238,8 +238,14 @@ class ItemBoxLocationClass(LocationClass):
         if toggle is None or not bool(toggle.value):
             return []
         tier = int(getattr(options, "shortcut_knowledge").value)
+        from .cortex_vortex_track import dropped_track
+        # A destination the Cortex Vortex track dropped takes its boxes with
+        # it (Cortex Vortex itself has none).
+        dropped = dropped_track(options)
         out = []
         for track in BOX_TRACKS:
+            if track == dropped:
+                continue
             for slot in range(1, PLACED_COUNTS[track] + 1):
                 if SK_REQUIRED_TIER.get((track, slot), SK_EASY) > tier:
                     continue

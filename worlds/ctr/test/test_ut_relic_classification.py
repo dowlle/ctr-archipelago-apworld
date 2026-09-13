@@ -205,5 +205,5 @@ class TestRelicClassificationNoSchemaBump(CTRTestBase):
         # Baseline is 7, the unconditional #166 bump (Q28 ruling); relic
         # classification itself contributes no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 13)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 13)
+        self.assertEqual(slot_data["schema_version"], 15)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 15)

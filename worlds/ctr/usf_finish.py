@@ -125,9 +125,14 @@ FIRST_BOOST_COUNT = 1
 #: unlike Oxide's FINISH gate: route knowledge does not substitute for the
 #: missing boost reserves on a relic pace, and for N. Gin Labs it does not
 #: restore the unreachable boxes either.
-USF_RELIC_GOLD_TRACKS = frozenset({"Hot Air Skyway", "Oxide Station"})
+#:
+#: Cortex Vortex (2026-09-13 contract) takes the USF tier for Gold and
+#: Platinum like Oxide Station. Its relic targets are Oxide Station's retail
+#: times as placeholders until the track author supplies real ones.
+USF_RELIC_GOLD_TRACKS = frozenset(
+    {"Hot Air Skyway", "Oxide Station", "Cortex Vortex"})
 USF_RELIC_PLATINUM_TRACKS = frozenset(
-    {"Hot Air Skyway", "Oxide Station", "N. Gin Labs"})
+    {"Hot Air Skyway", "Oxide Station", "N. Gin Labs", "Cortex Vortex"})
 
 
 def relic_tier_boost_min(track, tier):
@@ -163,13 +168,19 @@ def usf_term(world, required_character=None):
     return boost_term(world, required_character, USF_BOOST_COUNT)
 
 
-def track_finish_term(track, world):
-    """Return this track's option-aware and racer-aware finish term."""
+def track_finish_term(track, world, bind_racer=True):
+    """Return this track's option-aware and racer-aware finish term.
+
+    `bind_racer=False` is for a race that is NOT launched from the pad that
+    loads `track`: Oxide's Final Challenge on Cortex Vortex starts in the
+    garage, so the racer lock of whichever pad carries the Cortex Vortex pad
+    track (when that option is on) does not apply to it."""
     from .item_boxes import SK_HARD
     if (track in USF_OR_HARD_SK_FINISH_TRACKS
             and int(world.options.shortcut_knowledge.value) == SK_HARD):
         return lambda state, player: True
-    required_character = track_required_character(world, track)
+    required_character = (track_required_character(world, track)
+                          if bind_racer else None)
     return usf_term(world, required_character)
 
 

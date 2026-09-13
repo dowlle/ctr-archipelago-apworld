@@ -44,8 +44,9 @@ family and registers every name UNCONDITIONALLY:
                       item-box track mapping uses. Contiguous behind the global
                       code so the family reads as one block.
   * 35016120          the Purple Gem Cup custom DESTINATION SLOT.
-  * 35016121          Cortex Vortex as the Final Challenge venue. This fixed
-                      encounter identity never aliases Oxide Station.
+  * 35016121          Cortex Vortex, from any race on it: the Final
+                      Challenge venue and, since 2026-09-13, the optional pad
+                      track and its Gem Cup legs. Never aliases Oxide Station.
                       Future custom roles take 35016122 and up; a new PACKAGE
                       in an already-supported role needs no
                       code at all, which is the point of keying the identity to
@@ -153,12 +154,34 @@ def eligible_retail_tracks(options) -> Tuple[str, ...]:
     Trophy Race location. That location is the apworld-owned proof that native
     exposes the AI/arcade-style race instead of the retail relic-only launch.
     """
+    from .cortex_vortex_track import dropped_track
     trial_trophies = set(TRIAL_TROPHY_CLASS.created_location_names(options))
+    dropped = dropped_track(options)
     return tuple(
         track for track in WUMPA_RETAIL_TRACKS
-        if (track in WUMPA_ALWAYS_RACEABLE_TRACKS
-            or TRIAL_TROPHY_CLASS.location_name(track) in trial_trophies)
+        if track != dropped
+        and (track in WUMPA_ALWAYS_RACEABLE_TRACKS
+             or TRIAL_TROPHY_CLASS.location_name(track) in trial_trophies)
     )
+
+
+def cortex_vortex_venue_active(options) -> bool:
+    """Oxide's Final Challenge is raced on Cortex Vortex this seed and Oxide
+    content is present -- the venue route onto the Cortex Vortex Wumpa check."""
+    oxide_final = getattr(options, "oxide_final_track", None)
+    oxide_goal = getattr(options, "oxide_goal", None)
+    return (oxide_final is not None and int(oxide_final.value) == 0 and
+            (oxide_goal is None or int(oxide_goal.value) != 3))
+
+
+def cortex_vortex_wumpa_active(options) -> bool:
+    """Per-track mode creates `Cortex Vortex: Reach 10 Wumpa` when Cortex
+    Vortex is a pad track, or when it is the Oxide 2 venue with Oxide content
+    present (2026-09-13 contract). One identity for every route onto it."""
+    from .cortex_vortex_track import track_on
+    if _mode(options) != WUMPA_PER_TRACK:
+        return False
+    return track_on(options) or cortex_vortex_venue_active(options)
 
 
 def _mode(options) -> int:
@@ -284,14 +307,15 @@ class WumpaLocationClass(LocationClass):
         names += [custom_location_name(label)
                   for _role, label, _region, _entry
                   in eligible_custom_roles(options)]
-        oxide_final = getattr(options, "oxide_final_track", None)
-        oxide_goal = getattr(options, "oxide_goal", None)
-        if (oxide_final is not None and int(oxide_final.value) == 0 and
-                (oxide_goal is None or int(oxide_goal.value) != 3)):
+        if cortex_vortex_wumpa_active(options):
             names.append(WUMPA_CORTEX_VORTEX_LOCATION)
         return names
 
     # ------------------------------------------------------------------- wire
+
+    def cortex_vortex_active(self, options) -> bool:
+        """Whether `Cortex Vortex: Reach 10 Wumpa` exists this seed."""
+        return cortex_vortex_wumpa_active(options)
 
     def retail_code(self, track: str) -> int:
         return WUMPA_RETAIL_CODE_BASE + WUMPA_RETAIL_TRACKS.index(track)

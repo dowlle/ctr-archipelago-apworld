@@ -55,11 +55,14 @@ FIXTURE_PATH = FIXTURE_DIR / "location_class_id_stability_v0_1_5.json"
 #: freeze minted (relic perfects, lettersanity, item boxes, itemsanity, the
 #: global wumpa check, the trial trophy races); the 2026-08-29 file holds the 19
 #: names the approved per-track Wumpa unfreeze appended (18 retail destinations
-#: plus one custom destination slot).
+#: plus one custom destination slot); the 2026-09-13 file holds the 13 names
+#: the approved Cortex Vortex pad-track unfreeze minted (five podium rungs and
+#: eight track checks).
 FIXTURE_PATHS = (
     FIXTURE_PATH,
     FIXTURE_DIR / "location_class_id_stability_v0_2_0.json",
     FIXTURE_DIR / "location_class_id_stability_2026_08_29_wumpa.json",
+    FIXTURE_DIR / "location_class_id_stability_2026_09_13_cortex_vortex.json",
 )
 
 PODIUM_TOGGLES = (
@@ -166,8 +169,10 @@ class TestPodiumClassIdentity(unittest.TestCase):
     def test_superset_is_16_tracks_x_7_entries(self) -> None:
         entries = PODIUM_CLASS.all_locations()
         self.assertEqual(len(TROPHY_TRACKS), 16)
-        self.assertEqual(len(entries), 16 * (len(SHIPPED_RUNGS) + len(NEW_RUNGS)) + 10)
-        self.assertEqual(len(entries), 122)
+        # + 10 trial-track rungs (#203) + 5 Cortex Vortex pad-track rungs
+        # (2026-09-13 unfreeze, 35026010..014).
+        self.assertEqual(len(entries), 16 * (len(SHIPPED_RUNGS) + len(NEW_RUNGS)) + 10 + 5)
+        self.assertEqual(len(entries), 127)
 
     def test_module_facade_delegates_to_the_class(self) -> None:
         """Regions.py and Rules.py still call the module functions; they must be
@@ -195,7 +200,7 @@ class TestPodiumClassIdentity(unittest.TestCase):
         """The declared blocks are the freeze's documentation (#177); a code
         outside them means the docstring lies."""
         blocks = PODIUM_CLASS.code_blocks
-        self.assertEqual(len(blocks), 3)
+        self.assertEqual(len(blocks), 4)
         for _name, code, _region in PODIUM_CLASS.all_locations():
             self.assertTrue(
                 any(base <= code < base + 100 for base in blocks),
@@ -272,7 +277,7 @@ class TestActiveAndInactiveClasses(unittest.TestCase):
         for a seed that creates none of them."""
         opts = _StubOptions()
         self.assertEqual(PODIUM_CLASS.created_locations(opts), [])
-        self.assertEqual(len(PODIUM_CLASS.all_locations()), 122)
+        self.assertEqual(len(PODIUM_CLASS.all_locations()), 127)
         for name, _code, _region in PODIUM_CLASS.all_locations():
             self.assertIn(name, CTR_LOCATION_IDS)
 
@@ -486,8 +491,9 @@ class TestLocationClassIdStability(unittest.TestCase):
     def test_fixture_covers_every_class_owned_location(self) -> None:
         frozen = self._frozen()
         # 112 podium + 361 frozen by #177 + 19 from the approved 2026-08-29
-        # per-track Wumpa unfreeze.
-        self.assertEqual(len(frozen), 492)
+        # per-track Wumpa unfreeze + 13 from the approved 2026-09-13 Cortex
+        # Vortex pad-track unfreeze.
+        self.assertEqual(len(frozen), 505)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(

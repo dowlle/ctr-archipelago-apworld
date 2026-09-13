@@ -12,6 +12,7 @@ from test.general import setup_multiworld
 from .. import ctrAPWorld
 from ..capability_contract import (
     CONFIRMED_FINISH_CAPABILITIES,
+    OPTIONAL_TROPHY_TRACKS,
     EASY_TROPHY_GROUP,
     RULED_TROPHY_GROUP,
     STATUS_CONFIRMED,
@@ -68,6 +69,13 @@ class TestContractCoverage(unittest.TestCase):
         self.assertNotIn("", names)
 
 
+def _track_options(track):
+    """Options that create `track`'s Trophy Race. A record in
+    OPTIONAL_TROPHY_TRACKS (the Cortex Vortex pad track) only has one with its
+    option on; every retail record keeps the default seed."""
+    return {"cortex_vortex_track": True} if track in OPTIONAL_TROPHY_TRACKS else {}
+
+
 class TestConfirmedFinishBoundaries(unittest.TestCase):
     def test_zero_one_two_copy_boundary_for_every_confirmed_finish(self):
         for record in CONFIRMED_FINISH_CAPABILITIES:
@@ -75,6 +83,7 @@ class TestConfirmedFinishBoundaries(unittest.TestCase):
                 options = {"shortcut_knowledge": "medium"}
             else:
                 options = {}
+            options.update(_track_options(record.track))
             mw = _build(progressive_boost="shared_global", **options)
             name = f"{record.track}: Trophy Race"
             with self.subTest(track=record.track, boost=0):
@@ -88,10 +97,11 @@ class TestConfirmedFinishBoundaries(unittest.TestCase):
                     name, "Location", PLAYER))
 
     def test_held_first_gating_matches_the_contract(self):
-        mw = _build(progressive_boost="shared_global",
-                    shortcut_knowledge="medium")
-        blocked = _state(mw, boost=0)
         for record in CONFIRMED_FINISH_CAPABILITIES:
+            mw = _build(progressive_boost="shared_global",
+                        shortcut_knowledge="medium",
+                        **_track_options(record.track))
+            blocked = _state(mw, boost=0)
             actual = blocked.can_reach(
                 location_name(record.track, "held_1st"), "Location", PLAYER)
             with self.subTest(track=record.track):
