@@ -743,14 +743,29 @@ def add_oxide_access_contract(world, player):
         final_rule = (lambda state, f=first_rule, r=relic_rule:
                       f(state) and r(state))
 
+    # Winning on Cortex Vortex needs USF with no hard-shortcut escape (from
+    # Oxide 2 play: several jumps need USF, 2026-09-13). It has no
+    # capability_contract record yet because those records assume a Trophy
+    # Race; it moves there when Cortex Vortex becomes a pad track. The Oxide
+    # Station venue keeps its earlier behaviour: only the 101% goal predicate
+    # in _install_goal carries its finish term.
+    from .usf_finish import oxide_final_track_name, track_finish_term
+    final_win_rule = final_rule
+    if oxide_final_track_name(world) == "Cortex Vortex":
+        final_win_rule = (
+            lambda state, r=final_rule,
+            t=track_finish_term("Cortex Vortex", world):
+            r(state) and t(state, player))
+
     _and_onto(world, player, OXIDE_FIRST_LOCATION, first_rule)
     _and_onto(world, player, OXIDE_FIRST_EVENT, first_rule)
-    _and_onto(world, player, OXIDE_FINAL_LOCATION, final_rule, replace=True)
-    _and_onto(world, player, OXIDE_FINAL_EVENT, final_rule)
+    _and_onto(world, player, OXIDE_FINAL_LOCATION, final_win_rule, replace=True)
+    _and_onto(world, player, OXIDE_FINAL_EVENT, final_win_rule)
 
     # The Cortex Vortex Wumpa check can only fire during the Final Challenge
     # race, so its entrance takes the same rule (the four Keys come from the
-    # garage door, as for the Final Challenge location).
+    # garage door, as for the Final Challenge location). It fires mid-race, so
+    # like the held podium rungs it does not take the finish term.
     from .Regions import CORTEX_VORTEX_WUMPA_ENTRANCE
     try:
         vortex = world.multiworld.get_entrance(
