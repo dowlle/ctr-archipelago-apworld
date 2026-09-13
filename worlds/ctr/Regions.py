@@ -17,6 +17,10 @@ from .warp_pad_logic import (
 )
 from .relic_tiers import RELIC_TIERS, tier_location_pool
 from .Options import OxideGoal
+from . import cortex_vortex_track as cvt
+from .cortex_vortex_track import (
+    CORTEX_VORTEX, DESTINATION_ID as CV_DESTINATION_ID,
+)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from . import ctrAPWorld
@@ -97,6 +101,10 @@ def _build_reward_track_resolver(world):
     for pad_name, meta in pad_ids.items():
         if pad_name.endswith(" Warp Pad"):
             id_to_track[meta["level_id"]] = pad_name[: -len(" Warp Pad")]
+    # The Cortex Vortex pad track has no pad of its own: its virtual
+    # destination ID resolves to its track name (a no-op with the option off,
+    # because no pad then loads that ID).
+    id_to_track[CV_DESTINATION_ID] = CORTEX_VORTEX
     remap = {}
     for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
         if pad_name.endswith(" Warp Pad"):
@@ -131,6 +139,7 @@ def _build_pad_by_destination(world):
         for pad_name, meta in pad_ids.items()
         if pad_name.endswith(" Warp Pad")
     }
+    id_to_track[CV_DESTINATION_ID] = CORTEX_VORTEX
     out = {}
     for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
         if not pad_name.endswith(" Warp Pad"):
@@ -284,6 +293,7 @@ def _ut_reconstruct_unlock(world, passthrough):
     lid_to_track = {meta["level_id"]: name[: -len(" Warp Pad")]
                     for name, meta in world.warp_pad_ids.items()
                     if name.endswith(" Warp Pad")}
+    lid_to_track[CV_DESTINATION_ID] = CORTEX_VORTEX
     full_map = {int(k): int(v)
                 for k, v in passthrough.get("warp_pad_map", {}).items()}
     _ZERO = {"type": 0, "count": 0, "colour": -1}
@@ -402,7 +412,18 @@ def create_regions(world: "ctrAPWorld"):
     world.warp_pad_map = (
         _ut_reconstruct_warp_pad_map(world, ut_passthrough)
         if ut_passthrough else build_warp_pad_map(world))
-    do_shuffle = bool(world.warp_pad_map)
+    # "Did destination shuffle move anything". With the Cortex Vortex pad
+    # track on, the map also carries the dropped destination's pad loading
+    # 110 when that pad took part in no shuffle -- its HOME destination, not a
+    # shuffle -- so the verdict compares against the home map instead.
+    _home = cvt.home_destinations(opts)
+    if _home:
+        do_shuffle = any(
+            _home.get(world.warp_pad_ids[_pad]["level_id"],
+                      world.warp_pad_ids[_pad]["level_id"]) != _dest
+            for _pad, _dest in world.warp_pad_map.items())
+    else:
+        do_shuffle = bool(world.warp_pad_map)
     world.shuffle_warp_pads = do_shuffle
 
     # Gem Cup leg composition (issue #166): which 4 trophy tracks each cup
@@ -482,7 +503,8 @@ def create_regions(world: "ctrAPWorld"):
     # vanilla block this replaces in create_items).
     _relic_removed_names = set()
     for _tier_label, _relic_item, _opt_name in RELIC_TIERS:
-        _pool = set(tier_location_pool(world.location_name_to_id, _tier_label))
+        _pool = set(tier_location_pool(world.location_name_to_id, _tier_label,
+                                       opts))
         _keep = world._ctr_relic_keep.get(_relic_item, frozenset(_pool))
         _relic_removed_names |= (_pool - _keep)
 
@@ -502,11 +524,18 @@ def create_regions(world: "ctrAPWorld"):
             "N. Oxide Garage: N. Oxide's Challenge",
             "N. Oxide Garage: N. Oxide's Final Challenge",
         }
+    # The Cortex Vortex pad track's dropped destination: every location it
+    # owns leaves the seed, registered but not created, exactly like the two
+    # removals above (Trophy Race, Time Trials, CTR Token Challenge, Crystal
+    # Bonus Round or Gem). Its region stays in the graph with no entrance.
+    _dropped_region = cvt.dropped_region(opts)
     for reg in data["regions"]:
         region = region_lookup[reg["name"]]
         for loc_data in reg.get("locations", []):
             name = loc_data["name"]
             if name in _relic_removed_names or name in _oxide_removed_names:
+                continue
+            if reg["name"] == _dropped_region:
                 continue
             # A selected custom race replaces the cup's AP check identity, not
             # merely its bytes.  The cup's Gem item may still be shuffled into
@@ -569,6 +598,44 @@ def create_regions(world: "ctrAPWorld"):
             _source.exits.append(_ent)
             mw.regions.entrance_cache[player][_ent.name] = _ent
 
+    # The Cortex Vortex pad track: an ordinary "race" region built here
+    # because data/world.json has none. Its Trophy Race, CTR Token Challenge
+    # and selected letters come from its location class; its Time Trials from
+    # this seed's relic-tier draw, like every other Time Trial. The pad exit
+    # that loads destination 110 is wired to it below, like any destination,
+    # and its return exit goes to that pad's hub.
+    if cvt.track_on(opts):
+        from .cortex_vortex_track import CORTEX_VORTEX_TRACK_CLASS, relic_name
+        _cv = Region(CORTEX_VORTEX, player, mw)
+        _cv.type = "race"
+        mw.regions.append(_cv)
+        regions.append(_cv)
+        region_lookup[_cv.name] = _cv
+        _cv_names = list(CORTEX_VORTEX_TRACK_CLASS.created_location_names(opts))
+        _kept = set().union(*world._ctr_relic_keep.values())
+        _cv_names += [relic_name(_tier) for _tier, _item, _opt in RELIC_TIERS
+                      if relic_name(_tier) in _kept]
+        for _name in _cv_names:
+            _loc = create_location(player, _name, _cv)
+            _loc.type = ("cortex_vortex_letter" if ": Letter " in _name
+                         else "cortex_vortex")
+            _loc.logic_text = "True"
+            _cv.locations.append(_loc)
+            mw.regions.location_cache[player][_name] = _loc
+        _cv_pad = next((_pad for _pad, _dest in world.warp_pad_map.items()
+                        if _dest == CV_DESTINATION_ID), None)
+        if _cv_pad is None:
+            raise ValueError("the Cortex Vortex pad track is on but no pad "
+                             "loads destination 110")
+        _cv_hub = next(reg["name"] for reg in data["regions"]
+                       for ex in reg.get("exits", []) if ex["name"] == _cv_pad)
+        _ret = Entrance(player=player, name=f"{CORTEX_VORTEX} -> Hub",
+                        parent=_cv)
+        _ret.access_rule_text = "True"
+        _ret.connect(region_lookup[_cv_hub])
+        _cv.exits.append(_ret)
+        mw.regions.entrance_cache[player][_ret.name] = _ret
+
     # Itemsanity is global: a player can fire a received weapon from any race,
     # so its checks belong to the always-reachable Menu region rather than a
     # track.  Their item ownership rules are installed in Rules.py after the
@@ -603,14 +670,15 @@ def create_regions(world: "ctrAPWorld"):
     # resolved destination region because that region is already the sole race
     # route for the Alpha6 package.
     #
-    # Cortex Vortex gets the same dead-end shape. Its only race today is Oxide's
-    # Final Challenge, so its one entrance comes from the garage and
-    # add_oxide_access_contract gives it the Final Challenge rule; the garage
-    # door alone is only the Oxide 1 requirement. A future pad, Cup-leg or
-    # destination route onto Cortex Vortex adds another entrance to this region.
+    # Cortex Vortex gets the same dead-end shape, with one entrance per route
+    # onto the track: from the garage when it is Oxide's Final Challenge venue
+    # (add_oxide_access_contract gives that entrance the Final Challenge rule;
+    # the garage door alone is only the Oxide 1 requirement), and, when it is a
+    # pad track, from its own region and every Gem Cup that legs it.
     from .wumpa_checks import (WUMPA_CLASS, WUMPA_CORTEX_VORTEX_LOCATION,
                                WUMPA_RETAIL_TRACKS)
     _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
+    from .wumpa_checks import cortex_vortex_venue_active
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
         if _name == WUMPA_CORTEX_VORTEX_LOCATION:
             _region = Region(CORTEX_VORTEX_WUMPA_REGION, player, mw)
@@ -618,12 +686,29 @@ def create_regions(world: "ctrAPWorld"):
             mw.regions.append(_region)
             regions.append(_region)
             region_lookup[_region.name] = _region
-            _source = region_lookup[_region_name]
-            _ent = Entrance(player=player, name=CORTEX_VORTEX_WUMPA_ENTRANCE,
-                            parent=_source)
-            _ent.connect(_region)
-            _source.exits.append(_ent)
-            mw.regions.entrance_cache[player][_ent.name] = _ent
+            # Venue route: the garage entrance, ruled by
+            # add_oxide_access_contract (the Final Challenge rule).
+            if cortex_vortex_venue_active(opts):
+                _source = region_lookup[_region_name]
+                _ent = Entrance(player=player, name=CORTEX_VORTEX_WUMPA_ENTRANCE,
+                                parent=_source)
+                _ent.connect(_region)
+                _source.exits.append(_ent)
+                mw.regions.entrance_cache[player][_ent.name] = _ent
+            # Pad-track routes (2026-09-13 contract): the track itself and
+            # every Gem Cup that legs it, the retail Wumpa shape.
+            if cvt.track_on(opts):
+                _sources = [region_lookup[CORTEX_VORTEX]]
+                _sources += [region_lookup[_cup]
+                             for _cup in _wumpa_track_cups.get(CORTEX_VORTEX, [])
+                             if _cup in region_lookup]
+                for _source in _sources:
+                    _ent = Entrance(player=player,
+                                    name=f"{_source.name} -> {_region.name}",
+                                    parent=_source)
+                    _ent.connect(_region)
+                    _source.exits.append(_ent)
+                    mw.regions.entrance_cache[player][_ent.name] = _ent
         elif _region_name in WUMPA_RETAIL_TRACKS:
             _region = Region(f"{_region_name}: Wumpa", player, mw)
             _region.type = "wumpa"
@@ -853,6 +938,8 @@ def create_regions(world: "ctrAPWorld"):
             meta = world.warp_pad_ids.get(ex["name"])
             if meta is not None and ex.get("target") is not None:
                 _lid_to_region[meta["level_id"]] = ex["target"]
+    if cvt.track_on(opts):
+        _lid_to_region[CV_DESTINATION_ID] = CORTEX_VORTEX
     pad_dest_region = {}
     for pad_name, dest_lid in getattr(world, "warp_pad_map", {}).items():
         dest_region = _lid_to_region.get(dest_lid)

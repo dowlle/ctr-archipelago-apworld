@@ -116,6 +116,13 @@ def resolve_gem_cup_legs(world) -> Dict[str, List[str]]:
     pool = [track for track, _lid in sorted(ids.items(), key=lambda kv: kv[1])]
     assert len(pool) == len(TROPHY_TRACK_ID_POOL), \
         "warp_pad_ids.json race pads no longer cover LevelIDs 0..15"
+    # Cortex Vortex pad track (2026-09-13 contract): it joins the leg pool
+    # (LevelID 110, so after the 16 retail tracks) and a dropped race track
+    # leaves it -- 17 tracks minus any dropped one. Off: the 16 exactly.
+    from .cortex_vortex_track import CORTEX_VORTEX, dropped_track, track_on
+    if track_on(world.options):
+        dropped = dropped_track(world.options)
+        pool = [track for track in pool if track != dropped] + [CORTEX_VORTEX]
     return {
         cup: [pool[world.random.randrange(len(pool))] for _ in range(4)]
         for cup, _lid in CUP_LEVEL_IDS
@@ -162,11 +169,20 @@ def cup_legs_to_wire(cup_legs: Dict[str, List[str]]) -> Dict[str, List[int]]:
     """Serialize the map for slot_data: {"<cupLevelID>": [trackLevelID x4]}.
     Always all five cups -- the smallest COMPLETE mapping (a partial map
     would force native to guess the rest)."""
-    ids = track_level_ids()
+    ids = _leg_level_ids()
     return {
         str(cup_lid): [ids[track] for track in cup_legs[cup]]
         for cup, cup_lid in CUP_LEVEL_IDS
     }
+
+
+def _leg_level_ids() -> Dict[str, int]:
+    """Leg track name -> wire LevelID: the 16 trophy tracks plus the Cortex
+    Vortex pad track's virtual destination ID 110."""
+    from .cortex_vortex_track import CORTEX_VORTEX, DESTINATION_ID
+    ids = track_level_ids()
+    ids[CORTEX_VORTEX] = DESTINATION_ID
+    return ids
 
 
 def reconstruct_gem_cup_legs_from_wire(
@@ -191,6 +207,12 @@ def reconstruct_gem_cup_legs_from_wire(
         return load_vanilla_cup_legs()
     ids = track_level_ids()
     lid_to_track = {lid: track for track, lid in ids.items()}
+    # 110 is a valid leg only on a room that turned the Cortex Vortex pad
+    # track on; anywhere else it is malformed and falls back like any other.
+    co = passthrough.get("ctr_options", {}) or {}
+    if co.get("cortex_vortex_track", 0) == 1:
+        from .cortex_vortex_track import CORTEX_VORTEX, DESTINATION_ID
+        lid_to_track[DESTINATION_ID] = CORTEX_VORTEX
     out: Dict[str, List[str]] = {}
     for cup, cup_lid in CUP_LEVEL_IDS:
         legs = wire.get(str(cup_lid))

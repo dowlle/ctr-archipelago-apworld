@@ -35,13 +35,32 @@ RELIC_TIERS: Tuple[Tuple[str, str, str], ...] = (
 )
 
 
-def tier_location_pool(location_name_to_id, tier_label: str) -> List[str]:
-    """All 18 Time Trial location names for one relic tier, sorted for a
-    deterministic input sequence (`world.random.sample` below needs a stable
-    ordering to be reproducible per seed -- a set or dict-iteration order is
-    not guaranteed stable across processes)."""
+def tier_location_pool(location_name_to_id, tier_label: str,
+                       options=None) -> List[str]:
+    """The Time Trial location names one relic tier can create THIS seed,
+    sorted for a deterministic input sequence (`world.random.sample` below
+    needs a stable ordering to be reproducible per seed -- a set or
+    dict-iteration order is not guaranteed stable across processes).
+
+    Scoped to the tracks active in the seed rather than the whole datapackage:
+    the 18 retail relic tracks, minus a destination the Cortex Vortex track
+    dropped, plus Cortex Vortex when that option is on
+    (`cortex_vortex_track.active_time_trial_tracks`). Without `options`, or
+    with the option off, this is exactly the 18 retail names it always was, so
+    option-off seeds sample the identical pool."""
+    from .cortex_vortex_track import CORTEX_VORTEX, dropped_track, track_on
     suffix = f": {tier_label} Time Trial"
-    return sorted(n for n in location_name_to_id if n.endswith(suffix))
+    dropped = dropped_track(options) if options is not None else None
+    with_vortex = options is not None and track_on(options)
+    out = []
+    for name in location_name_to_id:
+        if not name.endswith(suffix):
+            continue
+        track = name[: -len(suffix)]
+        if track == dropped or (track == CORTEX_VORTEX and not with_vortex):
+            continue
+        out.append(name)
+    return sorted(out)
 
 
 def resolve_comfort_guards(options) -> Tuple[bool, bool]:
@@ -90,7 +109,8 @@ def draw_relic_tier_keep(world) -> Tuple[Dict[str, FrozenSet[str]], Dict[str, in
     created: Dict[str, int] = {}
     _, force_vanilla_tt = resolve_comfort_guards(world.options)
     for tier_label, relic_item, option_name in RELIC_TIERS:
-        pool = tier_location_pool(world.location_name_to_id, tier_label)
+        pool = tier_location_pool(world.location_name_to_id, tier_label,
+                                  world.options)
         n = getattr(world.options, option_name).value
         if force_vanilla_tt:
             tt_name = f"Turbo Track: {tier_label} Time Trial"
@@ -135,7 +155,8 @@ def restore_relic_tier_keep_from_wire(
     created: Dict[str, int] = {}
     wire = ctr_options.get("relic_tier_locations")
     for tier_label, relic_item, _option_name in RELIC_TIERS:
-        pool = tier_location_pool(world.location_name_to_id, tier_label)
+        pool = tier_location_pool(world.location_name_to_id, tier_label,
+                                  world.options)
         if isinstance(wire, dict) and relic_item in wire:
             codes = set(wire[relic_item])
             names = frozenset(

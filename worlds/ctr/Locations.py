@@ -17,6 +17,7 @@ from .trial_trophy import TRIAL_TROPHY_CLASS
 from .wumpa_checks import WUMPA_CLASS
 from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS, CUSTOM_CTR_CHALLENGE_CLASS
+from .cortex_vortex_track import CORTEX_VORTEX_TRACK_CLASS
 
 # The registered optional location classes (#176), in registration order.
 #
@@ -42,6 +43,8 @@ from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS, CUSTOM_CTR_CHALLENGE
 #   itemsanity     #145  35016000  22 names
 #   wumpa          R-H   35016100  1 name
 #   trial_trophy   #203  35016200  2 names
+#   cortex_vortex_track   35026000  8 names (2026-09-13 unfreeze; its five
+#                                   podium rungs ride the podium class)
 #
 # podium keeps its FIRST registration slot regardless: it shipped, and moving it
 # would churn the manifest diff for every already-frozen rung name.
@@ -56,6 +59,7 @@ CTR_LOCATION_CLASSES.register(TRIAL_TROPHY_CLASS)
 CTR_LOCATION_CLASSES.register(CUSTOM_TRACK_LOCATION_CLASS)
 CTR_LOCATION_CLASSES.register(CUSTOM_LETTERSANITY_CLASS)
 CTR_LOCATION_CLASSES.register(CUSTOM_CTR_CHALLENGE_CLASS)
+CTR_LOCATION_CLASSES.register(CORTEX_VORTEX_TRACK_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")

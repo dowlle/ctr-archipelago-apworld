@@ -162,9 +162,13 @@ class TestGatedCupSelection(unittest.TestCase):
                          frozenset({"Red Gem Cup", "Green Gem Cup"}))
 
     def test_the_gated_tracks_are_real_trophy_tracks(self):
+        """Every gated track is a retail trophy track, except the records whose
+        Trophy Race only an option creates (the Cortex Vortex pad track)."""
+        from ..capability_contract import OPTIONAL_TROPHY_TRACKS
         self.assertTrue(USF_FINISH_TRACKS)
-        for track in USF_FINISH_TRACKS:
+        for track in USF_FINISH_TRACKS - OPTIONAL_TROPHY_TRACKS:
             self.assertIn(track, TROPHY_TRACKS)
+        self.assertEqual(OPTIONAL_TROPHY_TRACKS - USF_FINISH_TRACKS, frozenset())
 
 
 class TestTrophyRaceGate(unittest.TestCase):

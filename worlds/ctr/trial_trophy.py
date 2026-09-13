@@ -74,9 +74,15 @@ class TrialTrophyLocationClass(LocationClass):
         return f"{track}: CTR Token Challenge"
 
     def created_location_names(self, options):
+        from .cortex_vortex_track import dropped_track
         names = []
         option_names = ("slide_coliseum_races", "turbo_track_races")
+        # A trial the Cortex Vortex track dropped has no pad, so its races
+        # leave the seed whatever its own option says.
+        dropped = dropped_track(options) if options is not None else None
         for track, option_name in zip(TRIAL_TRACKS, option_names):
+            if track == dropped:
+                continue
             mode = int(getattr(getattr(options, option_name, 0), "value",
                                getattr(options, option_name, 0)))
             if mode >= 1:

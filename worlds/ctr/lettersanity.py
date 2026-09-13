@@ -77,10 +77,16 @@ def eligible_letter_tracks(options):
     and Trophy access alone never admit letter items or checks.
     """
     from .trial_trophy import TRIAL_TRACKS, TRIAL_TROPHY_CLASS
+    from .cortex_vortex_track import dropped_track
     created = set(TRIAL_TROPHY_CLASS.created_location_names(options))
-    return tuple(LETTER_TRACKS) + tuple(
+    tracks = tuple(LETTER_TRACKS) + tuple(
         track for track in TRIAL_TRACKS
         if TRIAL_TROPHY_CLASS.ctr_location_name(track) in created)
+    # A destination the Cortex Vortex track dropped loses its CTR Token
+    # Challenge, so its letters (checks and items) leave the seed with it.
+    # Cortex Vortex's own letters are that class's, not this retail family's.
+    dropped = dropped_track(options) if options is not None else None
+    return tuple(track for track in tracks if track != dropped)
 
 
 def item_name(track: str, letter: str) -> str:

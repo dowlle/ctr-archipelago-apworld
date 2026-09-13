@@ -5,7 +5,8 @@ identity and shuffled-map contract can be tested directly.
 """
 
 
-def changed_pad_destination_rows(resolved_map, pad_ids, custom_destinations=None):
+def changed_pad_destination_rows(resolved_map, pad_ids, custom_destinations=None,
+                                 extra_destination_names=None):
     """Return ``(physical_level_id, physical_name, destination_name)`` rows.
 
     ``resolved_map`` is the complete physical LevelID to destination LevelID
@@ -20,6 +21,9 @@ def changed_pad_destination_rows(resolved_map, pad_ids, custom_destinations=None
     row. The displaced cup's own pad is included even at identity, because
     native still serves the custom track there. An absent (or empty) mapping
     leaves the output byte-identical to the pre-custom-tracks spoiler.
+
+    ``extra_destination_names`` names destinations that have no physical pad
+    of their own, such as the Cortex Vortex pad track's virtual ID 110.
     """
     id_to_name = {
         int(meta["level_id"]): name
@@ -27,6 +31,7 @@ def changed_pad_destination_rows(resolved_map, pad_ids, custom_destinations=None
         if "level_id" in meta
     }
     custom = dict(custom_destinations or {})
+    extra = dict(extra_destination_names or {})
     rows = []
     for physical_raw, destination_raw in resolved_map.items():
         try:
@@ -41,7 +46,8 @@ def changed_pad_destination_rows(resolved_map, pad_ids, custom_destinations=None
             displaced_name = id_to_name.get(destination, f"pad {destination}")
             destination_name = f"{track_title} (replaces {displaced_name})"
         else:
-            destination_name = id_to_name.get(destination, f"track {destination}")
+            destination_name = extra.get(
+                destination, id_to_name.get(destination, f"track {destination}"))
         rows.append((
             physical,
             id_to_name.get(physical, f"pad {physical}"),

@@ -29,8 +29,8 @@ class TestOxide1Optional(unittest.TestCase):
                     mw = _build(oxide_goal=goal, oxide_1_optional=enabled,
                                 bosses_required_goal=2, **RELIC_OPTS)
                     wire = mw.worlds[1].fill_slot_data()
-                    self.assertEqual(wire["schema_version"], 13)
-                    self.assertEqual(wire["ctr_options"]["schema_version"], 13)
+                    self.assertEqual(wire["schema_version"], 15)
+                    self.assertEqual(wire["ctr_options"]["schema_version"], 15)
                     self.assertEqual(wire["ctr_options"]["oxide_1_optional"],
                                      (2 if enabled in ("filler", "true_filler") else int(enabled))
                                      if goal == "101_percent" else 0)

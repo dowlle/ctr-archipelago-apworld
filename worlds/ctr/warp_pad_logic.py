@@ -37,6 +37,8 @@ import math
 import pkgutil
 import re
 
+from .cortex_vortex_track import CORTEX_VORTEX
+
 
 # ---------------------------------------------------------------------------
 # Stage-2 collapse reporting (issue #75, ruled 2026-08-07)
@@ -184,6 +186,14 @@ ARENA_TRACKS = {"Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court"}
 # trial pads and the 5 gem-cup pads, so the trophy pads are exactly HUB_STATIC
 # minus the arenas, the trials AND the cups.
 TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS - CUP_TRACKS
+
+# Every DESTINATION that carries a stage 2: the 16 trophy tracks plus the
+# Cortex Vortex pad track (2026-09-13 contract), which has no physical pad and
+# so is not in HUB_STATIC. Stage 2 is keyed by destination throughout the
+# sphere search, so the pad track joins here only. With the option off no
+# "Cortex Vortex" region or location exists, so every membership test and every
+# loop over this set behaves exactly as it did over TROPHY_TRACKS.
+STAGE2_DESTINATIONS = frozenset(TROPHY_TRACKS | {CORTEX_VORTEX})
 
 # NOTE: HUB_STATIC is defined above; TROPHY_TRACKS is finalised after it so the
 # set comprehension sees the full dict.
@@ -745,13 +755,18 @@ def _vanilla_pad_targets():
     return _VANILLA_PAD_TARGET
 
 
-def _identity_exits(exits):
+def _identity_exits(exits, home_targets=None):
     """Copy of a build_graph exits dict with every warp-pad exit re-targeted to
     the region it vanilla-loads -- the identity-topology view. The live AP graph
     is rewired to shuffled destinations by create_regions BEFORE the sweep runs,
     so identity must be reconstructed here explicitly. Exits keep their physical
-    static gates (hub floors); only the target region changes."""
-    vanilla = _vanilla_pad_targets()
+    static gates (hub floors); only the target region changes.
+
+    `home_targets` overrides the vanilla target of a pad whose unshuffled
+    destination this seed is not its own (the Cortex Vortex pad track sits on
+    the dropped destination's pad)."""
+    vanilla = dict(_vanilla_pad_targets())
+    vanilla.update(home_targets or {})
     return {
         region: [(name, vanilla.get(name, tgt), gate)
                  for (name, tgt, gate) in ex_list]
@@ -843,7 +858,7 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
             if tl is None or tl["region"] not in seen or not passes(tl["gate"]):
                 continue
             region = meta["region"]
-            if region in TROPHY_TRACKS:
+            if region in STAGE2_DESTINATIONS:
                 s2 = s2_by_region.get(region, "UNSET")
                 if s2 == "UNSET":
                     continue
@@ -922,7 +937,7 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
                 # STAGE-2 gate: relic-race / CTR-token-challenge content on the 16
                 # trophy pads opens only once that pad's stage 2 is assigned AND met.
                 region = meta["region"]
-                if region in TROPHY_TRACKS:
+                if region in STAGE2_DESTINATIONS:
                     s2 = stage2_reqs.get(region, "UNSET")
                     if s2 == "UNSET":
                         continue  # stage 2 not yet assigned -> content still closed
@@ -1150,13 +1165,19 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # requirement is a property of a pad's ENTRY; the shuffle is about content.
     pad_ids = getattr(world, "warp_pad_ids", {})
     wpm = getattr(world, "warp_pad_map", {}) or {}
+    # "Identity" is each pad's HOME destination: its own LevelID, except the
+    # pad carrying the Cortex Vortex pad track (2026-09-13 contract), whose
+    # home is 110. With that option off this is the plain LevelID test.
+    home_lid = _home_level_ids(world)
     shuffle_active = any(
-        pad_ids.get(pad, {}).get("level_id") != dest
+        home_lid.get(pad, pad_ids.get(pad, {}).get("level_id")) != dest
         for pad, dest in wpm.items())
+    home_track = _home_track_resolver(world)
     if shuffle_active:
         _ex_live, locations_id, _ = build_graph(
-            world, lambda t: t, include_gem_cups)
-        exits, locations = _identity_exits(_ex_live), locations_id
+            world, home_track, include_gem_cups)
+        exits, locations = (_identity_exits(_ex_live, _home_exit_targets(world)),
+                            locations_id)
     else:
         exits, locations = exits_real, locations_real
 
@@ -1187,13 +1208,14 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # stage2_reqs: dest-track keyed; only the 16 trophy tracks. When collapsed
     # (autounlock), pre-set every trophy track to None (= open, no stage-2 gate)
     # so the loop never assigns one and collection never holds rewards back.
-    stage2_reqs = {t: None for t in TROPHY_TRACKS} if collapse_stage2 else {}
+    stage2_reqs = ({t: None for t in _stage2_destinations(world)}
+                   if collapse_stage2 else {})
 
     # dest-track -> physical-pad track, so a stage-2 fallback can collapse to the
     # SAME pad's stage-1 requirement. Under destination shuffle the locations of
     # dest D live in region D, but D's pad ENTRY requirement is the physical pad P
     # with reward_track_for(P) == D. Identity when shuffle is off.
-    sweep_resolver = (lambda t: t) if shuffle_active else reward_track_for
+    sweep_resolver = home_track if shuffle_active else reward_track_for
     dest_to_phys = {}
     dest_to_phys_real = {}
     for _p in HUB_STATIC:
@@ -1213,7 +1235,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # a satisfiable stage 1, so this drains to empty.)
         return any(
             d not in stage2_reqs and f"{d}: Trophy Race" in collected
-            for d in TROPHY_TRACKS
+            for d in STAGE2_DESTINATIONS
         )
 
     # 2) sphere loop: assign stage-1 reqs to every pad AND stage-2 reqs to every
@@ -1242,7 +1264,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # which excludes that pad's own still-locked relics/tokens. OPEN model: a
         # real tier-2 requirement is the DEFAULT; the relaxation fallbacks below
         # only collapse a pad's tier 2 to its tier 1 when needed.
-        for dest in sorted(TROPHY_TRACKS):
+        for dest in sorted(STAGE2_DESTINATIONS):
             if dest in stage2_reqs:
                 continue
             if f"{dest}: Trophy Race" in collected:
@@ -1423,9 +1445,53 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     out = {}
     for t in HUB_STATIC:
         dest = reward_track_for(t)
-        s2 = stage2_reqs.get(dest) if dest in TROPHY_TRACKS else None
+        s2 = stage2_reqs.get(dest) if dest in STAGE2_DESTINATIONS else None
         out[t] = {1: pad_reqs.get(t), 2: s2}
     return out
+
+
+def _cortex_vortex_home(world):
+    """(dropped pad exit name, dropped track key) when the Cortex Vortex pad
+    track is on, else None."""
+    from .cortex_vortex_track import dropped_pad, track_key
+    pad = dropped_pad(world.options)
+    return None if pad is None else (pad, track_key(pad))
+
+
+def _home_level_ids(world):
+    """{pad exit name: home destination LevelID} for the pads whose home is
+    not their own LevelID. Empty with the Cortex Vortex pad track off."""
+    from .cortex_vortex_track import DESTINATION_ID
+    home = _cortex_vortex_home(world)
+    return {} if home is None else {home[0]: DESTINATION_ID}
+
+
+def _home_exit_targets(world):
+    """{pad exit name: region} overrides for the identity-topology view."""
+    home = _cortex_vortex_home(world)
+    return {} if home is None else {home[0]: CORTEX_VORTEX}
+
+
+def _home_track_resolver(world):
+    """Physical track key -> the destination its pad loads WITHOUT destination
+    shuffle. Identity, except the dropped destination's pad, whose home is the
+    Cortex Vortex pad track."""
+    home = _cortex_vortex_home(world)
+    if home is None:
+        return lambda t: t
+    dropped_track = home[1]
+    return lambda t: CORTEX_VORTEX if t == dropped_track else t
+
+
+def _stage2_destinations(world):
+    """The stage-2 destinations present this seed: the 16 trophy tracks, plus
+    Cortex Vortex when it is a pad track. Used where a loop would otherwise
+    CREATE an entry (the stage-2 collapse), so an option-off seed builds the
+    exact dict it always built."""
+    from .cortex_vortex_track import track_on
+    if track_on(world.options):
+        return STAGE2_DESTINATIONS
+    return TROPHY_TRACKS
 
 
 # --------------------------------------------------------------------------
@@ -2088,7 +2154,7 @@ def _dest_trophy_capacity(dest_lid, id_kind, ctx):
 def _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
     """True iff every boss floor's reachable pads expose >= that floor's trophy count
     of trophy-capable slots. `out` = {pad_exit_name -> dest_levelID} (partial; an
-    unshuffled pad loads itself)."""
+    unshuffled pad loads its HOME destination, `own_lid`)."""
     for floor, keys in _BOSS_CAP_FLOORS:
         cap = 0
         for pad_name, lid in own_lid.items():
@@ -2117,19 +2183,32 @@ def _capacity_gate_open(world, grouping):
     return grouping == "merged" and not bool(world.options.shuffle_keys.value)
 
 
-def _permute_pools(world, pools, id_to_name):
+def _pool_destinations(ids, home):
+    """The destinations a pool of physical pad LevelIDs holds before shuffle:
+    each pad's home destination (its own LevelID, except the Cortex Vortex pad
+    track's 110 on the dropped destination's pad)."""
+    return [home.get(lid, lid) for lid in ids]
+
+
+def _permute_pools(world, pools, id_to_name, home=None):
     """Permute destinations within each resolved pool (the historical body of
     build_warp_pad_map): re-roll up to 8x if a pool's whole permutation is identity.
-    Returns {pad_exit_name -> destination LevelID}. Uses world.random."""
+    Returns {pad_exit_name -> destination LevelID}. Uses world.random.
+
+    `home` ({pad LevelID: destination}) substitutes the Cortex Vortex pad track
+    for its dropped destination BEFORE the shuffle (2026-09-13 contract), so the
+    permutation runs over the survivors plus 110. None or empty keeps the
+    historical lists and draws exactly."""
     rnd = world.random
     out = {}
     for ids in pools:
         if len(ids) < 2:
             continue  # nothing to permute
-        perm = ids[:]
+        dests = _pool_destinations(ids, home or {})
+        perm = dests[:]
         for _ in range(8):
             rnd.shuffle(perm)
-            if perm != ids:
+            if perm != dests:
                 break
         for phys, dest in zip(ids, perm):
             name = id_to_name.get(phys)
@@ -2213,7 +2292,8 @@ def _enforce_gem_cup_floor(world, out, pools, id_to_name, keygate, floor):
     return out
 
 
-def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_lid, ctx):
+def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_lid, ctx,
+                               home=None):
     """Deterministic fallback when the bounded re-roll cannot land a satisfying map
     (astronomically unlikely -- a valid arrangement always exists since only the 5
     cups are zero-capacity). Under `merged` there is exactly one pool; pin race
@@ -2222,10 +2302,11 @@ def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_l
     the higher floors' wide slack. RNG = world.random."""
     rnd = world.random
     ids = pools[0]  # merged == single pool of LevelIDs
+    dests = _pool_destinations(ids, home or {})
     lid_to_name = {lid: id_to_name.get(lid) for lid in ids}
     open_pos = [i for i, lid in enumerate(ids)
                 if keygate.get(lid_to_name.get(lid), 0) == 0]
-    race_dests = [lid for lid in ids if id_kind.get(lid) == "race"]
+    race_dests = [lid for lid in dests if id_kind.get(lid) == "race"]
 
     def _assemble(perm):
         out = {}
@@ -2247,7 +2328,7 @@ def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_l
             d = pinned.pop()
             perm[pos] = d
             used.add(d)
-        rest = [lid for lid in ids if lid not in used]
+        rest = [lid for lid in dests if lid not in used]
         rnd.shuffle(rest)
         ri = 0
         for pos in range(len(ids)):
@@ -2290,9 +2371,14 @@ def build_warp_pad_map(world):
     NO extra RNG on a map that already satisfies the floors (byte-identical seeds).
     The cup floor is applied INSIDE that loop, before each capacity check, so the
     invariant always validates the map that is actually returned."""
+    from .cortex_vortex_track import DESTINATION_ID, home_destinations
     id_to_name = {meta["level_id"]: name
                   for name, meta in world.warp_pad_ids.items()}
     pools, grouping = resolve_shuffle_pools(world)
+    # Cortex Vortex pad track (2026-09-13 contract): the dropped destination's
+    # pad holds 110 before the shuffle. Empty with the option off, which keeps
+    # every list, draw and check below exactly as it was.
+    home = home_destinations(world.options)
 
     # Gem-cup placement floor (#149). Resolved once: 0 (inert) unless the cups pool
     # actually participates, so every other configuration keeps its old RNG stream
@@ -2305,7 +2391,7 @@ def build_warp_pad_map(world):
                if cup_floor > 0 else None)
 
     out = _enforce_gem_cup_floor(
-        world, _permute_pools(world, pools, id_to_name),
+        world, _permute_pools(world, pools, id_to_name, home),
         pools, id_to_name, keygate, cup_floor)
 
     # Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation).
@@ -2314,21 +2400,25 @@ def build_warp_pad_map(world):
     if _capacity_gate_open(world, grouping):
         id_kind = {meta["level_id"]: meta["kind"]
                    for meta in world.warp_pad_ids.values()}
+        if home:
+            # The pad track counts like a race destination: a Trophy Race
+            # plus its podium rungs.
+            id_kind[DESTINATION_ID] = "race"
         ctx = _capacity_context(world)
         # Only a zero-capacity destination (a lock-placed gem cup, or a fully-pinned
         # trial) can starve a floor; nothing to enforce when none participates.
         if any(_dest_trophy_capacity(lid, id_kind, ctx) == 0
-               for pool in pools for lid in pool):
+               for pool in pools for lid in _pool_destinations(pool, home)):
             if keygate is None:
                 keygate = _pad_keygate_table(
                     crystals_at_hub_floor=_crystals_open(world))
-            own_lid = {name: meta["level_id"]
+            own_lid = {name: home.get(meta["level_id"], meta["level_id"])
                        for name, meta in world.warp_pad_ids.items()}
             attempts = 0
             while (not _floors_satisfied(out, keygate, id_kind, own_lid, ctx)
                    and attempts < _CAPACITY_MAX_REROLLS):
                 out = _enforce_gem_cup_floor(
-                    world, _permute_pools(world, pools, id_to_name),
+                    world, _permute_pools(world, pools, id_to_name, home),
                     pools, id_to_name, keygate, cup_floor)
                 attempts += 1
             if not _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
@@ -2338,7 +2428,8 @@ def build_warp_pad_map(world):
                 out = _enforce_gem_cup_floor(
                     world,
                     _constructive_capacity_pin(
-                        world, pools, id_to_name, keygate, id_kind, own_lid, ctx),
+                        world, pools, id_to_name, keygate, id_kind, own_lid, ctx,
+                        home),
                     pools, id_to_name, keygate, cup_floor)
 
     # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
@@ -2360,4 +2451,11 @@ def build_warp_pad_map(world):
         )
         for _pad in _GUARDED_PADS:
             out.pop(_pad, None)
+    # A dropped destination whose pad took part in no shuffle pool (or whose
+    # remap the comfort guard just stripped) still loads the pad track: 110
+    # sits on its own physical pad, the no-shuffle case of the contract.
+    for _lid, _dest in home.items():
+        _pad = id_to_name.get(_lid)
+        if _pad is not None and _pad not in out:
+            out[_pad] = _dest
     return out

@@ -386,8 +386,8 @@ class TestOxideDisabledRemovesTheContent(unittest.TestCase):
         self.assertEqual(wire["ctr_options"]["goal_oxide"],
                          OxideGoal.option_disabled)
         self.assertEqual(wire["ctr_options"]["goal_oxide"], 3)
-        self.assertEqual(wire["schema_version"], 13)
-        self.assertEqual(wire["ctr_options"]["schema_version"], 13)
+        self.assertEqual(wire["schema_version"], 15)
+        self.assertEqual(wire["ctr_options"]["schema_version"], 15)
         self.assertEqual(wire["ctr_options"]["goal"], -1,
                          "disabled has no legacy single-goal analogue")
 

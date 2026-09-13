@@ -736,6 +736,25 @@ class TurboTrackRaces(TrialTrackRaces):
     display_name = "Turbo Track Races"
 
 
+class CortexVortexTrack(Toggle):
+    """Add Cortex Vortex as a full warp-pad track: a Trophy Race, then its
+    three Time Trials and a CTR Token Challenge, like a regular track.
+
+    Cortex Vortex has no pad of its own. Each seed picks one other destination
+    to go without a pad, and Cortex Vortex takes that pad instead. That
+    destination's checks are removed from the seed. Destination shuffle can
+    then move Cortex Vortex like any other destination, including onto a
+    Crystal Challenge or Gem Cup pad, and it can be a Gem Cup leg when cup
+    tracks are randomized.
+
+    Crossing the finish line on Cortex Vortex needs Ultimate Sacred Fire, so
+    its finish checks expect two Progressive Boosts when boosts are
+    randomized. It has no item boxes."""
+    # Default off until a runtime pass proves an 8-kart race, relic mode and
+    # the AI on this LEV (frozen contract, 2026-09-13).
+    display_name = "Cortex Vortex Track"
+
+
 class ApItemTypeColors(DefaultOnToggle):
     """Colour the Archipelago markers by what kind of item is behind them.
 
@@ -1185,6 +1204,7 @@ class ctrAPOptions(PerGameCommonOptions):
     custom_tracks: CustomTracks
     slide_coliseum_races: SlideColiseumRaces
     turbo_track_races: TurboTrackRaces
+    cortex_vortex_track: CortexVortexTrack
     shuffle_keys: ShuffleKeys
     trap_fill_percentage: TrapFillPercentage
     trap_weights: TrapWeights
@@ -1269,7 +1289,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
                      Lettersanity, LettersPerTrack,
-                     SlideColiseumRaces, TurboTrackRaces,
+                     SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
                      PodiumPlacementChecks, PodiumFinishRungs,
                      PodiumAnyPositionRung, PodiumHeldRungs,
                      PodiumHeldFifthRung],

@@ -151,11 +151,15 @@ class TestRelicTierBoostTable(unittest.TestCase):
         "Slide Coliseum", "Turbo Track")
 
     def test_the_ruled_usf_sets(self):
+        # Cortex Vortex (pad track, 2026-09-13 contract) takes the USF tier
+        # for both, like Oxide Station.
         self.assertEqual(USF_RELIC_GOLD_TRACKS,
-                         frozenset({"Hot Air Skyway", "Oxide Station"}))
+                         frozenset({"Hot Air Skyway", "Oxide Station",
+                                    "Cortex Vortex"}))
         self.assertEqual(
             USF_RELIC_PLATINUM_TRACKS,
-            frozenset({"Hot Air Skyway", "Oxide Station", "N. Gin Labs"}))
+            frozenset({"Hot Air Skyway", "Oxide Station", "N. Gin Labs",
+                       "Cortex Vortex"}))
 
     def test_every_gold_and_platinum_has_a_boost_floor(self):
         for track in self.ALL_TRACKS:

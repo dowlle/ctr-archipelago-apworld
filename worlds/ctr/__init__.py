@@ -18,6 +18,8 @@ from .custom_tracks import (custom_tracks_to_wire,
 from .Locations import CTR_LOCATION_CLASSES, get_location_names, get_total_locations
 from .Items import load_item_table
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA, CUSTOM_LETTERSANITY_CLASS
+from . import cortex_vortex_track
+from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
 from . import item_supply
 from . import wumpa_family
 from .wumpa_checks import WUMPA_CLASS
@@ -134,10 +136,16 @@ class ctrAPWorld(World):
 
     # Item + Location mapping
     _item_data_by_name = {item["name"]: item for item in
-                          (*load_item_table(), *CUSTOM_LETTER_ITEM_DATA)}
+                          (*load_item_table(), *CUSTOM_LETTER_ITEM_DATA,
+                           *CORTEX_VORTEX_LETTER_ITEM_DATA)}
     item_name_to_id = {
         name: item["code"] for name, item in _item_data_by_name.items()
     }
+    # The Cortex Vortex letter items (35010200-202) sit directly after the
+    # positional data/items.json table; an append to that table must move past
+    # them rather than silently sharing a code.
+    assert len(set(item_name_to_id.values())) == len(item_name_to_id), \
+        "two CTR item names share one code"
     location_name_to_id = get_location_names()
     location_name_groups = CTR_LOCATION_CLASSES.location_name_groups()
 
@@ -312,6 +320,10 @@ class ctrAPWorld(World):
         _restore("shortcut_knowledge", "shortcut_knowledge")
         _restore("slide_coliseum_races", "slide_coliseum_races")
         _restore("turbo_track_races", "turbo_track_races")
+        # Cortex Vortex pad track: the option, the dropped destination and its
+        # letter selection, pinned before anything below reads which
+        # destinations this seed kept (lettersanity rows, relic tiers).
+        cortex_vortex_track.restore_from_wire(o, passthrough)
         # Character phase (#54/#209). Two logic-relevant keys, both of which UT
         # gets wrong by default if it falls back to the tracking player's YAML:
         #   character_unlocks decides whether 15 unlock items exist AT ALL, so
@@ -354,6 +366,16 @@ class ctrAPWorld(World):
                 inc_cups = True
             elif lid in _CRYSTAL_LIDS:
                 inc_arenas = True
+        # The Cortex Vortex pad track only ever drops a Gem Cup or a crystal
+        # arena whose content is in the seed (cortex_vortex_track.
+        # _statically_eligible), which proves that toggle on even where no pad
+        # gate says so (vanilla unlock mode). Without this the tracker would
+        # pin vanilla rewards onto the dropped destination's absent location.
+        _dropped = cortex_vortex_track.dropped_level_id(o)
+        if _dropped is not None:
+            _kind = cortex_vortex_track.destination_table()[_dropped][2]
+            inc_cups = inc_cups or _kind == "cup"
+            inc_arenas = inc_arenas or _kind == "crystal"
         o.include_gem_cups.value = int(inc_cups)
         o.include_battle_arenas.value = int(inc_arenas)
 
@@ -449,6 +471,8 @@ class ctrAPWorld(World):
         selected = lettersanity.restore_letter_selection(o, lb, mode, count)
         o.lettersanity.value = mode
         o.letters_per_track.value = count
+        if cortex_vortex_track.track_on(o):
+            selected[cortex_vortex_track.CORTEX_VORTEX] = o._cortex_vortex_letters
         o._lettersanity_selected = selected
 
     def generate_early(self) -> None:
@@ -466,6 +490,14 @@ class ctrAPWorld(World):
         locations to build (R1: a below-count slot is never created), then
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
+        # Cortex Vortex pad track (2026-09-13 contract): draw the destination
+        # that goes without a pad FIRST, because the letter selection below and
+        # the relic-tier draw both leave its checks out. A Universal Tracker
+        # re-generation pins it from the wire in _ut_restore_options instead.
+        # No draw with the option off, so such a seed keeps its RNG stream.
+        _passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if not _passthrough:
+            cortex_vortex_track.draw_dropped_destination(self)
         if not hasattr(self.options, "_lettersanity_selected"):
             mode = int(self.options.lettersanity.value)
             if mode in (1, 2):
@@ -476,6 +508,11 @@ class ctrAPWorld(World):
             else:
                 self.options._lettersanity_selected = {
                     track: lettersanity.LETTERS for track in lettersanity.eligible_letter_tracks(self.options)}
+            # Cortex Vortex's own letters, drawn after the retail selection so
+            # the retail draws are unchanged by the option.
+            if cortex_vortex_track.track_on(self.options):
+                self.options._lettersanity_selected[cortex_vortex_track.CORTEX_VORTEX] = \
+                    cortex_vortex_track.draw_letters(self)
 
         # Comfort guard flags (Icebound force_vanilla_turbotrack): needed by
         # the relic draw below, ahead of when Regions.create_regions would
@@ -1210,7 +1247,11 @@ class ctrAPWorld(World):
         # needs USF with no hard-shortcut escape.
         from .usf_finish import oxide_final_track_name, track_finish_term
         oxide_finish = track_finish_term("Oxide Station", self)
-        final_finish = track_finish_term(oxide_final_track_name(self), self)
+        # The Cortex Vortex venue is raced from the garage, never from the pad
+        # carrying the Cortex Vortex pad track, so no pad racer lock applies.
+        final_track = oxide_final_track_name(self)
+        final_finish = track_finish_term(
+            final_track, self, bind_racer=final_track != "Cortex Vortex")
 
         if o.oxide_goal.value == OxideGoal.option_any_percent:
             flag = self._add_goal_event(
@@ -1538,6 +1579,10 @@ class ctrAPWorld(World):
         # positional retail item table. Include before capacity/overflow checks.
         pool.extend(self.create_item(name) for name in
                     CUSTOM_LETTERSANITY_CLASS.created_item_names(self.options))
+        # Cortex Vortex's letter items live outside the positional table, like
+        # the custom ones above. Empty with the option off.
+        pool.extend(self.create_item(name) for name in
+                    cortex_vortex_track.created_letter_item_names(self.options))
 
         # --- Character unlocks (issues #54 / #209, R4). ALWAYS ON: the
         # character phase is core 0.2.0 content, not a toggle, so every seed
@@ -1966,7 +2011,11 @@ class ctrAPWorld(World):
         # not silently discard required trial letter items/checks.
         # Schema 13: encounter priority can skip Oxide 1 and a final win
         # collects both checks. Old clients cannot enforce that contract.
-        schema = 13
+        # Schema 15 (2026-09-13 contract; 14 is claimed by Hit Character):
+        # the Cortex Vortex pad track puts destination 110 in warp_pad_map and
+        # gem_cup_legs and removes a destination's checks. Unconditional, per
+        # the standing Q28 rule.
+        schema = 15
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
             "Slot": self.multiworld.player_name[self.player],
@@ -2021,6 +2070,9 @@ class ctrAPWorld(World):
                 "warppad_unlock_mode": o.warppad_unlock_requirements.value,
                 "slide_coliseum_races": int(o.slide_coliseum_races.value),
                 "turbo_track_races": int(o.turbo_track_races.value),
+                # Always emitted 0/1; the conditional block below carries
+                # the resolved destination and codes when it is 1.
+                "cortex_vortex_track": int(o.cortex_vortex_track.value),
                 "bossgarage_mode": o.bossgarage_unlock_requirements.value,
                 # Warp-pad item display (issue #59): 0 one_pile / 1
                 # by_reward_type. ADDITIVE key, no schema bump -- the one_lap_cups
@@ -2191,10 +2243,11 @@ class ctrAPWorld(World):
                           else "oxide_station"),
                 "opponent": "nitros_oxide",
                 "location": 35011105,
-                "wumpa_location": (35016121
-                                    if int(o.wumpa_check.value) == 2 and
-                                    int(o.oxide_final_track.value) == 0 and
-                                    int(o.oxide_goal.value) != 3 else -1),
+                # Widened 2026-09-13: the code exists whenever per-track
+                # Wumpa is on and Cortex Vortex is raced at all -- as a pad
+                # track, or as this venue with Oxide content present.
+                "wumpa_location": (35016121 if WUMPA_CLASS.cortex_vortex_active(o)
+                                   else -1),
                 "host_level_id": 13,
                 "lev_sha256": ("4e3a2daf56c67be3ac645d3bb5375e516"
                                "c828a0bca24c35ac69b3366c466fe13"),
@@ -2217,6 +2270,9 @@ class ctrAPWorld(World):
                 "enabled": True,
                 "locations": trial_locations,
             }
+        if cortex_vortex_track.track_on(o):
+            # 2026-09-13 contract: present only with the option on.
+            slot_data["cortex_vortex_track"] = cortex_vortex_track.wire_block(self)
         if legs_randomized:
             # Issue #166: the five cups' leg tracks (see _resolve_gem_cup_legs).
             # Emitted only when randomized -- absent means vanilla legs to both
@@ -2305,6 +2361,10 @@ class ctrAPWorld(World):
                 meta = pad_ids.get(ex["name"])
                 if meta is not None and ex.get("target") is not None:
                     lid_to_region[meta["level_id"]] = ex["target"]
+        # The Cortex Vortex pad track's region, reached through whichever pad
+        # loads destination 110 (unused with the option off).
+        lid_to_region[cortex_vortex_track.DESTINATION_ID] = \
+            cortex_vortex_track.CORTEX_VORTEX
 
         # Inverse of pad_dest_region, filtered to genuinely-shuffled pads. A pad that
         # loads its own vanilla destination (a fixed point within a pool) is not worth
@@ -2420,7 +2480,23 @@ class ctrAPWorld(World):
             _pad_ids,
             effective_custom_destinations(
                 getattr(self, "custom_tracks", {}) or {}),
+            {cortex_vortex_track.DESTINATION_ID: cortex_vortex_track.CORTEX_VORTEX},
         )
+        # Cortex Vortex pad track: which destination went without a pad and
+        # which physical pad loads the track. Written only with the option on.
+        _dropped = cortex_vortex_track.dropped_level_id(self.options)
+        if _dropped is not None:
+            _pad_names = {meta["level_id"]: name for name, meta in _pad_ids.items()}
+            _loaded_by = next(
+                (_pad_names.get(int(lid), f"pad {lid}")
+                 for lid, dest in self._resolve_warp_pad_map().items()
+                 if int(dest) == cortex_vortex_track.DESTINATION_ID), "?")
+            _dest_region = cortex_vortex_track.destination_table()[_dropped][1]
+            spoiler_handle.write(
+                f"\n\nCTR Cortex Vortex track ({_player_name}): "
+                f"{_dest_region} (destination {_dropped}) has no pad this seed "
+                f"and its checks are removed; Cortex Vortex is loaded by "
+                f"{_loaded_by}.\n")
         if destination_rows:
             spoiler_handle.write(
                 f"\n\nCTR shuffled warp-pad destinations ({_player_name}):\n")
