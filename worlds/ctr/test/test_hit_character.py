@@ -290,6 +290,25 @@ class TestUTRestore(unittest.TestCase):
         # Re-emitting the restored world reproduces the exact same ordering.
         self.assertEqual(slot_data(world), block)
 
+    def test_tuple_lists_from_a_packed_seed_restore_as_lists(self):
+        """Slot data read back from a packed .archipelago carries tuples (the
+        tracker fuzz hook reads it that way); it is the same wire value."""
+        def tuplify(value):
+            if isinstance(value, dict):
+                return {key: tuplify(item) for key, item in value.items()}
+            if isinstance(value, list):
+                return tuple(tuplify(item) for item in value)
+            return value
+
+        source = _build(hit_character=True).worlds[1]
+        wire = source.fill_slot_data()
+        block = copy.deepcopy(wire["hit_character_encounters"])
+        packed = dict(wire)
+        packed["hit_character_encounters"] = tuplify(block)
+        world = self._restore(packed)
+        self.assertEqual(world.ctr_hit_character_encounters, block)
+        self.assertEqual(slot_data(world), block)
+
     def test_legacy_absence_restores_to_off(self):
         world = self._restore({"ctr_options": {}, "warp_pad_unlock": {},
                                "podium_checks": {}})

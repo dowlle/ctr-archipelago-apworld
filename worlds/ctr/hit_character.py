@@ -480,9 +480,35 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
             f"integer global schema_version in {GLOBAL_SCHEMA_MIN}.."
             f"{GLOBAL_SCHEMA_MAX}.")
 
+    # A server's JSON slot_data carries lists, but slot_data read back from a
+    # packed .archipelago (the tracker fuzz hook does this) carries tuples.
+    # Both are the same wire value, so normalize before the strict list checks.
+    # A JSON block is kept as the same object (restore is verbatim).
+    if _has_tuple(block):
+        block = _tuples_to_lists(block)
     _validate_block(block)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
+
+
+def _has_tuple(value) -> bool:
+    """Whether `value` contains a tuple anywhere, recursively."""
+    if isinstance(value, tuple):
+        return True
+    if isinstance(value, dict):
+        return any(_has_tuple(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_has_tuple(item) for item in value)
+    return False
+
+
+def _tuples_to_lists(value):
+    """Copy `value` with every tuple turned into a list, recursively."""
+    if isinstance(value, dict):
+        return {key: _tuples_to_lists(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_tuples_to_lists(item) for item in value]
+    return value
 
 
 # ---------------------------------------------------------------------------
