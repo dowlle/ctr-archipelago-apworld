@@ -623,11 +623,11 @@ class TestBuildIdentity(unittest.TestCase):
 
     def test_internal_slice_build_badge_and_numeric_versions(self):
         from ..version import BUILD_VERSION
-        self.assertEqual(BUILD_VERSION, "0.2.1-hit-slice1")
+        self.assertEqual(BUILD_VERSION, "0.2.1-hit1")
         mw = _build(hit_character=True)
         wire = mw.worlds[1].fill_slot_data()
         co = wire["ctr_options"]
-        self.assertEqual(co["build_version"], "0.2.1-hit-slice1")
+        self.assertEqual(co["build_version"], "0.2.1-hit1")
         # Numeric identities this internal staging must not move.
         self.assertEqual(co["world_version"], "0.2.1")
         self.assertEqual(co["schema_version"], 16)

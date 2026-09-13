@@ -4,4 +4,4 @@
 COMPAT_VERSION = "0.2.1"
 
 # Human-facing prerelease identity carried in slot data and release packages.
-BUILD_VERSION = "0.2.1-hit-slice1"
+BUILD_VERSION = "0.2.1-hit1"
