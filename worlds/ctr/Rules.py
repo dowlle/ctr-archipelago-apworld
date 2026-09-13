@@ -148,6 +148,12 @@ def set_rules(world):
     add_item_box_rules(world, player)
     add_lettersanity_rules(world, player)
     add_custom_ctr_challenge_rules(world, player)
+    # Hit Character encounter checks (tickets 07/08): install every target's
+    # real rule LAST, so each guest's trigger capture sees every Trophy rule
+    # (including the difficulty gates) already in place. A structurally
+    # impossible target raises a clear OptionError. See hit_character.install_rules.
+    from . import hit_character
+    hit_character.install_rules(world, player)
 
 
 def add_capability_difficulty_rules(world, player):

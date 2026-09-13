@@ -65,6 +65,9 @@ EXPECTED_CLASSES = [
     # Time Trials, CTR Token Challenge and three letters at 35026000..008
     # (35026005 reserved, not minted). Its five rungs are podium's, above.
     ("cortex_vortex_track", 8, (35026000,)),
+    # 0.2.1 candidate: the sixteen Hit Character encounter checks, appended
+    # last so every earlier class keeps its datapackage order.
+    ("hit_character", 16, (35025000,)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -133,7 +136,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
         # + 13 Cortex Vortex pad-track names (2026-09-13 unfreeze).
-        self.assertEqual(len(world_type.location_name_to_id), 1345)
+        # + the 16 Hit Character encounter names (0.2.1 candidate).
+        self.assertEqual(len(world_type.location_name_to_id), 1361)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:

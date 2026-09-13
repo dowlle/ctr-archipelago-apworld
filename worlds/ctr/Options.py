@@ -483,6 +483,18 @@ class Itemsanity(Toggle):
     It changes how the whole game plays, not just what you collect."""
     display_name = "Itemsanity"
 
+class HitCharacter(Toggle):
+    """Add a check for hitting each of the 16 racers in a race.
+
+    Every playable racer gets one check, paid the first time you land a hit on
+    them during an Adventure race. Each guest racer appears on particular
+    tracks once you have cleared the race that unlocks them.
+
+    Some guests appear on the Slide Coliseum and Turbo Track Trophy Races, so
+    both trial race options must be enabled for every check to be reachable."""
+    display_name = "Hit Character Checks"
+
+
 class Lettersanity(Choice):
     """Turn the C-T-R letters into checks, items, or both.
 
@@ -1209,6 +1221,8 @@ class ctrAPOptions(PerGameCommonOptions):
     trap_fill_percentage: TrapFillPercentage
     trap_weights: TrapWeights
     itemsanity: Itemsanity
+    # Hit Character encounter checks (0.2.1 candidate)
+    hit_character: HitCharacter
     # Papu's Pyramid mask helper (#223)
     tizi_helper: TiziHelper
     # The wumpa family (2026-08-10 ruling): two bundle fillers, the starting
@@ -1288,6 +1302,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
+                     HitCharacter,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
                      PodiumPlacementChecks, PodiumFinishRungs,

@@ -214,8 +214,8 @@ class TestVanillaLegParity(CTRTestBase):
     def test_no_wire_key_but_current_schema_is_unconditional(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
         self.assertNotIn("gem_cup_legs", slot_data)
-        self.assertEqual(slot_data["schema_version"], 15)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 15)
+        self.assertEqual(slot_data["schema_version"], 16)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
 
     def test_podium_wiring_matches_vanilla_legs(self):
         # Hot Air Skyway legs the Yellow and Purple cups in vanilla; its
@@ -255,8 +255,8 @@ class TestRandomizedLegsIntegration(CTRTestBase):
 
     def test_current_schema_is_declared(self):
         slot_data = json.loads(json.dumps(self.world.fill_slot_data()))
-        self.assertEqual(slot_data["schema_version"], 15)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 15)
+        self.assertEqual(slot_data["schema_version"], 16)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
 
     def test_seed_exhibits_repeats_and_absent_tracks(self):
         # Documents the LEGS_SEED choice: if generation-internal RNG
@@ -355,7 +355,7 @@ class TestUTRegenParity(CTRTestBase):
         self.assertEqual(ut_world.options.randomize_gem_cup_tracks.value, 1)
         ut_slot_data = json.loads(json.dumps(ut_world.fill_slot_data()))
         self.assertEqual(ut_slot_data["gem_cup_legs"], slot_data["gem_cup_legs"])
-        self.assertEqual(ut_slot_data["schema_version"], 15)
+        self.assertEqual(ut_slot_data["schema_version"], 16)
 
         # The re-generated reachability graph follows the pinned map too.
         t2c = track_to_cups(server_legs)

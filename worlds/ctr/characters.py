@@ -245,6 +245,17 @@ def racer_locks_effective(world) -> bool:
     return bool(getattr(world, "ctr_racer_locks", {}))
 
 
+def _hit_character_enabled(world) -> bool:
+    """Whether this seed enables the Hit Character encounter checks.
+
+    Read straight off the option rather than importing `hit_character`, which
+    imports this module. An enabled Hit seed's route names racers, so its
+    unlock items are logic inputs exactly like a racer-locked pad's.
+    """
+    toggle = getattr(world.options, "hit_character", None)
+    return bool(toggle is not None and toggle.value)
+
+
 def unlock_classification(world) -> ItemClassification:
     """R17. Locks ON -> a pad can demand a specific racer, so the unlock items
     genuinely gate reachability and MUST be progression (logic state does not
@@ -258,6 +269,11 @@ def unlock_classification(world) -> ItemClassification:
     no rule naming a racer, so promoting the 15 items there would pay the
     fill cost of a feature the seed does not have.
 
+    An ENABLED Hit Character seed is the other case that names racers: its
+    implemented hit route requires a selectable non-target racer, so the
+    unlocks are logic inputs there too. The promotion keeps every identity and
+    count unchanged -- only the classification moves.
+
     `useful` rather than pure `filler` is deliberate and is R17's own caveat:
     a character still opens options (and, under per_character capability modes,
     access to that racer's chains), so it is not dead padding.
@@ -265,7 +281,8 @@ def unlock_classification(world) -> ItemClassification:
     from . import progressive_capability
     return (ItemClassification.progression
             if (racer_locks_effective(world)
-                or progressive_capability.unlock_items_are_logic_inputs(world))
+                or progressive_capability.unlock_items_are_logic_inputs(world)
+                or _hit_character_enabled(world))
             else ItemClassification.useful)
 
 
