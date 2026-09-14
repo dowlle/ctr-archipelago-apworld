@@ -150,11 +150,16 @@ class FinalOxideRelicCount(NamedRange):
     - Every other mode supports 1-18 because it checks one 18-item tier.
 
     Values above 18 with a non-total mode fail generation clearly instead of
-    producing an impossible goal."""
+    producing an impossible goal.
+
+    - **all**: shorthand for the maximum supported value, 54 (see range_end
+      above; the total_relics mode is the only one that can use it, the same
+      as typing 54 directly)."""
     display_name = "Oxide's Final Challenge Relic Count"
     range_start = 1
     range_end = 54
     default = 18
+    special_range_names = {"all": 54}
 
 
 class OxideFinalTrack(Choice):
@@ -167,7 +172,6 @@ class OxideFinalTrack(Choice):
     option_cortex_vortex = 0
     option_oxide_station = 1
     default = 0
-    special_range_names = {"all": 18}
 
 
 class ShuffleGems(DefaultOnToggle):
