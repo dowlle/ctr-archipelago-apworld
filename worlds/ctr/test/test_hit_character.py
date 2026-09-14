@@ -4,7 +4,8 @@ Covers the bounded ticket scope only:
 
   * the sixteen frozen location identities and their additive code block;
   * off creates nothing / on creates sixteen, in the Menu region;
-  * the deterministic rotation, the guest pins and the boss identity table;
+  * the seeded per-destination draw orders, the unlock triggers and the boss
+    identity table (block schema 2);
   * the single cached uint32 roster seed (off consumes no RNG, on draws once);
   * the top-level block and the always-emitted scalar;
   * Universal Tracker restore: exact round-trip, legacy absence/off, and the
@@ -29,10 +30,13 @@ from ..hit_character import (
     HIT_CHARACTER_CLASS,
     HIT_CHARACTER_CODE_BASE,
     HIT_CHARACTER_SCHEMA,
-    PIN_GUESTS,
+    MAX_GUESTS,
+    POLICY_DRAW,
     TRACK_LEVEL_IDS,
+    UNLOCK_TRIGGERS,
     _validate_block,
     build_encounters,
+    destination_order,
     resolve_for_generation,
     restore_from_wire,
     slot_data,
@@ -55,11 +59,6 @@ def _options(**overrides):
 def _build(seed=1, steps=STEPS, **overrides):
     return setup_multiworld(ctrAPWorld, steps, seed=seed,
                             options=_options(**overrides))
-
-
-def _rotate(ids, offset):
-    amount = offset % len(ids)
-    return list(ids[amount:]) + list(ids[:amount])
 
 
 class TestLocationClassIdentity(unittest.TestCase):
@@ -173,62 +172,58 @@ class TestOnCreatesAndEmits(unittest.TestCase):
 
 
 class TestDeterministicLayout(unittest.TestCase):
-    def test_rotation_for_every_track_and_cup(self):
+    def test_every_destination_carries_a_seeded_permutation(self):
         for seed in (0, 1, 123456789, 0xFFFFFFFF):
             block = build_encounters(seed)
-            for level_id in TRACK_LEVEL_IDS:
-                entry = block["tracks"][str(level_id)]
-                offset = (seed + level_id) % 8
-                self.assertEqual(entry["base"],
-                                 _rotate(DEFAULT_RACER_IDS, offset))
-                self.assertEqual(entry["reserve"],
-                                 _rotate(GUEST_RACER_IDS, offset))
-            for cup in CUP_IDS:
-                entry = block["cups"][str(cup)]
-                offset = (seed + cup) % 8
-                self.assertEqual(entry["base"],
-                                 _rotate(DEFAULT_RACER_IDS, offset))
-                self.assertEqual(entry["reserve"],
-                                 _rotate(GUEST_RACER_IDS, offset))
+            for group, keys in (("tracks", TRACK_LEVEL_IDS), ("cups", CUP_IDS)):
+                self.assertEqual(set(block[group]), {str(k) for k in keys})
+                for key in keys:
+                    with self.subTest(seed=seed, group=group, key=key):
+                        entry = block[group][str(key)]
+                        self.assertEqual(set(entry), {"order"})
+                        self.assertEqual(sorted(entry["order"]), list(range(16)))
+                        self.assertEqual(entry["order"],
+                                         destination_order(seed, key))
+
+    def test_orders_are_reproducible_and_vary(self):
+        """String-seeded, so independent of PYTHONHASHSEED and of the world
+        RNG; different destinations and seeds give different orders."""
+        self.assertEqual(destination_order(42, 3), destination_order(42, 3))
+        orders = {tuple(destination_order(42, d)) for d in TRACK_LEVEL_IDS}
+        self.assertGreater(len(orders), 15)
+        self.assertNotEqual(destination_order(42, 3), destination_order(43, 3))
+        # Pinned literal: a change to the recipe would silently move every
+        # emitted order, so it must fail here first.
+        self.assertEqual(destination_order(0, 0),
+                         _PINNED_ORDER_SEED0_DEST0)
 
     def test_uint32_boundaries_are_accepted(self):
         for seed in (0, 0xFFFFFFFF):
             block = build_encounters(seed)
             self.assertEqual(block["policy"]["seed"], seed)
-            self.assertEqual(block["tracks"]["0"]["base"],
-                             _rotate(DEFAULT_RACER_IDS, seed % 8))
+            _validate_block(block)
 
-    def test_lists_have_no_duplicates_and_bounded_pins(self):
-        block = build_encounters(0xDEADBEEF)
-        for group in ("tracks", "cups"):
-            for key, entry in block[group].items():
-                with self.subTest(group=group, key=key):
-                    for list_name in ("base", "pinned", "reserve"):
-                        values = entry[list_name]
-                        self.assertEqual(len(set(values)), len(values))
-                    self.assertLessEqual(len(entry["pinned"]), 1)
+    def test_policy_is_the_pool_draw(self):
+        block = build_encounters(5)
+        self.assertEqual(block["schema"], 2)
+        self.assertEqual(block["policy"], {
+            "seed": 5, "self_character": "never_seat_player",
+            "draw": POLICY_DRAW, "max_guests": MAX_GUESTS})
+        self.assertEqual(POLICY_DRAW, "unhit_first_rotation")
+        self.assertEqual(MAX_GUESTS, 3)
 
 
-class TestPinsAndBosses(unittest.TestCase):
-    def test_pin_guests_land_on_their_exact_destinations(self):
+class TestTriggersAndBosses(unittest.TestCase):
+    def test_trigger_table_is_the_announced_unlock_set(self):
         expected = {
-            8: (7,), 9: (5,), 10: (6,), 11: (1,),
-            12: (16, 17), 13: (2, 12), 14: (3, 8), 15: (13,),
+            8: ((35011103,), "boss"), 9: ((35011101,), "boss"),
+            10: ((35011100,), "boss"), 11: ((35011102,), "boss"),
+            12: ((35016200, 35016201), "track"),
+            13: ((35011008, 35011010), "track"),
+            14: ((35011000, 35011003), "track"),
+            15: ((35011104, 35011105), "boss"),
         }
-        self.assertEqual({cid: levels for cid, (levels, _c, _k)
-                          in PIN_GUESTS.items()}, expected)
-        block = build_encounters(42)
-        for guest, (levels, _codes, _kind) in PIN_GUESTS.items():
-            for level_id in levels:
-                with self.subTest(guest=guest, level=level_id):
-                    self.assertEqual(block["tracks"][str(level_id)]["pinned"],
-                                     [guest])
-        pinned_levels = {lid for levels, _c, _k in PIN_GUESTS.values()
-                         for lid in levels}
-        for level_id in TRACK_LEVEL_IDS:
-            if level_id not in pinned_levels:
-                self.assertEqual(
-                    block["tracks"][str(level_id)]["pinned"], [])
+        self.assertEqual(UNLOCK_TRIGGERS, expected)
 
     def test_unlock_triggers_carry_codes_not_names(self):
         block = build_encounters(7)
@@ -322,13 +317,12 @@ class TestUTRestore(unittest.TestCase):
         self.assertIsNone(world.ctr_hit_character_seed)
 
     def test_reordered_candidates_are_preserved_verbatim(self):
-        """Any valid permutation of the correct candidate sets is accepted and
+        """Any valid permutation of the sixteen ids is accepted and
         round-tripped without reordering, re-drawing or rebuilding."""
         block = build_encounters(1)
         for group in ("tracks", "cups"):
             for entry in block[group].values():
-                entry["base"] = list(reversed(entry["base"]))
-                entry["reserve"] = list(reversed(entry["reserve"]))
+                entry["order"] = list(reversed(entry["order"]))
         block["unlock_triggers"]["12"]["any_of"] = list(
             reversed(block["unlock_triggers"]["12"]["any_of"]))
         world = self._restore(
@@ -483,7 +477,7 @@ class TestUTRestore(unittest.TestCase):
         self.assertEqual(world.ctr_hit_character_seed, fresh["policy"]["seed"])
 
     def test_unknown_schema_is_refused(self):
-        for bad_schema in (2, "1", 1.0, None, True):
+        for bad_schema in (1, 3, "2", 2.0, None, True):
             with self.subTest(schema=bad_schema):
                 block = build_encounters(1)
                 block["schema"] = bad_schema
@@ -491,10 +485,28 @@ class TestUTRestore(unittest.TestCase):
                 with self.assertRaises(OptionError):
                     self._restore_block(world, block)
 
+    def test_superseded_schema_1_block_is_refused(self):
+        """A pinned schema-1 block (alpha2 test seeds before the pool draw)
+        cannot be modelled by this apworld and is refused with a clear
+        message, never reinterpreted."""
+        block = build_encounters(1)
+        block["schema"] = 1
+        block["policy"] = {"seed": 1, "self_character": "never_seat_player",
+                           "boss_eligible_after_clear": True,
+                           "guest_slots": 1}
+        for group in ("tracks", "cups"):
+            for key in block[group]:
+                block[group][key] = {"base": list(range(8)), "pinned": [],
+                                     "reserve": list(range(8, 16))}
+        world = self._world()
+        with self.assertRaises(OptionError) as ctx:
+            self._restore_block(world, block)
+        self.assertIn("schema 1", str(ctx.exception))
+        self.assertIsNone(world.ctr_hit_character_encounters)
+
     def test_manager_reported_invalid_blocks_are_refused(self):
-        """The four blocks the manager reproduced as accepted: schema=True,
-        guest_slots=True, a guest substituted into base, and bosses keyed '1'
-        through '6'."""
+        """Blocks that look close to valid: schema=True, max_guests=True, an
+        order with a repeated id, and bosses keyed '1' through '6'."""
         world = self._world()
 
         b = build_encounters(1)
@@ -503,12 +515,12 @@ class TestUTRestore(unittest.TestCase):
             self._restore_block(world, b)
 
         b = build_encounters(1)
-        b["policy"]["guest_slots"] = True
+        b["policy"]["max_guests"] = True
         with self.assertRaises(OptionError):
             self._restore_block(world, b)
 
         b = build_encounters(1)
-        b["tracks"]["3"]["base"][0] = 15
+        b["tracks"]["3"]["order"][0] = b["tracks"]["3"]["order"][1]
         with self.assertRaises(OptionError):
             self._restore_block(world, b)
 
@@ -526,36 +538,49 @@ class TestUTRestore(unittest.TestCase):
         arms["missing_track"] = b
 
         b = build_encounters(1)
-        b["tracks"]["3"]["base"] = [0, 0, 1, 2, 3, 4, 5, 6]
-        arms["duplicate_base"] = b
+        b["tracks"]["3"]["order"] = list(range(15))
+        arms["short_order"] = b
 
         b = build_encounters(1)
-        b["tracks"]["0"]["reserve"] = list(range(8))  # base ids, not guests
-        arms["reserve_not_guest_permutation"] = b
+        b["tracks"]["3"]["order"] = list(range(17))
+        arms["long_order"] = b
 
         b = build_encounters(1)
-        b["tracks"]["3"]["pinned"] = [8, 9]
-        arms["two_pins"] = b
+        b["tracks"]["3"]["order"] = [0] + list(range(1, 16))[:-1] + [0]
+        arms["duplicate_in_order"] = b
 
         b = build_encounters(1)
-        b["tracks"]["3"]["pinned"] = [13]  # wrong guest for Crash Cove
-        arms["wrong_track_pin"] = b
+        b["tracks"]["3"]["order"] = [True] + list(range(1, 16))
+        arms["bool_in_order"] = b
 
         b = build_encounters(1)
-        b["cups"]["100"]["pinned"] = [8]
-        arms["cup_pin_nonempty"] = b
+        b["tracks"]["3"]["pinned"] = []
+        arms["extra_track_key"] = b
+
+        b = build_encounters(1)
+        b["cups"]["100"] = {"base": list(range(8)), "pinned": [],
+                            "reserve": list(range(8, 16))}
+        arms["schema1_cup_entry"] = b
+
+        b = build_encounters(1)
+        b["cups"]["100"] = list(range(16))
+        arms["bare_list_cup_entry"] = b
 
         b = build_encounters(1)
         b["policy"]["seed"] = 2 ** 32
         arms["seed_out_of_range"] = b
 
         b = build_encounters(1)
-        b["policy"]["guest_slots"] = 2
-        arms["bad_guest_slots"] = b
+        b["policy"]["max_guests"] = 2
+        arms["bad_max_guests"] = b
 
         b = build_encounters(1)
-        b["policy"]["boss_eligible_after_clear"] = 1
-        arms["bool_eligible"] = b
+        b["policy"]["draw"] = "pins"
+        arms["bad_draw"] = b
+
+        b = build_encounters(1)
+        b["policy"]["guest_slots"] = 1
+        arms["schema1_policy_key"] = b
 
         b = build_encounters(1)
         b["policy"]["extra"] = 1
@@ -596,17 +621,39 @@ class TestUTRestore(unittest.TestCase):
 
 
 class TestTrialTrophyModeGuard(unittest.TestCase):
-    def test_enabled_without_trial_modes_raises(self):
-        for overrides in (
-            {"slide_coliseum_races": 0, "turbo_track_races": 0},
-            {"slide_coliseum_races": 0},
-            {"turbo_track_races": 0},
-        ):
+    def test_enabled_without_any_trial_mode_raises(self):
+        with self.assertRaises(OptionError) as ctx:
+            _build(steps=("generate_early",), hit_character=True,
+                   slide_coliseum_races=0, turbo_track_races=0)
+        self.assertIn("hit_character", str(ctx.exception))
+
+    def test_one_trial_mode_with_cortex_vortex_raises(self):
+        """Cortex Vortex may take the single enabled trial's pad, so one
+        trial mode is not enough while it is on (no random late failure)."""
+        for overrides in ({"slide_coliseum_races": 0},
+                          {"turbo_track_races": 0}):
             with self.subTest(**overrides):
                 with self.assertRaises(OptionError) as ctx:
-                    _build(steps=("generate_early",),
-                           hit_character=True, **overrides)
-                self.assertIn("hit_character", str(ctx.exception))
+                    _build(steps=("generate_early",), hit_character=True,
+                           cortex_vortex_track=True, **overrides)
+                self.assertIn("cortex_vortex_track", str(ctx.exception))
+
+    def test_both_trial_modes_with_cortex_vortex_generate(self):
+        mw = _build(steps=("generate_early",), hit_character=True,
+                    cortex_vortex_track=True)
+        self.assertTrue(mw.worlds[1].options.hit_character.value)
+
+    def test_one_trial_mode_is_enough(self):
+        """Since the pool draw N. Tropy needs one trial Trophy win, not two:
+        a seed with one trial mode generates with all sixteen reachable."""
+        for overrides in ({"slide_coliseum_races": 0},
+                          {"turbo_track_races": 0}):
+            with self.subTest(**overrides):
+                mw = _build(seed=3, hit_character=True, **overrides)
+                state = mw.get_all_state(False)
+                for name in HIT_CHARACTER_CLASS.names():
+                    self.assertTrue(
+                        mw.get_location(name, 1).can_reach(state), name)
 
     def test_enabled_with_both_trial_modes_generates(self):
         mw = _build(steps=("generate_early",), hit_character=True)
@@ -632,6 +679,10 @@ class TestBuildIdentity(unittest.TestCase):
         self.assertEqual(co["world_version"], "0.2.1")
         self.assertEqual(co["schema_version"], 16)
         self.assertEqual(wire["schema_version"], 16)
+
+
+#: destination_order(0, 0), pinned so a recipe change cannot pass silently.
+_PINNED_ORDER_SEED0_DEST0 = [7, 4, 11, 14, 8, 1, 10, 0, 12, 2, 3, 6, 9, 5, 13, 15]
 
 
 if __name__ == "__main__":
