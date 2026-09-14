@@ -1297,7 +1297,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
     # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
-             FinalOxideUnlock, FinalOxideRelicCount],
+             FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            BossGarageRequirements],
