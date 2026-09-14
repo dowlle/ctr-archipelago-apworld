@@ -746,10 +746,22 @@ class TrialTrackRaces(Choice):
 
 
 class SlideColiseumRaces(TrialTrackRaces):
+    """Standalone Adventure race family for Slide Coliseum.
+
+    Trophy Race also restores Slide Coliseum's per-track Reach 10 Wumpa
+    route. CTR Challenge includes Trophy Race by construction, so a
+    CTR-only seed cannot be expressed.
+    """
     display_name = "Slide Coliseum Races"
 
 
 class TurboTrackRaces(TrialTrackRaces):
+    """Standalone Adventure race family for Turbo Track.
+
+    Trophy Race also restores Turbo Track's per-track Reach 10 Wumpa
+    route. CTR Challenge includes Trophy Race by construction, so a
+    CTR-only seed cannot be expressed.
+    """
     display_name = "Turbo Track Races"
 
 
