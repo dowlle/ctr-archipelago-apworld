@@ -496,7 +496,7 @@ class HitCharacter(Toggle):
     have not hit yet get a seat first, up to three per race.
 
     N. Tropy needs at least one of the Slide Coliseum or Turbo Track Trophy
-    Race options enabled."""
+    Race options enabled, or both when Cortex Vortex Track is on."""
     display_name = "Hit Character Checks"
 
 

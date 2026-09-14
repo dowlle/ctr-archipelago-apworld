@@ -627,6 +627,22 @@ class TestTrialTrophyModeGuard(unittest.TestCase):
                    slide_coliseum_races=0, turbo_track_races=0)
         self.assertIn("hit_character", str(ctx.exception))
 
+    def test_one_trial_mode_with_cortex_vortex_raises(self):
+        """Cortex Vortex may take the single enabled trial's pad, so one
+        trial mode is not enough while it is on (no random late failure)."""
+        for overrides in ({"slide_coliseum_races": 0},
+                          {"turbo_track_races": 0}):
+            with self.subTest(**overrides):
+                with self.assertRaises(OptionError) as ctx:
+                    _build(steps=("generate_early",), hit_character=True,
+                           cortex_vortex_track=True, **overrides)
+                self.assertIn("cortex_vortex_track", str(ctx.exception))
+
+    def test_both_trial_modes_with_cortex_vortex_generate(self):
+        mw = _build(steps=("generate_early",), hit_character=True,
+                    cortex_vortex_track=True)
+        self.assertTrue(mw.worlds[1].options.hit_character.value)
+
     def test_one_trial_mode_is_enough(self):
         """Since the pool draw N. Tropy needs one trial Trophy win, not two:
         a seed with one trial mode generates with all sixteen reachable."""

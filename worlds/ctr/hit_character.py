@@ -594,29 +594,41 @@ def _tuples_to_lists(value):
 # ---------------------------------------------------------------------------
 
 def raise_if_required_trial_modes_disabled(world) -> None:
-    """Refuse an enabled seed where N. Tropy can never unlock.
+    """Refuse an enabled seed where N. Tropy might never unlock.
 
     N. Tropy joins the draw pool after a win of the Slide Coliseum or Turbo
-    Track Trophy Race (35016200 / 35016201) and has no boss race. One trial
-    Trophy Race is enough; with BOTH trial Trophy modes off no trigger exists
-    and his mandatory Hit check could never be reached, so fail clearly
-    instead of silently enabling an option or omitting the check.
+    Track Trophy Race (35016200 / 35016201) and has no boss race. With BOTH
+    trial Trophy modes off no trigger exists. With only ONE on, the Cortex
+    Vortex pad track can still take that trial's pad (its dropped destination
+    is drawn per seed and may be a trial track), which would remove the only
+    trigger at random; so one trial mode is enough only while
+    `cortex_vortex_track` is off. Fail clearly and early instead of silently
+    enabling an option, omitting the check, or failing late for some seeds.
 
     Relaxed 2026-09-14 with the pool draw: schema 1 pinned N. Tropy to both
-    trial tracks and therefore required both modes.
+    trial tracks and therefore always required both modes.
     """
     if not enabled(world):
         return
-    if int(world.options.slide_coliseum_races.value) >= 1:
+    trial_on = [name for name in ("slide_coliseum_races", "turbo_track_races")
+                if int(getattr(world.options, name).value) >= 1]
+    cortex = bool(getattr(world.options, "cortex_vortex_track", 0).value) \
+        if hasattr(world.options, "cortex_vortex_track") else False
+    if len(trial_on) >= 2 or (len(trial_on) == 1 and not cortex):
         return
-    if int(world.options.turbo_track_races.value) >= 1:
-        return
+    if not trial_on:
+        raise OptionError(
+            "CTR: 'hit_character' is enabled, but N. Tropy only joins the "
+            "opponent pool after a Slide Coliseum or Turbo Track Trophy Race "
+            "win, and this YAML disables both 'slide_coliseum_races' and "
+            "'turbo_track_races'. Set at least one of them to 'trophy_race' or "
+            "higher (or turn 'hit_character' off).")
     raise OptionError(
-        "CTR: 'hit_character' is enabled, but N. Tropy only joins the "
-        "opponent pool after a Slide Coliseum or Turbo Track Trophy Race win, "
-        "and this YAML disables both 'slide_coliseum_races' and "
-        "'turbo_track_races'. Set at least one of them to 'trophy_race' or "
-        "higher (or turn 'hit_character' off).")
+        "CTR: 'hit_character' is enabled with only "
+        f"'{trial_on[0]}' on, and 'cortex_vortex_track' may take that trial "
+        "track's pad, which would leave N. Tropy with no unlock win. Turn on "
+        "both 'slide_coliseum_races' and 'turbo_track_races' (at least "
+        "'trophy_race'), or turn 'cortex_vortex_track' off.")
 
 
 def raise_if_required_boss_encounters_disabled(world) -> None:
