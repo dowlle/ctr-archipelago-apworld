@@ -152,14 +152,14 @@ class FinalOxideRelicCount(NamedRange):
     Values above 18 with a non-total mode fail generation clearly instead of
     producing an impossible goal.
 
-    - **all**: shorthand for the maximum supported value, 54 (see range_end
-      above; the total_relics mode is the only one that can use it, the same
-      as typing 54 directly)."""
+    - **all**: shorthand for 18, a full single tier, the same as the 0.2.0
+      meaning. It works in every mode. Players using total_relics who want
+      every relic of every tier type 54."""
     display_name = "Oxide's Final Challenge Relic Count"
     range_start = 1
     range_end = 54
     default = 18
-    special_range_names = {"all": 54}
+    special_range_names = {"all": 18}
 
 
 class OxideFinalTrack(Choice):

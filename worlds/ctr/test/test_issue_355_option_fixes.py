@@ -15,7 +15,7 @@
    0/1 Choice) instead of FinalOxideRelicCount (the NamedRange the 0.2.0
    template's `all` value was meant for), so `oxide_final_challenge_relic_count:
    all` raised an AttributeError during NamedRange.from_text() instead of
-   resolving to the option's real maximum (range_end = 54).
+   resolving to 18, a full single tier, as in 0.2.0.
 """
 from test.general import setup_multiworld
 
@@ -77,15 +77,14 @@ class TestTrialTrackRaceDescriptions(CTRTestBase):
 
 class TestFinalOxideRelicCountSpecialRangeNames(CTRTestBase):
     def test_special_range_names_live_on_the_relic_count_option(self):
-        self.assertEqual(FinalOxideRelicCount.special_range_names, {"all": 54})
+        self.assertEqual(FinalOxideRelicCount.special_range_names, {"all": 18})
 
     def test_oxide_final_track_no_longer_carries_it(self):
         self.assertEqual(getattr(OxideFinalTrack, "special_range_names", {}), {})
 
-    def test_all_resolves_to_the_option_maximum(self):
+    def test_all_resolves_to_a_full_single_tier(self):
         option = FinalOxideRelicCount.from_text("all")
-        self.assertEqual(option.value, FinalOxideRelicCount.range_end)
-        self.assertEqual(option.value, 54)
+        self.assertEqual(option.value, 18)
 
     def test_legacy_all_yaml_generates(self):
         # This is the exact shape of the 0.2.0 template value that used to
@@ -104,4 +103,4 @@ class TestFinalOxideRelicCountSpecialRangeNames(CTRTestBase):
         }
         mw = setup_multiworld(ctrAPWorld, seed=355, options=options)
         self.assertEqual(
-            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 54)
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 18)
