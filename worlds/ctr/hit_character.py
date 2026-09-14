@@ -851,19 +851,40 @@ def _appearance_players(target_name: str,
                  if name != target_name)
 
 
+#: Trial destinations and the option that gives each a Trophy Race. A trial
+#: pad always exists (its Time Trials live there), but it only hosts an AI race
+#: when its race option is at least `trophy_race`; native refuses a Hit
+#: opportunity on an invalid trial row the same way.
+TRIAL_RACE_OPTIONS: Dict[int, str] = {
+    16: "slide_coliseum_races",
+    17: "turbo_track_races",
+}
+
+
+def _hit_supported_level(world, level_id: int) -> bool:
+    """Whether an ordinary destination can host a Hit race at all."""
+    option = TRIAL_RACE_OPTIONS.get(level_id)
+    if option is None:
+        return True
+    return int(getattr(world.options, option).value) >= 1
+
+
 def _build_ordinary_routes(world, player: int, target_id: int,
                            block) -> List[HitRoute]:
     """Structurally resolve every Hit-supported ordinary route for `target_id`.
 
-    Every target scans all eighteen ordinary destination levels. A route whose
-    pad is missing, displaced to custom content, or locked to the target itself
-    is dropped.
+    Every target scans all eighteen ordinary destination levels. A trial level
+    whose race option is off (its pad then only holds Time Trials), a route
+    whose pad is missing, displaced to custom content, or locked to the target
+    itself is dropped.
     """
     del block  # schema 2 orders never restrict who can be drawn
     target_name = characters.CHARACTER_ID_TO_NAME[target_id]
     by_level = _track_name_by_level_id(world)
     routes: List[HitRoute] = []
     for level_id in TRACK_LEVEL_IDS:
+        if not _hit_supported_level(world, level_id):
+            continue
         track = by_level.get(level_id)
         if track is None:
             continue

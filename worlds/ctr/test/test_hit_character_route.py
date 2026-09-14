@@ -147,6 +147,47 @@ class TestAppearancePlayers(unittest.TestCase):
                 routes = _build_ordinary_routes(world, PLAYER, cid, block)
                 self.assertEqual({r.level_id for r in routes}, levels)
 
+    def test_trial_without_a_trophy_race_is_no_route(self):
+        """A trial pad exists for its Time Trials even with its race option
+        off, but it hosts no AI race, so it must never prove a Hit."""
+        from ..hit_character import _build_ordinary_routes
+        for off, level in (("slide_coliseum_races", 16),
+                           ("turbo_track_races", 17)):
+            with self.subTest(off=off):
+                mw = _build(seed=1, hit_character=True, **{off: 0})
+                world = mw.worlds[PLAYER]
+                block = world.ctr_hit_character_encounters
+                self.assertIn(level, _track_name_by_level_id(world))
+                for cid in range(16):
+                    levels = {r.level_id for r in _build_ordinary_routes(
+                        world, PLAYER, cid, block)}
+                    self.assertNotIn(level, levels)
+                    self.assertIn(3, levels)
+
+    def test_only_route_through_a_raceless_trial_proves_nothing(self):
+        """Mutation guard for the trial filter: when the only reachable pad is
+        a trial without a Trophy Race, no Hit rule holds."""
+        from unittest import mock
+        from .. import hit_character as hc
+        mw = _build(seed=1, steps=ITEMS_STEPS, hit_character=True,
+                    slide_coliseum_races=0)
+        real = hc.retail_route
+
+        def only_slide(world, player, track):
+            got = real(world, player, track)
+            if got is None:
+                return None
+            if track != "Slide Coliseum":
+                return (got[0], got[1], lambda state: False)
+            return got
+
+        with mock.patch.object(hc, "retail_route", only_slide):
+            call_all(mw, "set_rules")
+        state = _all_items_state(mw)
+        for cid in (0, 3, 7):
+            with self.subTest(engine_id=cid):
+                self.assertFalse(_hit_rule(mw, cid)(state))
+
     def test_field_sizes_are_the_contract_values(self):
         self.assertEqual(ORDINARY_FIELD_SIZE, 7)
         self.assertEqual(PURPLE_CUP_FIELD_SIZE, 4)
