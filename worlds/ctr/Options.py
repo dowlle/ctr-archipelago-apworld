@@ -158,8 +158,11 @@ class FinalOxideRelicCount(NamedRange):
 
 
 class OxideFinalTrack(Choice):
-    """Venue for N. Oxide's Final Challenge. The opponent and AP location
-    remain Nitros Oxide and 35011105 for both choices."""
+    """Venue for N. Oxide's Final Challenge. The opponent remains Nitros
+    Oxide for both choices."""
+    # The AP location backing this challenge is 35011105 for both venue
+    # choices -- an implementation detail, not something a player needs to
+    # know to pick a venue (issue #355).
     display_name = "Oxide Final Challenge Track"
     option_cortex_vortex = 0
     option_oxide_station = 1
