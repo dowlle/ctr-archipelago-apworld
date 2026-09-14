@@ -150,21 +150,28 @@ class FinalOxideRelicCount(NamedRange):
     - Every other mode supports 1-18 because it checks one 18-item tier.
 
     Values above 18 with a non-total mode fail generation clearly instead of
-    producing an impossible goal."""
+    producing an impossible goal.
+
+    - **all**: shorthand for 18, a full single tier, the same as the 0.2.0
+      meaning. It works in every mode. Players using total_relics who want
+      every relic of every tier type 54."""
     display_name = "Oxide's Final Challenge Relic Count"
     range_start = 1
     range_end = 54
     default = 18
+    special_range_names = {"all": 18}
 
 
 class OxideFinalTrack(Choice):
-    """Venue for N. Oxide's Final Challenge. The opponent and AP location
-    remain Nitros Oxide and 35011105 for both choices."""
+    """Venue for N. Oxide's Final Challenge. The opponent remains Nitros
+    Oxide for both choices."""
+    # The AP location backing this challenge is 35011105 for both venue
+    # choices -- an implementation detail, not something a player needs to
+    # know to pick a venue (issue #355).
     display_name = "Oxide Final Challenge Track"
     option_cortex_vortex = 0
     option_oxide_station = 1
     default = 0
-    special_range_names = {"all": 18}
 
 
 class ShuffleGems(DefaultOnToggle):
@@ -746,10 +753,22 @@ class TrialTrackRaces(Choice):
 
 
 class SlideColiseumRaces(TrialTrackRaces):
+    """Standalone Adventure race family for Slide Coliseum.
+
+    Trophy Race also restores Slide Coliseum's per-track Reach 10 Wumpa
+    route. CTR Challenge includes Trophy Race by construction, so a
+    CTR-only seed cannot be expressed.
+    """
     display_name = "Slide Coliseum Races"
 
 
 class TurboTrackRaces(TrialTrackRaces):
+    """Standalone Adventure race family for Turbo Track.
+
+    Trophy Race also restores Turbo Track's per-track Reach 10 Wumpa
+    route. CTR Challenge includes Trophy Race by construction, so a
+    CTR-only seed cannot be expressed.
+    """
     display_name = "Turbo Track Races"
 
 
@@ -1297,7 +1316,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
     # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
-             FinalOxideUnlock, FinalOxideRelicCount],
+             FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            BossGarageRequirements],
