@@ -8,11 +8,11 @@ apworld owns the names, the option, the AP location codes and the emitted
 `hit_character_encounters` wire block. Nothing in this module hooks the race
 loop or claims a reachability proof -- it is registration plus wire data.
 
-WHO OWNS THE SEMANTICS. The apworld decides which engine ids exist, how the
-deterministic candidate rotation is laid out, and which ordinary destinations
-each guest is pinned to. Native owns the actual hit dispatch, the model
-loading and the field seating; it never reconstructs the candidate lists from
-its own RNG, it consumes the ordered lists this module emits.
+WHO OWNS THE SEMANTICS. The apworld decides which engine ids exist, the
+seeded draw order of every destination and the unlock triggers. Native owns the
+actual hit dispatch, the model loading and the per-race draw; it never shuffles
+with its own RNG, it walks the ordered lists this module emits (block schema 2,
+"unhit_first_rotation", see `reference_draw`).
 
 DATAPACKAGE STABILITY. This class claims the additive block 35025000, stride 1
 in engine-character-id order, and registers all sixteen names UNCONDITIONALLY.
@@ -24,12 +24,14 @@ the roster the rest of the world uses.
 FROZEN-NAME WARNING. These names ride the 0.2.0/0.2.1 datapackage line; after
 that bump they are permanent and their ids can never move.
 
-WIRE SHAPE. The top-level `hit_character_encounters` block (schema 1) is
+WIRE SHAPE. The top-level `hit_character_encounters` block (schema 2) is
 emitted only when the option is enabled. `ctr_options.hit_character` is always
-emitted as a boolean, so a tracker can tell "off" from "pre-feature seed". The
-candidate lists are fully resolved here, including the deterministic rotation
-and the guest pins; native never re-draws them.
+emitted as a boolean, so a tracker can tell "off" from "pre-feature seed". Each
+destination carries one seeded `order` (a permutation of all sixteen engine
+ids); native draws every race's field by walking it. Schema 1 (pins, reserve,
+one guest slot) is superseded and refused.
 """
+import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -42,7 +44,14 @@ from .location_class import LocationClass
 HIT_CHARACTER_CODE_BASE = 35025000
 
 #: Wire-block version, independent of the seed's global `schema_version`.
-HIT_CHARACTER_SCHEMA = 1
+#: Schema 2 (2026-09-14) replaces schema 1's pins, reserve list and single guest
+#: slot with the pool draw. A schema-1 block is refused, never reinterpreted.
+HIT_CHARACTER_SCHEMA = 2
+
+#: `policy.draw` and `policy.max_guests`, verbatim. The engine has three extra
+#: driver-model slots, so at most three non-stock opponents race at once.
+POLICY_DRAW = "unhit_first_rotation"
+MAX_GUESTS = 3
 
 #: Inclusive bounds of the global `ctr_options.schema_version` this apworld
 #: accepts for an enabled encounter block. The upper bound is the signed 32-bit
@@ -58,25 +67,27 @@ GLOBAL_SCHEMA_MAX = 2147483647
 #: `ADVENTURE_STARTERS` boundary, not the apworld roster order.
 DEFAULT_RACER_IDS: Tuple[int, ...] = tuple(range(8))
 GUEST_RACER_IDS: Tuple[int, ...] = tuple(range(8, 16))
+ALL_RACER_IDS: Tuple[int, ...] = tuple(range(16))
 
 #: Ordinary destination level ids 0..17 and cup ids 100..104.
 TRACK_LEVEL_IDS: Tuple[int, ...] = tuple(range(18))
 CUP_IDS: Tuple[int, ...] = (100, 101, 102, 103, 104)
 
-#: Guest pin table, keyed by guest engine id:
-#:     (ordinary destination level ids, authoritative any-of AP win codes, kind)
-#: The ordinary pins deliberately differ from the retail champion metadata; they
-#: are the approved encounter destinations. `kind` describes the authoritative
-#: trigger -- a boss win or an ordinary/trial track win.
-PIN_GUESTS: Dict[int, Tuple[Tuple[int, ...], Tuple[int, ...], str]] = {
-    8: ((7,), (35011103,), "boss"),           # Pinstripe -> Hot Air Skyway
-    9: ((5,), (35011101,), "boss"),           # Papu Papu -> Papu's Pyramid
-    10: ((6,), (35011100,), "boss"),          # Ripper Roo -> Roo's Tubes
-    11: ((1,), (35011102,), "boss"),          # Komodo Joe -> Dragon Mines
-    12: ((16, 17), (35016200, 35016201), "track"),   # N. Tropy -> trials
-    13: ((2, 12), (35011008, 35011010), "track"),    # Penta -> Blizzard/Polar
-    14: ((3, 8), (35011000, 35011003), "track"),     # Fake Crash -> Cove/Sewer
-    15: ((13,), (35011104, 35011105), "boss"),       # Oxide -> Oxide Station
+#: Guest unlock triggers, keyed by guest engine id:
+#:     (authoritative any-of AP win codes, kind)
+#: A guest joins the draw pool of every Hit-supported race once ANY listed win is
+#: checked. `kind` describes the trigger: a boss win or a track win. Schema 1
+#: also pinned each guest to one or two destinations; that is superseded by the
+#: pool draw (2026-09-14) and no destination list remains.
+UNLOCK_TRIGGERS: Dict[int, Tuple[Tuple[int, ...], str]] = {
+    8: ((35011103,), "boss"),                 # Pinstripe
+    9: ((35011101,), "boss"),                 # Papu Papu
+    10: ((35011100,), "boss"),                # Ripper Roo
+    11: ((35011102,), "boss"),                # Komodo Joe
+    12: ((35016200, 35016201), "track"),      # N. Tropy: Slide Coliseum / Turbo Track
+    13: ((35011008, 35011010), "track"),      # Penta: Blizzard Bluff / Polar Pass
+    14: ((35011000, 35011003), "track"),      # Fake Crash: Crash Cove / Sewer Speedway
+    15: ((35011104, 35011105), "boss"),       # Nitros Oxide
 }
 
 #: Boss-win AP code -> engine opponent id. The shared appearance identity table;
@@ -144,46 +155,31 @@ def enabled(world) -> bool:
     return bool(world.options.hit_character.value)
 
 
-def _rotate(ids: Tuple[int, ...], offset: int) -> List[int]:
-    """Left-rotate `ids` by `offset` places (modulo the list length)."""
-    amount = offset % len(ids)
-    return list(ids[amount:]) + list(ids[:amount])
+def destination_order(seed: int, destination: int) -> List[int]:
+    """The seeded draw order for one destination: a permutation of 0..15.
 
-
-def _pinned_guests(level_id: int) -> List[int]:
-    """Guest engine ids pinned to an ordinary destination level id, sorted."""
-    return sorted(cid for cid, (levels, _codes, _kind) in PIN_GUESTS.items()
-                  if level_id in levels)
-
-
-def _candidate_lists(level_id: int, seed: int) -> Dict[str, List[int]]:
-    """The resolved `{base, pinned, reserve}` lists for one destination.
-
-    `base` is the eight default racer ids and `reserve` the eight guest ids,
-    each left-rotated by `(seed + level_id) % 8`. The arithmetic is
-    mathematical integer addition before the modulo, which is identical to
-    uint32 overflow for this modulus. `pinned` carries the guest pin, at most
-    one per destination.
+    Derived from the roster seed and the destination key only, through a
+    string-seeded `random.Random` (SHA-512 based, independent of
+    PYTHONHASHSEED), so it consumes no world RNG and is reproducible anywhere.
     """
-    offset = (seed + level_id) % 8
-    return {
-        "base": _rotate(DEFAULT_RACER_IDS, offset),
-        "pinned": _pinned_guests(level_id),
-        "reserve": _rotate(GUEST_RACER_IDS, offset),
-    }
+    order = list(ALL_RACER_IDS)
+    random.Random(f"ctr-hit-order:{int(seed)}:{int(destination)}").shuffle(order)
+    return order
 
 
 def build_encounters(seed: int) -> Dict[str, object]:
-    """Build the `hit_character_encounters` block for a resolved uint32 seed."""
+    """Build the `hit_character_encounters` block (schema 2) for a uint32 seed."""
     locations = {
         str(cid): HIT_CHARACTER_CODE_BASE + cid
         for cid in sorted(characters.CHARACTER_ID_TO_NAME)
     }
-    tracks = {str(lid): _candidate_lists(lid, seed) for lid in TRACK_LEVEL_IDS}
-    cups = {str(cup): _candidate_lists(cup, seed) for cup in CUP_IDS}
+    tracks = {str(lid): {"order": destination_order(seed, lid)}
+              for lid in TRACK_LEVEL_IDS}
+    cups = {str(cup): {"order": destination_order(seed, cup)}
+            for cup in CUP_IDS}
     triggers: Dict[str, Dict[str, object]] = {}
     for guest in GUEST_RACER_IDS:
-        _levels, codes, kind = PIN_GUESTS[guest]
+        codes, kind = UNLOCK_TRIGGERS[guest]
         triggers[str(guest)] = {"kind": kind, "any_of": list(codes)}
     bosses = {str(code): opponent
               for code, opponent in sorted(BOSS_WIN_OPPONENTS.items())}
@@ -193,14 +189,103 @@ def build_encounters(seed: int) -> Dict[str, object]:
         "policy": {
             "seed": seed,
             "self_character": POLICY_SELF_CHARACTER,
-            "boss_eligible_after_clear": True,
-            "guest_slots": 1,
+            "draw": POLICY_DRAW,
+            "max_guests": MAX_GUESTS,
         },
         "tracks": tracks,
         "cups": cups,
         "unlock_triggers": triggers,
         "bosses": bosses,
     }
+
+
+# ---------------------------------------------------------------------------
+# The per-race draw (reference; native owns the runtime implementation)
+# ---------------------------------------------------------------------------
+#
+# Generation never simulates races. This reference documents the exact native
+# draw ("unhit_first_rotation") and is what the guarantee tests run, so the
+# logic below can rely on the guarantees it proves:
+#
+#   G1  at most three unhit unlocked guests (not the player): all of them are
+#       seated in every race.
+#   G2  more than three: a window of three rotates through them; each is seated
+#       at least once in any ceil(n / 3) consecutive fresh races at one
+#       destination while that set is unchanged.
+#   G3  the seven stock ids of the player's pack take at least four seats per
+#       ordinary race and rotate, so each appears within two fresh races.
+#   G4  the other non-stock ids (checked guests, and Pura when the player is a
+#       non-default racer) rotate through the remaining extra-model slots.
+#   G5  the sets above change only when a Hit is checked or a guest unlocks,
+#       which is monotone and finite, so re-racing one destination and hitting
+#       every seated unchecked target reaches every eligible non-player target.
+
+#: Draw cursors start here, so the first walk begins at order position 0.
+CURSOR_INIT = 15
+
+
+def stock(player: int) -> List[int]:
+    """The seven ids the player's arcade pack carries (what LOAD_Robots1P writes).
+
+    Seven ids counted up from 0, skipping the player: the seven other defaults
+    for a default player, 0..6 for a guest player (Pura then needs an extra).
+    """
+    out: List[int] = []
+    nxt = 0
+    for _ in range(7):
+        if nxt == player:
+            nxt += 1
+        out.append(nxt)
+        nxt += 1
+    return out
+
+
+def _take(order, member, cursor: int, want: int):
+    """Walk `order` cyclically from `cursor + 1`, collecting up to `want` members."""
+    picked: List[int] = []
+    pos = cursor
+    for step in range(1, 17):
+        if len(picked) >= want:
+            break
+        p = (cursor + step) % 16
+        if member(order[p]):
+            picked.append(order[p])
+            pos = p
+    return picked, pos
+
+
+def reference_draw(order, player: int, eligible, unchecked, ai_seats: int,
+                   cursors):
+    """One fresh field: returns `(field, new_cursors)`.
+
+    `eligible[i]` / `unchecked[i]` are truthy per engine id 0..15 (`unchecked`
+    means the Hit location is in the seed and not yet checked). `cursors` is
+    `[unhit guests, other non-stock, stock]`. Seat order is unhit guests, then
+    other non-stock ids, then stock ids. Never the player, never a duplicate,
+    at most `MAX_GUESTS` non-stock ids, always exactly `ai_seats` opponents.
+    """
+    st = set(stock(player))
+    c_p, c_x, c_t = cursors
+    unhit, c_p = _take(
+        order,
+        lambda i: i >= 8 and i != player and eligible[i] and unchecked[i],
+        c_p, min(MAX_GUESTS, ai_seats))
+    free = MAX_GUESTS - len(unhit)
+    other, c_x = _take(
+        order,
+        lambda i: i != player and i not in st and eligible[i] and i not in unhit,
+        c_x, min(free, ai_seats - len(unhit)))
+    fill, c_t = _take(order, lambda i: i in st, c_t,
+                      ai_seats - len(unhit) - len(other))
+    return unhit + other + fill, [c_p, c_x, c_t]
+
+
+def reference_opportunity(player: int, eligible, unchecked) -> int:
+    """The pad's Hit opportunity: lowest eligible non-player unchecked id, or -1."""
+    for cid in ALL_RACER_IDS:
+        if cid != player and eligible[cid] and unchecked[cid]:
+            return cid
+    return -1
 
 
 def resolve_for_generation(world) -> Dict[str, object] | None:
@@ -284,32 +369,26 @@ def _validate_engine_list(value, label: str, *, expected_set=None,
               f"got {value}")
 
 
-def _validate_lists(entry, label: str, expected_pins) -> None:
+def _validate_order(entry, label: str) -> None:
     if not isinstance(entry, dict):
-        _fail(f"{label} must be an object with base/pinned/reserve lists")
-    if set(entry) != {"base", "pinned", "reserve"}:
-        _fail(f"{label} must carry exactly base, pinned and reserve")
-    _validate_engine_list(entry["base"], f"{label}.base",
-                          expected_set=DEFAULT_RACER_IDS, exact_length=8)
-    _validate_engine_list(entry["reserve"], f"{label}.reserve",
-                          expected_set=GUEST_RACER_IDS, exact_length=8)
-    _validate_engine_list(entry["pinned"], f"{label}.pinned")
-    if entry["pinned"] != list(expected_pins):
-        _fail(f"{label}.pinned must be exactly {list(expected_pins)}, "
-              f"got {entry['pinned']}")
+        _fail(f"{label} must be an object with one order list")
+    if set(entry) != {"order"}:
+        _fail(f"{label} must carry exactly order")
+    _validate_engine_list(entry["order"], f"{label}.order",
+                          expected_set=ALL_RACER_IDS, exact_length=16)
 
 
 def _validate_block(block) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
-    Every structural commitment of the frozen contract is enforced exactly:
+    Every structural commitment of the schema-2 contract is enforced exactly:
     exact integer types (bool is rejected even where it compares equal to 0/1),
-    the canonical location mapping, base/reserve permutations of the default
-    and guest id sets, the approved per-track pins, empty cup pins, the six
-    canonical boss-win keys with engine-id values, and the guest trigger kinds
-    and authoritative any-of win-code sets. Valid candidate ORDERING is not
-    constrained -- any permutation of the correct sets is accepted and
-    preserved verbatim -- so a tracker can round-trip a reordered block.
+    the canonical location mapping, the draw policy, one `order` permutation of
+    all sixteen engine ids per destination and cup, the six canonical boss-win
+    keys with engine-id values, and the guest trigger kinds and authoritative
+    any-of win-code sets. The ORDER itself is not constrained -- any
+    permutation is accepted and preserved verbatim -- so a tracker can
+    round-trip a block it did not draw.
     """
     if not isinstance(block, dict):
         _fail("block must be an object")
@@ -320,7 +399,8 @@ def _validate_block(block) -> None:
     schema = block.get("schema")
     if type(schema) is not int or schema != HIT_CHARACTER_SCHEMA:
         _fail(f"unknown schema {schema!r}; expected integer "
-              f"{HIT_CHARACTER_SCHEMA}")
+              f"{HIT_CHARACTER_SCHEMA} (schema 1 pins are superseded by the "
+              "pool draw and cannot be modelled by this apworld)")
 
     locations = block.get("locations")
     if not isinstance(locations, dict) or set(locations) != {
@@ -339,36 +419,33 @@ def _validate_block(block) -> None:
     policy = block.get("policy")
     if not isinstance(policy, dict):
         _fail("policy must be an object")
-    if set(policy) != {"seed", "self_character", "boss_eligible_after_clear",
-                       "guest_slots"}:
-        _fail("policy must carry exactly seed, self_character, "
-              "boss_eligible_after_clear and guest_slots")
+    if set(policy) != {"seed", "self_character", "draw", "max_guests"}:
+        _fail("policy must carry exactly seed, self_character, draw and "
+              "max_guests")
     if not _is_uint32(policy.get("seed")):
         _fail("policy.seed must be an unsigned 32-bit integer")
     if policy.get("self_character") != POLICY_SELF_CHARACTER:
         _fail("policy.self_character must be "
               f"{POLICY_SELF_CHARACTER!r}")
-    if (type(policy.get("boss_eligible_after_clear")) is not bool
-            or policy["boss_eligible_after_clear"] is not True):
-        _fail("policy.boss_eligible_after_clear must be true")
-    if type(policy.get("guest_slots")) is not int \
-            or policy["guest_slots"] != 1:
-        _fail("policy.guest_slots must be the integer 1")
+    if policy.get("draw") != POLICY_DRAW:
+        _fail(f"policy.draw must be {POLICY_DRAW!r}")
+    if type(policy.get("max_guests")) is not int \
+            or policy["max_guests"] != MAX_GUESTS:
+        _fail(f"policy.max_guests must be the integer {MAX_GUESTS}")
 
     tracks = block.get("tracks")
     if not isinstance(tracks, dict) or set(tracks) != {
             str(lid) for lid in TRACK_LEVEL_IDS}:
         _fail("tracks must map exactly level ids 0..17")
     for lid in TRACK_LEVEL_IDS:
-        _validate_lists(tracks[str(lid)], f"tracks[{lid!r}]",
-                        _pinned_guests(lid))
+        _validate_order(tracks[str(lid)], f"tracks[{lid!r}]")
 
     cups = block.get("cups")
     if not isinstance(cups, dict) or set(cups) != {
             str(cup) for cup in CUP_IDS}:
         _fail("cups must map exactly cup ids 100..104")
     for cup in CUP_IDS:
-        _validate_lists(cups[str(cup)], f"cups[{cup!r}]", [])
+        _validate_order(cups[str(cup)], f"cups[{cup!r}]")
 
     triggers = block.get("unlock_triggers")
     if not isinstance(triggers, dict) or set(triggers) != {
@@ -379,7 +456,7 @@ def _validate_block(block) -> None:
         if not isinstance(entry, dict) or set(entry) != {"kind", "any_of"}:
             _fail(f"unlock_triggers[{cid!r}] must carry exactly kind and "
                   "any_of")
-        _levels, expected_codes, expected_kind = PIN_GUESTS[cid]
+        expected_codes, expected_kind = UNLOCK_TRIGGERS[cid]
         if entry.get("kind") != expected_kind:
             _fail(f"unlock_triggers[{cid!r}].kind must be {expected_kind!r}")
         any_of = entry.get("any_of")
@@ -425,8 +502,9 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
         ignoring the block, so the apworld refuses instead of accepting a block
         that can never be activated or one that a truncating reader could
         misread. An integer global schema in 16..2147483647 is accepted as long
-        as the block's own known version 1 validates;
-      * a present block with an unknown schema or a malformed shape is refused.
+        as the block's own known version 2 validates;
+      * a present block with an unknown schema (including the superseded
+        schema 1) or a malformed shape is refused.
 
     A pre-feature wire (neither scalar nor block) restores to off, which is the
     correct reading of a seed that has no encounters, regardless of the global
@@ -516,38 +594,36 @@ def _tuples_to_lists(value):
 # ---------------------------------------------------------------------------
 
 def raise_if_required_trial_modes_disabled(world) -> None:
-    """Refuse an enabled seed whose trial Trophy races are not available.
+    """Refuse an enabled seed where N. Tropy can never unlock.
 
-    N. Tropy's guaranteed ordinary pins are Slide Coliseum (level 16) and
-    Turbo Track (level 17), and their authoritative triggers are those two
-    tracks' Trophy Races (35016200/35016201). If either trial Trophy mode is
-    off, that opportunity cannot exist, so an enabled seed would advertise a
-    check the player can never reach. Fail clearly instead of silently
-    enabling another option or omitting the pin.
+    N. Tropy joins the draw pool after a win of the Slide Coliseum or Turbo
+    Track Trophy Race (35016200 / 35016201) and has no boss race. One trial
+    Trophy Race is enough; with BOTH trial Trophy modes off no trigger exists
+    and his mandatory Hit check could never be reached, so fail clearly
+    instead of silently enabling an option or omitting the check.
+
+    Relaxed 2026-09-14 with the pool draw: schema 1 pinned N. Tropy to both
+    trial tracks and therefore required both modes.
     """
     if not enabled(world):
         return
-    missing = []
-    if int(world.options.slide_coliseum_races.value) < 1:
-        missing.append("slide_coliseum_races")
-    if int(world.options.turbo_track_races.value) < 1:
-        missing.append("turbo_track_races")
-    if not missing:
+    if int(world.options.slide_coliseum_races.value) >= 1:
+        return
+    if int(world.options.turbo_track_races.value) >= 1:
         return
     raise OptionError(
-        "CTR: 'hit_character' is enabled, but N. Tropy's guaranteed "
-        "encounters are on the Slide Coliseum and Turbo Track Trophy Races, "
-        "and this YAML disables "
-        + " and ".join(f"'{name}'" for name in missing)
-        + ". Set both 'slide_coliseum_races' and 'turbo_track_races' to at "
-        "least 'trophy_race' (or turn 'hit_character' off).")
+        "CTR: 'hit_character' is enabled, but N. Tropy only joins the "
+        "opponent pool after a Slide Coliseum or Turbo Track Trophy Race win, "
+        "and this YAML disables both 'slide_coliseum_races' and "
+        "'turbo_track_races'. Set at least one of them to 'trophy_race' or "
+        "higher (or turn 'hit_character' off).")
 
 
 def raise_if_required_boss_encounters_disabled(world) -> None:
     """Refuse an enabled seed whose Nitros Oxide route is removed outright.
 
-    Oxide's Hit check is proved by its ordinary pin (Oxide Station, gated on
-    the Oxide win trigger) or by one of its two boss encounters. With
+    Oxide's Hit check is proved by the pool draw after an Oxide win (his
+    unlock trigger) or by one of his two boss encounters. With
     `oxide_goal: disabled` both Oxide races are removed from the seed, so no
     authoritative trigger and no enabled boss encounter remains and the
     mandatory check could never be reached. This is the early, actionable
@@ -591,12 +667,19 @@ def raise_if_required_boss_encounters_disabled(world) -> None:
 #      Missile x3 while Itemsanity models weapons; ordinary vanilla supply when
 #      it does not).
 #
-# ORDINARY PIN ROUTES (guests). A guest's guaranteed pins are the only required
-# ordinary opportunities; reserve appearances and cups are extra and are not
-# modelled as required logic. A pin route additionally requires the guest's
-# authoritative any-of trigger (a reachable completed win), captured once after
-# every Trophy rule is installed. A boss's ordinary pin is therefore eligible
-# only after its clear.
+# ORDINARY ROUTES (pool draw, block schema 2). Every Hit-supported ordinary
+# destination (the sixteen retail tracks and the two trial Trophy tracks) is a
+# route for every target, because native draws each race from the whole pool
+# (`reference_draw`). The guarantees G1 to G5 above make "the pad is accessible
+# with a selectable racer other than the target" sufficient: re-racing that
+# destination and hitting each seated unchecked target seats every eligible
+# target within a bounded number of races, and native keeps a won pad offering
+# a Trophy re-race while any eligible non-player target has an unchecked Hit.
+# A guest additionally needs its authoritative any-of trigger (a reachable
+# completed win), captured once after every Trophy rule is installed. A boss is
+# therefore in the pool only after its clear. Cups are extra opportunities and
+# are not modelled. Schema 1 pinned each guest to one or two destinations and
+# reserved a guest seat against default targets; both are superseded.
 #
 # BOSS ROUTES. A boss-kind guest can be hit during its boss race whether or not
 # the boss is cleared. The route comes from the emitted `bosses` identity table
@@ -604,16 +687,14 @@ def raise_if_required_boss_encounters_disabled(world) -> None:
 # moves the route with the table. A boss race removed by options (for example
 # `oxide_goal: disabled`) simply produces no boss route.
 #
-# DEFAULT RACERS. A default racer appears through the deterministic base list,
-# never through an invented trigger. The contract reserves the one possible
-# guest seat, so only the first `field_size - 1` non-player base IDs are
-# guaranteed; the player being a default inside that prefix shifts the next base
-# ID in by one seat. This conservative subset does not change as guests unlock,
-# which is what preserves the availability invariant for default targets.
+# SELF. `never_seat_player`: the target is never the player's own racer, so a
+# route's appearance players are every roster racer except the target, or the
+# pad's racer lock when that lock is not the target. Owning the target is never
+# an appearance proof.
 #
 # STRUCTURAL FAILURES RAISE. A target with no structurally available route at
-# all -- every retail route missing/displaced, every pin trigger absent, every
-# route pad locked to the target itself, or no level that can seat a default --
+# all -- every retail route missing/displaced, every trigger absent, or every
+# route pad locked to the target itself --
 # is a configuration error, not an inventory state, and raises a clear
 # `OptionError`. Ordinary missing inventory stays a False predicate, because
 # receiving the missing items can resolve it. No target is ever omitted.
@@ -639,7 +720,7 @@ class HitRoute:
     `appearance_players` is the precomputed set of player racers that make the
     target actually appear on this route. An empty set means the route proves no
     appearance and is never installed. `triggers` carries the captured
-    `(region, rule)` proofs for a guest pin and is empty for default racers and
+    `(region, rule)` proofs for a guest unlock and is empty for default racers and
     for boss routes. `boss_region`/`boss_rule` are set only for boss routes.
     """
 
@@ -742,39 +823,13 @@ def _selectable(world, state, player: int, racer: str) -> bool:
         world, state, player, required_character=racer)
 
 
-def _default_appearance_players(target_id: int, base: Tuple[int, ...],
-                                field_size: int,
-                                pad_lock: Optional[str]) -> Tuple[str, ...]:
-    """Player racers under which `target_id` is guaranteed to be seated.
+def _appearance_players(target_name: str,
+                        pad_lock: Optional[str]) -> Tuple[str, ...]:
+    """Player racers under which the pool draw can seat `target_name`.
 
-    One guest seat is reserved, so only the first `field_size - 1` base IDs
-    after removing the player are guaranteed. The player being a default inside
-    that prefix shifts the next base ID in by exactly one seat, so the single
-    seat after the guaranteed prefix is also reachable when the player is drawn
-    from the prefix. The final base ID can never be shifted in by one removal.
-    """
-    limit = field_size - 1
-    target_name = characters.CHARACTER_ID_TO_NAME[target_id]
-    if pad_lock is not None:
-        if pad_lock == target_name:
-            return ()
-        pid = characters.ROSTER_CHARACTER_ID[pad_lock]
-        pruned = [b for b in base if b != pid]
-        return (pad_lock,) if target_id in pruned[:limit] else ()
-    if target_id in base[:limit]:
-        return tuple(name for name in progressive_capability.ROSTER
-                     if name != target_name)
-    if target_id in base[:field_size]:
-        return tuple(characters.CHARACTER_ID_TO_NAME[b] for b in base[:limit])
-    return ()
-
-
-def _guest_appearance_players(target_name: str,
-                              pad_lock: Optional[str]) -> Tuple[str, ...]:
-    """Player racers under which a pinned guest actually appears.
-
-    A guaranteed pin seats the guest as long as the player is a different,
-    selectable racer; a racer-locked pad narrows that to the one locked racer.
+    Any selectable racer other than the target; a racer-locked pad narrows
+    that to its one locked racer, and a pad locked to the target itself proves
+    nothing (you cannot race against yourself).
     """
     if pad_lock == target_name:
         return ()
@@ -786,19 +841,17 @@ def _guest_appearance_players(target_name: str,
 
 def _build_ordinary_routes(world, player: int, target_id: int,
                            block) -> List[HitRoute]:
-    """Structurally resolve every retail ordinary route for `target_id`.
+    """Structurally resolve every Hit-supported ordinary route for `target_id`.
 
-    Default racers scan all eighteen destination levels through the base list;
-    guests scan only their guaranteed pin levels. A route whose pad is missing,
-    displaced to custom content, or locked to the target itself is dropped.
+    Every target scans all eighteen ordinary destination levels. A route whose
+    pad is missing, displaced to custom content, or locked to the target itself
+    is dropped.
     """
+    del block  # schema 2 orders never restrict who can be drawn
     target_name = characters.CHARACTER_ID_TO_NAME[target_id]
-    tracks = block["tracks"]
     by_level = _track_name_by_level_id(world)
-    is_default = target_id in DEFAULT_RACER_IDS
-    levels = TRACK_LEVEL_IDS if is_default else PIN_GUESTS[target_id][0]
     routes: List[HitRoute] = []
-    for level_id in levels:
+    for level_id in TRACK_LEVEL_IDS:
         track = by_level.get(level_id)
         if track is None:
             continue
@@ -807,12 +860,7 @@ def _build_ordinary_routes(world, player: int, target_id: int,
             continue
         _pad_name, hub, entrance_rule = resolved
         pad_lock = progressive_capability.track_required_character(world, track)
-        if is_default:
-            base = tuple(tracks[str(level_id)]["base"])
-            players = _default_appearance_players(
-                target_id, base, ORDINARY_FIELD_SIZE, pad_lock)
-        else:
-            players = _guest_appearance_players(target_name, pad_lock)
+        players = _appearance_players(target_name, pad_lock)
         if not players:
             continue
         routes.append(HitRoute(
@@ -895,7 +943,7 @@ def _install_target(world, player: int, target_id: int, block,
                 reason = ("no created authoritative trigger win and no enabled "
                           "boss encounter")
             else:
-                reason = ("every guaranteed pin route is missing, displaced to "
+                reason = ("every ordinary route is missing, displaced to "
                           "custom content, or locked to the target, and no "
                           "enabled boss encounter exists")
             _fail(f"guest {target_name!r} has no reachable encounter route: "

@@ -425,11 +425,11 @@ def apply_raise_guards(world):
 
 
 def raise_if_hit_character_needs_trial_trophy_modes(world):
-    """Hit Character encounters (0.2.1 candidate). N. Tropy's guaranteed pins
-    are the Slide Coliseum and Turbo Track Trophy Races, so an enabled seed
-    with either trial mode off would advertise an unreachable opportunity.
-    Delegated to the feature module so the pin/trigger knowledge lives in one
-    place; it is a RAISE guard because no silent re-roll or auto-enable is an
+    """Hit Character encounters (0.2.1). N. Tropy joins the opponent pool
+    only after a Slide Coliseum or Turbo Track Trophy Race win, so an enabled
+    seed with BOTH trial modes off would advertise an unreachable check (one is
+    enough since the 2026-09-14 pool draw). Delegated to the feature module so
+    the trigger knowledge lives in one place; it is a RAISE guard because no silent re-roll or auto-enable is an
     acceptable resolution (the contract forbids modifying other options)."""
     from . import hit_character
     hit_character.raise_if_required_trial_modes_disabled(world)

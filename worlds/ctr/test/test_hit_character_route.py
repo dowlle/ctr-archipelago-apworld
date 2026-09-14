@@ -4,8 +4,8 @@ Ticket 06 proved one route; tickets 07 and 08 generalize it to every target.
 This file tests the reusable predicate helpers directly, not only a green
 accessibility seed:
 
-  * the precomputed appearance-player sets for default racers (conservative
-    guest-seat reservation) and for pinned guests;
+  * the appearance-player sets under the pool draw (any racer but the target,
+    narrowed by a racer lock);
   * the any-of trigger capture and proof;
   * route resolution through the shuffled destination -> physical pad map;
   * ordinary, boss and hit-method predicates;
@@ -26,11 +26,12 @@ from ..hit_character import (
     HIT_CHARACTER_CLASS,
     HIT_METHOD_ITEMS,
     ORDINARY_FIELD_SIZE,
-    PIN_GUESTS,
     POLICY_SELF_CHARACTER,
     PURPLE_CUP_FIELD_SIZE,
-    _default_appearance_players,
-    _guest_appearance_players,
+    TRACK_LEVEL_IDS,
+    UNLOCK_TRIGGERS,
+    _appearance_players,
+    _track_name_by_level_id,
     install_rules,
     retail_route,
     trigger_proofs,
@@ -48,9 +49,16 @@ NO_SHUFFLE = {"warppad_unlock_requirements": "vanilla",
 TRACKS_SHUFFLE = {"warppad_unlock_requirements": "vanilla",
                   "warp_pad_shuffle_categories": ["tracks"]}
 
-#: A flat base list for the pure appearance-player tests.
-BASE = tuple(range(8))
-RACER_NAMES = tuple(characters.CHARACTER_ID_TO_NAME[b] for b in BASE)
+
+
+def _all_route_pads(world):
+    """Every physical pad that loads a Hit-supported ordinary destination."""
+    pads = []
+    for level, track in sorted(_track_name_by_level_id(world).items()):
+        if level not in TRACK_LEVEL_IDS:
+            continue  # battle arenas, crystal challenges and cups
+        pads.append(world.ctr_pad_by_destination.get(track, f"{track} Warp Pad"))
+    return pads
 
 
 def _build(seed=1, steps=STEPS, **overrides):
@@ -105,57 +113,41 @@ def _proof_for(world, target_id, region_name):
 
 
 class TestAppearancePlayers(unittest.TestCase):
-    """The conservative guest-seat reservation and pin appearance sets."""
+    """Pool-draw appearance sets: any racer but the target, or the lock."""
 
-    def test_default_in_guaranteed_prefix_accepts_any_other_player(self):
-        players = _default_appearance_players(0, BASE, ORDINARY_FIELD_SIZE, None)
-        self.assertEqual(set(players),
-                         set(characters.ROSTER_CHARACTER_ID)
-                         - {characters.CHARACTER_ID_TO_NAME[0]})
+    def test_no_lock_accepts_any_other_player(self):
+        for cid in (0, 7, 8, 14, 15):
+            target = characters.CHARACTER_ID_TO_NAME[cid]
+            with self.subTest(engine_id=cid):
+                self.assertEqual(set(_appearance_players(target, None)),
+                                 set(characters.ROSTER_CHARACTER_ID) - {target})
 
-    def test_default_in_shift_in_seat_needs_a_prefix_player(self):
-        # Target 6 is base[6] (the seat after the guaranteed six): only a
-        # player drawn from the guaranteed prefix shifts it in.
-        players = _default_appearance_players(6, BASE, ORDINARY_FIELD_SIZE, None)
-        self.assertEqual(set(players), set(RACER_NAMES[:6]))
-        self.assertNotIn(characters.CHARACTER_ID_TO_NAME[7], players)
+    def test_locked_to_the_target_is_impossible(self):
+        for cid in (0, 14):
+            target = characters.CHARACTER_ID_TO_NAME[cid]
+            with self.subTest(engine_id=cid):
+                self.assertEqual(_appearance_players(target, target), ())
 
-    def test_default_last_base_seat_is_never_guaranteed(self):
-        self.assertEqual(
-            _default_appearance_players(7, BASE, ORDINARY_FIELD_SIZE, None), ())
-
-    def test_default_locked_to_the_target_is_impossible(self):
-        self.assertEqual(
-            _default_appearance_players(
-                0, BASE, ORDINARY_FIELD_SIZE,
-                characters.CHARACTER_ID_TO_NAME[0]), ())
-
-    def test_default_locked_to_another_racer_is_that_racer_only(self):
-        cortex = characters.CHARACTER_ID_TO_NAME[1]
-        self.assertEqual(
-            _default_appearance_players(0, BASE, ORDINARY_FIELD_SIZE, cortex),
-            (cortex,))
-        # Target 7 can never be shifted in by a single removal.
-        self.assertEqual(
-            _default_appearance_players(7, BASE, ORDINARY_FIELD_SIZE, cortex),
-            ())
-
-    def test_guest_no_lock_accepts_any_other_player(self):
-        target = characters.CHARACTER_ID_TO_NAME[14]
-        players = _guest_appearance_players(target, None)
-        self.assertEqual(set(players),
-                         set(characters.ROSTER_CHARACTER_ID) - {target})
-
-    def test_guest_locked_to_the_target_is_impossible(self):
-        target = characters.CHARACTER_ID_TO_NAME[14]
-        self.assertEqual(_guest_appearance_players(target, target), ())
-
-    def test_guest_locked_to_another_racer_is_that_racer_only(self):
+    def test_locked_to_another_racer_is_that_racer_only(self):
         target = characters.CHARACTER_ID_TO_NAME[14]
         penta = characters.CHARACTER_ID_TO_NAME[13]
-        self.assertEqual(_guest_appearance_players(target, penta), (penta,))
+        self.assertEqual(_appearance_players(target, penta), (penta,))
 
-    def test_purple_cup_field_size_is_the_contract_value(self):
+    def test_every_supported_destination_is_a_route_for_every_target(self):
+        from ..hit_character import _build_ordinary_routes
+        mw = _build(seed=1, hit_character=True)
+        world = mw.worlds[PLAYER]
+        block = world.ctr_hit_character_encounters
+        levels = set(_track_name_by_level_id(world)) & set(TRACK_LEVEL_IDS)
+        self.assertEqual(len(levels), 18)
+        self.assertIn(16, levels)
+        self.assertIn(17, levels)
+        for cid in range(16):
+            with self.subTest(engine_id=cid):
+                routes = _build_ordinary_routes(world, PLAYER, cid, block)
+                self.assertEqual({r.level_id for r in routes}, levels)
+
+    def test_field_sizes_are_the_contract_values(self):
         self.assertEqual(ORDINARY_FIELD_SIZE, 7)
         self.assertEqual(PURPLE_CUP_FIELD_SIZE, 4)
 
@@ -268,11 +260,10 @@ class TestBossAndMethodPredicates(unittest.TestCase):
     def test_boss_route_is_reachable_before_the_clear(self):
         mw = _build(seed=1, steps=ITEMS_STEPS, hit_character=True)
         world = mw.worlds[PLAYER]
-        # Lock the ordinary Pinstripe pin pad to Pinstripe itself, so only the
+        # Lock every ordinary route pad to Pinstripe himself, so only the
         # boss encounter can prove Hit Pinstripe.
-        pad = world.ctr_pad_by_destination.get("Hot Air Skyway",
-                                               "Hot Air Skyway Warp Pad")
-        world.ctr_racer_locks = {pad: "Pinstripe"}
+        world.ctr_racer_locks = {pad: "Pinstripe"
+                                 for pad in _all_route_pads(world)}
         call_all(mw, "set_rules")
         state = _state_without_racer_unlocks(mw)
         _grant(state, world, *(["Trophy"] * 16))
@@ -406,14 +397,11 @@ class TestStructuralErrors(unittest.TestCase):
             call_all(mw, "set_rules")
         self.assertIn("Fake Crash", str(ctx.exception))
 
-    def test_all_pins_locked_to_the_target_raises(self):
+    def test_every_route_locked_to_the_target_raises(self):
         mw = self._items_world()
         world = mw.worlds[PLAYER]
-        locks = {}
-        for track in ("Crash Cove", "Sewer Speedway"):
-            pad = world.ctr_pad_by_destination.get(track, f"{track} Warp Pad")
-            locks[pad] = "Fake Crash"
-        world.ctr_racer_locks = locks
+        world.ctr_racer_locks = {pad: "Fake Crash"
+                                 for pad in _all_route_pads(world)}
         with self.assertRaises(OptionError) as ctx:
             call_all(mw, "set_rules")
         self.assertIn("Fake Crash", str(ctx.exception))
@@ -424,8 +412,9 @@ class TestStructuralErrors(unittest.TestCase):
                    bosses_required_goal=4)
         self.assertIn("Nitros Oxide", str(ctx.exception))
 
-    def test_displaced_route_leaves_the_other_pin_as_the_route(self):
-        """A single displaced pin is not fatal: the other pin still proves it."""
+    def test_displaced_route_leaves_other_routes(self):
+        """A single displaced destination is not fatal: every other supported
+        destination still proves the target."""
         mw = _build(seed=1, hit_character=True)
         world = mw.worlds[PLAYER]
         pad = world.ctr_pad_by_destination.get("Crash Cove",
@@ -455,28 +444,63 @@ class TestStructuralErrors(unittest.TestCase):
 
 
 class TestSelectorStaticContract(unittest.TestCase):
-    """STATIC contract only: the frozen pin table and the policy string.
+    """STATIC wire contract only: triggers, policy and one order per destination.
 
-    This does NOT verify the production selector, its growing eligible set, or
-    the seating order under `never_seat_player` -- that is native's selector and
-    the native worker owns the all-sixteen P1 verification. What is checked here
-    is the immutable wire contract the native consumer reads.
+    The draw itself is pinned by test_hit_pool_draw.py against the shared
+    native vector fixture.
     """
 
-    def test_static_pin_and_policy_contract(self):
+    def test_static_trigger_and_policy_contract(self):
         from ..hit_character import build_encounters
         self.assertEqual(POLICY_SELF_CHARACTER, "never_seat_player")
         for seed in (0, 1, 0xDEADBEEF, 0xFFFFFFFF):
             block = build_encounters(seed)
             with self.subTest(seed=seed):
-                self.assertEqual(block["tracks"]["3"]["pinned"], [14])
-                self.assertNotIn(14, block["tracks"]["3"]["base"])
+                self.assertEqual(sorted(block["tracks"]["3"]["order"]),
+                                 list(range(16)))
                 self.assertEqual(block["policy"]["self_character"],
                                  POLICY_SELF_CHARACTER)
-        self.assertEqual({cid: levels for cid, (levels, _c, _k)
-                          in PIN_GUESTS.items()},
-                         {8: (7,), 9: (5,), 10: (6,), 11: (1,),
-                          12: (16, 17), 13: (2, 12), 14: (3, 8), 15: (13,)})
+                for guest, (codes, kind) in UNLOCK_TRIGGERS.items():
+                    self.assertEqual(block["unlock_triggers"][str(guest)],
+                                     {"kind": kind, "any_of": list(codes)})
+
+
+class TestRuleTermsAreLoadBearing(unittest.TestCase):
+    """Mutation guards: each rule term flips the result when it is false."""
+
+    def test_guest_ordinary_route_needs_its_trigger(self):
+        from unittest import mock
+        from .. import hit_character as hc
+        mw = _build(seed=1, steps=ITEMS_STEPS, hit_character=True)
+        world = mw.worlds[PLAYER]
+        never = [(mw.get_region("Menu", PLAYER), lambda state: False)]
+        with mock.patch.object(hc, "trigger_proofs",
+                               lambda *_a, **_k: list(never)):
+            call_all(mw, "set_rules")
+        state = _all_items_state(mw)
+        # Fake Crash has no boss route: a closed trigger closes the check.
+        self.assertFalse(_hit_rule(mw, 14)(state))
+        # Defaults need no trigger.
+        self.assertTrue(_hit_rule(mw, 3)(state))
+
+    def test_ordinary_route_needs_the_pad_entrance(self):
+        from unittest import mock
+        from .. import hit_character as hc
+        mw = _build(seed=1, steps=ITEMS_STEPS, hit_character=True)
+        real = hc.retail_route
+
+        def closed(world, player, track):
+            got = real(world, player, track)
+            if got is None:
+                return None
+            return (got[0], got[1], lambda state: False)
+
+        with mock.patch.object(hc, "retail_route", closed):
+            call_all(mw, "set_rules")
+        state = _all_items_state(mw)
+        for cid in (0, 5, 14):
+            with self.subTest(engine_id=cid):
+                self.assertFalse(_hit_rule(mw, cid)(state))
 
 
 class TestBuildIdentity(unittest.TestCase):

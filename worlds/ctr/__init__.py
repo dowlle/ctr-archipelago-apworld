@@ -2026,11 +2026,15 @@ class ctrAPWorld(World):
         # Schema 15 (2026-09-13 contract): the Cortex Vortex pad track puts
         # destination 110 in warp_pad_map and gem_cup_legs and removes a
         # destination's checks. Unconditional, per the standing Q28 rule.
-        # Schema 16: the top-level `hit_character_encounters` block (schema 1)
+        # Schema 16: the top-level `hit_character_encounters` block (block schema 2)
         # plus the always-emitted `ctr_options.hit_character` scalar. Hit
         # Character integrated after Cortex Vortex, so it takes 16, not the 14
         # it was drafted against; a schema-15 client reports the newer seed
         # instead of silently ignoring the encounter data.
+        # 2026-09-14: the encounter block moved to its own block schema 2 (the
+        # pool draw). The global schema stays 16: 16 was never tagged, the Hit
+        # block carries its own version, and a block-schema-1 client refuses a
+        # block-2 seed visibly at admission, so a global bump adds nothing.
         schema = 16
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,

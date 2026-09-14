@@ -487,11 +487,16 @@ class HitCharacter(Toggle):
     """Add a check for hitting each of the 16 racers in a race.
 
     Every playable racer gets one check, paid the first time you land a hit on
-    them during an Adventure race. Each guest racer appears on particular
-    tracks once you have cleared the race that unlocks them.
+    them during an Adventure race. Beat Papu Papu, Ripper Roo, Komodo Joe,
+    Pinstripe or N. Oxide in their boss race, or win the tracks that belong to
+    Fake Crash (Crash Cove, Sewer Speedway), Penta Penguin (Blizzard Bluff,
+    Polar Pass) or N. Tropy (Slide Coliseum, Turbo Track), and that racer joins
+    your opponent pool. Every Trophy race then picks its opponents from the
+    default racers plus your pool, never your own racer. Unlocked racers you
+    have not hit yet get a seat first, up to three per race.
 
-    Some guests appear on the Slide Coliseum and Turbo Track Trophy Races, so
-    both trial race options must be enabled for every check to be reachable."""
+    N. Tropy needs at least one of the Slide Coliseum or Turbo Track Trophy
+    Race options enabled."""
     display_name = "Hit Character Checks"
 
 
