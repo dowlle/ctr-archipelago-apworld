@@ -189,12 +189,16 @@ class TestRelicTierBoostGates(unittest.TestCase):
         bare = _state_all_but_boost(mw, 0)
         one = _state_all_but_boost(mw, FIRST_BOOST_COUNT)
         for name in ("Crash Cove: Gold Time Trial",
-                     "Crash Cove: Platinum Time Trial",
                      "Tiny Arena: Gold Time Trial",
-                     "Tiny Arena: Platinum Time Trial",
                      f"{LABS}: Gold Time Trial"):
             self.assertFalse(_reachable(mw, bare, name), name)
             self.assertTrue(_reachable(mw, one, name), name)
+
+        two = _state_all_but_boost(mw, USF_BOOST_COUNT)
+        for name in ("Crash Cove: Platinum Time Trial",
+                     "Tiny Arena: Platinum Time Trial"):
+            self.assertFalse(_reachable(mw, one, name), name)
+            self.assertTrue(_reachable(mw, two, name), name)
 
     def test_sapphire_trophy_and_token_stay_ungated(self):
         mw = _build(progressive_boost="shared_global", platinum_relic_count=18)

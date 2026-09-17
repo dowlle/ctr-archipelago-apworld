@@ -129,22 +129,31 @@ FIRST_BOOST_COUNT = 1
 #: Cortex Vortex (2026-09-13 contract) takes the USF tier for Gold and
 #: Platinum like Oxide Station. Its relic targets are Oxide Station's retail
 #: times as placeholders until the track author supplies real ones.
+#: The 2026-09-17 review raises every Platinum target to rank 2 on Easy and
+#: Medium. Easy with Blue Fire enabled requires rank 3. Hard keeps these
+#: per-track minima. Gold and Sapphire are unchanged.
 USF_RELIC_GOLD_TRACKS = frozenset(
     {"Hot Air Skyway", "Oxide Station", "Cortex Vortex"})
 USF_RELIC_PLATINUM_TRACKS = frozenset(
     {"Hot Air Skyway", "Oxide Station", "N. Gin Labs", "Cortex Vortex"})
 
 
-def relic_tier_boost_min(track, tier):
+def relic_tier_boost_min(track, tier, options=None):
     """Progressive Boost copies the `<tier> Time Trial` of `track` requires.
 
     0 for Sapphire (and anything that is not a relic tier name), so callers
-    can feed every Time Trial location through without branching.
+    can feed every Time Trial location through without branching. Without
+    options, return the original per-track minimum for compatibility.
     """
     if tier == "Gold":
         return (USF_BOOST_COUNT if track in USF_RELIC_GOLD_TRACKS
                 else FIRST_BOOST_COUNT)
     if tier == "Platinum":
+        if options is not None and int(options.logic_difficulty.value) <= 1:
+            if (int(options.logic_difficulty.value) == 0
+                    and bool(options.progressive_boost_blue_fire.value)):
+                return 3
+            return USF_BOOST_COUNT
         return (USF_BOOST_COUNT if track in USF_RELIC_PLATINUM_TRACKS
                 else FIRST_BOOST_COUNT)
     return 0
