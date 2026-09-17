@@ -200,5 +200,7 @@ class TestCortexVortexFinalNeedsUsf(unittest.TestCase):
     def test_oxide_station_venue_keeps_its_rules(self):
         mw = self._build(oxide_final_track="oxide_station",
                          oxide_goal="101_percent", shortcut_knowledge="hard")
-        self.assertTrue(mw.get_location(self.FINAL, 1).can_reach(
+        self.assertFalse(mw.get_location(self.FINAL, 1).can_reach(
             self._state(mw, 0)))
+        self.assertTrue(mw.get_location(self.FINAL, 1).can_reach(
+            self._state(mw, 1)))

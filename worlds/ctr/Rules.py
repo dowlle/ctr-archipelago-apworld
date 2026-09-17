@@ -674,6 +674,19 @@ def add_boss_garage_rules(world, player):
         ent.access_rule = (
             lambda s, n=thr, p=player: s.has("Trophy", p, n)
         )
+    from .Regions import BOSS_WUMPA_TRACKS
+    from .usf_finish import ALL_USF_FINISH_TRACKS, boost_term, track_finish_term
+    for garage, track in BOSS_WUMPA_TRACKS.items():
+        if garage == "N. Oxide Garage":
+            continue  # Both Oxide encounters are ruled below with their goals.
+        floor = boost_term(world, boost_min=1)
+        finish = (track_finish_term(track, world, bind_racer=False)
+                  if track in ALL_USF_FINISH_TRACKS else None)
+        def win_rule(state, f=floor, t=finish, p=player):
+            return f(state, p) and (t is None or t(state, p))
+        _and_onto(world, player, f"{garage}: Boss Race", win_rule)
+        _and_onto(world, player,
+                  f"{garage.removesuffix(' Garage')} Boss Race Won", win_rule)
     # N. Oxide Garage Door keeps its has('Key', 4) text rule as its base
     # requirement; add_oxide_access_contract ANDs the composed-goal companion
     # terms onto it below when Oxide is an active goal condition.
@@ -781,23 +794,20 @@ def add_oxide_access_contract(world, player):
         final_rule = (lambda state, f=first_rule, r=relic_rule:
                       f(state) and r(state))
 
-    # Winning on Cortex Vortex needs USF with no hard-shortcut escape (from
-    # Oxide 2 play: several jumps need USF, 2026-09-13). The term comes from
-    # the Cortex Vortex record in capability_contract, which the pad track
-    # shares. It is not bound to a pad's racer lock: this race starts in the
-    # garage, not on the pad that carries the Cortex Vortex pad track. The
-    # Oxide Station venue keeps its earlier behaviour: only the 101% goal
-    # predicate in _install_goal carries its finish term.
-    from .usf_finish import oxide_final_track_name, track_finish_term
-    final_win_rule = final_rule
-    if oxide_final_track_name(world) == "Cortex Vortex":
-        final_win_rule = (
-            lambda state, r=final_rule,
-            t=track_finish_term("Cortex Vortex", world, bind_racer=False):
-            r(state) and t(state, player))
+    from .Regions import BOSS_WUMPA_TRACKS
+    from .usf_finish import boost_term, oxide_final_track_name, track_finish_term
+    station = BOSS_WUMPA_TRACKS.get("N. Oxide Garage", "Oxide Station")
+    floor = boost_term(world, boost_min=1)
+    first_finish = track_finish_term(station, world, bind_racer=False)
+    final_finish = track_finish_term(
+        oxide_final_track_name(world), world, bind_racer=False)
+    first_win_rule = (lambda state, r=first_rule, f=floor, t=first_finish:
+                      r(state) and f(state, player) and t(state, player))
+    final_win_rule = (lambda state, r=final_rule, f=floor, t=final_finish:
+                      r(state) and f(state, player) and t(state, player))
 
-    _and_onto(world, player, OXIDE_FIRST_LOCATION, first_rule)
-    _and_onto(world, player, OXIDE_FIRST_EVENT, first_rule)
+    _and_onto(world, player, OXIDE_FIRST_LOCATION, first_win_rule)
+    _and_onto(world, player, OXIDE_FIRST_EVENT, first_win_rule)
     _and_onto(world, player, OXIDE_FINAL_LOCATION, final_win_rule, replace=True)
     _and_onto(world, player, OXIDE_FINAL_EVENT, final_win_rule)
 
@@ -1075,14 +1085,15 @@ def add_time_trial_and_ctr_requirements(world, player):
         # Relic tier boost gates (ruling 2026-08-21, superseding the narrow
         # 2026-08-19 Labs-Platinum ruling): every Gold and Platinum Time Trial
         # ANDs the racer-aware boost term at usf_finish.relic_tier_boost_min's
-        # rank, wrapping the rule built above so the Trophy prerequisite and
+        # rank (including the reviewed Platinum difficulty floor), wrapping
+        # the rule built above so the Trophy prerequisite and
         # any stage-2 gate are preserved. Sapphire returns rank 0 and stays
         # free. boost_term is always-True when the boost chain is not
         # randomized, so no branch on the option is needed here. Deliberately
         # NOT track_finish_term: tier gates have no hard-shortcut escape.
         if name.endswith(" Time Trial"):
             _tier = name.rsplit(": ", 1)[1][:-len(" Time Trial")]
-            _tier_min = relic_tier_boost_min(track_prefix, _tier)
+            _tier_min = relic_tier_boost_min(track_prefix, _tier, world.options)
             if _tier_min:
                 _tier_term = boost_term(
                     world, track_required_character(world, track_prefix),
