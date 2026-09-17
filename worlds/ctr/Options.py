@@ -356,14 +356,22 @@ class ProgressiveBoostBlueFire(Toggle):
 class LogicDifficulty(Choice):
     """How much the logic expects you to be able to do.
 
-    It only applies while both Progressive Boost and Itemsanity are
-    randomizing your capabilities.
+    Race and placement difficulty gates apply while both Progressive Boost
+    and Itemsanity are randomizing your capabilities. Platinum Time Trial
+    boost requirements also use this setting when Progressive Boost is on,
+    regardless of Itemsanity.
 
     - **easy**: winning a race, finishing on the podium and holding first
       all wait until you have boost or a couple of decent weapons.
     - **medium** (default): only winning the race waits. Placement checks
       stay available.
-    - **hard**: no extra requirement; you are expected to manage.
+    - **hard**: no extra race or placement requirement; you are expected to
+      manage those checks with your available items.
+
+    Every Platinum Time Trial needs two boosts on easy and medium. On easy,
+    enabling Blue Fire raises that requirement to three. Hard keeps each
+    track's existing Platinum boost requirement. Boss wins need at least one
+    boost at every difficulty and may need more for their race venue.
 
     Tracks whose geometry genuinely demands speed ignore this setting.
     Cortex Castle and Hot Air Skyway always need USF, and so does Oxide
