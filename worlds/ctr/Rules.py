@@ -215,15 +215,44 @@ def add_lettersanity_rules(world, player):
     from . import lettersanity
     from .item_boxes import TIGER_TEMPLE_DOOR_OPENERS
     from .progressive_capability import gate_satisfied, track_required_character
+    from .usf_finish import boost_term, USF_BOOST_COUNT
     mode = int(world.options.lettersanity.value)
+    selected = world.options._lettersanity_selected
+    cache = world.multiworld.regions.location_cache[player]
+    # Oxide's hard-shortcut route can finish the race without USF, but it
+    # cannot collect the physical T or R. Keep that finish escape on Trophy
+    # and C while gating each created T/R pickup and full token completion.
+    oxide_letters = ({"C", "T", "R"} if mode != 2 else
+                     set(selected.get("Oxide Station", ())))
+    oxide_term = boost_term(
+        world, track_required_character(world, "Oxide Station"),
+        USF_BOOST_COUNT)
+    oxide_token = "Oxide Station: CTR Token Challenge"
+    oxide_gate = None
+    if oxide_token in cache and oxide_letters.intersection(("T", "R")):
+        previous = cache[oxide_token].access_rule
+        oxide_gate = lambda state, previous=previous, term=oxide_term, p=player: \
+            previous(state) and term(state, p)
+        cache[oxide_token].access_rule = oxide_gate
+    for letter in ("T", "R"):
+        name = lettersanity.LETTERSANITY_CLASS.location_name(
+            "Oxide Station", letter)
+        if name in cache:
+            loc = cache[name]
+            if oxide_gate is not None:
+                loc.access_rule = oxide_gate
+            else:
+                previous = loc.access_rule
+                loc.access_rule = lambda state, previous=previous, term=oxide_term, p=player: \
+                    previous(state) and term(state, p)
     # Token completion needs physical R except when mode 2 excludes it.
     # Install after the entry rule was shared with individual letters, so
     # collecting C or T does not require opening R's shortcut door. Skipped
     # when the Cortex Vortex track dropped Tiger Temple: its token is gone.
     if (world.options.itemsanity.value
             and "Tiger Temple: CTR Token Challenge"
-            in world.multiworld.regions.location_cache[player]
-            and (mode != 2 or "R" in world.options._lettersanity_selected.get(
+            in cache
+            and (mode != 2 or "R" in selected.get(
                 "Tiger Temple", ()))):
         token = world.multiworld.get_location(
             "Tiger Temple: CTR Token Challenge", player)
@@ -236,7 +265,6 @@ def add_lettersanity_rules(world, player):
     if mode not in (1, 2, 3):
         return
     _add_cortex_vortex_letter_rules(world, player, mode)
-    selected = world.options._lettersanity_selected
     if mode in (2, 3):
         for track in lettersanity.eligible_letter_tracks(world.options):
             required = (lettersanity.LETTERS if mode == 3 else selected[track])

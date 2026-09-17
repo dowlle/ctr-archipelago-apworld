@@ -216,6 +216,81 @@ class TestTigerTempleLetterRDoorRule(unittest.TestCase):
                 self.assertTrue(rule(state))
 
 
+class TestOxideStationLetterBoostRule(unittest.TestCase):
+    """The hard-knowledge finish shortcut does not reach physical T or R."""
+
+    def test_token_and_created_letters_keep_distinct_route_requirements(self):
+        for mode in ("off", "locations_only", "locations_and_items", "items_only"):
+            with self.subTest(mode=mode):
+                mw = _build(seed=335, lettersanity=mode, letters_per_track=3,
+                            shortcut_knowledge="hard",
+                            progressive_boost="shared_global", box_locations=True)
+                token = mw.get_location("Oxide Station: CTR Token Challenge", 1)
+                trophy = mw.get_location("Oxide Station: Trophy Race", 1)
+                letters = [mw.get_location(
+                    LETTERSANITY_CLASS.location_name("Oxide Station", letter), 1)
+                    for letter in ("C", "T", "R") if mode in
+                    ("locations_only", "locations_and_items")]
+                no_boost = _collect_all(mw, exclude="Progressive Boost")
+                self.assertTrue(trophy.access_rule(no_boost))
+                self.assertFalse(token.access_rule(no_boost))
+                for loc in letters:
+                    self.assertEqual(loc.access_rule(no_boost), loc.name.endswith("Letter C"))
+                no_boost.add_item("Progressive Boost", 1, 1)
+                self.assertFalse(token.access_rule(no_boost))
+                for loc in letters:
+                    self.assertEqual(loc.access_rule(no_boost), loc.name.endswith("Letter C"))
+                no_boost.add_item("Progressive Boost", 1, 1)
+                self.assertTrue(token.access_rule(no_boost))
+                self.assertTrue(all(loc.access_rule(no_boost) for loc in letters))
+
+    def test_unrandomized_boost_keeps_vanilla_routes(self):
+        mw = _build(lettersanity="locations_only", letters_per_track=3,
+                    shortcut_knowledge="hard", progressive_boost="off")
+        state = _collect_all(mw)
+        self.assertTrue(mw.get_location(
+            "Oxide Station: CTR Token Challenge", 1).access_rule(state))
+        for letter in ("C", "T", "R"):
+            self.assertTrue(mw.get_location(
+                LETTERSANITY_CLASS.location_name("Oxide Station", letter),
+                1).access_rule(state))
+
+    def test_mode2_only_c_does_not_need_the_unselected_letters_route(self):
+        mw = _build(seed=340, lettersanity="locations_and_items",
+                    letters_per_track=1, shortcut_knowledge="hard",
+                    progressive_boost="shared_global", box_locations=True)
+        self.assertEqual(mw.worlds[1].options._lettersanity_selected["Oxide Station"],
+                         ("C",))
+        state = _collect_all(mw, exclude="Progressive Boost")
+        self.assertTrue(mw.get_location(
+            "Oxide Station: CTR Token Challenge", 1).access_rule(state))
+        self.assertTrue(mw.get_location(
+            LETTERSANITY_CLASS.location_name("Oxide Station", "C"),
+            1).access_rule(state))
+
+    def test_universal_tracker_rebuilds_the_same_t_and_r_gates(self):
+        source = _build(seed=335, lettersanity="locations_and_items",
+                        letters_per_track=3, shortcut_knowledge="hard",
+                        progressive_boost="shared_global", box_locations=True)
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=999)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: source.worlds[1].fill_slot_data()}
+        from worlds.AutoWorld import call_all
+        for step in STEPS:
+            call_all(tracker, step)
+        for label, mw in (("source", source), ("tracker", tracker)):
+            with self.subTest(world=label):
+                for name in ("Oxide Station: CTR Token Challenge",
+                             LETTERSANITY_CLASS.location_name("Oxide Station", "T"),
+                             LETTERSANITY_CLASS.location_name("Oxide Station", "R")):
+                    state = _collect_all(mw, exclude="Progressive Boost")
+                    loc = mw.get_location(name, 1)
+                    self.assertFalse(loc.access_rule(state))
+                    state.add_item("Progressive Boost", 1, 1)
+                    self.assertFalse(loc.access_rule(state))
+                    state.add_item("Progressive Boost", 1, 1)
+                    self.assertTrue(loc.access_rule(state))
+
+
 class TestPapuPyramidLetterCapabilityRules(unittest.TestCase):
     """Papu's Pyramid C and T need boost, Turbo, or Mask."""
 
@@ -389,8 +464,13 @@ class TestLettersanityMode2SelfItemRules(unittest.TestCase):
                         own = own_by_loc[loc_name]
                         with self.subTest(loc=loc_name, count=count):
                             loc = mw.get_location(loc_name, 1)
+                            expected_term = tier2_term
+                            if track == "Oxide Station" and letter == "C":
+                                # C keeps the hard-knowledge finish route;
+                                # T/R and full token completion need two Boosts.
+                                expected_term = tier2_term.__defaults__[0]
                             self.assertIs(
-                                loc.access_rule.__defaults__[0], tier2_term,
+                                loc.access_rule.__defaults__[0], expected_term,
                                 f"{loc_name} must reuse the token challenge's "
                                 f"tier-2 rule object by reference")
                             # Full collection: tier-2 met, own held.
@@ -460,13 +540,11 @@ class TestLettersanityMode2SelfItemRules(unittest.TestCase):
             track = name.split(":")[0].strip()
             tc_rule = mw1.get_location(f"{track}: CTR Token Challenge", 1).access_rule
             with self.subTest(loc=name):
-                # Identity (parity audit family 2, ruling 2026-08-12): a mode-1
-                # letter location carries the EXACT SAME rule object as its
-                # track's CTR Token Challenge -- the tier-2 term installed by
-                # add_time_trial_and_ctr_requirements, never a re-written
-                # stage-2 term. There is no self-item term in mode 1 (no items
-                # exist), so identity is the whole story.
-                self.assertIs(mw1.get_location(name, 1).access_rule, tc_rule)
+                # Oxide C stays on the earlier finish route while T/R and
+                # full token completion share the new physical-letter term.
+                expected = (tc_rule.__defaults__[0]
+                            if name == "Oxide Station: Letter C" else tc_rule)
+                self.assertIs(mw1.get_location(name, 1).access_rule, expected)
         # Mode 3: items but no locations.
         mw3 = _build(lettersanity="items_only", letters_per_track=1)
         self.assertEqual([n for n in LETTERSANITY_CLASS.names()
