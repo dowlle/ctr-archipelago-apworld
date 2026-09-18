@@ -215,6 +215,26 @@ class TestTrapWeightResolution(unittest.TestCase):
                          {"flatten", "warpball_ambush"})
 
 
+class TestUpsideDownDefaultOff(unittest.TestCase):
+    """upside_down ships off by default (owner decision, 2026-09-18): still a
+    valid trap identity and a valid trap_weights key, just never drawn unless
+    a player opts back in."""
+
+    def test_default_weight_is_zero(self):
+        self.assertEqual(traps.DEFAULT_TRAP_WEIGHTS["upside_down"], 0)
+
+    def test_it_is_still_a_valid_key_not_dropped_from_the_table(self):
+        self.assertIn("upside_down", traps.TRAP_WEIGHT_KEYS)
+        self.assertIn("upside_down", traps.DEFAULT_TRAP_WEIGHTS)
+        self.assertIn("Upside Down", traps.TRAP_ITEM_NAMES)
+
+    def test_an_explicit_nonzero_weight_is_accepted_and_drawable(self):
+        world = _world(seed=290, weights={"upside_down": 5})
+        self.assertEqual(traps.effective_trap_weights(world)["upside_down"], 5)
+        drawn = set(traps.draw_trap_names(world, 500))
+        self.assertIn("Upside Down", drawn)
+
+
 class TestWeightedDraw(unittest.TestCase):
     """Half 2: what the draw actually produces."""
 
@@ -232,7 +252,9 @@ class TestWeightedDraw(unittest.TestCase):
         return {name: hits / len(drawn) for name, hits in counted.items()}
 
     def test_default_weights_produce_their_documented_ratios(self):
-        # The reviewed 20-effect table totals 75 relative-weight points.
+        # The reviewed 20-effect table totals 73 relative-weight points.
+        # Upside Down defaults to weight 0 (off), so it draws zero share and
+        # is excluded from the expected table below, not listed at 0.
         world = _world(seed=280)
         shares = self._shares(world)
         expected_weights = {
@@ -241,11 +263,11 @@ class TestWeightedDraw(unittest.TestCase):
             "Flatten": 6, "Item Reroll": 5, "Forced Use": 4,
             "Empty Crates": 3, "Weakened Kart": 3, "Boost Blocker": 3,
             "Wireframe": 2, "Nitro Drop": 5, "Reverse Steering": 4,
-            "Red Potion": 3, "Upside Down": 2, "Mirror Mode": 3,
+            "Red Potion": 3, "Mirror Mode": 3,
             "Warpball Ambush": 3,
             "Demo Camera": 3,
         }
-        expected = {name: weight / 75
+        expected = {name: weight / 73
                     for name, weight in expected_weights.items()}
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
@@ -266,7 +288,11 @@ class TestWeightedDraw(unittest.TestCase):
                                delta=self.TOLERANCE)
 
     def test_a_zero_weight_is_exact_exclusion_not_rarity(self):
-        world = _world(seed=282, weights={"first_person": 0, "forced_usf": 0})
+        # upside_down is opted back on here so this test's exclusion set is
+        # exactly the two traps explicitly zeroed, not also the trap that
+        # defaults to off.
+        world = _world(seed=282, weights={"first_person": 0, "forced_usf": 0,
+                                          "upside_down": 2})
         drawn = set(traps.draw_trap_names(world, self.SAMPLE))
         self.assertNotIn("First Person", drawn)
         self.assertNotIn("Forced USF", drawn)
