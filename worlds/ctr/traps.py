@@ -80,7 +80,10 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("reverse_steering", "Reverse Steering", 4, True, "freeze"),
     TrapEntry("red_potion",       "Red Potion",       3, True, "freeze"),
     # Native AP_TrapEffect 16-19, minted by #280, ids 35010190-35010193.
-    TrapEntry("upside_down",      "Upside Down",      2, True, "rework"),
+    # upside_down defaults to weight 0 (off): still selectable, still weighted
+    # normally, at 0 relative weight until a player opts back in via
+    # trap_weights.
+    TrapEntry("upside_down",      "Upside Down",      0, True, "rework"),
     TrapEntry("mirror_mode",      "Mirror Mode",      3, True, "rework"),
     TrapEntry("warpball_ambush",  "Warpball Ambush",  3, True, "rework"),
     TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
