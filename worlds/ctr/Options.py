@@ -507,9 +507,10 @@ class HitCharacter(Toggle):
     Pinstripe or N. Oxide in their boss race, or win the tracks that belong to
     Fake Crash (Crash Cove, Sewer Speedway), Penta Penguin (Blizzard Bluff,
     Polar Pass) or N. Tropy (Slide Coliseum, Turbo Track), and that racer joins
-    your opponent pool. Every Trophy race then picks its opponents from the
-    default racers plus your pool, never your own racer. Unlocked racers you
-    have not hit yet get a seat first, up to three per race.
+    your opponent pool. Every Trophy race and CTR Challenge then picks its
+    opponents from the default racers plus your pool, never your own racer.
+    Unlocked racers you have not hit yet get a seat first, up to three per
+    race.
 
     When a racer's unlock race is not in your seed at all, Keys unlock them
     instead: Fake Crash at 1 Key, Penta Penguin at 2, N. Tropy at 3 and
