@@ -839,12 +839,31 @@ def add_oxide_access_contract(world, player):
     _and_onto(world, player, OXIDE_FINAL_LOCATION, final_win_rule, replace=True)
     _and_onto(world, player, OXIDE_FINAL_EVENT, final_win_rule)
 
+    # Oxide Station dropped by `cortex_vortex_track` (ruling of 2026-09-18):
+    # its pad is gone, so the garage is the only route onto its Wumpa check and
+    # that route is N. Oxide's Challenge. The check fires mid-race, so it takes
+    # the first challenge's access rule without its finish term. The four Keys
+    # come from the shared garage door, as everywhere else here. Left alone
+    # when Oxide Station still has its pad: the pad route already carries the
+    # honest rule, and retightening the garage edge there would narrow seeds
+    # this ruling does not touch.
+    from .cortex_vortex_track import dropped_track
+    from .Regions import (CORTEX_VORTEX_WUMPA_ENTRANCE,
+                          OXIDE_STATION_WUMPA_ENTRANCE)
+    if dropped_track(o) == station:
+        try:
+            oxide_wumpa = world.multiworld.get_entrance(
+                OXIDE_STATION_WUMPA_ENTRANCE, player)
+        except KeyError:
+            oxide_wumpa = None  # not per-track Wumpa
+        if oxide_wumpa is not None:
+            oxide_wumpa.access_rule = first_rule
+
     # From the garage, the Cortex Vortex Wumpa check can only fire during the
     # Final Challenge race, so that entrance takes the same rule (the four Keys
     # come from the garage door, as for the Final Challenge location). It
     # fires mid-race, so like the held podium rungs it does not take the
     # finish term. The pad-track and Cup-leg routes are separate entrances.
-    from .Regions import CORTEX_VORTEX_WUMPA_ENTRANCE
     try:
         vortex = world.multiworld.get_entrance(
             CORTEX_VORTEX_WUMPA_ENTRANCE, player)

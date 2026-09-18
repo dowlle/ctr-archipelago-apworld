@@ -593,8 +593,10 @@ class WumpaCheck(Choice):
     - **per_track**: one location for every race track where this seed provides
       a race in which you can collect fruit, paid the first time you reach 10
       fruit on that track. Slide Coliseum and Turbo Track participate only when
-      their optional Trophy/arcade-style races are in the seed. This replaces
-      the global check rather than adding to it.
+      their optional Trophy/arcade-style races are in the seed. A track the
+      Cortex Vortex Track option left without a pad keeps this check only when
+      it hosts a boss race, which you then have to reach 10 fruit in. This
+      replaces the global check rather than adding to it.
 
     An older YAML still reads correctly: `false` is off and `true` is global.
 
@@ -789,8 +791,10 @@ class CortexVortexTrack(Toggle):
 
     Cortex Vortex has no pad of its own. Each seed picks one other destination
     to go without a pad, and Cortex Vortex takes that pad instead. That
-    destination's checks are removed from the seed. Destination shuffle can
-    then move Cortex Vortex like any other destination, including onto a
+    destination's checks are removed from the seed. The one exception is a boss
+    track: its boss race still runs, so with `wumpa_check: per_track` its
+    10 Wumpa check stays and is paid from that boss race. Destination shuffle
+    can then move Cortex Vortex like any other destination, including onto a
     Crystal Challenge or Gem Cup pad, and it can be a Gem Cup leg when cup
     tracks are randomized.
 

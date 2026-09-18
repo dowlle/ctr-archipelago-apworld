@@ -56,6 +56,12 @@ BOSS_WUMPA_TRACKS = {
 CORTEX_VORTEX_WUMPA_REGION = "Cortex Vortex: Wumpa"
 CORTEX_VORTEX_WUMPA_ENTRANCE = "N. Oxide Garage -> Cortex Vortex: Wumpa"
 
+# The garage route onto Oxide Station's own Wumpa check. Named because it is
+# the ONLY route when `cortex_vortex_track` drops Oxide Station (ruling of
+# 2026-09-18), and add_oxide_access_contract then has to give it N. Oxide's
+# Challenge's rule rather than leaving it at the bare garage door.
+OXIDE_STATION_WUMPA_ENTRANCE = "N. Oxide Garage -> Oxide Station: Wumpa"
+
 # Vanilla race-track LevelIDs that belong to each boss's hub, in the same
 # 0..15 numbering native + Icebound use (verified against
 # icebound-standalone LevelID enum and data/warp_pad_ids.json):
@@ -691,6 +697,7 @@ def create_regions(world: "ctrAPWorld"):
     from .wumpa_checks import (WUMPA_CLASS, WUMPA_CORTEX_VORTEX_LOCATION,
                                WUMPA_RETAIL_TRACKS)
     _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
+    _dropped_track = cvt.dropped_track(opts)
     from .wumpa_checks import cortex_vortex_venue_active
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
         if _name == WUMPA_CORTEX_VORTEX_LOCATION:
@@ -728,13 +735,23 @@ def create_regions(world: "ctrAPWorld"):
             mw.regions.append(_region)
             regions.append(_region)
             region_lookup[_region.name] = _region
-            _sources = [region_lookup[_region_name]]
+            # A dropped destination that kept this check (2026-09-18 ruling)
+            # has no pad, so its own region is not a route: the boss garage
+            # below is. A Gem Cup leg still counts when the vanilla leg table
+            # really races it -- a randomized draw never can, because the
+            # dropped track is out of that pool (gem_cup_legs).
+            _sources = ([] if _region_name == _dropped_track
+                        else [region_lookup[_region_name]])
             _sources += [region_lookup[_cup]
                          for _cup in _wumpa_track_cups.get(_region_name, [])
                          if _cup in region_lookup]
             _sources += [region_lookup[_garage]
                          for _garage, _track in BOSS_WUMPA_TRACKS.items()
                          if _track == _region_name and _garage in region_lookup]
+            if not _sources:
+                raise ValueError(
+                    f"CTR: '{_name}' was created with no race route into "
+                    f"'{_region.name}'")
             for _source in _sources:
                 _ent = Entrance(player=player,
                                 name=f"{_source.name} -> {_region.name}",

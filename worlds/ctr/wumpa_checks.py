@@ -19,6 +19,13 @@ DESTINATION where the seed actually provides a race that can award it, plus one
 destination-slot check for an eligible bound custom track, and does NOT also
 create the global one. The two modes are alternatives, not layers.
 
+A DROPPED DESTINATION THAT STILL HOSTS A BOSS RACE KEEPS ITS CHECK (ruled
+2026-09-18). `cortex_vortex_track` drops one destination's pad and removes the
+locations it owns, but boss races launch from a garage and keep running on their
+vanilla track. So when the dropped destination is one of the five boss tracks
+its `<Track>: Reach 10 Wumpa` check stays in the seed, reachable through the
+boss race alone. See `dropped_boss_wumpa_track`.
+
 TRIAL TRACKS NEED A RACE SURFACE. Slide Coliseum and Turbo Track are registered
 retail identities, but their ordinary Adventure pads are relic-only. A relic
 race has no supported route to this check, so those two names stay uncreated
@@ -70,7 +77,7 @@ destination role provides a race mode in which reaching 10 wumpa is possible.
 inferred from the broad `crates` flag, because a track can carry crate instances
 without offering a real path to ten fruit.
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .custom_tracks import (REPLACEABLE_DESTINATIONS, WUMPA_COLLECTIBLE_FLAG,
                             normalize_custom_tracks)
@@ -146,6 +153,54 @@ def custom_location_name(label: str) -> str:
     return f"{label}: Reach 10 Wumpa"
 
 
+def _oxide_content_present(options) -> bool:
+    """Does this seed still hold the two N. Oxide races? Read defensively, on
+    the same stand-in-options convention as `_mode`; an options object without
+    the key answers with the option's own default, which keeps them."""
+    goal = getattr(options, "oxide_goal", None)
+    if goal is None:
+        return True
+    from .Options import OxideGoal
+    try:
+        return OxideGoal.oxide_content_present(int(goal.value))
+    except (AttributeError, TypeError, ValueError):
+        return True
+
+
+def dropped_boss_wumpa_track(options) -> Optional[str]:
+    """The dropped destination's own Wumpa check, when the drop leaves it.
+
+    RULED 2026-09-18. `cortex_vortex_track` drops one destination's pad and
+    removes every location that destination owns. A boss race is launched from
+    its garage, not from a pad, so a dropped destination that HOSTS a boss race
+    is still raced in that seed. The ruling keeps the per-track
+    `<Track>: Reach 10 Wumpa` check on exactly those destinations, reachable
+    only through the boss race. Nothing else the dropped destination owns comes
+    back, and AP item boxes keep their own pad-open rule unchanged.
+
+    Returns the track name, or None when the dropped destination hosts no boss
+    race, when this seed removed that race, or when nothing is dropped. The
+    garage-to-track mapping is read from `Regions.BOSS_WUMPA_TRACKS` rather
+    than retyped, so a later boss shuffle moves this answer with it.
+    """
+    from .cortex_vortex_track import dropped_track
+    from .Regions import BOSS_WUMPA_TRACKS
+    dropped = dropped_track(options)
+    if dropped is None or dropped not in WUMPA_RETAIL_TRACKS:
+        return None
+    garages = [garage for garage, track in BOSS_WUMPA_TRACKS.items()
+               if track == dropped]
+    if not garages:
+        return None
+    # `oxide_goal: disabled` removes both N. Oxide races and shuts the garage
+    # (issue #320), so a dropped Oxide Station then has no race left to award
+    # the check. Every other setting keeps N. Oxide's Challenge, which is raced
+    # on Oxide Station whatever `oxide_final_track` says, so the check survives.
+    if "N. Oxide Garage" in garages and not _oxide_content_present(options):
+        return None
+    return dropped
+
+
 def eligible_retail_tracks(options) -> Tuple[str, ...]:
     """Retail destinations with a supported Wumpa-awarding race this seed.
 
@@ -153,13 +208,17 @@ def eligible_retail_tracks(options) -> Tuple[str, ...]:
     Track qualify independently only when the seed creates their optional
     Trophy Race location. That location is the apworld-owned proof that native
     exposes the AI/arcade-style race instead of the retail relic-only launch.
+
+    A destination dropped by `cortex_vortex_track` leaves, EXCEPT when it hosts
+    a boss race that is still in the seed (`dropped_boss_wumpa_track`).
     """
     from .cortex_vortex_track import dropped_track
     trial_trophies = set(TRIAL_TROPHY_CLASS.created_location_names(options))
     dropped = dropped_track(options)
+    kept = dropped_boss_wumpa_track(options)
     return tuple(
         track for track in WUMPA_RETAIL_TRACKS
-        if track != dropped
+        if (track != dropped or track == kept)
         and (track in WUMPA_ALWAYS_RACEABLE_TRACKS
              or TRIAL_TROPHY_CLASS.location_name(track) in trial_trophies)
     )
