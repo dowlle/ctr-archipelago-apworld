@@ -11,7 +11,7 @@ loop or claims a reachability proof -- it is registration plus wire data.
 WHO OWNS THE SEMANTICS. The apworld decides which engine ids exist, the
 seeded draw order of every destination and the unlock triggers. Native owns the
 actual hit dispatch, the model loading and the per-race draw; it never shuffles
-with its own RNG, it walks the ordered lists this module emits (block schema 2,
+with its own RNG, it walks the ordered lists this module emits (block schema 3,
 "unhit_first_rotation", see `reference_draw`).
 
 DATAPACKAGE STABILITY. This class claims the additive block 35025000, stride 1
@@ -24,12 +24,20 @@ the roster the rest of the world uses.
 FROZEN-NAME WARNING. These names ride the 0.2.0/0.2.1 datapackage line; after
 that bump they are permanent and their ids can never move.
 
-WIRE SHAPE. The top-level `hit_character_encounters` block (schema 2) is
+WIRE SHAPE. The top-level `hit_character_encounters` block (schema 3) is
 emitted only when the option is enabled. `ctr_options.hit_character` is always
 emitted as a boolean, so a tracker can tell "off" from "pre-feature seed". Each
 destination carries one seeded `order` (a permutation of all sixteen engine
 ids); native draws every race's field by walking it. Schema 1 (pins, reserve,
-one guest slot) is superseded and refused.
+one guest slot) and schema 2 (no `fallback_keys`) are superseded and refused.
+
+KEY FALLBACK (2026-09-18). A guest whose authoritative unlock wins do not exist
+in this seed -- N. Tropy with the trial Trophy Races off, Nitros Oxide with
+`oxide_goal: disabled`, or any guest whose unlock tracks were displaced -- no
+longer fails generation. It joins the opponent pool once the player holds a
+fixed number of Keys (`FALLBACK_KEYS`), carried on the wire as
+`unlock_triggers[guest].fallback_keys`. A guest whose unlock wins DO exist is
+untouched.
 """
 import random
 from dataclasses import dataclass
@@ -44,9 +52,13 @@ from .location_class import LocationClass
 HIT_CHARACTER_CODE_BASE = 35025000
 
 #: Wire-block version, independent of the seed's global `schema_version`.
-#: Schema 2 (2026-09-14) replaces schema 1's pins, reserve list and single guest
-#: slot with the pool draw. A schema-1 block is refused, never reinterpreted.
-HIT_CHARACTER_SCHEMA = 2
+#: Schema 2 (2026-09-14) replaced schema 1's pins, reserve list and single guest
+#: slot with the pool draw. Schema 3 (2026-09-18) adds the optional per-guest
+#: `unlock_triggers[g].fallback_keys` Key count. Schema 3 is emitted for EVERY
+#: enabled seed, with or without a fallback guest, so there is one shape to
+#: parse and one test matrix. A schema-1 or schema-2 block is refused, never
+#: reinterpreted.
+HIT_CHARACTER_SCHEMA = 3
 
 #: `policy.draw` and `policy.max_guests`, verbatim. The engine has three extra
 #: driver-model slots, so at most three non-stock opponents race at once.
@@ -89,6 +101,32 @@ UNLOCK_TRIGGERS: Dict[int, Tuple[Tuple[int, ...], str]] = {
     14: ((35011000, 35011003), "track"),      # Fake Crash: Crash Cove / Sewer Speedway
     15: ((35011104, 35011105), "boss"),       # Nitros Oxide
 }
+
+#: Key fallback for a guest whose unlock wins do not exist in this seed
+#: (2026-09-18 ruling): guest engine id -> the number of Keys that joins it to
+#: the opponent pool instead. Fixed table for 0.2.1-alpha3; no per-seed random
+#: counts yet. The four bosses (8..11) are deliberately absent: each always has
+#: its own boss race, so it never needs a fallback and a `fallback_keys` field
+#: on one of them is refused as malformed wire data.
+#:
+#: `Key` is a real item in every seed: `data/items.json` declares a static
+#: count of 4 with progression classification, and `shuffle_keys` off pins the
+#: same four onto the Boss Race rewards rather than removing them. So
+#: `state.has("Key", player, n)` for n in 1..4 is a valid logic term in both
+#: modes, and the highest count here (4) is always satisfiable.
+FALLBACK_KEYS: Dict[int, int] = {
+    14: 1,  # Fake Crash
+    13: 2,  # Penta Penguin
+    12: 3,  # N. Tropy
+    15: 4,  # Nitros Oxide
+}
+
+#: Inclusive bounds the wire accepts for `fallback_keys`.
+FALLBACK_KEYS_MIN = 1
+FALLBACK_KEYS_MAX = 4
+
+#: The logic item the fallback counts.
+KEY_ITEM = "Key"
 
 #: Boss-win AP code -> engine opponent id. The shared appearance identity table;
 #: both Oxide win codes map to Oxide. Not a boss loader or randomizer.
@@ -167,8 +205,14 @@ def destination_order(seed: int, destination: int) -> List[int]:
     return order
 
 
-def build_encounters(seed: int) -> Dict[str, object]:
-    """Build the `hit_character_encounters` block (schema 2) for a uint32 seed."""
+def build_encounters(seed: int, fallback=None) -> Dict[str, object]:
+    """Build the `hit_character_encounters` block (schema 3) for a uint32 seed.
+
+    `fallback` is the optional `{guest engine id: Key count}` mapping produced
+    by `fallback_guests`. It cannot be decided here -- it depends on which
+    locations the seed created -- so `resolve_for_generation` builds the block
+    without it and `apply_fallback` stamps it in once locations are final.
+    """
     locations = {
         str(cid): HIT_CHARACTER_CODE_BASE + cid
         for cid in sorted(characters.CHARACTER_ID_TO_NAME)
@@ -177,10 +221,14 @@ def build_encounters(seed: int) -> Dict[str, object]:
               for lid in TRACK_LEVEL_IDS}
     cups = {str(cup): {"order": destination_order(seed, cup)}
             for cup in CUP_IDS}
+    fallback = dict(fallback or {})
     triggers: Dict[str, Dict[str, object]] = {}
     for guest in GUEST_RACER_IDS:
         codes, kind = UNLOCK_TRIGGERS[guest]
-        triggers[str(guest)] = {"kind": kind, "any_of": list(codes)}
+        entry: Dict[str, object] = {"kind": kind, "any_of": list(codes)}
+        if guest in fallback:
+            entry["fallback_keys"] = int(fallback[guest])
+        triggers[str(guest)] = entry
     bosses = {str(code): opponent
               for code, opponent in sorted(BOSS_WIN_OPPONENTS.items())}
     return {
@@ -324,6 +372,99 @@ def slot_data(world) -> Dict[str, object] | None:
 
 
 # ---------------------------------------------------------------------------
+# Key fallback for guests without an unlock win (2026-09-18)
+# ---------------------------------------------------------------------------
+#
+# WHY THIS IS NOT DECIDED IN `generate_early`. A guest is a fallback guest iff
+# NONE of its authoritative any-of win locations exists in this seed, and that
+# is only final once `create_regions` has run: it depends on option values
+# (`slide_coliseum_races`, `turbo_track_races`, `oxide_goal`) AND on per-seed
+# displacement draws (the Cortex Vortex pad track drops one destination and
+# removes its checks; a custom track can displace another). So the block is
+# drawn in `generate_early` (the ONLY RNG consumer here, unchanged) and the
+# fallback is stamped into it in `install_rules`, which `Rules.set_rules` calls
+# last -- after every location is created and every rule installed, and before
+# `fill_slot_data` and `write_spoiler` read the block. No RNG is consumed by
+# any of the functions below, so the existing RNG consumption order is
+# untouched and generation stays deterministic.
+
+def fallback_guests(created_codes) -> Dict[int, int]:
+    """`{guest engine id: Key count}` for the guests with no unlock win here.
+
+    Pure function of the seed's created AP location codes, so it is directly
+    testable without a world. A guest qualifies only when it has a
+    `FALLBACK_KEYS` entry (the four bosses never do) and none of its
+    authoritative `UNLOCK_TRIGGERS` codes is in `created_codes`.
+    """
+    created = {int(code) for code in created_codes}
+    return {
+        guest: keys
+        for guest, keys in sorted(FALLBACK_KEYS.items())
+        if not created.intersection(UNLOCK_TRIGGERS[guest][0])
+    }
+
+
+def created_trigger_codes(world, player: int) -> set:
+    """The authoritative unlock-win codes that exist as locations in this seed.
+
+    Reads the same `location_cache` `trigger_proofs` reads, so the fallback
+    determination and the trigger capture can never disagree about whether a
+    win exists.
+    """
+    names = _location_name_by_code(world)
+    cache = world.multiworld.regions.location_cache[player]
+    created = set()
+    for codes, _kind in UNLOCK_TRIGGERS.values():
+        for code in codes:
+            name = names.get(int(code))
+            if name is not None and cache.get(name) is not None:
+                created.add(int(code))
+    return created
+
+
+def apply_fallback(block, fallback) -> None:
+    """Stamp `fallback` into a block's `unlock_triggers`, in place.
+
+    Idempotent: a guest not in `fallback` loses any stale `fallback_keys`, so
+    re-running `install_rules` on the same world cannot leave a field behind
+    that the current location set no longer justifies.
+    """
+    triggers = block["unlock_triggers"]
+    for guest in GUEST_RACER_IDS:
+        entry = triggers[str(guest)]
+        if guest in fallback:
+            entry["fallback_keys"] = int(fallback[guest])
+        else:
+            entry.pop("fallback_keys", None)
+
+
+def resolve_fallback(world, player: int) -> Dict[int, int]:
+    """Decide (or restore) this seed's fallback guests and cache the answer.
+
+    A Universal Tracker regeneration has no access to the original seed's
+    option values or displacement draws, so it must NOT re-derive anything: the
+    connected seed's block is authoritative and the fallback is read back out
+    of it verbatim. A fresh generation derives it from the created locations
+    and writes it into the cached block, which is what `fill_slot_data` emits.
+    """
+    block = getattr(world, "ctr_hit_character_encounters", None)
+    if not block:
+        return {}
+    if getattr(world, "ctr_hit_character_restored", False):
+        fallback = {
+            int(guest): int(entry["fallback_keys"])
+            for guest, entry in block.get("unlock_triggers", {}).items()
+            if "fallback_keys" in entry
+        }
+    else:
+        fallback = fallback_guests(created_trigger_codes(world, player))
+        apply_fallback(block, fallback)
+        _validate_block(block)
+    world.ctr_hit_character_fallback = fallback
+    return fallback
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 
@@ -381,12 +522,14 @@ def _validate_order(entry, label: str) -> None:
 def _validate_block(block) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
-    Every structural commitment of the schema-2 contract is enforced exactly:
+    Every structural commitment of the schema-3 contract is enforced exactly:
     exact integer types (bool is rejected even where it compares equal to 0/1),
     the canonical location mapping, the draw policy, one `order` permutation of
     all sixteen engine ids per destination and cup, the six canonical boss-win
     keys with engine-id values, and the guest trigger kinds and authoritative
-    any-of win-code sets. The ORDER itself is not constrained -- any
+    any-of win-code sets. `fallback_keys` is optional, must be a real integer
+    equal to that guest's `FALLBACK_KEYS` table value, and is refused outright
+    on a guest with no table entry. The ORDER itself is not constrained -- any
     permutation is accepted and preserved verbatim -- so a tracker can
     round-trip a block it did not draw.
     """
@@ -400,7 +543,8 @@ def _validate_block(block) -> None:
     if type(schema) is not int or schema != HIT_CHARACTER_SCHEMA:
         _fail(f"unknown schema {schema!r}; expected integer "
               f"{HIT_CHARACTER_SCHEMA} (schema 1 pins are superseded by the "
-              "pool draw and cannot be modelled by this apworld)")
+              "pool draw, and schema 2 carries no fallback_keys, so neither "
+              "can be modelled by this apworld)")
 
     locations = block.get("locations")
     if not isinstance(locations, dict) or set(locations) != {
@@ -453,9 +597,25 @@ def _validate_block(block) -> None:
         _fail("unlock_triggers must map exactly guest engine ids 8..15")
     for cid in GUEST_RACER_IDS:
         entry = triggers[str(cid)]
-        if not isinstance(entry, dict) or set(entry) != {"kind", "any_of"}:
+        if not isinstance(entry, dict) or set(entry) not in (
+                {"kind", "any_of"}, {"kind", "any_of", "fallback_keys"}):
             _fail(f"unlock_triggers[{cid!r}] must carry exactly kind and "
-                  "any_of")
+                  "any_of, optionally plus fallback_keys")
+        if "fallback_keys" in entry:
+            if cid not in FALLBACK_KEYS:
+                _fail(f"unlock_triggers[{cid!r}] must not carry fallback_keys: "
+                      "this guest always has its own boss race and has no "
+                      "fallback entry")
+            count = entry["fallback_keys"]
+            if type(count) is not int:
+                _fail(f"unlock_triggers[{cid!r}].fallback_keys must be an "
+                      f"integer, got {type(count).__name__}")
+            if not FALLBACK_KEYS_MIN <= count <= FALLBACK_KEYS_MAX:
+                _fail(f"unlock_triggers[{cid!r}].fallback_keys must be in "
+                      f"{FALLBACK_KEYS_MIN}..{FALLBACK_KEYS_MAX}, got {count}")
+            if count != FALLBACK_KEYS[cid]:
+                _fail(f"unlock_triggers[{cid!r}].fallback_keys must be the "
+                      f"table value {FALLBACK_KEYS[cid]}, got {count}")
         expected_codes, expected_kind = UNLOCK_TRIGGERS[cid]
         if entry.get("kind") != expected_kind:
             _fail(f"unlock_triggers[{cid!r}].kind must be {expected_kind!r}")
@@ -502,9 +662,14 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
         ignoring the block, so the apworld refuses instead of accepting a block
         that can never be activated or one that a truncating reader could
         misread. An integer global schema in 16..2147483647 is accepted as long
-        as the block's own known version 2 validates;
-      * a present block with an unknown schema (including the superseded
-        schema 1) or a malformed shape is refused.
+        as the block's own known version 3 validates;
+      * a present block with an unknown schema or a malformed shape is
+        refused. That includes the superseded schema 1 AND schema 2: a schema-2
+        seed (0.2.1-alpha2) carries no `fallback_keys`, so reading it as
+        schema 3 would silently assert "no guest needs a fallback", which is
+        not something the older apworld ever decided. Refusing with the named
+        expected schema is the same visible break alpha1 to alpha2 had, and
+        matches the native client's admission refusal for the same seed.
 
     A pre-feature wire (neither scalar nor block) restores to off, which is the
     correct reading of a seed that has no encounters, regardless of the global
@@ -515,6 +680,8 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
     """
     world.ctr_hit_character_encounters = None
     world.ctr_hit_character_seed = None
+    world.ctr_hit_character_fallback = {}
+    world.ctr_hit_character_restored = False
 
     passthrough = _as_mapping(passthrough, "slot_data passthrough")
     co = _as_mapping(passthrough.get("ctr_options"), "ctr_options")
@@ -567,6 +734,16 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
     _validate_block(block)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
+    # The fallback determination is part of the restored data, not something a
+    # tracker may re-derive: a UT regeneration does not have the original
+    # seed's option values or displacement draws. `resolve_fallback` reads it
+    # back out of this block because of the flag below.
+    world.ctr_hit_character_restored = True
+    world.ctr_hit_character_fallback = {
+        int(guest): int(entry["fallback_keys"])
+        for guest, entry in block["unlock_triggers"].items()
+        if "fallback_keys" in entry
+    }
 
 
 def _has_tuple(value) -> bool:
@@ -587,73 +764,6 @@ def _tuples_to_lists(value):
     if isinstance(value, (list, tuple)):
         return [_tuples_to_lists(item) for item in value]
     return value
-
-
-# ---------------------------------------------------------------------------
-# Generation-time option guard
-# ---------------------------------------------------------------------------
-
-def raise_if_required_trial_modes_disabled(world) -> None:
-    """Refuse an enabled seed where N. Tropy might never unlock.
-
-    N. Tropy joins the draw pool after a win of the Slide Coliseum or Turbo
-    Track Trophy Race (35016200 / 35016201) and has no boss race. With BOTH
-    trial Trophy modes off no trigger exists. With only ONE on, the Cortex
-    Vortex pad track can still take that trial's pad (its dropped destination
-    is drawn per seed and may be a trial track), which would remove the only
-    trigger at random; so one trial mode is enough only while
-    `cortex_vortex_track` is off. Fail clearly and early instead of silently
-    enabling an option, omitting the check, or failing late for some seeds.
-
-    Relaxed 2026-09-14 with the pool draw: schema 1 pinned N. Tropy to both
-    trial tracks and therefore always required both modes.
-    """
-    if not enabled(world):
-        return
-    trial_on = [name for name in ("slide_coliseum_races", "turbo_track_races")
-                if int(getattr(world.options, name).value) >= 1]
-    cortex = bool(getattr(world.options, "cortex_vortex_track", 0).value) \
-        if hasattr(world.options, "cortex_vortex_track") else False
-    if len(trial_on) >= 2 or (len(trial_on) == 1 and not cortex):
-        return
-    if not trial_on:
-        raise OptionError(
-            "CTR: 'hit_character' is enabled, but N. Tropy only joins the "
-            "opponent pool after a Slide Coliseum or Turbo Track Trophy Race "
-            "win, and this YAML disables both 'slide_coliseum_races' and "
-            "'turbo_track_races'. Set at least one of them to 'trophy_race' or "
-            "higher (or turn 'hit_character' off).")
-    raise OptionError(
-        "CTR: 'hit_character' is enabled with only "
-        f"'{trial_on[0]}' on, and 'cortex_vortex_track' may take that trial "
-        "track's pad, which would leave N. Tropy with no unlock win. Turn on "
-        "both 'slide_coliseum_races' and 'turbo_track_races' (at least "
-        "'trophy_race'), or turn 'cortex_vortex_track' off.")
-
-
-def raise_if_required_boss_encounters_disabled(world) -> None:
-    """Refuse an enabled seed whose Nitros Oxide route is removed outright.
-
-    Oxide's Hit check is proved by the pool draw after an Oxide win (his
-    unlock trigger) or by one of his two boss encounters. With
-    `oxide_goal: disabled` both Oxide races are removed from the seed, so no
-    authoritative trigger and no enabled boss encounter remains and the
-    mandatory check could never be reached. This is the early, actionable
-    companion to the trial-mode guard; the `set_rules` structural error stays
-    as the backstop for lock-based impossibilities that are only decided in
-    `create_regions`.
-    """
-    if not enabled(world):
-        return
-    from .Options import OxideGoal
-    if OxideGoal.oxide_content_present(int(world.options.oxide_goal.value)):
-        return
-    raise OptionError(
-        "CTR: 'hit_character' is enabled, but 'oxide_goal' is 'disabled', "
-        "which removes both N. Oxide races from the seed. Nitros Oxide's "
-        "mandatory Hit check would then be unreachable (no created trigger "
-        "win and no enabled boss encounter). Set 'oxide_goal' to 'none', "
-        "'any_percent' or '101_percent', or turn 'hit_character' off.")
 
 
 # ---------------------------------------------------------------------------
@@ -679,7 +789,7 @@ def raise_if_required_boss_encounters_disabled(world) -> None:
 #      Missile x3 while Itemsanity models weapons; ordinary vanilla supply when
 #      it does not).
 #
-# ORDINARY ROUTES (pool draw, block schema 2). Every Hit-supported ordinary
+# ORDINARY ROUTES (pool draw, block schema 3). Every Hit-supported ordinary
 # destination (the sixteen retail tracks and the two trial Trophy tracks) is a
 # route for every target, because native draws each race from the whole pool
 # (`reference_draw`). The guarantees G1 to G5 above make "the pad is accessible
@@ -693,6 +803,12 @@ def raise_if_required_boss_encounters_disabled(world) -> None:
 # are not modelled. Schema 1 pinned each guest to one or two destinations and
 # reserved a guest seat against default targets; both are superseded.
 #
+# KEY FALLBACK. A guest whose any-of wins do not EXIST in this seed carries
+# `Key >= N` in place of the trigger term (`FALLBACK_KEYS`). Because that term
+# sits inside the Hit check's own rule, the generator guarantees those Keys are
+# reachable whenever the Hit check must be; under `accessibility: minimal` the
+# check may be left unreachable like any other non-goal check.
+#
 # BOSS ROUTES. A boss-kind guest can be hit during its boss race whether or not
 # the boss is cleared. The route comes from the emitted `bosses` identity table
 # (the shared resolved-identity source), so a resolved identity substitution
@@ -705,10 +821,12 @@ def raise_if_required_boss_encounters_disabled(world) -> None:
 # an appearance proof.
 #
 # STRUCTURAL FAILURES RAISE. A target with no structurally available route at
-# all -- every retail route missing/displaced, every trigger absent, or every
-# route pad locked to the target itself --
-# is a configuration error, not an inventory state, and raises a clear
-# `OptionError`. Ordinary missing inventory stays a False predicate, because
+# all -- every retail route missing/displaced, or every route pad locked to the
+# target itself -- is a configuration error, not an inventory state, and raises
+# a clear `OptionError`. A missing trigger alone is no longer such a failure
+# for the four fallback guests; for a boss-kind guest without a fallback entry
+# it still is, since only its own boss race could seat it.
+# Ordinary missing inventory stays a False predicate, because
 # receiving the missing items can resolve it. No target is ever omitted.
 
 #: The player-attributed hit methods accepted while Itemsanity models weapons.
@@ -948,8 +1066,14 @@ def _boss_predicate(route: HitRoute):
 
 
 def _install_target(world, player: int, target_id: int, block,
-                    itemsanity_on: bool) -> None:
-    """Build and install one target's rule, raising on structural impossibility."""
+                    itemsanity_on: bool, fallback=None) -> None:
+    """Build and install one target's rule, raising on structural impossibility.
+
+    `fallback` is this seed's `{guest engine id: Key count}` mapping. A guest in
+    it has NO created unlock win, so its rule carries no trigger term at all:
+    the boss route (if any) as today, or `Key >= N` plus any ordinary route.
+    """
+    fallback = fallback or {}
     target_name = characters.CHARACTER_ID_TO_NAME[target_id]
     location = world.multiworld.regions.location_cache[player].get(
         HIT_CHARACTER_CLASS.location_name(target_id))
@@ -958,6 +1082,7 @@ def _install_target(world, player: int, target_id: int, block,
               "to silently advertise an unreachable check or omit a target.")
 
     triggers: Tuple[Tuple[object, object], ...] = ()
+    fallback_count = fallback.get(target_id)
     if target_id in DEFAULT_RACER_IDS:
         ordinary = _build_ordinary_routes(world, player, target_id, block)
         boss: List[HitRoute] = []
@@ -968,13 +1093,16 @@ def _install_target(world, player: int, target_id: int, block,
                   "target). Refusing to advertise an unreachable check.")
     else:
         triggers = tuple(trigger_proofs(world, player, target_id))
+        # Ordinary routes are built for a fallback guest too, even though it has
+        # no trigger: `Key >= N` replaces the trigger term, so the routes are
+        # exactly what the rule leans on.
         ordinary = (_build_ordinary_routes(world, player, target_id, block)
-                    if triggers else [])
+                    if (triggers or fallback_count is not None) else [])
         boss = _build_boss_routes(world, player, target_id, block)
         if not ordinary and not boss:
-            if not triggers:
-                reason = ("no created authoritative trigger win and no enabled "
-                          "boss encounter")
+            if not triggers and fallback_count is None:
+                reason = ("no created authoritative trigger win, no Key "
+                          "fallback and no enabled boss encounter")
             else:
                 reason = ("every ordinary route is missing, displaced to "
                           "custom content, or locked to the target, and no "
@@ -987,15 +1115,20 @@ def _install_target(world, player: int, target_id: int, block,
     boss_preds = tuple(_boss_predicate(route) for route in boss)
 
     def rule(state, ordinary_preds=ordinary_preds, boss_preds=boss_preds,
-             triggers=triggers):
+             triggers=triggers, fallback_count=fallback_count):
         if itemsanity_on and not state.has_any(HIT_METHOD_ITEMS, player):
             return False
         if boss_preds and any(predicate(state) for predicate in boss_preds):
             return True
         if not ordinary_preds:
             return False
-        if triggers and not any(region.can_reach(state) and access(state)
-                                for region, access in triggers):
+        if fallback_count is not None:
+            # No unlock win exists in this seed, so Keys are the only thing
+            # that can seat this guest. The trigger term is absent, not false.
+            if not state.has(KEY_ITEM, player, fallback_count):
+                return False
+        elif triggers and not any(region.can_reach(state) and access(state)
+                                  for region, access in triggers):
             return False
         return any(predicate(state) for predicate in ordinary_preds)
 
@@ -1010,6 +1143,12 @@ def install_rules(world, player: int) -> None:
     rules. All sixteen checks are mandatory; a target that cannot be encountered
     under any structurally available route raises a clear `OptionError` instead
     of being omitted or silently left unreachable.
+
+    This is also where the Key fallback is decided and stamped into the cached
+    wire block: every location exists by now (including the Cortex Vortex and
+    custom-track displacements), and both `fill_slot_data` and `write_spoiler`
+    run after `set_rules`, so the emitted block and the installed rules always
+    describe the same determination.
     """
     if not enabled(world):
         return
@@ -1017,6 +1156,8 @@ def install_rules(world, player: int) -> None:
     if not block:
         _fail("the enabled encounter block is missing; refusing to install "
               "silently unreachable Hit checks.")
+    fallback = resolve_fallback(world, player)
     itemsanity_on = bool(world.options.itemsanity.value)
     for target_id in sorted(characters.CHARACTER_ID_TO_NAME):
-        _install_target(world, player, target_id, block, itemsanity_on)
+        _install_target(world, player, target_id, block, itemsanity_on,
+                        fallback)

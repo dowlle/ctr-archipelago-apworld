@@ -105,6 +105,20 @@ def _state_without_racer_unlocks(mw, *extra_excludes):
     return state
 
 
+def _state_without(mw, *excluded):
+    """Every item in the pool except the named ones, with regions swept."""
+    world = mw.worlds[PLAYER]
+    state = CollectionState(mw)
+    for item in mw.itempool:
+        if item.player == PLAYER and item.name not in excluded:
+            state.collect(world.create_item(item.name), prevent_sweep=True)
+    for item in mw.precollected_items.get(PLAYER, ()):
+        if item.name not in excluded:
+            state.collect(item, prevent_sweep=True)
+    state.update_reachable_regions(PLAYER)
+    return state
+
+
 def _proof_for(world, target_id, region_name):
     for region, rule in trigger_proofs(world, PLAYER, target_id):
         if region.name == region_name:
@@ -416,6 +430,80 @@ class TestBossAccessRules(unittest.TestCase):
         self.assertTrue(_hit_rule(mw, 8)(with_trophies))
 
 
+class TestKeyFallbackRule(unittest.TestCase):
+    """A guest with no unlock win in the seed: `Key >= N` plus any ordinary
+    route replaces the trigger term (2026-09-18 ruling).
+
+    Each arm is built so the guest has NO boss route either, which is what
+    makes the Key term load-bearing rather than shadowed by a boss race.
+    """
+
+    #: guest engine id -> (Key count, build options, locations to remove).
+    ARMS = {
+        14: (1, {}, ("Crash Cove: Trophy Race", "Sewer Speedway: Trophy Race")),
+        13: (2, {}, ("Blizzard Bluff: Trophy Race", "Polar Pass: Trophy Race")),
+        12: (3, {"slide_coliseum_races": 0, "turbo_track_races": 0}, ()),
+        15: (4, {"oxide_goal": "disabled", "bosses_required_goal": 2}, ()),
+    }
+
+    def _fallback_world(self, guest, extra=None):
+        keys, options, pops = self.ARMS[guest]
+        options = dict(options)
+        options.update(extra or {})
+        mw = _build(seed=1, steps=ITEMS_STEPS, hit_character=True, **options)
+        cache = mw.regions.location_cache[PLAYER]
+        for name in pops:
+            cache.pop(name, None)
+        call_all(mw, "set_rules")
+        self.assertEqual(mw.worlds[PLAYER].ctr_hit_character_fallback,
+                         {guest: keys})
+        return mw, keys
+
+    def test_each_fallback_guest_needs_exactly_its_key_count(self):
+        for guest in self.ARMS:
+            with self.subTest(guest=characters.CHARACTER_ID_TO_NAME[guest]):
+                mw, keys = self._fallback_world(guest)
+                world = mw.worlds[PLAYER]
+                state = _state_without(mw, "Key")
+                _grant(state, world, *(["Key"] * (keys - 1)))
+                state.update_reachable_regions(PLAYER)
+                # A default racer proves an ordinary route already holds at
+                # this Key count, so the guest's False below isolates the Key
+                # term rather than pad or hub access.
+                self.assertTrue(_hit_rule(mw, 0)(state))
+                self.assertFalse(_hit_rule(mw, guest)(state))
+                _grant(state, world, "Key")
+                state.update_reachable_regions(PLAYER)
+                self.assertTrue(_hit_rule(mw, guest)(state))
+
+    def test_fallback_guest_with_itemsanity_also_needs_a_weapon(self):
+        for guest in self.ARMS:
+            with self.subTest(guest=characters.CHARACTER_ID_TO_NAME[guest]):
+                mw, keys = self._fallback_world(guest, {"itemsanity": True})
+                world = mw.worlds[PLAYER]
+                state = _state_without(mw, "Key", *HIT_METHOD_ITEMS)
+                _grant(state, world, *(["Key"] * keys))
+                state.update_reachable_regions(PLAYER)
+                self.assertFalse(_hit_rule(mw, guest)(state))
+                _grant(state, world, "Bomb")
+                state.update_reachable_regions(PLAYER)
+                self.assertTrue(_hit_rule(mw, guest)(state))
+
+    def test_a_guest_with_its_unlock_win_is_not_key_gated(self):
+        """The unchanged rule: with the win in the seed the rule is the trigger
+        proof, which is what holds here, and no Key term is installed."""
+        mw = _build(seed=1, hit_character=True)
+        self.assertEqual(mw.worlds[PLAYER].ctr_hit_character_fallback, {})
+        self.assertTrue(_hit_rule(mw, 14)(_all_items_state(mw)))
+
+    def test_no_fallback_guest_keeps_the_wire_field_absent(self):
+        mw = _build(seed=1, hit_character=True)
+        block = mw.worlds[PLAYER].ctr_hit_character_encounters
+        for guest in range(8, 16):
+            self.assertNotIn("fallback_keys",
+                             block["unlock_triggers"][str(guest)])
+
+
 class TestStructuralErrors(unittest.TestCase):
     """Impossible targets refuse generation with a clear OptionError."""
 
@@ -429,14 +517,17 @@ class TestStructuralErrors(unittest.TestCase):
             call_all(mw, "set_rules")
         self.assertIn("Nitros Oxide", str(ctx.exception))
 
-    def test_no_created_trigger_raises(self):
+    def test_boss_guest_without_trigger_or_boss_race_raises(self):
+        """A boss-kind guest has no fallback entry, so removing its only
+        route is still a structural failure, not a Key rule."""
         mw = self._items_world()
         cache = mw.regions.location_cache[PLAYER]
-        cache.pop("Crash Cove: Trophy Race", None)
-        cache.pop("Sewer Speedway: Trophy Race", None)
+        cache.pop("Pinstripe Garage: Boss Race", None)
         with self.assertRaises(OptionError) as ctx:
             call_all(mw, "set_rules")
-        self.assertIn("Fake Crash", str(ctx.exception))
+        message = str(ctx.exception)
+        self.assertIn("Pinstripe", message)
+        self.assertIn("no Key fallback", message)
 
     def test_every_route_locked_to_the_target_raises(self):
         mw = self._items_world()
@@ -447,11 +538,14 @@ class TestStructuralErrors(unittest.TestCase):
             call_all(mw, "set_rules")
         self.assertIn("Fake Crash", str(ctx.exception))
 
-    def test_disabled_boss_route_with_no_alternative_raises(self):
-        with self.assertRaises(OptionError) as ctx:
-            _build(seed=1, hit_character=True, oxide_goal="disabled",
-                   bosses_required_goal=4)
-        self.assertIn("Nitros Oxide", str(ctx.exception))
+    def test_disabled_boss_route_falls_back_to_keys(self):
+        """`oxide_goal: disabled` removes both Oxide races. Oxide now joins the
+        pool at 4 Keys through the ordinary routes instead of raising."""
+        mw = _build(seed=1, hit_character=True, oxide_goal="disabled",
+                    bosses_required_goal=2)
+        world = mw.worlds[PLAYER]
+        self.assertEqual(world.ctr_hit_character_fallback, {15: 4})
+        self.assertTrue(_hit_rule(mw, 15)(_all_items_state(mw)))
 
     def test_displaced_route_leaves_other_routes(self):
         """A single displaced destination is not fatal: every other supported
