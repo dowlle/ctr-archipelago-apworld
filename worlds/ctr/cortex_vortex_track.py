@@ -32,6 +32,12 @@ THE POOL MODEL, and where each piece lives.
     skips it (podium, lettersanity, Wumpa, item boxes, trial races), the relic
     tier pool is scoped by `active_time_trial_tracks`, and `Regions` skips the
     dropped region's static locations.
+  * The ONE exception (ruled 2026-09-18): a boss race launches from its garage,
+    not from a pad, so dropping one of the five boss tracks does not stop that
+    race. Per-track `wumpa_check` therefore keeps `<Track>: Reach 10 Wumpa` on a
+    dropped boss track, reachable through the boss race alone
+    (`wumpa_checks.dropped_boss_wumpa_track`). Nothing else comes back, and AP
+    item boxes keep their pad-open rule, so a dropped track has none.
 
 DATAPACKAGE STABILITY. This class claims the block 35026000 and registers its
 eight names UNCONDITIONALLY: Trophy 35026000, Sapphire/Gold/Platinum Time Trial

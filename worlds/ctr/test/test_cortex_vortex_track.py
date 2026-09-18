@@ -233,11 +233,14 @@ class TestPlacementWithoutShuffle(unittest.TestCase):
         self.assertEqual(back.connected_region.name, "Citadel City")
 
     def test_every_check_of_the_dropped_destination_is_removed(self):
+        """Except its 10-Wumpa check: Hot Air Skyway hosts Pinstripe's boss
+        race, which the drop does not stop (ruling of 2026-09-18, pinned in
+        test_dropped_boss_wumpa)."""
         names = _names(self.mw)
         leftovers = {n for n in names if n.startswith("Hot Air Skyway:")}
-        self.assertEqual(leftovers, set())
+        self.assertEqual(leftovers, {"Hot Air Skyway: Reach 10 Wumpa"})
         self.assertNotIn("7", self.wire["podium_checks"]["locations"])
-        self.assertNotIn("7", self.wire["wumpa_checks"]["retail_tracks"])
+        self.assertIn("7", self.wire["wumpa_checks"]["retail_tracks"])
         self.assertNotIn("7", self.wire["lettersanity_checks"]["locations"])
         self.assertEqual(set(self.wire["item_box_checks"]["locations"]["7"]), {-1})
 
