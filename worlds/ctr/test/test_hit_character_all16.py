@@ -220,35 +220,41 @@ class TestUnlockOrder(unittest.TestCase):
 
 
 class TestAdversarialSeed(unittest.TestCase):
-    """A target that cannot appear fails generation clearly."""
+    """A target that cannot appear at all fails generation clearly; a target
+    whose unlock win is merely absent now falls back to Keys."""
 
-    def test_disabled_oxide_goal_is_an_early_named_failure(self):
-        """The oxide guard fires in generate_early, before any roster draw."""
-        with self.assertRaises(OptionError) as ctx:
-            _build(seed=1, steps=("generate_early",), hit_character=True,
-                   oxide_goal="disabled", bosses_required_goal=4)
-        message = str(ctx.exception)
-        self.assertIn("hit_character", message)
-        self.assertIn("oxide_goal", message)
-        self.assertIn("Nitros Oxide", message)
-        self.assertIn("disabled", message)
+    def test_disabled_oxide_goal_generates_with_oxide_on_keys(self):
+        """`oxide_goal: disabled` used to be an early guard failure. Oxide now
+        falls back to 4 Keys and every Hit check stays reachable."""
+        mw = _build(seed=1, hit_character=True, oxide_goal="disabled",
+                    bosses_required_goal=2, accessibility="full")
+        self.assertEqual(mw.worlds[PLAYER].ctr_hit_character_fallback, {15: 4})
+        state = mw.get_all_state(False)
+        for name in HIT_CHARACTER_CLASS.names():
+            self.assertTrue(mw.get_location(name, PLAYER).can_reach(state),
+                            name)
 
     def test_set_rules_structural_error_remains_the_backstop(self):
-        """Removing every trigger/route reaches the set_rules backstop."""
+        """A boss-kind guest has no Key fallback, so removing its only route
+        still reaches the set_rules backstop."""
         mw = _build(seed=1, steps=("generate_early", "create_regions",
                                    "create_items"), hit_character=True)
         cache = mw.regions.location_cache[PLAYER]
-        cache.pop("Crash Cove: Trophy Race", None)
-        cache.pop("Sewer Speedway: Trophy Race", None)
+        cache.pop("Ripper Roo Garage: Boss Race", None)
         with self.assertRaises(OptionError) as ctx:
             call_all(mw, "set_rules")
-        self.assertIn("Fake Crash", str(ctx.exception))
+        self.assertIn("Ripper Roo", str(ctx.exception))
 
-    def test_disabled_trial_modes_raise_for_n_tropy(self):
-        with self.assertRaises(OptionError) as ctx:
-            _build(seed=1, hit_character=True, slide_coliseum_races=0,
-                   turbo_track_races=0)
-        self.assertIn("hit_character", str(ctx.exception))
+    def test_disabled_trial_modes_generate_with_n_tropy_on_keys(self):
+        """The default-settings case: both trial race options off used to be a
+        hard guard failure and now puts N. Tropy on 3 Keys."""
+        mw = _build(seed=1, hit_character=True, slide_coliseum_races=0,
+                    turbo_track_races=0, accessibility="full")
+        self.assertEqual(mw.worlds[PLAYER].ctr_hit_character_fallback, {12: 3})
+        state = mw.get_all_state(False)
+        for name in HIT_CHARACTER_CLASS.names():
+            self.assertTrue(mw.get_location(name, PLAYER).can_reach(state),
+                            name)
 
 
 class TestUniversalTrackerParity(unittest.TestCase):
@@ -301,6 +307,28 @@ class TestUniversalTrackerParity(unittest.TestCase):
                   for cid in ALL_TARGETS),
             tuple(_hit_rule(rebuilt_mw, cid)(rebuilt_mw.get_all_state(False))
                   for cid in ALL_TARGETS))
+
+    def test_reconstruction_restores_a_fallback_guest_from_the_wire(self):
+        """A UT regeneration has no option values or displacement draws to
+        re-derive the fallback from, so it must read it back out of the block
+        and install the same Key rule the generated seed installed."""
+        source = _build(seed=1, hit_character=True, slide_coliseum_races=0,
+                        turbo_track_races=0, oxide_goal="disabled",
+                        bosses_required_goal=2)
+        original = source.worlds[PLAYER]
+        self.assertEqual(original.ctr_hit_character_fallback, {12: 3, 15: 4})
+        wire = original.fill_slot_data()
+        rebuilt_mw = self._reconstruct(wire)
+        rebuilt = rebuilt_mw.worlds[PLAYER]
+        self.assertTrue(rebuilt.ctr_hit_character_restored)
+        self.assertEqual(rebuilt.ctr_hit_character_fallback, {12: 3, 15: 4})
+        self.assertEqual(rebuilt.ctr_hit_character_encounters,
+                         original.ctr_hit_character_encounters)
+        for items in ((), ("Key",) * 3, ("Key",) * 4,
+                      ("Key",) * 4 + ("Trophy",) * 16):
+            with self.subTest(items=items):
+                self.assertEqual(self._hit_vector(source, items),
+                                 self._hit_vector(rebuilt_mw, items))
 
     def test_reconstruction_matches_across_option_shapes(self):
         for shape, options in SHAPES.items():

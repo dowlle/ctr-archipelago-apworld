@@ -5,11 +5,14 @@ Covers the bounded ticket scope only:
   * the sixteen frozen location identities and their additive code block;
   * off creates nothing / on creates sixteen, in the Menu region;
   * the seeded per-destination draw orders, the unlock triggers and the boss
-    identity table (block schema 2);
+    identity table (block schema 3);
   * the single cached uint32 roster seed (off consumes no RNG, on draws once);
   * the top-level block and the always-emitted scalar;
   * Universal Tracker restore: exact round-trip, legacy absence/off, and the
-    malformed/conflicting/unknown-schema refusals.
+    malformed/conflicting/unknown-schema refusals;
+  * the Key fallback for guests with no unlock win in the seed: the pure
+    determination, the per-seed Cortex Vortex outcome, the wire field's
+    accept/reject matrix and the spoiler lines.
 
 Native dispatch, model loading, reachability and the all-sixteen runtime
 behaviour are explicitly out of scope for this ticket.
@@ -25,6 +28,7 @@ from ..hit_character import (
     BOSS_WIN_OPPONENTS,
     CUP_IDS,
     DEFAULT_RACER_IDS,
+    FALLBACK_KEYS,
     GLOBAL_SCHEMA_MAX,
     GUEST_RACER_IDS,
     HIT_CHARACTER_CLASS,
@@ -36,7 +40,9 @@ from ..hit_character import (
     UNLOCK_TRIGGERS,
     _validate_block,
     build_encounters,
+    created_trigger_codes,
     destination_order,
+    fallback_guests,
     resolve_for_generation,
     restore_from_wire,
     slot_data,
@@ -205,7 +211,7 @@ class TestDeterministicLayout(unittest.TestCase):
 
     def test_policy_is_the_pool_draw(self):
         block = build_encounters(5)
-        self.assertEqual(block["schema"], 2)
+        self.assertEqual(block["schema"], 3)
         self.assertEqual(block["policy"], {
             "seed": 5, "self_character": "never_seat_player",
             "draw": POLICY_DRAW, "max_guests": MAX_GUESTS})
@@ -477,7 +483,7 @@ class TestUTRestore(unittest.TestCase):
         self.assertEqual(world.ctr_hit_character_seed, fresh["policy"]["seed"])
 
     def test_unknown_schema_is_refused(self):
-        for bad_schema in (1, 3, "2", 2.0, None, True):
+        for bad_schema in (1, 2, 4, "3", 3.0, None, True):
             with self.subTest(schema=bad_schema):
                 block = build_encounters(1)
                 block["schema"] = bad_schema
@@ -503,6 +509,74 @@ class TestUTRestore(unittest.TestCase):
             self._restore_block(world, block)
         self.assertIn("schema 1", str(ctx.exception))
         self.assertIsNone(world.ctr_hit_character_encounters)
+
+    def test_superseded_schema_2_block_is_refused(self):
+        """An alpha2 (block schema 2) seed carries no fallback_keys at all, so
+        reading it as schema 3 would silently assert that no guest needs a
+        fallback. It is refused with the expected schema named."""
+        block = build_encounters(1)
+        block["schema"] = 2
+        world = self._world()
+        with self.assertRaises(OptionError) as ctx:
+            self._restore_block(world, block)
+        self.assertIn("schema 2", str(ctx.exception))
+        self.assertIn("expected integer 3", str(ctx.exception))
+        self.assertIsNone(world.ctr_hit_character_encounters)
+
+    def test_fallback_keys_round_trips_verbatim(self):
+        """A restored block keeps its fallback guests, and the world's cached
+        determination comes from the wire rather than being re-derived."""
+        block = build_encounters(7, fallback={12: 3, 15: 4})
+        world = self._world()
+        self._restore_block(world, block)
+        restored = world.ctr_hit_character_encounters
+        self.assertEqual(restored["unlock_triggers"]["12"],
+                         {"kind": "track", "any_of": [35016200, 35016201],
+                          "fallback_keys": 3})
+        self.assertEqual(restored["unlock_triggers"]["15"]["fallback_keys"], 4)
+        self.assertNotIn("fallback_keys", restored["unlock_triggers"]["13"])
+        self.assertEqual(world.ctr_hit_character_fallback, {12: 3, 15: 4})
+        self.assertTrue(world.ctr_hit_character_restored)
+
+    def test_restore_without_fallback_reports_no_fallback_guest(self):
+        world = self._world()
+        self._restore_block(world, build_encounters(7))
+        self.assertEqual(world.ctr_hit_character_fallback, {})
+
+    def test_fallback_keys_validation_matrix(self):
+        """Accept the exact table value on a table guest; reject everything
+        else, including a boolean that compares equal to the right count."""
+        world = self._world()
+        for guest, count in FALLBACK_KEYS.items():
+            with self.subTest(accept=guest):
+                self._restore_block(
+                    world, build_encounters(1, fallback={guest: count}))
+                self.assertEqual(world.ctr_hit_character_fallback,
+                                 {guest: count})
+
+        arms = {}
+        for guest in (8, 9, 10, 11):
+            # A boss always has its own boss race and never falls back.
+            b = build_encounters(1)
+            b["unlock_triggers"][str(guest)]["fallback_keys"] = 1
+            arms[f"boss_guest_{guest}"] = b
+        for bad in (0, 5, -1, True, 1.0, "3", None):
+            b = build_encounters(1)
+            b["unlock_triggers"]["12"]["fallback_keys"] = bad
+            arms[f"bad_value_{bad!r}"] = b
+        # Right shape, another guest's count.
+        b = build_encounters(1)
+        b["unlock_triggers"]["12"]["fallback_keys"] = 1
+        arms["wrong_table_value"] = b
+        # An unknown extra key next to a valid fallback.
+        b = build_encounters(1, fallback={12: 3})
+        b["unlock_triggers"]["12"]["reason"] = "displaced"
+        arms["extra_key"] = b
+
+        for arm, block in arms.items():
+            with self.subTest(reject=arm):
+                with self.assertRaises(OptionError):
+                    self._restore_block(world, block)
 
     def test_manager_reported_invalid_blocks_are_refused(self):
         """Blocks that look close to valid: schema=True, max_guests=True, an
@@ -620,49 +694,103 @@ class TestUTRestore(unittest.TestCase):
                     self._restore_block(world, block)
 
 
-class TestTrialTrophyModeGuard(unittest.TestCase):
-    def test_enabled_without_any_trial_mode_raises(self):
-        with self.assertRaises(OptionError) as ctx:
-            _build(steps=("generate_early",), hit_character=True,
-                   slide_coliseum_races=0, turbo_track_races=0)
-        self.assertIn("hit_character", str(ctx.exception))
+class TestKeyFallbackDetermination(unittest.TestCase):
+    """The 2026-09-18 Key fallback replaces the two early option guards."""
 
-    def test_one_trial_mode_with_cortex_vortex_raises(self):
-        """Cortex Vortex may take the single enabled trial's pad, so one
-        trial mode is not enough while it is on (no random late failure)."""
-        for overrides in ({"slide_coliseum_races": 0},
-                          {"turbo_track_races": 0}):
-            with self.subTest(**overrides):
-                with self.assertRaises(OptionError) as ctx:
-                    _build(steps=("generate_early",), hit_character=True,
-                           cortex_vortex_track=True, **overrides)
-                self.assertIn("cortex_vortex_track", str(ctx.exception))
+    def test_table_is_the_approved_counts(self):
+        self.assertEqual(FALLBACK_KEYS, {14: 1, 13: 2, 12: 3, 15: 4})
+        self.assertEqual(set(FALLBACK_KEYS), set(GUEST_RACER_IDS) - {8, 9, 10, 11})
 
-    def test_both_trial_modes_with_cortex_vortex_generate(self):
-        mw = _build(steps=("generate_early",), hit_character=True,
-                    cortex_vortex_track=True)
-        self.assertTrue(mw.worlds[1].options.hit_character.value)
+    def test_pure_determination_from_a_created_code_set(self):
+        """`fallback_guests` is decided by location EXISTENCE only."""
+        every_code = set()
+        for codes, _kind in UNLOCK_TRIGGERS.values():
+            every_code.update(codes)
+        self.assertEqual(fallback_guests(every_code), {})
+        self.assertEqual(fallback_guests(()), {14: 1, 13: 2, 12: 3, 15: 4})
+        # One of the two N. Tropy trial wins is enough to keep the old rule.
+        self.assertNotIn(12, fallback_guests(every_code - {35016201}))
+        self.assertEqual(fallback_guests(every_code - {35016200, 35016201}),
+                         {12: 3})
+        # A boss never gains a fallback, however much is missing.
+        self.assertEqual(
+            set(fallback_guests(every_code - {35011100, 35011103})), set())
+
+    def test_both_trial_modes_off_generates_with_n_tropy_on_keys(self):
+        """The case that used to raise: default settings plus hit_character."""
+        mw = _build(hit_character=True, slide_coliseum_races=0,
+                    turbo_track_races=0)
+        world = mw.worlds[1]
+        self.assertEqual(world.ctr_hit_character_fallback, {12: 3})
+        block = world.fill_slot_data()["hit_character_encounters"]
+        self.assertEqual(block["unlock_triggers"]["12"]["fallback_keys"], 3)
+        for guest in (8, 9, 10, 11, 13, 14, 15):
+            self.assertNotIn("fallback_keys",
+                             block["unlock_triggers"][str(guest)])
 
     def test_one_trial_mode_is_enough(self):
-        """Since the pool draw N. Tropy needs one trial Trophy win, not two:
-        a seed with one trial mode generates with all sixteen reachable."""
+        """One created trial win keeps the ordinary trigger rule for N. Tropy."""
         for overrides in ({"slide_coliseum_races": 0},
                           {"turbo_track_races": 0}):
             with self.subTest(**overrides):
                 mw = _build(seed=3, hit_character=True, **overrides)
+                self.assertEqual(mw.worlds[1].ctr_hit_character_fallback, {})
                 state = mw.get_all_state(False)
                 for name in HIT_CHARACTER_CLASS.names():
                     self.assertTrue(
                         mw.get_location(name, 1).can_reach(state), name)
 
-    def test_enabled_with_both_trial_modes_generates(self):
-        mw = _build(steps=("generate_early",), hit_character=True)
-        self.assertTrue(mw.worlds[1].options.hit_character.value)
+    def test_oxide_goal_disabled_generates_with_oxide_on_four_keys(self):
+        mw = _build(hit_character=True, oxide_goal="disabled",
+                    bosses_required_goal=2)
+        world = mw.worlds[1]
+        self.assertEqual(world.ctr_hit_character_fallback, {15: 4})
+        block = world.fill_slot_data()["hit_character_encounters"]
+        self.assertEqual(block["unlock_triggers"]["15"]["fallback_keys"], 4)
+
+    def test_cortex_vortex_displacement_is_decided_per_seed(self):
+        """With one trial mode on and Cortex Vortex on, N. Tropy falls back
+        exactly on the seeds where CV took that trial's pad. This used to be a
+        blanket raise."""
+        outcomes = set()
+        for seed in range(1, 25):
+            mw = _build(seed=seed, hit_character=True, cortex_vortex_track=True,
+                        turbo_track_races=0)
+            world = mw.worlds[1]
+            created = created_trigger_codes(world, 1)
+            fell_back = 12 in world.ctr_hit_character_fallback
+            # The determination is exactly "no Slide Coliseum Trophy Race".
+            self.assertEqual(fell_back, 35016200 not in created)
+            outcomes.add(fell_back)
+        self.assertEqual(outcomes, {True, False},
+                         "expected both CV outcomes across 24 seeds")
 
     def test_disabled_ignores_trial_modes(self):
         mw = _build(steps=("generate_early",), hit_character=False,
                     slide_coliseum_races=0, turbo_track_races=0)
         self.assertFalse(mw.worlds[1].options.hit_character.value)
+
+    def test_spoiler_names_every_fallback_guest(self):
+        import io
+        mw = _build(hit_character=True, slide_coliseum_races=0,
+                    turbo_track_races=0, oxide_goal="disabled",
+                    bosses_required_goal=2)
+        world = mw.worlds[1]
+        self.assertEqual(world.ctr_hit_character_fallback, {12: 3, 15: 4})
+        handle = io.StringIO()
+        world.write_spoiler(handle)
+        text = handle.getvalue()
+        self.assertIn("N. Tropy has no unlock race in this seed and joins "
+                      "races at 3 Keys.", text)
+        self.assertIn("Nitros Oxide has no unlock race in this seed and joins "
+                      "races at 4 Keys.", text)
+
+    def test_spoiler_is_silent_without_a_fallback_guest(self):
+        import io
+        mw = _build(hit_character=True)
+        handle = io.StringIO()
+        mw.worlds[1].write_spoiler(handle)
+        self.assertNotIn("has no unlock race", handle.getvalue())
 
 
 class TestBuildIdentity(unittest.TestCase):

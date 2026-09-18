@@ -556,8 +556,10 @@ class ctrAPWorld(World):
         rung_sizer.apply_rung_sizing(self)
         # Hit Character encounters (0.2.1 candidate): draw the single roster
         # seed and cache the resolved block. No-op (and no RNG draw) when the
-        # option is off. The trial-Trophy requirement is enforced by
-        # forced_options.raise_if_required_trial_modes_disabled above.
+        # option is off. This is the block's ONLY RNG draw; the per-guest Key
+        # fallback is stamped into the same cached block later, in
+        # hit_character.install_rules, because it can only be decided once
+        # every location exists.
         hit_character.resolve_for_generation(self)
 
     def create_regions(self):
@@ -2035,6 +2037,11 @@ class ctrAPWorld(World):
         # pool draw). The global schema stays 16: 16 was never tagged, the Hit
         # block carries its own version, and a block-schema-1 client refuses a
         # block-2 seed visibly at admission, so a global bump adds nothing.
+        # 2026-09-18: the encounter block moved to block schema 3 (the per-guest
+        # Key fallback), emitted for every enabled seed. Same reasoning, same
+        # global schema 16: a block-2 client refuses a block-3 seed visibly,
+        # while a global bump would only add the out-of-date banner to every
+        # seed with Hit Character off.
         schema = 16
         slot_data: Dict[str, object] = {
             "Seed": self.multiworld.seed_name,
@@ -2488,6 +2495,20 @@ class ctrAPWorld(World):
                 f"CTR racer-locked pads ({_player_name}):\n")
             for _pad, _character in sorted(_locks.items()):
                 spoiler_handle.write(f"  {_pad}: requires {_character}\n")
+
+        # Hit Character Key fallback (2026-09-18): which guests had no unlock
+        # win in this seed and now join the opponent pool on Keys instead. This
+        # is a per-seed DERIVATION from the created locations, not an option
+        # value, so a spoiler read cannot otherwise tell. Nothing is written
+        # when no guest fell back, keeping those spoilers byte-identical.
+        for _guest, _keys in sorted(
+                (getattr(self, "ctr_hit_character_fallback", {}) or {}).items(),
+                key=lambda item: item[1]):
+            spoiler_handle.write(
+                f"\n\nCTR Hit Character ({_player_name}): "
+                f"{characters.CHARACTER_ID_TO_NAME[int(_guest)]} has no unlock "
+                f"race in this seed and joins races at {_keys} "
+                f"{'Key' if _keys == 1 else 'Keys'}.\n")
 
         if getattr(self, "_ctr_backstop_fired", False):
             player_name = self.multiworld.player_name[self.player]

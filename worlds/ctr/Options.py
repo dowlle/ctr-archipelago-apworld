@@ -510,8 +510,11 @@ class HitCharacter(Toggle):
     default racers plus your pool, never your own racer. Unlocked racers you
     have not hit yet get a seat first, up to three per race.
 
-    N. Tropy needs at least one of the Slide Coliseum or Turbo Track Trophy
-    Race options enabled, or both when Cortex Vortex Track is on."""
+    When a racer's unlock race is not in your seed at all, Keys unlock them
+    instead: Fake Crash at 1 Key, Penta Penguin at 2, N. Tropy at 3 and
+    N. Oxide at 4. So turning both trial track race options off, or setting
+    Oxide Goal to disabled, works fine with this option on. The spoiler log
+    names every racer that ended up on the Key route."""
     display_name = "Hit Character Checks"
 
 
