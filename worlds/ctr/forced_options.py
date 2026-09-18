@@ -38,6 +38,15 @@ code or the Specification/Contract -- never against "this quiets the fuzzer"
 (briefing rule 7): none of these change what a seed generates, only what the
 player is told about their own YAML.
 
+RESOLVE-WITH-WARNING is a third, narrower category, currently used by exactly
+one entry (`resolve_oxide_final_relic_count_to_mode_capacity`, 2026-09-18
+ruling). Unlike a downgrade, it DOES mutate the option's own stored value --
+justified there, and only there, because the value the player asked for is
+out of range for the chosen mode and has exactly one sensible reading (every
+relic of the tier, the same value the `all` special name already resolves
+to), so the seed can generate the thing the player clearly meant instead of
+failing over it.
+
 LETTERSANITY ROW (#148, added with the feature). The frozen design's `#178`
 obligation ("the #178 constraint matrix should carry the row", dossier
 amendment ruled 2026-08-10) is the mode-2 self-item access rule: in
@@ -304,30 +313,45 @@ def raise_if_oxidefinal_goal_has_no_progression_tier(world):
             f"tiers progression), or change the goal or mode.")
 
 
-def raise_if_oxide_final_count_exceeds_mode_capacity(world):
-    """Only total_relics can use the extended 19-54 range.
+def resolve_oxide_final_relic_count_to_mode_capacity(world):
+    """Only total_relics can use the extended 19-54 range; each specific tier
+    contains at most 18 relics, and any_relic_type still asks one individual
+    tier to reach the threshold.
 
-    Each specific tier contains at most 18 relics, and any_relic_type still
-    asks one individual tier to reach the threshold. Reject the mismatched
-    combination before supply and accessibility guards produce a less direct
-    error. The final-Oxide location uses this gate even when it is not the
-    selected goal, so the constraint is mode-based rather than goal-based.
+    2026-09-18 ruling: a count above 18 in one of those single-tier modes can
+    only mean the player wants every relic of that tier -- there is no other
+    relic left to ask for. That is exactly what the `all` special name
+    already resolves to (FinalOxideRelicCount.special_range_names) in every
+    single-tier mode, so this reuses that same value instead of failing
+    generation over a request that has an unambiguous answer. Mutates the
+    option's own stored value, the single point every downstream reader
+    (rules, goal checks, the spoiler, slot_data) consults, so nothing sees the
+    pre-resolution number.
+
+    Runs before the other RAISE guards below: the supply/accessibility guards
+    read this option's value too, and a resolved count must reach them
+    already resolved so a count of 40 with 11 created behaves identically to
+    a count of 18 with 11 created, not a nonsensical 40. The final-Oxide
+    location uses this gate even when it is not the selected goal, so the
+    constraint is mode-based rather than goal-based.
     """
     from .Options import FinalOxideUnlock, OxideGoal
     # Issue #320 acceptance 4: with `disabled` the Final Challenge LOCATION is
-    # never created, so its unlock mode + count gate nothing at all. Rejecting
-    # a seed over a requirement that no location in it carries would be a
-    # generation failure with no in-seed cause.
+    # never created, so its unlock mode + count gate nothing at all. Resolving
+    # a value that gates no location in this seed would only be noise.
     if not OxideGoal.oxide_content_present(world.options.oxide_goal.value):
         return
-    count = world.options.oxide_final_challenge_relic_count.value
+    opt = world.options.oxide_final_challenge_relic_count
     mode = world.options.oxide_final_challenge_unlock
-    if count > 18 and mode.value != FinalOxideUnlock.option_total_relics:
-        raise OptionError(
-            f"CTR: oxide_final_challenge_relic_count={count} exceeds the "
-            f"18-relic capacity of mode '{mode.current_key}'. Only "
-            f"oxide_final_challenge_unlock 'total_relics' supports counts "
-            f"from 19 through 54.")
+    requested = opt.value
+    if requested > 18 and mode.value != FinalOxideUnlock.option_total_relics:
+        opt.value = 18
+        logger.warning(
+            f"CTR: oxide_final_challenge_relic_count={requested} exceeds the "
+            f"18-relic capacity of mode '{mode.current_key}' for "
+            f"{_who(world)}, so it resolves to 18 (all relics of that tier) "
+            f"instead. Only oxide_final_challenge_unlock 'total_relics' "
+            f"supports counts from 19 through 54.")
 
 
 def _oxide_final_supply_shortfall(world):
@@ -417,7 +441,6 @@ def apply_raise_guards(world):
     raise_if_custom_tracks_descriptor_is_unusable(world)
     raise_if_composed_goal_is_empty(world)
     raise_if_gems_required_goal_needs_excluded_cups(world)
-    raise_if_oxide_final_count_exceeds_mode_capacity(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
 
@@ -789,8 +812,11 @@ def apply_downgrade_warnings(world):
 
 
 def apply(world):
-    """Single entry point for generate_early. Raise guards run first (they can
-    abort generation); downgrade warnings are informational only and never
-    change what the seed emits."""
+    """Single entry point for generate_early. The relic-count resolution runs
+    first because the RAISE guards below read the option's stored value and
+    must see the effective (post-resolution) count, not the raw one; raise
+    guards run next (they can abort generation); downgrade warnings are
+    informational only and never change what the seed emits."""
+    resolve_oxide_final_relic_count_to_mode_capacity(world)
     apply_raise_guards(world)
     apply_downgrade_warnings(world)
