@@ -401,18 +401,27 @@ class TestOxideDisabledRemovesTheContent(unittest.TestCase):
             optional.worlds[PLAYER].fill_slot_data()["TotalLocations"] - 2,
             disabled.worlds[PLAYER].fill_slot_data()["TotalLocations"])
 
-    def test_final_challenge_unlock_mode_and_count_are_ignored(self):
-        # #320 acceptance 4: a mode/count pair that a `none` seed rejects
-        # outright must generate cleanly when the location does not exist.
-        with self.assertRaises(OptionError):
-            setup_multiworld(ctrAPWorld, ("generate_early",), seed=1,
-                             options={"oxide_goal": "none",
-                                      "bosses_required_goal": 4,
-                                      "oxide_final_challenge_unlock": 0,
-                                      "oxide_final_challenge_relic_count": 30})
+    def test_final_challenge_unlock_mode_and_count_resolve_or_are_ignored(self):
+        # #320 acceptance 4: the pair is fully ignored when the location does
+        # not exist (`disabled`, value stays exactly what the YAML set). When
+        # the location exists but the seed's goal is something else (`none`),
+        # the 2026-09-18 ruling resolves an over-capacity single-tier count
+        # down to 18 rather than rejecting the seed.
+        mw_none = setup_multiworld(
+            ctrAPWorld, ("generate_early",), seed=1,
+            options={"oxide_goal": "none",
+                     "bosses_required_goal": 4,
+                     "oxide_final_challenge_unlock": 0,
+                     "oxide_final_challenge_relic_count": 30})
+        self.assertEqual(
+            mw_none.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
+            18)
+
         mw = self._disabled(oxide_final_challenge_unlock=0,
                             oxide_final_challenge_relic_count=30)
-        self.assertIsNotNone(mw)
+        self.assertEqual(
+            mw.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
+            30)
 
     def test_full_accessibility_generates_without_the_removed_locations(self):
         mw = self._disabled(accessibility="full")

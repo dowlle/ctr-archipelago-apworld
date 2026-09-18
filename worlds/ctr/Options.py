@@ -149,8 +149,9 @@ class FinalOxideRelicCount(NamedRange):
     - **total_relics** supports 1-54 by adding Sapphire, Gold and Platinum.
     - Every other mode supports 1-18 because it checks one 18-item tier.
 
-    Values above 18 with a non-total mode fail generation clearly instead of
-    producing an impossible goal.
+    A value above 18 in one of those single-tier modes can only mean every
+    relic of that tier, so generation resolves it down to 18 and logs a
+    warning naming the mode and the value you asked for, instead of failing.
 
     - **all**: shorthand for 18, a full single tier, the same as the 0.2.0
       meaning. It works in every mode. Players using total_relics who want

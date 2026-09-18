@@ -328,6 +328,25 @@ class TestGateCountGuards(unittest.TestCase):
                 "platinum_relic_count": 0,
             })
 
+    def test_over_capacity_count_shortfall_matches_explicit_18(self):
+        # 2026-09-18 ruling: a single-tier count above 18 resolves to 18
+        # before this guard ever reads it, so a supply shortfall at count 40
+        # must be the identical error a count of 18 would produce -- not a
+        # shortfall against 40, and not silently swallowed.
+        opts_18 = {
+            "accessibility": "full",
+            "oxide_goal": "first",
+            "oxide_final_challenge_unlock": "sapphire_relics",
+            "oxide_final_challenge_relic_count": 18,
+            "sapphire_relic_count": 11,
+        }
+        opts_40 = dict(opts_18, oxide_final_challenge_relic_count=40)
+        with self.assertRaises(OptionError) as ctx_18:
+            _early(opts_18)
+        with self.assertRaises(OptionError) as ctx_40:
+            _early(opts_40)
+        self.assertEqual(str(ctx_18.exception), str(ctx_40.exception))
+
 
 class TestOxideFinalLocationRuleFollowsMode(CTRTestBase):
     """Issue #53: the Final Challenge LOCATION rule must read the configured

@@ -20,6 +20,7 @@ reshapes a seed; it only reports what already-shipping generation logic does.
 """
 import unittest
 
+from BaseClasses import CollectionState
 from Options import OptionError
 
 from test.general import setup_multiworld
@@ -27,11 +28,17 @@ from .. import ctrAPWorld, forced_options
 from . import CTRTestBase
 
 EARLY = ("generate_early",)
+FULL = ("generate_early", "create_regions", "create_items", "set_rules")
 LOGGER_NAME = "worlds.ctr.forced_options"
+PLAYER = 1
 
 
 def _early(options):
     return setup_multiworld(ctrAPWorld, EARLY, options=options)
+
+
+def _full(options):
+    return setup_multiworld(ctrAPWorld, FULL, options=options)
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +387,100 @@ class TestDefaultOptionsAreConflictFree(CTRTestBase):
     def test_generate_early_logs_nothing(self):
         with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
             forced_options.apply(self.world)
+
+
+# ---------------------------------------------------------------------------
+# RESOLVE-WITH-WARNING guard -- over-capacity single-tier relic counts
+# (2026-09-18 ruling: resolve_oxide_final_relic_count_to_mode_capacity).
+# ---------------------------------------------------------------------------
+
+class TestOxideFinalRelicCountResolvesToModeCapacity(unittest.TestCase):
+    SINGLE_TIER_MODES = ("sapphire_relics", "gold_relics", "platinum_relics",
+                         "any_relic_type")
+
+    def test_each_single_tier_mode_resolves_above_18_to_18(self):
+        for mode in self.SINGLE_TIER_MODES:
+            with self.subTest(mode=mode):
+                mw = _full({
+                    "oxide_final_challenge_unlock": mode,
+                    "oxide_final_challenge_relic_count": 40,
+                    "sapphire_relic_count": 18,
+                    "gold_relic_count": 18,
+                    "platinum_relic_count": 18,
+                    "accessibility": "minimal",
+                })
+                world = mw.worlds[PLAYER]
+                self.assertEqual(
+                    world.options.oxide_final_challenge_relic_count.value, 18)
+                self.assertEqual(
+                    world.fill_slot_data()["ctr_options"]["oxide_final_count"],
+                    18)
+
+    def test_resolution_warns_exactly_once_per_player(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early({
+                "oxide_final_challenge_unlock": "gold_relics",
+                "oxide_final_challenge_relic_count": 40,
+                "gold_relic_count": 18,
+            })
+        matches = [m for m in cm.output
+                  if "exceeds the 18-relic capacity" in m]
+        self.assertEqual(len(matches), 1)
+        self.assertIn("oxide_final_challenge_relic_count=40", matches[0])
+        self.assertIn("gold_relics", matches[0])
+
+    def test_total_relics_above_18_is_untouched(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            mw = _early({
+                "oxide_final_challenge_unlock": "total_relics",
+                "oxide_final_challenge_relic_count": 40,
+                "sapphire_relic_count": 18,
+                "gold_relic_count": 18,
+                "platinum_relic_count": 18,
+            })
+        self.assertEqual(
+            mw.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
+            40)
+
+    def test_count_at_18_is_untouched_in_a_single_tier_mode(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            mw = _early({
+                "oxide_final_challenge_unlock": "sapphire_relics",
+                "oxide_final_challenge_relic_count": 18,
+            })
+        self.assertEqual(
+            mw.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
+            18)
+
+    def test_count_below_18_is_untouched_in_a_single_tier_mode(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            mw = _early({
+                "oxide_final_challenge_unlock": "platinum_relics",
+                "oxide_final_challenge_relic_count": 5,
+                "platinum_relic_count": 5,
+            })
+        self.assertEqual(
+            mw.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
+            5)
+
+    def test_resolved_count_gates_the_final_challenge_rule_exactly_like_18(self):
+        # Rule behaviour after resolution must match an explicit count of 18:
+        # 17 Gold Relics is short, 18 satisfies it.
+        mw = _full({
+            "oxide_final_challenge_unlock": "gold_relics",
+            "oxide_final_challenge_relic_count": 40,
+            "gold_relic_count": 18,
+        })
+        world = mw.worlds[PLAYER]
+        relic_rule = world._oxide_final_relic_rule()
+        short = CollectionState(mw)
+        short.add_item("Gold Relic", PLAYER, 17)
+        short.stale[PLAYER] = True
+        self.assertFalse(relic_rule(short))
+        met = CollectionState(mw)
+        met.add_item("Gold Relic", PLAYER, 18)
+        met.stale[PLAYER] = True
+        self.assertTrue(relic_rule(met))
 
 
 if __name__ == "__main__":
