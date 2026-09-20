@@ -18,10 +18,11 @@ from test.general import setup_multiworld
 from .. import ctrAPWorld
 from ..capability_contract import (CONFIRMED_FINISH_BY_TRACK,
                                    held_first_gated_tracks)
-from ..gem_cup_legs import load_vanilla_cup_legs
+from ..gem_cup_legs import CUP_LEVEL_IDS, load_vanilla_cup_legs
 from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
-from ..progressive_capability import boost_item_name
+from ..progressive_capability import (boost_item_name, destination_pad_key,
+                                      destination_pad_name)
 from ..usf_finish import (ALL_USF_FINISH_TRACKS, FIRST_BOOST_COUNT,
                           USF_BOOST_COUNT, USF_FINISH_TRACKS, UsfFinishGate,
                           USF_OR_HARD_SK_FINISH_TRACKS, cup_finish_term,
@@ -99,7 +100,13 @@ class TestGatedCupSelection(unittest.TestCase):
                 ("Red Gem Cup", "N. Gin", [HAS, "Cortex Castle", HAS])):
             with self.subTest(cup=cup):
                 # Shuffled physical host; standalone leg pads belong to Coco.
-                world.ctr_pad_by_destination = {cup: "Polar Pass Warp Pad"}
+                # `ctr_pad_by_destination` is keyed by PAD TRACK KEY, so a cup
+                # entry is "<Colour> Cup", not the "<Colour> Gem Cup" region
+                # name. This test used to write the region name as the key,
+                # which is the same key-space mistake `cup_finish_term` made:
+                # it passed only because both sides were wrong together.
+                world.ctr_pad_by_destination = {
+                    destination_pad_key(cup): "Polar Pass Warp Pad"}
                 world.ctr_racer_locks = {"Polar Pass Warp Pad": racer,
                                         f"{HAS} Warp Pad": "Coco Bandicoot",
                                         "Cortex Castle Warp Pad": "Coco Bandicoot"}
@@ -169,6 +176,132 @@ class TestGatedCupSelection(unittest.TestCase):
         for track in USF_FINISH_TRACKS - OPTIONAL_TROPHY_TRACKS:
             self.assertIn(track, TROPHY_TRACKS)
         self.assertEqual(OPTIONAL_TROPHY_TRACKS - USF_FINISH_TRACKS, frozenset())
+
+
+#: Merged destination shuffle with randomized cup legs: the shape that makes a
+#: cup sit on a pad other than its own, which is what the key-space bug needed
+#: to become visible.
+SHUFFLED_OPTIONS = dict(
+    progressive_boost="per_character", character_unlocks=False,
+    include_gem_cups=True, randomize_gem_cup_tracks=True,
+    warp_pad_shuffle_grouping="merged",
+    warppad_unlock_requirements="randomized",
+    podium_placement_checks=True,
+)
+
+#: No destination shuffle at all (empty category set), so `warp_pad_map` and
+#: `ctr_pad_by_destination` are empty and every pad loads its own content.
+VANILLA_OPTIONS = dict(include_gem_cups=True, warp_pad_shuffle_categories=[])
+
+
+def _real_cup_pads(world):
+    """{cup region -> the physical pad this seed's `warp_pad_map` puts it on}.
+
+    Read straight off the seed's pad map by cup LevelID, independently of
+    `ctr_pad_by_destination` and of the production helper, so these tests
+    cannot agree with the code under test by sharing its mistake.
+    """
+    by_lid = {lid: cup for cup, lid in CUP_LEVEL_IDS}
+    return {by_lid[lid]: pad
+            for pad, lid in (getattr(world, "warp_pad_map", {}) or {}).items()
+            if lid in by_lid}
+
+
+class TestCupPadKeySpace(unittest.TestCase):
+    """A Gem Cup's destination region name is NOT its pad map key.
+
+    `ctr_pad_by_destination` is keyed by pad track key ("Red Cup"); the cup's
+    region, and the name `cup_finish_term` is handed, is "Red Gem Cup". The
+    term used to look the cup up under the region name, always miss, and fall
+    back to the same-named RETAIL pad -- which under destination shuffle loads
+    something else entirely. These tests pin the resolution and both damage
+    directions it produced.
+    """
+
+    def test_the_helper_resolves_every_cup_to_its_real_physical_pad(self):
+        mw = _build(seed=1, **SHUFFLED_OPTIONS)
+        world = mw.worlds[PLAYER]
+        real = _real_cup_pads(world)
+        self.assertEqual(len(real), len(CUP_LEVEL_IDS))
+        moved = [cup for cup, pad in real.items()
+                 if pad != cup.replace(" Gem Cup", " Cup Warp Pad")]
+        self.assertTrue(moved, "seed 1 was expected to move at least one cup")
+        for cup, pad in real.items():
+            with self.subTest(cup=cup):
+                self.assertEqual(destination_pad_name(world, cup), pad)
+
+    def test_no_gem_cup_falls_through_the_fallback(self):
+        """The fallback must never be what answers for a cup.
+
+        A missing key is exactly how the bug hid: `dict.get` returned the
+        retail pad name and nothing complained. Assert the key the helper uses
+        is really present in the seed's map for every cup, on a shuffled seed
+        and on a vanilla one, so a future key-space drift fails here instead of
+        being masked again.
+        """
+        for label, options in (("shuffled", SHUFFLED_OPTIONS),
+                               ("vanilla", VANILLA_OPTIONS)):
+            mw = _build(seed=1, **options)
+            world = mw.worlds[PLAYER]
+            by_dest = getattr(world, "ctr_pad_by_destination", {}) or {}
+            for cup, _lid in CUP_LEVEL_IDS:
+                with self.subTest(seed_shape=label, cup=cup):
+                    key = destination_pad_key(cup)
+                    self.assertNotEqual(key, cup)
+                    self.assertEqual(key, cup.replace(" Gem Cup", " Cup"))
+                    if by_dest:
+                        self.assertIn(key, by_dest)
+
+    def test_vanilla_still_resolves_to_the_cup_s_own_pad(self):
+        """No shuffle, empty map: the answer is byte-identical to before."""
+        mw = _build(seed=1, **VANILLA_OPTIONS)
+        world = mw.worlds[PLAYER]
+        self.assertFalse(getattr(world, "ctr_pad_by_destination", {}))
+        for cup, _lid in CUP_LEVEL_IDS:
+            with self.subTest(cup=cup):
+                self.assertEqual(destination_pad_name(world, cup),
+                                 cup.replace(" Gem Cup", " Cup Warp Pad"))
+
+    def _moved_cup(self, world):
+        real = _real_cup_pads(world)
+        for cup, pad in sorted(real.items()):
+            if pad != cup.replace(" Gem Cup", " Cup Warp Pad"):
+                return cup, pad, cup.replace(" Gem Cup", " Cup Warp Pad")
+        self.fail("no cup moved off its own pad")
+
+    def _cup_term(self, world, cup, locks):
+        world.ctr_racer_locks = locks
+        world.gem_cup_legs = {cup: [HAS, "Cortex Castle"]}
+        return UsfFinishGate(world).cup_term(cup)
+
+    def test_the_retail_pad_s_lock_does_not_restrict_the_cup(self):
+        """Over-restrictive direction. Only the same-named retail pad is
+        locked; the pad the cup really sits on is free. The old lookup named
+        that unrelated pad's racer -- the community's "Red Gem Cup out of logic
+        until Pura arrived". Any driveable racer's USF must satisfy it."""
+        mw = _build(seed=1, **SHUFFLED_OPTIONS)
+        world = mw.worlds[PLAYER]
+        cup, real_pad, retail_pad = self._moved_cup(world)
+        rule = self._cup_term(world, cup, {retail_pad: "Pura"})
+        state = _state(mw)
+        state.add_item(boost_item_name("Dingodile"), PLAYER, USF_BOOST_COUNT)
+        self.assertTrue(rule(state, PLAYER))
+        self.assertEqual(destination_pad_name(world, cup), real_pad)
+
+    def test_the_real_pad_s_lock_does_restrict_the_cup(self):
+        """Under-restrictive direction, the dangerous one. Only the pad the cup
+        really sits on is locked; the same-named retail pad is free. The old
+        lookup found no lock and let any racer's USF answer, so a required item
+        could sit behind a race logic thought was finishable."""
+        mw = _build(seed=1, **SHUFFLED_OPTIONS)
+        world = mw.worlds[PLAYER]
+        cup, real_pad, _retail_pad = self._moved_cup(world)
+        rule = self._cup_term(world, cup, {real_pad: "Pura"})
+        state = _state(mw)
+        state.add_item(boost_item_name("Dingodile"), PLAYER, USF_BOOST_COUNT)
+        self.assertFalse(rule(state, PLAYER))
+        state.add_item(boost_item_name("Pura"), PLAYER, USF_BOOST_COUNT)
+        self.assertTrue(rule(state, PLAYER))
 
 
 class TestTrophyRaceGate(unittest.TestCase):
