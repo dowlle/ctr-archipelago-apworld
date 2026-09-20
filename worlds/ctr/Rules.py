@@ -169,9 +169,13 @@ def add_capability_difficulty_rules(world, player):
     measured easy group and the ruled group -- read through
     `difficulty_gated_tracks()` rather than either set, so a track cannot be
     gated here and skipped by a parity test.
+
+    The weapon-family arm requires `itemsanity.DIFFICULTY_WEAPON_FAMILY_MIN`
+    distinct families (three since the 2026-09-20 ruling, two before it).
     """
     from .capability_contract import difficulty_gated_tracks
-    from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
+    from .itemsanity import (DIFFICULTY_WEAPON_FAMILY_MIN,
+                             USEFUL_WEAPON_FAMILIES, family_count)
     from .podium import location_name
     from .progressive_capability import gate_satisfied, track_required_character
 
@@ -194,7 +198,8 @@ def add_capability_difficulty_rules(world, player):
             if gate_satisfied(world, state, p, boost_min=1,
                               required_character=racer):
                 return True
-            return family_count(state, p, USEFUL_WEAPON_FAMILIES) >= 2
+            return (family_count(state, p, USEFUL_WEAPON_FAMILIES)
+                    >= DIFFICULTY_WEAPON_FAMILY_MIN)
 
         gated = [f"{track}: Trophy Race"]
         if difficulty == 0:  # easy
@@ -1077,9 +1082,15 @@ def add_time_trial_and_ctr_requirements(world, player):
     locations live in the destination region under shuffle) -> {(item,count)}.
     Empty in vanilla mode / for pads with no stage 2 -> the rule is the plain
     can_reach(Trophy Race), exactly as before.
+
+    CAPABILITY TERMS ANDed on top of whatever the above built: the Gold and
+    Platinum relic tiers (2026-08-21) and every CTR Token Challenge
+    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`). Both are vacuous
+    while Progressive Boost is off.
     """
     from .progressive_capability import track_required_character
-    from .usf_finish import boost_term, relic_tier_boost_min
+    from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, boost_term,
+                             relic_tier_boost_min)
 
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
@@ -1155,13 +1166,42 @@ def add_time_trial_and_ctr_requirements(world, player):
         # 2026-08-12). Native letters only collide inside the CTR Token
         # Challenge (INSTANCE.c), and entering it requires the trophy race
         # checked plus the pad's stage-2 (AH_WarpPad.c), so a letter location's
-        # real reachability is the token challenge's, regardless of mode. Every
-        # created letter location therefore carries the SAME rule object built
-        # here (BY REFERENCE, never an independently written stage-2 term), so
-        # any future change to token-challenge access carries the letters with it
-        # without a second edit site. Mode 2's self-item term is ANDed on top
-        # later in add_lettersanity_rules, exactly as reviewed; modes 0/3 create
-        # no letter locations, so this loop finds none for them.
+        # real reachability is the token challenge's ENTRY, regardless of mode.
+        # Every created letter location therefore carries the SAME rule object
+        # built here (BY REFERENCE, never an independently written stage-2
+        # term), so any future change to token-challenge ENTRY carries the
+        # letters with it without a second edit site. Mode 2's self-item term is
+        # ANDed on top later in add_lettersanity_rules, exactly as reviewed;
+        # modes 0/3 create no letter locations, so this loop finds none for them.
         if name.endswith("CTR Token Challenge"):
             for letter_name in _created_letter_names_for(world, track_prefix):
                 mw.get_location(letter_name, player).access_rule = rule
+
+            # CTR Token Challenge boost floor (ruling 2026-09-20, see
+            # usf_finish.CTR_CHALLENGE_BOOST_COUNT). Same shape as the relic
+            # tier term above and the same reasons: racer-aware, vacuous while
+            # the boost chain is not randomized, ANDed on top of the Trophy
+            # prerequisite and any stage-2 gate rather than replacing them, so
+            # a higher race requirement is still inherited through can_reach.
+            # Applies at every logic difficulty and to every kind of track that
+            # reaches this loop (retail, trial, Cortex Vortex pad track,
+            # custom-track slots). Deliberately NOT track_finish_term: a token
+            # challenge is not a finish line, and Oxide's hard-shortcut escape
+            # belongs to the race, which is already inherited.
+            #
+            # Installed AFTER the letter sharing above, so it lands on the
+            # token location ONLY. The ruling is about COMPLETING the
+            # challenge; picking a single letter up during a run is a separate,
+            # already-ruled question (Papu's Pyramid C and T accept Turbo or
+            # Mask instead of boost, Oxide Station C keeps the hard-shortcut
+            # route, Tiger Temple R needs a door opener). Floor-sharing the
+            # letters would have silently overridden all three.
+            _ctr_term = boost_term(
+                world, track_required_character(world, track_prefix),
+                CTR_CHALLENGE_BOOST_COUNT)
+
+            def _ctr_rule(state: CollectionState, base=rule, term=_ctr_term,
+                          p=player):
+                return base(state) and term(state, p)
+
+            loc.access_rule = _ctr_rule

@@ -106,6 +106,28 @@ ALL_USF_FINISH_TRACKS = USF_FINISH_TRACKS | USF_OR_HARD_SK_FINISH_TRACKS
 #: rank (reserves at all; USF is the second rank above it).
 FIRST_BOOST_COUNT = 1
 
+#: CTR TOKEN CHALLENGE GATE (ruling 2026-09-20, 0.2.1-alpha3).
+#: A CTR Token Challenge used to carry no capability term of its own: it was
+#: gated only by `can_reach(<track>: Trophy Race)` plus any stage-2 warp-pad
+#: requirement. The alpha2 stream report is that the challenge is harder
+#: than the race it hangs off -- the three letters and the token have to be
+#: taken inside one clean lap. So every CTR Token Challenge now ANDs the first
+#: boost rank while the boost pack is on, at EVERY logic difficulty.
+#: The Trophy Race prerequisite stays, so a track whose race needs MORE (the
+#: USF finish tracks, the difficulty rule, a stage-2 pad requirement) still
+#: inherits that higher requirement through `can_reach`; this constant is a
+#: floor, never a ceiling. Installed in
+#: `Rules.add_time_trial_and_ctr_requirements`, the one site every CTR Token
+#: Challenge passes through (retail tracks, the two trial tracks, the Cortex
+#: Vortex pad track and custom-track slots alike).
+#: It lands on the token location ONLY. The ruling is about COMPLETING the
+#: challenge; the letter locations that share the challenge's entry rule keep
+#: their own earlier rulings for picking a single letter up (Papu's Pyramid C
+#: and T accept Turbo or Mask instead of boost, Oxide Station C keeps the
+#: hard-shortcut route, Tiger Temple R needs a door opener), so the floor is
+#: installed after that sharing rather than through it.
+CTR_CHALLENGE_BOOST_COUNT = FIRST_BOOST_COUNT
+
 #: RELIC TIER GATES (ruling 2026-08-21, posting-pack fixing-pass session).
 #: Every Gold and every Platinum Time Trial requires at least the first boost
 #: rank: the retail Gold and Platinum targets are set for a kart that can

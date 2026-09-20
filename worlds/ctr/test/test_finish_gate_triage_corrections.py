@@ -200,13 +200,25 @@ class TestRelicTierBoostGates(unittest.TestCase):
             self.assertFalse(_reachable(mw, one, name), name)
             self.assertTrue(_reachable(mw, two, name), name)
 
-    def test_sapphire_trophy_and_token_stay_ungated(self):
+    def test_sapphire_and_trophy_stay_ungated(self):
+        """Sapphire carries no tier term and the Labs race is still on the
+        difficulty rule only. The CTR Token Challenge left this list on
+        2026-09-20: it now carries its own first-boost floor, asserted in the
+        test below."""
         mw = _build(progressive_boost="shared_global", platinum_relic_count=18)
         state = _state_all_but_boost(mw, 0)
         for name in (f"{LABS}: Trophy Race", f"{LABS}: Sapphire Time Trial",
-                     f"{LABS}: CTR Token Challenge",
                      "Crash Cove: Sapphire Time Trial"):
             self.assertTrue(_reachable(mw, state, name), name)
+
+    def test_token_challenge_carries_the_first_boost_floor(self):
+        """Ruling 2026-09-20. The floor is the token's own term, not a relic
+        tier: it binds on a track whose race and Sapphire are both free."""
+        mw = _build(progressive_boost="shared_global", platinum_relic_count=18)
+        name = f"{LABS}: CTR Token Challenge"
+        self.assertFalse(_reachable(mw, _state_all_but_boost(mw, 0), name))
+        self.assertTrue(_reachable(
+            mw, _state_all_but_boost(mw, FIRST_BOOST_COUNT), name))
 
     def test_usf_tracks_need_usf_on_both_tiers_with_no_escape(self):
         # Hard shortcut knowledge makes Oxide Station's FINISH gate vacuous,

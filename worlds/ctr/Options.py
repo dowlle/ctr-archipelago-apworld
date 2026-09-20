@@ -312,7 +312,8 @@ class ProgressiveBoostMode(Choice):
 
     Some checks genuinely need the speed and stay out of reach until it
     arrives. Hot Air Skyway is the clearest case - its mid-track climb
-    cannot be cleared below USF.
+    cannot be cleared below USF. Every CTR Token Challenge also waits for
+    your first boost, and for more than that where its own race does.
 
     - **off** (default): every kart boosts normally, as in the retail game.
     - **shared_global**: one boost ladder, shared by every character.
@@ -363,9 +364,9 @@ class LogicDifficulty(Choice):
     regardless of Itemsanity.
 
     - **easy**: winning a race, finishing on the podium and holding first
-      all wait until you have boost or a couple of decent weapons.
-    - **medium** (default): only winning the race waits. Placement checks
-      stay available.
+      all wait until you have boost, or three different useful weapons.
+    - **medium** (default): only winning the race waits, on the same terms.
+      Placement checks stay available.
     - **hard**: no extra race or placement requirement; you are expected to
       manage those checks with your available items.
 

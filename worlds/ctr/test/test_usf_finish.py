@@ -234,10 +234,12 @@ class TestTimeTrialRipple(unittest.TestCase):
                 self.assertTrue(_reachable(mw, cleared, f"{HAS}: {suffix}"))
                 # Control: the same check on a non-USF track. Gold and
                 # Platinum carry the 2026-08-21 first-boost floor everywhere,
-                # so their control opens at one boost rather than bare;
-                # Sapphire and the token challenge stay free.
+                # and the CTR Token Challenge carries the 2026-09-20 one, so
+                # those controls open at one boost rather than bare. Only
+                # Sapphire is still free.
                 control = f"Crash Cove: {suffix}"
-                if suffix in ("Gold Time Trial", "Platinum Time Trial"):
+                if suffix in ("Gold Time Trial", "Platinum Time Trial",
+                              "CTR Token Challenge"):
                     self.assertFalse(_reachable(mw, blocked, control))
                     self.assertTrue(_reachable(mw, one_boost, control))
                 else:
