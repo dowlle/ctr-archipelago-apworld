@@ -327,6 +327,52 @@ class TestPerCharacterUniversalTracker(unittest.TestCase):
         self.assertEqual(world.options.progressive_boost.value, 2)
         self.assertEqual(world.options.progressive_stats.value, 2)
 
+    def test_blue_fire_overrides_tracking_yaml(self):
+        """Regression: the easy-difficulty Platinum floor reads Blue Fire.
+
+        A seed with logic_difficulty = easy and Blue Fire on holds every
+        Platinum Time Trial at boost rank 3 (usf_finish.relic_tier_boost_min).
+        Restoring the difficulty without the toggle left UT on the rank-2
+        floor, so it called Platinum relics in logic that the server did not
+        -- the check-ut divergence this test pins down.
+        """
+        from ..usf_finish import relic_tier_boost_min
+
+        server = _build(progressive_boost="shared_global",
+                        progressive_boost_blue_fire=True,
+                        logic_difficulty="easy")
+        slot_data = server.worlds[1].fill_slot_data()
+        self.assertIs(slot_data["ctr_options"]["boost_blue_fire"], True)
+
+        tracker = _build(progressive_boost="off",
+                         progressive_boost_blue_fire=False,
+                         logic_difficulty="medium")
+        world = tracker.worlds[1]
+        world._ut_restore_options(slot_data)
+
+        self.assertEqual(world.options.progressive_boost_blue_fire.value, 1)
+        self.assertEqual(
+            relic_tier_boost_min("Crash Cove", "Platinum", world.options), 3)
+        self.assertEqual(
+            relic_tier_boost_min("Crash Cove", "Platinum", world.options),
+            relic_tier_boost_min("Crash Cove", "Platinum",
+                                 server.worlds[1].options))
+
+    def test_blue_fire_absent_on_wire_restores_off(self):
+        """A pre-#85 wire carries no `boost_blue_fire`, and such a seed had no
+        Blue Fire tier at all, so the restore lands on off instead of letting
+        the tracking player's own YAML raise the Platinum floor."""
+        mw = _build(progressive_boost="shared_global",
+                    progressive_boost_blue_fire=True,
+                    logic_difficulty="easy")
+        world = mw.worlds[1]
+        world._ut_restore_options({
+            "ctr_options": {"boost_mode": 1},
+            "warp_pad_unlock": {},
+            "podium_checks": {},
+        })
+        self.assertEqual(world.options.progressive_boost_blue_fire.value, 0)
+
     def test_wire_needs_no_per_racer_rank_block(self):
         mw = _build(progressive_boost="per_character",
                     progressive_stats="per_character",
