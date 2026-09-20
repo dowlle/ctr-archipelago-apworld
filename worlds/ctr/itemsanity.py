@@ -81,6 +81,17 @@ USEFUL_WEAPON_FAMILIES = (
     ("N. Tropy Clock",),
 )
 
+#: Distinct useful weapon families that substitute for one Progressive Boost
+#: copy on a difficulty-gated Trophy Race (Rules.add_capability_difficulty_rules).
+#: RULING 2026-09-20 (0.2.1-alpha3): raised from two to three. Two families is
+#: what the alpha2 stream seed handed out in sphere 1 (Bomb x3 and Missile on
+#: two Blizzard Bluff boxes), which opened all 13 difficulty-gated Trophy Races
+#: -- and with them every CTR Token Challenge and Sapphire Time Trial on those
+#: tracks -- seven spheres before the first boost. Three families is a
+#: materially harder draw and keeps the arm as an escape hatch rather than a
+#: default route.
+DIFFICULTY_WEAPON_FAMILY_MIN = 3
+
 
 def family_count(state, player: int,
                  families: Iterable[Sequence[str]]) -> int:

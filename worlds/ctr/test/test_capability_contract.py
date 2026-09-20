@@ -22,7 +22,7 @@ from ..capability_contract import (
     unconditional_usf_finish_tracks,
     usf_or_hard_finish_tracks,
 )
-from ..itemsanity import ITEM_NAMES
+from ..itemsanity import DIFFICULTY_WEAPON_FAMILY_MIN, ITEM_NAMES
 from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS
 from ..podium import created_rung_keys_from_options, location_name
 from ..progressive_capability import (ROSTER, boost_item_name,
@@ -201,9 +201,13 @@ class TestRuledTrophyGroup(unittest.TestCase):
                 self.assertFalse(_state(mw).can_reach(name, "Location", PLAYER))
             with self.subTest(track=track, state="boost"):
                 self.assertTrue(_state(mw, boost=1).can_reach(name, "Location", PLAYER))
-            with self.subTest(track=track, state="weapons"):
-                self.assertTrue(_state(mw, held=("Mask", "Warpball")).can_reach(
+            with self.subTest(track=track, state="two weapons"):
+                self.assertFalse(_state(mw, held=("Mask", "Warpball")).can_reach(
                     name, "Location", PLAYER))
+            with self.subTest(track=track, state="three weapons"):
+                self.assertTrue(
+                    _state(mw, held=("Mask", "Warpball", "Bomb")).can_reach(
+                        name, "Location", PLAYER))
 
     def test_ruled_tracks_are_free_at_hard(self):
         for track in sorted(RULED_TROPHY_GROUP.tracks):
@@ -225,7 +229,14 @@ class TestDifficultyContract(unittest.TestCase):
         self.assertEqual(tracker.worlds[PLAYER].options.logic_difficulty.value,
                          0)
 
-    def test_medium_trophy_requires_boost_or_two_useful_families(self):
+    def test_medium_trophy_requires_boost_or_three_useful_families(self):
+        """Ruling 2026-09-20: the weapon-family arm moved from two to three.
+
+        Two families is what the alpha2 stream seed handed out in sphere 1, so
+        the boundary that matters is two False / three True -- not just "some
+        weapons open it".
+        """
+        self.assertEqual(DIFFICULTY_WEAPON_FAMILY_MIN, 3)
         for track in sorted(difficulty_gated_tracks()):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
                         logic_difficulty="medium")
@@ -235,9 +246,46 @@ class TestDifficultyContract(unittest.TestCase):
             with self.subTest(track=track, state="boost"):
                 self.assertTrue(_state(mw, boost=1).can_reach(
                     name, "Location", PLAYER))
-            with self.subTest(track=track, state="weapons"):
-                self.assertTrue(_state(mw, held=("Mask", "Warpball")).can_reach(
+            with self.subTest(track=track, state="one weapon"):
+                self.assertFalse(_state(mw, held=("Mask",)).can_reach(
                     name, "Location", PLAYER))
+            with self.subTest(track=track, state="two weapons"):
+                self.assertFalse(_state(mw, held=("Mask", "Warpball")).can_reach(
+                    name, "Location", PLAYER))
+            with self.subTest(track=track, state="three weapons"):
+                self.assertTrue(
+                    _state(mw, held=("Mask", "Warpball", "Bomb")).can_reach(
+                        name, "Location", PLAYER))
+
+    def test_three_family_arm_counts_families_not_items(self):
+        """The x3 variants share a family with their x1 counterpart, so four
+        weapon ITEMS spanning two families must still fail. This is the arm
+        the stream seed satisfied (`Bomb x3` plus `Missile`)."""
+        track = sorted(difficulty_gated_tracks())[0]
+        mw = _build(progressive_boost="shared_global", itemsanity=True,
+                    logic_difficulty="medium")
+        name = f"{track}: Trophy Race"
+        self.assertFalse(_state(
+            mw, held=("Bomb", "Bomb x3", "Missile", "Missile x3")).can_reach(
+                name, "Location", PLAYER))
+        self.assertTrue(_state(
+            mw, held=("Bomb x3", "Missile", "N. Tropy Clock")).can_reach(
+                name, "Location", PLAYER))
+
+    def test_easy_rung_gates_follow_the_same_three_family_term(self):
+        """Easy gates Finish on Podium and Held 1st with the SAME term, so the
+        raise has to move all three locations together."""
+        track = "Crash Cove"
+        mw = _build(progressive_boost="shared_global", itemsanity=True,
+                    logic_difficulty="easy")
+        two = _state(mw, held=("Mask", "Warpball"))
+        three = _state(mw, held=("Mask", "Warpball", "Bomb"))
+        for name in (f"{track}: Trophy Race",
+                     location_name(track, "finish_podium"),
+                     location_name(track, "held_1st")):
+            with self.subTest(location=name):
+                self.assertFalse(two.can_reach(name, "Location", PLAYER))
+                self.assertTrue(three.can_reach(name, "Location", PLAYER))
 
     def test_hard_trophy_is_free_and_easy_adds_only_ruled_rung_gates(self):
         track = "Crash Cove"

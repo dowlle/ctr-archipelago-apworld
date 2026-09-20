@@ -17,6 +17,30 @@ def _build(seed=148, **options):
     return setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
 
 
+def _wrapper_chain(rule):
+    """The rule objects a composed access rule wraps, outermost first.
+
+    Every layer in `Rules.py` keeps its inner rule as the first default
+    argument (`previous=` / `base=`), so following `__defaults__[0]` walks the
+    composition. Used to assert reuse BY REFERENCE without hard-coding how many
+    layers a given seed installs."""
+    chain = []
+    while callable(rule):
+        chain.append(rule)
+        defaults = getattr(rule, "__defaults__", None) or ()
+        if not defaults or not callable(defaults[0]):
+            break
+        rule = defaults[0]
+    return chain
+
+
+def _chain_index(chain, target):
+    for index, rule in enumerate(chain):
+        if rule is target:
+            return index
+    return None
+
+
 def _letter_pairs(mw, world):
     """All created letter locations with their own item, as (loc_name, item_name).
 
@@ -256,17 +280,23 @@ class TestOxideStationLetterBoostRule(unittest.TestCase):
                 1).access_rule(state))
 
     def test_mode2_only_c_does_not_need_the_unselected_letters_route(self):
+        """With only C selected, neither the token nor C needs the T/R
+        physical-letter route. C is free on the hard-knowledge finish; the
+        token still carries its own first-boost floor (ruling 2026-09-20), so
+        it opens one Progressive Boost later and not two."""
         mw = _build(seed=340, lettersanity="locations_and_items",
                     letters_per_track=1, shortcut_knowledge="hard",
                     progressive_boost="shared_global", box_locations=True)
         self.assertEqual(mw.worlds[1].options._lettersanity_selected["Oxide Station"],
                          ("C",))
         state = _collect_all(mw, exclude="Progressive Boost")
-        self.assertTrue(mw.get_location(
-            "Oxide Station: CTR Token Challenge", 1).access_rule(state))
+        token = mw.get_location("Oxide Station: CTR Token Challenge", 1)
+        self.assertFalse(token.access_rule(state))
         self.assertTrue(mw.get_location(
             LETTERSANITY_CLASS.location_name("Oxide Station", "C"),
             1).access_rule(state))
+        state.add_item("Progressive Boost", 1, 1)
+        self.assertTrue(token.access_rule(state))
 
     def test_universal_tracker_rebuilds_the_same_t_and_r_gates(self):
         source = _build(seed=335, lettersanity="locations_and_items",
@@ -448,31 +478,45 @@ class TestLettersanityMode2SelfItemRules(unittest.TestCase):
         Verified three ways here: (a) the shared `previous` object identity, (b)
         the tier-2 term being live (a full collection satisfies it), and (c) the
         self-item term being live (dropping the own letter blocks it while
-        dropping a DIFFERENT selected letter does not)."""
+        dropping a DIFFERENT selected letter does not).
+
+        (a) is checked as membership of the token challenge's wrapper CHAIN
+        rather than one fixed depth: the token grew its own boost floor on
+        2026-09-20 (`usf_finish.CTR_CHALLENGE_BOOST_COUNT`), which the letters
+        deliberately do NOT share, so the shared object now sits one level
+        deeper for most tracks. Membership still fails the moment a letter rule
+        is built from an independently written term."""
         for count in (1, 2, 3):
             with self.subTest(count=count):
                 mw, world, _state, pairs = self._rules(count)
                 own_by_loc = dict(pairs)
                 for track in LETTER_TRACKS:
                     tc = mw.get_location(f"{track}: CTR Token Challenge", 1)
-                    # The token challenge rule wraps the tier-2 term as its
-                    # `previous` (defaults[0]); the letter rules must wrap that
-                    # SAME object, never a re-written stage-2 term.
-                    tier2_term = tc.access_rule.__defaults__[0]
+                    chain = _wrapper_chain(tc.access_rule)
                     for letter in world.options._lettersanity_selected[track]:
                         loc_name = LETTERSANITY_CLASS.location_name(track, letter)
                         own = own_by_loc[loc_name]
                         with self.subTest(loc=loc_name, count=count):
                             loc = mw.get_location(loc_name, 1)
-                            expected_term = tier2_term
-                            if track == "Oxide Station" and letter == "C":
-                                # C keeps the hard-knowledge finish route;
-                                # T/R and full token completion need two Boosts.
-                                expected_term = tier2_term.__defaults__[0]
-                            self.assertIs(
-                                loc.access_rule.__defaults__[0], expected_term,
-                                f"{loc_name} must reuse the token challenge's "
-                                f"tier-2 rule object by reference")
+                            shared = loc.access_rule.__defaults__[0]
+                            depth = _chain_index(chain, shared)
+                            self.assertIsNotNone(
+                                depth,
+                                f"{loc_name} must reuse a rule object from the "
+                                f"token challenge's own chain by reference")
+                            if (track == "Oxide Station"
+                                    and "T" in world.options
+                                    ._lettersanity_selected[track]):
+                                # C keeps the hard-knowledge finish route; T/R
+                                # and full token completion need two Boosts, so
+                                # C reuses a strictly EARLIER object than T/R.
+                                oxide_t = mw.get_location(
+                                    LETTERSANITY_CLASS.location_name(
+                                        track, "T"), 1)
+                                t_depth = _chain_index(
+                                    chain, oxide_t.access_rule.__defaults__[0])
+                                if letter == "C":
+                                    self.assertGreater(depth, t_depth)
                             # Full collection: tier-2 met, own held.
                             self.assertTrue(loc.access_rule(_collect_all(mw)))
                             # Dropping the own letter: self-item term blocks.
@@ -540,11 +584,24 @@ class TestLettersanityMode2SelfItemRules(unittest.TestCase):
             track = name.split(":")[0].strip()
             tc_rule = mw1.get_location(f"{track}: CTR Token Challenge", 1).access_rule
             with self.subTest(loc=name):
-                # Oxide C stays on the earlier finish route while T/R and
-                # full token completion share the new physical-letter term.
-                expected = (tc_rule.__defaults__[0]
-                            if name == "Oxide Station: Letter C" else tc_rule)
-                self.assertIs(mw1.get_location(name, 1).access_rule, expected)
+                # The letters share the token challenge's ENTRY rule, which
+                # since 2026-09-20 is one level inside the token's own boost
+                # floor. Oxide C stays on the earlier finish route while T/R
+                # share the physical-letter term, so assert chain membership
+                # rather than one fixed depth.
+                chain = _wrapper_chain(tc_rule)
+                actual = mw1.get_location(name, 1).access_rule
+                self.assertIsNotNone(
+                    _chain_index(chain, actual),
+                    f"{name} must reuse a rule object from its token "
+                    f"challenge's chain by reference")
+                if not name.startswith("Oxide Station: Letter "):
+                    # Oxide T and R are the one exception: #87 shares the
+                    # physical-letter USF gate object with the token itself,
+                    # which already sits above the floor.
+                    self.assertIsNot(actual, tc_rule,
+                                     f"{name} must not carry the token's own "
+                                     f"boost floor")
         # Mode 3: items but no locations.
         mw3 = _build(lettersanity="items_only", letters_per_track=1)
         self.assertEqual([n for n in LETTERSANITY_CLASS.names()
