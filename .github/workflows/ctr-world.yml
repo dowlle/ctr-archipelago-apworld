@@ -23,10 +23,18 @@ env:
   AP_VERSION: '0.6.7'
   PYTHON_VERSION: '3.12'
   # Pinned to the same commits as dowlle/Archipelago-index fuzz.yml so a PR here
-  # and the publication gate cannot disagree on verdict semantics.
+  # and the publication gate cannot disagree on verdict semantics. The one
+  # deliberate difference is the check-ut arm below, which runs the real
+  # Universal Tracker hook instead of the index's placeholder.
   FUZZ_HOOKS_REPO: dowlle/apworld-fuzz-hooks
   FUZZ_HOOKS_REF: 38215940cb45a9258bc1e205de0240ea3f92b471
   FUZZER_COMMIT: acc0a12309bdd9b5d58f97ab5c3cfb8bc258525e
+  # Universal Tracker, pinned to the released build the local fuzz matrix uses.
+  # The check-ut arm imports worlds.tracker.fuzzer_hook from this file, so the
+  # arm only means anything when this world is installed. Never move this to a
+  # "latest" download: the checksum below is what makes the fetch trustworthy.
+  TRACKER_VERSION: 'v0.2.26'
+  TRACKER_SHA256: 'ce5674e899d0303f156d43f2c8ebe026498031bf7cd3382524c1d02ee359d463'
 
 jobs:
   tests:
@@ -93,7 +101,11 @@ jobs:
           - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz}
           - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz}
           - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz}
-          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.with_empty:Hook',                                     check_mode: fuzz}
+          # check-ut compares Universal Tracker's logic with the server's own
+          # logic, so it needs the tracker world installed and its own hook. It
+          # also forces accessibility: full, because a tracker divergence shows
+          # up as locations the server reached and the tracker did not.
+          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'worlds.tracker.fuzzer_hook:Hook',                           check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -121,6 +133,21 @@ jobs:
           cp fuzz-hooks/empty.apworld archipelago/custom_worlds/empty.apworld
           curl -SsL --fail -o archipelago/fuzz.py \
             "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/${FUZZER_COMMIT}/fuzz.py"
+      - name: Install the pinned Universal Tracker world
+        if: matrix.check_tracker == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -SsL --fail -o archipelago/custom_worlds/tracker.apworld \
+            "https://github.com/FarisTheAncient/Archipelago/releases/download/Tracker_${TRACKER_VERSION}/tracker.apworld"
+          echo "${TRACKER_SHA256}  archipelago/custom_worlds/tracker.apworld" | sha256sum -c -
+          # The tracker reads settings.universal_tracker.player_files_path, which
+          # defaults to "Players" and is a UserFolderPath: reading it raises
+          # FileNotFoundError when the folder does not exist. A fresh Archipelago
+          # checkout has no Players folder, so without this line every generation
+          # the hook inspects fails. A developer's own Archipelago install has
+          # one already, which is why the local fuzz matrix never saw this.
+          mkdir -p archipelago/Players
       - uses: actions/download-artifact@v4
         with:
           name: ctr.apworld
@@ -139,17 +166,25 @@ jobs:
           CHECK_RUNS: ${{ matrix.check_runs }}
           CHECK_HOOK: ${{ matrix.check_hook }}
           CHECK_MODE: ${{ matrix.check_mode }}
+          CHECK_META: ${{ matrix.check_meta }}
         run: |
           set -euo pipefail
           echo "=== ${CHECK_NAME} (${CHECK_RUNS} runs) ==="
           if [ "$CHECK_MODE" = "canonical" ]; then
             uv run python ../index-repo/.github/scripts/check_canonical_generation.py \
               --module ctr --artifact-dir canonical_output --seed 0
-          elif [ -z "$CHECK_HOOK" ]; then
-            uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120
-          else
-            uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 --hook "$CHECK_HOOK"
+            exit 0
           fi
+          extra_args=()
+          if [ -n "$CHECK_HOOK" ]; then
+            extra_args+=(--hook "$CHECK_HOOK")
+          fi
+          if [ "$CHECK_META" = "accessibility-full" ]; then
+            printf 'Crash Team Racing:\n  accessibility: full\n' > ci_meta.yaml
+            cat ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
+          uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}"
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
