@@ -311,6 +311,18 @@ class ctrAPWorld(World):
         # 2 per_character); absent on pre-#12 wires -> no-op.
         _restore("progressive_boost", "boost_mode")
         _restore("logic_difficulty", "logic_difficulty")
+        # Blue Fire is a reachability input too, not only a pool size: the
+        # #85 relic-tier floor raises EVERY Platinum Time Trial to rank 3 when
+        # logic_difficulty is easy AND Blue Fire is on (usf_finish.
+        # relic_tier_boost_min). Restoring the difficulty but not this toggle
+        # left UT computing the rank-2 floor against a rank-3 server, which is
+        # exactly the Platinum-only divergence the check-ut fuzz arm reported.
+        # The wire value is the capability block's `boost_blue_fire` boolean
+        # (progressive_capability.fill_slot_data). An absent key is a pre-#85
+        # seed, which had no Blue Fire tier at all, so it restores to off
+        # rather than letting the tracking player's YAML raise the floor.
+        o.progressive_boost_blue_fire.value = int(
+            bool(co.get("boost_blue_fire", 0)))
         # #109 box seeds: the toggle + knowledge tier decide which box slots
         # exist and the stat chains join the boost chain as reachability
         # inputs (hard-tier slots), so all three seed values must win over
