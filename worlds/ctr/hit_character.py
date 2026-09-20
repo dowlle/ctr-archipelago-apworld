@@ -934,9 +934,14 @@ def retail_route(world, player: int, track: str):
     seed's destination -> physical pad map, never by track name. The entrance
     must still lead to the retail region: a missing pad, or one retargeted to
     displaced custom content, is unavailable rather than silently substituted.
+
+    Resolution goes through the one shared `destination_pad_name` helper rather
+    than re-deriving the map key here. Today's callers only pass retail race
+    tracks, whose region name and pad key are the same string, so this is not a
+    behaviour change; it means a future caller passing a Gem Cup region cannot
+    repeat the `cup_finish_term` key-space miss.
     """
-    by_dest = getattr(world, "ctr_pad_by_destination", None) or {}
-    pad_name = by_dest.get(track, f"{track} Warp Pad")
+    pad_name = progressive_capability.destination_pad_name(world, track)
     try:
         entrance = world.multiworld.get_entrance(pad_name, player)
     except KeyError:

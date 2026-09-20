@@ -233,14 +233,25 @@ def cup_finish_term(legs, world, cup=None):
 
     A leg's standalone pad does not control the racer driving a cup. Resolve
     the cup destination's physical pad instead, including destination shuffle.
+
+    `cup` is a REGION name ("Red Gem Cup"), while `ctr_pad_by_destination` is
+    keyed by PAD TRACK KEY ("Red Cup"). This used to look the cup up under a
+    key that map never contains, so the lookup always missed and fell back to
+    the RETAIL pad name -- which under destination shuffle hosts some other
+    destination. The cup's term then named an unrelated pad's racer lock
+    (over-restrictive) or named nobody where the cup's real pad is locked
+    (under-restrictive, the direction that can hide a required item behind a
+    race logic thinks is finishable). `destination_pad_name` owns that split,
+    so the cup now resolves through the same key space as every other
+    destination. Vanilla is unchanged: with no shuffle the key still yields
+    "<Colour> Cup Warp Pad".
     """
     from .item_boxes import SK_HARD
+    from .progressive_capability import destination_pad_name
     gated = [track for track in legs if track in ALL_USF_FINISH_TRACKS
              and not (track in USF_OR_HARD_SK_FINISH_TRACKS
                       and int(world.options.shortcut_knowledge.value) == SK_HARD)]
-    by_dest = getattr(world, "ctr_pad_by_destination", {}) or {}
-    cup_pad = (by_dest.get(cup, cup.replace(" Gem Cup", " Cup Warp Pad"))
-               if cup is not None else None)
+    cup_pad = destination_pad_name(world, cup) if cup is not None else None
     racer = (getattr(world, "ctr_racer_locks", {}) or {}).get(cup_pad)
     return boost_term(world, racer, USF_BOOST_COUNT if gated else 0)
 

@@ -31,6 +31,7 @@ seed's capability rules read to `progression`.
     for rich seeds; the same live per-seed supply guard rejects combinations
     that still cannot seat the selected packs.
 """
+from functools import lru_cache
 from typing import Dict, List, Tuple
 
 from Options import OptionError
@@ -77,6 +78,64 @@ STAT_NAME_BY_CHARACTER: Dict[str, Dict[str, str]] = {
 SHARED_STAT_NAME: Dict[str, str] = {chain: chain for chain in STAT_CHAINS}
 
 
+@lru_cache(maxsize=1)
+def _pad_key_by_destination_region() -> Dict[str, str]:
+    """{destination REGION name -> that destination's pad track key}.
+
+    Two names exist for one destination and they are not always the same
+    string. ``ctr_pad_by_destination`` (Regions._build_pad_by_destination) is
+    keyed by the PAD TRACK KEY, which is the pad exit name minus " Warp Pad".
+    Regions, locations and `gem_cup_legs` speak REGION names. For all 22
+    non-cup destinations the two coincide; for the five Gem Cups the pad key is
+    "<Colour> Cup" while the region is "<Colour> Gem Cup".
+
+    Derived from `cortex_vortex_track.destination_table`, which reads the pad
+    ids and the real pad-exit targets out of the data files, so the split is
+    never retyped here and a future destination with a different name is picked
+    up automatically. Only entries whose two names differ are kept; everything
+    else falls through the identity in `destination_pad_key`.
+    """
+    from .cortex_vortex_track import destination_table, track_key
+    out: Dict[str, str] = {}
+    for pad_name, region, _kind in destination_table().values():
+        key = track_key(pad_name)
+        if key != region:
+            out[region] = key
+    return out
+
+
+def destination_pad_key(destination: str) -> str:
+    """The `ctr_pad_by_destination` key for a destination REGION name.
+
+    Identity for every destination whose region name already is its pad track
+    key (every retail track, the two trial tracks, the battle arenas, the
+    crystal challenges, and the virtual Cortex Vortex destination, which
+    `_build_pad_by_destination` keys by its region name). "Red Gem Cup" ->
+    "Red Cup".
+
+    This is the ONE place the cup split is spelled out. Callers ask for a pad
+    by the region name they already hold instead of re-deriving the key, which
+    is what `usf_finish.cup_finish_term` got wrong: it looked the cup up by its
+    region name, always missed, and silently fell back to the retail pad name.
+    """
+    return _pad_key_by_destination_region().get(destination, destination)
+
+
+def destination_pad_name(world, destination: str) -> str:
+    """The pad EXIT name of the physical pad that loads `destination`.
+
+    `destination` is a region name. Under destination shuffle the pad that
+    loads it is not the pad named after it: `create_regions` keeps each exit's
+    physical name and retargets it to a shuffled destination, so the seed's
+    destination -> physical pad map is the only correct source. Falls back to
+    the same-named pad when there is nothing to resolve (the map is empty in
+    vanilla, where the two coincide).
+    """
+    key = destination_pad_key(destination)
+    by_dest = getattr(world, "ctr_pad_by_destination", None) or {}
+    return by_dest.get(key, f"{key} Warp Pad")
+
+
 def track_required_character(world, track: str):
     """Return the racer a player must be driving to be ON `track`, or None.
 
@@ -85,9 +144,9 @@ def track_required_character(world, track: str):
     demand", and under destination shuffle that pad is not the one named after
     the track: `create_regions` keeps each exit's physical name and retargets it
     to a shuffled destination. So the lookup goes through
-    ``ctr_pad_by_destination``, the seed's destination -> physical pad map,
-    and only falls back to the same-name pad when there is no shuffle to
-    resolve (the map is empty in vanilla, where the two coincide).
+    ``destination_pad_name`` above, which resolves the region name through the
+    seed's destination -> physical pad map (and through the region/pad-key
+    split, so a Gem Cup region resolves too).
 
     Reading the lock by track name instead was wrong in all three directions at
     once, and all three were live in one seed on 2026-08-17: it invented a
@@ -99,9 +158,7 @@ def track_required_character(world, track: str):
     locks = getattr(world, "ctr_racer_locks", {}) or {}
     if not locks:
         return None
-    by_dest = getattr(world, "ctr_pad_by_destination", None) or {}
-    pad = by_dest.get(track, f"{track} Warp Pad")
-    return locks.get(pad)
+    return locks.get(destination_pad_name(world, track))
 
 
 def created_item_counts(world) -> Dict[str, int]:
