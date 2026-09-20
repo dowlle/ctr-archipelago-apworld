@@ -141,6 +141,13 @@ jobs:
           curl -SsL --fail -o archipelago/custom_worlds/tracker.apworld \
             "https://github.com/FarisTheAncient/Archipelago/releases/download/Tracker_${TRACKER_VERSION}/tracker.apworld"
           echo "${TRACKER_SHA256}  archipelago/custom_worlds/tracker.apworld" | sha256sum -c -
+          # The tracker reads settings.universal_tracker.player_files_path, which
+          # defaults to "Players" and is a UserFolderPath: reading it raises
+          # FileNotFoundError when the folder does not exist. A fresh Archipelago
+          # checkout has no Players folder, so without this line every generation
+          # the hook inspects fails. A developer's own Archipelago install has
+          # one already, which is why the local fuzz matrix never saw this.
+          mkdir -p archipelago/Players
       - uses: actions/download-artifact@v4
         with:
           name: ctr.apworld
