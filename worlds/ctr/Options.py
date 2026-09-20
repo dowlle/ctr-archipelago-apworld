@@ -690,7 +690,11 @@ class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
     Their checks become normal locations, and in a randomized-unlock seed
     their warp pads get their own entry requirement.
 
-    Turn it off to leave the battle arenas out of the seed."""
+    Turn it off to keep the battle arenas out of the randomizer: their warp
+    pads stay as in the original game and nothing in the seed ever requires
+    them. They can still be played, and each Crystal Challenge still gives its
+    Purple CTR Token, but that token is out of logic: it can open a pad that
+    asks for any CTR Tokens earlier than the logic and trackers expect."""
     # The off guarantees, precisely: crystal pads vanilla-fixed and never
     # destination-shuffled; the four Crystal Bonus Round checks keep their
     # vanilla Purple CTR Tokens LOCKED (no other world's item can hide there);
