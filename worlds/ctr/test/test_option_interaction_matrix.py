@@ -10,6 +10,12 @@ test_requirement_weights.py; this file adds #23's first direct unit test
 (previously reachable only through full generation, never asserted on
 directly) plus all seven new DOWNGRADE-WITH-WARNING cases.
 
+Two of those RAISE guards have since become RESOLVE-WITH-WARNING entries
+(2026-09-18 for the Oxide final relic count, 2026-09-21 for #50's Gem goal
+with the Gem Cups excluded); their coverage lives in the two blocks at the
+bottom of this file, and a resolve test asserts the opposite of a downgrade
+test -- the option's stored value MUST have changed.
+
 Every DOWNGRADE test proves three things per constraint: the warning fires on
 the conflicting combination, it does NOT fire on the matching non-conflicting
 combination, and -- because this module is log-only by design (see
@@ -481,6 +487,211 @@ class TestOxideFinalRelicCountResolvesToModeCapacity(unittest.TestCase):
         met.add_item("Gold Relic", PLAYER, 18)
         met.stale[PLAYER] = True
         self.assertTrue(relic_rule(met))
+
+
+# ---------------------------------------------------------------------------
+# RESOLVE-WITH-WARNING guard -- a Gem goal with the Gem Cups excluded
+# (2026-09-21 ruling: resolve_shuffle_gems_off_when_gem_goal_excludes_cups).
+#
+# This combination used to be #50's RAISE guard
+# (raise_if_gems_required_goal_needs_excluded_cups) and failed generation for
+# the WHOLE multiworld. It now resolves shuffle_gems OFF for the conflicting
+# slot: the five Gems stay on their own vanilla Gem Cups, which is the
+# already-supported shuffle-off path, and nothing the player excluded enters
+# the seed.
+# ---------------------------------------------------------------------------
+
+CUP_LOCATIONS = {
+    "Red Gem Cup: Gem": "Red Gem",
+    "Green Gem Cup: Gem": "Green Gem",
+    "Blue Gem Cup: Gem": "Blue Gem",
+    "Yellow Gem Cup: Gem": "Yellow Gem",
+    "Purple Gem Cup: Gem": "Purple Gem",
+}
+CONFLICT = {
+    "oxide_goal": "none",
+    "gems_required_goal": 5,
+    "shuffle_gems": True,
+    "include_gem_cups": False,
+}
+RESOLVED_MARKER = "'shuffle_gems' resolves to OFF"
+
+
+def _early_capturing_warnings(options):
+    """(world, warning messages) for one generate_early.
+
+    assertNoLogs is too blunt for the neighbour configurations: cups-off seeds
+    legitimately emit the unrelated `warn_shuffle_cups_without_include`
+    downgrade line, which predates this ruling and must keep firing. These
+    tests care only about whether the RESOLVE line appeared."""
+    import logging
+    records = []
+    handler = logging.Handler(level=logging.WARNING)
+    handler.emit = records.append
+    module_logger = logging.getLogger(LOGGER_NAME)
+    module_logger.addHandler(handler)
+    try:
+        mw = _early(options)
+    finally:
+        module_logger.removeHandler(handler)
+    return mw.worlds[PLAYER], [r.getMessage() for r in records]
+
+
+class TestGemGoalWithoutCupsResolvesShuffleGemsOff(unittest.TestCase):
+    def test_the_combination_generates(self):
+        # The whole point of the ruling: no OptionError, no aborted room.
+        mw = _full(dict(CONFLICT))
+        self.assertIsNotNone(mw.worlds[PLAYER])
+
+    def test_resolved_option_value_is_off(self):
+        world = _early(dict(CONFLICT)).worlds[PLAYER]
+        self.assertEqual(world.options.shuffle_gems.value, 0)
+
+    def test_the_players_own_options_are_not_rewritten(self):
+        # Only shuffle_gems moves. The opt-out and the goal are the player's.
+        world = _early(dict(CONFLICT)).worlds[PLAYER]
+        self.assertEqual(world.options.include_gem_cups.value, 0)
+        self.assertEqual(world.options.gems_required_goal.value, 5)
+
+    def test_warning_is_logged_once_and_names_both_ways_out(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early(dict(CONFLICT))
+        matches = [m for m in cm.output if RESOLVED_MARKER in m]
+        self.assertEqual(len(matches), 1)
+        message = matches[0]
+        self.assertIn(f"player {PLAYER}", message)
+        self.assertIn("gems_required_goal", message)
+        self.assertIn("include_gem_cups", message)
+        self.assertIn("shuffle_gems", message)
+        # Both escape routes from the ruling.
+        self.assertIn("turn 'include_gem_cups' on", message)
+        self.assertIn("set 'shuffle_gems' to false", message)
+
+    def test_warning_is_logged_once_through_a_full_generation(self):
+        # generate_early can run twice per seed (the two-stage fill probe
+        # builds a mirror multiworld over the REAL option objects). The
+        # resolution is idempotent, so the second pass finds nothing to say.
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _full(dict(CONFLICT))
+        self.assertEqual(
+            len([m for m in cm.output if RESOLVED_MARKER in m]), 1)
+
+    def test_the_five_gems_sit_on_their_own_vanilla_cups(self):
+        mw = _full(dict(CONFLICT))
+        for loc_name, gem in CUP_LOCATIONS.items():
+            with self.subTest(location=loc_name):
+                loc = mw.get_location(loc_name, PLAYER)
+                self.assertTrue(loc.locked)
+                self.assertEqual(loc.item.name, gem)
+                self.assertEqual(loc.item.player, PLAYER)
+        # ...and therefore nowhere else: no Gem is left in the pool to hide.
+        pooled = [item for item in mw.itempool
+                  if item.player == PLAYER and item.name in CUP_LOCATIONS.values()]
+        self.assertEqual(pooled, [])
+
+    def test_slot_data_reports_shuffle_gems_false(self):
+        # The native client and the spoiler must agree with the resolution.
+        mw = _full(dict(CONFLICT))
+        wire = mw.worlds[PLAYER].fill_slot_data()
+        self.assertFalse(wire["ctr_options"]["shuffle_gems"])
+        self.assertEqual(wire["ctr_options"]["goal_gems"], 5)
+
+    def test_universal_tracker_regeneration_reproduces_the_resolved_state(self):
+        # UT restores shuffle_gems from the wire (already resolved) and never
+        # reaches the resolution itself -- so no second warning, and the
+        # re-generated world matches the seed's own pinned Gems.
+        import json
+
+        from test.general import call_all
+        source = _full(dict(CONFLICT))
+        wire = json.loads(json.dumps(source.worlds[PLAYER].fill_slot_data()))
+        tracker = setup_multiworld(ctrAPWorld, (), seed=99)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        tracker.generation_is_fake = True
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            for step in FULL:
+                call_all(tracker, step)
+        self.assertEqual(
+            tracker.worlds[PLAYER].options.shuffle_gems.value, 0)
+        for loc_name, gem in CUP_LOCATIONS.items():
+            with self.subTest(location=loc_name):
+                loc = tracker.get_location(loc_name, PLAYER)
+                self.assertTrue(loc.locked)
+                self.assertEqual(loc.item.name, gem)
+
+
+class TestGemGoalWithoutCupsResolvesBeforeTheRNGDraws(unittest.TestCase):
+    """The resolution runs at the TOP of generate_early, not from
+    forced_options.apply, because three shuffle_gems readers run before apply:
+    the Cortex Vortex dropped-destination draw, the cached comfort-guard flags
+    and the relic-tier keep draw (the last two through
+    relic_tiers.resolve_comfort_guards, whose force_vanilla_turbotrack
+    condition contains `not shuffle_gems`). A resolution that landed in apply
+    would leave those three reading the pre-resolution value.
+
+    The proof is equivalence: the resolved seed must behave exactly like the
+    same YAML with shuffle_gems written False by hand."""
+
+    # accessibility minimal keeps the unrelated relic-supply guard out of the
+    # way: the comfort guard clamps Sapphire to 17, which a `full` seed with
+    # the default 18-relic Oxide gate rejects for reasons of its own.
+    EQUIVALENT = dict(CONFLICT, warppad_unlock_requirements="vanilla",
+                      accessibility="minimal")
+
+    def test_comfort_guard_matches_an_explicit_shuffle_off_seed(self):
+        resolved = _early(dict(self.EQUIVALENT)).worlds[PLAYER]
+        explicit = _early(dict(self.EQUIVALENT, shuffle_gems=False)).worlds[PLAYER]
+        # Vanilla unlock + gems not shuffled = the Turbo Track comfort guard.
+        # It is False before the resolution and True after it, so a late
+        # resolution would show up right here.
+        self.assertTrue(resolved._ctr_force_vanilla_turbotrack)
+        self.assertEqual(resolved._ctr_force_vanilla_turbotrack,
+                         explicit._ctr_force_vanilla_turbotrack)
+
+    def test_relic_draw_matches_an_explicit_shuffle_off_seed(self):
+        # The relic-tier keep draw reads the comfort guard, so a late
+        # resolution would create a different set of Time Trial locations.
+        resolved = _early(dict(self.EQUIVALENT)).worlds[PLAYER]
+        explicit = _early(dict(self.EQUIVALENT, shuffle_gems=False)).worlds[PLAYER]
+        self.assertEqual(resolved._ctr_relic_keep, explicit._ctr_relic_keep)
+        self.assertEqual(resolved._ctr_relic_created, explicit._ctr_relic_created)
+
+
+class TestGemGoalWithoutCupsNeighboursAreUntouched(unittest.TestCase):
+    """The three configurations one step away from the conflict must behave
+    exactly as they did before the ruling: no warning, no option rewritten."""
+
+    def test_cups_on_with_shuffle_on_is_unaffected(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            world = _early(dict(CONFLICT, include_gem_cups=True)).worlds[PLAYER]
+        self.assertEqual(world.options.shuffle_gems.value, 1)
+        self.assertEqual(world.options.include_gem_cups.value, 1)
+
+    def test_shuffle_off_with_cups_off_is_unaffected(self):
+        world, warnings = _early_capturing_warnings(
+            dict(CONFLICT, shuffle_gems=False))
+        self.assertEqual([w for w in warnings if RESOLVED_MARKER in w], [])
+        self.assertEqual(world.options.shuffle_gems.value, 0)
+        self.assertEqual(world.options.include_gem_cups.value, 0)
+
+    def test_no_gem_goal_with_the_same_other_options_is_unaffected(self):
+        # gems_required_goal == 0 is not a Gem goal, so the #50 cup pin (not
+        # this resolution) is what handles cups-off + shuffle-on: shuffle_gems
+        # must survive at ON.
+        world, warnings = _early_capturing_warnings(
+            dict(CONFLICT, gems_required_goal=0, bosses_required_goal=4))
+        self.assertEqual([w for w in warnings if RESOLVED_MARKER in w], [])
+        self.assertEqual(world.options.shuffle_gems.value, 1)
+        self.assertEqual(world.options.include_gem_cups.value, 0)
+
+
+class TestGemGoalWithoutCupsFullAccessibility(CTRTestBase):
+    """Real fill under accessibility: full. WorldTestBase's default tests
+    (all_state reaches everything, empty state reaches something, fill) are
+    the goal-reachability gate: the five pinned Gems sit behind their cups'
+    vanilla token gates, so a seed that fills here has a reachable goal."""
+
+    options = dict(CONFLICT, accessibility="full")
 
 
 if __name__ == "__main__":
