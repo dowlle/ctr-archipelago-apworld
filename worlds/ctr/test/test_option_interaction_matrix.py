@@ -620,6 +620,27 @@ class TestGemGoalWithoutCupsResolvesShuffleGemsOff(unittest.TestCase):
                 self.assertEqual(loc.item.name, gem)
 
 
+    def test_universal_tracker_takes_the_turbo_track_guard_from_the_seed(self):
+        # Vanilla warp-pad requirements plus the resolved shuffle_gems OFF set
+        # force_vanilla_turbotrack on the seed. The tracker's own YAML still
+        # has shuffle_gems on, so the flag must come from the restored options.
+        import json
+
+        from test.general import call_all
+        options = dict(CONFLICT)
+        options["warppad_unlock_requirements"] = 0
+        options["accessibility"] = "minimal"
+        source = _full(options)
+        self.assertTrue(source.worlds[PLAYER]._ctr_force_vanilla_turbotrack)
+        wire = json.loads(json.dumps(source.worlds[PLAYER].fill_slot_data()))
+        tracker = setup_multiworld(ctrAPWorld, (), seed=99)
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        tracker.generation_is_fake = True
+        for step in FULL:
+            call_all(tracker, step)
+        self.assertTrue(tracker.worlds[PLAYER]._ctr_force_vanilla_turbotrack)
+
+
 class TestGemGoalWithoutCupsResolvesBeforeTheRNGDraws(unittest.TestCase):
     """The resolution runs at the TOP of generate_early, not from
     forced_options.apply, because three shuffle_gems readers run before apply:

@@ -559,6 +559,14 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough:
             self._ut_restore_options(passthrough)
+            # The comfort guard flags above were computed from the tracking
+            # player's own YAML. Recompute them from the restored options so
+            # they match the connected seed: a seed whose shuffle_gems was
+            # resolved OFF (Gem goal with Gem Cups excluded) has
+            # force_vanilla_turbotrack set even when the tracker's YAML still
+            # says shuffle_gems on.
+            self._ctr_comfort_guards, self._ctr_force_vanilla_turbotrack = \
+                resolve_comfort_guards(self.options)
             self._ctr_relic_keep, self._ctr_relic_created = \
                 restore_relic_tier_keep_from_wire(
                     self, passthrough.get("ctr_options", {}) or {})
