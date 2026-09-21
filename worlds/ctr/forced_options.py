@@ -13,12 +13,16 @@ the code, not the ones the issue's body previewed for the unbuilt features.
 Convention ruled in #178 ("the one thing this issue has to settle first"):
 split by consequence.
 
-- RAISE when the combination breaks solvability or makes a goal unreachable.
+- RAISE when the combination breaks solvability or makes a goal unreachable
+  AND no resolution exists that the player would recognise as their own seed.
   The three guards below already existed inline in `__init__.generate_early`
   (issues #87, #50, #23) and move here with their behaviour byte-identical --
   moving them is exactly the issue's own "definition of done" clause ("the
   three existing guards behave identically to today, which the existing
-  tests should prove").
+  tests should prove"). One of those three (#50's gem-cup guard) has since
+  left the category: the 2026-09-21 ruling turned it into the
+  RESOLVE-WITH-WARNING entry described below, because a raise there failed a
+  whole multiworld over one player's YAML when a supported resolution existed.
 - DOWNGRADE-WITH-WARNING when the combination only affects flavour or leaves
   an option with nothing to do. Every downgrade case in this module was
   ALREADY a silent no-op on `main` before this issue -- generation logic
@@ -38,14 +42,27 @@ code or the Specification/Contract -- never against "this quiets the fuzzer"
 (briefing rule 7): none of these change what a seed generates, only what the
 player is told about their own YAML.
 
-RESOLVE-WITH-WARNING is a third, narrower category, currently used by exactly
-one entry (`resolve_oxide_final_relic_count_to_mode_capacity`, 2026-09-18
-ruling). Unlike a downgrade, it DOES mutate the option's own stored value --
-justified there, and only there, because the value the player asked for is
-out of range for the chosen mode and has exactly one sensible reading (every
-relic of the tier, the same value the `all` special name already resolves
-to), so the seed can generate the thing the player clearly meant instead of
-failing over it.
+RESOLVE-WITH-WARNING is a third, narrower category, currently used by two
+entries. Unlike a downgrade, it DOES mutate the option's own stored value, so
+each entry justifies that mutation on its own terms:
+
+- `resolve_oxide_final_relic_count_to_mode_capacity` (2026-09-18 ruling): the
+  value the player asked for is out of range for the chosen mode and has
+  exactly one sensible reading (every relic of the tier, the same value the
+  `all` special name already resolves to), so the seed generates the thing
+  the player clearly meant instead of failing over it.
+- `resolve_shuffle_gems_off_when_gem_goal_excludes_cups` (2026-09-21 ruling):
+  this entry replaces a RAISE guard
+  (`raise_if_gems_required_goal_needs_excluded_cups`). The justification is
+  player and multiworld behaviour, not a quieter fuzzer. A raise here aborted
+  generation for the WHOLE room over one player's YAML conflict, and the
+  conflict has a resolution that keeps the player's own opt-out intact:
+  nothing they excluded enters the seed (the cups keep their vanilla token
+  gate and hold their own Gem, so no other world's progression can hide on
+  opted-out content), and the resolved configuration -- `shuffle_gems` off
+  with a Gem goal -- is an existing supported path this world already
+  generates and tests (`gemgoal`'s own shuffle-off branch). The pad and track
+  pool rewrite will replace this entry later.
 
 LETTERSANITY ROW (#148, added with the feature). The frozen design's `#178`
 obligation ("the #178 constraint matrix should carry the row", dossier
@@ -220,29 +237,68 @@ def raise_if_composed_goal_is_empty(world):
                ", or set 'oxide_goal' to 'any_percent' or '101_percent'."))
 
 
-def raise_if_gems_required_goal_needs_excluded_cups(world):
-    """Issue #50, generalized for #152's composed goal. When Gems Required
-    Goal is active, its Gems ARE (in part) the 5 Gem Cups' vanilla contents.
-    Turning include_gem_cups OFF keeps those cups vanilla-fixed while
-    shuffle_gems ON scatters the goal Gems anywhere in the multiworld -- so
-    the cups the goal's Gems would otherwise sit on are opted out of the
-    seed, and the create_items #50 pin (which would put the Gems back on the
-    cups) is intentionally skipped whenever gems_required_goal is active
-    (gems ride the pool, 2026-07-15 ruling). Each Gem is a singleton item, so
-    the required COUNT does not weaken this: needing N of 5 is still "N of
-    the 5 items that live on the opted-out cups". That leaves an
-    unwinnable-by-design combination, so forbid it here with a clear message
-    rather than emit it. shuffle_gems OFF is fine (the Gems are pinned onto
-    the cups directly, see create_items), so this fires only on the
-    shuffle-ON conflict."""
-    if world.options.gems_required_goal.value > 0 \
-            and world.options.shuffle_gems.value \
-            and not world.options.include_gem_cups.value:
-        raise OptionError(
-            "CTR 'gems_required_goal' > 0 requires 'include_gem_cups: true' "
-            "when 'shuffle_gems' is also on (the required Gems live in the "
-            "gem cups; excluding the cups while shuffling gems leaves the "
-            "goal's own Gems out of the seed).")
+def resolve_shuffle_gems_off_when_gem_goal_excludes_cups(world):
+    """Issue #50, generalized for #152's composed goal, resolved instead of
+    rejected by the 2026-09-21 ruling.
+
+    When Gems Required Goal is active, its Gems ARE (in part) the 5 Gem Cups'
+    vanilla contents. Turning include_gem_cups OFF keeps those cups
+    vanilla-fixed while shuffle_gems ON scatters the goal Gems anywhere in the
+    multiworld -- so the cups the goal's Gems would otherwise sit on are opted
+    out of the seed, and the create_items #50 pin (which would put the Gems
+    back on the cups) is intentionally skipped whenever gems_required_goal is
+    active (gems ride the pool, 2026-07-15 ruling). Each Gem is a singleton
+    item, so the required COUNT does not weaken this: needing N of 5 is still
+    "N of the 5 items that live on the opted-out cups".
+
+    This used to raise OptionError. It no longer does. The ruling's reasoning:
+
+    - Nothing the player excluded enters the seed. Resolving shuffle_gems OFF
+      makes `gemgoal` lock each Gem onto its own cup, which takes those five
+      checks OUT of the multiworld pool; the cups keep their vanilla
+      has('<Colour> CTR Token', 4) gate. The opt-out is honoured more
+      literally after the resolution than before it.
+    - The resolved configuration is an existing supported path: shuffle_gems
+      off with a Gem goal is exactly `gemgoal`'s shuffle-off branch, shipping
+      and covered by tests (test_gem_cups' shuffle-off + cups-off case).
+    - One player's YAML conflict must not fail a whole multiworld. A raise in
+      generate_early aborts the room for everyone.
+
+    Mutating shuffle_gems is the resolution, and it is the single point every
+    downstream reader consults: create_items' pin blocks, `gemgoal`, the
+    warp-pad sphere search's pinned_items / critical_regions / gem_locked,
+    `relic_tiers.resolve_comfort_guards`,
+    `cortex_vortex_track._statically_eligible` and the slot_data emit all read
+    `options.shuffle_gems` rather than re-deriving it, so nothing sees the
+    pre-resolution value.
+
+    NOT called from `apply`. Three of those readers run in `generate_early`
+    BEFORE `forced_options.apply` (the Cortex Vortex dropped-destination draw,
+    the cached comfort-guard flags, and the relic-tier keep draw, all of which
+    reach `resolve_comfort_guards`, whose force_vanilla_turbotrack condition
+    includes `not shuffle_gems`). `__init__.generate_early` therefore calls
+    this first, ahead of that draw, so the resolved value is what those RNG
+    draws see. Re-entry is a no-op: once shuffle_gems is off the condition is
+    false, so the fill probe's second generate_early pass warns nothing.
+
+    Universal Tracker needs no separate handling: slot_data carries the
+    resolved `shuffle_gems`, `_ut_restore_options` restores it, and the
+    re-generation then evaluates this condition with shuffle_gems already off.
+    """
+    o = world.options
+    if o.gems_required_goal.value > 0 and o.shuffle_gems.value \
+            and not o.include_gem_cups.value:
+        o.shuffle_gems.value = 0
+        logger.warning(
+            f"CTR: {_who(world)} set 'gems_required_goal' to "
+            f"{o.gems_required_goal.value} with 'include_gem_cups' off, so "
+            f"'shuffle_gems' resolves to OFF for this slot and the 5 Gems "
+            f"stay on their own vanilla Gem Cups. Shuffling them would "
+            f"scatter the goal's own Gems while the cups they belong to are "
+            f"opted out of the seed, leaving the goal unreachable. To keep "
+            f"the Gems shuffled instead, turn 'include_gem_cups' on; to make "
+            f"this choice yourself and drop the warning, set 'shuffle_gems' "
+            f"to false.")
 
 
 def raise_if_oxidefinal_goal_has_no_progression_tier(world):
@@ -440,7 +496,6 @@ def apply_raise_guards(world):
     raise_if_trap_weights_are_unusable(world)
     raise_if_custom_tracks_descriptor_is_unusable(world)
     raise_if_composed_goal_is_empty(world)
-    raise_if_gems_required_goal_needs_excluded_cups(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
 
@@ -816,7 +871,13 @@ def apply(world):
     first because the RAISE guards below read the option's stored value and
     must see the effective (post-resolution) count, not the raw one; raise
     guards run next (they can abort generation); downgrade warnings are
-    informational only and never change what the seed emits."""
+    informational only and never change what the seed emits.
+
+    The other RESOLVE-WITH-WARNING entry,
+    `resolve_shuffle_gems_off_when_gem_goal_excludes_cups`, is deliberately
+    NOT called here: generate_early has shuffle_gems readers that run before
+    this function (see that function's docstring), so generate_early calls it
+    ahead of them instead."""
     resolve_oxide_final_relic_count_to_mode_capacity(world)
     apply_raise_guards(world)
     apply_downgrade_warnings(world)

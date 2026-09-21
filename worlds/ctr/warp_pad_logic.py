@@ -1403,8 +1403,12 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # pool-placed, not pinned to the cups at all, so no region needs this
         # special-case treatment -- the ORIGINAL code set this unconditionally
         # on `goal.value == 4`, over-constraining every already-legal
-        # gems-required + shuffle_gems=ON + include_gem_cups=ON seed (a
-        # config `raise_if_gems_required_goal_needs_excluded_cups` permits).
+        # gems-required + shuffle_gems=ON + include_gem_cups=ON seed (the only
+        # gems-required seed that still reaches here with shuffle_gems ON:
+        # generate_early's
+        # resolve_shuffle_gems_off_when_gem_goal_excludes_cups, 2026-09-21
+        # ruling, resolves the cups-OFF variant to shuffle_gems OFF, which
+        # lands in the critical_regions branch below).
         # Relaxing more than needed is conservative for solvability (Lessons
         # Learned precedent), so this correction can only shrink, never grow,
         # what the sweep treats as unsatisfiable; verified with a before/after

@@ -23,15 +23,15 @@ These tests lock in:
 - Shuffle Gems OFF + cups OFF: the existing shuffle-off pin still runs exactly
   once (no double-pin crash from the new block);
 - gems_required_goal:5 (issue #152, formerly goal allgemcups) + Shuffle Gems
-  ON + cups OFF: forbidden, raises OptionError;
+  ON + cups OFF: resolved, not rejected (2026-09-21 ruling) -- generate_early
+  turns Shuffle Gems OFF for the slot and the seed generates as the
+  shuffle-off row below;
 - gems_required_goal:5 + Shuffle Gems OFF + cups OFF: allowed (gemgoal pins
   the Gems onto the cups), no double-pin.
 """
 
 import json
 import pkgutil
-
-from Options import OptionError
 
 from . import CTRTestBase
 
@@ -236,22 +236,44 @@ class TestGemCupsAllGemsGoalShuffleOffCupsOff(CupPinningMixin, CTRTestBase):
                 self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
 
 
-class TestGemCupsForbiddenCombo(CTRTestBase):
-    """gems_required_goal:5 (issue #152, formerly goal allgemcups) + Shuffle
-    Gems ON + cups OFF is FORBIDDEN: the goal's own races are the gem cups,
-    so opting the cups out while the Gems scatter into the pool would strand
-    the goal. generate_early must raise a clean OptionError."""
+class TestGemCupsGemGoalShuffleOnCupsOffResolves(CupPinningMixin, CTRTestBase):
+    """gems_required_goal:5 + Shuffle Gems ON + cups OFF used to raise
+    OptionError. The 2026-09-21 ruling resolves it instead: generate_early
+    turns Shuffle Gems OFF for this slot, so gemgoal() pins the five Gems onto
+    their own cups and the seed generates. The end state must be identical to
+    the class above, which sets shuffle_gems False in the YAML directly."""
 
-    auto_construct = False
+    run_default_tests = False
     options = {
         "oxide_goal": "none",
         "gems_required_goal": 5,
         "shuffle_gems": True,
         "include_gem_cups": False,
+        "warppad_unlock_requirements": "randomized",
+        "warp_pad_shuffle_categories": ["crystals", "tracks"],
     }
 
-    def test_generation_raises_option_error(self):
-        with self.assertRaises(OptionError) as ctx:
-            self.world_setup()
-        self.assertIn("gems_required_goal", str(ctx.exception))
-        self.assertIn("include_gem_cups", str(ctx.exception))
+    def test_shuffle_gems_resolved_off(self):
+        self.assertEqual(self.world.options.shuffle_gems.value, 0)
+
+    def test_player_opt_out_is_untouched(self):
+        self.assertEqual(self.world.options.include_gem_cups.value, 0)
+        self.assertEqual(self.world.options.gems_required_goal.value, 5)
+
+    def test_each_cup_pinned_exactly_once(self):
+        for loc in self._cup_locations():
+            with self.subTest(location=loc.name):
+                self.assertTrue(loc.locked)
+                self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
+                self.assertEqual(loc.item.player, self.player)
+
+    def test_gems_absent_from_pool(self):
+        for gem in GEM_NAMES:
+            with self.subTest(gem=gem):
+                in_pool = [item for item in self.multiworld.itempool
+                           if item.player == self.player and item.name == gem]
+                self.assertEqual(len(in_pool), 0)
+
+    def test_slot_data_reports_the_resolved_value(self):
+        self.assertFalse(
+            self.world.fill_slot_data()["ctr_options"]["shuffle_gems"])

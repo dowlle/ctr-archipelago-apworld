@@ -516,6 +516,18 @@ class ctrAPWorld(World):
         # No draw with the option off, so such a seed keeps its RNG stream.
         _passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if not _passthrough:
+            # 2026-09-21 ruling: a Gems Required Goal with include_gem_cups off
+            # resolves shuffle_gems OFF (Gems stay on their vanilla cups)
+            # instead of failing the whole multiworld. This MUST run before the
+            # Cortex Vortex draw and the comfort-guard/relic draws below: all
+            # three read shuffle_gems (directly or through
+            # relic_tiers.resolve_comfort_guards), and an RNG draw taken
+            # against the pre-resolution value would not match the seed the
+            # rest of generation builds. The rest of the #178 matrix still runs
+            # from forced_options.apply further down. See
+            # forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups.
+            from . import forced_options as _forced_options
+            _forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups(self)
             cortex_vortex_track.draw_dropped_destination(self)
         if not hasattr(self.options, "_lettersanity_selected"):
             mode = int(self.options.lettersanity.value)
@@ -547,6 +559,14 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough:
             self._ut_restore_options(passthrough)
+            # The comfort guard flags above were computed from the tracking
+            # player's own YAML. Recompute them from the restored options so
+            # they match the connected seed: a seed whose shuffle_gems was
+            # resolved OFF (Gem goal with Gem Cups excluded) has
+            # force_vanilla_turbotrack set even when the tracker's YAML still
+            # says shuffle_gems on.
+            self._ctr_comfort_guards, self._ctr_force_vanilla_turbotrack = \
+                resolve_comfort_guards(self.options)
             self._ctr_relic_keep, self._ctr_relic_created = \
                 restore_relic_tier_keep_from_wire(
                     self, passthrough.get("ctr_options", {}) or {})
@@ -1506,11 +1526,14 @@ class ctrAPWorld(World):
         #   - shuffle_gems OFF, gems_required_goal == 0: _gems_locked block
         #     (above) pinned them.
         #   - shuffle_gems OFF, gems_required_goal > 0: gemgoal() pinned them.
-        #   - shuffle_gems ON, gems_required_goal > 0: forbidden in
-        #     generate_early (raise_if_gems_required_goal_needs_excluded_cups
-        #     -- the goal Gems ride the pool, so pinning them onto opted-out
-        #     cups would strand the goal; the _GEM_GOAL guard below is the
-        #     belt-and-suspenders).
+        #   - shuffle_gems ON, gems_required_goal > 0: unreachable here. The
+        #     goal Gems ride the pool, so pinning them onto opted-out cups
+        #     would strand the goal; generate_early's
+        #     resolve_shuffle_gems_off_when_gem_goal_excludes_cups (2026-09-21
+        #     ruling) resolves shuffle_gems to OFF before create_items runs, so
+        #     this config always arrives as the gemgoal()-pinned row above. It
+        #     used to raise OptionError instead. The _GEM_GOAL guard below is
+        #     the belt-and-suspenders either way.
         _cups_locked: Dict[str, int] = {}
         if not self.options.include_gem_cups.value \
                 and self.options.shuffle_gems.value and not _GEM_GOAL:

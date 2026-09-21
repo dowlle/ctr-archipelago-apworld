@@ -261,9 +261,10 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
 
 
 class TestComposedGoalGuards(unittest.TestCase):
-    """generate_early's raise guards for the composed goal (dossier §2.3):
+    """generate_early's guards for the composed goal (dossier §2.3):
     C1 empty goal, C2 gems+shuffle+excluded-cups, C3/C4 oxide-final with no
-    satisfying progression tier."""
+    satisfying progression tier. C2 became a RESOLVE-WITH-WARNING entry on
+    2026-09-21 and no longer raises; the rest are still raise guards."""
 
     def test_all_off_raises(self):
         with self.assertRaises(OptionError) as ctx:
@@ -279,12 +280,17 @@ class TestComposedGoalGuards(unittest.TestCase):
     def test_only_gems_active_does_not_raise(self):
         _early(oxide_goal="none", gems_required_goal=1)  # must not raise
 
-    def test_gems_required_with_shuffle_and_excluded_cups_raises(self):
-        with self.assertRaises(OptionError) as ctx:
-            _early(oxide_goal="none", gems_required_goal=1,
-                  shuffle_gems=True, include_gem_cups=False)
-        self.assertIn("gems_required_goal", str(ctx.exception))
-        self.assertIn("include_gem_cups", str(ctx.exception))
+    def test_gems_required_with_shuffle_and_excluded_cups_resolves(self):
+        # 2026-09-21 ruling: C2 is no longer a raise. The combination now
+        # generates with shuffle_gems resolved OFF, so the Gems stay on their
+        # own cups instead of the whole multiworld failing over one YAML.
+        mw = _early(oxide_goal="none", gems_required_goal=1,
+                    shuffle_gems=True, include_gem_cups=False)
+        world = mw.worlds[1]
+        self.assertEqual(world.options.shuffle_gems.value, 0)
+        # The player's own opt-out is untouched -- only shuffle_gems moved.
+        self.assertEqual(world.options.include_gem_cups.value, 0)
+        self.assertEqual(world.options.gems_required_goal.value, 1)
 
     def test_gems_required_with_shuffle_and_included_cups_does_not_raise(self):
         _early(oxide_goal="none", gems_required_goal=1,

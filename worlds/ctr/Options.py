@@ -103,9 +103,11 @@ class GemsRequiredGoal(Range):
     0 (default) turns this condition off. Combines with Oxide Goal and Bosses
     Required; every condition you set must be met.
 
-    If you ask for Gems with Shuffle Gems on, you also need Include Gem Cup
-    Warp Pads on - otherwise the Gems would sit on cups the seed left out.
-    Generation says so rather than handing you an unwinnable seed."""
+    If you ask for Gems with Shuffle Gems on but Include Gem Cup Warp Pads
+    off, the Gems would scatter while the cups they belong to are left out of
+    the seed. Generation turns Shuffle Gems off for your slot instead, keeping
+    the Gems on their own cups, and warns you. Turn Include Gem Cup Warp Pads
+    on if you would rather keep the Gems shuffled."""
     display_name = "Gems Required Goal"
     range_start = 0
     range_end = 5
@@ -182,7 +184,9 @@ class ShuffleGems(DefaultOnToggle):
       become normal checks.
     - **off**: each Gem stays on its own Gem Cup reward (vanilla placement).
 
-    Works with every goal, including a Gems Required goal."""
+    Works with every goal, including a Gems Required goal. With a Gems
+    Required goal and `Include Gem Cup Warp Pads` off, generation turns this
+    off for your slot and warns you, so the Gems stay on their own cups."""
     display_name = "Shuffle Gems"
 
 
@@ -192,16 +196,19 @@ class ShuffleWarpPadsGemCups(DefaultOnToggle):
     randomized entry requirement.
 
     - Not the same as `Shuffle Gems`: that moves the Gem items around; this one
-      includes the cup races themselves. It must be on when a shuffled Gem is
-      required for your goal.
+      includes the cup races themselves. Turn it on if you want the Gems
+      shuffled while a Gems Required goal is active.
     - **off**: cups stay fully vanilla, and shuffled Gems are pinned back onto
-      their own cups."""
+      their own cups. With a Gems Required goal, generation also turns
+      `Shuffle Gems` off for your slot and warns you."""
     # The Key-2 Cups Room hub gate is always kept on top of a randomized cup
     # requirement. This option is also the participation gate for the `cups`
     # destination-shuffle category. Off + Shuffle Gems on pins each Gem back onto
     # its own vanilla cup check (out of the pool) so opted-out cups never hold
-    # another world's progression; allgemcups + Shuffle Gems on + this off fails
-    # generation with a clear message rather than stranding the goal.
+    # another world's progression; a Gems Required goal + Shuffle Gems on +
+    # this off resolves Shuffle Gems to off with a warning (2026-09-21 ruling,
+    # forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups)
+    # rather than stranding the goal or failing the whole multiworld.
     display_name = "Include Gem Cup Warp Pads"
 
 
