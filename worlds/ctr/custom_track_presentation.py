@@ -18,6 +18,11 @@ def location_aliases(world, *, escape_markup: bool = True) -> dict[int, str]:
     Pinned package titles take precedence over the legacy compiled title table.
     Server datapackages request plain text; UT requires escaped Kivy markup.
     """
+    plan = getattr(world, "ctr_content_plan", None)
+    if plan is not None:
+        existing = {loc.address for loc in world.multiworld.get_locations(world.player)}
+        return {check["location"]: (_escape_markup(check["display_name"]) if escape_markup else check["display_name"])
+                for check in plan["checks"] if check["location"] in existing}
     prefixes = {}
     roles = {role: label for role, label, _region in CUSTOM_DESTINATION_ROLES}
     for track_id, entry in resolved_custom_tracks(world).items():
