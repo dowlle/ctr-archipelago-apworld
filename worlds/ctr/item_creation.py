@@ -217,6 +217,10 @@ def relic_progression_map(world) -> Dict[str, bool]:
 
 
 def create_items(world):
+    if hasattr(world, "ctr_content_plan"):
+        from . import content_plan
+        content_plan.create_items(world)
+        return
     player = world.player
     mw = world.multiworld
     pool = []

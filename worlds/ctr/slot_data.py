@@ -216,6 +216,9 @@ def resolve_itemsanity_checks(world) -> Dict[str, object]:
 
 
 def fill_slot_data(world) -> Dict[str, object]:
+    if hasattr(world, "ctr_content_plan"):
+        from . import content_plan
+        return content_plan.wire(world)
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
     # unwired; the real signal is "did any category participate" == the resolved
