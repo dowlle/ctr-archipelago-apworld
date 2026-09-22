@@ -73,7 +73,8 @@ class TestRegistration(unittest.TestCase):
         offered, text_client = Launcher.handle_uri(WEBHOST_LINK)
         self.assertEqual([c.display_name for c in offered], ["Crash Team Racing Client"])
         self.assertIsNotNone(text_client)
-        with mock.patch("webbrowser.open", return_value=True) as opened:
+        with mock.patch("webbrowser.open", return_value=True) as opened, \
+                mock.patch.object(lc, "room_links_supported", return_value=True):
             Launcher.run_component(offered[0], WEBHOST_LINK)
         opened.assert_called_once_with(EXPECTED)
 
@@ -252,6 +253,12 @@ class TestRejections(unittest.TestCase):
 
 
 class TestLaunchClient(unittest.TestCase):
+    def setUp(self):
+        # Room links are Windows only; these tests exercise the Windows path.
+        patcher = mock.patch.object(lc, "room_links_supported", return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_opens_once_after_validation(self):
         rec = Recorder()
         self.assertTrue(lc.launch_client(WEBHOST_LINK, open_url=rec.open_url, show=rec.show))
@@ -281,6 +288,11 @@ class TestLaunchClient(unittest.TestCase):
         title, text, error = rec.shown[0]
         self.assertFalse(error)
         self.assertIn("room page", text)
+        # Registration is automatic in the native client (ruling 2026-09-22):
+        # no manual setup step, and the conflict action is named as the client names it.
+        self.assertIn("sets up room links by itself", text)
+        self.assertIn("Use this client for room links", text)
+        self.assertIn("Windows only", text)
 
     def test_extra_arguments_are_rejected(self):
         rec = Recorder()
@@ -321,6 +333,40 @@ class TestLaunchClient(unittest.TestCase):
         self.assertNotIn(secret_pass, rec.opened[0])
 
 
+class TestPlatformScope(unittest.TestCase):
+    """0.2.1 ruling: room links are Windows only. Elsewhere nothing is opened."""
+
+    def test_only_windows_is_supported(self):
+        for platform, expected in (("win32", True), ("linux", False), ("darwin", False), ("cygwin", False)):
+            with self.subTest(platform=platform), mock.patch.object(lc.sys, "platform", platform):
+                self.assertIs(lc.room_links_supported(), expected)
+
+    def test_valid_link_on_an_unsupported_platform_opens_nothing(self):
+        rec = Recorder()
+        with mock.patch("webbrowser.open") as opened:
+            self.assertFalse(lc.launch_client(WEBHOST_LINK, show=rec.show, supported=lambda: False))
+        opened.assert_not_called()
+        self.assertEqual(rec.shown, [(lc.ERROR_TITLE, lc.UNSUPPORTED_TEXT, False)])
+        self.assertIn("Windows only", lc.UNSUPPORTED_TEXT)
+
+    def test_invalid_link_is_still_reported_as_invalid(self):
+        rec = Recorder()
+        self.assertFalse(lc.launch_client(link(query=f"room={ROOM}"), open_url=rec.open_url, show=rec.show,
+                                          supported=lambda: False))
+        self.assertEqual(rec.opened, [])
+        self.assertTrue(rec.shown[0][2])
+        self.assertIn("could not be used", rec.shown[0][1])
+
+    def test_default_follows_the_running_platform(self):
+        rec = Recorder()
+        with mock.patch.object(lc.sys, "platform", "linux"):
+            self.assertFalse(lc.launch_client(WEBHOST_LINK, open_url=rec.open_url, show=rec.show))
+        self.assertEqual(rec.opened, [])
+        with mock.patch.object(lc.sys, "platform", "win32"):
+            self.assertTrue(lc.launch_client(WEBHOST_LINK, open_url=rec.open_url, show=rec.show))
+        self.assertEqual(rec.opened, [EXPECTED])
+
+
 class TestNoSideEffectSurface(unittest.TestCase):
     """The AP-Pie audit flags process launching in apworlds. The component
     reaches the OS only through webbrowser.open."""
@@ -334,7 +380,7 @@ class TestNoSideEffectSurface(unittest.TestCase):
                 imported.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
-        self.assertEqual(imported - {"__future__", "logging", "re", "unicodedata", "typing", "urllib",
+        self.assertEqual(imported - {"__future__", "logging", "re", "sys", "unicodedata", "typing", "urllib",
                                      "webbrowser", "Utils", "worlds"}, set())
         attrs = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
         names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
@@ -425,7 +471,7 @@ from worlds.LauncherComponents import components, Type
 world = AutoWorldRegister.world_types["Crash Team Racing"]
 module = sys.modules[world.__module__]
 mine = [c for c in components if c.game_name == "Crash Team Racing"]
-with mock.patch("webbrowser.open", return_value=True) as opened:
+with mock.patch("webbrowser.open", return_value=True) as opened, mock.patch("sys.platform", "win32"):
     mine[0].func(sys.argv[1])
 print(json.dumps({
     "module_file": module.__file__,

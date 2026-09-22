@@ -17,8 +17,13 @@ password is never forwarded anywhere), builds the credential-free
 
 request that ctr-native-ap's launch-request parser accepts, and hands it to
 the operating system once through ``webbrowser.open``. The native client owns
-everything after that: its registered ``ctr-ap`` link handler, the disc, the
-connection config and any password prompt.
+everything after that: registering itself as the ``ctr-ap`` link handler
+(it does so on its own when it starts), the disc, the connection config, the
+confirmation before switching rooms and any password prompt.
+
+Room links are Windows only for 0.2.1: the native client registers the
+``ctr-ap`` handler on Windows only, and no other platform has been measured.
+Elsewhere the component explains that and opens nothing.
 
 It stores nothing, picks no executable, reads no disc, edits no Steam data,
 registers no handler, downloads nothing and starts no process of its own.
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 import unicodedata
 from typing import Callable, Dict, Optional, Tuple
 from urllib.parse import quote, unquote_to_bytes
@@ -60,17 +66,30 @@ SETUP_TITLE = "Crash Team Racing Client"
 SETUP_TEXT = (
     "Crash Team Racing connects from the Archipelago room page.\n\n"
     "Open your room, click your slot name, and choose \"Crash Team Racing Client\". "
-    "The CTR client (ctr-native-ap) then starts and connects to that slot.\n\n"
-    "This needs the CTR client's ctr-ap link registration, which you turn on in the "
-    "CTR client itself. See the Crash Team Racing setup guide for details.\n\n"
+    "The CTR client (ctr-native-ap) then connects to that slot. If it is already connected "
+    "to a different room or slot, it asks before switching.\n\n"
+    "The CTR client sets up room links by itself when it starts, so start it once before "
+    "using a room link. If another program already handles these links, open the client's "
+    "Connection page and choose \"Use this client for room links\".\n\n"
+    "Room links work on Windows only for now.\n\n"
     "Nothing was opened."
 )
 ERROR_TITLE = "Crash Team Racing Client"
 OPEN_FAILED_TEXT = (
     "The room link was valid, but the operating system could not open the CTR client. "
-    "Check that the CTR client's ctr-ap link registration is turned on, then click the "
-    "slot on the room page again."
+    "Start the CTR client once so it can set up room links, or choose \"Use this client for "
+    "room links\" on its Connection page, then click the slot on the room page again."
 )
+UNSUPPORTED_TEXT = (
+    "Room links work on Windows only for now.\n\n"
+    "Start the CTR client and enter the server, port and slot on its Connection page.\n\n"
+    "Nothing was opened."
+)
+
+
+def room_links_supported() -> bool:
+    """Windows only for 0.2.1; the native client registers no handler elsewhere."""
+    return sys.platform == "win32"
 
 
 class RoomLinkError(ValueError):
@@ -231,7 +250,8 @@ def _show(title: str, text: str, error: bool) -> None:
 
 def launch_client(*args: str,
                   open_url: Optional[Callable[[str], bool]] = None,
-                  show: Callable[[str, str, bool], None] = _show) -> bool:
+                  show: Callable[[str, str, bool], None] = _show,
+                  supported: Optional[Callable[[], bool]] = None) -> bool:
     """Launcher entry point. Returns True only when a connect request was
     handed to the operating system."""
     if not args:
@@ -245,6 +265,10 @@ def launch_client(*args: str,
         except RoomLinkError as error:
             reason = error.reason
         else:
+            if not (supported or room_links_supported)():
+                logging.info("Crash Team Racing Client: room links are Windows only; nothing was opened.")
+                show(ERROR_TITLE, UNSUPPORTED_TEXT, False)
+                return False
             if open_url is None:
                 import webbrowser
                 open_url = webbrowser.open
