@@ -1,0 +1,59 @@
+# Internal development fixture. Requires the matching content-plan native build.
+# Not compatible with rc1. Other content/mode/pack routes are still being added.
+name: CustomPadTest
+game: Crash Team Racing
+Crash Team Racing:
+  accessibility: full
+  oxide_goal: disabled
+  bosses_required_goal: 0
+  gems_required_goal: 5
+  character_unlocks: false
+  podium_placement_checks: false
+  content_pool:
+    preset: mixed
+    tracks:
+      retail: all
+      modes: [trophy]
+      custom:
+        - id: package/baby-t-park/1.0.2
+          content_id: baby-t-park
+          uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+          revision: 1.0.2
+          display_name: Baby T Park
+          author: Lockheart
+          files:
+            - role: lev
+              sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+              bytes: 2558168
+              format: ctr-lev
+              format_version: 1
+            - role: vrm
+              sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+              bytes: 458808
+              format: ctr-vrm
+              format_version: 1
+          evidence:
+            - capability: trophy
+              file_hashes:
+                - be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+                - 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+              verifier: ctr-managed-profile
+              revision: 1
+              level: structural
+    cups: {count: 0}
+    crystals: {count: 0}
+    bosses: {enabled: false}
+    required_entries: [custom/baby-t-park/1.0.2]
+  pad_layout:
+    placement: shuffle
+    stages: single
+    mode_order: fixed
+    merge_trophy_ctr: false
+  item_pool:
+    base:
+      trophies: 5
+      relics: {sapphire: 0, gold: 0, platinum: 0}
+      tokens: {red: 0, green: 0, blue: 0, yellow: 0, purple: 0}
+      gems: [red, green, blue, yellow, purple]
+      keys: 4
+    extra: {}

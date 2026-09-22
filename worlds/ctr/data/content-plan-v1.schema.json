@@ -1,0 +1,1308 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Package"
+      },
+      "maxItems": 132,
+      "minItems": 0
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Track"
+      },
+      "maxItems": 132,
+      "minItems": 0
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "maxItems": 33,
+      "minItems": 0
+    },
+    "pads": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Pad"
+      },
+      "maxItems": 32,
+      "minItems": 32
+    },
+    "encounters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Encounter"
+      },
+      "maxItems": 6,
+      "minItems": 0
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "maxItems": 128,
+      "minItems": 0
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "maxItems": 4096,
+      "minItems": 0
+    },
+    "items": {
+      "$ref": "#/$defs/ItemPlan"
+    },
+    "goal": {
+      "$ref": "#/$defs/Predicate"
+    },
+    "required_features": {
+      "type": "array",
+      "items": {
+        "const": "content_plan_v1"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "version",
+    "packages",
+    "tracks",
+    "entries",
+    "pads",
+    "encounters",
+    "requirements",
+    "checks",
+    "items",
+    "goal",
+    "required_features"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "FilePin": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "enum": [
+            "lev",
+            "vrm",
+            "navigation",
+            "ctr_letters",
+            "relic_targets",
+            "ap_boxes"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "format_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "role",
+        "sha256",
+        "bytes",
+        "format",
+        "format_version"
+      ],
+      "additionalProperties": false
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "capability": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "file_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "verifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "level": {
+          "enum": [
+            "structural",
+            "runtime"
+          ]
+        }
+      },
+      "required": [
+        "capability",
+        "file_hashes",
+        "verifier",
+        "revision",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "Package": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "content_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "uuid": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FilePin"
+          },
+          "maxItems": 6,
+          "minItems": 2
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 16,
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "content_id",
+        "uuid",
+        "revision",
+        "display_name",
+        "author",
+        "files",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Track": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "retail"
+            },
+            "retail_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "retail_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "custom"
+            },
+            "package_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "custom_slot": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 132
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "package_id",
+            "custom_slot"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "cortex_vortex"
+            },
+            "package_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "package_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Racer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "player"
+            },
+            "slot": {
+              "const": 0
+            }
+          },
+          "required": [
+            "role",
+            "slot"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "opponent"
+            },
+            "slot": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "character_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "driving_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "attack_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            }
+          },
+          "required": [
+            "role",
+            "slot",
+            "character_id",
+            "driving_profile",
+            "attack_profile"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Opponent": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "opponent"
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "character_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "driving_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "attack_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        }
+      },
+      "required": [
+        "role",
+        "slot",
+        "character_id",
+        "driving_profile",
+        "attack_profile"
+      ],
+      "additionalProperties": false
+    },
+    "Leg": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "track_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "laps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      },
+      "required": [
+        "id",
+        "track_id",
+        "laps"
+      ],
+      "additionalProperties": false
+    },
+    "Entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "track"
+            },
+            "track_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "merged": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "track_id",
+            "modes",
+            "merged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "cup"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "legs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Leg"
+              },
+              "maxItems": 4,
+              "minItems": 4
+            },
+            "roster": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Racer"
+              },
+              "maxItems": 8,
+              "minItems": 1
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "display_name",
+            "legs",
+            "roster",
+            "field_size"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "crystal"
+            },
+            "arena_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "target": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "time_limit_ticks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "arena_id",
+            "target",
+            "time_limit_ticks"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "boss_race"
+            },
+            "track_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "opponent": {
+              "$ref": "#/$defs/Opponent"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "track_id",
+            "laps",
+            "opponent"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ModeGate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "trophy",
+            "ctr",
+            "relic",
+            "merged"
+          ]
+        },
+        "stage": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "requirement_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        }
+      },
+      "required": [
+        "mode",
+        "stage",
+        "requirement_id"
+      ],
+      "additionalProperties": false
+    },
+    "Pad": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "hub_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "kind": {
+          "enum": [
+            "normal",
+            "garage"
+          ]
+        },
+        "entry_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entrance_req": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "mode_gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModeGate"
+          },
+          "maxItems": 3,
+          "minItems": 0
+        },
+        "racer_lock": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "hub_id",
+        "kind",
+        "entry_id",
+        "entrance_req",
+        "mode_gates",
+        "racer_lock"
+      ],
+      "additionalProperties": false
+    },
+    "Encounter": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "pad_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "index": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "entry_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirement_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "completion_location": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "pad_id",
+        "index",
+        "entry_id",
+        "requirement_id",
+        "completion_location"
+      ],
+      "additionalProperties": false
+    },
+    "Predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "always"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "count"
+            },
+            "item": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "item",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "distinct"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 1024,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "items",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "checked"
+            },
+            "locations": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 4096,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "locations",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Predicate"
+              },
+              "maxItems": 64,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "op",
+            "terms"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Requirement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "predicate": {
+          "$ref": "#/$defs/Predicate"
+        }
+      },
+      "required": [
+        "id",
+        "predicate"
+      ],
+      "additionalProperties": false
+    },
+    "Route": {
+      "type": "object",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "mode": {
+          "enum": [
+            "trophy",
+            "ctr",
+            "relic",
+            "merged",
+            "cup",
+            "crystal",
+            "boss_race"
+          ]
+        },
+        "leg_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encounter_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "own_pad_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "award": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        }
+      },
+      "required": [
+        "entry_id",
+        "mode",
+        "leg_id",
+        "encounter_id",
+        "own_pad_id",
+        "award"
+      ],
+      "additionalProperties": false
+    },
+    "Check": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Route"
+          },
+          "maxItems": 132,
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "location",
+        "owner",
+        "kind",
+        "display_name",
+        "routes"
+      ],
+      "additionalProperties": false
+    },
+    "ItemRow": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "base": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "extra": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "start_from_pool": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "start_additional": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "locked_selected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "receipt_cap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "requirement_ceiling": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "item",
+        "base",
+        "extra",
+        "start_from_pool",
+        "start_additional",
+        "locked_selected",
+        "remaining",
+        "receipt_cap",
+        "requirement_ceiling"
+      ],
+      "additionalProperties": false
+    },
+    "ItemPlan": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ItemRow"
+          },
+          "maxItems": 1024,
+          "minItems": 0
+        },
+        "coded_checks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "locked_checks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "filler_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "trap_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "rows",
+        "coded_checks",
+        "locked_checks",
+        "filler_count",
+        "trap_count"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

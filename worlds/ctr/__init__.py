@@ -509,6 +509,17 @@ class ctrAPWorld(World):
         locations to build (R1: a below-count slot is never created), then
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
+        passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
+        if passthrough and "content_plan" in passthrough:
+            from . import content_plan
+            content_plan.restore(self, passthrough)
+            return
+        if self.options.content_pool.value:
+            from . import content_plan
+            content_plan.generate(self)
+            return
+        if self.options.item_pool.value or self.options.pad_layout.value:
+            raise OptionError("CTR item_pool and pad_layout require an explicit content_pool; no silent legacy migration.")
         # Cortex Vortex pad track (2026-09-13 contract): draw the destination
         # that goes without a pad FIRST, because the letter selection below and
         # the relic-tier draw both leave its checks out. A Universal Tracker
@@ -595,6 +606,10 @@ class ctrAPWorld(World):
         hit_character.resolve_for_generation(self)
 
     def create_regions(self):
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            content_plan.create_regions(self)
+            return
         create_regions(self)
         from .custom_track_presentation import location_aliases
         self.location_id_to_alias = location_aliases(self)
@@ -605,6 +620,10 @@ class ctrAPWorld(World):
         embed_track_names(multiworld, multidata, cls.game)
 
     def set_rules(self):
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            content_plan.set_rules(self)
+            return
         set_rules(self)
 
     def pre_fill(self) -> None:
@@ -639,6 +658,8 @@ class ctrAPWorld(World):
         # a DIFFERENT seed and could wrongly collapse the stage-2 gates we just
         # pinned from slot_data. Skip all fill machinery -- reachability is fixed by
         # the reconstructed rules, and the server supplies the real item placements.
+        if hasattr(self, "ctr_content_plan"):
+            return  # Independent supply never uses automatic progression starts.
         if getattr(self.multiworld, "generation_is_fake", False):
             return
         solo = len(self.multiworld.worlds) == 1
@@ -1388,6 +1409,10 @@ class ctrAPWorld(World):
             lambda state, ps=tuple(predicates): all(p(state) for p in ps))
 
     def create_items(self):
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            content_plan.create_items(self)
+            return
         player = self.player
         mw = self.multiworld
         pool = []
@@ -2021,6 +2046,9 @@ class ctrAPWorld(World):
         }
 
     def fill_slot_data(self) -> Dict[str, object]:
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            return content_plan.wire(self)
         o = self.options
         # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
         # unwired; the real signal is "did any category participate" == the resolved
@@ -2516,6 +2544,11 @@ class ctrAPWorld(World):
         rescued seed is diagnosable. Written ONLY when the backstop fired: a
         non-fired seed adds nothing here, keeping it byte-identical to a build
         without the backstop (the fired: yes/no verdict is the line's presence)."""
+        if hasattr(self, "ctr_content_plan"):
+            spoiler_handle.write("\nCTR independent content/item plan:\n")
+            json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
+            spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            return
         # Character phase (#54/#209): which racer this seed starts you as, and
         # which pads demand a specific racer. Both are per-seed DRAWS rather
         # than option values, so without this a spoiler read cannot tell you

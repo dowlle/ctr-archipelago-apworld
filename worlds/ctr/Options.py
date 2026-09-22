@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
-                     Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
+                     Toggle, NamedRange, Range, PerGameCommonOptions, Visibility, StartInventoryPool)
 
 from . import characters
 from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
@@ -1249,8 +1249,39 @@ class EditableStats(Choice):
     default = 0
 
 
+class ContentPool(OptionDict):
+    """Experimental independent content selection. Empty keeps the legacy generator.
+
+    The development profile currently supports standalone Trophy races, including
+    exact custom Package descriptors. Unsupported selected content fails clearly.
+    """
+    display_name = "Content Pool (Experimental)"
+    default = {}
+
+
+class ContentPadLayout(OptionDict):
+    """Physical pad placement and mode stages for content_pool."""
+    display_name = "Content Pad Layout (Experimental)"
+    default = {}
+
+
+class ContentItemPool(OptionDict):
+    """Exact base and extra item counts, independent of selected content.
+
+    Four base Keys are mandatory. Gems are randomized. Extras replace filler;
+    capacity shortages fail without reducing counts or granting free starts.
+    """
+    display_name = "Item Pool (Experimental)"
+    default = {}
+
+
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
+
+    content_pool: ContentPool
+    pad_layout: ContentPadLayout
+    item_pool: ContentItemPool
+    start_inventory_from_pool: StartInventoryPool
 
     # goal & endgame (issue #152: composed conditions, ANDed)
     oxide_goal: OxideGoal
@@ -1335,6 +1366,7 @@ class ctrAPOptions(PerGameCommonOptions):
 
 
 ap_ctr_option_groups: Dict[str, List[Any]] = {
+    "Experimental Content Plan": [ContentPool, ContentPadLayout, ContentItemPool],
     # Ordered the way a player fills a YAML: what am I trying to do, then how
     # the randomizer works, then how big the seed is, then tuning, then
     # cosmetics. Mechanics before decoration -- pad unlocking is the heart of
