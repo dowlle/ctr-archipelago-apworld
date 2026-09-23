@@ -829,15 +829,24 @@ class ApItemTypeColors(DefaultOnToggle):
     display_name = "AP Item Type Colours"
 
 
-class ColorBoxesByItem(Toggle):
+class ColorBoxesByItem(DefaultOnToggle):
     """Colour each AP item box by the kind of item inside it.
 
-    Off (default): every AP item box is pink.
+    On (default): a box shows the Archipelago colour of its item before you
+    break it:
+    - purple: progression (items that open up the seed)
+    - blue: useful
+    - cyan: filler
+    - salmon: trap
+    A box stays pink until the game has looked up what is inside, a moment
+    after connecting.
 
-    On: a box shows the Archipelago colour of its item before you break it:
-    purple for progression, blue for useful, cyan for filler, salmon for traps.
-    That tells you which boxes matter, so leave it off if you would rather be
-    surprised.
+    Off: every AP item box is pink for everyone in this slot, so the colour
+    gives nothing away. Use this for races and tournaments.
+
+    Each player can also turn the colours off for themselves in the game:
+    Options, Archipelago page, Item Box Colours. When this option is off, the
+    game shows that row as "OFF (SEED)" and players cannot turn colours on.
 
     Only does something when Item Box Locations is on."""
     display_name = "Item Box Colours"

@@ -2,13 +2,15 @@
 
 R11 asked for colouring AP item boxes by the class of the item inside them as
 a YAML toggle, `color_boxes_by_item`, because a box's colour tells the player
-which checks matter. Native (ap/ap_box_colour_logic.h) draws every box pink
-when the key is off or absent, and the Archipelago item colour otherwise.
+which checks matter. A 2026-09-23 ruling made it default to on; a seed
+can turn it off for everyone, and each player can turn it off (never on) in
+the client. Native (ap/ap_box_colour_logic.h) draws every box pink when the
+key is off or absent.
 
 What the apworld owns and these tests prove:
 
-- the option exists, is off by default, and the wire value matches it;
-- on reaches slot_data as true under the wire name `color_boxes_by_item`;
+- the option exists, is on by default, and the wire value matches it;
+- off reaches slot_data as false under the wire name `color_boxes_by_item`;
 - it is ADDITIVE: schema_version does not move, so an older client (which
   never reads the key) keeps drawing pink boxes;
 - it is generation-neutral: same seed, only this option varied, and the
@@ -26,34 +28,42 @@ FIXED_SEED = 5949
 
 
 class TestColorBoxesByItemDefault(CTRTestBase):
-    """The default is off: every box pink, as every earlier client draws it."""
+    """The default is on (2026-09-23 ruling)."""
 
     run_default_tests = False
     options = {}
 
-    def test_default_is_off(self):
-        self.assertFalse(self.world.options.color_boxes_by_item.value)
+    def test_default_is_on(self):
+        self.assertTrue(self.world.options.color_boxes_by_item.value)
 
     def test_wire_value_matches_the_option(self):
         slot_data = self.world.fill_slot_data()
-        self.assertIs(slot_data["ctr_options"][WIRE_KEY], False)
+        self.assertIs(slot_data["ctr_options"][WIRE_KEY], True)
 
     def test_ut_does_not_restore_it(self):
         world = self.world
-        world.options.color_boxes_by_item.value = False
-        world._ut_restore_options({"ctr_options": {WIRE_KEY: True},
+        world.options.color_boxes_by_item.value = True
+        world._ut_restore_options({"ctr_options": {WIRE_KEY: False},
                                    "warp_pad_unlock": {}, "podium_checks": {}})
-        self.assertFalse(world.options.color_boxes_by_item.value)
+        self.assertTrue(world.options.color_boxes_by_item.value)
+
+    def test_help_text_documents_the_colours_and_the_client_override(self):
+        from ..Options import ColorBoxesByItem
+        doc = ColorBoxesByItem.__doc__
+        for phrase in ("purple: progression", "blue: useful", "cyan: filler",
+                       "salmon: trap", "On (default)", "Item Box Colours",
+                       "OFF (SEED)"):
+            self.assertIn(phrase, doc)
 
 
-class TestColorBoxesByItemOn(CTRTestBase):
-    """on reaches the wire as true and needs no schema bump."""
+class TestColorBoxesByItemOff(CTRTestBase):
+    """off reaches the wire as false and needs no schema bump."""
 
-    options = {"color_boxes_by_item": True, "box_locations": True}
+    options = {"color_boxes_by_item": False, "box_locations": True}
 
-    def test_wire_value_is_true(self):
+    def test_wire_value_is_false(self):
         slot_data = self.world.fill_slot_data()
-        self.assertIs(slot_data["ctr_options"][WIRE_KEY], True)
+        self.assertIs(slot_data["ctr_options"][WIRE_KEY], False)
 
     def test_schema_version_is_not_bumped(self):
         slot_data = self.world.fill_slot_data()
