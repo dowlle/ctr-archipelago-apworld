@@ -837,8 +837,9 @@ class WarpPadUnlockRequirements(Choice):
       before that pad opens.
     - **vanilla**: pads open on their vanilla trophy counts, like the original
       adventure.
-    - **random_without_4_keys**: like randomized, but the 4 boss Keys are never
-      pad requirements."""
+    - **random_without_4_keys**: like randomized, but no pad needs all 4 Keys.
+      Pads can still ask for 1 to 3 Keys. For no Keys on pads at all, use
+      `Requirement Variety` custom with `Key: 0` in `Requirement Weights`."""
     # "Always collectable" is enforced by the solvability-proven sphere search
     # at generation time.
     display_name = "Warp Pad Unlock Requirements"
