@@ -2160,6 +2160,15 @@ class ctrAPWorld(World):
                 # item, and nothing in AP logic reads it, so two seeds differing
                 # only in this value are identical apart from the key itself.
                 "ap_item_type_colors": bool(o.ap_item_type_colors.value),
+                # AP item box colours (ruling R11; default on per the
+                # 2026-09-23 ruling): on = each AP item box wears its item's
+                # Archipelago colour (each player can still turn that off in the
+                # client), off = every box pink and the players cannot turn it
+                # on. ADDITIVE key, no schema bump -- native json_int defaults
+                # the absent key to 0 (pink), so a seed from before this key
+                # shows pink boxes, as it always did. Display only: nothing in
+                # AP logic reads it.
+                "color_boxes_by_item": bool(o.color_boxes_by_item.value),
                 # QoL, additive (no schema bump): one-lap cup races. Native
                 # json_int defaults the absent key to 0, so a pre-one-lap-cups
                 # native (or an old seed on a new native) is exactly vanilla lap

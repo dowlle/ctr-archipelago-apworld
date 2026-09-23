@@ -22,6 +22,19 @@ CTR Tokens, relics, Gems, and other seed-specific items. Warp pads show the
 unclaimed rewards at their destination, including an Archipelago marker for
 items belonging to another player.
 
+## What do the AP item box colours mean?
+
+With Item Box Locations on, AP item boxes stand on the tracks. By default each
+box shows the Archipelago colour of the item inside: purple for progression,
+blue for useful, cyan for filler and salmon for a trap. A box is pink until the
+game has looked up what is inside, a moment after connecting.
+
+The YAML option Item Box Colours (`color_boxes_by_item`) turns this off for the
+whole slot, which is useful for races. Players can also turn the colours off
+for themselves in the game under **OPTIONS → Archipelago → Item Box Colours**.
+When the YAML turned them off, that row shows **OFF (SEED)** and cannot be
+turned on.
+
 ## Which items can be in another player's world?
 
 Progression, useful items, filler, and traps may all be placed in another
