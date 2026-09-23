@@ -85,6 +85,12 @@ SURFACE_ITEM_NAMES = frozenset({
     "Ignore Grass", "Ignore Dirt", "Ignore Snow", "Ignore Water", "Ignore Ice",
 })
 
+# Issue #334: the room page's "Connect via Game Client" link. The component only
+# translates the room link into a credential-free ctr-ap:// request for the
+# native client; see launcher_component.py for what it may and may not do.
+from . import launcher_component
+launcher_component.register()
+
 
 class ctrAPWeb(WebWorld):
     theme = "Party"
