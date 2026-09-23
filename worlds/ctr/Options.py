@@ -14,16 +14,14 @@ class OxideGoal(Choice):
     """What finishing the game means.
 
     - **any_percent** (default): beat Oxide, the retail ending.
-    - **101_percent**: beat Oxide's Final Challenge, the full-completion
-      ending.
-    - **none**: Oxide is not part of the goal, but both Oxide races stay in
-      the seed as ordinary optional checks.
-    - **disabled**: Oxide's garage never opens and both Oxide races are
-      removed from the seed entirely. Needs at least one Boss or Gem
-      condition, because nothing else would be left to finish.
+    - **101_percent**: beat Oxide's Final Challenge.
+    - **none**: Oxide is not part of the goal; both Oxide races stay as
+      optional checks.
+    - **disabled**: Oxide's garage never opens and both Oxide races leave the
+      seed.
 
-    Combine it with Bosses Required and Gems Required to build the goal you
-    want; every condition you set must be met."""
+    With none or disabled, set Bosses Required Goal or Gems Required Goal
+    above 0. Every goal condition you set must be met."""
     display_name = "Oxide Goal"
     option_none = 0
     option_any_percent = 1
@@ -62,16 +60,14 @@ class OxideGoal(Choice):
 
 
 class Oxide1Optional(Choice):
-    """Only applies when Oxide Goal is 101_percent (Oxide 2).
+    """Whether you must beat Oxide 1 before Oxide 2. Only applies when Oxide
+    Goal is 101_percent.
 
-    Mandatory (false): beat Oxide 1 before Oxide 2.
-    Optional (true): Oxide 1 remains playable early and may hold progression,
-    but the garage offers Oxide 2 directly
-    once its door, relic, Boss and Gem requirements are met. Winning Oxide 2
-    also collects the item at Oxide 1. It never removes that randomized check
-    or bypasses Oxide 2's requirements.
-    Filler: the same skip, plus Oxide 1 always holds Wumpa Fruit, strictly
-    filler, never progression, useful items or traps. Other goals are unchanged."""
+    - **mandatory** (default): beat Oxide 1 first.
+    - **optional**: the garage offers Oxide 2 once its own requirements are
+      met. Oxide 1 stays a normal check, and winning Oxide 2 also collects
+      it.
+    - **filler**: like optional, and Oxide 1 always holds Wumpa Fruit."""
     display_name = "Oxide 1 Optional"
     option_mandatory = 0
     option_optional = 1
@@ -88,9 +84,9 @@ class BossesRequiredGoal(Range):
     Ripper Roo, Papu Papu, Komodo Joe and Pinstripe. 0 (default) turns this
     condition off.
 
-    "Won" means you actually beat the boss - holding trophies or garage Keys
-    does not count. Combines with Oxide Goal and Gems Required; every
-    condition you set must be met."""
+    Only a won boss race counts; holding trophies or Keys does not. Every
+    goal condition you set with Oxide Goal and Gems Required Goal must be
+    met."""
     display_name = "Bosses Required Goal"
     range_start = 0
     range_end = 4
@@ -100,14 +96,11 @@ class BossesRequiredGoal(Range):
 class GemsRequiredGoal(Range):
     """How many of the 5 Gems you must hold for the goal.
 
-    0 (default) turns this condition off. Combines with Oxide Goal and Bosses
-    Required; every condition you set must be met.
+    0 (default) turns this condition off. Every goal condition you set with
+    Oxide Goal and Bosses Required Goal must be met.
 
-    If you ask for Gems with Shuffle Gems on but Include Gem Cup Warp Pads
-    off, the Gems would scatter while the cups they belong to are left out of
-    the seed. Generation turns Shuffle Gems off for your slot instead, keeping
-    the Gems on their own cups, and warns you. Turn Include Gem Cup Warp Pads
-    on if you would rather keep the Gems shuffled."""
+    With Include Gem Cup Warp Pads off, Shuffle Gems is turned off for you
+    and each Gem stays on its own cup."""
     display_name = "Gems Required Goal"
     range_start = 0
     range_end = 5
@@ -115,17 +108,16 @@ class GemsRequiredGoal(Range):
 
 
 class FinalOxideUnlock(Choice):
-    """Which relics turn Oxide's Challenge into Oxide's Final Challenge. The
-    count comes from `Oxide's Final Challenge Relic Count`.
+    """Which relics open Oxide's Final Challenge. Oxide's Final Challenge
+    Relic Count sets how many.
 
     - **sapphire_relics** (default), **gold_relics**, **platinum_relics**: that
       many relics of that tier.
-    - **any_relic_type**: any single tier reaches the count.
+    - **any_relic_type**: any one tier reaches the count.
     - **total_relics**: all relics added together reach the count.
 
-    Tiers are independent: a Platinum relic does not count toward a Gold
-    requirement. Requiring a tier whose relic count is 0 fails generation.
-    The old `18_gold_and_platinum_relics` value was removed."""
+    A Platinum relic does not count toward a Gold requirement. Generation
+    fails if the tiers you ask for have too few relics for the count."""
     # Item-side independence is unrelated to the location-side award-path
     # hierarchy (beating a Platinum time also sends that track's Gold and
     # Sapphire checks) -- that is about checks, not owned relic items.
@@ -146,18 +138,15 @@ class FinalOxideUnlock(Choice):
 
 
 class FinalOxideRelicCount(NamedRange):
-    """How many relics `Oxide's Final Challenge Unlock` requires.
+    """How many relics Oxide's Final Challenge Unlock asks for.
 
-    - **total_relics** supports 1-54 by adding Sapphire, Gold and Platinum.
-    - Every other mode supports 1-18 because it checks one 18-item tier.
-
-    A value above 18 in one of those single-tier modes can only mean every
-    relic of that tier, so generation resolves it down to 18 and logs a
-    warning naming the mode and the value you asked for, instead of failing.
-
-    - **all**: shorthand for 18, a full single tier, the same as the 0.2.0
-      meaning. It works in every mode. Players using total_relics who want
-      every relic of every tier type 54."""
+    With **total_relics** this can be 1 to 54. Every other mode counts one
+    tier, so 1 to 18; a higher value counts as 18. **all** means 18 in every
+    mode."""
+    # Above 18 in a single-tier mode, forced_options resolves the count to 18
+    # and logs a warning naming the mode and the requested value (2026-09-18
+    # ruling). `all` keeps its 0.2.0 meaning; total_relics players who want
+    # every relic of every tier write 54.
     display_name = "Oxide's Final Challenge Relic Count"
     range_start = 1
     range_end = 54
@@ -184,23 +173,21 @@ class ShuffleGems(DefaultOnToggle):
       become normal checks.
     - **off**: each Gem stays on its own Gem Cup reward (vanilla placement).
 
-    Works with every goal, including a Gems Required goal. With a Gems
-    Required goal and `Include Gem Cup Warp Pads` off, generation turns this
-    off for your slot and warns you, so the Gems stay on their own cups."""
+    With Include Gem Cup Warp Pads off, each Gem stays on its own cup
+    anyway."""
     display_name = "Shuffle Gems"
 
 
 class ShuffleWarpPadsGemCups(DefaultOnToggle):
-    """Bring the 5 Gem Cups and their races into the seed: their checks become
-    normal locations and, in a randomized-unlock seed, their warp pads get a
-    randomized entry requirement.
+    """Include the 5 Gem Cups and their races in the seed.
 
-    - Not the same as `Shuffle Gems`: that moves the Gem items around; this one
-      includes the cup races themselves. Turn it on if you want the Gems
-      shuffled while a Gems Required goal is active.
-    - **off**: cups stay fully vanilla, and shuffled Gems are pinned back onto
-      their own cups. With a Gems Required goal, generation also turns
-      `Shuffle Gems` off for your slot and warns you."""
+    - **on** (default): the cup checks are normal locations and, with
+      randomized unlocks, their warp pads get a randomized requirement.
+    - **off**: the cups stay as in the retail game and each Gem stays on its
+      own cup.
+
+    Shuffle Gems moves the Gem items; this option decides whether the cup
+    races are part of the seed."""
     # The Key-2 Cups Room hub gate is always kept on top of a randomized cup
     # requirement. This option is also the participation gate for the `cups`
     # destination-shuffle category. Off + Shuffle Gems on pins each Gem back onto
@@ -228,55 +215,19 @@ class RandomizeGemCupTracks(Toggle):
 
 
 class CustomTracks(OptionDict):
-    """Play a community custom track in place of a Gem Cup.
+    """Race a community custom track in place of a Gem Cup.
 
-    Leave this out (the default) and nothing changes: the seed is exactly the
-    seed you would get from a build without this option.
+    The cup keeps its warp pad, but behind it is one race on the custom track
+    instead of four retail tracks. Leave this empty (the default) for a
+    normal seed.
 
-    Fill it in and the Gem Cup you name stops running its four retail tracks.
-    Its warp pad still asks for the same four CTR Tokens and it still awards
-    the same Gem, but behind the pad is a single race on the custom track, and
-    winning that race is what awards the Gem. The retail version of that cup
-    is not in the seed at all.
+    You also need the track's files and a client that can load them. Use the
+    track's exact entry rather than writing your own: generation refuses an
+    entry this version does not know, and the game refuses files that do not
+    match it.
 
-    You describe the track yourself, which is why this is a mapping rather
-    than an on/off switch. The entry carries the SHA-256 of each of the
-    track's two files and the capabilities the track was measured to have.
-    The game hashes the real files before it loads anything and refuses to
-    race on a mismatch, so a wrong digest is a loud error rather than a
-    silently wrong track.
-
-    You also need the track's files and a game build that can load them. This
-    option only tells the seed what to expect.
-
-    Example - Baby T Park in place of the Purple Gem Cup::
-
-        custom_tracks:
-          baby-t-park:
-            lev_sha256: 96ad9f74f51a02eafcc207cd02c97052d674c950e0f24b6440a227494a705fe8
-            vrm_sha256: 2dcaa0fe93359c7ae00fb93842a581210e0dcc2db73f4de43508375834092e83
-            laps: 7
-            replaces: purple_gem_cup
-            flags:
-              crates: true
-              ctr_letters: true
-              relic_crates: true
-              ai_nav: true
-              minimap: false
-              ghosts: false
-              spawns: 8
-              checkpoints: 35
-
-    Every key above is required. Two more are optional: `host_level_id`
-    (0-17, which retail track slot the custom track borrows, default 6) and
-    `boxes` (whether item-box checks are allowed on the race, default true).
-
-    Known track ids: baby-t-park. The only cup that can be replaced is
-    purple_gem_cup. One track per seed.
-
-    This option is a mapping, so the Archipelago website's options pages
-    cannot show it and a YAML exported from there will not contain it. Start
-    from the downloadable YAML template instead."""
+    The only known track is baby-t-park, and only purple_gem_cup can be
+    replaced."""
     # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
     # `custom_tracks` descriptor rather than a throwaway toggle, and full
     # DISPLACEMENT of the replaced cup's destination. Shape, validation,
@@ -309,32 +260,17 @@ class ShuffleKeys(DefaultOnToggle):
 
 
 class ProgressiveBoostMode(Choice):
-    """Turn your kart's boost into something you have to find.
+    """Make boost an item you have to find.
 
-    Normally every kart can boost from the start. Switch this on and boost
-    arrives from the multiworld in stages: ordinary boost first, then Ultra
-    Sacred Fire. If Blue Fire is also on, one final Retro Fueled-style tier
-    turns turbo pads into Blue Fire pads, lets powerslides stack its reserves,
-    preserves reserves through U-turns, and turns the exhaust blue.
+    Boost arrives in stages: normal boost, then Ultimate Sacred Fire, plus a
+    Blue Fire tier if Progressive Boost: Blue Fire is on. Some checks need
+    the speed, such as the climb on Hot Air Skyway, and every CTR Token
+    Challenge waits for your first boost.
 
-    Some checks genuinely need the speed and stay out of reach until it
-    arrives. Hot Air Skyway is the clearest case - its mid-track climb
-    cannot be cleared below USF. Every CTR Token Challenge also waits for
-    your first boost, and for more than that where its own race does.
-
-    - **off** (default): every kart boosts normally, as in the retail game.
-    - **shared_global**: one boost ladder, shared by every character.
-    - **per_character**: each of the 16 racers has their own ladder. That is
-      sixteen times as many items, so the seed needs plenty of places to put
-      them; if there is not enough room, generation stops and says so.
-
-    per_character means 16 racers x 2 copies (3 with Blue Fire) = 32 to 48
-    Progressive Boost items by itself; add per_character Progressive Stats
-    too and the two packs together reach up to 16 x (3 boost + 12 stat
-    copies) = 240 progressive items (224 without Blue Fire). A solo game
-    returns every pool item to you, so most of your checks in a
-    per_character seed will hand back a progressive item rather than
-    something else."""
+    - **off** (default): every kart boosts normally.
+    - **shared_global**: one boost ladder for every racer.
+    - **per_character**: a ladder for each of the 16 racers, 32 to 48 items.
+      Needs a large seed; generation stops if they do not fit."""
     # Classification: `useful` (the spine-1 shape) while this option is off,
     # `progression` in every seed that randomizes the chain. It started
     # per-seed -- #145's Turbo checks and #109's boost-gated box slots were
@@ -355,7 +291,7 @@ class ProgressiveBoostBlueFire(Toggle):
     second of reserves. Powerslides can stack those reserves without losing
     Blue Fire, U-turns retain reserves, and active Blue Fire exhaust is blue.
 
-    - **off** (default): the ladder stops at USF.
+    - **off** (default): the ladder stops at Ultimate Sacred Fire.
     - **on**: one more tier, so one more Progressive Boost to find.
 
     No effect while Progressive Boost is off."""
@@ -363,28 +299,19 @@ class ProgressiveBoostBlueFire(Toggle):
 
 
 class LogicDifficulty(Choice):
-    """How much the logic expects you to be able to do.
+    """How much the logic expects you to manage in races while boost and
+    weapons are randomized.
 
-    Race and placement difficulty gates apply while both Progressive Boost
-    and Itemsanity are randomizing your capabilities. Platinum Time Trial
-    boost requirements also use this setting when Progressive Boost is on,
-    regardless of Itemsanity.
+    Race requirements apply when Progressive Boost and Itemsanity are both
+    on. Platinum Time Trials follow this whenever Progressive Boost is on.
 
-    - **easy**: winning a race, finishing on the podium and holding first
-      all wait until you have boost, or three different useful weapons.
-    - **medium** (default): only winning the race waits, on the same terms.
-      Placement checks stay available.
-    - **hard**: no extra race or placement requirement; you are expected to
-      manage those checks with your available items.
+    - **easy**: winning, finishing on the podium and holding 1st wait for
+      boost or three useful weapons.
+    - **medium** (default): only winning waits.
+    - **hard**: no extra requirement.
 
-    Every Platinum Time Trial needs two boosts on easy and medium. On easy,
-    enabling Blue Fire raises that requirement to three. Hard keeps each
-    track's existing Platinum boost requirement. Boss wins need at least one
-    boost at every difficulty and may need more for their race venue.
-
-    Tracks whose geometry genuinely demands speed ignore this setting.
-    Cortex Castle and Hot Air Skyway always need USF, and so does Oxide
-    Station unless Shortcut Knowledge is set to hard."""
+    Tracks that need speed ignore this: Cortex Castle and Hot Air Skyway
+    always need Ultimate Sacred Fire."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
@@ -393,22 +320,15 @@ class LogicDifficulty(Choice):
 
 
 class ProgressiveStatsMode(Choice):
-    """Turn your kart's top speed, acceleration and turning into items.
+    """Make top speed, acceleration and turning items you have to find.
 
-    Every kart starts at the bottom of all three and climbs as the stats
-    arrive. The ladder reaches beyond the retail maximum at the top end.
+    Karts start at the bottom of all three and climb as the stats arrive,
+    ending above the retail maximum.
 
     - **off** (default): karts keep their normal stats.
-    - **shared_global**: one set of stat ladders, shared by every character.
-    - **per_character**: a separate set for each of the 16 racers. Sixteen
-      times as many items, so the seed needs the room to hold them.
-
-    per_character means 16 racers x 3 chains x 4 copies = 192 Progressive
-    Stats items by itself; add per_character Progressive Boost too and the
-    two packs together reach up to 16 x (3 boost + 12 stat copies) = 240
-    progressive items (224 without Blue Fire). A solo game returns every
-    pool item to you, so most of your checks in a per_character seed will
-    hand back a progressive item rather than something else."""
+    - **shared_global**: one set of stat ladders for every racer.
+    - **per_character**: a set for each of the 16 racers, 192 items. Needs a
+      large seed."""
     display_name = "Progressive Stats"
     option_off = 0
     option_shared_global = 1
@@ -419,11 +339,11 @@ class ProgressiveStatsMode(Choice):
 class TrapFillPercentage(Range):
     """What percentage of this slot's filler items are replaced by traps.
 
-      0             = no traps, filler stays Wumpa Fruit
-      10  (default) = a taste of sabotage
-      100           = every filler slot becomes a trap
+    - **0**: no traps, filler stays Wumpa Fruit.
+    - **10** (default): a taste of sabotage.
+    - **100**: every filler slot becomes a trap.
 
-    Which trap you get is decided by `Trap Weights`.
+    Which trap you get is decided by Trap Weights.
 
     Traps never gate anything. A received trap arms silently and fires mid-race
     on a later lap."""
@@ -436,43 +356,18 @@ class TrapFillPercentage(Range):
 
 
 class TrapWeights(OptionDict):
-    """How often each trap is picked, once `Trap Fill Percentage` has decided
-    that a filler slot becomes a trap.
+    """How often each trap is picked when Trap Fill Percentage turns a filler
+    item into a trap.
 
-    Each entry is `trap: weight`. Higher weight means picked more often, 0
-    means never picked. The numbers are relative and do not have to add up to
-    anything. Traps you leave out keep their default weight, so you only have
-    to list the ones you want to change.
+    Weights are relative: higher means more often, 0 means never. Traps you
+    leave out keep their default weight.
 
-    Five traps change the camera or the screen itself and may be visually
-    intense or uncomfortable: First Person, Wireframe, Upside Down, Mirror
-    Mode, and Demo Camera. Set an individual trap's weight to 0 to disable
-    that effect entirely -- it becomes unpickable while every other trap
-    keeps its own weight.
+    `first_person`, `wireframe`, `upside_down`, `mirror_mode` and
+    `demo_camera` change the camera or the screen and can be visually
+    intense. Set a trap to 0 to turn it off; `upside_down` is 0 by default.
 
-    This option is a mapping, not a single value, so you have to edit it by
-    hand. The Archipelago website's options pages cannot show a mapping: this
-    option does not appear on them at all, and a YAML you export from there
-    has no `trap_weights` block, which means every trap keeps its default
-    weight. The downloadable YAML template does contain the full block, so the
-    simplest route is to start from the template and edit the numbers.
-
-    Example - never pick first person, pick icy road twice as often as usual,
-    everything else default::
-
-        trap_fill_percentage: 10
-        trap_weights:
-          first_person: 0
-          icy_road: 10
-
-    All 20 listed traps have a working native effect in this build and can be
-    picked. Setting every trap to 0 while `Trap Fill Percentage` is above 0
-    is an error, because then no trap could be picked at all.
-
-    Valid keys: icy_road, low_gravity, forced_usf, forced_boost, first_person,
-    wumpa_wipeout, flatten, item_reroll, forced_use, empty_crates,
-    weakened_kart, boost_blocker, wireframe, nitro, reverse_steering,
-    red_potion, upside_down, mirror_mode, warpball_ambush, demo_camera."""
+    Setting every trap to 0 while Trap Fill Percentage is above 0 is an
+    error."""
     # Machine keys, not item names: the 0.2.0 rework renamed five traps, and a
     # name-keyed option would have invalidated every YAML that mentioned one.
     # The defaults live in traps.DEFAULT_TRAP_WEIGHTS (the reviewed table)
@@ -499,32 +394,22 @@ class TrapWeights(OptionDict):
 class Itemsanity(Toggle):
     """Turn weapons into items you have to unlock.
 
-    Until a weapon arrives from the multiworld you cannot get it from a crate
-    - the roulette hands you Wumpa Fruit instead. Using each weapon for the
-    first time is itself a check, and using one while holding ten fruit is a
-    second.
+    Until a weapon arrives from the multiworld you cannot get it from a
+    crate; the roulette hands you Wumpa Fruit instead. Using each weapon for
+    the first time is itself a check, and using one while holding ten fruit
+    is a second.
 
     It changes how the whole game plays, not just what you collect."""
     display_name = "Itemsanity"
 
 class HitCharacter(Toggle):
-    """Add a check for hitting each of the 16 racers in a race.
+    """Add a check for each of the 16 racers, paid the first time you hit
+    them in an Adventure race.
 
-    Every playable racer gets one check, paid the first time you land a hit on
-    them during an Adventure race. Beat Papu Papu, Ripper Roo, Komodo Joe,
-    Pinstripe or N. Oxide in their boss race, or win the tracks that belong to
-    Fake Crash (Crash Cove, Sewer Speedway), Penta Penguin (Blizzard Bluff,
-    Polar Pass) or N. Tropy (Slide Coliseum, Turbo Track), and that racer joins
-    your opponent pool. Every Trophy race and CTR Challenge then picks its
-    opponents from the default racers plus your pool, never your own racer.
-    Unlocked racers you have not hit yet get a seat first, up to three per
-    race.
-
-    When a racer's unlock race is not in your seed at all, Keys unlock them
-    instead: Fake Crash at 1 Key, Penta Penguin at 2, N. Tropy at 3 and
-    N. Oxide at 4. So turning both trial track race options off, or setting
-    Oxide Goal to disabled, works fine with this option on. The spoiler log
-    names every racer that ended up on the Key route."""
+    The 8 retail Adventure racers can race you from the start. The other 8
+    join once you win their boss race or the tracks that unlock them. If
+    that race is not in your seed, Keys unlock them instead; the spoiler log
+    lists which racers use Keys."""
     display_name = "Hit Character Checks"
 
 
@@ -598,20 +483,12 @@ class WumpaCheck(Choice):
     """Add checks for reaching 10 Wumpa Fruit during a race.
 
     - **off** (default): no Wumpa checks.
-    - **global**: one location for the whole seed, paid the first time you
-      reach 10 fruit in any race.
-    - **per_track**: one location for every race track where this seed provides
-      a race in which you can collect fruit, paid the first time you reach 10
-      fruit on that track. Slide Coliseum and Turbo Track participate only when
-      their optional Trophy/arcade-style races are in the seed. A track the
-      Cortex Vortex Track option left without a pad keeps this check only when
-      it hosts a boss race, which you then have to reach 10 fruit in. This
-      replaces the global check rather than adding to it.
+    - **global**: one check, the first time you reach 10 fruit in any race.
+    - **per_track**: one check for each track you race on in this seed,
+      instead of the global one.
 
-    An older YAML still reads correctly: `false` is off and `true` is global.
-
-    This is separate from Itemsanity's juiced weapon checks: this pays out when
-    you reach 10 fruit, while those pay out when you fire a weapon at 10."""
+    Different from Itemsanity's juiced weapon checks, which pay out when you
+    fire a weapon at 10 fruit."""
     display_name = "Wumpa Check"
     option_off = 0
     option_global = 1
@@ -654,7 +531,7 @@ class BoxLocations(Toggle):
     Drive through one in any Adventure race on that track and it pays out.
 
     Boxes are the densest source of checks in the game, so this makes for a
-    much longer seed. Some sit past jumps or shortcuts you need boost for -
+    much longer seed. Some sit past jumps or shortcuts you need boost for;
     Shortcut Knowledge decides how much the logic expects of you there."""
     display_name = "Item Box Locations"
 
@@ -684,7 +561,7 @@ class OneLapCups(DefaultOnToggle):
 
     Only cup races shorten (including the Gem Cups); single races, boss races,
     relic time trials and CTR Token challenges keep their normal lap count.
-    Changes nothing about logic or which locations exist - everything is just
+    Changes nothing about logic or which locations exist; everything is just
     faster."""
     # Reuses the engine's built-in one-lap mechanism (the vanilla one-lap
     # cheat), scoped to cups.
@@ -692,16 +569,14 @@ class OneLapCups(DefaultOnToggle):
 
 
 class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
-    """Include the 4 Battle Arenas and their Crystal Challenges.
+    """Include the 4 Battle Arenas and their Crystal Challenges in the seed.
 
-    Their checks become normal locations, and in a randomized-unlock seed
-    their warp pads get their own entry requirement.
-
-    Turn it off to keep the battle arenas out of the randomizer: their warp
-    pads stay as in the original game and nothing in the seed ever requires
-    them. They can still be played, and each Crystal Challenge still gives its
-    Purple CTR Token, but that token is out of logic: it can open a pad that
-    asks for any CTR Tokens earlier than the logic and trackers expect."""
+    - **on** (default): their checks are normal locations and, with
+      randomized unlocks, their warp pads get a randomized requirement.
+    - **off**: the arenas stay as in the retail game and nothing in the seed
+      requires them. You can still play them, but their Purple CTR Tokens are
+      out of logic and can open a pad that asks for any CTR Tokens earlier
+      than the tracker expects."""
     # The off guarantees, precisely: crystal pads vanilla-fixed and never
     # destination-shuffled; the four Crystal Bonus Round checks keep their
     # vanilla Purple CTR Tokens LOCKED (no other world's item can hide there);
@@ -711,16 +586,17 @@ class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
 
 
 class WarpPadShuffleCategories(OptionSet):
-    """Which content categories take part in warp-pad destination shuffle. A
-    category left out always loads its own content.
+    """Which destinations take part in destination shuffle. Anything left
+    out always loads its own content.
 
     - **tracks**: the 16 trophy races plus Slide Coliseum and Turbo Track.
-    - **cups**: the 5 Gem Cups (needs `Include Gem Cup Warp Pads` on).
-    - **crystals**: the 4 Battle Arenas (needs `Include Battle Arena Warp Pads` on).
+    - **cups**: the 5 Gem Cups (needs Include Gem Cup Warp Pads on).
+    - **crystals**: the 4 Battle Arenas (needs Include Battle Arena Warp Pads
+      on).
 
-    Default: all three. Empty set: no destination shuffle. Under vanilla unlock
-    requirements, tracks and crystals shuffle within themselves and cups stay
-    fixed."""
+    Default: all three. An empty set turns destination shuffle off. With
+    vanilla unlock requirements, tracks and crystals shuffle only among
+    themselves and cups stay fixed."""
     # Composed with `Warp Pad Shuffle Grouping`. The vanilla-unlock collapse in
     # full: tracks = races only (no trials), grouping forced per_category,
     # cup/trial destination shuffle requires a randomized unlock mode.
@@ -780,41 +656,35 @@ class TrialTrackRaces(Choice):
 
 
 class SlideColiseumRaces(TrialTrackRaces):
-    """Standalone Adventure race family for Slide Coliseum.
+    """Add race checks to Slide Coliseum's warp pad, which normally runs
+    only relic races.
 
-    Trophy Race also restores Slide Coliseum's per-track Reach 10 Wumpa
-    route. CTR Challenge includes Trophy Race by construction, so a
-    CTR-only seed cannot be expressed.
-    """
+    - **off** (default): relic races only, as in the retail game.
+    - **trophy_race**: adds a Trophy Race check.
+    - **trophy_and_ctr_challenge**: adds a Trophy Race and a CTR Token
+      Challenge check."""
     display_name = "Slide Coliseum Races"
 
 
 class TurboTrackRaces(TrialTrackRaces):
-    """Standalone Adventure race family for Turbo Track.
+    """Add race checks to Turbo Track's warp pad, which normally runs only
+    relic races.
 
-    Trophy Race also restores Turbo Track's per-track Reach 10 Wumpa
-    route. CTR Challenge includes Trophy Race by construction, so a
-    CTR-only seed cannot be expressed.
-    """
+    - **off** (default): relic races only, as in the retail game.
+    - **trophy_race**: adds a Trophy Race check.
+    - **trophy_and_ctr_challenge**: adds a Trophy Race and a CTR Token
+      Challenge check."""
     display_name = "Turbo Track Races"
 
 
 class CortexVortexTrack(Toggle):
-    """Add Cortex Vortex as a full warp-pad track: a Trophy Race, then its
-    three Time Trials and a CTR Token Challenge, like a regular track.
+    """Add Cortex Vortex as a regular track: a Trophy Race, three Time Trials
+    and a CTR Token Challenge.
 
-    Cortex Vortex has no pad of its own. Each seed picks one other destination
-    to go without a pad, and Cortex Vortex takes that pad instead. That
-    destination's checks are removed from the seed. The one exception is a boss
-    track: its boss race still runs, so with `wumpa_check: per_track` its
-    10 Wumpa check stays and is paid from that boss race. Destination shuffle
-    can then move Cortex Vortex like any other destination, including onto a
-    Crystal Challenge or Gem Cup pad, and it can be a Gem Cup leg when cup
-    tracks are randomized.
-
-    Crossing the finish line on Cortex Vortex needs Ultimate Sacred Fire, so
-    its finish checks expect two Progressive Boosts when boosts are
-    randomized. It has no item boxes."""
+    It takes the warp pad of one other destination, chosen per seed, and
+    that destination's checks leave the seed. A boss race on that track
+    still runs. Crossing the finish line needs Ultimate Sacred Fire.
+    Cortex Vortex has no item boxes."""
     # Default off until a runtime pass proves an 8-kart race, relic mode and
     # the AI on this LEV (frozen contract, 2026-09-13).
     display_name = "Cortex Vortex Track"
@@ -834,26 +704,23 @@ class ColorBoxesByItem(DefaultOnToggle):
 
     On (default): a box shows the Archipelago colour of its item before you
     break it:
-    - purple: progression (items that open up the seed)
+
+    - purple: progression
     - blue: useful
     - cyan: filler
     - salmon: trap
-    A box stays pink until the game has looked up what is inside, a moment
-    after connecting.
 
     Off: every AP item box is pink for everyone in this slot, so the colour
     gives nothing away. Use this for races and tournaments.
 
-    Each player can also turn the colours off for themselves in the game:
-    Options, Archipelago page, Item Box Colours. When this option is off, the
-    game shows that row as "OFF (SEED)" and players cannot turn colours on.
-
-    Only does something when Item Box Locations is on."""
+    Players can also turn the colours off in the game under Options,
+    Archipelago, Item Box Colours. When this option is off, that row shows
+    "OFF (SEED)". Only does something when Item Box Locations is on."""
     display_name = "Item Box Colours"
 
 
 class WarpPadUnlockRequirements(Choice):
-    """How warp pads unlock, the heart of the randomizer.
+    """How warp pads unlock.
 
     - **randomized** (default): every warp pad gets a randomized entry
       requirement (trophies, tokens, relics, keys, gems...), always collectable
@@ -861,8 +728,8 @@ class WarpPadUnlockRequirements(Choice):
     - **vanilla**: pads open on their vanilla trophy counts, like the original
       adventure.
     - **random_without_4_keys**: like randomized, but no pad needs all 4 Keys.
-      Pads can still ask for 1 to 3 Keys. For no Keys on pads at all, use
-      `Requirement Variety` custom with `Key: 0` in `Requirement Weights`."""
+      Pads can still ask for 1 to 3 Keys. For no Keys on pads at all, set
+      Requirement Variety to custom and `Key: 0` in Requirement Weights."""
     # "Always collectable" is enforced by the solvability-proven sphere search
     # at generation time.
     display_name = "Warp Pad Unlock Requirements"
@@ -898,13 +765,14 @@ class TwoStageDensity(Choice):
 
 
 class RequirementVariety(Choice):
-    """Weight preset for randomized warp-pad requirements (randomized modes
-    only).
+    """Which mix of items randomized warp pads ask for. Only used with
+    randomized unlock requirements.
 
-    - **icebound_beta5** (default): Icebound's rebalanced weights - still
-      trophy-leaning, with more token, relic and key variety.
-    - **trophy_heavy_legacy**: the previous, more trophy-dominated weights.
-    - **custom**: use the weights from `Requirement Weights`."""
+    - **icebound_beta5** (default): Icebound's rebalanced mix. Trophies are
+      the most common, with plenty of CTR Tokens, Relics and Keys and a few
+      Gems.
+    - **trophy_heavy_legacy**: the older mix, with more Trophies.
+    - **custom**: use the weights from Requirement Weights."""
     # The exact tables: icebound_beta5 = Trophy 90, each CTR Token 16 (Purple
     # 12), each Relic tier 18, Key 20, each Gem 4; Any* collapse Token x0.8
     # (cap 16), Relic x0.5 (cap 27), Gem capped at 5 (no -1 reduction).
@@ -920,22 +788,15 @@ class RequirementVariety(Choice):
 
 
 class RequirementWeights(OptionDict):
-    """Roll your own requirement mix. Used only when `Requirement Variety` =
-    custom. Each entry is `item name: weight` - higher weight means picked more
-    often; 0 disables an item, except Trophy, which must stay above 0. The
-    pre-filled values are the icebound_beta5 weights - tweak from there. Items
-    you leave out keep their icebound_beta5 default weight.
+    """Your own mix of warp-pad requirements, used only when Requirement
+    Variety is custom.
 
-    Example:
+    Each entry is `item name: weight`. Higher means picked more often, 0
+    means never; Trophy must stay above 0. Items you leave out keep their
+    icebound_beta5 weight, which is also what the pre-filled values show.
 
-        requirement_variety: custom
-        requirement_weights:
-          Trophy: 30
-          Key: 40
-          Sapphire Relic: 40
-
-    Valid keys: Trophy, Key, the five CTR Token colours, the three Relic tiers,
-    and the five Gem colours."""
+    Valid keys: Trophy, Key, the five CTR Token colours, the three Relic
+    tiers and the five Gem colours."""
     # Trophy must stay above 0 because it bootstraps the randomized warp-pad
     # requirements. Unlisted items fall back to their icebound_beta5 weight
     # (see RequirementVariety's comment for the tables).
@@ -994,7 +855,8 @@ class DeathLink(Choice):
     - **mask_reset**: send a death only when the mask carries you back, meaning
       you fell off the track or were eaten. Low frequency.
     - **any_hit**: also send on every hit that lands on you (spin-out, blast,
-      squish, burn). Much higher frequency, so pair it with `DeathLink Amnesty`.
+      squish, burn). Much higher frequency, so pair it with DeathLink
+      Amnesty.
 
     Receiving a death always forces the full mask reset on you. Only
     adventure-mode races send."""
@@ -1013,8 +875,8 @@ class DeathLink(Choice):
 
 class DeathLinkAmnesty(Range):
     """How many of your deaths must pile up before one is actually sent. 1
-    (default) sends every death; N sends one per N. Meant for the `any_hit`
-    tier. Incoming deaths are unaffected - amnesty only throttles what you
+    (default) sends every death; N sends one per N. Meant for the any_hit
+    tier. Incoming deaths are unaffected; amnesty only throttles what you
     send."""
     # Does nothing useful at mask_reset (those wipeouts are already rare) and
     # is inert while DeathLink is off.
@@ -1038,30 +900,30 @@ class PodiumPlacementChecks(DefaultOnToggle):
 
 
 class PodiumFinishRungs(DefaultOnToggle):
-    """Include the finish-line rungs on each trophy race (needs `Podium
-    Placement Checks` on): "Finish on Podium" (top 3) and "Finish (Any
-    Position)". Toggle the any-position half with `Podium: Any-Position
-    Rung`."""
+    """Include the finish-line rungs on each trophy race (needs Podium
+    Placement Checks on): "Finish on Podium" (top 3) and "Finish (Any
+    Position)". Toggle the any-position half with Podium: Any-Position
+    Rung."""
     display_name = "Podium Finish Rungs"
 
 
 class PodiumAnyPositionRung(DefaultOnToggle):
     """Also include the "Finish (Any Position)" rung on each trophy race, earned
     by simply crossing the finish line. Off keeps only "Finish on Podium". Needs
-    `Podium Finish Rungs` on."""
+    Podium Finish Rungs on."""
     display_name = "Podium: Any-Position Rung"
 
 
 class PodiumHeldRungs(DefaultOnToggle):
-    """Include the live-position "held" rungs on each trophy race (needs `Podium
-    Placement Checks` on): "Held 1st" and "Held 3rd", earned the moment you hold
-    that position on track. Add "Held 5th" with `Podium: Held 5th Rung`."""
+    """Include the live-position "held" rungs on each trophy race (needs Podium
+    Placement Checks on): "Held 1st" and "Held 3rd", earned the moment you hold
+    that position on track. Add "Held 5th" with Podium: Held 5th Rung."""
     display_name = "Held-Position Rungs"
 
 
 class PodiumHeldFifthRung(Toggle):
     """Also add a "Held 5th" rung to each trophy race, earned by holding 5th
-    place or better at any point. Needs `Held-Position Rungs` on. Off by
+    place or better at any point. Needs Held-Position Rungs on. Off by
     default; turn it on for 16 extra early checks."""
     # The widest, easiest held rung -- kept off by default to hold the
     # item/location pool in balance.
@@ -1166,21 +1028,12 @@ class CharacterUnlocks(DefaultOnToggle):
 
 
 class RacerLockedPads(Range):
-    """The most warp pads that may be locked to a specific racer.
+    """The most warp pads that can require a specific racer.
 
-    You need to have unlocked the racer a pad names. When you enter, the game
-    seats you as that racer for the destination and restores your previous
-    racer when you return to the hub. The pad shows who it needs.
-
-    0 (default) turns racer locks off. Any higher value is a MAXIMUM, not a
-    promise: a pad can only take a lock if this seed randomized it and did not
-    leave it open from the start, so a seed with few randomized pads gives you
-    fewer locks than you asked for rather than failing to generate. The
-    always-open N. Sanity Beach starter pads are never locked.
-
-    Never your starting racer - a lock you already satisfy would be no lock
-    at all. Needs Character Unlocks to be on, since otherwise every racer is
-    available from the start."""
+    To enter a locked pad you need that racer unlocked; the game seats you as
+    them for that destination. 0 (default) turns this off. A seed with few
+    randomized pads gets fewer locks than you asked for. Your starting racer
+    is never required. Needs Character Unlocks on."""
     display_name = "Racer-Locked Warp Pads"
     range_start = 0
     # The complete supported physical-pad census. No seed has more pads than
@@ -1235,16 +1088,13 @@ class RacerLockedPads(Range):
 
 
 class PentaStats(Choice):
-    """Which version of Penta Penguin's stats to use.
+    """Which version of Penta Penguin's stats to use. Penta is the one racer
+    whose stats differ by region.
 
-    Penta is the one racer whose stats differ by region. He was added very
-    late and shipped unfinished in NTSC-U, where he simply reuses Polar and
-    Pura's turning class. The later PAL release finished him, with top values
-    in every category, which makes him the strongest racer in the game.
-
-    - **ntsc** (default): the turning-class version, same as Polar and Pura.
-    - **pal**: the maxed-out version, which makes him the strongest racer in
-      the game.
+    - **ntsc** (default): the unfinished NTSC-U version, which reuses Polar
+      and Pura's turning stats.
+    - **pal**: the finished PAL version, with top values in every category.
+      This makes him the strongest racer in the game.
 
     Progressive Stats or Editable Stats overrides this choice."""
     display_name = "Penta Penguin Stats"
@@ -1263,9 +1113,8 @@ class EditableStats(Choice):
     - **global**: one custom setup shared by every racer.
     - **per_character**: a separate setup for each of the 16 racers.
 
-    Progressive Stats wins if you enable both - the panel goes read-only and
-    no edit controls appear. The seed still generates; the two are simply
-    different ways to decide the same numbers."""
+    Progressive Stats wins if you enable both: the panel goes read-only and
+    no edit controls appear."""
     display_name = "Editable Stats"
     option_off = 0
     option_global = 1

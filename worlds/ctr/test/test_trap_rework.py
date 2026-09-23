@@ -420,26 +420,28 @@ class TestTrapWeightsAccessibilityHelpText(unittest.TestCase):
     a future edit to the docstring cannot silently drop the warning; no
     option semantics/values are touched or asserted here."""
 
+    @staticmethod
+    def _doc():
+        # Whitespace-normalized, so rewrapping the docstring does not break
+        # the pin; the wording itself is still checked.
+        return " ".join((TrapWeights.__doc__ or "").split())
+
     def test_help_text_names_the_camera_and_visual_traps(self):
         self.assertIn(
-            "Five traps change the camera or the screen itself and may be "
-            "visually\n    intense or uncomfortable: First Person, "
-            "Wireframe, Upside Down, Mirror\n    Mode, and Demo Camera.",
-            TrapWeights.__doc__)
+            "`first_person`, `wireframe`, `upside_down`, `mirror_mode` and "
+            "`demo_camera` change the camera or the screen and can be "
+            "visually intense.",
+            self._doc())
 
     def test_help_text_says_weight_zero_disables_the_effect(self):
-        self.assertIn(
-            "Set an individual trap's weight to 0 to disable\n    that "
-            "effect entirely -- it becomes unpickable while every other "
-            "trap\n    keeps its own weight.",
-            TrapWeights.__doc__)
+        self.assertIn("Set a trap to 0 to turn it off", self._doc())
 
-    def test_manual_yaml_limitation_note_is_still_present(self):
-        # This warning predates #280; the accessibility text must not have
-        # displaced or reworded it.
-        self.assertIn(
-            "The Archipelago website's options pages cannot show a mapping",
-            TrapWeights.__doc__)
+    def test_help_text_says_unlisted_traps_keep_their_default(self):
+        # The 2026-09-23 help-text trim dropped the website/template paragraph
+        # (it pointed at surfaces that do not host this world); the partial
+        # mapping rule is what a player editing by hand still needs.
+        self.assertIn("Traps you leave out keep their default weight.",
+                      self._doc())
 
 
 if __name__ == "__main__":
