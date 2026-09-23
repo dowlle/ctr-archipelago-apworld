@@ -479,7 +479,36 @@ def resolve_racer_locks(world) -> Dict[str, str]:
         return {}
     chosen_pads = world.random.sample(pads, n)
     candidates = [c for c in ROSTER if c != world.ctr_starting_character]
-    return {pad: world.random.choice(candidates) for pad in sorted(chosen_pads)}
+    return dict(zip(sorted(chosen_pads), spread_lock_racers(world, candidates, n)))
+
+
+def spread_lock_racers(world, candidates: List[str], n: int) -> List[str]:
+    """`n` required racers, spread as evenly as the roster allows.
+
+    Drawn from a shuffled bag of every candidate that is only refilled once it
+    is empty, so no racer locks a second pad until every candidate locks one.
+    With the 15 non-starter candidates that means one pad per racer up to 15
+    locks and at most two per racer from 16 to 30 (the option tops out at 27):
+    at most `ceil(n / len(candidates))` pads per racer, never more.
+
+    The draw used to be one independent `random.choice` per pad, with
+    replacement, so a single racer routinely locked three or more pads while
+    others locked none. That concentration made one unlock item gate a large
+    part of the seed, and made it likely that the item's own location sat on a
+    track that racer also locked (2026-09-22 racer-lock research).
+
+    The result is only ever produced here, at generation. Universal Tracker
+    pins the map from the wire (`reconstruct_racer_locks_from_wire`), so
+    changing the draw leaves every existing seed's reconstruction unchanged.
+    """
+    out: List[str] = []
+    if not candidates:
+        return out
+    while len(out) < n:
+        bag = list(candidates)
+        world.random.shuffle(bag)
+        out.extend(bag)
+    return out[:n]
 
 
 def racer_lock_counts(world) -> Tuple[int, int]:
@@ -566,6 +595,63 @@ def racer_lock_slot_data(world) -> Dict[str, object]:
     }
 
 
+def locked_destination_regions(world, pad_name: str) -> list:
+    """The regions whose checks belong to the destination `pad_name` loads.
+
+    Read from the built graph, not from pad or track names: the pad's own
+    entrance knows which destination region it loads this seed (destination
+    shuffle retargets it), so there is no name-to-pad lookup to get wrong.
+
+    The destination region itself, plus the dead-end regions that hang off it
+    and belong to it: its `"<destination>: Podium"` and `"<destination>: Wumpa"`
+    regions, which Gem Cup legs (and a boss garage for Wumpa) also enter, and
+    any child region every entrance of which comes from the destination (a
+    custom race that replaces a Gem Cup surface). A Gem Cup's exits into the
+    Podium and Wumpa regions of the tracks it races are NOT included: those
+    belong to their own tracks, which have their own pads.
+    """
+    mw = world.multiworld
+    try:
+        destination = mw.get_entrance(pad_name, world.player).connected_region
+    except KeyError:
+        return []
+    if destination is None:
+        return []
+    out = [destination]
+    prefix = f"{destination.name}: "
+    for ent in destination.exits:
+        child = ent.connected_region
+        if child is None or child is destination or child in out:
+            continue
+        if child.name.startswith(prefix) or all(
+                e.parent_region is destination for e in child.entrances):
+            out.append(child)
+    return out
+
+
+def racer_lock_forbidden_locations(world) -> Dict[str, list]:
+    """{racer -> this world's locations that racer's unlock item may not hold}.
+
+    A racer's unlock never sits on a check of a destination whose pad that
+    racer locks. AP's own fill already keeps it out of places that are only
+    reachable through that pad, but a track's Held and Finish rungs (and its
+    per-track Wumpa check) are ALSO reachable through any Gem Cup that races
+    the track. So without this rule the fill could seat Crash's unlock on
+    `Polar Pass: Held 3rd` while the pad that loads Polar Pass says "requires
+    Crash": in logic through the cup, and unreadable to the player (2026-09-22
+    racer-lock research, config D seed 183).
+    """
+    locks = getattr(world, "ctr_racer_locks", {}) or {}
+    out: Dict[str, list] = {}
+    for pad_name, racer in sorted(locks.items()):
+        bucket = out.setdefault(racer, [])
+        for region in locked_destination_regions(world, pad_name):
+            for loc in region.locations:
+                if loc not in bucket:
+                    bucket.append(loc)
+    return out
+
+
 def verify_no_self_lock(world) -> None:
     """Post-fill proof that no racer's unlock item sits behind that racer's own
     lock (issue #209, "character-locked-pad solvability logic gets built and
@@ -592,6 +678,15 @@ def verify_no_self_lock(world) -> None:
         if loc.item is not None and loc.item.player == player
         and loc.item.name in needed
     }
+    for character, forbidden in racer_lock_forbidden_locations(world).items():
+        loc = holders.get(unlock_item_name(character))
+        if loc is not None and loc in forbidden:
+            raise OptionError(
+                f"CTR racer-locked pads: '{character}' was placed at "
+                f"'{loc.name}', a check of a destination whose own pad "
+                f"requires '{character}'. The placement rule installed by "
+                f"Rules.add_racer_unlock_placement_rules forbids this; a fill "
+                f"that bypassed it produced this seed.")
     for pad_name, character in sorted(locks.items()):
         item_name = unlock_item_name(character)
         loc = holders.get(item_name)

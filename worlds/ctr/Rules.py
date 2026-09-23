@@ -133,6 +133,7 @@ def set_rules(world):
     # Racer locks AND on top of whatever add_warp_pad_unlock_rules just
     # installed, so they must run after it (#54/#209, R8).
     add_racer_lock_rules(world, player)
+    add_racer_unlock_placement_rules(world, player)
     add_boss_garage_rules(world, player)
     add_oxide_access_contract(world, player)
     add_oxide_final_challenge_rule(world, player)
@@ -429,6 +430,31 @@ def add_racer_lock_rules(world, player):
             lambda state, i=character, p=player, base=base_rule:
             base(state) and state.has(i, p)
         )
+
+
+def add_racer_unlock_placement_rules(world, player):
+    """Keep each racer's unlock item off the checks of a destination that
+    racer's own lock closes (2026-09-22 racer-lock research, design b).
+
+    An item rule, not an access rule: nothing about what is reachable changes,
+    only where the fill may seat the 15 unlock items. The forbidden set is the
+    destination the locked pad loads plus its Podium and Wumpa dead ends,
+    which is exactly what a Gem Cup leg can otherwise reach around the lock
+    (`characters.racer_lock_forbidden_locations`). `verify_no_self_lock`
+    re-checks the filled seed against the same set.
+
+    No-op when racer locks are off. Under Universal Tracker it is installed
+    too and is inert there, because nothing is filled.
+    """
+    from worlds.generic.Rules import add_item_rule
+    from .characters import racer_lock_forbidden_locations, unlock_item_name
+    for racer, locations in racer_lock_forbidden_locations(world).items():
+        item_name = unlock_item_name(racer)
+        for loc in locations:
+            add_item_rule(
+                loc,
+                lambda item, n=item_name, p=player:
+                not (item.player == p and item.name == n))
 
 
 def add_item_box_rules(world, player):
