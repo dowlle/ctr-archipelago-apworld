@@ -829,6 +829,20 @@ class ApItemTypeColors(DefaultOnToggle):
     display_name = "AP Item Type Colours"
 
 
+class ColorBoxesByItem(Toggle):
+    """Colour each AP item box by the kind of item inside it.
+
+    Off (default): every AP item box is pink.
+
+    On: a box shows the Archipelago colour of its item before you break it:
+    purple for progression, blue for useful, cyan for filler, salmon for traps.
+    That tells you which boxes matter, so leave it off if you would rather be
+    surprised.
+
+    Only does something when Item Box Locations is on."""
+    display_name = "Item Box Colours"
+
+
 class WarpPadUnlockRequirements(Choice):
     """How warp pads unlock, the heart of the randomizer.
 
@@ -1311,6 +1325,8 @@ class ctrAPOptions(PerGameCommonOptions):
     warp_pad_item_display: WarpPadItemDisplay
     # warp pads: AP-logo marker colours (issue #212)
     ap_item_type_colors: ApItemTypeColors
+    # item boxes: colour by the item inside (ruling R11)
+    color_boxes_by_item: ColorBoxesByItem
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1374,7 +1390,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                    RacerLockedPads, PentaStats, EditableStats],
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
-    "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors],
+    "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
+                        ColorBoxesByItem],
     "DeathLink": [DeathLink, DeathLinkAmnesty],
 }
 
