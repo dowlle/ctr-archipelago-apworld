@@ -2,8 +2,8 @@
 
 WHY THIS FILE EXISTS
 --------------------
-`warppad_unlock_requirements: random_without_4_keys` (mode 2) promises that the
-four boss Keys are never a pad requirement. Until now the only enforcement was
+`warppad_unlock_requirements: random_without_4_keys` (mode 2) promises that no
+pad ever requires all four boss Keys (1 to 3 Keys stay allowed). Until now the only enforcement was
 `_post_process`, which the sphere search runs once over `pad_reqs` and once over
 `stage2_reqs` (warp_pad_logic step 3). The play-session report was that the
 promise held for stage 1 but not stage 2.

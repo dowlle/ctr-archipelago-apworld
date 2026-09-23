@@ -20,12 +20,13 @@ because the crashing draws happen before the first Key exists (project ruling,
 2026-07-21). Trophy>0 is both necessary and sufficient; Key=0 alone is safe.
 """
 
+import random
 import unittest
 
 from Options import OptionError
 
 from test.general import setup_multiworld
-from .. import ctrAPWorld
+from .. import ctrAPWorld, warp_pad_logic
 
 
 # Only generate_early needs to run to trip the guard; keep the raising cases cheap
@@ -104,6 +105,60 @@ class TestValidCustomWeightsGenerate(unittest.TestCase):
                     ctrAPWorld, seed=seed,
                     options=_options("vanilla",
                                      weights={"Trophy": 0, "Key": 0}))
+
+
+class TestZeroWeightNeverDrawn(unittest.TestCase):
+    """Issue #384: a weight of 0 disables an item, so it must never be drawn and
+    must never crash the draw. The issue #342 stage-2 redraw (apworld #79)
+    excludes the stage-1 family, which can leave only zero-weight items owned;
+    those used to reach random.choices and raise ``ValueError: Total of weights
+    must be greater than zero``."""
+
+    def setUp(self):
+        self._saved = warp_pad_logic.REQ_WEIGHTS
+
+    def tearDown(self):
+        warp_pad_logic.REQ_WEIGHTS = self._saved
+
+    def test_only_zero_weight_items_owned_returns_none(self):
+        weights = dict(warp_pad_logic.DEFAULT_REQUIREMENT_WEIGHTS)
+        weights["Key"] = 0
+        warp_pad_logic.REQ_WEIGHTS = weights
+        inv = warp_pad_logic.Inv()
+        inv.add("Trophy")
+        inv.add("Key")
+        other = {it for it in weights if it != "Trophy"}
+        self.assertIsNone(warp_pad_logic._choose_requirement(
+            random.Random(1), inv, other))
+
+    def test_zero_weight_item_is_never_chosen(self):
+        weights = dict(warp_pad_logic.DEFAULT_REQUIREMENT_WEIGHTS)
+        weights["Key"] = 0
+        warp_pad_logic.REQ_WEIGHTS = weights
+        inv = warp_pad_logic.Inv()
+        inv.add("Trophy")
+        inv.add("Key")
+        rnd = random.Random(7)
+        for _ in range(200):
+            req = warp_pad_logic._choose_requirement(rnd, inv)
+            self.assertNotEqual(req[0], "Key")
+
+    def test_custom_key_zero_full_density_generates(self):
+        # Seeds 11 and 15 crashed in create_regions before the fix (issue
+        # #384 workaround config: mode 2, custom weights with Key 0, full
+        # two-stage density).
+        opts = _options("random_without_4_keys", weights={"Key": 0})
+        opts["two_stage_density"] = "full"
+        for seed in (11, 15):
+            with self.subTest(seed=seed):
+                multiworld = setup_multiworld(ctrAPWorld, seed=seed,
+                                              options=opts)
+                world = multiworld.worlds[1]
+                for stage in (world.warp_pad_unlock,
+                              world.warp_pad_unlock_stage2):
+                    for pad, req in stage.items():
+                        self.assertNotEqual(req["type"], 2,
+                                            f"{pad} requires Keys")
 
 
 if __name__ == "__main__":

@@ -630,7 +630,14 @@ def _choose_requirement(rnd, inv, allowed=None):
     authoritative and are never silently overridden."""
     pool_items = REQ_WEIGHTS if allowed is None else [
         it for it in REQ_WEIGHTS if it in allowed]
-    cands = [(it, inv.items[it]) for it in pool_items if inv.items[it] > 0]
+    # A weight of 0 disables an item (Options.RequirementWeights), so it is never
+    # a candidate. Dropping it cannot change a draw that has any positive weight
+    # (random.choices never lands on a zero-width slot); it only turns an
+    # all-zero candidate list into the "nothing eligible" None below instead of
+    # a ValueError from random.choices (issue #384: the #342 stage-2 redraw
+    # excludes the stage-1 family and can leave only a zero-weight Key).
+    cands = [(it, inv.items[it]) for it in pool_items
+             if inv.items[it] > 0 and REQ_WEIGHTS[it] > 0]
     if not cands:
         return None
     cands.sort()  # Rust sorts possible_reqs before weighting
