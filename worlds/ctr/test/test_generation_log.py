@@ -60,7 +60,8 @@ class TestNoticesOncePerSlot(unittest.TestCase):
             mine = [line for line in lines
                     if "Letters Per Track" in line and name in line]
             with self.subTest(player=name):
-                self.assertEqual(len(mine), 1, mine)
+                self.assertEqual(mine, [f"CTR ({name}): ignored options: "
+                                        "Letters Per Track (Lettersanity off)"])
 
     def test_nothing_ctr_is_logged_while_the_mirror_runs(self):
         from .. import _quiet_ctr_logs

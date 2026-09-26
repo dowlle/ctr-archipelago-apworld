@@ -186,7 +186,7 @@ class TestTurboTrackComfortGuardClamp(unittest.TestCase):
         self.assertNotIn(
             "Turbo Track: Sapphire Time Trial",
             world._ctr_relic_keep["Sapphire Relic"])
-        self.assertTrue(any("Clamped to 17" in line for line in cm.output))
+        self.assertTrue(any("lowered from 18 to 17" in line for line in cm.output))
 
     def test_no_clamp_when_guard_inactive(self):
         mw = _early({
@@ -224,7 +224,7 @@ class TestGateCountGuards(unittest.TestCase):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({"accessibility": "minimal", "sapphire_relic_count": 5,
                     "oxide_goal": "none", "bosses_required_goal": 4})
-        self.assertTrue(any("permanently unreachable" in line for line in cm.output))
+        self.assertTrue(any("can never be reached" in line for line in cm.output))
 
     def test_vanilla_full_accessibility_raises_below_10_at_slide_coliseum(self):
         with self.assertRaises(OptionError) as ctx:
@@ -300,7 +300,7 @@ class TestGateCountGuards(unittest.TestCase):
                 "platinum_relic_count": 2,
             })
         self.assertTrue(
-            any("permanently unreachable" in line for line in cm.output))
+            any("can never be reached" in line for line in cm.output))
 
     def test_oxidefinal_total_relics_sums_across_progression_tiers(self):
         # total_relics in randomized mode: all three tiers are progression, so

@@ -346,10 +346,9 @@ def _log_never_created_excludes(world):
         if name in known and name not in created:
             say_once(
                 world, f"exclude_not_created:{name}",
-                f"CTR: exclude_locations names '{name}' for player "
-                f"{world.player} ({world.multiworld.player_name[world.player]}), "
-                f"but this seed never created that location -- the exclusion "
-                f"has no effect.", logger, logging.INFO)
+                f"CTR ({world.multiworld.player_name[world.player]}): "
+                f"exclude_locations names '{name}', which this seed never "
+                f"created.", logger, logging.INFO)
 
 
 def create_regions(world: "ctrAPWorld"):

@@ -37,3 +37,22 @@ def say_once(world, key: str, message: str, logger: logging.Logger,
     said.add(key)
     logger.log(level, message)
     return True
+
+
+def note_ignored(world, label: str) -> None:
+    """Record an option this slot's seed ignores, for `emit_ignored_summary`.
+
+    `label` names the option and, in brackets, why it has no effect."""
+    ignored = _state(world).setdefault("ignored", [])
+    if label not in ignored:
+        ignored.append(label)
+
+
+def emit_ignored_summary(world, logger: logging.Logger) -> None:
+    """One line per slot listing every ignored option, e.g.
+    `CTR (CTR1): ignored options: Letters Per Track (Lettersanity off)`."""
+    ignored = _state(world).get("ignored") or []
+    if ignored:
+        say_once(world, "ignored_summary",
+                 f"CTR ({slot_label(world)}): ignored options: "
+                 + ", ".join(ignored), logger)

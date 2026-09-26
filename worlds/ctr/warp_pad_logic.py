@@ -59,10 +59,8 @@ from .cortex_vortex_track import CORTEX_VORTEX
 # so it is neither silent nor a surprise.
 
 _STAGE2_COLLAPSE_REASONS = {
-    "geography": ("no free starting-pad subset could open sphere 0 wide enough "
-                  "({detail})"),
-    "fill": ("a dry run of this multiworld predicted the item fill would fail "
-             "otherwise ({detail})"),
+    "geography": "the free starting pads open too little of the hub",
+    "fill": "the item fill would fail otherwise",
 }
 
 
@@ -81,15 +79,17 @@ def warn_stage2_collapsed(world, reason, detail=""):
         template = "{detail}"
     message = (
         "[CTR] %s: two-stage warp-pad gating was collapsed for this seed because "
-        "%s. Every stage-2 warp-pad requirement drops to a plain Trophy Race "
-        "check, so this seed has less layered gating than two_stage_density "
-        "requested. The seed is fully playable and beatable; re-roll if you want "
-        "the layered version." % (who, template.format(detail=detail)))
+        "%s; it is fully playable, re-roll for the layered version."
+        % (who, template.format(detail=detail)))
     try:
         from .notices import say_once
-        say_once(world, f"stage2_collapsed:{reason}", message, logging.getLogger())
+        said = say_once(world, f"stage2_collapsed:{reason}", message,
+                        logging.getLogger())
     except AttributeError:  # a world without options (test doubles)
         logging.warning(message)
+        said = True
+    if said and detail and reason in _STAGE2_COLLAPSE_REASONS:
+        logging.debug("[CTR] %s: stage-2 collapse detail: %s", who, detail)
 
 
 # ---------------------------------------------------------------------------

@@ -565,8 +565,7 @@ class TestRacerLockCount(unittest.TestCase):
         self.assertEqual(block["pads"], {})
         self.assertEqual(block["requested_count"], 0)
         forced = [m for m in messages
-                  if "Racer-Locked Warp Pads" in m
-                  and "Character Unlocks is off" in m]
+                  if "Racer-Locked Warp Pads (Character Unlocks off)" in m]
         self.assertEqual(len(forced), 1, messages)
 
     # -- wire ------------------------------------------------------------
@@ -657,21 +656,22 @@ class TestAlpha6BooleanCompatibility(unittest.TestCase):
 
     def test_the_normalization_is_logged_exactly_once(self):
         messages = _forced_option_warnings(1, racer_locked_pads=True)
-        said = [m for m in messages if "maximum lock COUNT" in m]
+        said = [m for m in messages if "'true' is read the Alpha 6 way" in m]
         self.assertEqual(len(said), 1, messages)
         message = said[0]
         # It must name what it did and what to write instead, not merely warn.
-        self.assertIn("Alpha 6 way", message)
+        self.assertIn("a quarter of the eligible pads", message)
+        self.assertIn("write a number instead", message)
         self.assertIn("0 turns racer locks off", message)
 
     def test_false_says_nothing_because_off_means_the_same_thing(self):
         said = [m for m in _forced_option_warnings(1, racer_locked_pads=False)
-                if "maximum lock COUNT" in m]
+                if "Alpha 6 way" in m]
         self.assertEqual(said, [])
 
     def test_an_integer_request_says_nothing_either(self):
         said = [m for m in _forced_option_warnings(1, racer_locked_pads=4)
-                if "maximum lock COUNT" in m]
+                if "Alpha 6 way" in m]
         self.assertEqual(said, [])
 
     def test_a_boolean_seed_still_survives_a_real_fill(self):
