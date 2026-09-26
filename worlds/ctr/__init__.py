@@ -137,6 +137,25 @@ def _quiet_ctr_logs():
         package.setLevel(previous)
 
 
+def _probe_error_where(step, error, real) -> str:
+    """The failing probe step, plus the slot and game when one world's step
+    raised: AP's `call_single` attaches "for player N, named X" to the
+    exception (PEP 678 note), and the mirror numbers slots like the room."""
+    import re
+    for note in getattr(error, "__notes__", ()) or ():
+        m = re.search(r"for player (\d+), named (.*)\.$", str(note))
+        if m:
+            player = int(m.group(1))
+            game = getattr(real, "game", {}).get(player, "?")
+            return f"{step}, player {player} {m.group(2)!r}, game {game!r}"
+    return step
+
+
+def _one_line(error) -> str:
+    text = " ".join(str(error).split())
+    return f"{type(error).__name__}: {text}" if text else type(error).__name__
+
+
 class ctrAPWorld(World):
     """
     Crash Team Racing (CTR) is a kart racing game developed by Naughty Dog and published by Sony
@@ -779,7 +798,9 @@ class ctrAPWorld(World):
         unaffected.
 
         The probe does not reproduce item links. It is a fillability predictor,
-        not a second generator; any error keeps two-stage."""
+        not a second generator; any error keeps two-stage, and names the step
+        (and the slot, when one world's step raised) on one line."""
+        step = "setup"
         try:
             from BaseClasses import MultiWorld as _MW, CollectionState as _CS
             from worlds.AutoWorld import call_all as _call_all, AutoWorldRegister
@@ -824,6 +845,7 @@ class ctrAPWorld(World):
                 for step in ("generate_early", "create_regions", "create_items",
                              "set_rules", "connect_entrances", "generate_basic"):
                     _call_all(pmw, step)
+                step = "pre_fill"
                 # Main.py's pre_fill step, with the mirror's CTR slots no-opped
                 # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
                 # assignment shadows the bound method for exactly these objects;
@@ -833,14 +855,19 @@ class ctrAPWorld(World):
                     if isinstance(pmw.worlds[p], ctrAPWorld):
                         pmw.worlds[p].pre_fill = lambda: None
                 _call_all(pmw, "pre_fill")
+                step = "fill"
                 _dist(pmw)
             return True
         except Exception as e:
             from Fill import FillError as _FE
             if isinstance(e, _FE):
                 return False
-            logging.warning("[CTR] two-stage fillability probe errored (%s); "
-                            "keeping two-stage.", type(e).__name__)
+            logging.warning("[CTR] two-stage fillability probe could not run "
+                            "(%s): %s; keeping two-stage.",
+                            _probe_error_where(step, e, self.multiworld),
+                            _one_line(e))
+            logging.debug("[CTR] two-stage fillability probe traceback",
+                          exc_info=True)
             return None
 
     _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40

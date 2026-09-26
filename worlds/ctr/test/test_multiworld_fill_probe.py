@@ -202,6 +202,50 @@ class ProbeVerdicts(unittest.TestCase):
             with self.subTest(exc=type(exc).__name__):
                 self.assertIsNone(self._probe_raising(exc))
 
+    def test_an_error_names_the_step_slot_game_and_message(self):
+        """One line a player can paste: which step, which slot and game when
+        one world's step raised, and the exception message. The traceback goes
+        to the debug log only."""
+        import logging
+        games = {1: "Crash Team Racing", 2: "FakeCompanion"}
+        real = _fake_real_multiworld(games)
+        world = ctrAPWorld.__new__(ctrAPWorld)
+        world.multiworld = real
+        world.player = 1
+        world.options = real.worlds[1].options
+
+        def failing_call_all(pmw, step, *a, **kw):
+            if step == "create_regions":
+                error = KeyError("Menu")
+                error.add_note("Exception in <bound method FakeWorld.create_regions> "
+                               "for player 2, named Player2.")
+                raise error
+
+        world_types = dict(AutoWorld.AutoWorldRegister.world_types)
+        world_types["FakeCompanion"] = _FakeWorld
+        with mock.patch.object(AutoWorld, "call_all", failing_call_all), \
+                mock.patch.dict(AutoWorld.AutoWorldRegister.world_types,
+                                world_types, clear=True), \
+                self.assertLogs(level=logging.DEBUG) as cm:
+            self.assertIsNone(world._probe_two_stage_fillable())
+        warnings = [r for r in cm.records if r.levelno >= logging.WARNING]
+        self.assertEqual(len(warnings), 1)
+        line = warnings[0].getMessage()
+        self.assertIn("create_regions, player 2 'Player2', game 'FakeCompanion'",
+                      line)
+        self.assertIn("KeyError: 'Menu'", line)
+        self.assertIsNone(warnings[0].exc_info)
+        debug = [r for r in cm.records if r.levelno == logging.DEBUG
+                 and r.exc_info]
+        self.assertEqual(len(debug), 1)
+
+    def test_a_fill_error_outside_one_world_names_the_step(self):
+        import logging
+        with self.assertLogs(level=logging.WARNING) as cm:
+            self.assertIsNone(self._probe_raising(RuntimeError("boom\nsecond line")))
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn("(fill): RuntimeError: boom second line", cm.output[0])
+
     def test_non_contiguous_player_ids_fail_open(self):
         """_MW(n) builds slots 1..n. If a real room ever numbers its slots any
         other way, mirroring it by count would silently predict for the wrong
