@@ -339,15 +339,17 @@ def _log_never_created_excludes(world):
     fires for ANY location class that freezes more names than a given seed
     creates -- podium rungs today, relic Time Trials from issue #171, any
     future class (#49/#109/#148) -- not a relic-specific check."""
+    from .notices import say_once
     created = set(world.multiworld.regions.location_cache[world.player].keys())
     known = set(world.location_name_to_id.keys())
     for name in sorted(world.options.exclude_locations.value):
         if name in known and name not in created:
-            logger.info(
+            say_once(
+                world, f"exclude_not_created:{name}",
                 f"CTR: exclude_locations names '{name}' for player "
                 f"{world.player} ({world.multiworld.player_name[world.player]}), "
                 f"but this seed never created that location -- the exclusion "
-                f"has no effect.")
+                f"has no effect.", logger, logging.INFO)
 
 
 def create_regions(world: "ctrAPWorld"):

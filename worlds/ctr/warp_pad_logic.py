@@ -79,13 +79,17 @@ def warn_stage2_collapsed(world, reason, detail=""):
     template = _STAGE2_COLLAPSE_REASONS.get(reason)
     if template is None:  # unknown reason -> still warn, never swallow
         template = "{detail}"
-    logging.warning(
+    message = (
         "[CTR] %s: two-stage warp-pad gating was collapsed for this seed because "
         "%s. Every stage-2 warp-pad requirement drops to a plain Trophy Race "
         "check, so this seed has less layered gating than two_stage_density "
         "requested. The seed is fully playable and beatable; re-roll if you want "
-        "the layered version.",
-        who, template.format(detail=detail))
+        "the layered version." % (who, template.format(detail=detail)))
+    try:
+        from .notices import say_once
+        say_once(world, f"stage2_collapsed:{reason}", message, logging.getLogger())
+    except AttributeError:  # a world without options (test doubles)
+        logging.warning(message)
 
 
 # ---------------------------------------------------------------------------

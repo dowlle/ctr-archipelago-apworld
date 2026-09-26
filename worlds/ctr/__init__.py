@@ -1,4 +1,5 @@
 import logging
+import contextlib
 import json
 import os
 from typing import ClassVar, Dict, List
@@ -109,6 +110,31 @@ class ctrAPWeb(WebWorld):
             ["Taor", "Icebound777"]
         )
     ]
+
+
+class _DropCtrRootRecords(logging.Filter):
+    """Drops the CTR lines some modules log straight on the root logger."""
+
+    def filter(self, record):
+        return not str(record.msg).startswith(("[CTR", "CTR"))
+
+
+@contextlib.contextmanager
+def _quiet_ctr_logs():
+    """Mute CTR log output: every `worlds.ctr.*` module logger (through the
+    package logger's level, which they inherit) and the root-logger `[CTR]`
+    lines. Other games' output is untouched."""
+    package = logging.getLogger(__name__)
+    root = logging.getLogger()
+    previous = package.level
+    root_filter = _DropCtrRootRecords()
+    package.setLevel(logging.CRITICAL + 1)
+    root.addFilter(root_filter)
+    try:
+        yield
+    finally:
+        root.removeFilter(root_filter)
+        package.setLevel(previous)
 
 
 class ctrAPWorld(World):
@@ -791,19 +817,23 @@ class ctrAPWorld(World):
             # fidelity fix, not a workaround: a probe that does not mirror
             # Main.py cannot predict Main.py.
             pmw.state = _CS(pmw)
-            for step in ("generate_early", "create_regions", "create_items",
-                         "set_rules", "connect_entrances", "generate_basic"):
-                _call_all(pmw, step)
-            # Main.py's pre_fill step, with the mirror's CTR slots no-opped
-            # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
-            # assignment shadows the bound method for exactly these objects;
-            # call_all still walks every slot in real player order and still
-            # runs any stage_pre_fill class hooks.
-            for p in players:
-                if isinstance(pmw.worlds[p], ctrAPWorld):
-                    pmw.worlds[p].pre_fill = lambda: None
-            _call_all(pmw, "pre_fill")
-            _dist(pmw)
+            # The mirror repeats every CTR step for every CTR slot; anything it
+            # logs was already said by the real pass, so CTR output is muted
+            # until the dry run ends (restored before any verdict is logged).
+            with _quiet_ctr_logs():
+                for step in ("generate_early", "create_regions", "create_items",
+                             "set_rules", "connect_entrances", "generate_basic"):
+                    _call_all(pmw, step)
+                # Main.py's pre_fill step, with the mirror's CTR slots no-opped
+                # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
+                # assignment shadows the bound method for exactly these objects;
+                # call_all still walks every slot in real player order and still
+                # runs any stage_pre_fill class hooks.
+                for p in players:
+                    if isinstance(pmw.worlds[p], ctrAPWorld):
+                        pmw.worlds[p].pre_fill = lambda: None
+                _call_all(pmw, "pre_fill")
+                _dist(pmw)
             return True
         except Exception as e:
             from Fill import FillError as _FE
