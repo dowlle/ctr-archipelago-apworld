@@ -254,5 +254,57 @@ class ProbeRunsOnARealMultiworld(unittest.TestCase):
                       "probe failed open on a plain 2-player room")
 
 
+class OneProbePerRoom(unittest.TestCase):
+    """Every CTR slot's pre_fill used to run its own probe. The mirror is the
+    whole room built from the real seed and the shared option objects, so the
+    probes were identical; one per room gives the same verdict."""
+
+    def _worlds(self, n):
+        real = types.SimpleNamespace()
+        out = []
+        for p in range(1, n + 1):
+            w = ctrAPWorld.__new__(ctrAPWorld)
+            w.multiworld = real
+            w.player = p
+            out.append(w)
+        return out
+
+    def test_the_first_caller_probes_and_the_rest_reuse_the_verdict(self):
+        for verdict in (True, False, None):
+            with self.subTest(verdict=verdict):
+                calls = []
+
+                def probe(self_, v=verdict):
+                    calls.append(self_.player)
+                    return v
+
+                with mock.patch.object(ctrAPWorld, "_probe_two_stage_fillable",
+                                       probe):
+                    got = [w._room_probe_verdict() for w in self._worlds(3)]
+                self.assertEqual(calls, [1])
+                self.assertEqual(got, [verdict] * 3)
+
+    def test_a_three_ctr_room_runs_one_dry_run(self):
+        """End-to-end through Main.py's step order: three CTR slots, pre_fill
+        on all of them, exactly one probe, and every two-stage slot gets the
+        same decision."""
+        from test.general import setup_multiworld
+        calls = []
+        original = ctrAPWorld._probe_two_stage_fillable
+
+        def counting(self_):
+            calls.append(self_.player)
+            return original(self_)
+
+        opts = {"warppad_unlock_requirements": "randomized"}
+        with mock.patch.object(ctrAPWorld, "_probe_two_stage_fillable", counting):
+            mw = setup_multiworld([ctrAPWorld] * 3, seed=11, options=opts)
+        active = [p for p in mw.player_ids
+                  if getattr(mw.worlds[p], "_ctr_two_stage_active", False)]
+        self.assertTrue(active, "fixture has no two-stage slot")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0], active[0])
+
+
 if __name__ == "__main__":
     unittest.main()

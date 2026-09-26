@@ -655,7 +655,7 @@ class ctrAPWorld(World):
         # corner on 60415b4ad) -- the terminal backstop below closes that residual.
         if (getattr(self, "_ctr_two_stage_active", False)
                 and not getattr(self, "_ctr_force_collapse_stage2", False)):
-            if self._probe_two_stage_fillable() is False:
+            if self._room_probe_verdict() is False:
                 self._ctr_force_collapse_stage2 = True
                 # Overwrite the stage-2 access rules with the collapsed (plain
                 # can_reach Trophy Race) form; fill_slot_data also emits type-0
@@ -685,9 +685,33 @@ class ctrAPWorld(World):
                     else "randomized")
             self._rollback_precollect_backstop(mode)
 
+    def _room_probe_verdict(self):
+        """The room's two-stage fillability verdict, probed once per room.
+
+        The probe mirrors the WHOLE room (every slot, every game) from the real
+        seed and the real option objects, and the mirror's CTR `pre_fill` is a
+        no-op, so a CTR slot's own collapse is not one of its inputs: every CTR
+        slot used to run an identical dry run and get the same answer. The
+        first CTR `pre_fill` that needs a verdict runs the probe -- the same
+        point in AP's call order where the first per-slot probe used to run --
+        and later CTR slots reuse it.
+
+        A latch on the multiworld rather than a `stage_pre_fill` hook: in AP
+        0.6.7 `call_all` runs the stage hook AFTER every world's `pre_fill`, so
+        it would run after the solo rollback-precollect backstop that must see
+        the collapse first."""
+        mw = self.multiworld
+        cached = getattr(mw, "_ctr_room_probe_verdict", None)
+        if cached is not None:
+            return cached[0]
+        verdict = self._probe_two_stage_fillable()
+        mw._ctr_room_probe_verdict = (verdict,)
+        return verdict
+
     def _probe_two_stage_fillable(self):
         """True/False if a faithful parallel dry-run fills; None if the probe could
-        not run (caller treats None as 'keep two-stage').
+        not run (caller treats None as 'keep two-stage'). Called once per room
+        through `_room_probe_verdict`.
 
         MULTIWORLD-AWARE (issue #75, ruled 2026-08-07). The probe mirrors the REAL
         room: same player count, same games per slot, each slot carrying its own
