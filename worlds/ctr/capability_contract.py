@@ -123,6 +123,15 @@ EASY_TROPHY_GROUP = DifficultyTrackGroup(
 #: Status is `ruled`, not `confirmed`, and it must stay that way until someone
 #: actually drives these for the matrix. If a later field pass measures one, it
 #: moves into EASY_TROPHY_GROUP with a real source line and leaves here.
+#:
+#: The two trial tracks joined later under the same ruling. Their Trophy Races
+#: (#203, `trial_trophy`) exist only when their option creates them, and they
+#: had been left out of every group, so they were free at every difficulty.
+#:
+#: Custom-track slots follow the same ruling without being listed here: their
+#: names are per-seed slots, so `Rules.add_capability_difficulty_rules` gates
+#: every created `Custom Track <n>: Trophy Race` from the seed's resolved
+#: custom tracks (`CUSTOM_TRACK_SLOTS_RULED` below says so in one place).
 RULED_TROPHY_GROUP = DifficultyTrackGroup(
     name="ruled_trophy_group",
     tracks=frozenset({
@@ -132,11 +141,19 @@ RULED_TROPHY_GROUP = DifficultyTrackGroup(
         "Polar Pass",
         "Tiny Arena",
         "N. Gin Labs",
+        "Slide Coliseum",
+        "Turbo Track",
     }),
     source="Design ruling 2026-08-17: unmeasured tracks take the easy-group "
-           "requirement rather than none",
+           "requirement rather than none. Slide Coliseum and Turbo Track "
+           "added from the player report of 2026-09-26, approved 2026-09-27",
     status=STATUS_RULED,
 )
+
+#: Every custom-track slot is unmeasured for this rule (a descriptor's
+#: measured flags say nothing about boost), so each created custom Trophy Race
+#: takes the ruled requirement too.
+CUSTOM_TRACK_SLOTS_RULED = True
 
 assert not (EASY_TROPHY_GROUP.tracks & RULED_TROPHY_GROUP.tracks), \
     "a track cannot be both measured and ruled"

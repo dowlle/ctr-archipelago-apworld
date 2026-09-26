@@ -169,12 +169,16 @@ def add_capability_difficulty_rules(world, player):
     The track inventory lives in capability_contract and is the UNION of the
     measured easy group and the ruled group -- read through
     `difficulty_gated_tracks()` rather than either set, so a track cannot be
-    gated here and skipped by a parity test.
+    gated here and skipped by a parity test. The seed's custom-track slots are
+    added to it (`CUSTOM_TRACK_SLOTS_RULED`); their podium rungs live in the
+    slot region, so the easy rung gates reach them by the same names.
 
     The weapon-family arm requires `itemsanity.DIFFICULTY_WEAPON_FAMILY_MIN`
     distinct families (three since the 2026-09-20 ruling, two before it).
     """
-    from .capability_contract import difficulty_gated_tracks
+    from .capability_contract import (CUSTOM_TRACK_SLOTS_RULED,
+                                      difficulty_gated_tracks)
+    from .custom_track_locations import slot_region
     from .itemsanity import (DIFFICULTY_WEAPON_FAMILY_MIN,
                              USEFUL_WEAPON_FAMILIES, family_count)
     from .podium import location_name
@@ -188,7 +192,11 @@ def add_capability_difficulty_rules(world, player):
         return
 
     names = {loc.name for loc in world.multiworld.get_locations(player)}
-    for track in difficulty_gated_tracks():
+    tracks = set(difficulty_gated_tracks())
+    if CUSTOM_TRACK_SLOTS_RULED:
+        tracks.update(slot_region(int(entry["slot"])) for entry in
+                      (getattr(world, "custom_tracks", None) or {}).values())
+    for track in sorted(tracks):
         required_character = track_required_character(world, track)
 
         def capability_rule(state, p=player, racer=required_character):

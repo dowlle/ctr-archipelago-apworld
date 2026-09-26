@@ -158,7 +158,23 @@ def track_required_character(world, track: str):
     locks = getattr(world, "ctr_racer_locks", {}) or {}
     if not locks:
         return None
-    return locks.get(destination_pad_name(world, track))
+    return locks.get(destination_pad_name(world, _custom_slot_host(world, track)))
+
+
+def _custom_slot_host(world, track: str) -> str:
+    """The destination region a custom-track slot replaced, or `track` itself.
+
+    A `Custom Track <n>` region has no pad of its own: it is entered through
+    the destination it displaced (the Purple Gem Cup today), so the racer that
+    pad demands is the racer on the custom track."""
+    if not track.startswith("Custom Track "):
+        return track
+    from .custom_track_locations import slot_region
+    from .custom_tracks import REPLACEABLE_DESTINATIONS
+    for entry in (getattr(world, "custom_tracks", None) or {}).values():
+        if slot_region(int(entry["slot"])) == track:
+            return REPLACEABLE_DESTINATIONS[entry["replaces"]][0]
+    return track
 
 
 def created_item_counts(world) -> Dict[str, int]:
