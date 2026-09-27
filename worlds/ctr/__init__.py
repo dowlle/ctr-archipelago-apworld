@@ -2270,7 +2270,9 @@ class ctrAPWorld(World):
                 # DeathLink (issue #6): ADDITIVE keys, no schema bump. A native
                 # predating these keys reads neither and DeathLink stays off (the
                 # one_lap_cups precedent: absent additive key degrades to the 0/off
-                # default). death_link is 0 off / 1 mask_reset / 2 any_hit; amnesty
+                # default). death_link is 0 off / 1 mask_reset / 2 any_hit /
+                # 3 race_loss (#286: native falls back to mask reset for any
+                # nonzero value it does not know, so no bump); amnesty
                 # is send-every-Nth (>=1). Native enables the "DeathLink" connection
                 # tag and its send/receive plumbing only when death_link != 0.
                 "death_link": o.death_link.value,
