@@ -283,6 +283,21 @@ class TestUniversalTracker(unittest.TestCase):
                          self.on_wire["relic_perfect_checks"])
         self.assertIs(again["ctr_options"]["relic_perfect_checks"], True)
 
+    def test_multidata_tuples_are_the_same_wire(self):
+        """A room's multidata hands the tracker tuples where a JSON round trip
+        has lists (seen in the check-ut fuzz arm)."""
+        wire = json.loads(json.dumps(self.on_wire))
+        wire["relic_perfect_checks"]["locations"] = {
+            k: tuple(v) for k, v in
+            wire["relic_perfect_checks"]["locations"].items()}
+        ut = _ut_regen(wire)
+        self.assertEqual(_names(ut) & set(NAMES), set(NAMES))
+
+    def test_string_code_is_refused(self):
+        wire = json.loads(json.dumps(self.on_wire))
+        wire["relic_perfect_checks"]["locations"]["3"] = ["35012400"]
+        self._refused(wire)
+
     def test_off_and_pre_feature_wires_regenerate_none(self):
         self.assertFalse(_names(_ut_regen(self.off_wire)) & set(NAMES))
         legacy = json.loads(json.dumps(self.off_wire))

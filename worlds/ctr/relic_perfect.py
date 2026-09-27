@@ -176,10 +176,21 @@ def restore_from_wire(options, passthrough) -> None:
                 "option off")
         return
     expected = RELIC_PERFECT_CLASS.wire_block(options)
-    if block != expected:
+    if _as_lists(block) != expected:
         raise OptionError(
             "CTR relic_perfect_checks: block does not match the frozen "
             "LevelID/code set for this seed")
+
+
+def _as_lists(value):
+    """The room's multidata stores sequences as tuples, a JSON round trip as
+    lists; compare them as the same wire. Nothing else is coerced: a string
+    code or a Boolean stays unequal to the frozen integer."""
+    if isinstance(value, (list, tuple)):
+        return [_as_lists(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _as_lists(v) for k, v in value.items()}
+    return value
 
 
 # ---------------------------------------------------------------------------
