@@ -707,7 +707,8 @@ class ctrAPWorld(World):
                 # stage 2. This re-install only reassigns loc.access_rule closures
                 # and consumes no multiworld.random (verified) -- so the terminal
                 # backstop's replay fidelity survives it.
-                from .Rules import add_lettersanity_rules, add_time_trial_and_ctr_requirements
+                from .Rules import (add_custom_ctr_challenge_rules, add_lettersanity_rules,
+                                    add_time_trial_and_ctr_requirements)
                 add_time_trial_and_ctr_requirements(self, self.player)
                 # The reinstall above deliberately replaces the CTR Token and
                 # created letter rules. Restore every Lettersanity layer after
@@ -715,6 +716,10 @@ class ctrAPWorld(World):
                 # the mode-2 own-letter guard. Universal Tracker skips this
                 # collapse path and already builds these layers in set_rules.
                 add_lettersanity_rules(self, self.player)
+                # Custom-track CTR Token Challenges take their letter item
+                # receipts from this separate installer; the reinstall above
+                # replaced those token rules too.
+                add_custom_ctr_challenge_rules(self, self.player)
                 from .warp_pad_logic import warn_stage2_collapsed
                 n = len(self.multiworld.worlds)
                 warn_stage2_collapsed(

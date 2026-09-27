@@ -1090,6 +1090,7 @@ def _rung_rule(track_branch, plain_cups, gated_cups, held_term, player):
 def _created_letter_names_for(world, track):
     """The seed's created letter location names on `track` (modes 1 and 2 both
     create them; modes 0 and 3 create none, so this returns nothing there).
+    Covers retail tracks, the Cortex Vortex pad track and custom-track slots.
 
     Filtered from LETTERSANITY_CLASS.created_location_names so the set matches
     exactly what create_regions built from the same resolved per-track selection
@@ -1100,8 +1101,16 @@ def _created_letter_names_for(world, track):
     if track == CORTEX_VORTEX:
         return CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options)
     prefix = f"{track}: Letter "
-    return [name for name in LETTERSANITY_CLASS.created_location_names(world.options)
-            if name.startswith(prefix)]
+    if track.startswith("Custom Track "):
+        # Custom-track slots: their letters sit inside that slot's own CTR
+        # Token Challenge exactly like a retail track's, so they take the
+        # same shared entry rule (ruling 2026-09-27). Same source list as
+        # create_regions uses for these locations.
+        from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
+        source = CUSTOM_LETTERSANITY_CLASS.created_location_names(world.options)
+    else:
+        source = LETTERSANITY_CLASS.created_location_names(world.options)
+    return [name for name in source if name.startswith(prefix)]
 
 
 def add_time_trial_and_ctr_requirements(world, player):
