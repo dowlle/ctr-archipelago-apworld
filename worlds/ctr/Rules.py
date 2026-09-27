@@ -1132,13 +1132,18 @@ def add_time_trial_and_ctr_requirements(world, player):
     can_reach(Trophy Race), exactly as before.
 
     CAPABILITY TERMS ANDed on top of whatever the above built: the Gold and
-    Platinum relic tiers (2026-08-21) and every CTR Token Challenge
-    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`). Both are vacuous
-    while Progressive Boost is off.
+    Platinum relic tiers (2026-08-21), every CTR Token Challenge
+    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and the N. Gin Labs
+    Relic Race perfect check (#49, `usf_finish.relic_perfect_boost_min`). All
+    are vacuous while Progressive Boost is off.
+
+    RELIC RACE PERFECT checks (#49) take the same Trophy + stage-2 entry rule
+    as their track's relic Time Trials: they are paid by the same Relic Race.
     """
     from .progressive_capability import track_required_character
+    from .relic_perfect import RELIC_PERFECT_SUFFIX
     from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, boost_term,
-                             relic_tier_boost_min)
+                             relic_perfect_boost_min, relic_tier_boost_min)
 
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
@@ -1154,7 +1159,8 @@ def add_time_trial_and_ctr_requirements(world, player):
     for loc in mw.get_locations(player):
         name = loc.name
 
-        if not (name.endswith("Time Trial") or name.endswith("CTR Token Challenge")):
+        if not (name.endswith("Time Trial") or name.endswith("CTR Token Challenge")
+                or name.endswith(RELIC_PERFECT_SUFFIX)):
             continue
 
         track_prefix = name.split(":")[0].strip()
@@ -1205,6 +1211,23 @@ def add_time_trial_and_ctr_requirements(world, player):
                     world, track_required_character(world, track_prefix),
                     _tier_min)
                 def rule(state: CollectionState, base=rule, term=_tier_term,
+                         p=player):
+                    return base(state) and term(state, p)
+
+        # Relic Race perfect checks (#49): the race-entry rule built above,
+        # i.e. exactly what the track's Sapphire Time Trial gets (Sapphire's
+        # tier term is rank 0), plus a per-track crate term only where an
+        # existing ruling says a time crate needs a capability. Today that is
+        # N. Gin Labs (2026-08-19 ruling, see usf_finish.relic_perfect_boost_
+        # min). Breaking every crate is not a relic time, so the Gold and
+        # Platinum tier terms are deliberately NOT inherited.
+        if name.endswith(RELIC_PERFECT_SUFFIX):
+            _perfect_min = relic_perfect_boost_min(track_prefix)
+            if _perfect_min:
+                _perfect_term = boost_term(
+                    world, track_required_character(world, track_prefix),
+                    _perfect_min)
+                def rule(state: CollectionState, base=rule, term=_perfect_term,
                          p=player):
                     return base(state) and term(state, p)
 

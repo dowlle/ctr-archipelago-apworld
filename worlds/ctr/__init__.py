@@ -37,6 +37,8 @@ from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
 from . import hit_character
+from . import relic_perfect
+from .relic_perfect import RELIC_PERFECT_CLASS
 from . import progressive_capability
 from . import rung_sizer
 from .spoiler_pad_map import changed_pad_destination_rows
@@ -544,6 +546,11 @@ class ctrAPWorld(World):
         # and never redraws the seed or the candidate arrays.
         hit_character.restore_from_wire(self, passthrough)
         o.hit_character.value = int(bool(co.get("hit_character", 0)))
+        # Relic Race perfect checks (#49): the always-emitted scalar is the
+        # option; an enabled seed's block must equal what these restored
+        # options emit (Cortex Vortex's dropped destination was restored
+        # above), otherwise the restore refuses. See relic_perfect.
+        relic_perfect.restore_from_wire(o, passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -2340,6 +2347,11 @@ class ctrAPWorld(World):
                 # configuration; the conditional top-level block below carries
                 # the resolved encounter data and is present only when enabled.
                 "hit_character": bool(o.hit_character.value),
+                # Relic Race perfect checks (#49). Always emitted as a boolean,
+                # same convention as itemsanity and hit_character; the
+                # top-level `relic_perfect_checks` block below is present only
+                # when enabled. Native reads the block, not this scalar.
+                "relic_perfect_checks": bool(o.relic_perfect_checks.value),
                 # The wumpa family's two scalars (2026-08-10 ruling). Always
                 # emitted, same convention as itemsanity and tizi_helper, and
                 # DIAGNOSTIC / TRACKER ONLY: native drives both from received
@@ -2459,6 +2471,11 @@ class ctrAPWorld(World):
             # convention. The block is fully resolved in generate_early (seed
             # drawn once, cached); UT pins the connected seed's block verbatim.
             slot_data["hit_character_encounters"] = hit_character_block
+        if o.relic_perfect_checks.value:
+            # Relic Race perfect checks (#49). Additive, no schema bump, same
+            # off-parity convention as itemsanity: omitted when off. LevelID ->
+            # [code] for every created check (Contract, relic_perfect_checks).
+            slot_data["relic_perfect_checks"] = RELIC_PERFECT_CLASS.wire_block(o)
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         custom_letters = CUSTOM_LETTERSANITY_CLASS.wire_block(o)

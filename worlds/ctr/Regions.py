@@ -669,6 +669,21 @@ def create_regions(world: "ctrAPWorld"):
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
 
+    # Relic Race perfect checks (#49). Track-owned: each hangs off its own
+    # track region, like that track's Time Trials, because only that track's
+    # Relic Race can pay it (Gem Cups never run a Relic Race). The race-entry
+    # rule (Trophy Race + stage 2, plus N. Gin Labs' crate term) is installed
+    # in Rules.add_time_trial_and_ctr_requirements. The Cortex Vortex dropped
+    # destination is already left out by the class.
+    from .relic_perfect import RELIC_PERFECT_CLASS
+    for _name, _code, _region_name in RELIC_PERFECT_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "relic_perfect"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
     # The 10-wumpa checks (2026-08-10 ruling, widened by the 2026-08-29 spec).
     # In `global` mode the single check hangs off Menu for the same reason
     # itemsanity does -- fruit are collected wherever you race -- and needs no

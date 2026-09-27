@@ -186,6 +186,24 @@ def relic_tier_boost_min(track, tier, options=None):
     return 0
 
 
+#: RELIC RACE PERFECT CRATE TERMS (#49). A perfect check is paid by breaking
+#: every time crate in the Relic Race, so it takes the Relic Race's entry rule
+#: (what Sapphire gets) and NO relic-time tier term. The only per-track crate
+#: term is one an existing ruling already states about the crates themselves:
+#: N. Gin Labs, where two of the Relic Race's boxes cannot be reached without
+#: USF (the 2026-08-19 triage ruling that also drives its Platinum term).
+#: Every other track's all-crate route at the entry capability is a Steam
+#: runtime gate (Rolling Testing List), not an encoded term; add a track here
+#: only with a ruling or measured route evidence.
+RELIC_PERFECT_BOOST_MIN: Dict[str, int] = {"N. Gin Labs": USF_BOOST_COUNT}
+
+
+def relic_perfect_boost_min(track) -> int:
+    """Progressive Boost copies `<track>: Relic Race Perfect` requires on top
+    of its Relic Race entry rule. 0 means no extra term."""
+    return RELIC_PERFECT_BOOST_MIN.get(track, 0)
+
+
 def boost_term(world, required_character=None, boost_min=USF_BOOST_COUNT):
     """The `(state, player) -> bool` term for a boost-rank capability gate.
 
