@@ -105,6 +105,7 @@ def draw_relic_tier_keep(world) -> Tuple[Dict[str, FrozenSet[str]], Dict[str, in
     Returns `(keep, created)`: `keep[relic_item_name]` is the frozen set of
     location names this seed creates for that tier; `created[relic_item_name]`
     is its size (the effective count after any comfort-guard clamp)."""
+    from .notices import say_once
     keep: Dict[str, FrozenSet[str]] = {}
     created: Dict[str, int] = {}
     _, force_vanilla_tt = resolve_comfort_guards(world.options)
@@ -117,14 +118,14 @@ def draw_relic_tier_keep(world) -> Tuple[Dict[str, FrozenSet[str]], Dict[str, in
             if tt_name in pool:
                 pool = [name for name in pool if name != tt_name]
                 if n > len(pool):
-                    logger.warning(
-                        f"CTR: player {world.player} "
-                        f"({world.multiworld.player_name[world.player]})'s "
-                        f"'{option_name}' asked for {n}, but the Turbo Track "
-                        f"comfort guard (vanilla warp-pad unlock + gems not "
-                        f"shuffled) keeps its {tier_label} Time Trial "
-                        f"vanilla-inert, so at most {len(pool)} of this tier "
-                        f"can be created this seed. Clamped to {len(pool)}.")
+                    from .notices import slot_label
+                    say_once(
+                        world, f"comfort_guard_clamp:{option_name}",
+                        f"CTR ({slot_label(world)}): {option_name} lowered "
+                        f"from {n} to {len(pool)}, because Turbo Track's "
+                        f"{tier_label} Time Trial stays vanilla with vanilla "
+                        f"warp-pad unlocks and unshuffled Gems.",
+                        logger)
                     n = len(pool)
         chosen = world.random.sample(pool, n)
         keep[relic_item] = frozenset(chosen)

@@ -302,16 +302,17 @@ class LogicDifficulty(Choice):
     """How much the logic expects you to manage in races while boost and
     weapons are randomized.
 
-    Race requirements apply when Progressive Boost and Itemsanity are both
-    on. Platinum Time Trials follow this whenever Progressive Boost is on.
+    Race requirements apply when Progressive Boost is on. Platinum Time
+    Trials follow this too.
 
     - **easy**: winning, finishing on the podium and holding 1st wait for
-      boost or three useful weapons.
+      boost, or for three useful weapons when Itemsanity is on.
     - **medium** (default): only winning waits.
     - **hard**: no extra requirement.
 
     Tracks that need speed ignore this: Cortex Castle and Hot Air Skyway
-    always need Ultimate Sacred Fire."""
+    always need Ultimate Sacred Fire, and so does holding 1st on Hot Air
+    Skyway."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
@@ -411,6 +412,14 @@ class HitCharacter(Toggle):
     that race is not in your seed, Keys unlock them instead; the spoiler log
     lists which racers use Keys."""
     display_name = "Hit Character Checks"
+
+
+class RelicPerfectChecks(Toggle):
+    """Add a check to each Relic Race for breaking every time crate in it.
+
+    It pays whether or not your time wins a relic, and never changes which
+    relic you get."""
+    display_name = "Relic Race Perfect Checks"
 
 
 class Lettersanity(Choice):
@@ -1149,6 +1158,7 @@ class ctrAPOptions(PerGameCommonOptions):
     itemsanity: Itemsanity
     # Hit Character encounter checks (0.2.1 candidate)
     hit_character: HitCharacter
+    relic_perfect_checks: RelicPerfectChecks
     # Papu's Pyramid mask helper (#223)
     tizi_helper: TiziHelper
     # The wumpa family (2026-08-10 ruling): two bundle fillers, the starting
@@ -1230,7 +1240,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
-                     HitCharacter,
+                     HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
                      PodiumPlacementChecks, PodiumFinishRungs,

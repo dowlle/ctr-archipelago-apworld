@@ -215,7 +215,8 @@ def clamp_elastic_option(
         f"({world.multiworld.player_name[world.player]}) was {old}, clamped "
         f"to {option.value} (friendly bounds {'on' if friendly else 'off'}, "
         f"resolved range {lo}-{hi}).")
-    logger.warning(message)
+    from .notices import say_once
+    say_once(world, f"elastic_clamp:{option_name}", message, logger)
     return message
 
 
@@ -266,7 +267,8 @@ def apply_elastic_veto(
             f"CTR '{option_name}' for player {world.player} "
             f"({world.multiworld.player_name[world.player]}) disallowed "
             f"from host.yaml, replaced with {replacement!r}. {reason}")
-        logger.warning(message)
+        from .notices import say_once
+        say_once(world, f"elastic_veto:{option_name}", message, logger)
         return message
     raise ValueError(f"apply_elastic_veto: unknown on_refuse={on_refuse!r}")
 

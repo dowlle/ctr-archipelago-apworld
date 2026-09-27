@@ -128,12 +128,16 @@ class TestPodiumSubtogglesInertness(unittest.TestCase):
                 "podium_held_fifth_rung": True,
             })
         world = mw.worlds[1]
-        self.assertEqual(
-            sum("Podium Placement Checks is off" in m for m in cm.output), 1)
-        # Scoped to master-off only: the finish/held-specific warnings must not
-        # also fire (that would be redundant with the master-off message).
-        self.assertFalse(any("Any-Position Rung has no effect" in m for m in cm.output))
-        self.assertFalse(any("Held 5th Rung has no effect" in m for m in cm.output))
+        lines = [m for m in cm.output if "ignored options" in m]
+        self.assertEqual(len(lines), 1, cm.output)
+        # Only the sub-toggle that differs from its default is named, once,
+        # under the master-off reason; the finish/held-specific notes must not
+        # also fire (that would be redundant with the master-off one).
+        self.assertIn("Podium: Held 5th Rung (Podium Placement Checks off)",
+                      lines[0])
+        self.assertNotIn("Podium Finish Rungs", lines[0])
+        self.assertNotIn("Held-Position Rungs off", lines[0])
+        self.assertNotIn("Podium Finish Rungs off", lines[0])
         # Log-only: every sub-toggle keeps the exact value this test set.
         self.assertTrue(world.options.podium_finish_rungs.value)
         self.assertTrue(world.options.podium_any_position_rung.value)
@@ -158,7 +162,8 @@ class TestPodiumSubtogglesInertness(unittest.TestCase):
                 "podium_any_position_rung": True,
             })
         world = mw.worlds[1]
-        self.assertTrue(any("Any-Position Rung has no effect" in m for m in cm.output))
+        self.assertTrue(any("Podium: Any-Position Rung (Podium Finish Rungs off)" in m
+                            for m in cm.output))
         self.assertTrue(world.options.podium_any_position_rung.value)  # untouched
 
     def test_finish_on_does_not_warn_about_any_position(self):
@@ -177,8 +182,43 @@ class TestPodiumSubtogglesInertness(unittest.TestCase):
                 "podium_held_fifth_rung": True,
             })
         world = mw.worlds[1]
-        self.assertTrue(any("Held 5th Rung has no effect" in m for m in cm.output))
+        self.assertTrue(any("Podium: Held 5th Rung (Held-Position Rungs off)" in m
+                            for m in cm.output))
         self.assertTrue(world.options.podium_held_fifth_rung.value)  # untouched
+
+    def test_any_position_off_says_nothing_with_finish_off(self):
+        """Finish Rungs off with Any-Position Rung also off: the player did
+        not ask for the rung that is being ignored, so there is no notice."""
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            _early({
+                "podium_placement_checks": True,
+                "podium_finish_rungs": False,
+                "podium_any_position_rung": False,
+            })
+
+    def test_held_fifth_off_says_nothing_with_held_off(self):
+        """Held-Position Rungs off with Held 5th Rung at its default (off) --
+        the report that started this: the warning named an option the player
+        never turned on."""
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            _early({
+                "podium_placement_checks": True,
+                "podium_held_rungs": False,
+            })
+
+    def test_every_ignored_option_shares_one_line(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early({
+                "podium_placement_checks": True,
+                "podium_held_rungs": False,
+                "podium_held_fifth_rung": True,
+                "lettersanity": "off",
+                "letters_per_track": 2,
+            })
+        self.assertEqual(cm.output, [
+            f"WARNING:{LOGGER_NAME}:CTR (Tester1): ignored options: "
+            "Podium: Held 5th Rung (Held-Position Rungs off), "
+            "Letters Per Track (Lettersanity off)"])
 
     def test_held_on_does_not_warn_about_held_fifth(self):
         with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
@@ -202,7 +242,9 @@ class TestShuffleCategoryIncludeGuards(unittest.TestCase):
                 "include_battle_arenas": False,
             })
         world = mw.worlds[1]
-        self.assertTrue(any("'crystals' entry" in m for m in cm.output))
+        self.assertTrue(any("'crystals' in Warp Pad Shuffle Categories "
+                            "(Include Battle Arena Warp Pads off)" in m
+                            for m in cm.output))
         self.assertIn("crystals", set(world.options.warp_pad_shuffle_categories.value))
         self.assertFalse(world.options.include_battle_arenas.value)
 
@@ -228,7 +270,9 @@ class TestShuffleCategoryIncludeGuards(unittest.TestCase):
                 "include_gem_cups": False,
             })
         world = mw.worlds[1]
-        self.assertTrue(any("'cups' entry" in m for m in cm.output))
+        self.assertTrue(any("'cups' in Warp Pad Shuffle Categories "
+                            "(Include Gem Cup Warp Pads off)" in m
+                            for m in cm.output))
         self.assertIn("cups", set(world.options.warp_pad_shuffle_categories.value))
 
     def test_cups_selected_with_include_does_not_warn(self):
@@ -249,8 +293,9 @@ class TestShuffleCategoryIncludeGuards(unittest.TestCase):
                 "warp_pad_shuffle_categories": ["tracks", "cups"],
                 "include_gem_cups": False,
             })
-        self.assertFalse(any("Include Gem Cup Warp Pads is off" in m for m in cm.output))
-        self.assertTrue(any("'vanilla' collapses destination shuffle" in m for m in cm.output))
+        self.assertFalse(any("Include Gem Cup Warp Pads off" in m for m in cm.output))
+        self.assertTrue(any("'cups' in Warp Pad Shuffle Categories "
+                            "(vanilla warp-pad unlocks)" in m for m in cm.output))
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +314,9 @@ class TestSphereSearchTuningIgnoredInVanilla(unittest.TestCase):
                 "requirement_weights": {"Key": 40},
             })
         world = mw.worlds[1]
-        msg = next(m for m in cm.output if "sphere-search" in m)
-        self.assertIn("Two-Stage Gate Density", msg)
-        self.assertIn("Requirement Variety", msg)
-        self.assertIn("Requirement Weights", msg)
+        msg = next(m for m in cm.output if "ignored options" in m)
+        self.assertIn("Two-Stage Gate Density, Requirement Variety, "
+                      "Requirement Weights (vanilla warp-pad unlocks)", msg)
         # Log-only: the options that triggered the warning are untouched.
         self.assertEqual(world.options.two_stage_density.current_key, "deep")
         self.assertEqual(world.options.requirement_variety.current_key, "custom")
@@ -282,10 +326,18 @@ class TestSphereSearchTuningIgnoredInVanilla(unittest.TestCase):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({
                 "warppad_unlock_requirements": "vanilla",
+                "two_stage_density": "deep",
                 "requirement_variety": "icebound_beta5",
             })
-        msg = next(m for m in cm.output if "sphere-search" in m)
+        msg = next(m for m in cm.output if "ignored options" in m)
+        self.assertIn("Two-Stage Gate Density (vanilla warp-pad unlocks)", msg)
         self.assertNotIn("Requirement Weights", msg)
+        self.assertNotIn("Requirement Variety", msg)
+
+    def test_vanilla_mode_with_defaulted_tuning_says_nothing(self):
+        """The player did not set these, so there is nothing to tell them."""
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
+            _early({"warppad_unlock_requirements": "vanilla"})
 
     def test_randomized_mode_does_not_warn(self):
         with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
@@ -303,33 +355,34 @@ class TestSphereSearchTuningIgnoredInVanilla(unittest.TestCase):
 
 class TestVanillaUnlockShuffleCollapse(unittest.TestCase):
 
-    def test_defaults_in_vanilla_mode_warn_about_all_three_parts(self):
-        # Default categories = {tracks, cups, crystals}, default grouping = merged.
-        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+    def test_defaults_in_vanilla_mode_say_nothing(self):
+        # Default categories = {tracks, cups, crystals}, default grouping =
+        # merged: none of it was set by the player, so none of it is named.
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
             mw = _early({"warppad_unlock_requirements": "vanilla"})
         world = mw.worlds[1]
-        msg = next(m for m in cm.output if "collapses destination shuffle" in m)
-        self.assertIn("merged", msg)
-        self.assertIn("per_category", msg)
-        self.assertIn("Slide Coliseum", msg)
-        self.assertIn("'cups'", msg)
         # Log-only: still reads back the raw pre-collapse YAML choice.
         self.assertEqual(world.options.warp_pad_shuffle_grouping.current_key, "merged")
         self.assertEqual(set(world.options.warp_pad_shuffle_categories.value),
                          {"tracks", "cups", "crystals"})
 
-    def test_per_category_with_only_crystals_selected_does_not_warn(self):
-        # This still warns via warn_sphere_search_tuning_ignored_in_vanilla (a
-        # different constraint), so check this message specifically rather
-        # than asserting zero logs.
+    def test_chosen_categories_in_vanilla_mode_name_the_ignored_parts(self):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early({"warppad_unlock_requirements": "vanilla",
+                    "warp_pad_shuffle_categories": ["tracks", "cups"]})
+        msg = next(m for m in cm.output if "ignored options" in m)
+        self.assertIn("Slide Coliseum and Turbo Track in the 'tracks' shuffle "
+                      "category, 'cups' in Warp Pad Shuffle Categories "
+                      "(vanilla warp-pad unlocks)", msg)
+
+    def test_per_category_with_only_crystals_selected_does_not_warn(self):
+        with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
             _early({
                 "warppad_unlock_requirements": "vanilla",
                 "warp_pad_shuffle_categories": ["crystals"],
                 "warp_pad_shuffle_grouping": "per_category",
                 "include_battle_arenas": True,
             })
-        self.assertFalse(any("collapses destination shuffle" in m for m in cm.output))
 
     def test_randomized_mode_does_not_warn(self):
         with self.assertNoLogs(LOGGER_NAME, level="WARNING"):
@@ -430,9 +483,9 @@ class TestOxideFinalRelicCountResolvesToModeCapacity(unittest.TestCase):
                 "gold_relic_count": 18,
             })
         matches = [m for m in cm.output
-                  if "exceeds the 18-relic capacity" in m]
+                  if "Relic Count lowered" in m]
         self.assertEqual(len(matches), 1)
-        self.assertIn("oxide_final_challenge_relic_count=40", matches[0])
+        self.assertIn("lowered from 40 to 18", matches[0])
         self.assertIn("gold_relics", matches[0])
 
     def test_total_relics_above_18_is_untouched(self):
@@ -514,7 +567,7 @@ CONFLICT = {
     "shuffle_gems": True,
     "include_gem_cups": False,
 }
-RESOLVED_MARKER = "'shuffle_gems' resolves to OFF"
+RESOLVED_MARKER = "Shuffle Gems turned off"
 
 
 def _early_capturing_warnings(options):
@@ -559,13 +612,12 @@ class TestGemGoalWithoutCupsResolvesShuffleGemsOff(unittest.TestCase):
         matches = [m for m in cm.output if RESOLVED_MARKER in m]
         self.assertEqual(len(matches), 1)
         message = matches[0]
-        self.assertIn(f"player {PLAYER}", message)
-        self.assertIn("gems_required_goal", message)
-        self.assertIn("include_gem_cups", message)
-        self.assertIn("shuffle_gems", message)
+        self.assertIn("CTR (Tester1)", message)
+        self.assertIn("Gems Required Goal", message)
+        self.assertIn("Include Gem Cup Warp Pads", message)
         # Both escape routes from the ruling.
-        self.assertIn("turn 'include_gem_cups' on", message)
-        self.assertIn("set 'shuffle_gems' to false", message)
+        self.assertIn("turn that on to keep Gems shuffled", message)
+        self.assertIn("set Shuffle Gems off yourself", message)
 
     def test_warning_is_logged_once_through_a_full_generation(self):
         # generate_early can run twice per seed (the two-stage fill probe

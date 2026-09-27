@@ -629,12 +629,20 @@ class TestCustomLetterGeneration(CTRTestBase):
         names = self.world.multiworld.get_locations(self.world.player)
         custom = [loc for loc in names if loc.name.startswith("Custom Track 1: Letter ")]
         self.assertEqual(len(custom), 2)
-        state = CollectionState(self.world.multiworld)
+        # Letters share the custom CTR Token Challenge's entry rule (Trophy
+        # Race reachable), so the own-letter guard is checked on a full state.
+        own_names = {f"Letter {loc.name[-1]} (Custom Track 1)" for loc in custom}
+        state = self.world.multiworld.get_all_state(False)
+        for item in [i for i in self.world.multiworld.itempool
+                     if i.name in own_names]:
+            state.remove(item)
         for loc in custom:
             self.assertFalse(loc.access_rule(state))
+            self.assertFalse(loc.access_rule(CollectionState(self.world.multiworld)))
             own = self.world.create_item(f"Letter {loc.name[-1]} (Custom Track 1)")
             state.collect(own, True)
             self.assertTrue(loc.access_rule(state))
+        del state
         wire = self.world.fill_slot_data()["custom_lettersanity_checks"]
         self.assertEqual([row["slot"] for row in wire["tracks"]], [1])
         self.assertEqual({c for c in wire["tracks"][0]["locations"] if c >= 0},

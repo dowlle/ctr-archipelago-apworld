@@ -339,15 +339,16 @@ def _log_never_created_excludes(world):
     fires for ANY location class that freezes more names than a given seed
     creates -- podium rungs today, relic Time Trials from issue #171, any
     future class (#49/#109/#148) -- not a relic-specific check."""
+    from .notices import say_once
     created = set(world.multiworld.regions.location_cache[world.player].keys())
     known = set(world.location_name_to_id.keys())
     for name in sorted(world.options.exclude_locations.value):
         if name in known and name not in created:
-            logger.info(
-                f"CTR: exclude_locations names '{name}' for player "
-                f"{world.player} ({world.multiworld.player_name[world.player]}), "
-                f"but this seed never created that location -- the exclusion "
-                f"has no effect.")
+            say_once(
+                world, f"exclude_not_created:{name}",
+                f"CTR ({world.multiworld.player_name[world.player]}): "
+                f"exclude_locations names '{name}', which this seed never "
+                f"created.", logger, logging.INFO)
 
 
 def create_regions(world: "ctrAPWorld"):
@@ -664,6 +665,21 @@ def create_regions(world: "ctrAPWorld"):
         _region = region_lookup[_region_name]
         _loc = create_location(player, _name, _region)
         _loc.type = "hit_character"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
+    # Relic Race perfect checks (#49). Track-owned: each hangs off its own
+    # track region, like that track's Time Trials, because only that track's
+    # Relic Race can pay it (Gem Cups never run a Relic Race). The race-entry
+    # rule (Trophy Race + stage 2, plus N. Gin Labs' crate term) is installed
+    # in Rules.add_time_trial_and_ctr_requirements. The Cortex Vortex dropped
+    # destination is already left out by the class.
+    from .relic_perfect import RELIC_PERFECT_CLASS
+    for _name, _code, _region_name in RELIC_PERFECT_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "relic_perfect"
         _loc.logic_text = "True"
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc

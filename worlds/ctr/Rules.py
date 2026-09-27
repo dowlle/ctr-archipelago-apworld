@@ -158,23 +158,29 @@ def set_rules(world):
 
 
 def add_capability_difficulty_rules(world, player):
-    """Install the ruled option-aware gates for the seven easy tracks.
+    """Install the ruled option-aware gates for the difficulty-gated tracks.
 
-    The rule is meaningful only when both item packs randomize the relevant
-    capabilities. With Progressive Boost off, vanilla boost satisfies it. With
-    Itemsanity off, vanilla weapon supply satisfies it. Medium gates only the
-    Trophy Race; easy also gates Finish on Podium and Held 1st; hard adds no
-    requirement.
+    The rule is meaningful only when Progressive Boost is on; with it off,
+    vanilla boost satisfies it and nothing is installed. With Itemsanity on the
+    term is "first boost rank OR enough useful weapon families". With
+    Itemsanity off weapons are not items, so the term is the first boost rank
+    alone (ruling 2026-09-27, issue #329; before it the rule added nothing
+    there). Medium gates only the Trophy Race; easy also gates Finish on Podium
+    and Held 1st; hard adds no requirement.
 
     The track inventory lives in capability_contract and is the UNION of the
     measured easy group and the ruled group -- read through
     `difficulty_gated_tracks()` rather than either set, so a track cannot be
-    gated here and skipped by a parity test.
+    gated here and skipped by a parity test. The seed's custom-track slots are
+    added to it (`CUSTOM_TRACK_SLOTS_RULED`); their podium rungs live in the
+    slot region, so the easy rung gates reach them by the same names.
 
     The weapon-family arm requires `itemsanity.DIFFICULTY_WEAPON_FAMILY_MIN`
     distinct families (three since the 2026-09-20 ruling, two before it).
     """
-    from .capability_contract import difficulty_gated_tracks
+    from .capability_contract import (CUSTOM_TRACK_SLOTS_RULED,
+                                      difficulty_gated_tracks)
+    from .custom_track_locations import slot_region
     from .itemsanity import (DIFFICULTY_WEAPON_FAMILY_MIN,
                              USEFUL_WEAPON_FAMILIES, family_count)
     from .podium import location_name
@@ -183,15 +189,20 @@ def add_capability_difficulty_rules(world, player):
     difficulty = int(world.options.logic_difficulty.value)
     if difficulty == 2:  # hard
         return
-    if (not bool(world.options.progressive_boost.value)
-            or not bool(world.options.itemsanity.value)):
+    if not bool(world.options.progressive_boost.value):
         return
+    weapon_arm = bool(world.options.itemsanity.value)
 
     names = {loc.name for loc in world.multiworld.get_locations(player)}
-    for track in difficulty_gated_tracks():
+    tracks = set(difficulty_gated_tracks())
+    if CUSTOM_TRACK_SLOTS_RULED:
+        tracks.update(slot_region(int(entry["slot"])) for entry in
+                      (getattr(world, "custom_tracks", None) or {}).values())
+    for track in sorted(tracks):
         required_character = track_required_character(world, track)
 
-        def capability_rule(state, p=player, racer=required_character):
+        def capability_rule(state, p=player, racer=required_character,
+                            weapons=weapon_arm):
             # Boost first and alone: the Turbo bonus below only ever applied
             # when `boost_ok` was already True, i.e. when the OR had already
             # short-circuited, so counting weapon families in that branch was
@@ -199,8 +210,10 @@ def add_capability_difficulty_rules(world, player):
             if gate_satisfied(world, state, p, boost_min=1,
                               required_character=racer):
                 return True
-            return (family_count(state, p, USEFUL_WEAPON_FAMILIES)
-                    >= DIFFICULTY_WEAPON_FAMILY_MIN)
+            # Itemsanity off: no weapon items exist, so there is no weapon
+            # arm and the first boost rank is the whole requirement.
+            return weapons and (family_count(state, p, USEFUL_WEAPON_FAMILIES)
+                                >= DIFFICULTY_WEAPON_FAMILY_MIN)
 
         gated = [f"{track}: Trophy Race"]
         if difficulty == 0:  # easy
@@ -1082,6 +1095,7 @@ def _rung_rule(track_branch, plain_cups, gated_cups, held_term, player):
 def _created_letter_names_for(world, track):
     """The seed's created letter location names on `track` (modes 1 and 2 both
     create them; modes 0 and 3 create none, so this returns nothing there).
+    Covers retail tracks, the Cortex Vortex pad track and custom-track slots.
 
     Filtered from LETTERSANITY_CLASS.created_location_names so the set matches
     exactly what create_regions built from the same resolved per-track selection
@@ -1092,8 +1106,16 @@ def _created_letter_names_for(world, track):
     if track == CORTEX_VORTEX:
         return CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options)
     prefix = f"{track}: Letter "
-    return [name for name in LETTERSANITY_CLASS.created_location_names(world.options)
-            if name.startswith(prefix)]
+    if track.startswith("Custom Track "):
+        # Custom-track slots: their letters sit inside that slot's own CTR
+        # Token Challenge exactly like a retail track's, so they take the
+        # same shared entry rule (ruling 2026-09-27). Same source list as
+        # create_regions uses for these locations.
+        from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
+        source = CUSTOM_LETTERSANITY_CLASS.created_location_names(world.options)
+    else:
+        source = LETTERSANITY_CLASS.created_location_names(world.options)
+    return [name for name in source if name.startswith(prefix)]
 
 
 def add_time_trial_and_ctr_requirements(world, player):
@@ -1110,13 +1132,18 @@ def add_time_trial_and_ctr_requirements(world, player):
     can_reach(Trophy Race), exactly as before.
 
     CAPABILITY TERMS ANDed on top of whatever the above built: the Gold and
-    Platinum relic tiers (2026-08-21) and every CTR Token Challenge
-    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`). Both are vacuous
-    while Progressive Boost is off.
+    Platinum relic tiers (2026-08-21), every CTR Token Challenge
+    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and the N. Gin Labs
+    Relic Race perfect check (#49, `usf_finish.relic_perfect_boost_min`). All
+    are vacuous while Progressive Boost is off.
+
+    RELIC RACE PERFECT checks (#49) take the same Trophy + stage-2 entry rule
+    as their track's relic Time Trials: they are paid by the same Relic Race.
     """
     from .progressive_capability import track_required_character
+    from .relic_perfect import RELIC_PERFECT_SUFFIX
     from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, boost_term,
-                             relic_tier_boost_min)
+                             relic_perfect_boost_min, relic_tier_boost_min)
 
     mw = world.multiworld
     all_location_names = {loc.name for loc in mw.get_locations(player)}
@@ -1132,7 +1159,8 @@ def add_time_trial_and_ctr_requirements(world, player):
     for loc in mw.get_locations(player):
         name = loc.name
 
-        if not (name.endswith("Time Trial") or name.endswith("CTR Token Challenge")):
+        if not (name.endswith("Time Trial") or name.endswith("CTR Token Challenge")
+                or name.endswith(RELIC_PERFECT_SUFFIX)):
             continue
 
         track_prefix = name.split(":")[0].strip()
@@ -1183,6 +1211,23 @@ def add_time_trial_and_ctr_requirements(world, player):
                     world, track_required_character(world, track_prefix),
                     _tier_min)
                 def rule(state: CollectionState, base=rule, term=_tier_term,
+                         p=player):
+                    return base(state) and term(state, p)
+
+        # Relic Race perfect checks (#49): the race-entry rule built above,
+        # i.e. exactly what the track's Sapphire Time Trial gets (Sapphire's
+        # tier term is rank 0), plus a per-track crate term only where an
+        # existing ruling says a time crate needs a capability. Today that is
+        # N. Gin Labs (2026-08-19 ruling, see usf_finish.relic_perfect_boost_
+        # min). Breaking every crate is not a relic time, so the Gold and
+        # Platinum tier terms are deliberately NOT inherited.
+        if name.endswith(RELIC_PERFECT_SUFFIX):
+            _perfect_min = relic_perfect_boost_min(track_prefix)
+            if _perfect_min:
+                _perfect_term = boost_term(
+                    world, track_required_character(world, track_prefix),
+                    _perfect_min)
+                def rule(state: CollectionState, base=rule, term=_perfect_term,
                          p=player):
                     return base(state) and term(state, p)
 

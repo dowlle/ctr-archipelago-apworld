@@ -204,8 +204,11 @@ class TestRelicTierBoostGates(unittest.TestCase):
         """Sapphire carries no tier term and the Labs race is still on the
         difficulty rule only. The CTR Token Challenge left this list on
         2026-09-20: it now carries its own first-boost floor, asserted in the
-        test below."""
-        mw = _build(progressive_boost="shared_global", platinum_relic_count=18)
+        test below. Hard logic: since the 2026-09-27 ruling (#329) easy and
+        medium gate the Labs race on one boost even with Itemsanity off, and
+        a Sapphire Time Trial inherits its track's race rule."""
+        mw = _build(progressive_boost="shared_global", platinum_relic_count=18,
+                    logic_difficulty="hard")
         state = _state_all_but_boost(mw, 0)
         for name in (f"{LABS}: Trophy Race", f"{LABS}: Sapphire Time Trial",
                      "Crash Cove: Sapphire Time Trial"):

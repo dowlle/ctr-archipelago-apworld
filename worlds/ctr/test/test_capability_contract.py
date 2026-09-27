@@ -72,8 +72,15 @@ class TestContractCoverage(unittest.TestCase):
 def _track_options(track):
     """Options that create `track`'s Trophy Race. A record in
     OPTIONAL_TROPHY_TRACKS (the Cortex Vortex pad track) only has one with its
-    option on; every retail record keeps the default seed."""
-    return {"cortex_vortex_track": True} if track in OPTIONAL_TROPHY_TRACKS else {}
+    option on, and so does each trial track (#203); every retail record keeps
+    the default seed."""
+    from ..trial_trophy import TRIAL_TRACKS
+    if track in OPTIONAL_TROPHY_TRACKS:
+        return {"cortex_vortex_track": True}
+    if track in TRIAL_TRACKS:
+        return {"slide_coliseum_races": "trophy_race",
+                "turbo_track_races": "trophy_race"}
+    return {}
 
 
 class TestConfirmedFinishBoundaries(unittest.TestCase):
@@ -167,6 +174,23 @@ class TestRacerLockResolution(unittest.TestCase):
             f"got {first[3]!r}" if mismatches else "")
 
 
+class TestCustomSlotRacer(unittest.TestCase):
+    def test_custom_slot_takes_the_racer_of_the_pad_it_displaced(self):
+        """A custom-track slot has no pad of its own; the displaced cup's pad
+        loads it, so that pad's racer lock is the one its capability terms
+        must name (the resolver used to return None for it, which lets
+        `gate_satisfied` fall through to any driveable racer)."""
+        from types import SimpleNamespace
+        world = SimpleNamespace(
+            ctr_racer_locks={"Purple Cup Warp Pad": "Coco"},
+            ctr_pad_by_destination={},
+            custom_tracks={"baby-t-park": {"slot": 1,
+                                           "replaces": "purple_gem_cup"}})
+        self.assertEqual(track_required_character(world, "Custom Track 1"),
+                         "Coco")
+        self.assertIsNone(track_required_character(world, "Custom Track 2"))
+
+
 class TestRuledTrophyGroup(unittest.TestCase):
     """The six tracks brought under the difficulty rule by ruling, not measurement.
 
@@ -179,11 +203,75 @@ class TestRuledTrophyGroup(unittest.TestCase):
 
     def test_every_trophy_track_is_now_gated_by_something(self):
         from ..podium import TROPHY_TRACKS
+        from ..trial_trophy import TRIAL_TRACKS
         from ..usf_finish import ALL_USF_FINISH_TRACKS
-        ungated = (set(TROPHY_TRACKS) - difficulty_gated_tracks()
-                   - set(ALL_USF_FINISH_TRACKS))
+        ungated = (set(TROPHY_TRACKS) | set(TRIAL_TRACKS)
+                   | set(OPTIONAL_TROPHY_TRACKS)) - difficulty_gated_tracks() \
+            - set(ALL_USF_FINISH_TRACKS)
         self.assertEqual(ungated, set(),
                          f"trophy races with no capability gate at all: {sorted(ungated)}")
+
+    def test_every_created_trophy_race_needs_a_capability(self):
+        """Parity over the Trophy Races a seed actually CREATES, not over a
+        hand-kept track list: the 16 retail races, both trial tracks (#203),
+        the Cortex Vortex pad track and a custom-track slot, all on at once.
+
+        The trial races were missed because the earlier parity check iterated
+        the 16 retail tracks only, so a Trophy Race added through a location
+        class could sit in logic with no requirement and nothing would notice.
+        Every created one must be unreachable on a bare state at medium and
+        reachable once the USF rank is held."""
+        from ..custom_tracks import BABY_T_PARK_CURRENT
+        import copy
+        custom = copy.deepcopy(BABY_T_PARK_CURRENT)
+        custom["modes"] = {"ctr_challenge": True}
+        for seed in (1, 2, 3):
+            mw = _build(seed=seed, progressive_boost="shared_global",
+                        itemsanity=True, logic_difficulty="medium",
+                        slide_coliseum_races="trophy_and_ctr_challenge",
+                        turbo_track_races="trophy_and_ctr_challenge",
+                        cortex_vortex_track=True, lettersanity="locations_only",
+                        custom_tracks={"baby-t-park": custom})
+            races = sorted(loc.name for loc in mw.get_locations(PLAYER)
+                           if loc.name.endswith(": Trophy Race"))
+            self.assertIn("Custom Track 1: Trophy Race", races)
+            self.assertIn("Cortex Vortex: Trophy Race", races)
+            self.assertGreaterEqual(len(races), 18)
+            bare, usf = _state(mw), _state(mw, boost=2)
+            for name in races:
+                with self.subTest(seed=seed, race=name):
+                    self.assertFalse(bare.can_reach(name, "Location", PLAYER))
+                    self.assertTrue(usf.can_reach(name, "Location", PLAYER))
+
+    def test_trial_track_checks_inherit_the_ruled_requirement(self):
+        """The trial tracks' Time Trials, letters and easy rungs reach their
+        track through the Trophy Race (or, for the rungs, the easy gate), so
+        each must now need boost or three weapon families like a retail
+        ruled track."""
+        from ..trial_trophy import TRIAL_TRACKS
+        mw = _build(progressive_boost="shared_global", itemsanity=True,
+                    logic_difficulty="easy",
+                    slide_coliseum_races="trophy_and_ctr_challenge",
+                    turbo_track_races="trophy_and_ctr_challenge",
+                    lettersanity="locations_only", podium_held_rungs=True,
+                    podium_finish_rungs=True)
+        names = {loc.name for loc in mw.get_locations(PLAYER)}
+        bare = _state(mw)
+        three = _state(mw, held=("Mask", "Warpball", "Bomb"))
+        checked = 0
+        for track in TRIAL_TRACKS:
+            for name in sorted(names):
+                if not name.startswith(f"{track}: "):
+                    continue
+                if name.endswith(("Held 3rd", "Held 5th", "Finish (Any Position)")):
+                    continue
+                checked += 1
+                with self.subTest(location=name):
+                    self.assertFalse(bare.can_reach(name, "Location", PLAYER))
+                    if not name.endswith(("Gold Time Trial", "Platinum Time Trial",
+                                          "CTR Token Challenge")):
+                        self.assertTrue(three.can_reach(name, "Location", PLAYER))
+        self.assertGreater(checked, 4)
 
     def test_the_two_groups_keep_their_provenance_apart(self):
         self.assertEqual(EASY_TROPHY_GROUP.status, STATUS_CONFIRMED)
@@ -195,7 +283,7 @@ class TestRuledTrophyGroup(unittest.TestCase):
     def test_ruled_tracks_gate_their_trophy_race_at_medium(self):
         for track in sorted(RULED_TROPHY_GROUP.tracks):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
-                        logic_difficulty="medium")
+                        logic_difficulty="medium", **_track_options(track))
             name = f"{track}: Trophy Race"
             with self.subTest(track=track, state="bare"):
                 self.assertFalse(_state(mw).can_reach(name, "Location", PLAYER))
@@ -212,7 +300,7 @@ class TestRuledTrophyGroup(unittest.TestCase):
     def test_ruled_tracks_are_free_at_hard(self):
         for track in sorted(RULED_TROPHY_GROUP.tracks):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
-                        logic_difficulty="hard")
+                        logic_difficulty="hard", **_track_options(track))
             with self.subTest(track=track):
                 self.assertTrue(_state(mw).can_reach(
                     f"{track}: Trophy Race", "Location", PLAYER))
@@ -239,7 +327,7 @@ class TestDifficultyContract(unittest.TestCase):
         self.assertEqual(DIFFICULTY_WEAPON_FAMILY_MIN, 3)
         for track in sorted(difficulty_gated_tracks()):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
-                        logic_difficulty="medium")
+                        logic_difficulty="medium", **_track_options(track))
             name = f"{track}: Trophy Race"
             with self.subTest(track=track, state="bare"):
                 self.assertFalse(_state(mw).can_reach(name, "Location", PLAYER))
@@ -398,7 +486,7 @@ class TestDifficultyContract(unittest.TestCase):
         """
         for track in sorted(difficulty_gated_tracks()):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
-                        logic_difficulty="medium")
+                        logic_difficulty="medium", **_track_options(track))
             bare = _state(mw)
             names = {loc.name for loc in mw.get_locations(PLAYER)}
             with self.subTest(track=track, spot="trophy race"):
@@ -412,14 +500,126 @@ class TestDifficultyContract(unittest.TestCase):
                 with self.subTest(track=track, rung=rung_key):
                     self.assertTrue(bare.can_reach(name, "Location", PLAYER))
 
-    def test_option_vacuity_when_either_item_pack_is_off(self):
-        for options in (
-            {"progressive_boost": "off", "itemsanity": True},
-            {"progressive_boost": "shared_global", "itemsanity": False},
-        ):
-            mw = _build(logic_difficulty="easy", **options)
+    def test_option_vacuity_when_the_boost_pack_is_off(self):
+        """With Progressive Boost off every kart has vanilla boost, so the
+        rule is vacuous whether Itemsanity is on or off."""
+        for itemsanity in (True, False):
+            mw = _build(logic_difficulty="easy", progressive_boost="off",
+                        itemsanity=itemsanity, podium_held_rungs=True,
+                        podium_finish_rungs=True,
+                        **_track_options("Slide Coliseum"))
             state = _state(mw)
             for track in difficulty_gated_tracks():
-                with self.subTest(options=options, track=track):
-                    self.assertTrue(state.can_reach(
-                        f"{track}: Trophy Race", "Location", PLAYER))
+                for name in (f"{track}: Trophy Race",
+                             location_name(track, "finish_podium"),
+                             location_name(track, "held_1st")):
+                    with self.subTest(itemsanity=itemsanity, location=name):
+                        self.assertTrue(state.can_reach(
+                            name, "Location", PLAYER))
+
+
+_ITEMSANITY_OFF = dict(progressive_boost="shared_global", itemsanity=False,
+                       podium_held_rungs=True, podium_finish_rungs=True,
+                       podium_held_fifth_rung=True,
+                       podium_any_position_rung=True,
+                       slide_coliseum_races="trophy_race",
+                       turbo_track_races="trophy_race")
+
+
+class TestItemsanityOffDifficulty(unittest.TestCase):
+    """Ruling 2026-09-27 (#329): with Itemsanity off there is no weapon arm,
+    so easy and medium require the first boost rank on the difficulty-gated
+    Trophy Races (easy also Finish on Podium and Held 1st). Hard adds
+    nothing, and Progressive Boost off keeps the whole rule vacuous."""
+
+    def test_medium_trophy_requires_one_boost(self):
+        mw = _build(logic_difficulty="medium", **_ITEMSANITY_OFF)
+        bare, one = _state(mw), _state(mw, boost=1)
+        for track in sorted(difficulty_gated_tracks()):
+            name = f"{track}: Trophy Race"
+            with self.subTest(track=track):
+                self.assertFalse(bare.can_reach(name, "Location", PLAYER))
+                self.assertTrue(one.can_reach(name, "Location", PLAYER))
+            # Medium leaves the placement rungs at the demonstrated floor.
+            for key in ("finish_podium", "held_1st", "held_3rd"):
+                with self.subTest(track=track, rung=key):
+                    self.assertTrue(bare.can_reach(
+                        location_name(track, key), "Location", PLAYER))
+
+    def test_easy_gates_trophy_podium_and_held_first(self):
+        mw = _build(logic_difficulty="easy", **_ITEMSANITY_OFF)
+        bare, one = _state(mw), _state(mw, boost=1)
+        for track in sorted(difficulty_gated_tracks()):
+            for key in ("finish_podium", "held_1st"):
+                name = location_name(track, key)
+                with self.subTest(track=track, rung=key):
+                    self.assertFalse(bare.can_reach(name, "Location", PLAYER))
+                    self.assertTrue(one.can_reach(name, "Location", PLAYER))
+            with self.subTest(track=track, spot="trophy race"):
+                self.assertFalse(bare.can_reach(
+                    f"{track}: Trophy Race", "Location", PLAYER))
+            for key in ("held_3rd", "held_5th", "finish_any"):
+                with self.subTest(track=track, free=key):
+                    self.assertTrue(bare.can_reach(
+                        location_name(track, key), "Location", PLAYER))
+
+    def test_hard_adds_nothing(self):
+        mw = _build(logic_difficulty="hard", **_ITEMSANITY_OFF)
+        bare = _state(mw)
+        for track in sorted(difficulty_gated_tracks()):
+            for name in (f"{track}: Trophy Race",
+                         location_name(track, "finish_podium"),
+                         location_name(track, "held_1st")):
+                with self.subTest(location=name):
+                    self.assertTrue(bare.can_reach(name, "Location", PLAYER))
+
+    def test_custom_trophy_race_takes_the_ruled_requirement(self):
+        from ..custom_tracks import BABY_T_PARK_CURRENT
+        import copy
+        custom = copy.deepcopy(BABY_T_PARK_CURRENT)
+        for difficulty, gated in (("easy", True), ("medium", True),
+                                  ("hard", False)):
+            mw = _build(logic_difficulty=difficulty,
+                        custom_tracks={"baby-t-park": custom},
+                        **_ITEMSANITY_OFF)
+            name = "Custom Track 1: Trophy Race"
+            with self.subTest(difficulty=difficulty):
+                self.assertEqual(_state(mw).can_reach(name, "Location", PLAYER),
+                                 not gated)
+                self.assertTrue(_state(mw, boost=1).can_reach(
+                    name, "Location", PLAYER))
+
+    def test_universal_tracker_regeneration_matches(self):
+        """UT restores logic_difficulty, itemsanity and boost_mode from the
+        wire, so a tracker whose own YAML says hard / Itemsanity on / boost
+        off rebuilds the same gates as the server."""
+        from worlds.AutoWorld import call_all
+        for difficulty in ("easy", "medium"):
+            source = _build(seed=5, logic_difficulty=difficulty,
+                            **_ITEMSANITY_OFF)
+            wire = source.worlds[PLAYER].fill_slot_data()
+            tracker_options = dict(_ITEMSANITY_OFF, progressive_boost="off",
+                                   itemsanity=True, logic_difficulty="hard")
+            tracker = setup_multiworld(ctrAPWorld, steps=(), seed=5,
+                                       options=tracker_options)
+            tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+            tracker.generation_is_fake = True
+            for step in STEPS:
+                call_all(tracker, step)
+            self.assertEqual(
+                tracker.worlds[PLAYER].options.logic_difficulty.value,
+                source.worlds[PLAYER].options.logic_difficulty.value)
+            names = sorted(
+                name for track in difficulty_gated_tracks() | {"Hot Air Skyway"}
+                for name in (f"{track}: Trophy Race",
+                             location_name(track, "finish_podium"),
+                             location_name(track, "held_1st"),
+                             location_name(track, "held_3rd")))
+            for boost in (0, 1, 2):
+                server, ut = _state(source, boost=boost), _state(tracker, boost=boost)
+                for name in names:
+                    with self.subTest(difficulty=difficulty, boost=boost,
+                                      location=name):
+                        self.assertEqual(
+                            ut.can_reach(name, "Location", PLAYER),
+                            server.can_reach(name, "Location", PLAYER))

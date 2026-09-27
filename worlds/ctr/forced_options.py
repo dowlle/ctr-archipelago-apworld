@@ -29,7 +29,9 @@ split by consequence.
   elsewhere already resolves the conflict correctly (podium.py gates every
   rung on the master toggle; warp_pad_logic.resolve_shuffle_pools already
   excludes an uninstantiated category). So "downgrade" here means exactly
-  one thing: log a line that names the option and why it did nothing. It
+  one thing: note the option and why it did nothing (`apply` prints every
+  note for the slot on one summary line, and only for options that differ
+  from their default -- a defaulted option is not one the player set). It
   does NOT mean mutating the option's own stored value the way Stardew
   Valley's forced_options.py sometimes does -- `warp_pad_shuffle_categories`
   is deliberately emitted RAW, pre-collapse, on the wire (slot_data Contract
@@ -88,24 +90,40 @@ def _who(world):
     return f"player {world.player} ({world.multiworld.player_name[world.player]})"
 
 
-def _say_once(option, flag: str, message: str) -> None:
-    """Log `message` once per option object.
+def _name(world):
+    from .notices import slot_label
+    return slot_label(world)
+
+
+def _changed(option) -> bool:
+    """Whether an option differs from its default -- the closest a world can
+    get to "the player set it". A notice about an option the player left at
+    its default names something they never chose."""
+    default = type(option).default
+    value = option.value
+    if isinstance(value, (set, frozenset)) or isinstance(default, (set, frozenset)):
+        return set(value) != set(default)
+    return value != default
+
+
+def _ignored(world, names: str, reason: str) -> None:
+    """Note an option this seed ignores; `apply` prints every note for the
+    slot on one line."""
+    from .notices import note_ignored
+    note_ignored(world, f"{names} ({reason})")
+
+
+def _warn(world, key: str, message: str) -> None:
+    """Log `message` once per slot (`notices.say_once`).
 
     `__init__._probe_two_stage_fillable` builds a mirror multiworld for the
     fill probe and hands its slots the REAL option objects, then runs
     `generate_early` on them -- so a seed that runs the probe reaches every
-    warning in this module twice. The player generated one seed and asked one
+    warning in this module again. The player generated one seed and asked one
     question; telling them the same thing twice reads like two different
-    problems. The option object is the right carrier for the latch precisely
-    because the probe shares it with the world it is predicting.
-
-    Only the racer-lock warnings use this so far; the rest of the module still
-    logs per pass.
-    """
-    if getattr(option, flag, False):
-        return
-    setattr(option, flag, True)
-    logger.warning(message)
+    problems."""
+    from .notices import say_once
+    say_once(world, key, message, logger)
 
 
 # ---------------------------------------------------------------------------
@@ -289,16 +307,11 @@ def resolve_shuffle_gems_off_when_gem_goal_excludes_cups(world):
     if o.gems_required_goal.value > 0 and o.shuffle_gems.value \
             and not o.include_gem_cups.value:
         o.shuffle_gems.value = 0
-        logger.warning(
-            f"CTR: {_who(world)} set 'gems_required_goal' to "
-            f"{o.gems_required_goal.value} with 'include_gem_cups' off, so "
-            f"'shuffle_gems' resolves to OFF for this slot and the 5 Gems "
-            f"stay on their own vanilla Gem Cups. Shuffling them would "
-            f"scatter the goal's own Gems while the cups they belong to are "
-            f"opted out of the seed, leaving the goal unreachable. To keep "
-            f"the Gems shuffled instead, turn 'include_gem_cups' on; to make "
-            f"this choice yourself and drop the warning, set 'shuffle_gems' "
-            f"to false.")
+        _warn(world, "resolve_shuffle_gems_off_when_gem_goal_excludes_cups",
+              f"CTR ({_name(world)}): Shuffle Gems turned off, because Gems "
+              f"Required Goal needs the Gem Cups and Include Gem Cup Warp Pads "
+              f"is off (turn that on to keep Gems shuffled, or set Shuffle "
+              f"Gems off yourself to drop this line).")
 
 
 def raise_if_oxidefinal_goal_has_no_progression_tier(world):
@@ -402,12 +415,10 @@ def resolve_oxide_final_relic_count_to_mode_capacity(world):
     requested = opt.value
     if requested > 18 and mode.value != FinalOxideUnlock.option_total_relics:
         opt.value = 18
-        logger.warning(
-            f"CTR: oxide_final_challenge_relic_count={requested} exceeds the "
-            f"18-relic capacity of mode '{mode.current_key}' for "
-            f"{_who(world)}, so it resolves to 18 (all relics of that tier) "
-            f"instead. Only oxide_final_challenge_unlock 'total_relics' "
-            f"supports counts from 19 through 54.")
+        _warn(world, "resolve_oxide_final_relic_count_to_mode_capacity",
+              f"CTR ({_name(world)}): Oxide's Final Challenge Relic Count "
+              f"lowered from {requested} to 18, the most '{mode.current_key}' "
+              f"allows.")
 
 
 def _oxide_final_supply_shortfall(world):
@@ -515,11 +526,14 @@ def warn_podium_subtoggles_without_master(world):
     o = world.options
     if o.podium_placement_checks.value:
         return
-    logger.warning(
-        f"CTR: Podium Placement Checks is off for {_who(world)}, so Podium "
-        f"Finish Rungs, Podium: Any-Position Rung, Held-Position Rungs and "
-        f"Podium: Held 5th Rung have no effect -- no podium rungs are created "
-        f"this seed regardless of their values.")
+    names = [label for label, option in (
+        ("Podium Finish Rungs", o.podium_finish_rungs),
+        ("Podium: Any-Position Rung", o.podium_any_position_rung),
+        ("Held-Position Rungs", o.podium_held_rungs),
+        ("Podium: Held 5th Rung", o.podium_held_fifth_rung),
+    ) if _changed(option)]
+    if names:
+        _ignored(world, ", ".join(names), "Podium Placement Checks off")
 
 
 def warn_podium_any_position_without_finish(world):
@@ -530,11 +544,11 @@ def warn_podium_any_position_without_finish(world):
     o = world.options
     if not o.podium_placement_checks.value:
         return
+    if not o.podium_any_position_rung.value:
+        return
     if o.podium_finish_rungs.value:
         return
-    logger.warning(
-        f"CTR: Podium Finish Rungs is off for {_who(world)}, so Podium: "
-        f"Any-Position Rung has no effect this seed.")
+    _ignored(world, "Podium: Any-Position Rung", "Podium Finish Rungs off")
 
 
 def warn_podium_held_fifth_without_held(world):
@@ -543,11 +557,11 @@ def warn_podium_held_fifth_without_held(world):
     o = world.options
     if not o.podium_placement_checks.value:
         return
+    if not o.podium_held_fifth_rung.value:
+        return
     if o.podium_held_rungs.value:
         return
-    logger.warning(
-        f"CTR: Held-Position Rungs is off for {_who(world)}, so Podium: Held "
-        f"5th Rung has no effect this seed.")
+    _ignored(world, "Podium: Held 5th Rung", "Held-Position Rungs off")
 
 
 def warn_shuffle_crystals_without_include(world):
@@ -559,12 +573,12 @@ def warn_shuffle_crystals_without_include(world):
     o = world.options
     if "crystals" not in set(o.warp_pad_shuffle_categories.value):
         return
+    if not _changed(o.warp_pad_shuffle_categories):
+        return
     if o.include_battle_arenas.value:
         return
-    logger.warning(
-        f"CTR: Include Battle Arena Warp Pads is off for {_who(world)}, so "
-        f"the 'crystals' entry in Warp Pad Shuffle Categories has no effect "
-        f"-- the arenas stay out of the seed and never destination-shuffle.")
+    _ignored(world, "'crystals' in Warp Pad Shuffle Categories",
+             "Include Battle Arena Warp Pads off")
 
 
 def warn_custom_track_displaces_a_randomized_cup(world):
@@ -584,11 +598,8 @@ def warn_custom_track_displaces_a_randomized_cup(world):
     cups = sorted(displaced_cups(resolve_custom_tracks(world)))
     if not cups:
         return
-    logger.warning(
-        f"CTR: {', '.join(cups)} is replaced by a custom track for "
-        f"{_who(world)}, so the legs Randomize Gem Cup Tracks drew for it are "
-        f"never raced -- that cup is one race on the custom track. The other "
-        f"cups randomize normally.")
+    _ignored(world, f"Randomize Gem Cup Tracks for {', '.join(cups)}",
+             "replaced by a custom track")
 
 
 def warn_shuffle_cups_without_include(world):
@@ -602,12 +613,12 @@ def warn_shuffle_cups_without_include(world):
         return
     if "cups" not in set(o.warp_pad_shuffle_categories.value):
         return
+    if not _changed(o.warp_pad_shuffle_categories):
+        return
     if o.include_gem_cups.value:
         return
-    logger.warning(
-        f"CTR: Include Gem Cup Warp Pads is off for {_who(world)}, so the "
-        f"'cups' entry in Warp Pad Shuffle Categories has no effect -- the "
-        f"cups stay out of the seed and never destination-shuffle.")
+    _ignored(world, "'cups' in Warp Pad Shuffle Categories",
+             "Include Gem Cup Warp Pads off")
 
 
 def warn_sphere_search_tuning_ignored_in_vanilla(world):
@@ -620,16 +631,17 @@ def warn_sphere_search_tuning_ignored_in_vanilla(world):
     o = world.options
     if o.warppad_unlock_requirements.value != 0:
         return
-    parts = [f"Two-Stage Gate Density ('{o.two_stage_density.current_key}')",
-             f"Requirement Variety ('{o.requirement_variety.current_key}')"]
-    # No .value truthiness check: the option's default is now the pre-filled
-    # icebound_beta5 table, so in custom mode the weights are always in play.
-    if o.requirement_variety.current_key == "custom":
-        parts.append("Requirement Weights")
-    logger.warning(
-        f"CTR: Warp Pad Unlock Requirements 'vanilla' never runs the "
-        f"randomized requirement sphere-search for {_who(world)}, so " +
-        ", ".join(parts) + " have no effect this seed.")
+    names = [label for label, option in (
+        ("Two-Stage Gate Density", o.two_stage_density),
+        ("Requirement Variety", o.requirement_variety),
+    ) if _changed(option)]
+    # The weights are read only in custom variety; defaulted weights are not
+    # something the player set.
+    if (o.requirement_variety.current_key == "custom"
+            and _changed(o.requirement_weights)):
+        names.append("Requirement Weights")
+    if names:
+        _ignored(world, ", ".join(names), "vanilla warp-pad unlocks")
 
 
 def warn_vanilla_unlock_collapses_destination_shuffle(world):
@@ -644,23 +656,19 @@ def warn_vanilla_unlock_collapses_destination_shuffle(world):
     o = world.options
     if o.warppad_unlock_requirements.value != 0:
         return
-    cats = set(o.warp_pad_shuffle_categories.value)
-    parts = []
-    if o.warp_pad_shuffle_grouping.current_key == "merged":
-        parts.append("'Warp Pad Shuffle Grouping: merged' is forced to "
-                     "'per_category'")
-    if "tracks" in cats:
-        parts.append("Slide Coliseum and Turbo Track drop out of the "
-                     "'tracks' shuffle pool (races-only)")
-    if "cups" in cats:
-        parts.append("the 'cups' category never participates")
-    if not parts:
-        return
-    logger.warning(
-        f"CTR: Warp Pad Unlock Requirements 'vanilla' collapses destination "
-        f"shuffle to its legacy shape for {_who(world)}: " + "; ".join(parts) +
-        ". Only randomized unlock modes get the full category x grouping "
-        f"matrix.")
+    names = []
+    # Per-category is what vanilla forces, and merged is the default, so the
+    # grouping is only worth naming when the player wrote merged themselves --
+    # which a defaulted option cannot tell apart; it is left out.
+    if _changed(o.warp_pad_shuffle_categories):
+        cats = set(o.warp_pad_shuffle_categories.value)
+        if "tracks" in cats:
+            names.append("Slide Coliseum and Turbo Track in the 'tracks' "
+                         "shuffle category")
+        if "cups" in cats:
+            names.append("'cups' in Warp Pad Shuffle Categories")
+    if names:
+        _ignored(world, ", ".join(names), "vanilla warp-pad unlocks")
 
 
 def warn_letters_per_track_ignored_outside_location_modes(world):
@@ -678,13 +686,8 @@ def warn_letters_per_track_ignored_outside_location_modes(world):
     mode = int(o.lettersanity.value)
     if mode in (1, 2):
         return
-    logger.warning(
-        f"CTR: Letters Per Track is set to {o.letters_per_track.value} for "
-        f"{_who(world)}, but Lettersanity is "
-        f"{'off' if mode == 0 else 'items_only'}, so the count knob has no "
-        f"effect -- this seed uses "
-        f"{'no letters' if mode == 0 else 'all three letters per track'} "
-        f"regardless.")
+    _ignored(world, "Letters Per Track",
+             f"Lettersanity {'off' if mode == 0 else 'items_only'}")
 
 
 def warn_relic_gates_may_be_permanently_unreachable(world):
@@ -706,24 +709,24 @@ def warn_relic_gates_may_be_permanently_unreachable(world):
     problems = []
     if world.options.warppad_unlock_requirements.value == 0 and sapphires < 10:
         problems.append(
-            f"'Gem Stone Valley -> Slide Coliseum Warp Pad' (needs 10 "
-            f"Sapphire Relics, {sapphires} created)")
+            f"the Slide Coliseum warp pad (needs 10 Sapphire Relics, "
+            f"{sapphires} exist)")
     # Issue #320 acceptance 4: a `disabled` seed never creates the Final
     # Challenge location, so there is no gate here to be unreachable. The
     # Slide Coliseum sapphire gate above is a separate, still-live relic gate
     # and keeps its check.
     from .Options import OxideGoal
     if OxideGoal.oxide_content_present(world.options.oxide_goal.value):
-        shortfall = _oxide_final_supply_shortfall(world)
-        if shortfall:
-            problems.append(shortfall)
+        if _oxide_final_supply_shortfall(world):
+            n = world.options.oxide_final_challenge_relic_count.value
+            problems.append(f"N. Oxide's Final Challenge (needs {n} relics, "
+                            f"fewer exist)")
     if not problems:
         return
-    logger.warning(
-        f"CTR: player {world.player} ({world.multiworld.player_name[world.player]}): "
-        + " and ".join(problems) + " -- can never be reached by any state, "
-        f"permanently unreachable, but tolerated under this accessibility "
-        f"setting.")
+    _warn(world, "warn_relic_gates_may_be_permanently_unreachable",
+          f"CTR ({_name(world)}): " + " and ".join(problems)
+          + " can never be reached; accessibility is not full, so the seed "
+          f"generates anyway.")
 
 
 def warn_editable_stats_overridden_by_progressive(world):
@@ -738,11 +741,7 @@ def warn_editable_stats_overridden_by_progressive(world):
         return
     if not o.editable_stats.value:
         return
-    logger.warning(
-        f"CTR: Progressive Stats is on for {_who(world)}, so Editable Stats "
-        f"has no effect -- progressive stats own the stat table and the "
-        f"in-game panel stays read-only with no edit control. Set Progressive "
-        f"Stats to 'off' if you want to tune stats yourself.")
+    _ignored(world, "Editable Stats", "Progressive Stats on")
 
 
 def warn_penta_stats_without_vanilla_stats(world):
@@ -759,11 +758,8 @@ def warn_penta_stats_without_vanilla_stats(world):
     source, _owner, _editable = effective_stat_config(world)
     if source == STAT_SOURCE_VANILLA:
         return
-    logger.warning(
-        f"CTR: Penta Penguin Stats is set to 'pal' for {_who(world)}, but "
-        f"this seed's stats are owned by Progressive Stats or Editable Stats, "
-        f"so Penta uses the AP-defined stats like every other racer and the "
-        f"selector has no gameplay effect.")
+    _ignored(world, "Penta Penguin Stats",
+             "Progressive or Editable Stats set the stats")
 
 
 def warn_racer_locked_pads_boolean_normalized(world):
@@ -776,14 +772,10 @@ def warn_racer_locked_pads_boolean_normalized(world):
     Not a downgrade: nothing is lost, the old spelling is simply translated."""
     if not characters.legacy_boolean_request(world):
         return
-    _say_once(
-        world.options.racer_locked_pads, "_ctr_said_boolean_normalized",
-        f"CTR: Racer-Locked Warp Pads is now a maximum lock COUNT, not a "
-        f"toggle, but {_who(world)}'s YAML still sets it to 'true'. Reading it "
-        f"the Alpha 6 way -- a quarter of this seed's eligible pads, at least "
-        f"1 and at most 6 -- rather than as the number 1. Write a number "
-        f"instead: 0 turns racer locks off, and any higher value is the most "
-        f"pads that may be locked.")
+    _warn(world, "warn_racer_locked_pads_boolean_normalized",
+          f"CTR ({_name(world)}): Racer-Locked Warp Pads 'true' is read the "
+          f"Alpha 6 way, as a quarter of the eligible pads (1 to 6); write a "
+          f"number instead, where 0 turns racer locks off.")
 
 
 def warn_racer_locks_without_character_unlocks(world):
@@ -799,12 +791,7 @@ def warn_racer_locks_without_character_unlocks(world):
         return
     if o.character_unlocks.value:
         return
-    _say_once(
-        o.racer_locked_pads, "_ctr_said_without_character_unlocks",
-        f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Character "
-        f"Unlocks is off (all-unlocked mode), so there are no character unlock "
-        f"items for a pad to require and no pad is locked to a racer. Turn "
-        f"Character Unlocks on to use racer locks.")
+    _ignored(world, "Racer-Locked Warp Pads", "Character Unlocks off")
 
 
 def warn_racer_locks_have_no_eligible_pads(world):
@@ -820,12 +807,7 @@ def warn_racer_locks_have_no_eligible_pads(world):
         return
     if o.warppad_unlock_requirements.value != 0:
         return
-    _say_once(
-        o.racer_locked_pads, "_ctr_said_no_eligible_pads",
-        f"CTR: Racer-Locked Warp Pads is on for {_who(world)}, but Warp Pad "
-        f"Unlock Requirements is 'vanilla', so no pad carries a randomized "
-        f"requirement and no racer lock can be placed. The 15 character "
-        f"unlock items still exist and are still playable racers.")
+    _ignored(world, "Racer-Locked Warp Pads", "vanilla warp-pad unlocks")
 
 
 def warn_wumpa_bundles_have_no_filler_slots(world):
@@ -842,9 +824,7 @@ def warn_wumpa_bundles_have_no_filler_slots(world):
         return
     if o.trap_fill_percentage.value < 100:
         return
-    logger.warning(
-        f"CTR: Trap Fill Percentage is 100 for {_who(world)}, so every filler "
-        f"slot becomes a trap and Wumpa Bundles has no effect this seed.")
+    _ignored(world, "Wumpa Bundles", "Trap Fill Percentage 100")
 
 
 def apply_downgrade_warnings(world):
@@ -881,3 +861,5 @@ def apply(world):
     resolve_oxide_final_relic_count_to_mode_capacity(world)
     apply_raise_guards(world)
     apply_downgrade_warnings(world)
+    from .notices import emit_ignored_summary
+    emit_ignored_summary(world, logger)

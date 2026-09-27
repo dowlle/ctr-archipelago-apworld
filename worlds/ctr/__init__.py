@@ -1,4 +1,5 @@
 import logging
+import contextlib
 import json
 import os
 from typing import ClassVar, Dict, List
@@ -36,6 +37,8 @@ from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
 from . import characters
 from . import hit_character
+from . import relic_perfect
+from .relic_perfect import RELIC_PERFECT_CLASS
 from . import progressive_capability
 from . import rung_sizer
 from .spoiler_pad_map import changed_pad_destination_rows
@@ -109,6 +112,50 @@ class ctrAPWeb(WebWorld):
             ["Taor", "Icebound777"]
         )
     ]
+
+
+class _DropCtrRootRecords(logging.Filter):
+    """Drops the CTR lines some modules log straight on the root logger."""
+
+    def filter(self, record):
+        return not str(record.msg).startswith(("[CTR", "CTR"))
+
+
+@contextlib.contextmanager
+def _quiet_ctr_logs():
+    """Mute CTR log output: every `worlds.ctr.*` module logger (through the
+    package logger's level, which they inherit) and the root-logger `[CTR]`
+    lines. Other games' output is untouched."""
+    package = logging.getLogger(__name__)
+    root = logging.getLogger()
+    previous = package.level
+    root_filter = _DropCtrRootRecords()
+    package.setLevel(logging.CRITICAL + 1)
+    root.addFilter(root_filter)
+    try:
+        yield
+    finally:
+        root.removeFilter(root_filter)
+        package.setLevel(previous)
+
+
+def _probe_error_where(step, error, real) -> str:
+    """The failing probe step, plus the slot and game when one world's step
+    raised: AP's `call_single` attaches "for player N, named X" to the
+    exception (PEP 678 note), and the mirror numbers slots like the room."""
+    import re
+    for note in getattr(error, "__notes__", ()) or ():
+        m = re.search(r"for player (\d+), named (.*)\.$", str(note))
+        if m:
+            player = int(m.group(1))
+            game = getattr(real, "game", {}).get(player, "?")
+            return f"{step}, player {player} {m.group(2)!r}, game {game!r}"
+    return step
+
+
+def _one_line(error) -> str:
+    text = " ".join(str(error).split())
+    return f"{type(error).__name__}: {text}" if text else type(error).__name__
 
 
 class ctrAPWorld(World):
@@ -499,6 +546,11 @@ class ctrAPWorld(World):
         # and never redraws the seed or the candidate arrays.
         hit_character.restore_from_wire(self, passthrough)
         o.hit_character.value = int(bool(co.get("hit_character", 0)))
+        # Relic Race perfect checks (#49): the always-emitted scalar is the
+        # option; an enabled seed's block must equal what these restored
+        # options emit (Cortex Vortex's dropped destination was restored
+        # above), otherwise the restore refuses. See relic_perfect.
+        relic_perfect.restore_from_wire(o, passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -655,14 +707,15 @@ class ctrAPWorld(World):
         # corner on 60415b4ad) -- the terminal backstop below closes that residual.
         if (getattr(self, "_ctr_two_stage_active", False)
                 and not getattr(self, "_ctr_force_collapse_stage2", False)):
-            if self._probe_two_stage_fillable() is False:
+            if self._room_probe_verdict() is False:
                 self._ctr_force_collapse_stage2 = True
                 # Overwrite the stage-2 access rules with the collapsed (plain
                 # can_reach Trophy Race) form; fill_slot_data also emits type-0
                 # stage 2. This re-install only reassigns loc.access_rule closures
                 # and consumes no multiworld.random (verified) -- so the terminal
                 # backstop's replay fidelity survives it.
-                from .Rules import add_lettersanity_rules, add_time_trial_and_ctr_requirements
+                from .Rules import (add_custom_ctr_challenge_rules, add_lettersanity_rules,
+                                    add_time_trial_and_ctr_requirements)
                 add_time_trial_and_ctr_requirements(self, self.player)
                 # The reinstall above deliberately replaces the CTR Token and
                 # created letter rules. Restore every Lettersanity layer after
@@ -670,6 +723,10 @@ class ctrAPWorld(World):
                 # the mode-2 own-letter guard. Universal Tracker skips this
                 # collapse path and already builds these layers in set_rules.
                 add_lettersanity_rules(self, self.player)
+                # Custom-track CTR Token Challenges take their letter item
+                # receipts from this separate installer; the reinstall above
+                # replaced those token rules too.
+                add_custom_ctr_challenge_rules(self, self.player)
                 from .warp_pad_logic import warn_stage2_collapsed
                 n = len(self.multiworld.worlds)
                 warn_stage2_collapsed(
@@ -685,9 +742,33 @@ class ctrAPWorld(World):
                     else "randomized")
             self._rollback_precollect_backstop(mode)
 
+    def _room_probe_verdict(self):
+        """The room's two-stage fillability verdict, probed once per room.
+
+        The probe mirrors the WHOLE room (every slot, every game) from the real
+        seed and the real option objects, and the mirror's CTR `pre_fill` is a
+        no-op, so a CTR slot's own collapse is not one of its inputs: every CTR
+        slot used to run an identical dry run and get the same answer. The
+        first CTR `pre_fill` that needs a verdict runs the probe -- the same
+        point in AP's call order where the first per-slot probe used to run --
+        and later CTR slots reuse it.
+
+        A latch on the multiworld rather than a `stage_pre_fill` hook: in AP
+        0.6.7 `call_all` runs the stage hook AFTER every world's `pre_fill`, so
+        it would run after the solo rollback-precollect backstop that must see
+        the collapse first."""
+        mw = self.multiworld
+        cached = getattr(mw, "_ctr_room_probe_verdict", None)
+        if cached is not None:
+            return cached[0]
+        verdict = self._probe_two_stage_fillable()
+        mw._ctr_room_probe_verdict = (verdict,)
+        return verdict
+
     def _probe_two_stage_fillable(self):
         """True/False if a faithful parallel dry-run fills; None if the probe could
-        not run (caller treats None as 'keep two-stage').
+        not run (caller treats None as 'keep two-stage'). Called once per room
+        through `_room_probe_verdict`.
 
         MULTIWORLD-AWARE (issue #75, ruled 2026-08-07). The probe mirrors the REAL
         room: same player count, same games per slot, each slot carrying its own
@@ -729,7 +810,9 @@ class ctrAPWorld(World):
         unaffected.
 
         The probe does not reproduce item links. It is a fillability predictor,
-        not a second generator; any error keeps two-stage."""
+        not a second generator; any error keeps two-stage, and names the step
+        (and the slot, when one world's step raised) on one line."""
+        step = "setup"
         try:
             from BaseClasses import MultiWorld as _MW, CollectionState as _CS
             from worlds.AutoWorld import call_all as _call_all, AutoWorldRegister
@@ -767,26 +850,36 @@ class ctrAPWorld(World):
             # fidelity fix, not a workaround: a probe that does not mirror
             # Main.py cannot predict Main.py.
             pmw.state = _CS(pmw)
-            for step in ("generate_early", "create_regions", "create_items",
-                         "set_rules", "connect_entrances", "generate_basic"):
-                _call_all(pmw, step)
-            # Main.py's pre_fill step, with the mirror's CTR slots no-opped
-            # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
-            # assignment shadows the bound method for exactly these objects;
-            # call_all still walks every slot in real player order and still
-            # runs any stage_pre_fill class hooks.
-            for p in players:
-                if isinstance(pmw.worlds[p], ctrAPWorld):
-                    pmw.worlds[p].pre_fill = lambda: None
-            _call_all(pmw, "pre_fill")
-            _dist(pmw)
+            # The mirror repeats every CTR step for every CTR slot; anything it
+            # logs was already said by the real pass, so CTR output is muted
+            # until the dry run ends (restored before any verdict is logged).
+            with _quiet_ctr_logs():
+                for step in ("generate_early", "create_regions", "create_items",
+                             "set_rules", "connect_entrances", "generate_basic"):
+                    _call_all(pmw, step)
+                step = "pre_fill"
+                # Main.py's pre_fill step, with the mirror's CTR slots no-opped
+                # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
+                # assignment shadows the bound method for exactly these objects;
+                # call_all still walks every slot in real player order and still
+                # runs any stage_pre_fill class hooks.
+                for p in players:
+                    if isinstance(pmw.worlds[p], ctrAPWorld):
+                        pmw.worlds[p].pre_fill = lambda: None
+                _call_all(pmw, "pre_fill")
+                step = "fill"
+                _dist(pmw)
             return True
         except Exception as e:
             from Fill import FillError as _FE
             if isinstance(e, _FE):
                 return False
-            logging.warning("[CTR] two-stage fillability probe errored (%s); "
-                            "keeping two-stage.", type(e).__name__)
+            logging.warning("[CTR] two-stage fillability probe could not run "
+                            "(%s): %s; keeping two-stage.",
+                            _probe_error_where(step, e, self.multiworld),
+                            _one_line(e))
+            logging.debug("[CTR] two-stage fillability probe traceback",
+                          exc_info=True)
             return None
 
     _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40
@@ -2254,6 +2347,11 @@ class ctrAPWorld(World):
                 # configuration; the conditional top-level block below carries
                 # the resolved encounter data and is present only when enabled.
                 "hit_character": bool(o.hit_character.value),
+                # Relic Race perfect checks (#49). Always emitted as a boolean,
+                # same convention as itemsanity and hit_character; the
+                # top-level `relic_perfect_checks` block below is present only
+                # when enabled. Native reads the block, not this scalar.
+                "relic_perfect_checks": bool(o.relic_perfect_checks.value),
                 # The wumpa family's two scalars (2026-08-10 ruling). Always
                 # emitted, same convention as itemsanity and tizi_helper, and
                 # DIAGNOSTIC / TRACKER ONLY: native drives both from received
@@ -2373,6 +2471,11 @@ class ctrAPWorld(World):
             # convention. The block is fully resolved in generate_early (seed
             # drawn once, cached); UT pins the connected seed's block verbatim.
             slot_data["hit_character_encounters"] = hit_character_block
+        if o.relic_perfect_checks.value:
+            # Relic Race perfect checks (#49). Additive, no schema bump, same
+            # off-parity convention as itemsanity: omitted when off. LevelID ->
+            # [code] for every created check (Contract, relic_perfect_checks).
+            slot_data["relic_perfect_checks"] = RELIC_PERFECT_CLASS.wire_block(o)
         if int(o.lettersanity.value) != 0:
             slot_data["lettersanity_checks"] = LETTERSANITY_CLASS.wire_block(o)
         custom_letters = CUSTOM_LETTERSANITY_CLASS.wire_block(o)

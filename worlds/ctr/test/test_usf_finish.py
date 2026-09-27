@@ -332,7 +332,10 @@ class TestTrophyRaceGate(unittest.TestCase):
         self.assertTrue(_reachable(mw, state, name))
 
     def test_no_other_track_is_gated(self):
-        mw = _build(progressive_boost="shared_global")
+        # Hard logic: with the boost chain on, easy and medium gate the
+        # difficulty tracks' Trophy Races even with Itemsanity off (#329,
+        # ruling 2026-09-27). This test isolates the USF finish gate.
+        mw = _build(progressive_boost="shared_global", logic_difficulty="hard")
         state = _state(mw, boost=0)
         for track in TROPHY_TRACKS:
             if track in ALL_USF_FINISH_TRACKS:
@@ -350,7 +353,10 @@ class TestTimeTrialRipple(unittest.TestCase):
                 "Platinum Time Trial", "CTR Token Challenge")
 
     def _check(self, **options):
-        mw = _build(progressive_boost="shared_global", **options)
+        # Hard logic keeps the Crash Cove Sapphire control free of the #329
+        # difficulty gate, so the control isolates the USF ripple.
+        mw = _build(progressive_boost="shared_global",
+                    logic_difficulty="hard", **options)
         blocked, cleared = _state(mw, boost=0), _state(mw, boost=USF_BOOST_COUNT)
         live = {loc.name for loc in mw.get_locations(PLAYER)}
         # The seed's relic-count sliders can remove whole tiers (#171), so the
@@ -403,14 +409,39 @@ class TestPodiumRungs(unittest.TestCase):
                 self.assertFalse(_reachable(mw, blocked, name))
                 self.assertTrue(_reachable(mw, cleared, name))
 
-    def test_held_rungs_stay_free(self):
+    def test_held_3rd_and_5th_stay_free(self):
         """`Held 3rd` was checked on Hot Air Skyway without USF in the same
         session: the live-position listener fires before the finish line."""
-        mw = _build(progressive_boost="shared_global")
-        blocked = _state(mw, boost=0)
-        for key in sorted(HELD_RUNG_KEYS & {"held_1st", "held_3rd"}):
-            with self.subTest(rung=key):
-                self.assertTrue(_reachable(mw, blocked, location_name(HAS, key)))
+        for difficulty in ("easy", "medium", "hard"):
+            mw = _build(progressive_boost="shared_global",
+                        logic_difficulty=difficulty,
+                        podium_held_fifth_rung=True)
+            blocked = _state(mw, boost=0)
+            for key in sorted(HELD_RUNG_KEYS - {"held_1st"}):
+                with self.subTest(difficulty=difficulty, rung=key):
+                    self.assertTrue(
+                        _reachable(mw, blocked, location_name(HAS, key)))
+
+    def test_held_1st_needs_usf(self):
+        """Ruling 2026-09-27 (#329): holding 1st on Hot Air Skyway needs USF
+        at every difficulty, through the track and through its legging cups,
+        with no hard-shortcut escape (unlike Oxide Station)."""
+        for difficulty in ("easy", "medium", "hard"):
+            for knowledge in ("medium", "hard"):
+                mw = _build(progressive_boost="shared_global",
+                            logic_difficulty=difficulty,
+                            shortcut_knowledge=knowledge)
+                name = location_name(HAS, "held_1st")
+                with self.subTest(difficulty=difficulty, knowledge=knowledge):
+                    self.assertFalse(_reachable(mw, _state(mw, boost=0), name))
+                    self.assertFalse(_reachable(mw, _state(mw, boost=1), name))
+                    self.assertTrue(_reachable(
+                        mw, _state(mw, boost=USF_BOOST_COUNT), name))
+
+    def test_held_1st_is_free_when_the_pack_is_off(self):
+        mw = _build(logic_difficulty="easy")
+        self.assertTrue(_reachable(mw, _state(mw),
+                                   location_name(HAS, "held_1st")))
 
     def test_other_tracks_keep_every_rung(self):
         mw = _build(progressive_boost="shared_global")
@@ -646,8 +677,10 @@ class TestOxideStationGate(unittest.TestCase):
         self.assertIn(OXIDE, USF_OR_HARD_SK_FINISH_TRACKS)
         self.assertIn(OXIDE, held_first_gated_tracks())
         self.assertNotIn(OXIDE, USF_FINISH_TRACKS)
-        # Hot Air Skyway is the contrast the ruling is written against.
-        self.assertNotIn(HAS, held_first_gated_tracks())
+        # Hot Air Skyway gates Held 1st too (ruling 2026-09-27, #329), but
+        # with no hard-shortcut escape.
+        self.assertIn(HAS, held_first_gated_tracks())
+        self.assertFalse(CONFIRMED_FINISH_BY_TRACK[HAS].hard_shortcut_escape)
         self.assertIn(HAS, USF_FINISH_TRACKS)
 
 
