@@ -413,6 +413,14 @@ class HitCharacter(Toggle):
     display_name = "Hit Character Checks"
 
 
+class RelicPerfectChecks(Toggle):
+    """Add a check to each Relic Race for breaking every time crate in it.
+
+    It pays whether or not your time wins a relic, and never changes which
+    relic you get."""
+    display_name = "Relic Race Perfect Checks"
+
+
 class Lettersanity(Choice):
     """Turn the C-T-R letters into checks, items, or both.
 
@@ -1149,6 +1157,7 @@ class ctrAPOptions(PerGameCommonOptions):
     itemsanity: Itemsanity
     # Hit Character encounter checks (0.2.1 candidate)
     hit_character: HitCharacter
+    relic_perfect_checks: RelicPerfectChecks
     # Papu's Pyramid mask helper (#223)
     tizi_helper: TiziHelper
     # The wumpa family (2026-08-10 ruling): two bundle fillers, the starting
@@ -1230,7 +1239,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
-                     HitCharacter,
+                     HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
                      PodiumPlacementChecks, PodiumFinishRungs,

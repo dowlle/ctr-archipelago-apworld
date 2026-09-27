@@ -69,6 +69,15 @@ unlock the racer instead: Fake Crash at 1 Key, Penta Penguin at 2, N. Tropy at
 3 and N. Oxide at 4. Up to three unlocked racers join a race, and racers you
 have not hit yet get a seat first.
 
+### Relic Race Perfect Checks
+
+Each Relic Race gets one check, paid when the race ends with every time crate
+broken (the crate counter reads full). It needs the same access as that
+track's Sapphire Time Trial. With Progressive Boost on, N. Gin Labs also needs
+Ultimate Sacred Fire, because two of its crates cannot be reached without it.
+If Cortex Vortex Track takes a track's pad, that track has no Relic Race and
+no perfect check.
+
 ### Wumpa Check
 
 With `per_track`, Slide Coliseum and Turbo Track only have a Wumpa check when
