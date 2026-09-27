@@ -866,19 +866,32 @@ class DeathLink(Choice):
     - **any_hit**: also send on every hit that lands on you (spin-out, blast,
       squish, burn). Much higher frequency, so pair it with DeathLink
       Amnesty.
+    - **race_loss**: sends like mask_reset (only when you fell off the track
+      or were eaten). A received death does not reset you. It ends your
+      current race on the spot as a last-place loss, and nothing that race
+      would have paid out (placement, trophy, relic, and similar checks) is
+      awarded. In a Gem Cup the cup carries on, and if that was the last race
+      and you still win the cup on points, the cup reward is still paid.
 
-    Receiving a death always forces the full mask reset on you. Only
-    adventure-mode races send."""
+    With mask_reset and any_hit, receiving a death forces the full mask reset
+    on you. Deaths are only sent and received during adventure-mode races; a
+    death that arrives outside a race waits for your next one. Older clients
+    that do not know race_loss treat it as mask_reset."""
     # A received death never triggers an outgoing one (no ping-pong). Type
-    # rationale: AP core ships DeathLink as an on/off Toggle; CTR uses a 3-value
-    # Choice because the send tiers are a real gameplay difference, and a
-    # separate toggle would permit "any_hit but do not send", which is not a
-    # supported mode. off mirrors 0 into slot_data, matching the Toggle
-    # convention native keys off.
+    # rationale: AP core ships DeathLink as an on/off Toggle; CTR uses a
+    # Choice because the send tiers and the receive effect are real gameplay
+    # differences, and a separate toggle would permit "any_hit but do not
+    # send", which is not a supported mode. off mirrors 0 into slot_data,
+    # matching the Toggle convention native keys off. The integer values are
+    # the wire contract with native (ap_deathlink.h CTR_DL_*): race_loss = 3
+    # (issue #286) sends on the mask_reset tier and ends the attempt as a
+    # forced loss on receive; a native build predating it falls back to the
+    # mask reset for any unknown nonzero value.
     display_name = "DeathLink"
     option_off = 0
     option_mask_reset = 1
     option_any_hit = 2
+    option_race_loss = 3
     default = 0
 
 
@@ -887,8 +900,8 @@ class DeathLinkAmnesty(Range):
     (default) sends every death; N sends one per N. Meant for the any_hit
     tier. Incoming deaths are unaffected; amnesty only throttles what you
     send."""
-    # Does nothing useful at mask_reset (those wipeouts are already rare) and
-    # is inert while DeathLink is off.
+    # Does nothing useful at mask_reset or race_loss (both send only on the
+    # rare mask-reset wipeouts) and is inert while DeathLink is off.
     display_name = "DeathLink Amnesty"
     range_start = 1
     range_end = 30
