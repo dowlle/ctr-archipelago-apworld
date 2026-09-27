@@ -22,7 +22,11 @@ reachable before the finish line stays reachable without USF:
   * the live-position podium rungs (`Held 1st` / `Held 3rd` / `Held 5th`), which
     fire from the placement listener DURING the race -- `Held 3rd` was likewise
     checked without USF in that session. Only `podium.FINISH_RUNG_KEYS` cross
-    the line, so only those carry the term.
+    the line, so only those carry the finish term. `Held 1st` is the one
+    exception, by ruling rather than geometry: issue #329 (ruling 2026-09-27)
+    reported that holding 1st before the climb is not realistic on a bare
+    kart, so it carries the USF term too (see `held_first_term`). `Held 3rd`
+    and `Held 5th` stay free.
 
 WHERE IT PROPAGATES (all installed from `Rules.py`):
 
@@ -59,9 +63,10 @@ OXIDE STATION (ruling 2026-08-14 17:15, live pre1 test session; issue #55).
 On an empty boost chain at easy/medium shortcut knowledge, Oxide Station is
 not realistically finishable and holding 1st is not realistic either -- but a
 player who declared HARD shortcut knowledge knows routes that make both work
-bare. So this track's finish, and (unlike Hot Air Skyway) its `Held 1st` rung,
-carry `USF OR shortcut_knowledge == hard`, while `Held 3rd`/`Held 5th` stay
-free. The escape is an OPTION, not a state term: at hard knowledge the gate is
+bare. So this track's finish, and its `Held 1st` rung, carry
+`USF OR shortcut_knowledge == hard`, while `Held 3rd`/`Held 5th` stay free.
+Hot Air Skyway's `Held 1st` has carried the plain USF term (no escape) since
+the 2026-09-27 ruling on issue #329. The escape is an OPTION, not a state term: at hard knowledge the gate is
 vacuous for this track alone, so a cup that legs both tracks keeps its Hot Air
 Skyway half -- which is why the cup term is composed per LEG rather than being
 one term per cup.
@@ -327,9 +332,9 @@ class UsfFinishGate:
 
     def held_first_term(self, track):
         """The extra term `Held 1st` carries on tracks where holding 1st bare
-        is ruled unrealistic (Oxide Station), or None everywhere else --
-        including Hot Air Skyway, whose held rungs are empirically bare-
-        reachable and stay free."""
+        is ruled unrealistic (Oxide Station; Hot Air Skyway since the
+        2026-09-27 ruling on issue #329), or None everywhere else. Only
+        `Held 1st` reads it: `Held 3rd` and `Held 5th` stay free."""
         if track in held_first_gated_tracks():
             return self._track_terms[track]
         return None

@@ -48,8 +48,9 @@ CONFIRMED_FINISH_CAPABILITIES = (
         track="Hot Air Skyway",
         boost_count=2,
         hard_shortcut_escape=False,
-        gate_held_first=False,
-        source="Live v3 test session, 2026-08-12 21:33-21:36 CEST",
+        gate_held_first=True,
+        source="Live v3 test session, 2026-08-12 21:33-21:36 CEST; Held 1st "
+               "gated by ruling 2026-09-27 (issue #329), Held 3rd stays free",
     ),
     FinishCapability(
         track="Oxide Station",

@@ -158,13 +158,15 @@ def set_rules(world):
 
 
 def add_capability_difficulty_rules(world, player):
-    """Install the ruled option-aware gates for the seven easy tracks.
+    """Install the ruled option-aware gates for the difficulty-gated tracks.
 
-    The rule is meaningful only when both item packs randomize the relevant
-    capabilities. With Progressive Boost off, vanilla boost satisfies it. With
-    Itemsanity off, vanilla weapon supply satisfies it. Medium gates only the
-    Trophy Race; easy also gates Finish on Podium and Held 1st; hard adds no
-    requirement.
+    The rule is meaningful only when Progressive Boost is on; with it off,
+    vanilla boost satisfies it and nothing is installed. With Itemsanity on the
+    term is "first boost rank OR enough useful weapon families". With
+    Itemsanity off weapons are not items, so the term is the first boost rank
+    alone (ruling 2026-09-27, issue #329; before it the rule added nothing
+    there). Medium gates only the Trophy Race; easy also gates Finish on Podium
+    and Held 1st; hard adds no requirement.
 
     The track inventory lives in capability_contract and is the UNION of the
     measured easy group and the ruled group -- read through
@@ -187,9 +189,9 @@ def add_capability_difficulty_rules(world, player):
     difficulty = int(world.options.logic_difficulty.value)
     if difficulty == 2:  # hard
         return
-    if (not bool(world.options.progressive_boost.value)
-            or not bool(world.options.itemsanity.value)):
+    if not bool(world.options.progressive_boost.value):
         return
+    weapon_arm = bool(world.options.itemsanity.value)
 
     names = {loc.name for loc in world.multiworld.get_locations(player)}
     tracks = set(difficulty_gated_tracks())
@@ -199,7 +201,8 @@ def add_capability_difficulty_rules(world, player):
     for track in sorted(tracks):
         required_character = track_required_character(world, track)
 
-        def capability_rule(state, p=player, racer=required_character):
+        def capability_rule(state, p=player, racer=required_character,
+                            weapons=weapon_arm):
             # Boost first and alone: the Turbo bonus below only ever applied
             # when `boost_ok` was already True, i.e. when the OR had already
             # short-circuited, so counting weapon families in that branch was
@@ -207,8 +210,10 @@ def add_capability_difficulty_rules(world, player):
             if gate_satisfied(world, state, p, boost_min=1,
                               required_character=racer):
                 return True
-            return (family_count(state, p, USEFUL_WEAPON_FAMILIES)
-                    >= DIFFICULTY_WEAPON_FAMILY_MIN)
+            # Itemsanity off: no weapon items exist, so there is no weapon
+            # arm and the first boost rank is the whole requirement.
+            return weapons and (family_count(state, p, USEFUL_WEAPON_FAMILIES)
+                                >= DIFFICULTY_WEAPON_FAMILY_MIN)
 
         gated = [f"{track}: Trophy Race"]
         if difficulty == 0:  # easy

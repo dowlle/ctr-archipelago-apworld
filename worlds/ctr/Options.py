@@ -302,16 +302,17 @@ class LogicDifficulty(Choice):
     """How much the logic expects you to manage in races while boost and
     weapons are randomized.
 
-    Race requirements apply when Progressive Boost and Itemsanity are both
-    on. Platinum Time Trials follow this whenever Progressive Boost is on.
+    Race requirements apply when Progressive Boost is on. Platinum Time
+    Trials follow this too.
 
     - **easy**: winning, finishing on the podium and holding 1st wait for
-      boost or three useful weapons.
+      boost, or for three useful weapons when Itemsanity is on.
     - **medium** (default): only winning waits.
     - **hard**: no extra requirement.
 
     Tracks that need speed ignore this: Cortex Castle and Hot Air Skyway
-    always need Ultimate Sacred Fire."""
+    always need Ultimate Sacred Fire, and so does holding 1st on Hot Air
+    Skyway."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
