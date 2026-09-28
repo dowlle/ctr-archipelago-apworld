@@ -17,6 +17,9 @@ With Character Unlocks off the option does nothing and says so once.
 import logging
 import unittest
 from collections import Counter
+from pathlib import Path
+
+import yaml
 
 from BaseClasses import CollectionState, ItemClassification
 from Fill import distribute_items_restrictive
@@ -325,7 +328,9 @@ class TestAccessibilityFull(unittest.TestCase):
 
 
 class TestUniversalTracker(unittest.TestCase):
-    """UT rebuilds the same logic from slot_data without a new wire key."""
+    """The wire carries the effective option and UT restores it (the
+    character_unlocks precedent): absent means off, the tracking player's own
+    YAML never wins."""
 
     STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 
@@ -337,21 +342,74 @@ class TestUniversalTracker(unittest.TestCase):
             call_all(tracker, step)
         return tracker
 
-    def test_starting_racer_and_locks_come_from_the_wire(self):
-        for local in ({}, {"remove_playable_oxide": True}):
-            with self.subTest(local=local):
-                original = _build(4, starting_character="random_any",
-                                  racer_locked_pads=8,
-                                  remove_playable_oxide=True)
-                world = original.worlds[PLAYER]
-                tracker = self._rebuild(world.fill_slot_data(), **local)
-                rebuilt = tracker.worlds[PLAYER]
-                self.assertEqual(rebuilt.ctr_starting_character,
-                                 world.ctr_starting_character)
-                self.assertEqual(rebuilt.ctr_racer_locks,
-                                 world.ctr_racer_locks)
-                # Pinned off, whatever the tracking player's YAML says.
-                self.assertFalse(rebuilt.options.remove_playable_oxide.value)
+    def _assert_same_pool(self, original, tracker):
+        self.assertEqual(Counter(
+            name for name in _pool_names(original)
+            if name in characters.ROSTER_CHARACTER_ID), Counter(
+            name for name in _pool_names(tracker)
+            if name in characters.ROSTER_CHARACTER_ID))
+        self.assertEqual(len(_pool_names(original)), len(_pool_names(tracker)))
+        self.assertEqual(len(tracker.get_unfilled_locations(PLAYER)),
+                         len(_pool_names(tracker)))
+
+    def test_wire_carries_the_effective_value(self):
+        cases = (
+            ({}, False),
+            ({"remove_playable_oxide": True}, True),
+            ({"remove_playable_oxide": True, "character_unlocks": False},
+             False),
+        )
+        for options, expected in cases:
+            with self.subTest(options=options):
+                wire = _build(1, **options).worlds[PLAYER].fill_slot_data()
+                value = wire["ctr_options"]["remove_playable_oxide"]
+                self.assertIs(type(value), bool)
+                self.assertEqual(value, expected)
+
+    def test_round_trip_restores_the_option_and_the_pool(self):
+        for seed_value in (True, False):
+            for local in ({}, {"remove_playable_oxide": not seed_value}):
+                with self.subTest(seed_value=seed_value, local=local):
+                    original = _build(4, starting_character="random_any",
+                                      racer_locked_pads=8,
+                                      remove_playable_oxide=seed_value)
+                    world = original.worlds[PLAYER]
+                    tracker = self._rebuild(world.fill_slot_data(), **local)
+                    rebuilt = tracker.worlds[PLAYER]
+                    self.assertEqual(
+                        bool(rebuilt.options.remove_playable_oxide.value),
+                        seed_value)
+                    self.assertEqual(rebuilt.ctr_starting_character,
+                                     world.ctr_starting_character)
+                    self.assertEqual(rebuilt.ctr_racer_locks,
+                                     world.ctr_racer_locks)
+                    self._assert_same_pool(original, tracker)
+
+    def test_absent_key_restores_off_whatever_the_local_yaml_says(self):
+        wire = _build(1).worlds[PLAYER].fill_slot_data()
+        del wire["ctr_options"]["remove_playable_oxide"]
+        tracker = self._rebuild(wire, remove_playable_oxide=True)
+        self.assertFalse(
+            tracker.worlds[PLAYER].options.remove_playable_oxide.value)
+        self.assertIn(OXIDE, _pool_names(tracker))
+
+    def test_tight_pool_seed_from_check_ut_round_trips(self):
+        # The CI check-ut failure: podium checks off and 95% traps, so the
+        # seed only fits 14 unlock items. Off, the same options are refused;
+        # on, UT must rebuild the same 14-racer pool instead of refusing.
+        options = yaml.safe_load(
+            (Path(__file__).parent
+             / "fixtures/remove_oxide_tight_pool_check_ut.yaml").read_text()
+        )[ctrAPWorld.game]
+        off = dict(options, remove_playable_oxide=False)
+        with self.assertRaises(OptionError):
+            _build(3, **off)
+        original = _build(3, **options)
+        wire = original.worlds[PLAYER].fill_slot_data()
+        self.assertTrue(wire["ctr_options"]["remove_playable_oxide"])
+        tracker = self._rebuild(wire)
+        self._assert_same_pool(original, tracker)
+        self.assertNotIn(OXIDE, _pool_names(tracker))
 
     def test_tracker_starting_as_oxide_does_not_raise(self):
         original = _build(1, starting_character="nitros_oxide")

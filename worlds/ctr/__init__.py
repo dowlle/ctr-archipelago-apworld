@@ -406,13 +406,13 @@ class ctrAPWorld(World):
         # generate_early, because it is a per-seed draw, not an option value.
         if "character_unlocks" in co:
             o.character_unlocks.value = int(bool(co["character_unlocks"]))
-        # Remove Playable Oxide (#426) is not on the wire, and logic does not
-        # need it: it only decides whether Oxide's unlock item is in the pool.
-        # Every rule reads received items, the starting racer and the racer
-        # locks are pinned from the wire, and a removed Oxide simply never
-        # arrives. Pin it off so the tracking player's own YAML cannot change
-        # the re-generated pool.
-        o.remove_playable_oxide.value = 0
+        # Remove Playable Oxide (#426) decides whether Oxide's unlock item is
+        # in the pool, so it is restored like character_unlocks: a tight seed
+        # that fits 14 unlock items does not fit a re-generation that rebuilds
+        # 15 (the check-ut arm found exactly that). Absent on an older wire
+        # means off, whatever the tracking player's own YAML says.
+        o.remove_playable_oxide.value = int(
+            bool(co.get("remove_playable_oxide", False)))
         if "racer_locked_pads" in co:
             # An Alpha 6 seed put a Boolean here, a 0.2.0 seed puts the
             # requested maximum. `int(True)` is 1, which is the honest reading

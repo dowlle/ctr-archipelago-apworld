@@ -824,6 +824,12 @@ def fill_slot_data(world) -> Dict[str, object]:
         # DIFFERENT pool than the seed has -- and on a reduced seed it does not
         # even fit, which is how the #54/#209 fuzz found this.
         "character_unlocks": unlocks_enabled(world),
+        # Remove Playable Oxide (#426), the EFFECTIVE value (off whenever
+        # Character Unlocks is off). Logic-relevant for Universal Tracker for
+        # the same reason as character_unlocks: it decides whether Oxide's
+        # unlock item is in the pool, and a tight seed that only fits the
+        # 14-racer pool does not fit a re-generation that rebuilds 15.
+        "remove_playable_oxide": oxide_removed(world),
         # The REQUESTED maximum, as an integer, after the all-unlocked-mode
         # AND and the Alpha 6 Boolean normalization. A native or tracker that
         # still reads this key as a Boolean is not broken by the change: 0 is
