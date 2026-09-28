@@ -406,6 +406,13 @@ class ctrAPWorld(World):
         # generate_early, because it is a per-seed draw, not an option value.
         if "character_unlocks" in co:
             o.character_unlocks.value = int(bool(co["character_unlocks"]))
+        # Remove Playable Oxide (#426) is not on the wire, and logic does not
+        # need it: it only decides whether Oxide's unlock item is in the pool.
+        # Every rule reads received items, the starting racer and the racer
+        # locks are pinned from the wire, and a removed Oxide simply never
+        # arrives. Pin it off so the tracking player's own YAML cannot change
+        # the re-generated pool.
+        o.remove_playable_oxide.value = 0
         if "racer_locked_pads" in co:
             # An Alpha 6 seed put a Boolean here, a 0.2.0 seed puts the
             # requested maximum. `int(True)` is 1, which is the honest reading
@@ -1742,7 +1749,9 @@ class ctrAPWorld(World):
         # comfort items for them instead of overflowing.
         #
         # Classification is per-seed (R17) and lives in create_item: progression
-        # when racer-locked pads are on, useful when they are off.
+        # when racer-locked pads are on, useful when they are off. Remove
+        # Playable Oxide (#426) leaves Oxide's item out (14 racers); the filler
+        # top-up at the end of this method fills the freed slot.
         _start_character = self.ctr_starting_character
         mw.push_precollected(self.create_item(
             characters.unlock_item_name(_start_character)))

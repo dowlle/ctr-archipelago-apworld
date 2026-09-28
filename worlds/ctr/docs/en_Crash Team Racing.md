@@ -97,6 +97,12 @@ A pad can only take a lock if the seed randomized its requirement, so the
 always-open N. Sanity Beach starter pads are never locked. When you return to
 the hub, the game gives you back the racer you chose.
 
+### Remove Playable Oxide
+
+Oxide stays in the racer select screen as a locked racer you can never
+unlock. He still races against you in his boss races, and in ordinary races
+once Hit Character adds him to the field.
+
 ### Trap Weights
 
 The keys are `icy_road`, `low_gravity`, `forced_usf`, `forced_boost`,

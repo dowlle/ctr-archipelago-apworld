@@ -1049,6 +1049,17 @@ class CharacterUnlocks(DefaultOnToggle):
     display_name = "Character Unlocks"
 
 
+class RemovePlayableOxide(Toggle):
+    """Take Nitros Oxide out of the racers you can unlock.
+
+    His unlock item is not created, so the pool gets one more filler or trap
+    instead. Random Any never starts you as him and no warp pad is locked to
+    him. He still races against you as the boss, and his Hit Character check
+    stays. Needs Character Unlocks on. Cannot be used with Starting Character
+    set to Nitros Oxide."""
+    display_name = "Remove Playable Oxide"
+
+
 class RacerLockedPads(Range):
     """The most warp pads that can require a specific racer.
 
@@ -1195,6 +1206,7 @@ class ctrAPOptions(PerGameCommonOptions):
     starting_character: StartingCharacter
     starting_stat_class: StartingStatClass
     character_unlocks: CharacterUnlocks
+    remove_playable_oxide: RemovePlayableOxide
     racer_locked_pads: RacerLockedPads
     penta_stats: PentaStats
     editable_stats: EditableStats
@@ -1268,7 +1280,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # I unlock", "can a pad demand a racer" and "who owns my stats" as one
     # decision.
     "Characters": [StartingCharacter, StartingStatClass, CharacterUnlocks,
-                   RacerLockedPads, PentaStats, EditableStats],
+                   RemovePlayableOxide, RacerLockedPads, PentaStats,
+                   EditableStats],
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
