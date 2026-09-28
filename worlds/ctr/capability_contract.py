@@ -41,8 +41,10 @@ CONFIRMED_FINISH_CAPABILITIES = (
         track="Cortex Castle",
         boost_count=2,
         hard_shortcut_escape=False,
-        gate_held_first=False,
-        source="Capability Matrix Field Notes, 2026-08-09 21:31-22:18 CEST",
+        gate_held_first=True,
+        source="Capability Matrix Field Notes, 2026-08-09 21:31-22:18 CEST; "
+               "Held 1st gated by ruling 2026-09-28 (player report: bare "
+               "Held 1st took many retries even with weapons)",
     ),
     FinishCapability(
         track="Hot Air Skyway",

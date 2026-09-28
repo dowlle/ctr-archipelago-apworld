@@ -144,6 +144,10 @@ def set_rules(world):
     usf_gate = UsfFinishGate(world)
     usf_gate.install(world, player)
     add_podium_placement_rules(world, player, usf_gate)
+    # Held 1st floor (ruling 2026-09-28): ANDed onto the whole rung rule the
+    # line above just built, so it binds the trophy branch and the cup-leg
+    # branch alike, and composes with the USF and easy-difficulty gates.
+    add_held_first_minimum_rules(world, player)
     add_capability_difficulty_rules(world, player)
     add_itemsanity_rules(world, player)
     add_item_box_rules(world, player)
@@ -228,6 +232,71 @@ def add_capability_difficulty_rules(world, player):
                 lambda state, b=base, gate=capability_rule:
                 b(state) and gate(state)
             )
+
+
+def held_first_minimum_term(world, track):
+    """The `(state) -> bool` floor every `Held 1st` rung carries, or None when
+    it is vacuous.
+
+    RULING 2026-09-28 (0.2.2, player report): holding 1st on a bare kart is not
+    realistic on any track, so each Held 1st needs the first Progressive Boost
+    rank OR, with Itemsanity on, `itemsanity.HELD_FIRST_WEAPON_FAMILY_MIN`
+    useful weapon family. It applies at every logic difficulty. With Progressive
+    Boost off every kart has vanilla boost from the start, so the floor is met
+    and nothing is installed (the `add_capability_difficulty_rules` pattern).
+    `Held 3rd` and `Held 5th` are unchanged.
+
+    The racer binding is the track's own pad racer, the same binding the USF
+    `held_first_term` and the easy-difficulty gate already put on this rung.
+    """
+    from .itemsanity import (HELD_FIRST_WEAPON_FAMILY_MIN,
+                             USEFUL_WEAPON_FAMILIES, family_count)
+    from .progressive_capability import gate_satisfied, track_required_character
+    from .usf_finish import FIRST_BOOST_COUNT
+
+    if not bool(world.options.progressive_boost.value):
+        return None
+    weapons = bool(world.options.itemsanity.value)
+    racer = track_required_character(world, track)
+    player = world.player
+
+    def term(state):
+        if gate_satisfied(world, state, player, boost_min=FIRST_BOOST_COUNT,
+                          required_character=racer):
+            return True
+        return weapons and (family_count(state, player, USEFUL_WEAPON_FAMILIES)
+                            >= HELD_FIRST_WEAPON_FAMILY_MIN)
+    return term
+
+
+def add_held_first_minimum_rules(world, player):
+    """AND `held_first_minimum_term` onto every created `Held 1st` rung: the
+    trophy tracks, the trial trophy tracks, Cortex Vortex and custom-track
+    slots.
+
+    Runs after `add_podium_placement_rules` has assigned the rung's full OR
+    (track branch, plain cups, USF-gated cups), so the floor binds every
+    branch. Stricter gates (the USF `held_first_term`, the easy-difficulty
+    gate) stay ANDed on top of it."""
+    from .custom_track_locations import slot_region
+    from .podium import enabled_trophy_tracks, location_name
+
+    if not bool(world.options.progressive_boost.value):
+        return
+    names = {loc.name for loc in world.multiworld.get_locations(player)}
+    tracks = list(enabled_trophy_tracks(world.options))
+    tracks.extend(slot_region(int(entry["slot"])) for entry in
+                  (getattr(world, "custom_tracks", None) or {}).values())
+    for track in tracks:
+        name = location_name(track, "held_1st")
+        if name not in names:
+            continue
+        term = held_first_minimum_term(world, track)
+        if term is None:
+            continue
+        loc = world.multiworld.get_location(name, player)
+        base = loc.access_rule
+        loc.access_rule = (lambda state, b=base, t=term: b(state) and t(state))
 
 
 def add_lettersanity_rules(world, player):

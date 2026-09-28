@@ -590,8 +590,15 @@ class TestOxideStationGate(unittest.TestCase):
         for name in self.FINISH_NAMES:
             if name not in live:
                 continue
+            # The escape removes the USF term only; Held 1st keeps the
+            # every-track first-boost floor (ruling 2026-09-28).
+            state = (_state(mw, boost=1)
+                     if name == location_name(OXIDE, "held_1st") else blocked)
             with self.subTest(location=name):
-                self.assertTrue(_reachable(mw, blocked, name))
+                self.assertTrue(_reachable(mw, state, name))
+        with self.subTest(location="held_1st bare"):
+            self.assertFalse(_reachable(mw, blocked,
+                                        location_name(OXIDE, "held_1st")))
 
     def test_hard_knowledge_does_not_escape_hot_air_skyway(self):
         """The escape is per TRACK, not per seed. Hot Air Skyway's record
