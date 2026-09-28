@@ -460,11 +460,11 @@ class LettersPerTrack(Range):
 
 
 class TiziHelper(Toggle):
-    """Guarantee a Mask on the crate row before Papu's Pyramid's tricky jump.
+    """Adds a Useful item to the pool that guarantees a Mask from the first
+    row of crates on Papu's Pyramid.
 
-    That jump is the single most common run-ender on the track. With this on,
-    the crate row just before it always contains an Aku Aku mask, so a clean
-    run is not decided by a coin flip.
+    This allows for a more consistent chance of being able to pull off the
+    'Tiziano' ultra shortcut.
 
     With Itemsanity on you also need to have unlocked the Mask for it to
     appear."""
