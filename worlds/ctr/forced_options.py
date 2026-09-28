@@ -502,6 +502,29 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
         f"'full'.")
 
 
+def raise_if_starting_as_removed_oxide(world):
+    """Remove Playable Oxide (#426) with Starting Character set to Nitros
+    Oxide. The option takes Oxide out of the racers you can play, and the other
+    option seats you as him: the two ask for opposite things, and there is no
+    reading of the seed that honours both. Picking a different starter for the
+    player would quietly change a choice they typed by name, so refuse with a
+    message that names both options (#178 RAISE convention).
+
+    Only while Character Unlocks is on: with it off the option does nothing
+    (see `warn_remove_playable_oxide_without_character_unlocks`), so starting
+    as Oxide is an ordinary seed."""
+    if not characters.oxide_removed(world):
+        return
+    if world.options.starting_character.current_key != "nitros_oxide":
+        return
+    raise OptionError(
+        f"CTR: 'remove_playable_oxide' is on for {_who(world)}, but "
+        f"'starting_character' is 'nitros_oxide'. Oxide cannot be removed from "
+        f"the playable racers and also be the racer you start as. Turn "
+        f"remove_playable_oxide off, or pick another starting_character "
+        f"(random_starter and random_any never pick Oxide with it on).")
+
+
 def apply_raise_guards(world):
     raise_if_custom_trophy_weight_is_zero(world)
     raise_if_trap_weights_are_unusable(world)
@@ -509,6 +532,7 @@ def apply_raise_guards(world):
     raise_if_composed_goal_is_empty(world)
     raise_if_oxidefinal_goal_has_no_progression_tier(world)
     raise_if_full_accessibility_needs_more_sapphires_than_created(world)
+    raise_if_starting_as_removed_oxide(world)
 
 
 # ---------------------------------------------------------------------------
@@ -794,6 +818,21 @@ def warn_racer_locks_without_character_unlocks(world):
     _ignored(world, "Racer-Locked Warp Pads", "Character Unlocks off")
 
 
+def warn_remove_playable_oxide_without_character_unlocks(world):
+    """Remove Playable Oxide (#426) leaves Oxide's unlock item out of the pool.
+    In all-unlocked mode (`character_unlocks: false`) no unlock item is ever
+    created and every racer is available from the start, so there is nothing
+    to leave out -- characters.oxide_removed resolves the pair to "off". Same
+    downgrade-with-warning shape as Racer-Locked Warp Pads: the seed is valid,
+    the option just has nothing to do in it."""
+    o = world.options
+    if not o.remove_playable_oxide.value:
+        return
+    if o.character_unlocks.value:
+        return
+    _ignored(world, "Remove Playable Oxide", "Character Unlocks off")
+
+
 def warn_racer_locks_have_no_eligible_pads(world):
     """Racer locks can only be placed on a pad this seed randomized and left
     non-free (characters.eligible_lock_pads). A vanilla-unlock seed randomizes
@@ -843,6 +882,7 @@ def apply_downgrade_warnings(world):
     warn_racer_locked_pads_boolean_normalized(world)
     warn_racer_locks_without_character_unlocks(world)
     warn_racer_locks_have_no_eligible_pads(world)
+    warn_remove_playable_oxide_without_character_unlocks(world)
     warn_wumpa_bundles_have_no_filler_slots(world)
 
 

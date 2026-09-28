@@ -160,7 +160,10 @@ def resolve_starting_character(world) -> str:
     if key == "random_starter":
         return world.random.choice(list(ADVENTURE_STARTERS))
     if key == "random_any":
-        return world.random.choice(list(ROSTER))
+        # Remove Playable Oxide (#426) takes him out of the draw. With the
+        # option off the list is the unchanged roster, so the draw is too.
+        return world.random.choice(
+            [name for name in ROSTER if not _excluded_racer(world, name)])
     name = OPTION_KEY_TO_CHARACTER.get(key)
     if name is None:  # unreachable via AP's own option validation
         raise OptionError(
@@ -210,6 +213,29 @@ def unlocks_enabled(world) -> bool:
     """Whether the 15 unlock items exist this seed (the ruled all-unlocked
     comfort mode, wayfarer gap 7a, is this option turned off)."""
     return bool(world.options.character_unlocks.value)
+
+
+# Remove Playable Oxide (#426). The roster name of the one racer the option
+# takes out of the unlockable roster.
+OXIDE = "Nitros Oxide"
+
+
+def oxide_removed(world) -> bool:
+    """Whether Nitros Oxide is out of the unlockable roster this seed.
+
+    The option only means something while the unlock items exist: with
+    Character Unlocks off every racer is available from the start and there is
+    no Oxide item to leave out, so the option does nothing (`forced_options`
+    notes it). This is the single place that resolves the pair.
+    """
+    toggle = getattr(world.options, "remove_playable_oxide", None)
+    return bool(toggle is not None and toggle.value) and unlocks_enabled(world)
+
+
+def _excluded_racer(world, name: str) -> bool:
+    """A racer this seed never lets you play: never a start draw, never an
+    unlock item, never a racer lock."""
+    return name == OXIDE and oxide_removed(world)
 
 
 def racer_locks_requested(world) -> bool:
@@ -295,11 +321,16 @@ def created_unlock_names(world) -> List[str]:
     seed either carries the whole family or none of it, the same atomic
     all-or-nothing rule the #14/#15 comfort pack follows. A partial roster
     would be a silent cap on a core feature.
+
+    The one ruled exception is Remove Playable Oxide (#426): an explicit
+    player choice that leaves Oxide's item out, so the list has 14 names. The
+    filler top-up in `create_items` fills the freed slot.
     """
     if not unlocks_enabled(world):
         return []
     start = world.ctr_starting_character
-    return [name for name in ROSTER if name != start]
+    return [name for name in ROSTER
+            if name != start and not _excluded_racer(world, name)]
 
 
 def raise_if_unlocks_exceed_location_supply(world, *, available_supply: int) -> None:
@@ -461,7 +492,8 @@ def resolve_racer_locks(world) -> Dict[str, str]:
 
     The required racer is never the starting character. A lock on the racer you
     already have would be satisfied at spawn and would spend an eligible pad on
-    nothing.
+    nothing. It is also never Oxide when Remove Playable Oxide is on (#426):
+    his unlock item does not exist, so such a lock could never open.
 
     The player's `racer_locked_pads` count is a MAXIMUM: the seed takes
     `min(requested, eligible)`, so an ambitious request on a seed with few
@@ -478,7 +510,8 @@ def resolve_racer_locks(world) -> Dict[str, str]:
     if n <= 0:
         return {}
     chosen_pads = world.random.sample(pads, n)
-    candidates = [c for c in ROSTER if c != world.ctr_starting_character]
+    candidates = [c for c in ROSTER if c != world.ctr_starting_character
+                  and not _excluded_racer(world, c)]
     return dict(zip(sorted(chosen_pads), spread_lock_racers(world, candidates, n)))
 
 
@@ -791,6 +824,12 @@ def fill_slot_data(world) -> Dict[str, object]:
         # DIFFERENT pool than the seed has -- and on a reduced seed it does not
         # even fit, which is how the #54/#209 fuzz found this.
         "character_unlocks": unlocks_enabled(world),
+        # Remove Playable Oxide (#426), the EFFECTIVE value (off whenever
+        # Character Unlocks is off). Logic-relevant for Universal Tracker for
+        # the same reason as character_unlocks: it decides whether Oxide's
+        # unlock item is in the pool, and a tight seed that only fits the
+        # 14-racer pool does not fit a re-generation that rebuilds 15.
+        "remove_playable_oxide": oxide_removed(world),
         # The REQUESTED maximum, as an integer, after the all-unlocked-mode
         # AND and the Alpha 6 Boolean normalization. A native or tracker that
         # still reads this key as a Boolean is not broken by the change: 0 is
