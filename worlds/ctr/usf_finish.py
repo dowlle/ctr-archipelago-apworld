@@ -25,8 +25,12 @@ reachable before the finish line stays reachable without USF:
     the line, so only those carry the finish term. `Held 1st` is the one
     exception, by ruling rather than geometry: issue #329 (ruling 2026-09-27)
     reported that holding 1st before the climb is not realistic on a bare
-    kart, so it carries the USF term too (see `held_first_term`). `Held 3rd`
-    and `Held 5th` stay free.
+    kart, so it carries the USF term too (see `held_first_term`). Cortex
+    Castle's `Held 1st` joined by the 2026-09-28 ruling (a player report of
+    many retries even with weapons). `Held 3rd` and `Held 5th` stay free.
+    Separately, every track's `Held 1st` carries the first-boost-or-one-weapon
+    floor (`Rules.held_first_minimum_term`, ruling 2026-09-28); on these
+    tracks the USF term is stricter and ANDs on top of it.
 
 WHERE IT PROPAGATES (all installed from `Rules.py`):
 
@@ -66,7 +70,8 @@ player who declared HARD shortcut knowledge knows routes that make both work
 bare. So this track's finish, and its `Held 1st` rung, carry
 `USF OR shortcut_knowledge == hard`, while `Held 3rd`/`Held 5th` stay free.
 Hot Air Skyway's `Held 1st` has carried the plain USF term (no escape) since
-the 2026-09-27 ruling on issue #329. The escape is an OPTION, not a state term: at hard knowledge the gate is
+the 2026-09-27 ruling on issue #329, and Cortex Castle's since the
+2026-09-28 ruling. The escape is an OPTION, not a state term: at hard knowledge the gate is
 vacuous for this track alone, so a cup that legs both tracks keeps its Hot Air
 Skyway half -- which is why the cup term is composed per LEG rather than being
 one term per cup.
@@ -351,7 +356,8 @@ class UsfFinishGate:
     def held_first_term(self, track):
         """The extra term `Held 1st` carries on tracks where holding 1st bare
         is ruled unrealistic (Oxide Station; Hot Air Skyway since the
-        2026-09-27 ruling on issue #329), or None everywhere else. Only
+        2026-09-27 ruling on issue #329; Cortex Castle since the 2026-09-28
+        ruling), or None everywhere else. Only
         `Held 1st` reads it: `Held 3rd` and `Held 5th` stay free."""
         if track in held_first_gated_tracks():
             return self._track_terms[track]

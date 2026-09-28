@@ -310,9 +310,12 @@ class LogicDifficulty(Choice):
     - **medium** (default): only winning waits.
     - **hard**: no extra requirement.
 
+    At every level, holding 1st needs boost, or one useful weapon when
+    Itemsanity is on.
+
     Tracks that need speed ignore this: Cortex Castle and Hot Air Skyway
-    always need Ultimate Sacred Fire, and so does holding 1st on Hot Air
-    Skyway."""
+    always need Ultimate Sacred Fire, and so does holding 1st on either of
+    them."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
@@ -939,7 +942,12 @@ class PodiumAnyPositionRung(DefaultOnToggle):
 class PodiumHeldRungs(DefaultOnToggle):
     """Include the live-position "held" rungs on each trophy race (needs Podium
     Placement Checks on): "Held 1st" and "Held 3rd", earned the moment you hold
-    that position on track. Add "Held 5th" with Podium: Held 5th Rung."""
+    that position on track. Add "Held 5th" with Podium: Held 5th Rung.
+
+    With Progressive Boost on, logic expects "Held 1st" only once you have
+    boost, or one useful weapon when Itemsanity is on. Cortex Castle and Hot
+    Air Skyway need Ultimate Sacred Fire for it. "Held 3rd" and "Held 5th"
+    need nothing extra."""
     display_name = "Held-Position Rungs"
 
 

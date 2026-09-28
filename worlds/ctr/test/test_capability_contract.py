@@ -108,8 +108,10 @@ class TestConfirmedFinishBoundaries(unittest.TestCase):
             mw = _build(progressive_boost="shared_global",
                         shortcut_knowledge="medium",
                         **_track_options(record.track))
-            blocked = _state(mw, boost=0)
-            actual = blocked.can_reach(
+            # One boost clears the every-track Held 1st floor (ruling
+            # 2026-09-28), so what is left is the record's own USF gate.
+            first_rank = _state(mw, boost=1)
+            actual = first_rank.can_reach(
                 location_name(record.track, "held_1st"), "Location", PLAYER)
             with self.subTest(track=record.track):
                 self.assertEqual(actual,
@@ -498,7 +500,11 @@ class TestDifficultyContract(unittest.TestCase):
                 if name not in names:
                     continue
                 with self.subTest(track=track, rung=rung_key):
-                    self.assertTrue(bare.can_reach(name, "Location", PLAYER))
+                    # Held 1st carries its own every-difficulty floor (ruling
+                    # 2026-09-28): one useful weapon family clears it.
+                    state = (_state(mw, held=("Mask",))
+                             if rung_key == "held_1st" else bare)
+                    self.assertTrue(state.can_reach(name, "Location", PLAYER))
 
     def test_option_vacuity_when_the_boost_pack_is_off(self):
         """With Progressive Boost off every kart has vanilla boost, so the
@@ -540,11 +546,17 @@ class TestItemsanityOffDifficulty(unittest.TestCase):
             with self.subTest(track=track):
                 self.assertFalse(bare.can_reach(name, "Location", PLAYER))
                 self.assertTrue(one.can_reach(name, "Location", PLAYER))
-            # Medium leaves the placement rungs at the demonstrated floor.
-            for key in ("finish_podium", "held_1st", "held_3rd"):
+            # Medium leaves the placement rungs at the demonstrated floor;
+            # Held 1st has its own every-difficulty floor (ruling 2026-09-28).
+            for key in ("finish_podium", "held_3rd"):
                 with self.subTest(track=track, rung=key):
                     self.assertTrue(bare.can_reach(
                         location_name(track, key), "Location", PLAYER))
+            with self.subTest(track=track, rung="held_1st"):
+                self.assertFalse(bare.can_reach(
+                    location_name(track, "held_1st"), "Location", PLAYER))
+                self.assertTrue(one.can_reach(
+                    location_name(track, "held_1st"), "Location", PLAYER))
 
     def test_easy_gates_trophy_podium_and_held_first(self):
         mw = _build(logic_difficulty="easy", **_ITEMSANITY_OFF)
@@ -565,13 +577,17 @@ class TestItemsanityOffDifficulty(unittest.TestCase):
 
     def test_hard_adds_nothing(self):
         mw = _build(logic_difficulty="hard", **_ITEMSANITY_OFF)
-        bare = _state(mw)
+        bare, one = _state(mw), _state(mw, boost=1)
         for track in sorted(difficulty_gated_tracks()):
             for name in (f"{track}: Trophy Race",
-                         location_name(track, "finish_podium"),
-                         location_name(track, "held_1st")):
+                         location_name(track, "finish_podium")):
                 with self.subTest(location=name):
                     self.assertTrue(bare.can_reach(name, "Location", PLAYER))
+            # The Held 1st floor (ruling 2026-09-28) holds at hard too.
+            name = location_name(track, "held_1st")
+            with self.subTest(location=name):
+                self.assertFalse(bare.can_reach(name, "Location", PLAYER))
+                self.assertTrue(one.can_reach(name, "Location", PLAYER))
 
     def test_custom_trophy_race_takes_the_ruled_requirement(self):
         from ..custom_tracks import BABY_T_PARK_CURRENT
@@ -610,7 +626,8 @@ class TestItemsanityOffDifficulty(unittest.TestCase):
                 tracker.worlds[PLAYER].options.logic_difficulty.value,
                 source.worlds[PLAYER].options.logic_difficulty.value)
             names = sorted(
-                name for track in difficulty_gated_tracks() | {"Hot Air Skyway"}
+                name for track in difficulty_gated_tracks()
+                | {"Hot Air Skyway", "Cortex Castle"}
                 for name in (f"{track}: Trophy Race",
                              location_name(track, "finish_podium"),
                              location_name(track, "held_1st"),

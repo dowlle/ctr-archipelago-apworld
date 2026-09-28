@@ -92,6 +92,15 @@ USEFUL_WEAPON_FAMILIES = (
 #: default route.
 DIFFICULTY_WEAPON_FAMILY_MIN = 3
 
+#: Distinct useful weapon families that substitute for the first Progressive
+#: Boost rank on every `Held 1st` rung (Rules.add_held_first_minimum_rules).
+#: RULING 2026-09-28 (0.2.2): holding 1st on a bare kart with no weapon is not
+#: realistic on any track, so each Held 1st needs the first boost rank or, with
+#: Itemsanity on, one useful weapon family. Deliberately lower than
+#: DIFFICULTY_WEAPON_FAMILY_MIN: this is a floor at every logic difficulty, not
+#: the difficulty rule's escape hatch.
+HELD_FIRST_WEAPON_FAMILY_MIN = 1
+
 
 def family_count(state, player: int,
                  families: Iterable[Sequence[str]]) -> int:
