@@ -299,23 +299,25 @@ class ProgressiveBoostBlueFire(Toggle):
 
 
 class LogicDifficulty(Choice):
-    """How much the logic expects you to manage in races while boost and
-    weapons are randomized.
+    """How much the logic expects you to manage in races while boost is
+    randomized. Only matters when Progressive Boost is on. Platinum Time
+    Trials follow it too.
 
-    Race requirements apply when Progressive Boost is on. Platinum Time
-    Trials follow this too.
+    Below, "boost" means your first Progressive Boost, or three useful
+    weapons when Itemsanity is on. The useful weapons are Mask, Missile,
+    Bomb, Warpball and N. Tropy Clock.
 
-    - **easy**: winning, finishing on the podium and holding 1st wait for
-      boost, or for three useful weapons when Itemsanity is on.
-    - **medium** (default): only winning waits.
+    - **easy**: winning, finishing on the podium and holding 1st need boost.
+    - **medium** (default): winning needs boost.
     - **hard**: no extra requirement.
 
-    At every level, holding 1st needs boost, or one useful weapon when
-    Itemsanity is on.
+    At every level, holding 1st needs your first Progressive Boost, or one
+    useful weapon when Itemsanity is on.
 
-    Tracks that need speed ignore this: Cortex Castle and Hot Air Skyway
-    always need Ultimate Sacred Fire, and so does holding 1st on either of
-    them."""
+    Some tracks need Ultimate Sacred Fire whatever you pick here: finishing
+    Cortex Castle, Hot Air Skyway and Cortex Vortex, and holding 1st on
+    Cortex Castle and Hot Air Skyway. Oxide Station needs it for both,
+    unless Shortcut Knowledge is hard."""
     display_name = "Logic Difficulty"
     option_easy = 0
     option_medium = 1
@@ -420,8 +422,8 @@ class HitCharacter(Toggle):
 class RelicPerfectChecks(Toggle):
     """Add a check to each Relic Race for breaking every time crate in it.
 
-    It pays whether or not your time wins a relic, and never changes which
-    relic you get."""
+    You get the check even when your time does not earn a relic, and it
+    never changes which relic you get."""
     display_name = "Relic Race Perfect Checks"
 
 
@@ -945,9 +947,10 @@ class PodiumHeldRungs(DefaultOnToggle):
     that position on track. Add "Held 5th" with Podium: Held 5th Rung.
 
     With Progressive Boost on, logic expects "Held 1st" only once you have
-    boost, or one useful weapon when Itemsanity is on. Cortex Castle and Hot
-    Air Skyway need Ultimate Sacred Fire for it. "Held 3rd" and "Held 5th"
-    need nothing extra."""
+    your first Progressive Boost, or one useful weapon when Itemsanity is on
+    (see Logic Difficulty). On Cortex Castle and Hot Air Skyway it needs
+    Ultimate Sacred Fire, and on Oxide Station too unless Shortcut Knowledge
+    is hard. "Held 3rd" and "Held 5th" need nothing extra."""
     display_name = "Held-Position Rungs"
 
 
