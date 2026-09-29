@@ -28,9 +28,10 @@ reachable before the finish line stays reachable without USF:
     kart, so it carries the USF term too (see `held_first_term`). Cortex
     Castle's `Held 1st` joined by the 2026-09-28 ruling (a player report of
     many retries even with weapons). `Held 3rd` and `Held 5th` stay free.
-    Separately, every track's `Held 1st` carries the first-boost-or-one-weapon
-    floor (`Rules.held_first_minimum_term`, ruling 2026-09-28); on these
-    tracks the USF term is stricter and ANDs on top of it.
+    Separately, on easy and medium every track's `Held 1st` carries the
+    first-boost-or-one-weapon floor (`Rules.held_first_minimum_term`, ruling
+    2026-09-28, dropped on hard by the 2026-09-29 ruling); on these tracks the
+    USF term is stricter, ANDs on top of it, and applies on hard too.
 
 WHERE IT PROPAGATES (all installed from `Rules.py`):
 

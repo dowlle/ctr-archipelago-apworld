@@ -311,8 +311,8 @@ class LogicDifficulty(Choice):
     - **medium** (default): winning needs boost.
     - **hard**: no extra requirement.
 
-    At every level, holding 1st needs your first Progressive Boost, or one
-    useful weapon when Itemsanity is on.
+    On easy and medium, holding 1st needs your first Progressive Boost, or
+    one useful weapon when Itemsanity is on.
 
     Some tracks need Ultimate Sacred Fire whatever you pick here: finishing
     Cortex Castle, Hot Air Skyway and Cortex Vortex, and holding 1st on
@@ -946,9 +946,9 @@ class PodiumHeldRungs(DefaultOnToggle):
     Placement Checks on): "Held 1st" and "Held 3rd", earned the moment you hold
     that position on track. Add "Held 5th" with Podium: Held 5th Rung.
 
-    With Progressive Boost on, logic expects "Held 1st" only once you have
-    your first Progressive Boost, or one useful weapon when Itemsanity is on
-    (see Logic Difficulty). On Cortex Castle and Hot Air Skyway it needs
+    With Progressive Boost on, on easy and medium Logic Difficulty, logic
+    expects "Held 1st" only once you have your first Progressive Boost, or one
+    useful weapon when Itemsanity is on. On Cortex Castle and Hot Air Skyway it needs
     Ultimate Sacred Fire, and on Oxide Station too unless Shortcut Knowledge
     is hard. "Held 3rd" and "Held 5th" need nothing extra."""
     display_name = "Held-Position Rungs"

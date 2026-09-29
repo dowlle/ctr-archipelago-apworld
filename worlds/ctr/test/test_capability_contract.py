@@ -583,11 +583,11 @@ class TestItemsanityOffDifficulty(unittest.TestCase):
                          location_name(track, "finish_podium")):
                 with self.subTest(location=name):
                     self.assertTrue(bare.can_reach(name, "Location", PLAYER))
-            # The Held 1st floor (ruling 2026-09-28) holds at hard too.
+            # No Held 1st floor at hard (ruling 2026-09-29): Held 1st opens
+            # with its Trophy Race.
             name = location_name(track, "held_1st")
             with self.subTest(location=name):
-                self.assertFalse(bare.can_reach(name, "Location", PLAYER))
-                self.assertTrue(one.can_reach(name, "Location", PLAYER))
+                self.assertTrue(bare.can_reach(name, "Location", PLAYER))
 
     def test_custom_trophy_race_takes_the_ruled_requirement(self):
         from ..custom_tracks import BABY_T_PARK_CURRENT

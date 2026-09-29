@@ -144,9 +144,10 @@ def set_rules(world):
     usf_gate = UsfFinishGate(world)
     usf_gate.install(world, player)
     add_podium_placement_rules(world, player, usf_gate)
-    # Held 1st floor (ruling 2026-09-28): ANDed onto the whole rung rule the
-    # line above just built, so it binds the trophy branch and the cup-leg
-    # branch alike, and composes with the USF and easy-difficulty gates.
+    # Held 1st floor (ruling 2026-09-28, easy and medium only since the
+    # 2026-09-29 ruling): ANDed onto the whole rung rule the line above just
+    # built, so it binds the trophy branch and the cup-leg branch alike, and
+    # composes with the USF and easy-difficulty gates.
     add_held_first_minimum_rules(world, player)
     add_capability_difficulty_rules(world, player)
     add_itemsanity_rules(world, player)
@@ -241,10 +242,18 @@ def held_first_minimum_term(world, track):
     RULING 2026-09-28 (0.2.2, player report): holding 1st on a bare kart is not
     realistic on any track, so each Held 1st needs the first Progressive Boost
     rank OR, with Itemsanity on, `itemsanity.HELD_FIRST_WEAPON_FAMILY_MIN`
-    useful weapon family. It applies at every logic difficulty. With Progressive
-    Boost off every kart has vanilla boost from the start, so the floor is met
-    and nothing is installed (the `add_capability_difficulty_rules` pattern).
-    `Held 3rd` and `Held 5th` are unchanged.
+    useful weapon family. With Progressive Boost off every kart has vanilla
+    boost from the start, so the floor is met and nothing is installed (the
+    `add_capability_difficulty_rules` pattern). `Held 3rd` and `Held 5th` are
+    unchanged.
+
+    RULING 2026-09-29 (0.2.2 feedback): no floor at logic difficulty hard.
+    On hard `add_capability_difficulty_rules` adds nothing, so the Trophy Race
+    win needs no boost, yet the floor still gated Held 1st: a player had the
+    win in logic while Held 1st was not, though winning means holding 1st.
+    Easy and medium keep the floor. The per-track USF `held_first_term` (Hot
+    Air Skyway, Cortex Castle, and Oxide Station unless shortcut_knowledge is
+    hard) is a separate gate and still applies at hard.
 
     The racer binding is the track's own pad racer, the same binding the USF
     `held_first_term` and the easy-difficulty gate already put on this rung.
@@ -255,6 +264,8 @@ def held_first_minimum_term(world, track):
     from .usf_finish import FIRST_BOOST_COUNT
 
     if not bool(world.options.progressive_boost.value):
+        return None
+    if int(world.options.logic_difficulty.value) == 2:  # hard, ruling 2026-09-29
         return None
     weapons = bool(world.options.itemsanity.value)
     racer = track_required_character(world, track)
@@ -277,11 +288,14 @@ def add_held_first_minimum_rules(world, player):
     Runs after `add_podium_placement_rules` has assigned the rung's full OR
     (track branch, plain cups, USF-gated cups), so the floor binds every
     branch. Stricter gates (the USF `held_first_term`, the easy-difficulty
-    gate) stay ANDed on top of it."""
+    gate) stay ANDed on top of it. Nothing is installed at logic difficulty
+    hard (ruling 2026-09-29, see `held_first_minimum_term`)."""
     from .custom_track_locations import slot_region
     from .podium import enabled_trophy_tracks, location_name
 
     if not bool(world.options.progressive_boost.value):
+        return
+    if int(world.options.logic_difficulty.value) == 2:  # hard
         return
     names = {loc.name for loc in world.multiworld.get_locations(player)}
     tracks = list(enabled_trophy_tracks(world.options))

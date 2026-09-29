@@ -1,9 +1,12 @@
-"""Held 1st floor (ruling 2026-09-28, release 0.2.2).
+"""Held 1st floor (ruling 2026-09-28, release 0.2.2; hard exempt since the
+2026-09-29 ruling).
 
-Every `Held 1st` rung needs the first Progressive Boost rank or, with
-Itemsanity on, one useful weapon family, at every logic difficulty. Cortex
-Castle's Held 1st also needs USF, like Hot Air Skyway. Held 3rd and Held 5th
-are unchanged, and Progressive Boost off leaves the floor vacuous.
+On easy and medium every `Held 1st` rung needs the first Progressive Boost
+rank or, with Itemsanity on, one useful weapon family. On hard there is no
+floor: the Trophy Race win needs no boost there, and winning means holding
+1st, so Held 1st opens with the win. Cortex Castle's and Hot Air Skyway's
+Held 1st need USF at every difficulty. Held 3rd and Held 5th are unchanged,
+and Progressive Boost off leaves the floor vacuous.
 """
 import copy
 import unittest
@@ -34,8 +37,8 @@ class TestHeldFirstFloor(unittest.TestCase):
         self.assertTrue(_reach(_state(mw), location_name("Cortex Castle",
                                                          "held_3rd")))
 
-    def test_every_held_first_needs_one_boost_at_every_difficulty(self):
-        for difficulty in ("easy", "medium", "hard"):
+    def test_every_held_first_needs_one_boost_on_easy_and_medium(self):
+        for difficulty in ("easy", "medium"):
             mw = _build(progressive_boost="shared_global", itemsanity=False,
                         logic_difficulty=difficulty,
                         shortcut_knowledge="hard", **TRIALS)
@@ -48,7 +51,9 @@ class TestHeldFirstFloor(unittest.TestCase):
                     self.assertTrue(_reach(one, name))
 
     def test_one_useful_weapon_family_suffices_with_itemsanity(self):
-        for difficulty in ("medium", "hard"):
+        # Medium only: easy also gates Held 1st with the difficulty rule's
+        # three-family arm, and hard has no floor (ruling 2026-09-29).
+        for difficulty in ("medium",):
             mw = _build(progressive_boost="shared_global", itemsanity=True,
                         logic_difficulty=difficulty)
             for track in ("Crash Cove", "Dingo Canyon"):
@@ -94,7 +99,7 @@ class TestHeldFirstFloor(unittest.TestCase):
         """Close Crash Cove's own pad: its rungs are then reachable only
         through the Red Gem Cup leg, and Held 1st still needs the floor."""
         mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard", warp_pad_shuffle_categories=[])
+                    logic_difficulty="medium", warp_pad_shuffle_categories=[])
         mw.get_entrance("Crash Cove Warp Pad", PLAYER).access_rule = (
             lambda state: False)
         bare, one = _state(mw), _state(mw, boost=1)
@@ -106,7 +111,7 @@ class TestHeldFirstFloor(unittest.TestCase):
     def test_custom_track_slot_held_first(self):
         from ..custom_tracks import BABY_T_PARK_CURRENT
         mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard",
+                    logic_difficulty="medium",
                     custom_tracks={"baby-t-park":
                                    copy.deepcopy(BABY_T_PARK_CURRENT)})
         name = "Custom Track 1: Held 1st"
@@ -117,7 +122,62 @@ class TestHeldFirstFloor(unittest.TestCase):
 
     def test_cortex_vortex_held_first(self):
         mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard", cortex_vortex_track=True)
+                    logic_difficulty="medium", cortex_vortex_track=True)
         name = "Cortex Vortex: Held 1st"
         self.assertFalse(_reach(_state(mw), name))
         self.assertTrue(_reach(_state(mw, boost=1), name))
+
+
+class TestHardHasNoHeldFirstFloor(unittest.TestCase):
+    """Ruling 2026-09-29 (0.2.2 feedback): on hard the Trophy Race win needs
+    no boost, so the floor made Held 1st stricter than the win it is part of.
+    Hard drops the floor; the per-track USF terms stay."""
+
+    def test_non_usf_held_first_matches_its_trophy_race_at_zero_boost(self):
+        for itemsanity in (False, True):
+            mw = _build(progressive_boost="shared_global",
+                        itemsanity=itemsanity, logic_difficulty="hard",
+                        **TRIALS)
+            bare = _state(mw)
+            for track in ("Crash Cove", "Dingo Canyon", "N. Gin Labs",
+                          "Slide Coliseum", "Turbo Track"):
+                with self.subTest(itemsanity=itemsanity, track=track):
+                    self.assertTrue(_reach(bare, f"{track}: Trophy Race"))
+                    self.assertTrue(_reach(bare, location_name(track,
+                                                               "held_1st")))
+
+    def test_medium_still_has_the_floor(self):
+        mw = _build(progressive_boost="shared_global", itemsanity=False,
+                    logic_difficulty="medium", **TRIALS)
+        bare, one = _state(mw), _state(mw, boost=1)
+        for track in ("Crash Cove", "Dingo Canyon", "Slide Coliseum"):
+            name = location_name(track, "held_1st")
+            with self.subTest(track=track):
+                self.assertFalse(_reach(bare, name))
+                self.assertTrue(_reach(one, name))
+
+    def test_usf_held_first_tracks_still_need_usf_on_hard(self):
+        mw = _build(progressive_boost="shared_global", itemsanity=False,
+                    logic_difficulty="hard")
+        for track in ("Hot Air Skyway", "Cortex Castle", "Oxide Station"):
+            name = location_name(track, "held_1st")
+            with self.subTest(track=track):
+                self.assertFalse(_reach(_state(mw, boost=1), name))
+                self.assertTrue(_reach(_state(mw, boost=2), name))
+
+    def test_oxide_hard_shortcut_escape_leaves_held_first_free_on_hard(self):
+        mw = _build(progressive_boost="shared_global", itemsanity=False,
+                    logic_difficulty="hard", shortcut_knowledge="hard")
+        self.assertTrue(_reach(_state(mw),
+                               location_name("Oxide Station", "held_1st")))
+
+    def test_cortex_vortex_and_custom_slot_free_on_hard(self):
+        from ..custom_tracks import BABY_T_PARK_CURRENT
+        mw = _build(progressive_boost="shared_global", itemsanity=False,
+                    logic_difficulty="hard", cortex_vortex_track=True)
+        self.assertTrue(_reach(_state(mw), "Cortex Vortex: Held 1st"))
+        mw = _build(progressive_boost="shared_global", itemsanity=False,
+                    logic_difficulty="hard",
+                    custom_tracks={"baby-t-park":
+                                   copy.deepcopy(BABY_T_PARK_CURRENT)})
+        self.assertTrue(_reach(_state(mw), "Custom Track 1: Held 1st"))
