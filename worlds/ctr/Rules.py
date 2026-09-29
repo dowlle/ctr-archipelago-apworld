@@ -1202,12 +1202,15 @@ def add_time_trial_and_ctr_requirements(world, player):
 
     CAPABILITY TERMS ANDed on top of whatever the above built: the Gold and
     Platinum relic tiers (2026-08-21), every CTR Token Challenge
-    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and the N. Gin Labs
-    Relic Race perfect check (#49, `usf_finish.relic_perfect_boost_min`). All
-    are vacuous while Progressive Boost is off.
+    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and every Relic Race
+    perfect check (#49, USF on every track per the 2026-09-29 ruling,
+    `usf_finish.relic_perfect_boost_min`). All are vacuous while Progressive
+    Boost is off.
 
     RELIC RACE PERFECT checks (#49) take the same Trophy + stage-2 entry rule
     as their track's relic Time Trials: they are paid by the same Relic Race.
+    On a trial track with no Trophy Race the entry is the track region itself,
+    and the perfect check still carries its crate term.
     """
     from .progressive_capability import track_required_character
     from .relic_perfect import RELIC_PERFECT_SUFFIX
@@ -1236,6 +1239,18 @@ def add_time_trial_and_ctr_requirements(world, player):
         trophy_name = f"{track_prefix}: Trophy Race"
 
         if trophy_name not in all_location_names:
+            if name.endswith(RELIC_PERFECT_SUFFIX):
+                # Trial track without a Trophy Race: region access is the
+                # race entry (its logic_text is "True"), and the crate term
+                # of the 2026-09-29 ruling still applies.
+                _perfect_min = relic_perfect_boost_min(track_prefix)
+                _perfect_term = boost_term(
+                    world, track_required_character(world, track_prefix),
+                    _perfect_min) if _perfect_min else None
+                loc.access_rule = (
+                    (lambda state, term=_perfect_term, p=player: term(state, p))
+                    if _perfect_term is not None else (lambda state: True))
+                continue
             logging.debug(
                 f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
             continue
@@ -1285,11 +1300,12 @@ def add_time_trial_and_ctr_requirements(world, player):
 
         # Relic Race perfect checks (#49): the race-entry rule built above,
         # i.e. exactly what the track's Sapphire Time Trial gets (Sapphire's
-        # tier term is rank 0), plus a per-track crate term only where an
-        # existing ruling says a time crate needs a capability. Today that is
-        # N. Gin Labs (2026-08-19 ruling, see usf_finish.relic_perfect_boost_
-        # min). Breaking every crate is not a relic time, so the Gold and
-        # Platinum tier terms are deliberately NOT inherited.
+        # tier term is rank 0), plus the crate term. Ruling 2026-09-29: every
+        # track's perfect needs USF at every logic difficulty, bound to the
+        # pad's racer (see usf_finish.relic_perfect_boost_min, which keeps a
+        # per-track override for later lowering). Breaking every crate is not
+        # a relic time, so the Gold and Platinum tier terms are deliberately
+        # NOT inherited.
         if name.endswith(RELIC_PERFECT_SUFFIX):
             _perfect_min = relic_perfect_boost_min(track_prefix)
             if _perfect_min:
