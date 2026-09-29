@@ -1204,7 +1204,8 @@ def _created_letter_names_for(world, track):
 def add_time_trial_and_ctr_requirements(world, player):
     """
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
-    except for bonus tracks like Slide Coliseum and Turbo Track.
+    except for bonus tracks like Slide Coliseum and Turbo Track when they have no
+    Trophy Race (their capability terms still apply, see below).
 
     TWO-STAGE: for the 16 trophy pads in randomized mode, the track's CTR Token
     Challenge + 3 relic Time Trials carry a STAGE-2 requirement ANDed on top of the
@@ -1223,8 +1224,9 @@ def add_time_trial_and_ctr_requirements(world, player):
 
     RELIC RACE PERFECT checks (#49) take the same Trophy + stage-2 entry rule
     as their track's relic Time Trials: they are paid by the same Relic Race.
-    On a trial track with no Trophy Race the entry is the track region itself,
-    and the perfect check still carries its crate term.
+    On a trial track with no Trophy Race the entry is the track region itself;
+    its Gold and Platinum Time Trials still carry the relic tier term and its
+    perfect check the crate term (ruling 2026-09-29). Sapphire stays free.
     """
     from .progressive_capability import track_required_character
     from .relic_perfect import RELIC_PERFECT_SUFFIX
@@ -1253,44 +1255,42 @@ def add_time_trial_and_ctr_requirements(world, player):
         trophy_name = f"{track_prefix}: Trophy Race"
 
         if trophy_name not in all_location_names:
-            if name.endswith(RELIC_PERFECT_SUFFIX):
-                # Trial track without a Trophy Race: region access is the
-                # race entry (its logic_text is "True"), and the crate term
-                # of the 2026-09-29 ruling still applies.
-                _perfect_min = relic_perfect_boost_min(track_prefix)
-                _perfect_term = boost_term(
-                    world, track_required_character(world, track_prefix),
-                    _perfect_min) if _perfect_min else None
-                loc.access_rule = (
-                    (lambda state, term=_perfect_term, p=player: term(state, p))
-                    if _perfect_term is not None else (lambda state: True))
+            if not (name.endswith(" Time Trial")
+                    or name.endswith(RELIC_PERFECT_SUFFIX)):
+                logging.debug(
+                    f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
                 continue
-            logging.debug(
-                f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
-            continue
-
-        s2 = stage2.get(track_prefix)
-        if s2 is not None:
-            s2_item, s2_count = s2
-
-            if s2_item in AGG_BY_NAME:
-                # any_of aggregate stage-2 gate: "any N of this type", summed.
-                def rule(state: CollectionState, t=trophy_name, p=player,
-                         ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
-                    return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
-            else:
-                def rule(state: CollectionState, t=trophy_name, p=player,
-                         i=s2_item, n=s2_count):
-                    return state.can_reach(t, "Location", p) and state.has(i, p, n)
-
-            logging.debug(
-                f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
+            # Trial track (Slide Coliseum, Turbo Track) without a Trophy
+            # Race: region access is the Relic Race entry (these locations
+            # have no logic_text), so the base rule is True. The relic tier
+            # term (2026-08-21 ruling with the 2026-09-17 Platinum raise) and
+            # the perfect crate term (2026-09-29 ruling) below still AND on,
+            # exactly as they would with a Trophy Race (ruling 2026-09-29).
+            def rule(state: CollectionState):
+                return True
         else:
-            def rule(state: CollectionState, t=trophy_name, p=player):
-                return state.can_reach(t, "Location", p)
+            s2 = stage2.get(track_prefix)
+            if s2 is not None:
+                s2_item, s2_count = s2
 
-            logging.debug(
-                f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
+                if s2_item in AGG_BY_NAME:
+                    # any_of aggregate stage-2 gate: "any N of this type", summed.
+                    def rule(state: CollectionState, t=trophy_name, p=player,
+                             ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
+                        return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
+                else:
+                    def rule(state: CollectionState, t=trophy_name, p=player,
+                             i=s2_item, n=s2_count):
+                        return state.can_reach(t, "Location", p) and state.has(i, p, n)
+
+                logging.debug(
+                    f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
+            else:
+                def rule(state: CollectionState, t=trophy_name, p=player):
+                    return state.can_reach(t, "Location", p)
+
+                logging.debug(
+                    f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
         # Relic tier boost gates (ruling 2026-08-21, superseding the narrow
         # 2026-08-19 Labs-Platinum ruling): every Gold and Platinum Time Trial
