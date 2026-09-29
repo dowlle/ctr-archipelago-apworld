@@ -28,9 +28,10 @@ reachable before the finish line stays reachable without USF:
     kart, so it carries the USF term too (see `held_first_term`). Cortex
     Castle's `Held 1st` joined by the 2026-09-28 ruling (a player report of
     many retries even with weapons). `Held 3rd` and `Held 5th` stay free.
-    Separately, every track's `Held 1st` carries the first-boost-or-one-weapon
-    floor (`Rules.held_first_minimum_term`, ruling 2026-09-28); on these
-    tracks the USF term is stricter and ANDs on top of it.
+    Separately, on easy and medium every track's `Held 1st` carries the
+    first-boost-or-one-weapon floor (`Rules.held_first_minimum_term`, ruling
+    2026-09-28, dropped on hard by the 2026-09-29 ruling); on these tracks the
+    USF term is stricter, ANDs on top of it, and applies on hard too.
 
 WHERE IT PROPAGATES (all installed from `Rules.py`):
 
@@ -193,20 +194,28 @@ def relic_tier_boost_min(track, tier, options=None):
 
 #: RELIC RACE PERFECT CRATE TERMS (#49). A perfect check is paid by breaking
 #: every time crate in the Relic Race, so it takes the Relic Race's entry rule
-#: (what Sapphire gets) and NO relic-time tier term. The only per-track crate
-#: term is one an existing ruling already states about the crates themselves:
-#: N. Gin Labs, where two of the Relic Race's boxes cannot be reached without
-#: USF (the 2026-08-19 triage ruling that also drives its Platinum term).
-#: Every other track's all-crate route at the entry capability is a Steam
-#: runtime gate (Rolling Testing List), not an encoded term; add a track here
-#: only with a ruling or measured route evidence.
-RELIC_PERFECT_BOOST_MIN: Dict[str, int] = {"N. Gin Labs": USF_BOOST_COUNT}
+#: (what Sapphire gets) plus a crate term, and NO relic-time tier term.
+#:
+#: Ruling (2026-09-29, 0.2.2 player feedback): every
+#: `<track>: Relic Race Perfect` requires USF (`USF_BOOST_COUNT` Progressive
+#: Boost copies) at every logic difficulty, bound to the racer the track's pad
+#: demands. A Hard-logic player had Blizzard Bluff's perfect in logic with no
+#: boost, but a time crate in its lake shortcut needs boost. This supersedes
+#: the narrower 2026-08-19 N. Gin Labs-only crate term, which it contains.
+#: The term covers all 18 relic tracks, the two trial tracks included.
+#:
+#: Per-track lowering stays possible: `RELIC_PERFECT_BOOST_DEFAULT` applies
+#: to every track, and `RELIC_PERFECT_BOOST_OVERRIDES` lowers (or raises) one
+#: track. Add an override only with a ruling or measured route evidence.
+RELIC_PERFECT_BOOST_DEFAULT = USF_BOOST_COUNT
+RELIC_PERFECT_BOOST_OVERRIDES: Dict[str, int] = {}
 
 
 def relic_perfect_boost_min(track) -> int:
     """Progressive Boost copies `<track>: Relic Race Perfect` requires on top
-    of its Relic Race entry rule. 0 means no extra term."""
-    return RELIC_PERFECT_BOOST_MIN.get(track, 0)
+    of its Relic Race entry rule. USF on every track unless overridden
+    (ruling 2026-09-29); 0 would mean no extra term."""
+    return RELIC_PERFECT_BOOST_OVERRIDES.get(track, RELIC_PERFECT_BOOST_DEFAULT)
 
 
 def boost_term(world, required_character=None, boost_min=USF_BOOST_COUNT):

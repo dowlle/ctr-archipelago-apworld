@@ -364,7 +364,8 @@ class TestUsfFinishTerm(unittest.TestCase):
 
     def test_held_first_takes_only_the_every_track_floor(self):
         """No USF gate on Cortex Vortex's Held 1st, only the first-boost
-        floor every Held 1st carries (ruling 2026-09-28)."""
+        floor every Held 1st carries on easy and medium (ruling 2026-09-28,
+        hard exempt since 2026-09-29)."""
         self.assertFalse(self._at(0, "Cortex Vortex: Held 1st"))
         self.assertTrue(self._at(1, "Cortex Vortex: Held 1st"))
 

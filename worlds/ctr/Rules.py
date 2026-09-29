@@ -144,9 +144,10 @@ def set_rules(world):
     usf_gate = UsfFinishGate(world)
     usf_gate.install(world, player)
     add_podium_placement_rules(world, player, usf_gate)
-    # Held 1st floor (ruling 2026-09-28): ANDed onto the whole rung rule the
-    # line above just built, so it binds the trophy branch and the cup-leg
-    # branch alike, and composes with the USF and easy-difficulty gates.
+    # Held 1st floor (ruling 2026-09-28, easy and medium only since the
+    # 2026-09-29 ruling): ANDed onto the whole rung rule the line above just
+    # built, so it binds the trophy branch and the cup-leg branch alike, and
+    # composes with the USF and easy-difficulty gates.
     add_held_first_minimum_rules(world, player)
     add_capability_difficulty_rules(world, player)
     add_itemsanity_rules(world, player)
@@ -241,10 +242,18 @@ def held_first_minimum_term(world, track):
     RULING 2026-09-28 (0.2.2, player report): holding 1st on a bare kart is not
     realistic on any track, so each Held 1st needs the first Progressive Boost
     rank OR, with Itemsanity on, `itemsanity.HELD_FIRST_WEAPON_FAMILY_MIN`
-    useful weapon family. It applies at every logic difficulty. With Progressive
-    Boost off every kart has vanilla boost from the start, so the floor is met
-    and nothing is installed (the `add_capability_difficulty_rules` pattern).
-    `Held 3rd` and `Held 5th` are unchanged.
+    useful weapon family. With Progressive Boost off every kart has vanilla
+    boost from the start, so the floor is met and nothing is installed (the
+    `add_capability_difficulty_rules` pattern). `Held 3rd` and `Held 5th` are
+    unchanged.
+
+    RULING 2026-09-29 (0.2.2 feedback): no floor at logic difficulty hard.
+    On hard `add_capability_difficulty_rules` adds nothing, so the Trophy Race
+    win needs no boost, yet the floor still gated Held 1st: a player had the
+    win in logic while Held 1st was not, though winning means holding 1st.
+    Easy and medium keep the floor. The per-track USF `held_first_term` (Hot
+    Air Skyway, Cortex Castle, and Oxide Station unless shortcut_knowledge is
+    hard) is a separate gate and still applies at hard.
 
     The racer binding is the track's own pad racer, the same binding the USF
     `held_first_term` and the easy-difficulty gate already put on this rung.
@@ -255,6 +264,8 @@ def held_first_minimum_term(world, track):
     from .usf_finish import FIRST_BOOST_COUNT
 
     if not bool(world.options.progressive_boost.value):
+        return None
+    if int(world.options.logic_difficulty.value) == 2:  # hard, ruling 2026-09-29
         return None
     weapons = bool(world.options.itemsanity.value)
     racer = track_required_character(world, track)
@@ -277,11 +288,14 @@ def add_held_first_minimum_rules(world, player):
     Runs after `add_podium_placement_rules` has assigned the rung's full OR
     (track branch, plain cups, USF-gated cups), so the floor binds every
     branch. Stricter gates (the USF `held_first_term`, the easy-difficulty
-    gate) stay ANDed on top of it."""
+    gate) stay ANDed on top of it. Nothing is installed at logic difficulty
+    hard (ruling 2026-09-29, see `held_first_minimum_term`)."""
     from .custom_track_locations import slot_region
     from .podium import enabled_trophy_tracks, location_name
 
     if not bool(world.options.progressive_boost.value):
+        return
+    if int(world.options.logic_difficulty.value) == 2:  # hard
         return
     names = {loc.name for loc in world.multiworld.get_locations(player)}
     tracks = list(enabled_trophy_tracks(world.options))
@@ -1190,7 +1204,8 @@ def _created_letter_names_for(world, track):
 def add_time_trial_and_ctr_requirements(world, player):
     """
     Lock Time Trials and CTR Challenges until their track's Trophy Race is completed,
-    except for bonus tracks like Slide Coliseum and Turbo Track.
+    except for bonus tracks like Slide Coliseum and Turbo Track when they have no
+    Trophy Race (their capability terms still apply, see below).
 
     TWO-STAGE: for the 16 trophy pads in randomized mode, the track's CTR Token
     Challenge + 3 relic Time Trials carry a STAGE-2 requirement ANDed on top of the
@@ -1202,12 +1217,16 @@ def add_time_trial_and_ctr_requirements(world, player):
 
     CAPABILITY TERMS ANDed on top of whatever the above built: the Gold and
     Platinum relic tiers (2026-08-21), every CTR Token Challenge
-    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and the N. Gin Labs
-    Relic Race perfect check (#49, `usf_finish.relic_perfect_boost_min`). All
-    are vacuous while Progressive Boost is off.
+    (2026-09-20, `usf_finish.CTR_CHALLENGE_BOOST_COUNT`) and every Relic Race
+    perfect check (#49, USF on every track per the 2026-09-29 ruling,
+    `usf_finish.relic_perfect_boost_min`). All are vacuous while Progressive
+    Boost is off.
 
     RELIC RACE PERFECT checks (#49) take the same Trophy + stage-2 entry rule
     as their track's relic Time Trials: they are paid by the same Relic Race.
+    On a trial track with no Trophy Race the entry is the track region itself;
+    its Gold and Platinum Time Trials still carry the relic tier term and its
+    perfect check the crate term (ruling 2026-09-29). Sapphire stays free.
     """
     from .progressive_capability import track_required_character
     from .relic_perfect import RELIC_PERFECT_SUFFIX
@@ -1236,32 +1255,42 @@ def add_time_trial_and_ctr_requirements(world, player):
         trophy_name = f"{track_prefix}: Trophy Race"
 
         if trophy_name not in all_location_names:
-            logging.debug(
-                f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
-            continue
-
-        s2 = stage2.get(track_prefix)
-        if s2 is not None:
-            s2_item, s2_count = s2
-
-            if s2_item in AGG_BY_NAME:
-                # any_of aggregate stage-2 gate: "any N of this type", summed.
-                def rule(state: CollectionState, t=trophy_name, p=player,
-                         ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
-                    return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
-            else:
-                def rule(state: CollectionState, t=trophy_name, p=player,
-                         i=s2_item, n=s2_count):
-                    return state.can_reach(t, "Location", p) and state.has(i, p, n)
-
-            logging.debug(
-                f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
+            if not (name.endswith(" Time Trial")
+                    or name.endswith(RELIC_PERFECT_SUFFIX)):
+                logging.debug(
+                    f"[CTR Rules] Skipping prerequisite for {name} (no Trophy Race found)")
+                continue
+            # Trial track (Slide Coliseum, Turbo Track) without a Trophy
+            # Race: region access is the Relic Race entry (these locations
+            # have no logic_text), so the base rule is True. The relic tier
+            # term (2026-08-21 ruling with the 2026-09-17 Platinum raise) and
+            # the perfect crate term (2026-09-29 ruling) below still AND on,
+            # exactly as they would with a Trophy Race (ruling 2026-09-29).
+            def rule(state: CollectionState):
+                return True
         else:
-            def rule(state: CollectionState, t=trophy_name, p=player):
-                return state.can_reach(t, "Location", p)
+            s2 = stage2.get(track_prefix)
+            if s2 is not None:
+                s2_item, s2_count = s2
 
-            logging.debug(
-                f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
+                if s2_item in AGG_BY_NAME:
+                    # any_of aggregate stage-2 gate: "any N of this type", summed.
+                    def rule(state: CollectionState, t=trophy_name, p=player,
+                             ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
+                        return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
+                else:
+                    def rule(state: CollectionState, t=trophy_name, p=player,
+                             i=s2_item, n=s2_count):
+                        return state.can_reach(t, "Location", p) and state.has(i, p, n)
+
+                logging.debug(
+                    f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
+            else:
+                def rule(state: CollectionState, t=trophy_name, p=player):
+                    return state.can_reach(t, "Location", p)
+
+                logging.debug(
+                    f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
 
         # Relic tier boost gates (ruling 2026-08-21, superseding the narrow
         # 2026-08-19 Labs-Platinum ruling): every Gold and Platinum Time Trial
@@ -1285,11 +1314,12 @@ def add_time_trial_and_ctr_requirements(world, player):
 
         # Relic Race perfect checks (#49): the race-entry rule built above,
         # i.e. exactly what the track's Sapphire Time Trial gets (Sapphire's
-        # tier term is rank 0), plus a per-track crate term only where an
-        # existing ruling says a time crate needs a capability. Today that is
-        # N. Gin Labs (2026-08-19 ruling, see usf_finish.relic_perfect_boost_
-        # min). Breaking every crate is not a relic time, so the Gold and
-        # Platinum tier terms are deliberately NOT inherited.
+        # tier term is rank 0), plus the crate term. Ruling 2026-09-29: every
+        # track's perfect needs USF at every logic difficulty, bound to the
+        # pad's racer (see usf_finish.relic_perfect_boost_min, which keeps a
+        # per-track override for later lowering). Breaking every crate is not
+        # a relic time, so the Gold and Platinum tier terms are deliberately
+        # NOT inherited.
         if name.endswith(RELIC_PERFECT_SUFFIX):
             _perfect_min = relic_perfect_boost_min(track_prefix)
             if _perfect_min:
