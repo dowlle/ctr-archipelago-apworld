@@ -1,8 +1,7 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from Options import (Choice, OptionGroup, OptionDict, OptionSet, DefaultOnToggle,
-                     Toggle, NamedRange, Range, PerGameCommonOptions, Visibility,
-                     OptionError)
+                     Toggle, NamedRange, Range, PerGameCommonOptions, Visibility)
 
 from . import characters
 from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
@@ -939,7 +938,8 @@ class DeathLinkSend(OptionSet):
     sends what DeathLink used to imply: mask_reset sends on mask grabs,
     any_hit on mask grabs and weapon hits, race_loss on mask grabs and race
     losses, off sends nothing. Any list you write replaces that, so every
-    trigger you want must be in it. To receive DeathLinks without sending any,
+    trigger you want must be in it (follow_death_link listed together with
+    triggers is ignored). To receive DeathLinks without sending any,
     use an empty list (`death_link_send: []`). A death that was forced on you
     by a received DeathLink is never sent back.
 
@@ -952,19 +952,19 @@ class DeathLinkSend(OptionSet):
     # before it existed) gets the legacy coupling, while an explicit empty list
     # is a real empty set and means "send nothing". A plain empty-set default
     # could not tell those two apart. Mixing the sentinel with triggers is
-    # rejected in verify(). Bits are the slot_data contract with native, see
-    # DL_SEND_BITS.
+    # resolved in verify() (the triggers win) instead of raising, because the
+    # fuzzer and random rolls draw arbitrary subsets of valid_keys. Bits are
+    # the slot_data contract with native, see DL_SEND_BITS.
     display_name = "DeathLink Send"
     valid_keys = {"follow_death_link", "mask_grab", "weapon_hit", "race_loss"}
     default = frozenset({"follow_death_link"})
 
     def verify(self, world, player_name, plando_options) -> None:
         super().verify(world, player_name, plando_options)
+        # A random or hand-written set that lists follow_death_link next to
+        # triggers means the triggers: the sentinel is dropped, not an error.
         if "follow_death_link" in self.value and len(self.value) > 1:
-            raise OptionError(
-                f"{player_name}: DeathLink Send cannot combine "
-                f"follow_death_link with other values. Remove it and list "
-                f"the triggers you want.")
+            self.value.discard("follow_death_link")
 
     def send_mask(self, death_link_value: int) -> int:
         """The int bitmask emitted as slot_data ctr_options.death_link_send."""

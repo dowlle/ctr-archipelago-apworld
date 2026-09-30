@@ -6,8 +6,6 @@ death_link (the legacy coupling); an explicit list, including an empty one,
 overrides it. The bit values are a contract with native.
 """
 
-from Options import OptionError
-
 from ..Options import DeathLink, DeathLinkSend
 from . import CTRTestBase
 
@@ -41,10 +39,11 @@ class TestBits(CTRTestBase):
                          {"mask_grab"})
         self.assertEqual(DeathLinkSend.default, frozenset({"follow_death_link"}))
 
-    def test_mixed_sentinel_is_rejected(self):
+    def test_mixed_sentinel_drops_the_sentinel(self):
         opt = DeathLinkSend.from_any(["follow_death_link", "mask_grab"])
-        with self.assertRaises(OptionError):
-            opt.verify(self.multiworld.worlds[1], "P", None)
+        opt.verify(self.multiworld.worlds[1], "P", None)
+        self.assertEqual(set(opt.value), {"mask_grab"})
+        self.assertEqual(opt.send_mask(0), 1)
 
     def test_unknown_value_is_rejected(self):
         with self.assertRaises(Exception):
