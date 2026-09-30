@@ -593,6 +593,8 @@ class ctrAPWorld(World):
             # forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups.
             from . import forced_options as _forced_options
             _forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups(self)
+            # No one-way DeathLink (2026-09-30): sending implies receiving.
+            _forced_options.resolve_death_link_off_when_send_conditions_set(self)
             cortex_vortex_track.draw_dropped_destination(self)
         if not hasattr(self.options, "_lettersanity_selected"):
             mode = int(self.options.lettersanity.value)
@@ -2285,6 +2287,15 @@ class ctrAPWorld(World):
                 # is send-every-Nth (>=1). Native enables the "DeathLink" connection
                 # tag and its send/receive plumbing only when death_link != 0.
                 "death_link": o.death_link.value,
+                # DeathLink send conditions (0.2.3), same additive/no-bump
+                # convention, always emitted. int bitmask: 1 mask_grab,
+                # 2 weapon_hit, 4 race_loss. While the option is left at its
+                # default this is the legacy coupling derived from death_link
+                # (mask_reset 1, any_hit 1|2, race_loss 1|4, off 0); a native
+                # that finds the key absent applies the same fallback itself.
+                # An explicit empty list is 0: receive only.
+                "death_link_send": o.death_link_send.send_mask(
+                    o.death_link.value),
                 "deathlink_amnesty": o.deathlink_amnesty.value,
                 # Universal Tracker: this seed's RESOLVED per-tier relic
                 # classification (True = progression, False = useful), exactly as

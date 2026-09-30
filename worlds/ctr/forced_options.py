@@ -44,8 +44,9 @@ code or the Specification/Contract -- never against "this quiets the fuzzer"
 (briefing rule 7): none of these change what a seed generates, only what the
 player is told about their own YAML.
 
-RESOLVE-WITH-WARNING is a third, narrower category, currently used by two
-entries. Unlike a downgrade, it DOES mutate the option's own stored value, so
+RESOLVE-WITH-WARNING is a third, narrower category, currently used by three
+entries (the third, `resolve_death_link_off_when_send_conditions_set`, is
+documented on the function). Unlike a downgrade, it DOES mutate the option's own stored value, so
 each entry justifies that mutation on its own terms:
 
 - `resolve_oxide_final_relic_count_to_mode_capacity` (2026-09-18 ruling): the
@@ -312,6 +313,33 @@ def resolve_shuffle_gems_off_when_gem_goal_excludes_cups(world):
               f"Required Goal needs the Gem Cups and Include Gem Cup Warp Pads "
               f"is off (turn that on to keep Gems shuffled, or set Shuffle "
               f"Gems off yourself to drop this line).")
+
+
+def resolve_death_link_off_when_send_conditions_set(world):
+    """No one-way DeathLink (ruling of 2026-09-30): when the resolved
+    `death_link_send` bitmask is non-zero while `death_link` is off, the
+    effective `death_link` becomes mask_reset (the mildest receive effect), so
+    a player who sends deaths also takes them. Receive-only (DeathLink on,
+    send nothing) stays allowed.
+
+    Mutates the option's stored value, like the shuffle_gems resolution above,
+    so the slot_data emit reads the resolved value and needs no second rule.
+    Only an explicit `death_link_send` list can trigger it: the default
+    (follow_death_link) resolves to 0 while death_link is off. Re-entry is a
+    no-op (the condition is false once death_link is on), so the fill probe's
+    second generate_early pass warns nothing. Universal Tracker re-generation
+    does not call this; it restores nothing from either key."""
+    o = world.options
+    if o.death_link.value == 0 \
+            and o.death_link_send.send_mask(o.death_link.value) != 0:
+        o.death_link.value = o.death_link.option_mask_reset
+        _warn(world, "resolve_death_link_off_when_send_conditions_set",
+              f"CTR ({_name(world)}): DeathLink turned on as mask_reset, "
+              f"because DeathLink Send lists at least one trigger and "
+              f"DeathLink was off. A slot that sends deaths also receives "
+              f"them (set DeathLink to mask_reset or race_loss yourself to "
+              f"drop this line, or set DeathLink Send to [] to send "
+              f"nothing).")
 
 
 def raise_if_oxidefinal_goal_has_no_progression_tier(world):
