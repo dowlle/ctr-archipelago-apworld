@@ -863,35 +863,38 @@ class BossGarageRequirements(Choice):
 
 
 class DeathLink(Choice):
-    """Share your wipeouts with the other DeathLink players, and take theirs.
+    """What happens to you when another DeathLink player dies. DeathLink Send
+    chooses what makes you send a death.
 
-    - **off** (default): disabled.
-    - **mask_reset**: send a death only when the mask carries you back, meaning
-      you fell off the track or were eaten. Low frequency.
-    - **any_hit**: also send on every hit that lands on you (spin-out, blast,
-      squish, burn). Much higher frequency, so pair it with DeathLink
-      Amnesty.
-    - **race_loss**: sends like mask_reset (only when you fell off the track
-      or were eaten). A received death does not reset you. It ends your
-      current race on the spot as a last-place loss, and nothing that race
-      would have paid out (placement, trophy, relic, and similar checks) is
-      awarded. In a Gem Cup the cup carries on, and if that was the last race
-      and you still win the cup on points, the cup reward is still paid.
+    - **off** (default): disabled, nothing is sent or received.
+    - **mask_reset**: a received death forces the full mask reset on you.
+    - **race_loss**: a received death ends your current race on the spot as a
+      last-place loss, and nothing that race would have paid out (placement,
+      trophy, relic, and similar checks) is awarded. In a Gem Cup the cup
+      carries on, and if that was the last race and you still win the cup on
+      points, the cup reward is still paid.
+    - **any_hit**: legacy value, kept so older YAML files still load. It
+      receives exactly like mask_reset. While DeathLink Send is left at its
+      default it also sends on every weapon hit.
 
-    With mask_reset and any_hit, receiving a death forces the full mask reset
-    on you. Deaths are only sent and received during adventure-mode races; a
-    death that arrives outside a race waits for your next one. Older clients
-    that do not know race_loss treat it as mask_reset."""
+    While DeathLink Send is left at its default, this option also decides what
+    you send, as it did before DeathLink Send existed: mask_reset sends on
+    mask grabs, any_hit on mask grabs and weapon hits, race_loss on mask grabs
+    and race losses. Set DeathLink Send to choose sending yourself; listing
+    any trigger there while this is off turns this on as mask_reset, because
+    a slot that sends deaths also receives them. Deaths are
+    only sent and received during adventure-mode races; a received death is
+    never saved for a later race."""
     # A received death never triggers an outgoing one (no ping-pong). Type
     # rationale: AP core ships DeathLink as an on/off Toggle; CTR uses a
-    # Choice because the send tiers and the receive effect are real gameplay
-    # differences, and a separate toggle would permit "any_hit but do not
-    # send", which is not a supported mode. off mirrors 0 into slot_data,
-    # matching the Toggle convention native keys off. The integer values are
-    # the wire contract with native (ap_deathlink.h CTR_DL_*): race_loss = 3
-    # (issue #286) sends on the mask_reset tier and ends the attempt as a
-    # forced loss on receive; a native build predating it falls back to the
-    # mask reset for any unknown nonzero value.
+    # Choice because the receive effects are real gameplay differences. off
+    # mirrors 0 into slot_data, matching the Toggle convention native keys
+    # off. The integer values are the wire contract with native
+    # (ap_deathlink.h CTR_DL_*): race_loss = 3 (issue #286) ends the attempt
+    # as a forced loss on receive; a native build predating it falls back to
+    # the mask reset for any unknown nonzero value. Send conditions live in
+    # DeathLinkSend below; this option only couples to them through the legacy
+    # fallback (DL_LEGACY_SEND).
     display_name = "DeathLink"
     option_off = 0
     option_mask_reset = 1
@@ -900,13 +903,86 @@ class DeathLink(Choice):
     default = 0
 
 
+# Wire bits of slot_data ctr_options.death_link_send. Fixed contract with
+# native: never renumber.
+DL_SEND_MASK_GRAB = 1
+DL_SEND_WEAPON_HIT = 2
+DL_SEND_RACE_LOSS = 4
+
+DL_SEND_BITS = {
+    "mask_grab": DL_SEND_MASK_GRAB,
+    "weapon_hit": DL_SEND_WEAPON_HIT,
+    "race_loss": DL_SEND_RACE_LOSS,
+}
+
+# Legacy coupling, used while DeathLink Send is left at its default: the send
+# side that each death_link value implied before death_link_send existed.
+DL_LEGACY_SEND = {
+    DeathLink.option_off: 0,
+    DeathLink.option_mask_reset: DL_SEND_MASK_GRAB,
+    DeathLink.option_any_hit: DL_SEND_MASK_GRAB | DL_SEND_WEAPON_HIT,
+    DeathLink.option_race_loss: DL_SEND_MASK_GRAB | DL_SEND_RACE_LOSS,
+}
+
+
+class DeathLinkSend(OptionSet):
+    """What makes you send a DeathLink. Only matters while DeathLink is not
+    off.
+
+    - **mask_grab**: falling off the track or being eaten.
+    - **weapon_hit**: getting hit by a weapon.
+    - **race_loss**: losing a race or the whole Gem Cup, or restarting or
+      exiting to the map from the pause menu.
+
+    Default: **follow_death_link**, the only value that is not a trigger. It
+    sends what DeathLink used to imply: mask_reset sends on mask grabs,
+    any_hit on mask grabs and weapon hits, race_loss on mask grabs and race
+    losses, off sends nothing. Any list you write replaces that, so every
+    trigger you want must be in it (follow_death_link listed together with
+    triggers is ignored). To receive DeathLinks without sending any,
+    use an empty list (`death_link_send: []`). A death that was forced on you
+    by a received DeathLink is never sent back.
+
+    There is no send-only DeathLink: if you list any trigger while DeathLink
+    is off, DeathLink is turned on as mask_reset (the mildest receive effect)
+    and generation prints a notice. Set DeathLink to mask_reset or race_loss
+    yourself to choose the receive effect."""
+    # Unset vs explicitly empty: the default is the one-element sentinel set
+    # {"follow_death_link"}, so a YAML that omits the option (every YAML written
+    # before it existed) gets the legacy coupling, while an explicit empty list
+    # is a real empty set and means "send nothing". A plain empty-set default
+    # could not tell those two apart. Mixing the sentinel with triggers is
+    # resolved in verify() (the triggers win) instead of raising, because the
+    # fuzzer and random rolls draw arbitrary subsets of valid_keys. Bits are
+    # the slot_data contract with native, see DL_SEND_BITS.
+    display_name = "DeathLink Send"
+    valid_keys = {"follow_death_link", "mask_grab", "weapon_hit", "race_loss"}
+    default = frozenset({"follow_death_link"})
+
+    def verify(self, world, player_name, plando_options) -> None:
+        super().verify(world, player_name, plando_options)
+        # A random or hand-written set that lists follow_death_link next to
+        # triggers means the triggers: the sentinel is dropped, not an error.
+        if "follow_death_link" in self.value and len(self.value) > 1:
+            self.value.discard("follow_death_link")
+
+    def send_mask(self, death_link_value: int) -> int:
+        """The int bitmask emitted as slot_data ctr_options.death_link_send."""
+        if "follow_death_link" in self.value:
+            return DL_LEGACY_SEND.get(death_link_value, DL_SEND_MASK_GRAB)
+        mask = 0
+        for key in self.value:
+            mask |= DL_SEND_BITS[key]
+        return mask
+
+
 class DeathLinkAmnesty(Range):
     """How many of your deaths must pile up before one is actually sent. 1
-    (default) sends every death; N sends one per N. Meant for the any_hit
-    tier. Incoming deaths are unaffected; amnesty only throttles what you
-    send."""
-    # Does nothing useful at mask_reset or race_loss (both send only on the
-    # rare mask-reset wipeouts) and is inert while DeathLink is off.
+    (default) sends every death; N sends one per N. Meant for weapon hits,
+    which are frequent. Incoming deaths are unaffected; amnesty only
+    throttles what you send."""
+    # Does nothing useful when only mask grabs and race losses send (both are
+    # rare) and is inert while DeathLink is off.
     display_name = "DeathLink Amnesty"
     range_start = 1
     range_end = 30
@@ -1246,6 +1322,7 @@ class ctrAPOptions(PerGameCommonOptions):
     one_lap_cups: OneLapCups
     # deathlink
     death_link: DeathLink
+    death_link_send: DeathLinkSend
     deathlink_amnesty: DeathLinkAmnesty
     # relic difficulty
     sapphire_relic_count: SapphireRelicCount
@@ -1297,7 +1374,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
                         ColorBoxesByItem],
-    "DeathLink": [DeathLink, DeathLinkAmnesty],
+    "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 
 def create_option_groups() -> List[OptionGroup]:
