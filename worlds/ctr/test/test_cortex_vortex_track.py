@@ -7,9 +7,8 @@ the USF finish term, Gem Cup legs, lettersanity, the relic tier pool, the
 `cortex_vortex_track` wire block and its Universal Tracker restore.
 
 Most tests pin the dropped destination by presetting
-`options._cortex_vortex_dropped` before generate_early -- the same path the
-two-stage fill probe takes -- so each scenario names its destination instead of
-depending on a seed's draw.
+`options._cortex_vortex_dropped` before generate_early, so each scenario
+names its destination instead of depending on a seed's draw.
 """
 import io
 import json

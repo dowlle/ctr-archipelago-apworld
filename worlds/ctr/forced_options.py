@@ -118,12 +118,10 @@ def _ignored(world, names: str, reason: str) -> None:
 def _warn(world, key: str, message: str) -> None:
     """Log `message` once per slot (`notices.say_once`).
 
-    `__init__._probe_two_stage_fillable` builds a mirror multiworld for the
-    fill probe and hands its slots the REAL option objects, then runs
-    `generate_early` on them -- so a seed that runs the probe reaches every
-    warning in this module again. The player generated one seed and asked one
-    question; telling them the same thing twice reads like two different
-    problems."""
+    Anything that runs `generate_early` again on the same option objects
+    reaches every warning in this module again. The player generated one seed
+    and asked one question; telling them the same thing twice reads like two
+    different problems."""
     from .notices import say_once
     say_once(world, key, message, logger)
 
@@ -299,7 +297,7 @@ def resolve_shuffle_gems_off_when_gem_goal_excludes_cups(world):
     includes `not shuffle_gems`). `__init__.generate_early` therefore calls
     this first, ahead of that draw, so the resolved value is what those RNG
     draws see. Re-entry is a no-op: once shuffle_gems is off the condition is
-    false, so the fill probe's second generate_early pass warns nothing.
+    false, so a second generate_early pass warns nothing.
 
     Universal Tracker needs no separate handling: slot_data carries the
     resolved `shuffle_gems`, `_ut_restore_options` restores it, and the
@@ -327,8 +325,8 @@ def resolve_death_link_off_when_send_conditions_set(world):
     so the slot_data emit reads the resolved value and needs no second rule.
     Only an explicit `death_link_send` list can trigger it: the default
     (follow_death_link) resolves to 0 while death_link is off. Re-entry is a
-    no-op (the condition is false once death_link is on), so the fill probe's
-    second generate_early pass warns nothing. Universal Tracker re-generation
+    no-op (the condition is false once death_link is on), so a second
+    generate_early pass warns nothing. Universal Tracker re-generation
     does not call this; it restores nothing from either key."""
     o = world.options
     if o.death_link.value == 0 \

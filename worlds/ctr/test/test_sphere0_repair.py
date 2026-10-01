@@ -89,7 +89,7 @@ class TestSphere0RepairControlFlow(unittest.TestCase):
     def test_capped_seed_terminates_and_falls_back(self):
         """Geography-capped seed: no roll ever clears. The wrapper must stop
         after its bounded budget (not spin) and take the stage-2-collapse
-        escape hatch, flagging two-stage off so __init__ skips its probe."""
+        escape hatch and flag two-stage off."""
         narrow = wpl._SPHERE0_MIN_BREADTH - 1
         tries = wpl._SPHERE0_REPAIR_TRIES
         out, calls, world = self._run([narrow] * (tries + 5))

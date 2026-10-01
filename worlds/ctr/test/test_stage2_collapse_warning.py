@@ -7,10 +7,11 @@ give nobody any way to notice. Measured on the 0.1.5 apworld this is not a corne
 case: 0 in 10,000 seeds at shipped defaults, but 15.8% with
 `podium_placement_checks: false` and 43.3% at the tightest measured config.
 
-So both silent collapse paths now log exactly one warning naming the collapse and
-its cause:
+So the silent collapse path logs exactly one warning naming the collapse and its
+cause:
   geography -- no free starting-pad subset opens sphere 0 wide enough
-  fill      -- the pre_fill dry run predicts this room would FillError
+(The former `fill` cause, a pre_fill dry run predicting a FillError, was removed
+with the room fillability probe.)
 
 Deliberately NOT warned: `two_stage_density: off`. That collapse is what the YAML
 asked for, so a warning would be noise, and it would fire on every such seed.
@@ -53,21 +54,18 @@ class WarningWording(unittest.TestCase):
         # The measurement is maintainer detail: debug log only.
         self.assertNotIn("best breadth was 3", line)
 
-    def test_each_reason_has_its_own_explanation(self):
+    def test_the_geography_reason_has_its_explanation(self):
         world = _fake_world()
         with self.assertLogs(level=logging.WARNING) as cm:
             wpl.warn_stage2_collapsed(world, "geography", "detail-g")
         self.assertIn("starting pads open too little", cm.output[0])
-        with self.assertLogs(level=logging.WARNING) as cm:
-            wpl.warn_stage2_collapsed(world, "fill", "detail-f")
-        self.assertIn("item fill would fail", cm.output[0])
 
     def test_says_the_seed_is_still_playable(self):
         """The warning must not read as an error. A collapsed seed is beatable;
         it just has less layered gating than requested."""
         world = _fake_world()
         with self.assertLogs(level=logging.WARNING) as cm:
-            wpl.warn_stage2_collapsed(world, "fill", "2 slots in the room")
+            wpl.warn_stage2_collapsed(world, "geography", "best breadth was 3")
         line = cm.output[0]
         self.assertIn("playable", line)
         self.assertIn("re-roll", line)

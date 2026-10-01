@@ -119,35 +119,6 @@ class TestCustomLettersFollowTheirTrophyRace(unittest.TestCase):
                 self.assertTrue(_reach(_state(mw, boost=2), name))
 
 
-class TestCustomLettersSurviveStage2Collapse(unittest.TestCase):
-    def test_prefill_collapse_keeps_every_custom_letter_layer(self):
-        mw = _build(lettersanity="locations_and_items",
-                    warppad_unlock_requirements="randomized")
-        world = mw.worlds[PLAYER]
-        world._ctr_two_stage_active = True
-        world._ctr_force_collapse_stage2 = False
-        world._room_probe_verdict = lambda: False
-        world._rollback_precollect_backstop = lambda _mode: None
-        world.pre_fill()
-        self.assertTrue(world._ctr_force_collapse_stage2)
-
-        letters = _custom_letters(mw)
-        self.assertTrue(letters)
-        for name in letters:
-            own = custom_check_name("letter_item", 1,
-                                    LETTERS.index(name[-1]))
-            with self.subTest(location=name):
-                self.assertFalse(_reach(_state(mw), name))
-                self.assertFalse(_reach(_state(mw, boost=2, exclude=(own,)),
-                                        name))
-                self.assertTrue(_reach(_state(mw, boost=2), name))
-        token = f"{CUSTOM}: CTR Token Challenge"
-        items = tuple(custom_check_name("letter_item", 1, LETTERS.index(n[-1]))
-                      for n in letters)
-        self.assertFalse(_reach(_state(mw, boost=2, exclude=items), token))
-        self.assertTrue(_reach(_state(mw, boost=2), token))
-
-
 class TestEveryCreatedLetterSharesItsChallengeEntry(unittest.TestCase):
     def test_parity_over_every_created_letter(self):
         """Every created letter location (retail, Cortex Vortex, custom)

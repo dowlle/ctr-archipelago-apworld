@@ -448,7 +448,6 @@ class TestMutationInjectedStageTwoFourKeyIsCaught(_MutationBase):
         world.warp_pad_unlock_stage2[pad_name] = {
             "type": _TYPE_KEY, "count": 4, "colour": -1}
         world.warp_pad_unlock_stage2_concrete[dest] = ("Key", 4)
-        world._ctr_force_collapse_stage2 = False
 
         found = self.find_four_key_rows(world)
         wheres = " | ".join(w for w, _ in found)
