@@ -2634,17 +2634,21 @@ class ctrAPWorld(World):
             return f"any {count} {label}"
         return f"{count}x {ITEM_BY_TYPE[t](colour if colour >= 0 else 0)}"
 
-    def post_fill(self) -> None:
-        """Prove the racer-lock self-lock invariant on the FILLED multiworld.
+    @classmethod
+    def stage_post_fill(cls, multiworld) -> None:
+        """Prove the racer-lock self-lock invariant on the FILLED multiworld,
+        once for every CTR slot in the room.
 
         Issue #209 names "a fill can never place a character's own unlock item
         behind a pad that requires that same character" as a thing that has to
         be built and proven, not asserted. With the unlock items as progression
         AP's fill already guarantees it; this re-derives it from the real
         placements so a future change to the lock selection cannot quietly
-        break it. No-op when racer locks are off.
+        break it. A stage hook runs after every world's `post_fill`, so it sees
+        the final placements, and one shared all-items state serves every CTR
+        slot. No-op when racer locks are off.
         """
-        characters.verify_no_self_lock(self)
+        characters.verify_room_no_self_lock(multiworld)
 
     def write_spoiler(self, spoiler_handle) -> None:
         """Record this seed's per-pad unlock requirements (stage 1 + stage 2) with

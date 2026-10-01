@@ -539,18 +539,23 @@ def add_racer_unlock_placement_rules(world, player):
     (`characters.racer_lock_forbidden_locations`). `verify_no_self_lock`
     re-checks the filled seed against the same set.
 
+    Item links count: a linked unlock is placed as the link GROUP's copy, so
+    the rule also refuses the copy of every group that carries that racer to
+    this player. Same-named unlocks of unrelated players stay allowed.
+
     No-op when racer locks are off. Under Universal Tracker it is installed
     too and is inert there, because nothing is filled.
     """
     from worlds.generic.Rules import add_item_rule
-    from .characters import racer_lock_forbidden_locations, unlock_item_name
+    from .characters import racer_link_groups, racer_lock_forbidden_locations, unlock_item_name
     for racer, locations in racer_lock_forbidden_locations(world).items():
         item_name = unlock_item_name(racer)
+        owners = (player,) + racer_link_groups(world.multiworld, player, item_name)
         for loc in locations:
             add_item_rule(
                 loc,
-                lambda item, n=item_name, p=player:
-                not (item.player == p and item.name == n))
+                lambda item, n=item_name, o=owners:
+                not (item.name == n and item.player in o))
 
 
 def add_item_box_rules(world, player):

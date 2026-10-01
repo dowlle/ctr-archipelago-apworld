@@ -79,7 +79,7 @@ them in locations reachable from the current state, and a pad requiring X is
 by construction not reachable until X is received -- the deadlock cannot be
 constructed. That is an argument, not a proof, so `verify_no_self_lock` below
 re-derives it from the FILLED multiworld and raises if it is ever false. It is
-wired into `post_fill`, and the test suite drives it directly.
+wired into `stage_post_fill` (once per room), and the test suite drives it directly.
 """
 import json
 import pkgutil
@@ -685,69 +685,145 @@ def racer_lock_forbidden_locations(world) -> Dict[str, list]:
     return out
 
 
+def racer_link_groups(multiworld, player: int, item_name: str) -> Tuple[int, ...]:
+    """Item-link groups through which `player` receives `item_name`.
+
+    Under AP item links the network copy of a linked item belongs to the GROUP
+    player, and each member receives it through a group-owned receipt event.
+    A check that only follows `item.player == player` therefore never sees the
+    item that actually unlocks the racer."""
+    return tuple(gid for gid, group in getattr(multiworld, "groups", {}).items()
+                 if player in group["players"] and item_name in group["item_pool"])
+
+
 def verify_no_self_lock(world) -> None:
     """Post-fill proof that no racer's unlock item sits behind that racer's own
     lock (issue #209, "character-locked-pad solvability logic gets built and
     proven ... so a fill can never place a character's own unlock item behind a
-    pad that requires that same character").
+    pad that requires that same character"). One world; generation runs
+    `verify_room_no_self_lock` once for every CTR slot instead."""
+    verify_room_no_self_lock(world.multiworld, [world])
 
-    Re-derived from the FILLED multiworld rather than argued: for every locked
-    pad, walk to the location actually holding the required racer's unlock item
-    and confirm that location is reachable in a state that does NOT hold it.
-    With the unlock items as progression that is what AP's fill already
-    guarantees, so this never fires -- which is the point. If the invariant is
-    ever broken by a future change to the lock selection, this raises here at
-    generation instead of shipping a seed nobody can finish.
-    """
-    locks = getattr(world, "ctr_racer_locks", {}) or {}
-    if not locks:
+
+def verify_room_no_self_lock(multiworld, worlds=None) -> None:
+    """`verify_no_self_lock` for every CTR slot in the room, sharing one
+    all-items state.
+
+    Re-derived from the FILLED multiworld rather than argued: for every racer
+    a pad requires, walk to each location holding that racer's unlock item and
+    confirm it is reachable in a state that does NOT hold it. With the unlock
+    items as progression that is what AP's fill already guarantees, so this
+    never fires -- which is the point. If the invariant is ever broken by a
+    future change to the lock selection, this raises at generation instead of
+    shipping a seed nobody can finish.
+
+    The all-items state is built ONCE per room. It used to be rebuilt for every
+    locked pad of every CTR slot, a whole-room sweep each time, so the check
+    grew with (CTR slots x locked pads x room size): 741 s of a 500-slot room
+    with 125 CTR slots (Generation scale baseline, 2026-10-01). Each racer is
+    now checked by taking it out of the shared state, re-walking only the
+    affected players and putting everything back.
+
+    Item links count: the unlock can be the group's network copy, and the
+    counterfactual removes the group copy too, otherwise the racer is simply
+    received again through the link."""
+    mw = multiworld
+    if worlds is None:
+        worlds = [mw.worlds[p] for p in mw.player_ids]
+    checks = []
+    for world in worlds:
+        locks = getattr(world, "ctr_racer_locks", {}) or {}
+        if locks:
+            checks.append((world, locks))
+    if not checks:
         return
-    mw = world.multiworld
-    player = world.player
-    needed = {unlock_item_name(c) for c in locks.values()}
-    holders = {
-        loc.item.name: loc
-        for loc in mw.get_filled_locations()
-        if loc.item is not None and loc.item.player == player
-        and loc.item.name in needed
-    }
-    for character, forbidden in racer_lock_forbidden_locations(world).items():
-        loc = holders.get(unlock_item_name(character))
-        if loc is not None and loc in forbidden:
-            raise OptionError(
-                f"CTR racer-locked pads: '{character}' was placed at "
-                f"'{loc.name}', a check of a destination whose own pad "
-                f"requires '{character}'. The placement rule installed by "
-                f"Rules.add_racer_unlock_placement_rules forbids this; a fill "
-                f"that bypassed it produced this seed.")
-    for pad_name, character in sorted(locks.items()):
-        item_name = unlock_item_name(character)
-        loc = holders.get(item_name)
-        if loc is None:
-            # Not placed in this multiworld's location set at all (start
-            # inventory, or another world holds it under item links). Nothing
-            # local can be behind the lock.
-            continue
-        state = mw.get_all_state(False)
-        # Strip the item OUTRIGHT rather than calling `state.remove(loc.item)`.
-        # `get_all_state` can end up holding more than one logical copy of a
-        # single placed item (it collects the pool AND sweeps the placements),
-        # so a single decrement leaves the count at 1 and the check silently
-        # passes whatever the placement is -- a verifier that cannot fail. Set
-        # the count to zero and invalidate the region caches, which is exactly
-        # "a state that does not hold this racer".
-        state.prog_items[player].pop(item_name, None)
-        state.reachable_regions[player] = set()
-        state.blocked_connections[player] = set()
-        state.stale[player] = True
-        if not loc.can_reach(state):
-            raise OptionError(
-                f"CTR racer-locked pads: '{item_name}' was placed at "
-                f"'{loc.name}', which is not reachable without '{item_name}' "
-                f"itself -- the pad '{pad_name}' requires that racer. This is "
-                f"the self-lock deadlock issue #209 names; the seed would be "
-                f"unfinishable. Re-roll, or lower 'racer_locked_pads' (0 turns "
-                f"racer locks off).")
+
+    groups = getattr(mw, "groups", {})
+    needed = {unlock_item_name(c) for _, locks in checks for c in locks.values()}
+    # (owning player, item name) -> locations holding it. Group-owned
+    # locations are link receipts: virtual events that hold a member's copy
+    # and open exactly when the group copy is held, so they are never where
+    # the racer actually is.
+    holders: Dict[Tuple[int, str], list] = {}
+    for loc in mw.get_filled_locations():
+        if loc.item is not None and loc.item.name in needed and loc.player not in groups:
+            holders.setdefault((loc.item.player, loc.item.name), []).append(loc)
+
+    for world, locks in checks:
+        player = world.player
+        for character, forbidden in racer_lock_forbidden_locations(world).items():
+            item_name = unlock_item_name(character)
+            owners = (player,) + racer_link_groups(mw, player, item_name)
+            for owner in owners:
+                for loc in holders.get((owner, item_name), ()):
+                    if loc in forbidden:
+                        raise OptionError(
+                            f"CTR racer-locked pads: '{character}' was placed at "
+                            f"'{loc.name}', a check of a destination whose own pad "
+                            f"requires '{character}'. The placement rule installed by "
+                            f"Rules.add_racer_unlock_placement_rules forbids this; a fill "
+                            f"that bypassed it produced this seed.")
+
+    state = mw.get_all_state()
+    for world, locks in checks:
+        player = world.player
+        precollected = {item.name for item in mw.precollected_items[player]}
+        pads_by_racer: Dict[str, str] = {}
+        for pad_name, character in sorted(locks.items()):
+            pads_by_racer.setdefault(unlock_item_name(character), pad_name)
+        for item_name, pad_name in sorted(pads_by_racer.items()):
+            if item_name in precollected:
+                # Start inventory: no placement can be behind the lock.
+                continue
+            link_groups = racer_link_groups(mw, player, item_name)
+            owners = (player,) + link_groups
+            placed = [loc for owner in owners for loc in holders.get((owner, item_name), ())]
+            if not placed:
+                continue
+            loc = _first_unreachable_without(state, item_name, owners, link_groups, placed)
+            if loc is not None:
+                raise OptionError(
+                    f"CTR racer-locked pads: '{item_name}' was placed at "
+                    f"'{loc.name}', which is not reachable without '{item_name}' "
+                    f"itself -- the pad '{pad_name}' requires that racer. This is "
+                    f"the self-lock deadlock issue #209 names; the seed would be "
+                    f"unfinishable. Re-roll, or lower 'racer_locked_pads' (0 turns "
+                    f"racer locks off).")
+
+
+def _first_unreachable_without(state, item_name, owners, link_groups, placed):
+    """First of `placed` that `state` cannot reach once every owner's copy of
+    `item_name` is gone, or None. `state` is restored before returning.
+
+    Strips the item OUTRIGHT rather than calling `state.remove(...)`:
+    `get_all_state` can hold more than one logical copy of a single placed
+    item (it collects the pool AND sweeps the placements), so a single
+    decrement leaves the count at 1 and the check passes whatever the
+    placement is -- a verifier that cannot fail. Zero the count for the
+    owners and for every member of a link group that carries it (they receive
+    it through the same group copy), and drop their region caches."""
+    affected = set(owners)
+    for gid in link_groups:
+        affected.update(state.multiworld.groups[gid]["players"])
+    saved = {p: (state.prog_items[p].get(item_name), state.reachable_regions[p],
+                 state.blocked_connections[p], state.stale[p]) for p in affected}
+    try:
+        for p in affected:
+            state.prog_items[p].pop(item_name, None)
+            state.reachable_regions[p] = set()
+            state.blocked_connections[p] = set()
+            state.stale[p] = True
+        for loc in placed:
+            if not loc.can_reach(state):
+                return loc
+        return None
+    finally:
+        for p, (count, regions, blocked, stale) in saved.items():
+            if count is not None:
+                state.prog_items[p][item_name] = count
+            state.reachable_regions[p] = regions
+            state.blocked_connections[p] = blocked
+            state.stale[p] = stale
 
 
 # ---------------------------------------------------------------------------
