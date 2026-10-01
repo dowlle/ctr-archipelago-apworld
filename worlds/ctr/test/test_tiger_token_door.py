@@ -54,17 +54,3 @@ class TestTigerTokenDoor(unittest.TestCase):
                                     {t: set(v) for t, v in tracker.worlds[1].options._lettersanity_selected.items()},
                                     {t: set(v) for t, v in mw.worlds[1].options._lettersanity_selected.items()})
                             self.check_world(tracker)
-
-    def test_collapse_reinstalls_token_gate(self):
-        for mode in ('off', 'locations_only', 'locations_and_items', 'items_only'):
-            with self.subTest(mode=mode):
-                mw = _build(seed=335, lettersanity=mode, letters_per_track=3, itemsanity=True,
-                            warppad_unlock_requirements='randomized')
-                world = mw.worlds[1]
-                world._ctr_two_stage_active = True
-                world._ctr_force_collapse_stage2 = False
-                world._probe_two_stage_fillable = lambda: False
-                world._rollback_precollect_backstop = lambda _mode: None
-                world.pre_fill()
-                self.assertTrue(world._ctr_force_collapse_stage2)
-                self.check_world(mw)

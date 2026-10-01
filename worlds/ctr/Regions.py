@@ -406,7 +406,6 @@ def create_regions(world: "ctrAPWorld"):
     world.warp_pad_unlock_stage2 = {}            # physical-pad keyed (slot_data)
     world.warp_pad_unlock_stage2_concrete = {}   # dest-track keyed (AP rules)
     world._ctr_two_stage_active = False
-    world._ctr_force_collapse_stage2 = False      # density-adaptive collapse (create_items)
 
     # Destination shuffle. Build the NON-IDENTITY warp_pad_map FIRST so the
     # sphere-search rewards each physical pad with the rewards of the track it

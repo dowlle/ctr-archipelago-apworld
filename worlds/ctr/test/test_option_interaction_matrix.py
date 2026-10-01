@@ -620,9 +620,8 @@ class TestGemGoalWithoutCupsResolvesShuffleGemsOff(unittest.TestCase):
         self.assertIn("set Shuffle Gems off yourself", message)
 
     def test_warning_is_logged_once_through_a_full_generation(self):
-        # generate_early can run twice per seed (the two-stage fill probe
-        # builds a mirror multiworld over the REAL option objects). The
-        # resolution is idempotent, so the second pass finds nothing to say.
+        # One warning per full generation. The resolution is idempotent, so a
+        # second generate_early pass would find nothing to say.
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _full(dict(CONFLICT))
         self.assertEqual(

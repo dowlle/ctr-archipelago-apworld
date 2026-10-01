@@ -1,28 +1,24 @@
-"""The two-stage probe must mirror companion pre_fill (Bethany/Dex, 2026-08-21).
+"""Two-stage gating survives, and fills, next to a pre_fill companion.
 
-CTR's pre_fill dry-runs the room on a parallel mirror to predict whether the
-two-stage pad gates would FillError, and collapses them only then. The mirror
-used to skip the pre_fill step entirely, so a companion whose pre_fill locks
-items into dedicated locations (KH2 places Donald, Goofy and keyblade
-abilities into 66 of its own locations) presented the mirror's main fill with
-66 phantom open locations. The mirror dead-ended, and CTR collapsed every
-stage-2 gate on a room the real generator fills fine: measured 6 of 6 false
-collapses on Dex's CTR plus KH2 pair, all 28 wire stage2 entries type 0.
+Reported by Bethany/Dex, 2026-08-21: a companion whose pre_fill locks items
+into dedicated locations (KH2 places Donald, Goofy and keyblade abilities into
+66 of its own locations) used to make CTR collapse every stage-2 gate on a
+room the real generator fills fine. The room fillability probe that caused it
+has since been removed; these tests keep the room shape covered end to end:
 
-These tests pin the fix from both directions:
-
-* a REAL companion with a pre-fill lifecycle (KH2 itself, the reported game)
-  must no longer collapse stage 2;
+* a REAL companion with a pre-fill lifecycle (KH2 itself, the reported game);
 * a GENERIC minimal companion whose only interesting property is "more
-  locations than pool items, difference placed in pre_fill" must not either,
-  so the fix cannot silently regress into a KH2-only special case (the fix
-  keys on CTR's own world class, never on a companion's name).
+  locations than pool items, difference placed in pre_fill".
+
+Each room keeps its concrete stage-2 requirements and then fills and is
+beatable with them in place.
 """
 import unittest
 
 from test.general import setup_multiworld
 from worlds.AutoWorld import AutoWorldRegister, World
 from BaseClasses import Item, ItemClassification, Location, Region
+from Fill import distribute_items_restrictive
 
 from .. import ctrAPWorld
 
@@ -34,13 +30,12 @@ CTR_OPTIONS = {"warppad_unlock_requirements": 1, "two_stage_density": "full"}
 def _assert_two_stage_survived(test, mw, ctr_player=1):
     ctr = mw.worlds[ctr_player]
     test.assertIsInstance(ctr, ctrAPWorld)
-    test.assertFalse(
-        getattr(ctr, "_ctr_force_collapse_stage2", False),
-        "the probe collapsed stage 2 for a room the real generator fills")
     test.assertTrue(getattr(ctr, "_ctr_two_stage_active", False))
     test.assertTrue(
         getattr(ctr, "warp_pad_unlock_stage2_concrete", {}),
         "no concrete stage-2 requirements survived")
+    distribute_items_restrictive(mw)
+    test.assertTrue(mw.can_beat_game(), "the two-stage room did not fill")
 
 
 class TestKH2RoomKeepsStageTwo(unittest.TestCase):

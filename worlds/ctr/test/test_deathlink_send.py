@@ -168,6 +168,6 @@ class TestResolutionNotice(CTRTestBase):
                 self.world)
         self.assertIn("DeathLink turned on as mask_reset", cm.output[0])
         self.assertEqual(o.death_link.value, DeathLink.option_mask_reset)
-        # Second call (fill probe re-entry) changes nothing.
+        # Second call (re-entry) changes nothing.
         forced_options.resolve_death_link_off_when_send_conditions_set(self.world)
         self.assertEqual(o.death_link.value, DeathLink.option_mask_reset)

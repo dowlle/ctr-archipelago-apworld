@@ -1,12 +1,9 @@
 """Once-per-slot generation notices.
 
-A CTR slot's option notices can be reached more than once in one generation:
-the two-stage fill probe (`__init__._probe_two_stage_fillable`) builds a mirror
-of the room whose slots share the REAL option objects and runs every
-generation step on them again. The option object is therefore the carrier for
-"already said": the mirror shares it with the slot it predicts, so a notice the
-real pass printed is never printed again for that slot, whichever pass reaches
-it first.
+A CTR slot's option notices can be reached more than once in one generation
+(a resolution helper re-entered, or a step re-run on the same option objects).
+The option object is the carrier for "already said", so a notice printed once
+for a slot is never printed again for that slot.
 """
 import logging
 
