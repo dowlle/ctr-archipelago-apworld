@@ -64,10 +64,12 @@ class TestItemsanityOn(CTRTestBase):
             "locations": list(range(ITEMSANITY_CODE_BASE, ITEMSANITY_CODE_BASE + 22)),
         })
 
-    def test_early_items_are_one_or_two_distinct_weapon_types(self):
+    def test_early_items_are_one_weapon_type(self):
+        # One early weapon, not one or two: AP locks early items into the
+        # starting checks (fuzz 36720, 2026-10-01).
         early = self.multiworld.early_items[self.player]
         weapons = {name: count for name, count in early.items() if name in ITEM_NAMES}
-        self.assertIn(len(weapons), (1, 2))
+        self.assertEqual(len(weapons), 1)
         self.assertEqual(set(weapons), set(weapons) & set(WEAPONS))
         self.assertEqual(set(weapons.values()), {1})
 

@@ -1,6 +1,7 @@
 """Sphere-0 guard: refuse a slot that starts with no reachable check
 (fuzz failures 32541, 6813 and 10634, 2026-10-01; refusal ruled the same
-evening).
+evening), and since 2026-10-02 a slot that starts with only one (fuzz
+14603; see MIN_STARTING_CHECKS).
 
 WHY THIS EXISTS
 ---------------
@@ -59,9 +60,11 @@ def sphere0_breadth(world) -> int:
 
 
 def openers(world):
-    """Sorted names of this slot's pool items that alone open a location."""
+    """Sorted names of this slot's pool items that alone open a location
+    beyond those reachable at the start."""
     mw = world.multiworld
     base = _base_state(world)
+    start = _reachable_empty(world, base)
     names = set()
     for item in mw.itempool:
         if (item.player != world.player or not item.advancement
@@ -69,7 +72,7 @@ def openers(world):
             continue
         state = base.copy()
         state.collect(item, True)
-        if _reachable_empty(world, state):
+        if _reachable_empty(world, state) > start:
             names.add(item.name)
     return sorted(names)
 
@@ -88,14 +91,46 @@ def _cause(world) -> str:
     return "no single item opens a check at the start"
 
 
-def raise_if_empty(world) -> None:
-    """Refuse the slot when no location is reachable from its starting
-    inventory."""
-    if sphere0_breadth(world) > 0:
+# Fewest starting checks a slot may have (ruling 2026-10-02: refuse only when
+# really short). With one starting check the fill has a single early spot for
+# the item that opens the next check; in a room another slot's early items or a
+# minimal-accessibility partner's items can take it (fuzz 14603, 2026-10-01:
+# both slots start with one check and the room fails on about 1 in 12 AP
+# seeds). Measured 2026-10-02: no seed that 0.2.3 generates starts with fewer
+# than two checks (2,380 solo fuzzer rolls and 201 two-slot rooms), so two
+# refuses nothing 0.2.3 accepts. Three would.
+MIN_STARTING_CHECKS = 2
+
+
+def _narrow_cause(world) -> str:
+    from .progressive_capability import BOOST_CHAIN
+    difficulty = world.options.logic_difficulty.current_key
+    found = openers(world)
+    if any(name.startswith(BOOST_CHAIN) for name in found):
+        return (f"most tracks it can reach first need the first Progressive "
+                f"Boost at logic difficulty {difficulty}")
+    if found:
+        return f"its next checks need an item such as {found[0]}"
+    return "few of its first checks are open without items"
+
+
+def raise_if_narrow(world) -> None:
+    """Refuse the slot when fewer than MIN_STARTING_CHECKS locations are
+    reachable from its starting inventory."""
+    breadth = sphere0_breadth(world)
+    if breadth >= MIN_STARTING_CHECKS:
         return
+    name = world.multiworld.player_name[world.player]
+    fix = ("Usual fix: turn on Item Box Locations, turn on Held-Position "
+           "Rungs (or more Podium Rung categories), or set logic_difficulty "
+           "to hard.")
+    if breadth == 0:
+        raise OptionError(
+            f"CTR: {name} has no check it can reach at the start: "
+            f"{_cause(world)}, so the item fill cannot begin. {fix}")
     raise OptionError(
-        f"CTR: {world.multiworld.player_name[world.player]} has no check it "
-        f"can reach at the start: {_cause(world)}, so the item fill cannot "
-        f"begin. Usual fix: turn on Item Box Locations, turn on Held-Position "
-        f"Rungs (or more Podium Rung categories), or set logic_difficulty to "
-        f"hard.")
+        f"CTR: {name} can reach only {breadth} check"
+        f"{'' if breadth == 1 else 's'} at the start (at least "
+        f"{MIN_STARTING_CHECKS} needed): {_narrow_cause(world)}, so the item "
+        f"fill can run out of early spots for the item that opens the next "
+        f"check. {fix}")
