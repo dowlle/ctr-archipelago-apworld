@@ -676,20 +676,14 @@ class ctrAPWorld(World):
         set_rules(self)
 
     def generate_basic(self) -> None:
-        """Sphere-0 opener (sphere0_opener.py): a slot with no check reachable
-        from its starting inventory gets the one item that opens the most
-        checks, so AP's fill has somewhere to start. Runs here, not in
-        pre_fill, so the two-stage probe's mirror repeats it. Universal
-        Tracker skips it: the server sends the opener as starting inventory."""
+        """Sphere-0 guard (sphere0_guard.py): refuse a slot with no check
+        reachable from its starting inventory, because AP's fill cannot
+        begin there (ruling 2026-10-01). Universal Tracker skips it: the
+        connected seed already generated."""
         if getattr(self.multiworld, "generation_is_fake", False):
             return
-        from . import sphere0_opener
-        self._ctr_sphere0_opener = sphere0_opener.apply(self)
-        if self._ctr_sphere0_opener:
-            logging.info(
-                "[CTR] %s: no check was reachable at the start, so %s is in "
-                "starting inventory.", self.multiworld.player_name[self.player],
-                ", ".join(self._ctr_sphere0_opener))
+        from . import sphere0_guard
+        sphere0_guard.raise_if_empty(self)
 
     def pre_fill(self) -> None:
         """Per-seed fillability guards -- one branch per warp-pad fill mode.
@@ -2731,12 +2725,6 @@ class ctrAPWorld(World):
                 f"{characters.CHARACTER_ID_TO_NAME[int(_guest)]} has no unlock "
                 f"race in this seed and joins races at {_keys} "
                 f"{'Key' if _keys == 1 else 'Keys'}.\n")
-
-        if getattr(self, "_ctr_sphere0_opener", None):
-            spoiler_handle.write(
-                f"\n\nCTR sphere-0 opener ({self.multiworld.player_name[self.player]}): "
-                f"no check was reachable from the starting inventory, so "
-                f"{', '.join(self._ctr_sphere0_opener)} starts collected.\n")
 
         if getattr(self, "_ctr_backstop_fired", False):
             player_name = self.multiworld.player_name[self.player]
