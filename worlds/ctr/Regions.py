@@ -15,7 +15,8 @@ from .warp_pad_logic import (
     run_sphere_search, to_slot_req, build_warp_pad_map, HUB_STATIC,
     _COLOURS, _RELIC_TIERS,
 )
-from .relic_tiers import RELIC_TIERS, tier_location_pool
+from .relic_tiers import (RELIC_TIERS, SLIDE_COLISEUM_PAD, slide_coliseum_access_rule,
+                          tier_location_pool)
 from .Options import OxideGoal
 from . import cortex_vortex_track as cvt
 from .cortex_vortex_track import (
@@ -908,6 +909,17 @@ def create_regions(world: "ctrAPWorld"):
             for ex in reg.get("exits", []):
                 if ex["name"] in _TRIAL_PAD_EXITS:
                     ex["access_rule"] = "has('Key', 1)"
+    # Vanilla mode with fewer than 10 Sapphire Relics created (ruling
+    # 2026-10-01): the Slide Coliseum pad opens at the Sapphire Relics that
+    # exist. The same value is emitted as pad 16's stage-1 requirement, which
+    # native enforces and displays; see relic_tiers.slide_coliseum_sapphire_gate.
+    elif unlock_mode == 0:
+        _slide_rule = slide_coliseum_access_rule(world)
+        if _slide_rule is not None:
+            for reg in data["regions"]:
+                for ex in reg.get("exits", []):
+                    if ex["name"] == SLIDE_COLISEUM_PAD:
+                        ex["access_rule"] = _slide_rule
 
     # GEM-CUP pads (Red/Green/Blue/Yellow/Purple Cup): same OPEN treatment as the
     # trials, gated by the include_gem_cups YAML option (mirrors include_battle_arenas

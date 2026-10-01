@@ -1,9 +1,11 @@
 """Adaptive podium-rung sizing (issue #71).
 
 Podium's four sub-toggles are a parent/child ladder, not a scalar.  This
-module computes the smallest layout that would give the generated pool a spare
-location.  It never changes a player-selected subcategory: if the configured
-layout is too small, generation raises with the required category count.  This
+module computes the smallest layout whose locations hold the mandatory pool.
+It never changes a player-selected subcategory: if the configured layout is
+too small, generation raises with the seed's demand, supply and required
+category count.  The ruled one-category working margin is kept as
+``target_categories`` but is never a refusal reason (ruling 2026-10-01).  This
 supersedes the earlier host-gated upward expansion because existing host files
 carried its old default-on value and could not distinguish that inherited value
 from informed consent to override a YAML.  It also never enables the master
@@ -261,35 +263,78 @@ def _capability_packs_active(world) -> bool:
     return bool(world.options.progressive_boost.value or world.options.progressive_stats.value)
 
 
-def required_categories(world) -> Optional[int]:
-    """Smallest rung-category count that leaves one spare location.
-
-    ``None`` means the full five-category ladder cannot satisfy the current
-    live registry and item pool. The extra category above the arithmetic
-    minimum is the ruled working margin. The pre-box practical floor of three
-    remains only when Item Box Locations are off; authored boxes provide the
-    live surplus that made lower player-selected rung layouts exercisable.
-    """
+def _demand(world) -> int:
+    """Locations this seed must provide: the mandatory pool, the goal's
+    excluded reserve, and the player's own exclude_locations."""
     demand = predicted_mandatory_pool(world)
     demand += predicted_goal_excluded_reserve(world.options)
     demand += len(world.options.exclude_locations.value)
-    base = _base_location_supply(world)
-    minimum = next((categories for categories in range(6)
-                    if demand <= base + len(enabled_trophy_tracks(world.options)) * categories), None)
+    return demand
+
+
+def location_supply(world, categories: int) -> int:
+    """Locations available with ``categories`` podium rung categories."""
+    return _base_location_supply(world) + len(enabled_trophy_tracks(world.options)) * categories
+
+
+def required_categories(world) -> Optional[int]:
+    """Smallest rung-category count whose locations hold the mandatory pool.
+
+    ``None`` means the full five-category ladder cannot satisfy the current
+    live registry and item pool. This is the REFUSAL threshold: the
+    2026-10-01 ruling is that a seed is refused only when its locations are
+    really short. The working margin of ``target_categories`` is never a
+    refusal reason. A seed with zero to a few spare locations sheds filler and
+    the terrain comfort pack first, and the general capacity check in
+    ``create_items`` still catches a predictor error.
+    """
+    demand = _demand(world)
+    return next((categories for categories in range(6)
+                 if demand <= location_supply(world, categories)), None)
+
+
+def target_categories(world) -> Optional[int]:
+    """The ruled working-margin target, kept for a sizer that may expand again.
+
+    Since #279 the sizer never turns a rung option on, so nothing reads this
+    to change a seed. It is kept as the documented target (balance sheet
+    2026-08-10: zero margin "is not a shippable default"): one category above
+    ``required_categories`` while a capability pack is on, and, without Item
+    Box Locations, at least three. Until 2026-10-01 this value also decided
+    refusals; the ruling that day removed it from the refusal path.
+    """
+    minimum = required_categories(world)
     if minimum is None:
         return None
     if _capability_packs_active(world):
-        # Capability packs are the only live consumers that need the ruled
-        # working margin. Before authored boxes landed, a floor of three kept
-        # the tight C=2 boundary away from a one-location census discrepancy.
-        # Boxes are measured directly in `base`, so they make the downward half
-        # real: retain the one-category margin but do not force disabled rungs
-        # back into a box-backed seed.
         margin = min(minimum + 1, 5)
         if bool(world.options.box_locations.value):
             return margin
         return max(margin, 3)
     return minimum
+
+
+def _usual_fixes(world) -> str:
+    """The cheapest changes that usually free enough locations, in the order
+    the 2026-10-01 refusal tally found them effective: the progressive packs
+    first, then Item Box Locations. Character Unlocks fixed 5 of 428 refused
+    rolls in that sample, so it is named only when no pack is on."""
+    o = world.options
+    fixes = []
+    packs = [label for label, option in (
+        ("Progressive Boost", o.progressive_boost),
+        ("Progressive Stats", o.progressive_stats)) if option.value]
+    if packs:
+        fixes.append(f"turn off {' or '.join(packs)} (or pick a smaller mode)")
+    if not bool(o.box_locations.value):
+        fixes.append("turn on Item Box Locations")
+    if not packs and bool(o.character_unlocks.value):
+        # With no pack on, the 15 unlock items are the remaining pool driver,
+        # and all-unlocked mode is the ruled answer for a podium-off seed.
+        fixes.append("set character_unlocks to false (all racers unlocked)")
+    if not fixes:
+        fixes.append("turn off an item-pool option")
+    return "; ".join(fixes)
 
 
 def _new_name_count(current: RungLayout, candidate: RungLayout) -> int:
@@ -314,42 +359,42 @@ def _select_layout(options, target: int) -> Optional[RungLayout]:
 
 
 def apply_rung_sizing(world) -> Optional[str]:
-    """Apply the ruled upward-only sizing policy, or raise clearly.
+    """Refuse a seed whose podium rung layout cannot hold its mandatory pool.
 
     This runs in ``generate_early`` before regions consume the podium toggles.
-    A sufficient player layout is untouched and takes no random draw.
+    It never changes an option: a sufficient player layout is untouched and
+    takes no random draw, and a short one raises with the seed's demand and
+    supply (2026-10-01 ruling: CTR never turns rung options or the master
+    toggle on; refuse only when locations are really short).
     """
     target = required_categories(world)
     current = category_count(world.options)
+    demand = _demand(world)
     if target is None:
         capability_added = sum(
             progressive_capability.created_item_counts(world).values())
+        maximum_supply = location_supply(world, 5)
         if capability_added:
-            total_demand = predicted_mandatory_pool(world)
-            total_demand += predicted_goal_excluded_reserve(world.options)
-            total_demand += len(world.options.exclude_locations.value)
-            maximum_supply = _base_location_supply(world) + len(enabled_trophy_tracks(world.options)) * 5
             progressive_capability.raise_if_capability_items_exceed_location_supply(
                 world, available_supply=max(
-                    0, maximum_supply - (total_demand - capability_added)))
+                    0, maximum_supply - (demand - capability_added)))
         raise OptionError(
-            "CTR: the current mandatory item pool exceeds the full five-category "
-            "Podium Rung ladder. Disable an item-pool option or add a live "
-            "location class; the rung sizer cannot create more than 80 locations.")
+            f"CTR: this seed needs {demand} locations for its mandatory items, "
+            f"but even all five Podium Rung categories give only "
+            f"{maximum_supply}. Usual fix: {_usual_fixes(world)}.")
     if current >= target:
         return None
+    supply = location_supply(world, current)
     if not bool(world.options.podium_placement_checks.value):
         raise OptionError(
-            "CTR: this seed needs more Podium Rung capacity, but Podium Placement "
-            "Checks is off. The adaptive sizer never enables that master toggle; "
-            "turn it on, or reduce the enabled item-pool options -- the usual "
-            "candidates are Character Unlocks (15 items, set 'character_unlocks' "
-            "to false for all-unlocked mode), Progressive Stats (12) and "
-            "Progressive Boost (2-3). All three add pool items without adding "
-            "any locations of their own.")
+            f"CTR: this seed needs {demand} locations for its mandatory items "
+            f"but has only {supply}, and Podium Placement Checks is off. CTR "
+            f"never turns that option on for you. Usual fix: "
+            f"{_usual_fixes(world)}; or turn on Podium Placement Checks "
+            f"({target} rung categor{'y' if target == 1 else 'ies'} needed).")
     raise OptionError(
-        f"CTR: this seed needs at least {target} Podium Rung categories, but "
-        f"the YAML selects {current}. CTR will not turn disabled rung options "
-        "back on. Enable more podium rung subcategories, enable another "
-        "location family such as Item Box Locations, or reduce item-pool "
-        "options such as Progressive Boost or Progressive Stats.")
+        f"CTR: this seed needs {demand} locations for its mandatory items but "
+        f"has only {supply} with the {current} Podium Rung categories the YAML "
+        f"selects; it needs at least {target}. CTR will not turn disabled rung "
+        f"options back on. Usual fix: {_usual_fixes(world)}; or enable more "
+        f"podium rung subcategories.")

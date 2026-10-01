@@ -44,9 +44,10 @@ code or the Specification/Contract -- never against "this quiets the fuzzer"
 (briefing rule 7): none of these change what a seed generates, only what the
 player is told about their own YAML.
 
-RESOLVE-WITH-WARNING is a third, narrower category, currently used by three
-entries (the third, `resolve_death_link_off_when_send_conditions_set`, is
-documented on the function). Unlike a downgrade, it DOES mutate the option's own stored value, so
+RESOLVE-WITH-WARNING is a third, narrower category, currently used by four
+entries (`resolve_death_link_off_when_send_conditions_set` and
+`resolve_oxide_final_relic_count_to_created_supply`, the 2026-10-01 ruling,
+are documented on the functions). Unlike a downgrade, it DOES mutate the option's own stored value, so
 each entry justifies that mutation on its own terms:
 
 - `resolve_oxide_final_relic_count_to_mode_capacity` (2026-09-18 ruling): the
@@ -449,6 +450,82 @@ def resolve_oxide_final_relic_count_to_mode_capacity(world):
               f"allows.")
 
 
+def _oxide_final_created_supply(world) -> int:
+    """Relics the Final Challenge can count this seed: total_relics sums the
+    created relics of every tier; every other mode needs one tier to reach the
+    count, so its supply is the largest created tier it names. Same arithmetic
+    as `_oxide_final_supply_shortfall`."""
+    from .Options import FinalOxideUnlock
+    created = world._ctr_relic_created
+    counts = [created.get(t, 0) for t in world._oxide_goal_tiers()]
+    if world.options.oxide_final_challenge_unlock.value \
+            == FinalOxideUnlock.option_total_relics:
+        return sum(counts)
+    return max(counts, default=0)
+
+
+def resolve_oxide_final_relic_count_to_created_supply(world):
+    """Ruling 2026-10-01: when Oxide's Final Challenge asks for more relics
+    than this seed creates, lower the count to the created supply, with a
+    notice, in EVERY seed ("lower to supply always makes the most sense"),
+    whatever the accessibility and goal. It extends the 2026-09-18 rule that a
+    count above 18 means every relic of the tier: a count above what exists
+    can only mean every relic that exists.
+
+    This replaces a refusal (`accessibility: full` and the 101% goal) and an
+    unreachable Final Challenge (`minimal`). Mutates the option's stored value,
+    the single point the rule, the goal, the spoiler and slot_data
+    (`oxide_final_count`) read, so native and Universal Tracker see the lowered
+    count with no new wire key. Runs after the capacity resolution and before
+    the RAISE guards, which then see a satisfiable count.
+
+    A seed whose satisfying tiers created no relic at all is left alone: there
+    is no count of 1 or more to lower to, so the guards below refuse it (full,
+    or the 101% goal) or warn (minimal), exactly as before."""
+    from .Options import OxideGoal
+    if not OxideGoal.oxide_content_present(world.options.oxide_goal.value):
+        return
+    opt = world.options.oxide_final_challenge_relic_count
+    requested = opt.value
+    supply = _oxide_final_created_supply(world)
+    if supply < 1 or requested <= supply:
+        return
+    opt.value = supply
+    mode = world.options.oxide_final_challenge_unlock
+    tiers = world._oxide_goal_tiers()
+    if len(tiers) == 1:
+        what = f"the number of {tiers[0]}s this seed creates"
+    elif mode.current_key == "total_relics":
+        what = "the number of relics this seed creates across all tiers"
+    else:
+        what = "the most relics of any one tier this seed creates"
+    _warn(world, "resolve_oxide_final_relic_count_to_created_supply",
+          f"CTR ({_name(world)}): Oxide's Final Challenge Relic Count "
+          f"lowered from {requested} to {supply}, {what} (mode "
+          f"'{mode.current_key}').")
+
+
+def notice_slide_coliseum_gate_lowered(world):
+    """Ruling 2026-10-01: in vanilla warp-pad mode the Slide Coliseum pad needs
+    10 Sapphire Relics. A seed that creates fewer keeps the player's
+    sapphire_relic_count and lowers the pad's gate to the Sapphires that exist
+    (relic_tiers.slide_coliseum_sapphire_gate, emitted to native as pad 16's
+    stage-1 requirement). Nothing in the YAML changes, so this only tells the
+    player the pad opens earlier than in the retail game."""
+    from .relic_tiers import slide_coliseum_lowered_gate
+    gate = slide_coliseum_lowered_gate(world)
+    if gate is None:
+        return
+    if gate == 0:
+        how = "opens without Sapphire Relics, because this seed creates none"
+    else:
+        how = (f"opens at {gate} Sapphire Relic{'s' if gate != 1 else ''} "
+               f"instead of 10, because this seed creates only {gate}")
+    _warn(world, "notice_slide_coliseum_gate_lowered",
+          f"CTR ({_name(world)}): the Slide Coliseum warp pad {how}. The "
+          f"gate was lowered.")
+
+
 def _oxide_final_supply_shortfall(world):
     """Shared arithmetic for the two Final Challenge supply checks below
     (issue #53; kept in lockstep with `_relic_progression_map`'s access_full
@@ -483,38 +560,32 @@ def _oxide_final_supply_shortfall(world):
 
 
 def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
-    """Issue #171/#28 R5, generalized by issue #53: two relic-count location
-    gates exist -- 'Gem Stone Valley -> Slide Coliseum Warp Pad'
-    (has('Sapphire Relic', 10), FIXED, vanilla warp-pad unlock only;
-    randomized unlock strips this exact exit rule in Regions.create_regions)
-    and 'N. Oxide Garage: N. Oxide's Final Challenge', which since #53
-    follows the CONFIGURED oxide_final_challenge_unlock mode + count in
-    every warp-pad unlock mode and every goal
-    (Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire text
-    is legacy and overridden).
+    """Issue #171/#28 R5, generalized by issue #53, narrowed 2026-10-01:
+    'N. Oxide's Final Challenge' follows the CONFIGURED
+    oxide_final_challenge_unlock mode + count in every warp-pad unlock mode
+    and every goal (Rules.add_oxide_final_challenge_rule -- the world.json
+    18-Sapphire text is legacy and overridden).
 
-    If the created relic supply cannot satisfy a gate, that gate can NEVER
-    be satisfied by any state, no matter what the player collects. Under
-    accessibility 'full' every location must be reachable, so this is a
-    genuine, generation-aborting solvability break -- RAISE, not clamp
-    (clamping would mean silently overriding the player's own relic counts,
-    in a case with no clear 'safe' direction to clamp toward). See
+    Since the 2026-10-01 rulings the count is lowered to the created
+    supply first (resolve_oxide_final_relic_count_to_created_supply), and the
+    vanilla Slide Coliseum pad, the other relic gate this guard used to
+    check, opens at the Sapphires that exist. What is left is a seed whose
+    satisfying tiers created no relic at all: that gate can NEVER be
+    satisfied, and under accessibility 'full' every location must be
+    reachable, so this still RAISES. See
     warn_relic_gates_may_be_permanently_unreachable for the
     non-full-accessibility case, where AP already tolerates an unreachable
     non-required location (see test_vanilla_floors.TestVanillaBadSeedClass)."""
     if world.options.accessibility.value != 0:  # Accessibility.option_full == 0
         return
-    sapphires = world._ctr_relic_created.get("Sapphire Relic", 0)
     problems = []
-    if world.options.warppad_unlock_requirements.value == 0 and sapphires < 10:
-        problems.append(
-            f"'Gem Stone Valley -> Slide Coliseum Warp Pad' needs 10 Sapphire "
-            f"Relics but only {sapphires} are created (vanilla warp-pad "
-            f"unlock keeps this world.json gate; randomized unlock strips it)")
+    # The Slide Coliseum pad (vanilla mode, has('Sapphire Relic', 10)) was the
+    # second gate checked here until 2026-10-01. The ruling that day lowers
+    # that gate to the Sapphires that exist (notice_slide_coliseum_gate_lowered),
+    # so it is satisfiable by construction and needs no check.
     # Issue #320 acceptance 4: the Final Challenge location does not exist in a
     # `disabled` seed, so accessibility 'full' has nothing to make reachable
-    # there. The Slide Coliseum sapphire gate above is a separate, still-live
-    # relic gate and keeps its check.
+    # there.
     from .Options import OxideGoal
     if OxideGoal.oxide_content_present(world.options.oxide_goal.value):
         shortfall = _oxide_final_supply_shortfall(world)
@@ -525,9 +596,8 @@ def raise_if_full_accessibility_needs_more_sapphires_than_created(world):
     raise OptionError(
         f"CTR: accessibility 'full' requires every location reachable, but: "
         + "; ".join(problems) + ". Raise the relevant *_relic_count "
-        f"option(s), lower oxide_final_challenge_relic_count or change "
-        f"oxide_final_challenge_unlock, or switch accessibility away from "
-        f"'full'.")
+        f"option(s) above 0, change oxide_final_challenge_unlock, or switch "
+        f"accessibility to 'minimal'.")
 
 
 def raise_if_starting_as_removed_oxide(world):
@@ -757,22 +827,17 @@ def warn_relic_gates_may_be_permanently_unreachable(world):
     _oxide_final_supply_shortfall)."""
     if world.options.accessibility.value == 0:
         return
-    sapphires = world._ctr_relic_created.get("Sapphire Relic", 0)
     problems = []
-    if world.options.warppad_unlock_requirements.value == 0 and sapphires < 10:
-        problems.append(
-            f"the Slide Coliseum warp pad (needs 10 Sapphire Relics, "
-            f"{sapphires} exist)")
+    # The Slide Coliseum pad left this warning on 2026-10-01: its vanilla gate
+    # is lowered to the Sapphires that exist (notice_slide_coliseum_gate_lowered).
     # Issue #320 acceptance 4: a `disabled` seed never creates the Final
-    # Challenge location, so there is no gate here to be unreachable. The
-    # Slide Coliseum sapphire gate above is a separate, still-live relic gate
-    # and keeps its check.
+    # Challenge location, so there is no gate here to be unreachable.
     from .Options import OxideGoal
     if OxideGoal.oxide_content_present(world.options.oxide_goal.value):
         if _oxide_final_supply_shortfall(world):
             n = world.options.oxide_final_challenge_relic_count.value
             problems.append(f"N. Oxide's Final Challenge (needs {n} relics, "
-                            f"fewer exist)")
+                            f"none of the tiers it counts was created)")
     if not problems:
         return
     _warn(world, "warn_relic_gates_may_be_permanently_unreachable",
@@ -915,9 +980,12 @@ def apply_downgrade_warnings(world):
 
 
 def apply(world):
-    """Single entry point for generate_early. The relic-count resolution runs
-    first because the RAISE guards below read the option's stored value and
-    must see the effective (post-resolution) count, not the raw one; raise
+    """Single entry point for generate_early. The two relic-count resolutions
+    run first (mode capacity, then created supply, 2026-10-01) because the
+    RAISE guards below read the option's stored value and must see the
+    effective (post-resolution) count, not the raw one. The Slide Coliseum
+    notice follows; it changes no option (the lowered pad gate is derived from
+    the relic draw where it is used). Raise
     guards run next (they can abort generation); downgrade warnings are
     informational only and never change what the seed emits.
 
@@ -927,6 +995,8 @@ def apply(world):
     this function (see that function's docstring), so generate_early calls it
     ahead of them instead."""
     resolve_oxide_final_relic_count_to_mode_capacity(world)
+    resolve_oxide_final_relic_count_to_created_supply(world)
+    notice_slide_coliseum_gate_lowered(world)
     apply_raise_guards(world)
     apply_downgrade_warnings(world)
     from .notices import emit_ignored_summary

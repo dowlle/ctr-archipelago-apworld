@@ -46,6 +46,7 @@ from . import version
 from .Regions import create_regions
 from .relic_tiers import (
     RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
+    SLIDE_COLISEUM_LEVEL_ID, slide_coliseum_stage1_wire,
     resolve_comfort_guards,
 )
 from .Rules import set_rules
@@ -1176,8 +1177,9 @@ class ctrAPWorld(World):
           requirement to ANY pad, so relics must remain orderable by fill; the
           randomized path's own pre_fill relax-not-pin guard handles fillability.
           No behavioural change from today.
-        * Vanilla mode (mode 0) -- two relic-count gates exist: the FIXED Slide
-          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json) and
+        * Vanilla mode (mode 0) -- two relic-count gates exist: the Slide
+          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json, lowered
+          to the Sapphires created when fewer exist, 2026-10-01) and
           N. Oxide's Final Challenge, whose gate follows the CONFIGURED
           oxide_final_challenge_unlock mode + count in every seed (issue #53,
           Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire
@@ -2045,6 +2047,16 @@ class ctrAPWorld(World):
                 out.setdefault(
                     str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
                 out[str(lid)]["stage1"] = _req(req)
+        # Vanilla mode, fewer than 10 Sapphire Relics created (ruling 2026-10-01):
+        # the Slide Coliseum pad opens at the Sapphires that exist. Native
+        # prefers a non-type-0 stage 1 on pad 16 over its hardcoded 10, so the
+        # lowered gate travels here; the exit rule in Regions reads the same
+        # helper. No entry means the retail 10 on both sides.
+        _slide = slide_coliseum_stage1_wire(self)
+        if _slide is not None:
+            out.setdefault(str(SLIDE_COLISEUM_LEVEL_ID),
+                           {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
+            out[str(SLIDE_COLISEUM_LEVEL_ID)]["stage1"] = dict(_slide)
         # Density-adaptive collapse (create_items): on a tight seed every stage 2 is
         # dropped in AP logic, so emit type-0 stage 2 to native too (the relic/token
         # menu opens the instant the trophy race is beaten) -- AP rules and native

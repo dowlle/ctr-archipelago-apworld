@@ -102,5 +102,7 @@ class TestFinalOxideRelicCountSpecialRangeNames(CTRTestBase):
             "accessibility": "minimal",
         }
         mw = setup_multiworld(ctrAPWorld, seed=355, options=options)
+        # "all" parses to 18; since 2026-10-01 a count above the created
+        # supply is lowered to it, here the 1 + 1 + 1 relics this seed creates.
         self.assertEqual(
-            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 18)
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 3)
