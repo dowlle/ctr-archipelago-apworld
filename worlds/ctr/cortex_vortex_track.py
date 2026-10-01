@@ -144,8 +144,7 @@ def track_key(pad_name: str) -> str:
 #
 # LocationClass subclasses only see `options`, so the drawn destination lives
 # there as `options._cortex_vortex_dropped` (the lettersanity-selection
-# precedent). The two-stage fill probe shares the real world's options object,
-# so it sees the same destination.
+# precedent).
 
 def track_on(options) -> bool:
     toggle = getattr(options, "cortex_vortex_track", None)
@@ -406,10 +405,10 @@ def eligible_dropped_destinations(world) -> List[int]:
 def draw_dropped_destination(world) -> Optional[int]:
     """Draw this seed's dropped destination (one `world.random.choice`).
 
-    No draw at all with the option off. The two-stage fill probe runs this on a
-    parallel world that shares the real world's options: it still draws, so its
-    RNG stream stays aligned with the real one, and keeps the value already on
-    the options object (the same seed draws the same value anyway)."""
+    No draw at all with the option off. A destination already on the options
+    object (preset by a test, or a re-run over the same options) is kept and
+    only checked for eligibility; the draw still happens so the RNG stream
+    stays aligned with a fresh generation."""
     o = world.options
     if not track_on(o):
         return None

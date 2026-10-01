@@ -60,7 +60,6 @@ from .cortex_vortex_track import CORTEX_VORTEX
 
 _STAGE2_COLLAPSE_REASONS = {
     "geography": "the free starting pads open too little of the hub",
-    "fill": "the item fill would fail otherwise",
 }
 
 
@@ -1595,7 +1594,7 @@ def run_sphere_search(world, mode, reward_track_for=None,
         # seed its two-stage experience, but it is the difference between a
         # playable seed and a FillError. Assigning _ctr_two_stage_active here is
         # safe: Regions.create_regions sets it BEFORE calling us, so this False
-        # sticks and __init__ correctly skips the two-stage fill probe.
+        # sticks.
         world._ctr_two_stage_active = False
         warn_stage2_collapsed(
             world, "geography",
@@ -1629,7 +1628,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     demands a POOL-SHUFFLED item type: the synthetic vanilla-reward inventory
     under-approximates real fill, which places pool items freely on reachable
     locations, so unreached-ness is not evidence of an unsatisfiable
-    requirement. True fill risk stays covered downstream by the pre_fill probe
+    requirement. True fill risk stays covered downstream by the solo pre_fill
     backstop, the accessibility sweep, and the fuzz gate.
 
     The EXCEPTION is `pinned_items`: item types whose placement is pinned to

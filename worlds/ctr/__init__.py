@@ -1,5 +1,4 @@
 import logging
-import contextlib
 import json
 import os
 from typing import ClassVar, Dict, List
@@ -112,50 +111,6 @@ class ctrAPWeb(WebWorld):
             ["Taor", "Icebound777"]
         )
     ]
-
-
-class _DropCtrRootRecords(logging.Filter):
-    """Drops the CTR lines some modules log straight on the root logger."""
-
-    def filter(self, record):
-        return not str(record.msg).startswith(("[CTR", "CTR"))
-
-
-@contextlib.contextmanager
-def _quiet_ctr_logs():
-    """Mute CTR log output: every `worlds.ctr.*` module logger (through the
-    package logger's level, which they inherit) and the root-logger `[CTR]`
-    lines. Other games' output is untouched."""
-    package = logging.getLogger(__name__)
-    root = logging.getLogger()
-    previous = package.level
-    root_filter = _DropCtrRootRecords()
-    package.setLevel(logging.CRITICAL + 1)
-    root.addFilter(root_filter)
-    try:
-        yield
-    finally:
-        root.removeFilter(root_filter)
-        package.setLevel(previous)
-
-
-def _probe_error_where(step, error, real) -> str:
-    """The failing probe step, plus the slot and game when one world's step
-    raised: AP's `call_single` attaches "for player N, named X" to the
-    exception (PEP 678 note), and the mirror numbers slots like the room."""
-    import re
-    for note in getattr(error, "__notes__", ()) or ():
-        m = re.search(r"for player (\d+), named (.*)\.$", str(note))
-        if m:
-            player = int(m.group(1))
-            game = getattr(real, "game", {}).get(player, "?")
-            return f"{step}, player {player} {m.group(2)!r}, game {game!r}"
-    return step
-
-
-def _one_line(error) -> str:
-    text = " ".join(str(error).split())
-    return f"{type(error).__name__}: {text}" if text else type(error).__name__
 
 
 class ctrAPWorld(World):
@@ -675,221 +630,29 @@ class ctrAPWorld(World):
         set_rules(self)
 
     def pre_fill(self) -> None:
-        """Per-seed fillability guards -- one branch per warp-pad fill mode.
+        """Terminal fill backstop for solo generations, in both warp-pad modes.
 
-        RANDOMIZED-MODE BRANCH: two-stage guard (design rule: a pad's tier 2 MAY
-        collapse if a seed needs it FOR GENERATION).
+        Two-stage gating is kept as rolled: there is no fill prediction and no
+        stage-2 collapse here. The room fillability probe that used to dry-run
+        the whole room on a mirror multiworld was removed in favour of measured
+        fill success (0.2.3: no collapse verdict in 6,300+ probed seeds).
 
-        CTR's item pool is ~98% progression in every config, and AP's greedy
-        fill_restrictive cannot reliably ORDER a near-full pool through stacked
-        logical stage-2 gates -- every seed stays fully reachable, but a small
-        fraction (~0.1-0.2%) is not greedily fillable, raising FillError. The
-        relaxation knobs (per-pad collapse roll, real-gate cap, count ceilings,
-        slider filter, min-3 bootstrap) shrink that tail but cannot zero it, while
-        a FULL stage-2 collapse fills 0/10000. So: keep genuine two-stage by default
-        and, only when THIS seed would FillError, collapse every stage-2 gate for it.
-
-        Mechanism: run a faithful DRY-RUN of the exact fill on an independent,
-        identically-seeded+optioned parallel multiworld (same world.random stream ->
-        same fill decisions). If the dry run raises FillError, re-install the real
-        world's TT/token rules in COLLAPSED form (add_time_trial_and_ctr_requirements
-        already honours the flag) so the real fill that Main runs next is the
-        guaranteed-fillable single-stage DAG. Any probe error falls back to KEEPING
-        two-stage (fail-open: never makes a fillable seed worse).
-
-        TERMINAL BACKSTOP (both modes, solo only): after any mode-specific rung,
-        the shared rollback-precollect backstop replays the real fill and, if it
-        still dead-ends, precollects the stranded progression so the seed cannot
-        ship an unfillable red. See _rollback_precollect_backstop."""
+        Solo only: the rollback-precollect backstop replays the real fill and,
+        if it dead-ends, precollects the stranded progression so the seed
+        cannot ship an unfillable red. See _rollback_precollect_backstop."""
         # Universal Tracker (issue #29): under a fake generation there is no real
-        # fill to protect, and the two-stage probe would re-roll a parallel fill on
-        # a DIFFERENT seed and could wrongly collapse the stage-2 gates we just
-        # pinned from slot_data. Skip all fill machinery -- reachability is fixed by
-        # the reconstructed rules, and the server supplies the real item placements.
+        # fill to protect. Reachability is fixed by the rules reconstructed from
+        # slot_data, and the server supplies the real item placements.
         if getattr(self.multiworld, "generation_is_fake", False):
             return
-        solo = len(self.multiworld.worlds) == 1
-        # Randomized two-stage rung: faithful parallel-MW probe; on a predicted
-        # FillError collapse every stage-2 gate for this seed. Necessary but, on
-        # dense post-fix trees, not always sufficient (the stage-2 collapse cannot
-        # touch the stage-1 + near-full-pool residual -- 0.43% at the max any_of
-        # corner on 60415b4ad) -- the terminal backstop below closes that residual.
-        if (getattr(self, "_ctr_two_stage_active", False)
-                and not getattr(self, "_ctr_force_collapse_stage2", False)):
-            if self._room_probe_verdict() is False:
-                self._ctr_force_collapse_stage2 = True
-                # Overwrite the stage-2 access rules with the collapsed (plain
-                # can_reach Trophy Race) form; fill_slot_data also emits type-0
-                # stage 2. This re-install only reassigns loc.access_rule closures
-                # and consumes no multiworld.random (verified) -- so the terminal
-                # backstop's replay fidelity survives it.
-                from .Rules import (add_custom_ctr_challenge_rules, add_lettersanity_rules,
-                                    add_time_trial_and_ctr_requirements)
-                add_time_trial_and_ctr_requirements(self, self.player)
-                # The reinstall above deliberately replaces the CTR Token and
-                # created letter rules. Restore every Lettersanity layer after
-                # it: token letter receipts, per-location physical gates, and
-                # the mode-2 own-letter guard. Universal Tracker skips this
-                # collapse path and already builds these layers in set_rules.
-                add_lettersanity_rules(self, self.player)
-                # Custom-track CTR Token Challenges take their letter item
-                # receipts from this separate installer; the reinstall above
-                # replaced those token rules too.
-                add_custom_ctr_challenge_rules(self, self.player)
-                from .warp_pad_logic import warn_stage2_collapsed
-                n = len(self.multiworld.worlds)
-                warn_stage2_collapsed(
-                    self, "fill",
-                    f"{n} slot{'' if n == 1 else 's'} in the room")
-        # Terminal rollback-precollect backstop -- the universal solo safety net.
         # Solo only (replay fidelity: nothing consumes multiworld.random between
         # here and the fill). Vanilla and randomized both route through the same
         # mode-agnostic machinery; a non-fired seed is byte-identical to an
         # un-backstopped build, a fired seed is logged to the spoiler.
-        if solo:
+        if len(self.multiworld.worlds) == 1:
             mode = ("vanilla" if self.options.warppad_unlock_requirements.value == 0
                     else "randomized")
             self._rollback_precollect_backstop(mode)
-
-    def _room_probe_verdict(self):
-        """The room's two-stage fillability verdict, probed once per room.
-
-        The probe mirrors the WHOLE room (every slot, every game) from the real
-        seed and the real option objects, and the mirror's CTR `pre_fill` is a
-        no-op, so a CTR slot's own collapse is not one of its inputs: every CTR
-        slot used to run an identical dry run and get the same answer. The
-        first CTR `pre_fill` that needs a verdict runs the probe -- the same
-        point in AP's call order where the first per-slot probe used to run --
-        and later CTR slots reuse it.
-
-        A latch on the multiworld rather than a `stage_pre_fill` hook: in AP
-        0.6.7 `call_all` runs the stage hook AFTER every world's `pre_fill`, so
-        it would run after the solo rollback-precollect backstop that must see
-        the collapse first."""
-        mw = self.multiworld
-        cached = getattr(mw, "_ctr_room_probe_verdict", None)
-        if cached is not None:
-            return cached[0]
-        verdict = self._probe_two_stage_fillable()
-        mw._ctr_room_probe_verdict = (verdict,)
-        return verdict
-
-    def _probe_two_stage_fillable(self):
-        """True/False if a faithful parallel dry-run fills; None if the probe could
-        not run (caller treats None as 'keep two-stage'). Called once per room
-        through `_room_probe_verdict`.
-
-        MULTIWORLD-AWARE (issue #75, ruled 2026-08-07). The probe mirrors the REAL
-        room: same player count, same games per slot, each slot carrying its own
-        option object. It used to dry-run `_MW(1)` unconditionally, so in a
-        multiworld it predicted the fillability of a room that does not exist.
-
-        Why that mattered: CTR's FillError tail is a property of the ROOM, not of
-        the CTR slot. Measured on 0.1.5 (`podium_placement_checks: false`, 2-player
-        against a 0-location companion, 10,000 seeds), the solo-shaped probe let 90
-        seeds reach a real FillError, and separately collapsed stage 2 on seeds that
-        fill perfectly well in the real room -- a third of its collapses in the
-        tightest config were such false positives. Mirroring the room removes both
-        directions of the error, because the dry run and the real fill are finally
-        the same problem.
-
-        SOLO IS UNCHANGED BY CONSTRUCTION: with one player the mirror IS `_MW(1)`
-        with this world's own options, i.e. exactly the shipped probe. Verified as a
-        byte-identical 10,000-seed arm, not just argued.
-
-        COMPANION PRE_FILL IS MIRRORED (Bethany/Dex CTR+KH2 report, 2026-08-21).
-        The probe used to skip the `pre_fill` step entirely, and that skew was a
-        systematic false-collapse source: a companion whose `pre_fill` locks
-        items into dedicated locations (KH2 places Donald, Goofy and keyblade
-        abilities into 66 of its own locations) leaves the REAL room's main fill
-        with matching item and location counts, while the mirror still showed
-        those locations as open with no items for them. The mirror's fill then
-        dead-ended on the phantom surplus and collapsed stage 2 on a room the
-        real generator fills without complaint (measured 6 of 6 collapses on
-        Dex's CTR+KH2 pair). The mirror now runs Main.py's `pre_fill` step via
-        the same `call_all`, with one exception: every CTR world instance on the
-        mirror has its `pre_fill` replaced by a no-op, because CTR's `pre_fill`
-        IS this method's caller (running it would recurse) and its only
-        multiworld-relevant action is the collapse decision this probe exists to
-        make -- the room state with CTR pre_fill skipped is exactly the
-        keep-two-stage room the probe is predicting. The exception keys on the
-        world CLASS, never on a game-name string, so it covers every CTR slot in
-        the room and no companion. Only the mirror's RNG streams are consumed;
-        `self.multiworld.random` is untouched, so backstop replay fidelity is
-        unaffected.
-
-        The probe does not reproduce item links. It is a fillability predictor,
-        not a second generator; any error keeps two-stage, and names the step
-        (and the slot, when one world's step raised) on one line."""
-        step = "setup"
-        try:
-            from BaseClasses import MultiWorld as _MW, CollectionState as _CS
-            from worlds.AutoWorld import call_all as _call_all, AutoWorldRegister
-            from Fill import distribute_items_restrictive as _dist
-            real = self.multiworld
-            # AP numbers real slots 1..N contiguously, which is what _MW(n) builds.
-            # If that ever stops holding, fail open rather than probe a room whose
-            # slot numbering does not match the one we are predicting for.
-            players = tuple(real.player_ids)
-            if players != tuple(range(1, len(players) + 1)):
-                logging.warning("[CTR] two-stage fillability probe skipped: "
-                                "non-contiguous player ids; keeping two-stage.")
-                return None
-            pmw = _MW(len(players))
-            pmw.game = dict(real.game)
-            pmw.player_name = dict(real.player_name)
-            pmw.set_seed(real.seed)
-            # Same construction style as the shipped solo probe, one slot per real
-            # slot: instantiate the slot's own world type and hand it the REAL
-            # world's option object, so every slot rolls identically to the room
-            # being predicted.
-            pmw.worlds = {
-                p: AutoWorldRegister.world_types[real.game[p]](pmw, p)
-                for p in players
-            }
-            for p in players:
-                pmw.worlds[p].options = real.worlds[p].options
-            # State BEFORE the world steps, exactly as Main.py:51 orders it
-            # (`multiworld.state = CollectionState(multiworld)` runs before any
-            # `call_all`). The probe used to build it afterwards, which worked
-            # only for as long as no CTR step touched `multiworld.state`; the
-            # character phase's `push_precollected` in create_items does, and it
-            # made the probe fail open (returning None) on every seed instead of
-            # returning a verdict. Ordering it like the real generator is the
-            # fidelity fix, not a workaround: a probe that does not mirror
-            # Main.py cannot predict Main.py.
-            pmw.state = _CS(pmw)
-            # The mirror repeats every CTR step for every CTR slot; anything it
-            # logs was already said by the real pass, so CTR output is muted
-            # until the dry run ends (restored before any verdict is logged).
-            with _quiet_ctr_logs():
-                for step in ("generate_early", "create_regions", "create_items",
-                             "set_rules", "connect_entrances", "generate_basic"):
-                    _call_all(pmw, step)
-                step = "pre_fill"
-                # Main.py's pre_fill step, with the mirror's CTR slots no-opped
-                # (see COMPANION PRE_FILL IS MIRRORED above). Instance-attribute
-                # assignment shadows the bound method for exactly these objects;
-                # call_all still walks every slot in real player order and still
-                # runs any stage_pre_fill class hooks.
-                for p in players:
-                    if isinstance(pmw.worlds[p], ctrAPWorld):
-                        pmw.worlds[p].pre_fill = lambda: None
-                _call_all(pmw, "pre_fill")
-                step = "fill"
-                _dist(pmw)
-            return True
-        except Exception as e:
-            from Fill import FillError as _FE
-            if isinstance(e, _FE):
-                return False
-            logging.warning("[CTR] two-stage fillability probe could not run "
-                            "(%s): %s; keeping two-stage.",
-                            _probe_error_where(step, e, self.multiworld),
-                            _one_line(e))
-            logging.debug("[CTR] two-stage fillability probe traceback",
-                          exc_info=True)
-            return None
 
     _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40
 
@@ -928,15 +691,12 @@ class ctrAPWorld(World):
            fill goes green (bounded: every round strictly removes progression from
            the ordered pool). The real fill then replays the green simulation.
 
-        REPLAY FIDELITY across modes (why solo is enough for both):
-          - vanilla mode: pre_fill routes straight here;
-          - randomized mode: the two-stage probe builds its OWN parallel
-            MultiWorld with its own RNG, and the stage-2 collapse re-install
-            (add_time_trial_and_ctr_requirements) only reassigns loc.access_rule
-            closures -- neither consumes self.multiworld.random. create_filler
-            returns a fixed Wumpa Fruit, so the precollect top-up draws no RNG
-            either. So the RNG state the simulation snapshots is exactly the state
-            the real fill will run from (harness-asserted over 100 seeds).
+        REPLAY FIDELITY (why solo is enough for both modes): pre_fill routes
+        straight here in both modes and nothing else in CTR's pre_fill consumes
+        self.multiworld.random. create_filler returns a fixed Wumpa Fruit, so
+        the precollect top-up draws no RNG either. So the RNG state the
+        simulation snapshots is exactly the state the real fill will run from
+        (harness-asserted over 100 seeds).
 
         SOLO ONLY (enforced by the caller): with other worlds present, their
         pre_fill hooks may run after ours and consume multiworld.random, breaking
@@ -2045,27 +1805,22 @@ class ctrAPWorld(World):
                 out.setdefault(
                     str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
                 out[str(lid)]["stage1"] = _req(req)
-        # Density-adaptive collapse (create_items): on a tight seed every stage 2 is
-        # dropped in AP logic, so emit type-0 stage 2 to native too (the relic/token
-        # menu opens the instant the trophy race is beaten) -- AP rules and native
-        # stay in lockstep.
-        if not getattr(self, "_ctr_force_collapse_stage2", False):
-            for pad_name, req in unlock_s2.items():
-                meta = pad_ids.get(pad_name)
-                if meta is None:
-                    continue
-                lid = meta["level_id"]
-                if 0 <= lid < self.WARP_PAD_ID_RANGE:
-                    out[str(lid)]["stage2"] = _req(req)
-                elif meta.get("kind") == "cup":
-                    # Cup pad (LevelID 100-104) hosting a TROPHY-track destination
-                    # under merged destination shuffle carries a REAL stage 2
-                    # (contract §2/§4, design §5): stop forcing type-0 on cups. The
-                    # cup key exists here only when include_gem_cups randomized it
-                    # (stage 1 already emitted above); setdefault guards the ordering.
-                    out.setdefault(
-                        str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
-                    out[str(lid)]["stage2"] = _req(req)
+        for pad_name, req in unlock_s2.items():
+            meta = pad_ids.get(pad_name)
+            if meta is None:
+                continue
+            lid = meta["level_id"]
+            if 0 <= lid < self.WARP_PAD_ID_RANGE:
+                out[str(lid)]["stage2"] = _req(req)
+            elif meta.get("kind") == "cup":
+                # Cup pad (LevelID 100-104) hosting a TROPHY-track destination
+                # under merged destination shuffle carries a REAL stage 2
+                # (contract §2/§4, design §5): stop forcing type-0 on cups. The
+                # cup key exists here only when include_gem_cups randomized it
+                # (stage 1 already emitted above); setdefault guards the ordering.
+                out.setdefault(
+                    str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
+                out[str(lid)]["stage2"] = _req(req)
         return out
 
     def _resolve_podium_checks(self) -> Dict[str, object]:
