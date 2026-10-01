@@ -296,8 +296,10 @@ def required_categories(world) -> Optional[int]:
 def target_categories(world) -> Optional[int]:
     """The ruled working-margin target, kept for a sizer that may expand again.
 
-    Since #279 the sizer never turns a rung option on, so nothing reads this
-    to change a seed. It is kept as the documented target (balance sheet
+    Since #279 the sizer never turns a rung option on. The one reader is the
+    Cortex Vortex destination drop (`cortex_vortex_track._supply_feasible`),
+    which keeps this margin when it picks the destination to drop, as it did
+    before the 2026-10-01 ruling. It is kept as the documented target (balance sheet
     2026-08-10: zero margin "is not a shippable default"): one category above
     ``required_categories`` while a capability pack is on, and, without Item
     Box Locations, at least three. Until 2026-10-01 this value also decided

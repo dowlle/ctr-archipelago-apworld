@@ -192,6 +192,42 @@ class TestEligibility(unittest.TestCase):
             self.assertNotIn(HOT_AIR_SKYWAY,
                              cvt.eligible_dropped_destinations(world))
 
+    def test_a_drop_that_leaves_no_working_margin_is_not_drawn(self):
+        """The drop keeps the ruled working margin (`target_categories`), as it
+        did before the 2026-10-01 refusal ruling, not just the bare refusal
+        threshold (`required_categories`)."""
+        mw = _build(steps=())
+        world = mw.worlds[PLAYER]
+        from .. import rung_sizer
+        real = rung_sizer.target_categories
+
+        def fake(w):
+            return 99 if w.options._cortex_vortex_dropped == HOT_AIR_SKYWAY else real(w)
+
+        with mock.patch.object(rung_sizer, "target_categories", side_effect=fake):
+            self.assertNotIn(HOT_AIR_SKYWAY,
+                             cvt.eligible_dropped_destinations(world))
+
+    def test_scope_roll_4003_generates_as_on_0_2_3(self):
+        """Fuzzer roll 4003 (2026-10-02 scope run) generates on 0.2.3 on every
+        AP seed. Reading the bare threshold for the drop let AP seed 1 drop a
+        destination that left no margin, and create_items refused the seed for
+        its Progressive Boost items (48 items, 46 locations)."""
+        import yaml
+        from pathlib import Path
+        from Options import OptionError
+        from .. import rung_sizer
+        doc = yaml.safe_load((Path(__file__).parent / "fixtures"
+                              / "scope_20261002_4003.yaml").read_text())
+        options = doc[ctrAPWorld.game]
+        steps = STEPS + ("connect_entrances", "generate_basic")
+        # Precondition: the fixture reproduces the refusal with the bare threshold.
+        with mock.patch.object(rung_sizer, "target_categories",
+                               rung_sizer.required_categories):
+            with self.assertRaises(OptionError):
+                setup_multiworld(ctrAPWorld, steps, seed=1, options=options)
+        setup_multiworld(ctrAPWorld, steps, seed=1, options=options)
+
     def test_the_draw_stays_in_the_eligible_set_and_varies(self):
         seen = set()
         for seed in range(12):

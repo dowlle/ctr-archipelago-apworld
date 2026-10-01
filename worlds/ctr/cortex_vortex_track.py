@@ -344,7 +344,17 @@ def _supply_feasible(world, lid) -> bool:
     this asks it directly, with the per-seed inputs it needs predicted without
     RNG: relic counts from `_predicted_relic_created`, letter selections as
     counts, and a placeholder starting racer (only the unlock COUNT matters).
-    Every temporary attribute is removed again; nothing here draws."""
+    Every temporary attribute is removed again; nothing here draws.
+
+    It asks for `target_categories`, the count WITH the ruled working margin,
+    not the bare refusal threshold `required_categories`. Until 2026-10-01 the
+    two were one function, so this kept a margin of spare locations when it
+    picked the destination to drop. Reading the bare threshold after the
+    refusal ruling let the draw drop a destination that leaves no margin, and
+    create_items then refused the seed for capability items it could not fit
+    (fuzzer roll 4003 of the 2026-10-02 scope run: 0.2.3 generates it on 20 of
+    20 AP seeds, the ruling-1 build on 8). With the margin the eligible list,
+    and so the draw, is the one 0.2.3 makes."""
     from . import rung_sizer
     from .characters import ROSTER
     o = world.options
@@ -368,7 +378,7 @@ def _supply_feasible(world, lid) -> bool:
             world._ctr_relic_created = _predicted_relic_created(world)
         if not had_start:
             world.ctr_starting_character = ROSTER[0]
-        target = rung_sizer.required_categories(world)
+        target = rung_sizer.target_categories(world)
         if target is None:
             return False
         if rung_sizer.category_count(o) >= target:
