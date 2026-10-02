@@ -932,7 +932,9 @@ class DeathLinkSend(OptionSet):
     - **mask_grab**: falling off the track or being eaten.
     - **weapon_hit**: getting hit by a weapon.
     - **race_loss**: losing a race or the whole Gem Cup, or restarting or
-      exiting to the map from the pause menu.
+      exiting to the map from the pause menu, but only while that race's
+      win is in logic for you and not collected yet. Losing a race you
+      already won, or one you are not expected to win yet, sends nothing.
 
     Default: **follow_death_link**, the only value that is not a trigger. It
     sends what DeathLink used to imply: mask_reset sends on mask grabs,
