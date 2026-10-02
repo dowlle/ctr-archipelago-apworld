@@ -47,16 +47,34 @@ class TestRungLadder(unittest.TestCase):
         self.assertTrue(all(row.any_position for row in rung_sizer.rows_reachable_from(options)))
 
 
+def _make_short_by(world, short_by=1):
+    """Pad the raw exclude_locations option (counted by the sizer whether or
+    not the names exist) until this world's demand sits `short_by` locations
+    above the supply of its current rung layout: a seed that is really short."""
+    current = rung_sizer.category_count(world.options)
+    supply = rung_sizer.location_supply(world, current)
+    world.options.exclude_locations.value = frozenset()
+    pad = supply - rung_sizer._demand(world) + short_by
+    world.options.exclude_locations.value = frozenset(
+        f"synthetic exclude {i}" for i in range(max(pad, 0)))
+    return rung_sizer._demand(world), supply
+
+
+def _rungs_off(world):
+    world.options.podium_finish_rungs.value = False
+    world.options.podium_any_position_rung.value = False
+    world.options.podium_held_rungs.value = False
+    world.options.podium_held_fifth_rung.value = False
+
+
 class TestRungSizingGeneration(unittest.TestCase):
     def test_legacy_host_opt_in_cannot_override_yaml(self):
         mw = setup_multiworld(ctrAPWorld, seed=711)
         world = mw.worlds[1]
-        world.options.podium_finish_rungs.value = False
-        world.options.podium_any_position_rung.value = False
-        world.options.podium_held_rungs.value = False
-        world.options.podium_held_fifth_rung.value = False
+        _rungs_off(world)
         world.options.progressive_boost.value = 1
         world.settings.allow_rung_sizing = True
+        _make_short_by(world)
         with self.assertRaises(OptionError) as ctx:
             rung_sizer.apply_rung_sizing(world)
         self.assertIn("will not turn disabled rung options back on", str(ctx.exception))
@@ -65,11 +83,15 @@ class TestRungSizingGeneration(unittest.TestCase):
         self.assertFalse(world.options.podium_held_fifth_rung.value)
         self.assertFalse(world.options.podium_finish_rungs.value)
 
-    def test_held_opt_out_fails_instead_of_silently_expanding(self):
-        for capability in ("progressive_boost", "progressive_stats"):
-            with self.subTest(capability=capability), self.assertRaises(OptionError) as ctx:
-                setup_multiworld(
-                    ctrAPWorld, seed=715,
+    def test_margin_alone_never_refuses_a_held_opt_out(self):
+        # Ruling 2026-10-01: refuse only when locations are really short. This
+        # YAML fits with its own two categories; before the ruling the working
+        # margin for a capability pack refused it. It now generates with the
+        # player's layout untouched.
+        for seed, capability in ((715, "progressive_boost"), (717, "progressive_stats")):
+            with self.subTest(capability=capability):
+                mw = setup_multiworld(
+                    ctrAPWorld, seed=seed,
                     options={
                         "podium_placement_checks": True,
                         "podium_finish_rungs": True,
@@ -78,7 +100,47 @@ class TestRungSizingGeneration(unittest.TestCase):
                         "podium_held_fifth_rung": False,
                         capability: "shared_global",
                     })
-            self.assertIn("will not turn disabled rung options back on", str(ctx.exception))
+                world = mw.worlds[1]
+                self.assertEqual(rung_sizer.category_count(world.options), 2)
+                self.assertFalse(world.options.podium_held_rungs.value)
+                self.assertFalse(world.options.podium_held_fifth_rung.value)
+                self.assertLessEqual(rung_sizer.required_categories(world), 2)
+                self.assertGreater(rung_sizer.target_categories(world),
+                                   rung_sizer.required_categories(world))
+
+    def test_held_opt_out_fails_when_really_short(self):
+        mw = setup_multiworld(
+            ctrAPWorld, seed=715,
+            options={
+                "podium_placement_checks": True,
+                "podium_finish_rungs": True,
+                "podium_any_position_rung": True,
+                "podium_held_rungs": False,
+                "podium_held_fifth_rung": False,
+                "progressive_boost": "shared_global",
+            })
+        world = mw.worlds[1]
+        demand, supply = _make_short_by(world)
+        with self.assertRaises(OptionError) as ctx:
+            rung_sizer.apply_rung_sizing(world)
+        message = str(ctx.exception)
+        self.assertIn("will not turn disabled rung options back on", message)
+        self.assertIn(f"needs {demand} locations", message)
+        self.assertIn(f"has only {supply}", message)
+        self.assertFalse(world.options.podium_held_rungs.value)
+
+    def test_one_spare_location_is_not_refused(self):
+        mw = setup_multiworld(ctrAPWorld, seed=718,
+                              options={"progressive_boost": "shared_global",
+                                       "box_locations": True})
+        world = mw.worlds[1]
+        _rungs_off(world)
+        world.options.podium_placement_checks.value = False
+        _make_short_by(world, short_by=0)
+        self.assertIsNone(rung_sizer.apply_rung_sizing(world))
+        _make_short_by(world, short_by=1)
+        with self.assertRaises(OptionError):
+            rung_sizer.apply_rung_sizing(world)
 
     def test_box_supply_preserves_held_opt_out_under_capability_pressure(self):
         mw = setup_multiworld(
@@ -107,27 +169,63 @@ class TestRungSizingGeneration(unittest.TestCase):
                       for name in rung_sizer._TOGGLE_NAMES)
         self.assertEqual(after, before)
 
+    def test_master_off_with_a_capability_pack_generates_when_it_fits(self):
+        # Before 2026-10-01 every seed with Progressive Boost or Stats on and
+        # Podium Placement Checks off was refused by the margin, whatever its
+        # size. The master toggle stays off.
+        mw = setup_multiworld(
+            ctrAPWorld, seed=713,
+            options={
+                "podium_placement_checks": False,
+                "progressive_boost": "shared_global",
+                "box_locations": True,
+            })
+        world = mw.worlds[1]
+        self.assertFalse(world.options.podium_placement_checks.value)
+        self.assertEqual(rung_sizer.category_count(world.options), 0)
+
     def test_master_toggle_is_never_enabled(self):
+        mw = setup_multiworld(ctrAPWorld, seed=713)
+        world = mw.worlds[1]
+        _rungs_off(world)
+        world.options.podium_placement_checks.value = False
+        world.options.progressive_boost.value = 1
+        demand, supply = _make_short_by(world)
         with self.assertRaises(OptionError) as ctx:
-            setup_multiworld(
-                ctrAPWorld, seed=713,
-                options={
-                    "podium_placement_checks": False,
-                    "progressive_boost": "shared_global",
-                })
-        self.assertIn("never enables that master toggle", str(ctx.exception))
+            rung_sizer.apply_rung_sizing(world)
+        message = str(ctx.exception)
+        self.assertIn("never turns that option on", message)
+        self.assertFalse(world.options.podium_placement_checks.value)
+        # 2026-10-01 wording: demand and supply, and the usual fix names the
+        # progressive packs and Item Box Locations, not Character Unlocks.
+        self.assertIn(f"needs {demand} locations", message)
+        self.assertIn(f"has only {supply}", message)
+        self.assertIn("Progressive Boost", message)
+        self.assertIn("Item Box Locations", message)
+        self.assertNotIn("Character Unlocks", message)
+
+    def test_usual_fix_skips_item_box_locations_when_already_on(self):
+        mw = setup_multiworld(
+            ctrAPWorld, seed=719,
+            options={"progressive_stats": "shared_global", "box_locations": True})
+        world = mw.worlds[1]
+        _rungs_off(world)
+        world.options.podium_placement_checks.value = False
+        _make_short_by(world)
+        with self.assertRaises(OptionError) as ctx:
+            rung_sizer.apply_rung_sizing(world)
+        self.assertIn("Progressive Stats", str(ctx.exception))
+        self.assertNotIn("Item Box Locations", str(ctx.exception))
 
     def test_host_veto_raises_instead_of_mutating(self):
         # Build a normal world first, then turn its live options into the tight
         # case and call the pure generate-early action directly.
         mw = setup_multiworld(ctrAPWorld, seed=714)
         world = mw.worlds[1]
-        world.options.podium_finish_rungs.value = False
-        world.options.podium_any_position_rung.value = False
-        world.options.podium_held_rungs.value = False
-        world.options.podium_held_fifth_rung.value = False
+        _rungs_off(world)
         world.options.progressive_boost.value = 1
         world.settings.allow_rung_sizing = False
+        _make_short_by(world)
         with self.assertRaises(OptionError) as ctx:
             rung_sizer.apply_rung_sizing(world)
         self.assertIn("will not turn disabled rung options back on", str(ctx.exception))

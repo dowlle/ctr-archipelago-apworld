@@ -168,3 +168,82 @@ def restore_relic_tier_keep_from_wire(
         keep[relic_item] = names
         created[relic_item] = len(names)
     return keep, created
+
+
+# ---------------------------------------------------------------------------
+# Vanilla Slide Coliseum pad gate (ruling 2026-10-01).
+#
+# The retail pad needs 10 Sapphire Relics (data/world.json, native's type-0
+# fallback). Since issue #171 a seed may create fewer. The ruling: keep the
+# player's sapphire_relic_count and let the pad open at the number of Sapphire
+# Relics that exist. The lowered gate travels on the wire as pad 16's stage-1
+# requirement in vanilla mode (slot_data Contract, 2026-10-01 entry), which
+# native already prefers over its hardcoded 10. A seed without that entry
+# keeps 10 on both sides.
+# ---------------------------------------------------------------------------
+
+SLIDE_COLISEUM_PAD = "Slide Coliseum Warp Pad"
+SLIDE_COLISEUM_LEVEL_ID = 16
+VANILLA_SLIDE_COLISEUM_SAPPHIRES = 10
+
+
+def _sapphire_gate_from_wire(passthrough: dict) -> int:
+    """The gate a connected seed's native enforces: an emitted Sapphire
+    requirement (type 4, Sapphire tier) or the free convention (type 1,
+    count 0) on pad 16, else the retail 10."""
+    unlock = passthrough.get("warp_pad_unlock") or {}
+    stage1 = (unlock.get(str(SLIDE_COLISEUM_LEVEL_ID)) or {}).get("stage1") or {}
+    kind = int(stage1.get("type", 0))
+    count = int(stage1.get("count", 0))
+    if kind == 4 and int(stage1.get("colour", -1)) in (0, -1):
+        return count
+    if kind == 1 and count == 0:
+        return 0
+    return VANILLA_SLIDE_COLISEUM_SAPPHIRES
+
+
+def slide_coliseum_sapphire_gate(world):
+    """Sapphire Relics the vanilla-mode Slide Coliseum pad needs this seed, or
+    None outside vanilla warp-pad mode (randomized modes strip the relic gate
+    and give the pad a sphere-search requirement instead).
+
+    Generation: the retail 10, lowered to the Sapphire Relics this seed
+    creates. Universal Tracker: read back from the wire, so a seed rolled
+    before this rule (no pad-16 entry) keeps 10 exactly as its native does."""
+    if world.options.warppad_unlock_requirements.value != 0:
+        return None
+    passthrough = getattr(world.multiworld, "re_gen_passthrough", {}).get(world.game)
+    if passthrough:
+        return _sapphire_gate_from_wire(passthrough)
+    created = getattr(world, "_ctr_relic_created", None)
+    if created is None:  # no relic draw yet: nothing to lower against
+        return VANILLA_SLIDE_COLISEUM_SAPPHIRES
+    return min(VANILLA_SLIDE_COLISEUM_SAPPHIRES, created.get("Sapphire Relic", 0))
+
+
+def slide_coliseum_lowered_gate(world):
+    """The lowered gate when it differs from the retail 10, else None."""
+    gate = slide_coliseum_sapphire_gate(world)
+    if gate is None or gate >= VANILLA_SLIDE_COLISEUM_SAPPHIRES:
+        return None
+    return gate
+
+
+def slide_coliseum_stage1_wire(world):
+    """Pad 16's stage-1 wire requirement for a lowered vanilla gate, else None.
+    Zero Sapphires uses the free-pad convention ({type 1, count 0}, slot_data
+    Contract section 4), so native opens the pad with nothing to show."""
+    gate = slide_coliseum_lowered_gate(world)
+    if gate is None:
+        return None
+    if gate == 0:
+        return {"type": 1, "count": 0, "colour": -1}
+    return {"type": 4, "count": gate, "colour": 0}
+
+
+def slide_coliseum_access_rule(world):
+    """world.json access-rule text for the lowered vanilla gate, else None."""
+    gate = slide_coliseum_lowered_gate(world)
+    if gate is None:
+        return None
+    return f"has('Sapphire Relic', {gate})" if gate else "True"

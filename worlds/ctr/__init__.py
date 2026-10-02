@@ -45,6 +45,7 @@ from . import version
 from .Regions import create_regions
 from .relic_tiers import (
     RELIC_TIERS, draw_relic_tier_keep, restore_relic_tier_keep_from_wire,
+    SLIDE_COLISEUM_LEVEL_ID, slide_coliseum_stage1_wire,
     resolve_comfort_guards,
 )
 from .Rules import set_rules
@@ -629,6 +630,18 @@ class ctrAPWorld(World):
     def set_rules(self):
         set_rules(self)
 
+    def generate_basic(self) -> None:
+        """Starting-check guard (sphere0_guard.py): refuse a slot that can
+        reach fewer than MIN_STARTING_CHECKS checks from its starting
+        inventory, because AP's fill cannot begin there or runs out of early
+        spots for the item that opens the next check (rulings 2026-10-01 and
+        2026-10-02). Universal Tracker skips it: the connected seed already
+        generated."""
+        if getattr(self.multiworld, "generation_is_fake", False):
+            return
+        from . import sphere0_guard
+        sphere0_guard.raise_if_narrow(self)
+
     def pre_fill(self) -> None:
         """Terminal fill backstop for solo generations, in both warp-pad modes.
 
@@ -659,8 +672,9 @@ class ctrAPWorld(World):
     def _vanilla_fill_backstop(self) -> None:
         """Vanilla-mode entry to the shared terminal backstop. Kept as a named
         method because the vanilla-fill story (levers 1+2 -- honest relic
-        classification + vanilla early-Keys -- shrink the tight-fill FillError
-        class to a ~0.1-0.2% residual that this removes exactly) is documented
+        classification + vanilla early-Keys, the latter removed 2026-10-02 --
+        shrink the tight-fill FillError class to a ~0.1-0.2% residual that
+        this removes exactly) is documented
         against this name across the design notes. See
         _rollback_precollect_backstop for the mechanism."""
         self._rollback_precollect_backstop("vanilla")
@@ -741,6 +755,15 @@ class ctrAPWorld(World):
                 for name in stranded:
                     for i, item in enumerate(mw.itempool):
                         if item.player == self.player and item.name == name:
+                            if self._completes_goal_at_start(item):
+                                # Fuzz 32541: a stranded Gem on a one-Gem goal
+                                # would start the slot with its goal complete.
+                                logging.warning(
+                                    "[CTR] %s fill backstop: stranded item %r "
+                                    "would complete the goal from starting "
+                                    "inventory; not precollecting it "
+                                    "(fail-open).", mode, name)
+                                return
                             del mw.itempool[i]
                             mw.push_precollected(item)
                             mw.itempool.append(self.create_filler())
@@ -825,12 +848,22 @@ class ctrAPWorld(World):
         try:
             try:
                 _dist(self.multiworld, panic)
-                return True
+                # Main.py's output step also runs the accessibility check;
+                # green means both pass (fuzz 32541 filled but failed it).
+                return bool(self.multiworld.fulfills_accessibility())
             except _FE:
                 return False
         finally:
             self._fill_rollback(snap)
             logging.disable(prev_disable)
+
+    def _completes_goal_at_start(self, item) -> bool:
+        """True when precollecting ``item`` would leave this slot's goal
+        complete from starting inventory."""
+        from BaseClasses import CollectionState
+        state = CollectionState(self.multiworld)
+        state.collect(item, True)
+        return bool(self.multiworld.has_beaten_game(state, self.player))
 
     def _rollback_enumerate_stranded(self) -> List[str]:
         """Names of this player's items the upcoming fill cannot place, via a
@@ -936,8 +969,9 @@ class ctrAPWorld(World):
           requirement to ANY pad, so relics must remain orderable by fill; the
           randomized path's own pre_fill relax-not-pin guard handles fillability.
           No behavioural change from today.
-        * Vanilla mode (mode 0) -- two relic-count gates exist: the FIXED Slide
-          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json) and
+        * Vanilla mode (mode 0) -- two relic-count gates exist: the Slide
+          Coliseum pad exit (has('Sapphire Relic', 10), data/world.json, lowered
+          to the Sapphires created when fewer exist, 2026-10-01) and
           N. Oxide's Final Challenge, whose gate follows the CONFIGURED
           oxide_final_challenge_unlock mode + count in every seed (issue #53,
           Rules.add_oxide_final_challenge_rule -- the world.json 18-Sapphire
@@ -1265,27 +1299,28 @@ class ctrAPWorld(World):
         # whole create_items pass sees a single consistent map.
         self._ctr_relic_prog = self._relic_progression_map()
 
-        # Vanilla-fill lever 2: in VANILLA warp-pad mode, seat the 4
-        # hub-backbone Keys into early spheres so greedy fill_restrictive cannot
-        # strand a Key in the zero-slack vanilla pool (the residual after lever 1).
-        # VANILLA-ONLY: randomized mode already has its pre_fill guard and must stay
-        # byte-identical, so it is untouched. Only meaningful when Keys are actually
-        # in the shuffled pool (shuffle_keys on); when off, Keys are pinned to boss
-        # races and never enter fill, so this is inert. early_items is a fill-order
-        # hint (distribute_early_items, allow_partial) -- it changes neither what is
-        # required nor any emitted slot_data value.
-        if (self.options.warppad_unlock_requirements.value == 0
-                and self.options.shuffle_keys.value):
-            mw.early_items.setdefault(player, {})["Key"] = 4
+        # Vanilla-fill lever 2 (four early Keys in vanilla warp-pad mode with
+        # Keys shuffled) was removed on 2026-10-02. AP locks early items into
+        # the slot's starting checks, so on a narrow start the Keys took every
+        # one of them and left no spot for the item that opens the next check
+        # (fuzz 36720, 2026-10-01). Measured 2026-10-02 on 2,986 solo seeds and
+        # 1,002 two-slot rooms that 0.2.3 accepts: with no early Key every one
+        # generates and the backstop never fires (it fired 6 times with four).
 
         # Itemsanity's native crate filter returns Wumpa when the player has no
-        # received weapon.  Seed one or two distinct weapon types into early
-        # fill so an enabled seed has an opening weapon without granting it as
-        # starting inventory.  No RNG is consumed while the toggle is off.
+        # received weapon. Seed one weapon type into early fill so an enabled
+        # seed has an opening weapon without granting it as starting
+        # inventory. One, not two: with the narrowest admitted start (two
+        # checks, sphere0_guard.MIN_STARTING_CHECKS) one starting check stays
+        # free. The draw still takes a count of one or two and a sample of that
+        # size, exactly as before, so every later draw from self.random is
+        # unchanged; only the first sampled weapon is used. early_items is a
+        # fill-order hint: it changes neither what is required nor any emitted
+        # slot_data value. No RNG is consumed while the toggle is off.
         if self.options.itemsanity.value:
             early_count = self.random.randint(1, 2)
-            for weapon in self.random.sample(WEAPONS, early_count):
-                mw.early_items.setdefault(player, {})[weapon] = 1
+            weapon = self.random.sample(WEAPONS, early_count)[0]
+            mw.early_items.setdefault(player, {})[weapon] = 1
 
         self._install_goal(player)
 
@@ -1805,6 +1840,16 @@ class ctrAPWorld(World):
                 out.setdefault(
                     str(lid), {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
                 out[str(lid)]["stage1"] = _req(req)
+        # Vanilla mode, fewer than 10 Sapphire Relics created (ruling 2026-10-01):
+        # the Slide Coliseum pad opens at the Sapphires that exist. Native
+        # prefers a non-type-0 stage 1 on pad 16 over its hardcoded 10, so the
+        # lowered gate travels here; the exit rule in Regions reads the same
+        # helper. No entry means the retail 10 on both sides.
+        _slide = slide_coliseum_stage1_wire(self)
+        if _slide is not None:
+            out.setdefault(str(SLIDE_COLISEUM_LEVEL_ID),
+                           {"stage1": dict(_ZERO), "stage2": dict(_ZERO)})
+            out[str(SLIDE_COLISEUM_LEVEL_ID)]["stage1"] = dict(_slide)
         for pad_name, req in unlock_s2.items():
             meta = pad_ids.get(pad_name)
             if meta is None:

@@ -1,0 +1,117 @@
+description: Crash Team Racing Template, generated with https://github.com/Eijebong/Archipelago-fuzzer/tree/0.6.2
+game: Crash Team Racing
+requires:
+  version: 0.6.7
+Crash Team Racing:
+  progression_balancing: 87
+  accessibility: full
+  oxide_goal: any_percent
+  oxide_1_optional: mandatory
+  bosses_required_goal: 0
+  gems_required_goal: 0
+  oxide_final_challenge_unlock: total_relics
+  oxide_final_challenge_relic_count: 37
+  oxide_final_track: oxide_station
+  warppad_unlock_requirements: randomized
+  two_stage_density: 'off'
+  requirement_variety: custom
+  requirement_weights:
+    Trophy: 90
+    Key: 20
+    Red CTR Token: 16
+    Green CTR Token: 16
+    Blue CTR Token: 16
+    Yellow CTR Token: 16
+    Purple CTR Token: 12
+    Sapphire Relic: 18
+    Gold Relic: 18
+    Platinum Relic: 18
+    Red Gem: 4
+    Green Gem: 4
+    Blue Gem: 4
+    Yellow Gem: 4
+    Purple Gem: 4
+  warp_pad_shuffle_categories:
+  - cups
+  warp_pad_shuffle_grouping: per_category
+  include_battle_arenas: 'true'
+  include_gem_cups: 'false'
+  randomize_gem_cup_tracks: 'true'
+  custom_tracks: {}
+  box_locations: 'false'
+  shortcut_knowledge: easy
+  itemsanity: 'true'
+  hit_character: 'true'
+  relic_perfect_checks: 'false'
+  lettersanity: 'false'
+  letters_per_track: 2
+  slide_coliseum_races: 'off'
+  turbo_track_races: 'off'
+  cortex_vortex_track: 'true'
+  podium_placement_checks: 'true'
+  podium_finish_rungs: 'false'
+  podium_any_position_rung: 'true'
+  podium_held_rungs: 'true'
+  podium_held_fifth_rung: 'true'
+  shuffle_gems: 'true'
+  shuffle_keys: 'false'
+  trap_fill_percentage: 79
+  trap_weights:
+    icy_road: 5
+    low_gravity: 5
+    forced_usf: 2
+    forced_boost: 4
+    first_person: 3
+    wumpa_wipeout: 4
+    flatten: 6
+    item_reroll: 5
+    forced_use: 4
+    empty_crates: 3
+    weakened_kart: 3
+    boost_blocker: 3
+    wireframe: 2
+    nitro: 5
+    reverse_steering: 4
+    red_potion: 3
+    upside_down: 0
+    mirror_mode: 3
+    warpball_ambush: 3
+    demo_camera: 3
+  tizi_helper: 'true'
+  wumpa_bundles: 'true'
+  progressive_starting_wumpa: 10
+  wumpa_check: global
+  turbo_grant: 'true'
+  progressive_boost: per_character
+  progressive_boost_blue_fire: 'true'
+  progressive_stats: 'off'
+  logic_difficulty: easy
+  starting_character: neo_cortex
+  starting_stat_class: vanilla
+  character_unlocks: 'true'
+  remove_playable_oxide: 'true'
+  racer_locked_pads: 17
+  penta_stats: ntsc
+  editable_stats: 'false'
+  sapphire_relic_count: 11
+  gold_relic_count: 17
+  platinum_relic_count: 12
+  one_lap_cups: 'true'
+  warp_pad_item_display: one_pile
+  ap_item_type_colors: 'true'
+  color_boxes_by_item: 'true'
+  death_link: any_hit
+  death_link_send:
+  - mask_grab
+  - follow_death_link
+  - weapon_hit
+  deathlink_amnesty: 20
+  local_items: []
+  non_local_items: []
+  start_inventory: {}
+  start_hints: []
+  start_location_hints: []
+  exclude_locations: []
+  priority_locations: []
+  item_links: []
+  plando_items: []

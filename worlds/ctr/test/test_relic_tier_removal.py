@@ -209,31 +209,43 @@ class TestTurboTrackComfortGuardClamp(unittest.TestCase):
 
 
 class TestGateCountGuards(unittest.TestCase):
-    """Issue #171/#28 R5: the two fixed-gate guards (full accessibility vs.
-    the world.json Sapphire-count gates) and the extended oxide-final guard."""
+    """Issue #171/#28 R5: the relic-gate guards (full accessibility vs. the
+    created relic supply) and the extended oxide-final guard. Since the
+    2026-10-01 rulings a count above the created supply is lowered to it and
+    the vanilla Slide Coliseum pad opens at the Sapphires that exist, so the
+    guards only fire when a satisfying tier created no relic at all
+    (test_refusal_rulings_20261001.py covers the lowering itself)."""
 
-    def test_full_accessibility_raises_below_18_sapphires(self):
-        with self.assertRaises(OptionError) as ctx:
-            _early({"accessibility": "full", "sapphire_relic_count": 17})
-        self.assertIn("Sapphire Relic", str(ctx.exception))
+    def test_full_accessibility_lowers_below_18_sapphires(self):
+        mw = _early({"accessibility": "full", "sapphire_relic_count": 17})
+        self.assertEqual(
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 17)
 
     def test_full_accessibility_ok_at_18_sapphires(self):
         _early({"accessibility": "full", "sapphire_relic_count": 18})
 
-    def test_minimal_accessibility_warns_not_raises(self):
+    def test_minimal_accessibility_lowers_with_a_notice(self):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({"accessibility": "minimal", "sapphire_relic_count": 5,
                     "oxide_goal": "none", "bosses_required_goal": 4})
+        self.assertTrue(any("lowered from 18 to 5" in line for line in cm.output))
+        self.assertFalse(any("can never be reached" in line for line in cm.output))
+
+    def test_minimal_accessibility_warns_when_the_tier_created_none(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
+            _early({"accessibility": "minimal", "sapphire_relic_count": 0,
+                    "oxide_goal": "none", "bosses_required_goal": 4})
         self.assertTrue(any("can never be reached" in line for line in cm.output))
 
-    def test_vanilla_full_accessibility_raises_below_10_at_slide_coliseum(self):
-        with self.assertRaises(OptionError) as ctx:
+    def test_vanilla_full_accessibility_below_10_lowers_the_slide_coliseum_gate(self):
+        with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({
                 "accessibility": "full",
                 "warppad_unlock_requirements": "vanilla",
                 "sapphire_relic_count": 9,
             })
-        self.assertIn("Slide Coliseum", str(ctx.exception))
+        self.assertTrue(any("Slide Coliseum warp pad opens at 9" in line
+                            for line in cm.output))
 
     def test_randomized_full_accessibility_ignores_slide_coliseum_floor(self):
         # Randomized mode strips the Slide Coliseum vanilla exit gate, so only
@@ -244,16 +256,16 @@ class TestGateCountGuards(unittest.TestCase):
             "sapphire_relic_count": 18,
         })
 
-    def test_oxidefinal_raises_when_tier_supply_below_requested_count(self):
-        with self.assertRaises(OptionError) as ctx:
-            _early({
-                "oxide_goal": "final",
-                "accessibility": "minimal",
-                "oxide_final_challenge_unlock": "gold_relics",
-                "oxide_final_challenge_relic_count": 10,
-                "gold_relic_count": 3,
-            })
-        self.assertIn("oxidefinal", str(ctx.exception))
+    def test_oxidefinal_lowers_when_tier_supply_below_requested_count(self):
+        mw = _early({
+            "oxide_goal": "final",
+            "accessibility": "minimal",
+            "oxide_final_challenge_unlock": "gold_relics",
+            "oxide_final_challenge_relic_count": 10,
+            "gold_relic_count": 3,
+        })
+        self.assertEqual(
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 3)
 
     def test_oxidefinal_ok_when_tier_supply_meets_requested_count(self):
         _early({
@@ -264,19 +276,31 @@ class TestGateCountGuards(unittest.TestCase):
             "gold_relic_count": 10,
         })
 
-    def test_full_accessibility_raises_when_mode_supply_short(self):
+    def test_full_accessibility_lowers_when_mode_supply_short(self):
         # Issue #53's exact field repro (native verifier profile): non-final
         # goal + platinum mode + count 10 with only 2 platinums created used
         # to GENERATE (the location kept the legacy 18-Sapphire text rule and
         # 18+ sapphires satisfied it), stranding a progression item on a
-        # natively-unreachable location. Must now raise instead.
+        # natively-unreachable location. It then raised; since 2026-10-01 the
+        # count is lowered to the 2 that exist and the location gate follows.
+        mw = _early({
+            "accessibility": "full",
+            "oxide_goal": "first",
+            "oxide_final_challenge_unlock": "platinum_relics",
+            "oxide_final_challenge_relic_count": 10,
+            "platinum_relic_count": 2,
+        })
+        self.assertEqual(
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 2)
+
+    def test_full_accessibility_raises_when_the_mode_tier_created_none(self):
         with self.assertRaises(OptionError) as ctx:
             _early({
                 "accessibility": "full",
                 "oxide_goal": "first",
                 "oxide_final_challenge_unlock": "platinum_relics",
                 "oxide_final_challenge_relic_count": 10,
-                "platinum_relic_count": 2,
+                "platinum_relic_count": 0,
             })
         self.assertIn("Final Challenge", str(ctx.exception))
         self.assertIn("platinum", str(ctx.exception))
@@ -290,7 +314,7 @@ class TestGateCountGuards(unittest.TestCase):
             "platinum_relic_count": 10,
         })
 
-    def test_minimal_accessibility_mode_supply_short_warns_not_raises(self):
+    def test_minimal_accessibility_mode_supply_short_lowers_not_raises(self):
         with self.assertLogs(LOGGER_NAME, level="WARNING") as cm:
             _early({
                 "accessibility": "minimal",
@@ -300,7 +324,7 @@ class TestGateCountGuards(unittest.TestCase):
                 "platinum_relic_count": 2,
             })
         self.assertTrue(
-            any("can never be reached" in line for line in cm.output))
+            any("lowered from 10 to 2" in line for line in cm.output))
 
     def test_oxidefinal_total_relics_sums_across_progression_tiers(self):
         # total_relics in randomized mode: all three tiers are progression, so
@@ -316,23 +340,24 @@ class TestGateCountGuards(unittest.TestCase):
             "gold_relic_count": 5,
             "platinum_relic_count": 0,
         })
-        with self.assertRaises(OptionError):
-            _early({
-                "oxide_goal": "final",
-                "accessibility": "minimal",
-                "warppad_unlock_requirements": "randomized",
-                "oxide_final_challenge_unlock": "total_relics",
-                "oxide_final_challenge_relic_count": 11,
-                "sapphire_relic_count": 5,
-                "gold_relic_count": 5,
-                "platinum_relic_count": 0,
-            })
+        # One above the summed supply is lowered to it (2026-10-01).
+        mw = _early({
+            "oxide_goal": "final",
+            "accessibility": "minimal",
+            "warppad_unlock_requirements": "randomized",
+            "oxide_final_challenge_unlock": "total_relics",
+            "oxide_final_challenge_relic_count": 11,
+            "sapphire_relic_count": 5,
+            "gold_relic_count": 5,
+            "platinum_relic_count": 0,
+        })
+        self.assertEqual(
+            mw.worlds[1].options.oxide_final_challenge_relic_count.value, 10)
 
-    def test_over_capacity_count_shortfall_matches_explicit_18(self):
+    def test_over_capacity_count_resolves_like_explicit_18(self):
         # 2026-09-18 ruling: a single-tier count above 18 resolves to 18
-        # before this guard ever reads it, so a supply shortfall at count 40
-        # must be the identical error a count of 18 would produce -- not a
-        # shortfall against 40, and not silently swallowed.
+        # first; the 2026-10-01 supply resolution then lowers both to the 11
+        # created, so 40 and 18 end at the identical count.
         opts_18 = {
             "accessibility": "full",
             "oxide_goal": "first",
@@ -341,11 +366,10 @@ class TestGateCountGuards(unittest.TestCase):
             "sapphire_relic_count": 11,
         }
         opts_40 = dict(opts_18, oxide_final_challenge_relic_count=40)
-        with self.assertRaises(OptionError) as ctx_18:
-            _early(opts_18)
-        with self.assertRaises(OptionError) as ctx_40:
-            _early(opts_40)
-        self.assertEqual(str(ctx_18.exception), str(ctx_40.exception))
+        for opts in (opts_18, opts_40):
+            mw = _early(opts)
+            self.assertEqual(
+                mw.worlds[1].options.oxide_final_challenge_relic_count.value, 11)
 
 
 class TestOxideFinalLocationRuleFollowsMode(CTRTestBase):
