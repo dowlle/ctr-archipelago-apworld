@@ -319,6 +319,23 @@ def win_locations(world):
     return sorted(out, key=lambda pair: int(pair[0].address))
 
 
+def start_counts(world) -> Dict[str, int]:
+    """Precollected copies that Archipelago's logic counts, by AP item id.
+
+    `CollectionState` collects every precollected item whose classification
+    is progression (YAML `start_inventory`, `start_inventory_from_pool` and
+    the tight-fill backstop's precollect). The server sends those copies as
+    `NetworkItem(id, -2, 0)`: location -2 and flags 0, so native cannot tell
+    from the wire which of them logic counts. This table is that answer;
+    native adds it to its progression-flagged received counts and ignores
+    every received entry with location -2 (SCHEMA.md "Received count")."""
+    counts: Dict[int, int] = {}
+    for item in world.multiworld.precollected_items[world.player]:
+        if item.code is not None and item.advancement:
+            counts[int(item.code)] = counts.get(int(item.code), 0) + 1
+    return {str(code): counts[code] for code in sorted(counts)}
+
+
 def wire_block(world) -> Dict[str, object]:
     """Build the `win_logic` block for this slot from the installed terms."""
     enc = _Encoder(world)
@@ -366,6 +383,7 @@ def wire_block(world) -> Dict[str, object]:
                      for fam in weapon_families()],
         "regions": regions,
         "checks": checks,
+        "start": start_counts(world),
     }
 
 

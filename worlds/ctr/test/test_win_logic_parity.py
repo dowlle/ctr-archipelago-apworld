@@ -13,6 +13,15 @@ scalars and the bosses-won tally), and asserts
 for every win check, on random-option seeds and random item sets. The region
 half is also compared on its own against `Region.can_reach`.
 
+The evaluator receives items the way the server sends them: start inventory
+(every precollected item) as `NetworkItem(id, -2, 0)`, flags 0 whatever its
+classification (MultiServer), and every other item with its own flags. Its
+counts are the progression-flagged entries off location -2 plus the block's
+`start` table, as SCHEMA.md "Received count" specifies.
+`TestWinLogicStartInventory` covers seeds with a YAML start inventory, the
+`start_inventory_from_pool` mechanism and the tight-fill backstop's
+precollect.
+
 The states need not be reachable ones: the two sides must agree everywhere.
 A plain lambda ANDed onto a win check later makes the exporter raise
 (`WinLogicExportError`), so the guard is the generation itself.
@@ -30,9 +39,12 @@ import sys
 import unittest
 from typing import Dict
 
+from unittest import mock
+
 from BaseClasses import CollectionState
 from Options import OptionError
 from test.general import setup_multiworld
+from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld
 from ..characters import ROSTER_CHARACTER_ID, unlock_item_name
@@ -71,17 +83,26 @@ _RELICS = (35010001, 35010002, 35010003)
 _GEMS = (35010009, 35010010, 35010011, 35010012, 35010013)
 
 
+class MalformedBlock(AssertionError):
+    """The block breaks SCHEMA.md; native refuses the whole block."""
+
+
 def _req_ids(rtype, colour):
+    """SCHEMA.md `req`: types 3 and 5 name one colour 0..4; type 4 one tier
+    0..2 or the legacy -1 (Sapphire). Any other colour on those types makes
+    the block malformed (native refuses it)."""
     if rtype == 1:
         return (35010000,)
     if rtype == 2:
         return (35010014,)
-    if rtype == 3:
-        return (_TOKENS[colour],)
+    if rtype in (3, 5):
+        if not 0 <= colour <= 4:
+            raise MalformedBlock(f"req type {rtype} colour {colour}")
+        return ((_TOKENS if rtype == 3 else _GEMS)[colour],)
     if rtype == 4:
-        return (_RELICS[colour if colour >= 0 else 0],)
-    if rtype == 5:
-        return (_GEMS[colour],)
+        if not -1 <= colour <= 2:
+            raise MalformedBlock(f"req type 4 tier {colour}")
+        return (_RELICS[max(colour, 0)],)
     return {6: _TOKENS, 7: _RELICS, 8: _GEMS}[rtype]
 
 
@@ -91,9 +112,15 @@ class WireEvaluator:
 
     def __init__(self, block, ctr_options, received: Dict[int, int],
                  bosses_won: int, item_ids: Dict[str, int]):
+        """`received`: native's tally, `_received` of the server's entries."""
         assert block["version"] == 1
         self.block = block
         self.received = received
+        self.start_table = {}
+        for key, n in block["start"].items():
+            if not (key.isdigit() and key[0] != "0") or type(n) is not int or n < 1:
+                raise MalformedBlock(f"start {key!r}: {n!r}")
+            self.start_table[int(key)] = n
         self.bosses_won = bosses_won
         self.boost_mode = int(ctr_options["boost_mode"])
         self.start = int(ctr_options["starting_character"])
@@ -105,7 +132,8 @@ class WireEvaluator:
         self.used = collections.Counter()
 
     def count(self, item_id):
-        return self.received.get(item_id, 0)
+        """SCHEMA.md "Received count": the tally plus the `start` table."""
+        return self.received.get(item_id, 0) + self.start_table.get(item_id, 0)
 
     def in_logic(self, location_id: int) -> bool:
         entry = self.block["checks"][str(location_id)]
@@ -190,45 +218,62 @@ def _random_options(rng):
     return opts
 
 
+START_LOCATION = -2  # MultiServer: start inventory is NetworkItem(id, -2, 0)
+
+
 def _player_items(mw):
-    """Every item this slot can receive: the pool, the start inventory and the
-    items locked onto locations (vanilla-pinned Purple tokens, Gems, ...),
-    whatever their classification."""
-    items = [it for it in mw.itempool if it.player == PLAYER]
-    items += list(mw.precollected_items[PLAYER])
-    items += [loc.item for loc in mw.get_locations()
+    """Every item this slot can receive during play: the pool and the items
+    locked onto locations (vanilla-pinned Purple tokens, Gems, ...), whatever
+    their classification, as (item, server location). Pool items are not
+    placed yet; any found location is positive, so 1 stands in for it. The
+    start inventory is not here: the server always sends it (`_start_entries`)
+    and every `CollectionState` already holds it."""
+    items = [(it, 1) for it in mw.itempool if it.player == PLAYER]
+    items += [(loc.item, int(loc.address)) for loc in mw.get_locations()
               if loc.item is not None and loc.item.player == PLAYER
               and loc.address is not None]
     return items
 
 
-def _received(items):
-    """Native's view: {AP item id: received count}, counting only copies whose
-    NetworkItem flags carry the progression bit (SCHEMA.md "Received
-    count"). The flags are what the server sends, `Item.flags`."""
+def _start_entries(mw):
+    """The start inventory exactly as MultiServer sends it: every precollected
+    item with a code, as (id, -2, flags 0), whatever its classification."""
+    return [(int(it.code), START_LOCATION, 0)
+            for it in mw.precollected_items[PLAYER] if it.code is not None]
+
+
+def _received(entries):
+    """Native's tally from ReceivedItems entries (id, location, flags): only
+    progression-flagged copies off location -2 (SCHEMA.md "Received count").
+    The block's `start` table supplies the start inventory."""
     out = collections.Counter()
-    for it in items:
-        if it.code is not None and it.flags & 0b001:
-            out[int(it.code)] += 1
+    for item_id, location, flags in entries:
+        if location != START_LOCATION and flags & 0b001:
+            out[item_id] += 1
     return out
 
 
 def _states(mw, rng, n):
-    """(Archipelago state, the received items native would hold) pairs. The
-    state takes only advancement copies, as collection does; the received
-    list keeps every copy with its flags."""
+    """(Archipelago state, native's tally) pairs. The state is a fresh
+    `CollectionState`, which holds the precollected items, plus the chosen
+    advancement copies, as collection does. Native's entries are the start
+    inventory as the server sends it plus the chosen copies with their own
+    flags."""
     items = _player_items(mw)
+    start = _start_entries(mw)
     events = [loc.item.name for loc in mw.get_locations(PLAYER)
               if loc.item is not None and loc.address is None]
 
     def build(chosen, chosen_events):
         state = CollectionState(mw)
-        for it in chosen:
+        for it, _ in chosen:
             if it.advancement:
                 state.add_item(it.name, PLAYER)
         for name in chosen_events:
             state.add_item(name, PLAYER)
-        return state, _received(chosen)
+        entries = start + [(int(it.code), loc, it.flags)
+                           for it, loc in chosen if it.code is not None]
+        return state, _received(entries)
 
     yield build([], [])
     yield build(items, events)
@@ -358,6 +403,154 @@ class TestWinLogicFixedSeeds(unittest.TestCase):
             with self.subTest(options=case):
                 mw = setup_multiworld(ctrAPWorld, STEPS, seed=11, options=case)
                 self.assertEqual(check_seed(mw, rng, states_per_seed=60), [])
+
+
+def generate_with_start(options, seed, steps=STEPS, from_pool=None):
+    """`setup_multiworld` in Main.py's order around the start inventory: the
+    YAML `start_inventory` (and `from_pool`, Main's
+    `start_inventory_from_pool` handling) is precollected right after
+    `generate_early` with `create_item`, and the `from_pool` copies are then
+    removed from the item pool and topped up with filler after
+    `generate_basic` (or at the end), before `pre_fill`."""
+    mw = setup_multiworld(ctrAPWorld, (), seed=seed, options=options)
+    world = mw.worlds[PLAYER]
+    pending = dict(from_pool or {})
+
+    def deplete():
+        for name, n in pending.items():
+            for _ in range(n):
+                index = next(i for i, it in enumerate(mw.itempool)
+                             if it.player == PLAYER and it.name == name)
+                del mw.itempool[index]
+                mw.itempool.append(world.create_filler())
+        pending.clear()
+
+    for step in steps:
+        if step == "pre_fill":
+            deplete()
+        call_all(mw, step)
+        if step == "generate_early":
+            for name, n in world.options.start_inventory.value.items():
+                for _ in range(n):
+                    mw.push_precollected(mw.create_item(name, PLAYER))
+            for name, n in pending.items():
+                for _ in range(n):
+                    mw.push_precollected(mw.create_item(name, PLAYER))
+        if step == "generate_basic":
+            deplete()
+    deplete()
+    return mw
+
+
+class TestWinLogicStartInventory(unittest.TestCase):
+    """Review B1: the server sends start inventory with flags 0, but
+    Archipelago's logic and Universal Tracker count its progression copies.
+    The block's `start` table carries them; every source of precollected
+    items must keep parity."""
+
+    def _check(self, mw, states=40):
+        precollected = [it for it in mw.precollected_items[PLAYER] if it.code is not None]
+        self.assertTrue(precollected, "the seed has no start inventory")
+        block = mw.worlds[PLAYER].fill_slot_data()["win_logic"]
+        want = collections.Counter(str(int(it.code)) for it in precollected if it.advancement)
+        self.assertEqual(block["start"], dict(want))
+        self.assertEqual(check_seed(mw, random.Random(5), states_per_seed=states), [])
+        return block
+
+    def test_yaml_start_inventory(self):
+        coco_unlock = unlock_item_name("Coco Bandicoot")
+        cases = (
+            {"start_inventory": {"Key": 4, "Trophy": 16}},
+            {"progressive_boost": "shared_global",
+             "start_inventory": {"Progressive Boost": 3}},
+            {"start_inventory": {"Sapphire Relic": 5, "Red CTR Token": 4,
+                                 "Green CTR Token": 4, "Blue CTR Token": 4,
+                                 "Yellow CTR Token": 4, "Wumpa Fruit": 2}},
+            {"progressive_boost": "per_character", "character_unlocks": True,
+             "starting_character": "crash_bandicoot",
+             "start_inventory": {coco_unlock: 1,
+                                 boost_item_name("Coco Bandicoot"): 2,
+                                 "Key": 1}},
+            {"warppad_unlock_requirements": "vanilla", "accessibility": "minimal",
+             "start_inventory": {"Gold Relic": 3, "Platinum Relic": 2,
+                                 "Red Gem": 1, "Purple CTR Token": 2}},
+            {"oxide_goal": "101_percent", "bosses_required_goal": 4,
+             "gems_required_goal": 5, "include_battle_arenas": False,
+             "start_inventory": {"Purple Gem": 1, "Yellow CTR Token": 3,
+                                 "Trophy": 8}},
+        )
+        for case in cases:
+            with self.subTest(options=case):
+                try:
+                    mw = generate_with_start(case, seed=13)
+                except OptionError as exc:
+                    self.fail(f"fixture refused: {exc}")
+                self._check(mw)
+
+    def test_random_options_with_start_inventory(self):
+        """Random option draws, each with a random start inventory drawn from
+        the slot's own progression items."""
+        rng = random.Random(4242)
+        done = attempts = 0
+        while done < 12:
+            attempts += 1
+            self.assertLess(attempts, 150)
+            seed = rng.randrange(1 << 30)
+            options = _random_options(rng)
+            try:
+                probe = setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
+            except OptionError:
+                continue
+            names = sorted({it.name for it in probe.itempool
+                            if it.player == PLAYER and it.advancement})
+            pick = rng.sample(names, min(len(names), rng.randint(1, 6)))
+            options = dict(options, start_inventory={n: rng.randint(1, 4) for n in pick})
+            mw = generate_with_start(options, seed)
+            with self.subTest(seed=seed, start=options["start_inventory"]):
+                self._check(mw, states=20)
+            done += 1
+
+    def test_start_inventory_from_pool(self):
+        """CTR declares no `start_inventory_from_pool` option today; this pins
+        Main.py's mechanism for it (create_item copies precollected, the pool
+        copies removed) in case one is added."""
+        from_pool = {"Key": 2, "Sapphire Relic": 3, "Red CTR Token": 2}
+        mw = generate_with_start({}, seed=17, from_pool=from_pool)
+        pool = collections.Counter(it.name for it in mw.itempool if it.player == PLAYER)
+        ref = generate_with_start({}, seed=17)
+        ref_pool = collections.Counter(it.name for it in ref.itempool if it.player == PLAYER)
+        for name, n in from_pool.items():
+            self.assertEqual(pool[name], ref_pool[name] - n, name)
+        self._check(mw)
+
+    def test_backstop_precollect(self):
+        """The tight-fill backstop (`_rollback_precollect_backstop`) moves
+        stranded pool items into the start inventory. Natural firings are
+        about 0.1 to 0.2 percent of solo seeds, so the simulation is forced to
+        dead-end once and to name two progression items; the precollect
+        itself is the backstop's own code."""
+        world_cls = ctrAPWorld
+        calls = {"n": 0}
+
+        def simulate(self, panic):
+            calls["n"] += 1
+            return calls["n"] > 1
+
+        def stranded(self):
+            names = [it.name for it in self.multiworld.itempool
+                     if it.player == self.player and it.advancement
+                     and it.name in ("Key", "Trophy", "Sapphire Relic")]
+            return sorted(set(names))[:2]
+
+        steps = STEPS + ("connect_entrances", "generate_basic", "pre_fill")
+        with mock.patch.object(world_cls, "_rollback_simulate_fill", simulate), \
+                mock.patch.object(world_cls, "_rollback_enumerate_stranded", stranded):
+            mw = generate_with_start({}, seed=19, steps=steps)
+        world = mw.worlds[PLAYER]
+        self.assertTrue(getattr(world, "_ctr_backstop_fired", False))
+        self.assertEqual(len(world._ctr_backstop_items), 2)
+        block = self._check(mw)
+        self.assertTrue(block["start"])
 
 
 if __name__ == "__main__":
