@@ -96,7 +96,8 @@ from .capability_contract import (
     unconditional_usf_finish_tracks,
     usf_or_hard_finish_tracks,
 )
-from .progressive_capability import gate_satisfied, track_required_character
+from .logic_terms import TRUE, and_term, as_state_player, boost_cap
+from .progressive_capability import track_required_character
 
 #: Received `Progressive Boost` copies that put a player at the USF rank.
 USF_BOOST_COUNT = 2
@@ -223,12 +224,10 @@ def boost_term(world, required_character=None, boost_min=USF_BOOST_COUNT):
 
     Always-True when the boost chain is not randomized (see VACUITY above), so
     callers can AND it unconditionally instead of branching on the option.
+    Compiled from `logic_terms.boost_cap`, the term the win-check layers AND
+    on directly.
     """
-    if not bool(world.options.progressive_boost.value):
-        return lambda state, player: True
-    return lambda state, player: gate_satisfied(
-        world, state, player, boost_min=boost_min,
-        required_character=required_character)
+    return as_state_player(boost_cap(world, required_character, boost_min))
 
 
 def usf_term(world, required_character=None):
@@ -236,8 +235,9 @@ def usf_term(world, required_character=None):
     return boost_term(world, required_character, USF_BOOST_COUNT)
 
 
-def track_finish_term(track, world, bind_racer=True):
-    """Return this track's option-aware and racer-aware finish term.
+def track_finish_t(track, world, bind_racer=True):
+    """This track's option-aware and racer-aware finish TERM
+    (`logic_terms`).
 
     `bind_racer=False` is for a race that is NOT launched from the pad that
     loads `track`: Oxide's Final Challenge on Cortex Vortex starts in the
@@ -246,10 +246,15 @@ def track_finish_term(track, world, bind_racer=True):
     from .item_boxes import SK_HARD
     if (track in USF_OR_HARD_SK_FINISH_TRACKS
             and int(world.options.shortcut_knowledge.value) == SK_HARD):
-        return lambda state, player: True
+        return TRUE
     required_character = (track_required_character(world, track)
                           if bind_racer else None)
-    return usf_term(world, required_character)
+    return boost_cap(world, required_character, USF_BOOST_COUNT)
+
+
+def track_finish_term(track, world, bind_racer=True):
+    """`track_finish_t` as a `(state, player) -> bool` callable."""
+    return as_state_player(track_finish_t(track, world, bind_racer))
 
 
 def oxide_final_track_name(world):
@@ -266,7 +271,12 @@ def usf_finish_cups(cup_legs: Dict[str, List[str]]) -> frozenset:
 
 
 def cup_finish_term(legs, world, cup=None):
-    """Require one cup-eligible racer to finish every leg.
+    """`cup_finish_t` as a `(state, player) -> bool` callable."""
+    return as_state_player(cup_finish_t(legs, world, cup))
+
+
+def cup_finish_t(legs, world, cup=None):
+    """Require one cup-eligible racer to finish every leg (a TERM).
 
     A leg's standalone pad does not control the racer driving a cup. Resolve
     the cup destination's physical pad instead, including destination shuffle.
@@ -290,7 +300,7 @@ def cup_finish_term(legs, world, cup=None):
                       and int(world.options.shortcut_knowledge.value) == SK_HARD)]
     cup_pad = destination_pad_name(world, cup) if cup is not None else None
     racer = (getattr(world, "ctr_racer_locks", {}) or {}).get(cup_pad)
-    return boost_term(world, racer, USF_BOOST_COUNT if gated else 0)
+    return boost_cap(world, racer, USF_BOOST_COUNT if gated else 0)
 
 
 class UsfFinishGate:
@@ -313,10 +323,16 @@ class UsfFinishGate:
         # hard-knowledge escape, no racer binding. Ask `cup_term` or
         # `held_first_term`, both of which are keyed by what they gate.
         self.cups = usf_finish_cups(legs)
-        self._track_terms = {track: track_finish_term(track, world)
-                             for track in ALL_USF_FINISH_TRACKS}
-        self._cup_terms = {cup: cup_finish_term(legs[cup], world, cup)
-                           for cup in self.cups}
+        # Term objects (logic_terms), installed on the win checks; the
+        # `(state, player)` views below are what the podium rungs call.
+        self._track_term_objs = {track: track_finish_t(track, world)
+                                 for track in ALL_USF_FINISH_TRACKS}
+        self._cup_term_objs = {cup: cup_finish_t(legs[cup], world, cup)
+                               for cup in self.cups}
+        self._track_terms = {track: as_state_player(term) for track, term
+                             in self._track_term_objs.items()}
+        self._cup_terms = {cup: as_state_player(term) for cup, term
+                           in self._cup_term_objs.items()}
         self._raceable = {}
 
     def install(self, world, player):
@@ -341,20 +357,12 @@ class UsfFinishGate:
             self._raceable[track] = (
                 lambda state, r=loc.parent_region, b=base: r.can_reach(state) and b(state)
             )
-            loc.access_rule = (
-                lambda state, b=base, t=self._track_terms[track], p=player:
-                b(state) and t(state, p)
-            )
+            and_term(loc, self._track_term_objs[track])
         for cup in sorted(self.cups):
             gem = f"{cup}: Gem"
             if gem not in names:
                 continue
-            loc = mw.get_location(gem, player)
-            base = loc.access_rule
-            loc.access_rule = (
-                lambda state, b=base, t=self._cup_terms[cup], p=player:
-                b(state) and t(state, p)
-            )
+            and_term(mw.get_location(gem, player), self._cup_term_objs[cup])
 
     def raceable_rule(self, track):
         """The captured pre-gate rule for a USF track, or None for any track
