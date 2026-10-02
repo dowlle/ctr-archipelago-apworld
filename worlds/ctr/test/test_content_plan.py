@@ -124,3 +124,14 @@ class TestContentPlan(CTRTestBase):
         options["content_pool"]["cups"]["count"] = 1
         with self.assertRaisesRegex(OptionError, "not implemented"):
             make_world(options)
+        # Options added on main after the experiment refuse instead of being
+        # dropped from the content-plan wire.
+        options = profile_options()
+        options["relic_perfect_checks"] = True
+        with self.assertRaisesRegex(OptionError, "relic_perfect_checks"):
+            make_world(options)
+        for send in ([], ["weapon_hit"]):
+            options = profile_options()
+            options["death_link_send"] = send
+            with self.subTest(death_link_send=send), self.assertRaisesRegex(OptionError, "death_link_send"):
+                make_world(options)
