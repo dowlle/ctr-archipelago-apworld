@@ -1,8 +1,10 @@
 import logging
 import re
-from BaseClasses import CollectionState
 
 from .gem_cup_legs import resolved_gem_cup_legs, track_to_cups
+from .logic_terms import (FALSE, TRUE, Families, Has, HasAny, HasEach, ItemSum,
+                          Or, Ref, TextRule, all_of, and_term, boost_cap,
+                          set_term, Cap)
 from .Options import OxideGoal
 from .usf_finish import UsfFinishGate
 
@@ -61,11 +63,21 @@ def make_rule(expr_text: str, player: int):
     Converts simple logic like:
         has('Key', 2) and has('Progressive Relic', 10)
     into a combined rule lambda.
+
+    The rule is compiled from `rule_term`, so a text rule and its `win_logic`
+    export come from one parse.
     """
+    return rule_term(expr_text, player).compile()
+
+
+def rule_term(expr_text: str, player: int) -> TextRule:
+    """Parse a text rule into its `TextRule` term (no requirements for
+    `True` / `always` / empty). Raises the same ValueError as before on
+    unsupported syntax."""
     expr_text = expr_text.strip()
 
     if not expr_text or expr_text.lower() in ("true", "always"):
-        return lambda state: True
+        return TextRule((), player)
 
     requirements = []
     for segment in _split_rule_segments(expr_text):
@@ -92,13 +104,7 @@ def make_rule(expr_text: str, player: int):
                 raise _rule_error(expr_text, segment, "count must not be negative")
         requirements.append((item, count))
 
-    def rule(state: CollectionState):
-        for item, count in requirements:
-            if not state.has(item, player, count):
-                return False
-        return True
-
-    return rule
+    return TextRule(requirements, player)
 
 
 def set_rules(world):
@@ -109,14 +115,17 @@ def set_rules(world):
     player = world.player
     mw = world.multiworld
 
+    # Every entrance and location starts from its text rule as a TERM
+    # (logic_terms): the win-check layers below AND further terms onto these,
+    # and the `win_logic` slot_data block is serialised from the same objects.
     for region in mw.get_regions(player):
         for ent in region.exits:
             rule_text = getattr(ent, "access_rule_text", "True")
-            ent.access_rule = make_rule(rule_text, player)
+            set_term(ent, rule_term(rule_text, player))
 
         for loc in region.locations:
             rule_text = getattr(loc, "logic_text", "True")
-            loc.access_rule = make_rule(rule_text, player)
+            set_term(loc, rule_term(rule_text, player))
 
     add_time_trial_and_ctr_requirements(world, player)
 
@@ -186,10 +195,9 @@ def add_capability_difficulty_rules(world, player):
     from .capability_contract import (CUSTOM_TRACK_SLOTS_RULED,
                                       difficulty_gated_tracks)
     from .custom_track_locations import slot_region
-    from .itemsanity import (DIFFICULTY_WEAPON_FAMILY_MIN,
-                             USEFUL_WEAPON_FAMILIES, family_count)
+    from .itemsanity import DIFFICULTY_WEAPON_FAMILY_MIN, USEFUL_WEAPON_FAMILIES
     from .podium import location_name
-    from .progressive_capability import gate_satisfied, track_required_character
+    from .progressive_capability import track_required_character
 
     difficulty = int(world.options.logic_difficulty.value)
     if difficulty == 2:  # hard
@@ -206,19 +214,14 @@ def add_capability_difficulty_rules(world, player):
     for track in sorted(tracks):
         required_character = track_required_character(world, track)
 
-        def capability_rule(state, p=player, racer=required_character,
-                            weapons=weapon_arm):
-            # Boost first and alone: the Turbo bonus below only ever applied
-            # when `boost_ok` was already True, i.e. when the OR had already
-            # short-circuited, so counting weapon families in that branch was
-            # always dead work. Same answer, one term instead of two.
-            if gate_satisfied(world, state, p, boost_min=1,
-                              required_character=racer):
-                return True
-            # Itemsanity off: no weapon items exist, so there is no weapon
-            # arm and the first boost rank is the whole requirement.
-            return weapons and (family_count(state, p, USEFUL_WEAPON_FAMILIES)
-                                >= DIFFICULTY_WEAPON_FAMILY_MIN)
+        # Boost first, then (Itemsanity on) the weapon-family arm. Itemsanity
+        # off: no weapon items exist, so there is no weapon arm and the first
+        # boost rank is the whole requirement. A term, so the Trophy Race's
+        # `win_logic` export carries it (logic_terms).
+        capability_term = Cap(world, 1, required_character)
+        if weapon_arm:
+            capability_term = Or(capability_term, Families(
+                USEFUL_WEAPON_FAMILIES, DIFFICULTY_WEAPON_FAMILY_MIN, player))
 
         gated = [f"{track}: Trophy Race"]
         if difficulty == 0:  # easy
@@ -227,12 +230,8 @@ def add_capability_difficulty_rules(world, player):
         for name in gated:
             if name not in names:
                 continue
-            loc = world.multiworld.get_location(name, player)
-            base = loc.access_rule
-            loc.access_rule = (
-                lambda state, b=base, gate=capability_rule:
-                b(state) and gate(state)
-            )
+            and_term(world.multiworld.get_location(name, player),
+                     capability_term)
 
 
 def held_first_minimum_term(world, track):
@@ -317,7 +316,7 @@ def add_lettersanity_rules(world, player):
     from . import lettersanity
     from .item_boxes import TIGER_TEMPLE_DOOR_OPENERS
     from .progressive_capability import gate_satisfied, track_required_character
-    from .usf_finish import boost_term, USF_BOOST_COUNT
+    from .usf_finish import USF_BOOST_COUNT
     mode = int(world.options.lettersanity.value)
     selected = world.options._lettersanity_selected
     cache = world.multiworld.regions.location_cache[player]
@@ -326,16 +325,13 @@ def add_lettersanity_rules(world, player):
     # and C while gating each created T/R pickup and full token completion.
     oxide_letters = ({"C", "T", "R"} if mode != 2 else
                      set(selected.get("Oxide Station", ())))
-    oxide_term = boost_term(
+    oxide_term = boost_cap(
         world, track_required_character(world, "Oxide Station"),
         USF_BOOST_COUNT)
     oxide_token = "Oxide Station: CTR Token Challenge"
     oxide_gate = None
     if oxide_token in cache and oxide_letters.intersection(("T", "R")):
-        previous = cache[oxide_token].access_rule
-        oxide_gate = lambda state, previous=previous, term=oxide_term, p=player: \
-            previous(state) and term(state, p)
-        cache[oxide_token].access_rule = oxide_gate
+        oxide_gate = and_term(cache[oxide_token], oxide_term)
     for letter in ("T", "R"):
         name = lettersanity.LETTERSANITY_CLASS.location_name(
             "Oxide Station", letter)
@@ -344,9 +340,7 @@ def add_lettersanity_rules(world, player):
             if oxide_gate is not None:
                 loc.access_rule = oxide_gate
             else:
-                previous = loc.access_rule
-                loc.access_rule = lambda state, previous=previous, term=oxide_term, p=player: \
-                    previous(state) and term(state, p)
+                and_term(loc, oxide_term)
     # Token completion needs physical R except when mode 2 excludes it.
     # Install after the entry rule was shared with individual letters, so
     # collecting C or T does not require opening R's shortcut door. Skipped
@@ -358,12 +352,7 @@ def add_lettersanity_rules(world, player):
                 "Tiger Temple", ()))):
         token = world.multiworld.get_location(
             "Tiger Temple: CTR Token Challenge", player)
-        previous = token.access_rule
-        token.access_rule = (
-            lambda state, previous=previous,
-                   openers=TIGER_TEMPLE_DOOR_OPENERS, p=player:
-            previous(state) and state.has_any(openers, p)
-        )
+        and_term(token, HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))
     if mode not in (1, 2, 3):
         return
     _add_cortex_vortex_letter_rules(world, player, mode)
@@ -372,9 +361,7 @@ def add_lettersanity_rules(world, player):
             required = (lettersanity.LETTERS if mode == 3 else selected[track])
             names = tuple(lettersanity.item_name(track, letter) for letter in required)
             loc = world.multiworld.get_location(f"{track}: CTR Token Challenge", player)
-            previous = loc.access_rule
-            loc.access_rule = lambda state, previous=previous, names=names, p=player: \
-                previous(state) and all(state.has(name, p) for name in names)
+            and_term(loc, HasEach(names, player))
 
     # Tiger Temple's R sits behind the same stone shortcut door as Item Box 5.
     # When Itemsanity models weapon ownership, reaching that letter therefore
@@ -387,12 +374,7 @@ def add_lettersanity_rules(world, player):
             and "R" in selected.get("Tiger Temple", ())
             and tiger_r in world.multiworld.regions.location_cache[player]):
         loc = world.multiworld.get_location(tiger_r, player)
-        previous = loc.access_rule
-        loc.access_rule = (
-            lambda state, previous=previous,
-                   openers=TIGER_TEMPLE_DOOR_OPENERS, p=player:
-            previous(state) and state.has_any(openers, p)
-        )
+        and_term(loc, HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))
 
     # Papu's Pyramid C and T each sit on a route that needs either boost or a
     # usable shortcut weapon. This gate is needed only while Progressive Boost
@@ -468,10 +450,7 @@ def _add_cortex_vortex_letter_rules(world, player, mode):
     cache = world.multiworld.regions.location_cache[player]
     if mode in (2, 3) and CTR_TOKEN_NAME in cache:
         names = tuple(required_letter_item_names(world.options))
-        loc = cache[CTR_TOKEN_NAME]
-        previous = loc.access_rule
-        loc.access_rule = lambda state, previous=previous, names=names, p=player: \
-            previous(state) and all(state.has(name, p) for name in names)
+        and_term(cache[CTR_TOKEN_NAME], HasEach(names, player))
     if mode == 2:
         for name in CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options):
             own = letter_item_name(name.rsplit(" ", 1)[1])
@@ -489,9 +468,7 @@ def add_custom_ctr_challenge_rules(world, player):
         chosen = getattr(world.options, "_custom_lettersanity_selected", {}).get(slot, ())
         required = tuple(custom_check_name("letter_item", slot, LETTERS.index(letter))
                          for letter in chosen) if mode in (2, 3) else ()
-        previous = loc.access_rule
-        loc.access_rule = lambda state, previous=previous, required=required, p=player: \
-            previous(state) and state.has_all(required, p)
+        and_term(loc, HasEach(required, player, style="has_all"))
 
 
 def add_racer_lock_rules(world, player):
@@ -520,12 +497,7 @@ def add_racer_lock_rules(world, player):
         return
     mw = world.multiworld
     for pad_name, character in locks.items():
-        ent = mw.get_entrance(pad_name, player)
-        base_rule = ent.access_rule
-        ent.access_rule = (
-            lambda state, i=character, p=player, base=base_rule:
-            base(state) and state.has(i, p)
-        )
+        and_term(mw.get_entrance(pad_name, player), Has(character, 1, player))
 
 
 def add_racer_unlock_placement_rules(world, player):
@@ -745,20 +717,14 @@ def add_warp_pad_unlock_rules(world, player):
         if t == 0:
             continue  # native-fixed pad (vanilla mode) / not randomized; keep text rule
         ent = mw.get_entrance(pad_name, player)
-        base_rule = ent.access_rule  # vanilla Key-gate already applied above
+        # ANDed onto the vanilla Key-gate already applied above.
         if t in AGG_BY_TYPE:
             # any_of aggregate: gate is "any N of this type" summed across colours/tiers.
             names = _scoped_agg_names(world, AGG_BY_TYPE[t])
-            ent.access_rule = (
-                lambda state, ns=names, n=count, p=player, base=base_rule:
-                base(state) and _agg_has(state, ns, p, n)
-            )
+            and_term(ent, ItemSum(names, count, player))
         else:
             item = ITEM_BY_TYPE[t](colour if colour >= 0 else 0)
-            ent.access_rule = (
-                lambda state, i=item, n=count, p=player, base=base_rule:
-                base(state) and state.has(i, p, n)
-            )
+            and_term(ent, Has(item, count, player))
 
 
 def add_vanilla_floor_rules(world, player):
@@ -790,12 +756,8 @@ def add_vanilla_floor_rules(world, player):
         floor = meta.get("vanilla_trophies", 0)
         if floor <= 0:
             continue  # floor-0 pads (Crash Cove / Roo's Tubes): stay open, bootstrap
-        ent = mw.get_entrance(pad_name, player)
-        base_rule = ent.access_rule  # vanilla hub-Key gate already applied above
-        ent.access_rule = (
-            lambda state, n=floor, p=player, base=base_rule:
-            base(state) and state.has("Trophy", p, n)
-        )
+        # ANDed onto the vanilla hub-Key gate already applied above.
+        and_term(mw.get_entrance(pad_name, player), Has("Trophy", floor, player))
 
 
 # Garage-door exit name -> trophy threshold (vanilla 4/8/12/16). Oxide left as
@@ -830,20 +792,16 @@ def add_boss_garage_rules(world, player):
     """
     mw = world.multiworld
     for door, thr in HUB_BOSS.items():
-        ent = mw.get_entrance(door, player)
-        ent.access_rule = (
-            lambda s, n=thr, p=player: s.has("Trophy", p, n)
-        )
+        set_term(mw.get_entrance(door, player), Has("Trophy", thr, player))
     from .Regions import BOSS_WUMPA_TRACKS
-    from .usf_finish import ALL_USF_FINISH_TRACKS, boost_term, track_finish_term
+    from .usf_finish import ALL_USF_FINISH_TRACKS, track_finish_t
     for garage, track in BOSS_WUMPA_TRACKS.items():
         if garage == "N. Oxide Garage":
             continue  # Both Oxide encounters are ruled below with their goals.
-        floor = boost_term(world, boost_min=1)
-        finish = (track_finish_term(track, world, bind_racer=False)
-                  if track in ALL_USF_FINISH_TRACKS else None)
-        def win_rule(state, f=floor, t=finish, p=player):
-            return f(state, p) and (t is None or t(state, p))
+        floor = boost_cap(world, None, 1)
+        finish = (track_finish_t(track, world, bind_racer=False)
+                  if track in ALL_USF_FINISH_TRACKS else TRUE)
+        win_rule = all_of(floor, finish)
         _and_onto(world, player, f"{garage}: Boss Race", win_rule)
         _and_onto(world, player,
                   f"{garage.removesuffix(' Garage')} Boss Race Won", win_rule)
@@ -858,21 +816,27 @@ OXIDE_FIRST_EVENT = "N. Oxide's Challenge Cleared"
 OXIDE_FINAL_EVENT = "N. Oxide's Final Challenge Cleared"
 
 
-def oxide_companion_predicate(world):
-    """The conjunction of this seed's ACTIVE non-Oxide goal arms, or None when
-    none is active.
+def oxide_companion_term(world):
+    """The conjunction of this seed's ACTIVE non-Oxide goal arms as a term, or
+    None when none is active.
 
-    Reuses `_install_goal`'s own predicate objects
-    (`world._ctr_boss_won_predicate`, `world._ctr_gems_predicate`) rather than
-    re-deriving "bosses won" or "gems held" a second way, so an Oxide encounter
-    and the goal cannot drift apart about the same question -- the rule native
-    enforces for AP_ComposedBossesWon and the gem tally."""
-    preds = [p for p in (getattr(world, "_ctr_boss_won_predicate", None),
-                         getattr(world, "_ctr_gems_predicate", None))
-             if p is not None]
-    if not preds:
+    Reuses `_install_goal`'s own term objects (`world._ctr_boss_won_term`,
+    `world._ctr_gems_term`, whose compiled forms are the goal predicates)
+    rather than re-deriving "bosses won" or "gems held" a second way, so an
+    Oxide encounter and the goal cannot drift apart about the same question --
+    the rule native enforces for AP_ComposedBossesWon and the gem tally."""
+    terms = [t for t in (getattr(world, "_ctr_boss_won_term", None),
+                         getattr(world, "_ctr_gems_term", None))
+             if t is not None]
+    if not terms:
         return None
-    return lambda state, ps=tuple(preds): all(p(state) for p in ps)
+    return all_of(*terms)
+
+
+def oxide_companion_predicate(world):
+    """`oxide_companion_term` as a `state -> bool` predicate, or None."""
+    term = oxide_companion_term(world)
+    return None if term is None else term.compile()
 
 
 def add_oxide_access_contract(world, player):
@@ -932,39 +896,35 @@ def add_oxide_access_contract(world, player):
         # there is nothing here to rule on. Shut the entrance too, so the graph
         # states the closed garage rather than merely happening to hold no
         # checks behind an open door.
-        world.multiworld.get_entrance(
-            "N. Oxide Garage Door", player).access_rule = lambda state: False
+        set_term(world.multiworld.get_entrance("N. Oxide Garage Door", player),
+                 FALSE)
         return
 
-    companions = oxide_companion_predicate(world)
+    companions = oxide_companion_term(world)
     gates_first = (companions is not None
                    and o.oxide_goal.value == OxideGoal.option_any_percent)
     gates_final = (companions is not None
                    and o.oxide_goal.value == OxideGoal.option_101_percent)
 
-    first_rule = companions if gates_first else (lambda state: True)
+    first_rule = companions if gates_first else TRUE
     # oxide_1_optional changes encounter priority, not reward availability:
     # with a Final goal the first reward is still reachable early, or jointly
     # collected on a final win. Final still needs all relic/companion terms.
-    relic_rule = world._oxide_final_relic_rule()
+    relic_rule = world._oxide_final_relic_term()
     if gates_final:
-        final_rule = (lambda state, f=first_rule, r=relic_rule, c=companions:
-                      f(state) and r(state) and c(state))
+        final_rule = all_of(first_rule, relic_rule, companions)
     else:
-        final_rule = (lambda state, f=first_rule, r=relic_rule:
-                      f(state) and r(state))
+        final_rule = all_of(first_rule, relic_rule)
 
     from .Regions import BOSS_WUMPA_TRACKS
-    from .usf_finish import boost_term, oxide_final_track_name, track_finish_term
+    from .usf_finish import oxide_final_track_name, track_finish_t
     station = BOSS_WUMPA_TRACKS.get("N. Oxide Garage", "Oxide Station")
-    floor = boost_term(world, boost_min=1)
-    first_finish = track_finish_term(station, world, bind_racer=False)
-    final_finish = track_finish_term(
+    floor = boost_cap(world, None, 1)
+    first_finish = track_finish_t(station, world, bind_racer=False)
+    final_finish = track_finish_t(
         oxide_final_track_name(world), world, bind_racer=False)
-    first_win_rule = (lambda state, r=first_rule, f=floor, t=first_finish:
-                      r(state) and f(state, player) and t(state, player))
-    final_win_rule = (lambda state, r=final_rule, f=floor, t=final_finish:
-                      r(state) and f(state, player) and t(state, player))
+    first_win_rule = all_of(first_rule, floor, first_finish)
+    final_win_rule = all_of(final_rule, floor, final_finish)
 
     _and_onto(world, player, OXIDE_FIRST_LOCATION, first_win_rule)
     _and_onto(world, player, OXIDE_FIRST_EVENT, first_win_rule)
@@ -989,7 +949,7 @@ def add_oxide_access_contract(world, player):
         except KeyError:
             oxide_wumpa = None  # not per-track Wumpa
         if oxide_wumpa is not None:
-            oxide_wumpa.access_rule = first_rule
+            set_term(oxide_wumpa, first_rule)
 
     # From the garage, the Cortex Vortex Wumpa check can only fire during the
     # Final Challenge race, so that entrance takes the same rule (the four Keys
@@ -1001,11 +961,12 @@ def add_oxide_access_contract(world, player):
             CORTEX_VORTEX_WUMPA_ENTRANCE, player)
     except KeyError:
         return  # not per-track Wumpa, or Oxide Station is the venue
-    vortex.access_rule = final_rule
+    set_term(vortex, final_rule)
 
 
 def _and_onto(world, player, location_name, extra, replace=False):
-    """AND `extra` onto a location's existing access rule, or replace it.
+    """AND the term `extra` onto a location's existing access rule, or replace
+    it.
 
     `replace=True` is used for the Final Challenge LOCATION only, whose
     world.json text rule is the legacy fixed 18-Sapphire gate: that rule
@@ -1023,10 +984,9 @@ def _and_onto(world, player, location_name, extra, replace=False):
     except KeyError:
         return
     if replace:
-        loc.access_rule = extra
+        set_term(loc, extra)
         return
-    base = loc.access_rule
-    loc.access_rule = (lambda state, b=base, e=extra: b(state) and e(state))
+    and_term(loc, extra)
 
 
 def add_oxide_final_challenge_rule(world, player):
@@ -1235,7 +1195,7 @@ def add_time_trial_and_ctr_requirements(world, player):
     """
     from .progressive_capability import track_required_character
     from .relic_perfect import RELIC_PERFECT_SUFFIX
-    from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, boost_term,
+    from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT,
                              relic_perfect_boost_min, relic_tier_boost_min)
 
     mw = world.multiworld
@@ -1264,28 +1224,26 @@ def add_time_trial_and_ctr_requirements(world, player):
             # term (2026-08-21 ruling with the 2026-09-17 Platinum raise) and
             # the perfect crate term (2026-09-29 ruling) below still AND on,
             # exactly as they would with a Trophy Race (ruling 2026-09-29).
-            def rule(state: CollectionState):
-                return True
+            rule = TRUE
         else:
+            # Terms (logic_terms): the Trophy Race reference exports as a
+            # `ref` to that check's `win_logic` entry, region included.
             s2 = stage2.get(track_prefix)
             if s2 is not None:
                 s2_item, s2_count = s2
 
                 if s2_item in AGG_BY_NAME:
                     # any_of aggregate stage-2 gate: "any N of this type", summed.
-                    def rule(state: CollectionState, t=trophy_name, p=player,
-                             ns=_scoped_agg_names(world, AGG_BY_NAME[s2_item]), n=s2_count):
-                        return state.can_reach(t, "Location", p) and _agg_has(state, ns, p, n)
+                    s2_term = ItemSum(_scoped_agg_names(world, AGG_BY_NAME[s2_item]),
+                                      s2_count, player)
                 else:
-                    def rule(state: CollectionState, t=trophy_name, p=player,
-                             i=s2_item, n=s2_count):
-                        return state.can_reach(t, "Location", p) and state.has(i, p, n)
+                    s2_term = Has(s2_item, s2_count, player)
+                rule = all_of(Ref(trophy_name, player), s2_term)
 
                 logging.debug(
                     f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
             else:
-                def rule(state: CollectionState, t=trophy_name, p=player):
-                    return state.can_reach(t, "Location", p)
+                rule = Ref(trophy_name, player)
 
                 logging.debug(
                     f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")
@@ -1296,19 +1254,16 @@ def add_time_trial_and_ctr_requirements(world, player):
         # rank (including the reviewed Platinum difficulty floor), wrapping
         # the rule built above so the Trophy prerequisite and
         # any stage-2 gate are preserved. Sapphire returns rank 0 and stays
-        # free. boost_term is always-True when the boost chain is not
+        # free. boost_cap is always-TRUE when the boost chain is not
         # randomized, so no branch on the option is needed here. Deliberately
         # NOT track_finish_term: tier gates have no hard-shortcut escape.
         if name.endswith(" Time Trial"):
             _tier = name.rsplit(": ", 1)[1][:-len(" Time Trial")]
             _tier_min = relic_tier_boost_min(track_prefix, _tier, world.options)
             if _tier_min:
-                _tier_term = boost_term(
+                rule = all_of(rule, boost_cap(
                     world, track_required_character(world, track_prefix),
-                    _tier_min)
-                def rule(state: CollectionState, base=rule, term=_tier_term,
-                         p=player):
-                    return base(state) and term(state, p)
+                    _tier_min))
 
         # Relic Race perfect checks (#49): the race-entry rule built above,
         # i.e. exactly what the track's Sapphire Time Trial gets (Sapphire's
@@ -1321,14 +1276,11 @@ def add_time_trial_and_ctr_requirements(world, player):
         if name.endswith(RELIC_PERFECT_SUFFIX):
             _perfect_min = relic_perfect_boost_min(track_prefix)
             if _perfect_min:
-                _perfect_term = boost_term(
+                rule = all_of(rule, boost_cap(
                     world, track_required_character(world, track_prefix),
-                    _perfect_min)
-                def rule(state: CollectionState, base=rule, term=_perfect_term,
-                         p=player):
-                    return base(state) and term(state, p)
+                    _perfect_min))
 
-        loc.access_rule = rule
+        set_term(loc, rule)
 
         # Tier-2 sharing for lettersanity (#148, parity audit family 2, ruling
         # 2026-08-12). Native letters only collide inside the CTR Token
@@ -1343,7 +1295,7 @@ def add_time_trial_and_ctr_requirements(world, player):
         # modes 0/3 create no letter locations, so this loop finds none for them.
         if name.endswith("CTR Token Challenge"):
             for letter_name in _created_letter_names_for(world, track_prefix):
-                mw.get_location(letter_name, player).access_rule = rule
+                mw.get_location(letter_name, player).access_rule = rule.compile()
 
             # CTR Token Challenge boost floor (ruling 2026-09-20, see
             # usf_finish.CTR_CHALLENGE_BOOST_COUNT). Same shape as the relic
@@ -1364,12 +1316,6 @@ def add_time_trial_and_ctr_requirements(world, player):
             # Mask instead of boost, Oxide Station C keeps the hard-shortcut
             # route, Tiger Temple R needs a door opener). Floor-sharing the
             # letters would have silently overridden all three.
-            _ctr_term = boost_term(
+            and_term(loc, boost_cap(
                 world, track_required_character(world, track_prefix),
-                CTR_CHALLENGE_BOOST_COUNT)
-
-            def _ctr_rule(state: CollectionState, base=rule, term=_ctr_term,
-                          p=player):
-                return base(state) and term(state, p)
-
-            loc.access_rule = _ctr_rule
+                CTR_CHALLENGE_BOOST_COUNT))

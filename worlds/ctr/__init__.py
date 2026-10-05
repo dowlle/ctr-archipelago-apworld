@@ -221,21 +221,26 @@ class ctrAPWorld(World):
         requirement, and a duplicate landing elsewhere cannot false-complete a
         count -- so no companion-flag decoupling is needed for the relic half
         (the Key-4 reachability half keeps its flag event)."""
+        return self._oxide_final_relic_term().compile()
+
+    def _oxide_final_relic_term(self):
+        """`_oxide_final_relic_rule` as a logic term (`logic_terms`), the form
+        the Final Challenge's `win_logic` export is built from."""
+        from .logic_terms import Has, ItemSum, Or
         p = self.player
         n = self.options.oxide_final_challenge_relic_count.value
         mode = self.options.oxide_final_challenge_unlock.value
         F = FinalOxideUnlock
         S, G, Pl = "Sapphire Relic", "Gold Relic", "Platinum Relic"
         if mode == F.option_gold_relics:
-            return lambda st: st.has(G, p, n)
+            return Has(G, n, p)
         if mode == F.option_platinum_relics:
-            return lambda st: st.has(Pl, p, n)
+            return Has(Pl, n, p)
         if mode == F.option_any_relic_type:
-            return lambda st: st.has(S, p, n) or st.has(G, p, n) or st.has(Pl, p, n)
+            return Or(Has(S, n, p), Has(G, n, p), Has(Pl, n, p))
         if mode == F.option_total_relics:
-            return lambda st: (st.count(S, p) + st.count(G, p)
-                               + st.count(Pl, p)) >= n
-        return lambda st: st.has(S, p, n)  # sapphire_relics (default)
+            return ItemSum((S, G, Pl), n, p)
+        return Has(S, n, p)  # sapphire_relics (default)
 
     # --- Universal Tracker support (issue #29) ---
 
@@ -1183,6 +1188,10 @@ class ctrAPWorld(World):
         # list above.
         self._ctr_boss_won_predicate = None
         self._ctr_gems_predicate = None
+        # The same two arms as logic terms (logic_terms); the predicates
+        # above are their compiled forms.
+        self._ctr_boss_won_term = None
+        self._ctr_gems_term = None
 
         # Both Oxide goal events inherit Oxide Station's confirmed finish
         # capability (triage ruling 2026-08-19): the challenge is raced on
@@ -1268,9 +1277,9 @@ class ctrAPWorld(World):
             ]
             flags = [self._add_goal_event(r, e, "True") for r, e in boss_events]
             n_bosses = o.bosses_required_goal.value
-            boss_predicate = (
-                lambda state, fs=flags, n=n_bosses:
-                    sum(state.has(f, player) for f in fs) >= n)
+            from .logic_terms import BossWins
+            self._ctr_boss_won_term = BossWins(flags, n_bosses, player)
+            boss_predicate = self._ctr_boss_won_term.compile()
             predicates.append(boss_predicate)
             self._ctr_boss_won_predicate = boss_predicate
 
@@ -1726,9 +1735,9 @@ class ctrAPWorld(World):
                 loc.place_locked_item(self.create_item(gem_name))
 
         gems = ["Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"]
-        predicate = (
-            lambda state, gems=gems, n=n:
-                state.has_from_list_unique(gems, player, n))
+        from .logic_terms import Distinct
+        self._ctr_gems_term = Distinct(gems, n, player)
+        predicate = self._ctr_gems_term.compile()
         predicates.append(predicate)
         return predicate
 
@@ -2339,6 +2348,12 @@ class ctrAPWorld(World):
             # understands this block's shape as it evolves.
             slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks,
                                                                 self.options)
+        # Race-loss DeathLink stakes (0.2.4, Contract 7m): every win check's
+        # logic as data, serialised from the installed rule terms. Always
+        # emitted with its own block version; no schema bump, because an older
+        # native ignores the key and keeps the 0.2.3 send behaviour.
+        from .win_logic import wire_block
+        slot_data["win_logic"] = wire_block(self)
         return slot_data
 
     def extend_hint_information(self, hint_data: Dict[int, Dict[int, str]]) -> None:
