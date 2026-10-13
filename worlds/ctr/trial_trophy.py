@@ -35,6 +35,7 @@ one independent three-state option per trial track. The third state also creates
 the paired CTR Challenge; because that state includes the Trophy Race, CTR-only
 configuration is unrepresentable.
 """
+from . import destinations
 from .location_class import LocationClass
 
 # Additive block for the two trial-track trophy races, stride 1.
@@ -44,7 +45,7 @@ TRIAL_CTR_CODE_BASE = 35016210
 #: The two adventure trial tracks, in level-ID order (Slide Coliseum 16, Turbo
 #: Track 17) -- the same relative order they hold at the tail of the 18-track
 #: relic canon. FROZEN: it is this block's stride order.
-TRIAL_TRACKS = ("Slide Coliseum", "Turbo Track")
+TRIAL_TRACKS = destinations.TRIAL_TRACKS
 
 
 class TrialTrophyLocationClass(LocationClass):
