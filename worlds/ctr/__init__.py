@@ -248,11 +248,10 @@ class ctrAPWorld(World):
         UT's re-generation reasons about the SAME world the seed was built from,
         regardless of the tracking player's own YAML.
 
-        Only options that steer the reachability graph are restored. include_gem_cups
-        / include_battle_arenas are not on the wire, so they are DERIVED from whether
-        their pad class carries a randomized (non-type-0) stage-1 requirement -- the
-        exact condition create_items / create_regions gate their exit-rule handling
-        on. Logic-irrelevant mirrors (one_lap_cups, death_link, ...) are skipped."""
+        Only options that steer the reachability graph are restored. Schema 18
+        carries include_battle_arenas explicitly. Older seeds use their pad
+        requirements to recover it, and include_gem_cups always does. Logic-irrelevant
+        mirrors (one_lap_cups, death_link, ...) are skipped."""
         o = self.options
         co = passthrough.get("ctr_options", {})
 
@@ -396,7 +395,10 @@ class ctrAPWorld(World):
             inc_cups = inc_cups or _kind == "cup"
             inc_arenas = inc_arenas or _kind == "crystal"
         o.include_gem_cups.value = int(inc_cups)
-        o.include_battle_arenas.value = int(inc_arenas)
+        o.include_battle_arenas.value = int(bool(co["include_battle_arenas"])) \
+            if type(co.get("schema_version")) is int and co["schema_version"] >= 18 \
+            and "include_battle_arenas" in co \
+            else int(inc_arenas)
 
         # Podium rung set is decided by five options that are NOT on the wire, but
         # the podium_checks block encodes exactly which rungs this seed created:

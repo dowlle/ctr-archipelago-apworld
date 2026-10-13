@@ -339,6 +339,7 @@ def fill_slot_data(world) -> Dict[str, object]:
             "shuffle_gems": bool(o.shuffle_gems.value),
             "shuffle_keys": bool(o.shuffle_keys.value),
             "warppad_unlock_mode": o.warppad_unlock_requirements.value,
+            "include_battle_arenas": bool(o.include_battle_arenas.value),
             "slide_coliseum_races": int(o.slide_coliseum_races.value),
             "turbo_track_races": int(o.turbo_track_races.value),
             # Always emitted 0/1; the conditional block below carries

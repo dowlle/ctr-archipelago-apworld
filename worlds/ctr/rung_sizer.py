@@ -188,8 +188,6 @@ def predicted_mandatory_pool(world) -> int:
             counts[name] = 0
     if not world.options.shuffle_keys.value:
         counts["Key"] = 0
-    if not world.options.include_battle_arenas.value:
-        counts["Purple CTR Token"] = max(0, counts["Purple CTR Token"] - 4)
     # #145 itemsanity: the 11 weapon items are frozen at count 0 in the
     # static table and create_items activates exactly one of each when the
     # toggle is on. Without this mirror the predictor under-counts mandatory
