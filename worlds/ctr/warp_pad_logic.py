@@ -37,6 +37,7 @@ import math
 import pkgutil
 import re
 
+from . import destinations
 from .cortex_vortex_track import CORTEX_VORTEX
 
 
@@ -112,74 +113,22 @@ def warn_stage2_collapsed(world, reason, detail=""):
 # Benign: reachability always comes from the live-graph sweep
 # (_reachable_pads_and_collect); HUB_STATIC values feed only the unreachable-
 # fallback's cheapest-Key sort heuristic.
-HUB_STATIC = {
-    # N. Sanity Beach -- no hub gate (Skull Rock crystal at hub floor 0)
-    "Crash Cove": [], "Roo's Tubes": [], "Mystery Caves": [],
-    "Sewer Speedway": [], "Skull Rock": [],
-    # Lost Ruins -- Key 1 (Rampage Ruins crystal at hub floor Key 1)
-    "Coco Park": [("Key", 1)], "Tiger Temple": [("Key", 1)],
-    "Papu's Pyramid": [("Key", 1)], "Dingo Canyon": [("Key", 1)],
-    "Rampage Ruins": [("Key", 1)],
-    # Glacier Park -- Key 2 (Rocky Road crystal at hub floor Key 2)
-    "Blizzard Bluff": [("Key", 2)], "Dragon Mines": [("Key", 2)],
-    "Polar Pass": [("Key", 2)], "Tiny Arena": [("Key", 2)],
-    "Rocky Road": [("Key", 2)],
-    # Citadel City -- Key 3 (Nitro Court crystal at hub floor Key 3)
-    "Hot Air Skyway": [("Key", 3)], "Cortex Castle": [("Key", 3)],
-    "N. Gin Labs": [("Key", 3)], "Oxide Station": [("Key", 3)],
-    "Nitro Court": [("Key", 3)],
-    # Gem Stone Valley TRIAL pads -- behind Key 1 (N. Sanity Beach <-> Gem Stone
-    # Valley). Slide Coliseum + Turbo Track have NO trophy race and NO CTR-token
-    # challenge: only the 3 relic Time Trials (verified against data/world.json).
-    # They are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry
-    # requirement (the OPEN model) -- excluded from TROPHY_TRACKS below so the
-    # sphere-search assigns them only a tier-1 req. Their vanilla relic/gem JSON
-    # gate is REPLACED by this randomized requirement in Rules.add_warp_pad_unlock_rules
-    # (keeping only the Key-1 hub gate).
-    "Slide Coliseum": [("Key", 1)], "Turbo Track": [("Key", 1)],
-    # Gem Stone Valley GEM-CUP pads -- behind Key 2 (the Cups Room hub gate:
-    # 'Gem Stone Valley <-> Cups Room' = has('Key', 2) in data/world.json). Each
-    # cup yields a Gem on completion ('<Colour> Gem Cup: Gem'). Like the trials they
-    # are SINGLE-STAGE (no stage 2) but DO get a randomized stage-1 entry requirement
-    # (the OPEN model) -- excluded from TROPHY_TRACKS AND from CUP_TRACKS below so
-    # the sphere-search assigns them only a tier-1 req. Their vanilla per-cup
-    # has('<Colour> CTR Token', 4) JSON gate is REPLACED by this randomized requirement
-    # in Rules.add_warp_pad_unlock_rules, keeping ONLY the Key-2 Cups Room hub gate
-    # (the randomized req is ANDed on TOP of that key gate, never replaces it). The
-    # track key is '<Colour> Cup' so _pad_exit_name yields '<Colour> Cup Warp Pad'
-    # (the AP exit name); the destination region is '<Colour> Gem Cup'. Gem cups are
-    # destination-shuffle-eligible (CATEGORY_POOLS['cups'], slot_data v3) when the
-    # 'cups' category is selected AND include_gem_cups puts their content in the seed;
-    # their UNLOCK REQUIREMENT is randomized on the same include_gem_cups gate (mirrors
-    # include_battle_arenas for crystals).
-    "Red Cup": [("Key", 2)], "Green Cup": [("Key", 2)], "Blue Cup": [("Key", 2)],
-    "Yellow Cup": [("Key", 2)], "Purple Cup": [("Key", 2)],
-}
+HUB_STATIC = destinations.hub_static()
 
 # The two Gem Stone Valley trial pads -- single-stage, randomized stage-1 only.
-TRIAL_TRACKS = {"Slide Coliseum", "Turbo Track"}
+TRIAL_TRACKS = set(destinations.TRIAL_TRACKS)
 
 # The five Gem Stone Valley gem-cup pads -- single-stage, randomized stage-1 only.
 # (Track keys, not region names: the region is '<Colour> Gem Cup'.)
-CUP_TRACKS = {"Red Cup", "Green Cup", "Blue Cup", "Yellow Cup", "Purple Cup"}
+CUP_TRACKS = set(destinations.CUP_PAD_TRACKS)
 
 # Vanilla CTR-Token COLOUR per track. Transcribed VERBATIM from game_world.rs
 # WarpPad::new (lines 1211-1219): Red/Green/Blue explicit, Yellow = default branch.
-TRACK_TOKEN_COLOUR = {
-    "Crash Cove": "Red", "Mystery Caves": "Red", "Papu's Pyramid": "Red",
-    "Blizzard Bluff": "Red",
-    "Roo's Tubes": "Green", "Coco Park": "Green", "Polar Pass": "Green",
-    "Cortex Castle": "Green",
-    "Sewer Speedway": "Blue", "Tiger Temple": "Blue", "Dragon Mines": "Blue",
-    "N. Gin Labs": "Blue",
-    # default -> Yellow
-    "Dingo Canyon": "Yellow", "Tiny Arena": "Yellow", "Hot Air Skyway": "Yellow",
-    "Oxide Station": "Yellow",
-}
+TRACK_TOKEN_COLOUR = destinations.token_colours()
 
 # Battle-arena crystal pads yield a Purple CTR Token (Rust BattleArenaRewards
 # single_reward = PurpleCtrToken).
-ARENA_TRACKS = {"Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court"}
+ARENA_TRACKS = set(destinations.ARENA_TRACKS)
 
 # The 16 trophy-race pads — the ONLY pads that carry a stage 2 (Icebound's
 # WarpPad.unlock_2; game_world.rs:1196-1231). Stage 2 gates that pad's CTR Token
@@ -202,8 +151,8 @@ STAGE2_DESTINATIONS = frozenset(TROPHY_TRACKS | {CORTEX_VORTEX})
 # set comprehension sees the full dict.
 
 # The 5 N. Sanity Beach candidates for the free subset, weighted sizes.
-FREE_CANDIDATES = ["Crash Cove", "Roo's Tubes", "Mystery Caves",
-                   "Sewer Speedway", "Skull Rock"]
+FREE_CANDIDATES = list(destinations.require_all(["Crash Cove", "Roo's Tubes", "Mystery Caves",
+                   "Sewer Speedway", "Skull Rock"]))
 FREE_SIZE_WEIGHTS = [(1, 10), (2, 30), (3, 30), (4, 15), (5, 15)]
 # Minimum number of FREE (open at spawn) bootstrap pads. See run_sphere_search
 # step 1 for the rationale (sphere-0 breadth vs AP fill capacity at ~98% density).

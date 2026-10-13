@@ -48,9 +48,8 @@ AND interleaving-aware slot numbers) before this build. Placement truth:
 241 across 18 tracks (logic survey complete).json` (vault). Native must count
 slots the same way; `placement_counts` on the wire is the desync guard.
 """
-import json
-import pkgutil
 
+from . import destinations
 from .location_class import LocationClass
 
 # Additive block for the 270 item-box checks, stride 15 per track.
@@ -63,37 +62,16 @@ ITEM_BOX_CODE_BASE = 35014000
 SLOTS_PER_TRACK = 15
 
 
-def _box_tracks():
-    """The 18 box tracks in canonical (Sapphire-trial code) order, read from
-    data/locations.json so this block's codes/order can never drift. The box set
-    is the 16 trophy tracks plus the two trial tracks, which is exactly the set
-    that carries Time Trial locations -- the same canon relic_perfect.py uses."""
-    data = json.loads(
-        pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
-    )
-    tt = [(loc["code"], loc["region"]) for loc in data
-          if loc["name"].endswith(": Sapphire Time Trial") and loc["code"] is not None]
-    return [region for _code, region in sorted(tt)]
+# Canonical, stable track order (module import time). 18 entries, read from
+# data/locations.json through the destination table so this block's
+# codes/order can never drift. The box set is the 16 trophy tracks plus the
+# two trial tracks, which is exactly the set that carries Time Trial
+# locations -- the same canon relic_perfect.py uses.
+BOX_TRACKS = destinations.tracks_with_suffix(": Sapphire Time Trial")
 
-
-# Canonical, stable track order (module import time). 18 entries.
-BOX_TRACKS = _box_tracks()
-
-
-def _track_level_ids():
-    """{track region name -> native LevelID} for the 18 box tracks, read from
-    data/warp_pad_ids.json (the single LevelID source) so the wire keys can
-    never drift from the pad canon."""
-    data = json.loads(
-        pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8")
-    )
-    return {pad_name[: -len(" Warp Pad")]: meta["level_id"]
-            for pad_name, meta in data["pads"].items()
-            if pad_name[: -len(" Warp Pad")] in set(BOX_TRACKS)}
-
-
-#: {track region name -> native LevelID}, 18 entries.
-TRACK_LEVEL_IDS = _track_level_ids()
+#: {track region name -> native LevelID}, 18 entries, from the destination
+#: table (which reads data/warp_pad_ids.json, the single LevelID source).
+TRACK_LEVEL_IDS = destinations.level_ids_for(BOX_TRACKS)
 
 #: Authored placements per track (FINAL 241 file; re-verified 2026-08-11).
 #: Slots placed+1..15 stay inert this curation generation.
@@ -105,6 +83,7 @@ PLACED_COUNTS = {
     "Polar Pass": 15, "Oxide Station": 14, "Coco Park": 10,
     "Tiny Arena": 15, "Slide Coliseum": 15, "Turbo Track": 15,
 }
+destinations.check_keys(PLACED_COUNTS, BOX_TRACKS, "item_boxes.PLACED_COUNTS")
 assert sum(PLACED_COUNTS.values()) == 241
 
 #: `shortcut_knowledge` tiers (Choice values).
@@ -206,6 +185,12 @@ TIGER_TEMPLE_DOOR_OPENERS = (
     "Bomb", "Bomb x3", "Missile", "Missile x3", "Beaker", "Shield Bubble",
     "Mask",
 )
+
+# Every per-box table above is keyed by a destination key from the shared table.
+for _table in (SK_REQUIRED_TIER, BOX_RULES):
+    destinations.require_all(track for track, _slot in _table)
+destinations.require_all(track for track, _slot in EXPLICIT_NO_GATE)
+del _table
 
 
 class ItemBoxLocationClass(LocationClass):

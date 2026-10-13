@@ -38,9 +38,8 @@ NAMES LAND INERT. `created_location_names` returns nothing, unconditionally, and
 every letter item carries `count: 0`, because no option creates either yet -- the
 0.2.0 freeze mints names, not features.
 """
-import json
-import pkgutil
 
+from . import destinations
 from .location_class import LocationClass
 
 # Additive block for the 48 letter checks, stride 3 per track.
@@ -51,21 +50,11 @@ LETTERSANITY_CODE_BASE = 35012500
 LETTERS = ("C", "T", "R")
 
 
-def _token_challenge_tracks():
-    """The 16 CTR Token Challenge tracks in canonical (token-code) order, read
-    from data/locations.json so this block's codes/order can never drift from the
-    token block it parallels. #148 scopes lettersanity to exactly the tracks that
-    have a CTR Token Challenge, which is the 16 trophy tracks."""
-    data = json.loads(
-        pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
-    )
-    tt = [(loc["code"], loc["region"]) for loc in data
-          if loc["name"].endswith(": CTR Token Challenge") and loc["code"] is not None]
-    return [region for _code, region in sorted(tt)]
-
-
-# Canonical, stable track order (module import time). 16 entries.
-LETTER_TRACKS = _token_challenge_tracks()
+# Canonical, stable track order (module import time). 16 entries, the CTR
+# Token Challenge tracks in token-code order (#148 scopes lettersanity to
+# exactly the tracks that have a CTR Token Challenge, which is the 16 trophy
+# tracks), read through the destination table.
+LETTER_TRACKS = destinations.tracks_with_suffix(": CTR Token Challenge")
 from .trial_trophy import TRIAL_TRACKS
 ALL_LETTER_TRACKS = tuple(LETTER_TRACKS) + TRIAL_TRACKS
 
@@ -150,9 +139,7 @@ class LettersanityLocationClass(LocationClass):
 #: The registered lettersanity class. `Locations.py` registers this instance.
 LETTERSANITY_CLASS = LettersanityLocationClass()
 
-_pads = json.loads(pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8"))["pads"]
-TRACK_LEVEL_IDS = {name[:-len(" Warp Pad")]: meta["level_id"] for name, meta in _pads.items()
-                   if name[:-len(" Warp Pad")] in set(ALL_LETTER_TRACKS)}
+TRACK_LEVEL_IDS = destinations.level_ids_for(ALL_LETTER_TRACKS)
 
 
 def restore_letter_selection(options, block, mode, count):

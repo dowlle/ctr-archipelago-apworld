@@ -43,9 +43,8 @@ enumerates the packages whose measured capability says they carry relic time
 crates; creation stays off (`CUSTOM_PERFECT_CREATION_ENABLED`) until the
 identity is minted and a custom Relic Race mode is admitted.
 """
-import json
-import pkgutil
 
+from . import destinations
 from .location_class import LocationClass
 
 # Additive block for the 18 relic-perfect checks, stride 1 in RELIC_TRACKS order.
@@ -60,14 +59,9 @@ RELIC_PERFECT_SUFFIX = "Relic Race Perfect"
 
 def _relic_tracks():
     """The 18 relic-race tracks in canonical (Sapphire-trial code) order, read
-    from data/locations.json so this block's codes/order can never drift from the
-    relic block they parallel."""
-    data = json.loads(
-        pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
-    )
-    tt = [(loc["code"], loc["region"]) for loc in data
-          if loc["name"].endswith(": Sapphire Time Trial") and loc["code"] is not None]
-    return [region for _code, region in sorted(tt)]
+    through the destination table from data/locations.json so this block's
+    codes/order can never drift from the relic block they parallel."""
+    return destinations.tracks_with_suffix(": Sapphire Time Trial")
 
 
 # Canonical, stable track order (module import time). 18 entries. Each entry is
@@ -140,12 +134,7 @@ def track_level_ids():
     `level_id` IS that track's LevelID (Crash Cove 3, Slide Coliseum 16, ...).
     Destination shuffle moves which pad loads a track, never the track's own
     LevelID, and native keys the relic race by the LevelID it is racing."""
-    pads = json.loads(
-        pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8")
-    )["pads"]
-    return {name[:-len(" Warp Pad")]: meta["level_id"]
-            for name, meta in pads.items()
-            if name[:-len(" Warp Pad")] in RELIC_TRACKS}
+    return destinations.level_ids_for(RELIC_TRACKS)
 
 
 def restore_from_wire(options, passthrough) -> None:

@@ -97,6 +97,7 @@ from .capability_contract import (
     usf_or_hard_finish_tracks,
 )
 from .logic_terms import TRUE, and_term, as_state_player, boost_cap
+from . import destinations
 from .progressive_capability import track_required_character
 
 #: Received `Progressive Boost` copies that put a player at the USF rank.
@@ -170,6 +171,9 @@ USF_RELIC_GOLD_TRACKS = frozenset(
     {"Hot Air Skyway", "Oxide Station", "Cortex Vortex"})
 USF_RELIC_PLATINUM_TRACKS = frozenset(
     {"Hot Air Skyway", "Oxide Station", "N. Gin Labs", "Cortex Vortex"})
+
+
+destinations.require_all(USF_RELIC_GOLD_TRACKS | USF_RELIC_PLATINUM_TRACKS)
 
 
 def relic_tier_boost_min(track, tier, options=None):

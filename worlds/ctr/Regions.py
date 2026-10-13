@@ -3,6 +3,7 @@ import logging
 import pkgutil
 from BaseClasses import Region, Entrance, EntranceType
 from . import characters
+from . import destinations
 from .Locations import create_location
 from .gem_cup_legs import (
     reconstruct_gem_cup_legs_from_wire, resolve_gem_cup_legs, track_to_cups,
@@ -44,13 +45,7 @@ BOSS_TROPHY = {"ripper_roo": 4, "papu_papu": 8, "komodo_joe": 12, "pinstripe": 1
 # through this table: a later boss-shuffle feature can replace the mapping in
 # one place. Both N. Oxide challenges launch from the same garage and load
 # Oxide Station, so they share its single garage-to-destination graph edge.
-BOSS_WUMPA_TRACKS = {
-    "Ripper Roo Garage": "Roo's Tubes",
-    "Papu Papu Garage": "Papu's Pyramid",
-    "Komodo Joe Garage": "Dragon Mines",
-    "Pinstripe Garage": "Hot Air Skyway",
-    "N. Oxide Garage": "Oxide Station",
-}
+BOSS_WUMPA_TRACKS = destinations.boss_garage_tracks()
 
 # Cortex Vortex as Oxide's Final Challenge venue races outside that table: only
 # the Final Challenge loads it, so its Wumpa check has its own dead-end region.
@@ -73,12 +68,7 @@ OXIDE_STATION_WUMPA_ENTRANCE = "N. Oxide Garage -> Oxide Station: Wumpa"
 # Used to build the per-boss 'tracks' metadata for the Original4Tracks /
 # SameHubTracks garage modes (Icebound get_modified_garage_unlocks). Oxide has
 # no track list (it stays a 4-key gate).
-VANILLA_BOSS_TRACKS = {
-    "ripper_roo": [3, 6, 9, 8],
-    "papu_papu":  [14, 4, 5, 0],
-    "komodo_joe": [2, 1, 12, 15],
-    "pinstripe":  [7, 10, 11, 13],
-}
+VANILLA_BOSS_TRACKS = destinations.boss_hub_level_ids()
 
 
 def _load_warp_pad_ids():

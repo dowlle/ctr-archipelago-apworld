@@ -60,12 +60,13 @@ from typing import Dict, List, Optional, Tuple
 
 from BaseClasses import ItemClassification
 
+from . import destinations
 from .location_class import LocationClass
 
-CORTEX_VORTEX = "Cortex Vortex"
+CORTEX_VORTEX = destinations.CORTEX_VORTEX
 
 #: Virtual destination ID, outside {0..27, 100..104}.
-DESTINATION_ID = 110
+DESTINATION_ID = destinations.CORTEX_VORTEX_LEVEL_ID
 #: Host LevelID native loads the pinned package on (retail Oxide Station).
 HOST_LEVEL_ID = 13
 #: The pinned Lockheart LEV/VRM pair, the same hashes as `oxide_final_venue`.

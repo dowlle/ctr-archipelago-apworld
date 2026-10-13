@@ -44,20 +44,17 @@ import logging
 import pkgutil
 from typing import Dict, List
 
+from . import destinations
+
 logger = logging.getLogger(__name__)
 
 # The five Gem Cup regions in their native LevelID order (cup LevelID ==
-# 100 + colour index), matching data/warp_pad_ids.json ("<Colour> Cup Warp
-# Pad" entries 100..104) and the cup order of data/gem_cup_legs.json, which
-# itself mirrors the native advCupTrackIDs row order. Draw order is
-# load-bearing for determinism: legs are drawn cup by cup in THIS order.
-CUP_LEVEL_IDS = (
-    ("Red Gem Cup", 100),
-    ("Green Gem Cup", 101),
-    ("Blue Gem Cup", 102),
-    ("Yellow Gem Cup", 103),
-    ("Purple Gem Cup", 104),
-)
+# 100 + colour index), from the destination table (which reads
+# data/warp_pad_ids.json "<Colour> Cup Warp Pad" entries 100..104); the cup
+# order of data/gem_cup_legs.json mirrors the native advCupTrackIDs row order.
+# Draw order is load-bearing for determinism: legs are drawn cup by cup in THIS
+# order.
+CUP_LEVEL_IDS = destinations.CUP_LEVEL_IDS
 
 # The eligible leg pool (ruled clamp): the 16 trophy-race track LevelIDs.
 TROPHY_TRACK_ID_POOL = tuple(range(16))
@@ -74,14 +71,7 @@ def load_vanilla_cup_legs() -> Dict[str, List[str]]:
 def track_level_ids() -> Dict[str, int]:
     """trophy-track name -> native LevelID (0..15), from
     data/warp_pad_ids.json (kind "race" pads; never retyped here)."""
-    pads = json.loads(
-        pkgutil.get_data(__package__, "data/warp_pad_ids.json").decode("utf-8")
-    )["pads"]
-    return {
-        name[: -len(" Warp Pad")]: meta["level_id"]
-        for name, meta in pads.items()
-        if meta["kind"] == "race"
-    }
+    return destinations.level_ids_for(destinations.RACE_TRACKS)
 
 
 def track_to_cups(cup_legs: Dict[str, List[str]]) -> Dict[str, List[str]]:
