@@ -145,8 +145,8 @@ class TestOnCreatesAndEmits(unittest.TestCase):
         self.assertTrue(set(HIT_CHARACTER_CLASS.names()) <= names)
         wire = world.fill_slot_data()
         self.assertTrue(wire["ctr_options"]["hit_character"])
-        self.assertEqual(wire["schema_version"], 16)
-        self.assertEqual(wire["ctr_options"]["schema_version"], 16)
+        self.assertEqual(wire["schema_version"], 18)
+        self.assertEqual(wire["ctr_options"]["schema_version"], 18)
         block = wire["hit_character_encounters"]
         self.assertEqual(block["schema"], HIT_CHARACTER_SCHEMA)
         self.assertEqual(block["locations"], {
@@ -805,8 +805,8 @@ class TestBuildIdentity(unittest.TestCase):
         self.assertEqual(co["build_version"], "0.2.4")
         # Numeric identities this internal staging must not move.
         self.assertEqual(co["world_version"], "0.2.4")
-        self.assertEqual(co["schema_version"], 16)
-        self.assertEqual(wire["schema_version"], 16)
+        self.assertEqual(co["schema_version"], 18)
+        self.assertEqual(wire["schema_version"], 18)
 
 
 #: destination_order(0, 0), pinned so a recipe change cannot pass silently.

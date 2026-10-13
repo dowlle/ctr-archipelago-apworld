@@ -409,8 +409,8 @@ class TestComposedGoalWire(CTRTestBase):
         self.assertEqual(co["goal_bosses"], 2)
         self.assertEqual(co["goal_gems"], 0)
         self.assertEqual(co["goal"], -1)  # no legacy analogue
-        self.assertEqual(co["schema_version"], 16)
-        self.assertEqual(sd["schema_version"], 16)
+        self.assertEqual(co["schema_version"], 18)
+        self.assertEqual(sd["schema_version"], 18)
 
 
 if __name__ == "__main__":
