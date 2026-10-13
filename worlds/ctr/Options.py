@@ -227,7 +227,11 @@ class CustomTracks(OptionDict):
     match it.
 
     The only known track is baby-t-park, and only purple_gem_cup can be
-    replaced."""
+    replaced.
+
+    An entry may also carry a `title` and an `author`. They only change the
+    name the room and Universal Tracker show for the track's checks; a title
+    that matches a retail track gets "(Custom)" added."""
     # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
     # `custom_tracks` descriptor rather than a throwaway toggle, and full
     # DISPLACEMENT of the replaced cup's destination. Shape, validation,

@@ -444,6 +444,17 @@ def create_regions(world: "ctrAPWorld"):
     world.custom_tracks = (
         reconstruct_custom_tracks_from_wire(ut_passthrough)
         if ut_passthrough else resolve_custom_tracks(world))
+    # Room titles for the generic-slot checks (#306 B+): sanitized and
+    # clash-suffixed at generation, read back from the schema-18
+    # `custom_track_titles` block under Universal Tracker. An older seed
+    # without the block falls back to the compiled title table.
+    from .custom_track_titles import legacy_titles, titles_from_wire
+    world.custom_track_titles = legacy_titles(world.custom_tracks)
+    if ut_passthrough and world.custom_tracks:
+        _wire_titles = titles_from_wire(ut_passthrough.get("custom_track_titles"),
+                                        [e["slot"] for e in world.custom_tracks.values()])
+        if _wire_titles is not None:
+            world.custom_track_titles = _wire_titles
     from .custom_lettersanity import (admitted_custom_ctr_wire_slots,
                                      select_custom_letters, restore_custom_letter_options)
     from .custom_tracks import custom_tracks_to_wire

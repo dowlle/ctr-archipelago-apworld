@@ -133,10 +133,11 @@ class _Encoder:
                 "USEFUL_WEAPON_FAMILIES")
         return ["families", int(count)]
 
-    def ref(self, location: str):
-        loc = self.world.multiworld.get_location(location, self.world.player)
+    def ref(self, location):
+        loc = (self.world.multiworld.get_location(location, self.world.player)
+               if isinstance(location, str) else location)
         if loc.address is None:
-            raise WinLogicExportError(f"CTR win_logic: ref to event {location!r}")
+            raise WinLogicExportError(f"CTR win_logic: ref to event {loc.name!r}")
         self.refs.add(int(loc.address))
         return ["ref", int(loc.address)]
 

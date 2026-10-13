@@ -11,7 +11,8 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
-from . import content_item_pool, characters, sphere0_guard, traps, wumpa_family
+from . import content_item_pool, characters, destinations, named_tracks, sphere0_guard, traps, wumpa_family
+from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
@@ -141,11 +142,20 @@ def generate(world):
     packages = resolve_packages(tracks.get("custom", []))
     candidates = [dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i],
                        laps=3, modes=["trophy"], capabilities=["trophy"], field_size=8) for i in sorted(retail)]
+    # #306: a package whose track key has a named block uses that block's
+    # ids and frozen name; any other package keeps its generic slot ids and is
+    # shown under its sanitized, clash-suffixed room title (B+).
+    named = {p["id"]: destinations.named_track(p["content_id"]) for p in packages}
+    titles = seed_titles([(slot, p["display_name"], p["author"], p["content_id"])
+                          for slot, p in enumerate(packages, 1) if named[p["id"]] is None])
     for slot, package in enumerate(packages, 1):
+        block = named[package["id"]]
+        addressing = (dict(named_block=block.block_index, room_title=block.ap_name) if block
+                      else dict(room_title=titles.get(slot, f"Custom Track {slot}")))
         candidates.append(dict(id="custom/" + package["content_id"] + "/" + package["revision"],
                                origin="custom", package_id=package["id"], custom_slot=slot,
                                display_name=package["display_name"], laps=7, modes=["trophy"],
-                               capabilities=["trophy"], field_size=8))
+                               capabilities=["trophy"], field_size=8, **addressing))
     required = raw.get("required_entries", [])
     ids = {t["id"] for t in candidates}
     if (not isinstance(required, list) or any(type(i) is not str or i not in ids for i in required)
@@ -184,11 +194,9 @@ def generate(world):
             entry_id = "entry/" + track["id"]
             entries.append(dict(id=entry_id, kind="track", track_id=track["id"], modes=["trophy"], merged=False))
             pad.update(entry_id=entry_id, mode_gates=[dict(mode="trophy", stage=1, requirement_id="free")])
-            name = (f"Custom Track {track['custom_slot']}: Trophy Race" if track["origin"] == "custom"
-                    else track["display_name"] + ": Trophy Race")
-            code = CTR_LOCATION_IDS[name]
+            name, code, title = trophy_identity(track)
             checks.append(dict(location=code, owner=track["id"], kind="trophy",
-                               display_name=track["display_name"] + ": Trophy Race",
+                               display_name=title + ": Trophy Race",
                                routes=[dict(entry_id=entry_id, mode="trophy", leg_id=None,
                                             encounter_id=None, own_pad_id=pad["id"], award="win")]))
         pads.append(pad)
@@ -213,6 +221,19 @@ def generate(world):
     world.ctr_content_original_starts = copy.deepcopy(o.start_inventory_from_pool.value)
     world.ctr_starting_character = characters.resolve_starting_character(world)
     return plan
+
+
+def trophy_identity(track):
+    """(location name, code, room title) of a track's Trophy Race check."""
+    if track["origin"] == "custom":
+        title = track.get("room_title", track["display_name"])
+        if "named_block" in track:
+            code = named_tracks.location_code(track["named_block"], "trophy")
+            return LOCATION_BY_CODE[code], code, title
+        name = f"Custom Track {track['custom_slot']}: Trophy Race"
+        return name, CTR_LOCATION_IDS[name], title
+    name = track["display_name"] + ": Trophy Race"
+    return name, CTR_LOCATION_IDS[name], track["display_name"]
 
 
 def predicate(world, node):
@@ -336,11 +357,17 @@ def validate(plan):
             slots.add(slot)
             require(track["laps"] == 7 and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
-            name = f"Custom Track {slot}: Trophy Race"
-        code = CTR_LOCATION_IDS[name]
+            block = destinations.named_track(package["content_id"])
+            if "named_block" in track:
+                require(block is not None and track["named_block"] == block.block_index and
+                        track.get("room_title") == block.ap_name, "named block does not match this build's registry")
+            else:
+                require(block is None, "a track with a named block must use it")
+                require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
+        _name, code, title = trophy_identity(track)
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
         expected_checks[code] = dict(location=code, owner=track["id"], kind="trophy",
-                                    display_name=track["display_name"] + ": Trophy Race",
+                                    display_name=title + ": Trophy Race",
                                     routes=[dict(entry_id=entry["id"], mode="trophy", leg_id=None,
                                                  encounter_id=None, own_pad_id=pad_id, award="win")])
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")

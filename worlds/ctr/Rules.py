@@ -1112,9 +1112,11 @@ def add_podium_placement_rules(world, player, usf_gate):
             if name not in all_names:
                 continue
             if gate_finish_rungs and rung_key in FINISH_RUNG_KEYS:
+                # The Location object, not its name: UT renames custom
+                # locations to their room title (#306 B+).
                 track_branch = (
-                    lambda state, t=trophy_name, p=player:
-                    state.can_reach(t, "Location", p)
+                    lambda state, t=mw.get_location(trophy_name, player):
+                    t.can_reach(state)
                 )
             else:
                 track_branch = raceable
@@ -1238,12 +1240,12 @@ def add_time_trial_and_ctr_requirements(world, player):
                                       s2_count, player)
                 else:
                     s2_term = Has(s2_item, s2_count, player)
-                rule = all_of(Ref(trophy_name, player), s2_term)
+                rule = all_of(Ref(world.multiworld.get_location(trophy_name, player), player), s2_term)
 
                 logging.debug(
                     f"[CTR Rules] {name}: Trophy({trophy_name}) AND stage2 has({s2_item},{s2_count})")
             else:
-                rule = Ref(trophy_name, player)
+                rule = Ref(world.multiworld.get_location(trophy_name, player), player)
 
                 logging.debug(
                     f"[CTR Rules] Added Trophy prerequisite: {name} requires {trophy_name}")

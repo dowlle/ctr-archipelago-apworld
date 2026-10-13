@@ -165,7 +165,11 @@ _REQUIRED_ENTRY_KEYS: FrozenSet[str] = frozenset({
     "minimum_apworld_version", "lev_sha256", "vrm_sha256", "navigation",
     "laps", "replaces", "flags",
 })
-_OPTIONAL_ENTRY_KEYS: FrozenSet[str] = frozenset({"host_level_id", "boxes", "modes"})
+#: `title` and `author` are presentation only (#306 B+): they name the track's
+#: generic-slot checks in the room and in Universal Tracker after sanitizing
+#: and clash suffixes (custom_track_titles.py). They never change an id.
+_OPTIONAL_ENTRY_KEYS: FrozenSet[str] = frozenset({"host_level_id", "boxes", "modes",
+                                                  "title", "author"})
 _ALL_ENTRY_KEYS: FrozenSet[str] = _REQUIRED_ENTRY_KEYS | _OPTIONAL_ENTRY_KEYS
 
 _SHA256_RE = re.compile(r"\A[0-9a-fA-F]{64}\Z")
@@ -342,6 +346,9 @@ def _validate_entry(track_id: str, entry) -> None:
                   f"engine's difficulty and track-metadata tables are sized "
                   f"for exactly those {high + 1} slots. Leave it out for the "
                   f"default ({DEFAULT_HOST_LEVEL_ID}).")
+    for key in ("title", "author"):
+        if key in entry and not isinstance(entry[key], str):
+            _fail(f"entry '{track_id}' key '{key}' must be text.")
     if "boxes" in entry and not isinstance(entry["boxes"], bool):
         _fail(f"entry '{track_id}' key 'boxes' is {entry['boxes']!r}. It must "
               f"be true or false.")
@@ -453,6 +460,7 @@ def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
                 **{k: int(entry["flags"][k]) for k in COUNT_FLAGS},
             },
             **({"modes": dict(entry["modes"])} if "modes" in entry else {}),
+            **{k: entry[k] for k in ("title", "author") if k in entry},
         }
     return normalized
 

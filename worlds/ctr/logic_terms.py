@@ -294,20 +294,30 @@ class Families(Term):
 
 
 class Ref(Term):
-    """`state.can_reach(<location>, "Location", player)`: region access AND
-    that location's own rule. On the wire, a reference to that check's
-    entry."""
+    """`Location.can_reach(state)`: region access AND that location's own rule.
+    On the wire, a reference to that check's entry.
 
-    def __init__(self, location: str, player: int):
-        self.location = location
+    Holds the Location object, not its name (#306 B+): Universal Tracker's
+    regeneration renames generic custom locations to their room title, and a
+    rule that looked its target up by name would then fail. A bare name is
+    still accepted for callers that have no object; it resolves by name at
+    evaluation time, as before."""
+
+    def __init__(self, location, player: int):
+        if isinstance(location, str):
+            self.location, self.spot = location, None
+        else:
+            self.location, self.spot = location.name, location
         self.player = player
 
     def _build(self):
+        if self.spot is not None:
+            return lambda state, spot=self.spot: spot.can_reach(state)
         return (lambda state, t=self.location, p=self.player:
                 state.can_reach(t, "Location", p))
 
     def wire(self, enc):
-        return enc.ref(self.location)
+        return enc.ref(self.spot if self.spot is not None else self.location)
 
 
 # --- installing terms on locations and entrances ---------------------------

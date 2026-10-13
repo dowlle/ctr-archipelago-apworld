@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "test_data": "TEST DATA ONLY. These rows exercise the named-block mechanism in tests and in local Universal Tracker checks. They are not registry entries and are never shipped names.",
+  "registry": {
+    "repository": "fixture",
+    "commit": "0000000000000000000000000000000000000000",
+    "digest": "fixture"
+  },
+  "tracks": [
+    {
+      "track_key": "baby-t-park",
+      "block_index": 0,
+      "ap_name": "Fixture Speedway",
+      "shipped_in": null,
+      "revisions": ["1.0.0", "1.0.2"]
+    },
+    {
+      "track_key": "fixture-crash-cove",
+      "block_index": 1,
+      "ap_name": "Crash Cove (Custom)",
+      "shipped_in": null,
+      "revisions": []
+    },
+    {
+      "track_key": "fixture-crash-cove-b",
+      "block_index": 2,
+      "ap_name": "Crash Cove (Custom, Fixture Author)",
+      "shipped_in": null,
+      "revisions": []
+    }
+  ]
+}

@@ -65,6 +65,10 @@ CTR_LOCATION_CLASSES.register(CORTEX_VORTEX_TRACK_CLASS)
 # Cortex Vortex pad track, so every earlier class keeps its datapackage order.
 # Global Menu checks like itemsanity.
 CTR_LOCATION_CLASSES.register(HIT_CHARACTER_CLASS)
+# Named custom-track blocks (#306): appended last. Empty until the minting step
+# fills data/named_tracks.json, so this registers nothing yet.
+from .named_tracks import NAMED_TRACK_CLASS
+CTR_LOCATION_CLASSES.register(NAMED_TRACK_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
@@ -89,6 +93,13 @@ CTR_LOCATION_CLASSES.assert_disjoint_from(CTR_LOCATION_IDS, "data/locations.json
 for _cls_name, _cls_code, _cls_region in CTR_LOCATION_CLASSES.all_locations():
     CTR_LOCATION_IDS[_cls_name] = _cls_code
     CTR_LOCATION_TO_REGION[_cls_name] = _cls_region
+
+# Named blocks must not collide with any other CTR name or id, and no other id
+# may sit inside a named range (#306).
+from .named_tracks import validate_tracks as _validate_named_tracks
+_validate_named_tracks(
+    NAMED_TRACK_CLASS.tracks,
+    {n: c for n, c in CTR_LOCATION_IDS.items() if n not in set(NAMED_TRACK_CLASS.names())})
 
 
 def get_location_id(name: str):

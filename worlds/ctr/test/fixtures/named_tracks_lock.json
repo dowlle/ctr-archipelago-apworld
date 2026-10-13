@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "tracks": [],
+  "layout": {
+    "locations": [
+      ["trophy", 0, "Trophy Race"],
+      ["held_1st", 1, "Held 1st"],
+      ["held_3rd", 2, "Held 3rd"],
+      ["held_5th", 3, "Held 5th"],
+      ["finish_podium", 4, "Finish on Podium"],
+      ["finish_any", 5, "Finish (Any Position)"],
+      ["relic_sapphire", 6, "Sapphire Time Trial"],
+      ["relic_gold", 7, "Gold Time Trial"],
+      ["relic_platinum", 8, "Platinum Time Trial"],
+      ["ctr_token", 9, "CTR Token Challenge"],
+      ["relic_perfect", 10, "Relic Race Perfect"],
+      ["letter_c", 11, "Letter C"],
+      ["letter_t", 12, "Letter T"],
+      ["letter_r", 13, "Letter R"],
+      ["wumpa", 14, "Reach 10 Wumpa"]
+    ],
+    "items": [
+      ["letter_c", 0, "C"],
+      ["letter_t", 1, "T"],
+      ["letter_r", 2, "R"]
+    ]
+  }
+}
