@@ -6,7 +6,9 @@ mechanism and are never shipped names.
 """
 import copy
 import json
+import os
 import pkgutil
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -27,6 +29,34 @@ def fixture_tracks():
 
 def lock_document():
     return json.loads(pkgutil.get_data("worlds.ctr", "test/fixtures/named_tracks_lock.json"))
+
+
+def parse_lock_tracks(document):
+    return [NamedTrack(row["track_key"], row["block_index"], row["ap_name"])
+            for row in document["tracks"]]
+
+
+def published_baseline():
+    """The last published lock, independent of this branch's own lock file.
+
+    CI writes the PR base's copy to CTR_NAMED_LOCK_BASELINE. Locally the same
+    file is read from the first of the base refs git knows. None when neither
+    exists (the PR that introduces the lock has nothing older to compare to).
+    """
+    path = os.environ.get("CTR_NAMED_LOCK_BASELINE")
+    if path:
+        if not os.path.exists(path) or not os.path.getsize(path):
+            return None
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    for ref in ("origin/dev/custom-pad-0.3.0", "origin/main"):
+        shown = subprocess.run(
+            ["git", "-C", root, "show", f"{ref}:worlds/ctr/test/fixtures/named_tracks_lock.json"],
+            capture_output=True, text=True)
+        if shown.returncode == 0 and shown.stdout.strip():
+            return json.loads(shown.stdout)
+    return None
 
 
 def live_ids():
@@ -98,6 +128,31 @@ class TestFreeze(unittest.TestCase):
                          "regenerate test/fixtures/named_tracks_lock.json with "
                          "`python -m worlds.ctr.named_tracks --print-lock` and review it")
 
+    def test_shipped_rows_match_the_published_baseline(self):
+        """The lock above lives in this branch, so regenerating it hides a
+        change. The baseline is the lock as last published (the PR base or the
+        previous commit), fetched by CI into CTR_NAMED_LOCK_BASELINE or read
+        from git locally. A shipped name, id or layout row can never change."""
+        baseline = published_baseline()
+        if baseline is None:
+            self.skipTest("no published baseline lock available (first introduction or no git ref)")
+        self.assertEqual(nt.freeze_violations(baseline["tracks"], destinations.NAMED_TRACKS), [])
+        self.assertEqual(nt.layout_violations(baseline["layout"]), [])
+        in_lock = parse_lock_tracks(lock_document())
+        self.assertEqual(nt.freeze_violations(baseline["tracks"], in_lock), [],
+                         "the committed lock rewrote a published row")
+
+    def test_regenerated_lock_cannot_hide_a_rename(self):
+        published = list(fixture_tracks())
+        baseline = nt.lock_rows(published)
+        renamed = [NamedTrack(t.track_key, t.block_index, t.ap_name + " X")
+                   if t.block_index == 0 else t for t in published]
+        regenerated = json.loads(nt.lock_document_text(renamed))
+        self.assertEqual(nt.freeze_violations(regenerated["tracks"], renamed), [],
+                         "the in-branch lock check alone is satisfied")
+        self.assertTrue(nt.freeze_violations(baseline, parse_lock_tracks(regenerated)),
+                        "the published baseline catches it")
+
     def test_append_passes_and_every_change_fails(self):
         tracks = list(fixture_tracks())
         frozen = nt.lock_rows(tracks)
@@ -168,8 +223,21 @@ class TestRegistryRows(unittest.TestCase):
         for first, last, label in nt.RESERVED_ID_RANGES:
             for lo, hi in (nt.NAMED_LOCATION_RANGE, nt.NAMED_ITEM_RANGE):
                 self.assertTrue(last < lo or first > hi, label)
-        every_live = list(ctrAPWorld.location_name_to_id.values()) + list(ctrAPWorld.item_name_to_id.values())
-        for code in every_live:
+        # Named ids belong to their own ranges; every other live id must sit in
+        # the reservation table. Pinning the registry export mints named ids,
+        # so the two sets are checked separately.
+        named_locations = set(nt.NAMED_TRACK_CLASS.names())
+        named_items = {row["name"] for row in nt.NAMED_TRACK_ITEM_DATA}
+        for name, code in ctrAPWorld.location_name_to_id.items():
+            if name in named_locations:
+                self.assertTrue(nt.NAMED_LOCATION_RANGE[0] <= code <= nt.NAMED_LOCATION_RANGE[1],
+                                f"named location {name!r} has {code} outside its range")
+        for name, code in ctrAPWorld.item_name_to_id.items():
+            if name in named_items:
+                self.assertTrue(nt.NAMED_ITEM_RANGE[0] <= code <= nt.NAMED_ITEM_RANGE[1],
+                                f"named item {name!r} has {code} outside its range")
+        other_locations, other_items = live_ids()
+        for code in list(other_locations.values()) + list(other_items.values()):
             self.assertTrue(any(first <= code <= last for first, last, _ in nt.RESERVED_ID_RANGES),
                             f"live code {code} is outside the reservation table; add its range")
 

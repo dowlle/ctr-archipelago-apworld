@@ -127,6 +127,42 @@ class TestLegacyPathTitles(unittest.TestCase):
         self.assertEqual(package, ctrAPWorld.get_data_package_data(), "registered package mutated")
 
 
+class TestSharedItemOwners(unittest.TestCase):
+    """Two CTR players share one generic letter item code (#306 review)."""
+
+    CODE = custom_check_code("letter_item", 1, 0)
+
+    def room(self, titles_p2):
+        from types import SimpleNamespace as NS
+        canonical_name = "Letter C (Custom Track 1)"
+        package = {"location_name_to_id": {}, "location_name_groups": {},
+                   "item_name_to_id": {canonical_name: self.CODE}, "item_name_groups": {}}
+        item = lambda player: NS(player=player, code=self.CODE)
+        locations = [NS(address=None, item=item(1), player=1), NS(address=None, item=item(2), player=2)]
+        worlds = {1: NS(game=GAME, custom_track_titles={1: "Baby T Park"}),
+                  2: NS(game=GAME, custom_track_titles=titles_p2)}
+        mw = NS(player_ids=[1, 2], worlds=worlds, player_name={1: "Ana", 2: "Bo"},
+                precollected_items={}, get_locations=lambda player=None: [
+                    l for l in locations if player is None or l.player == player])
+        multidata = {"datapackage": {GAME: package}}
+        with patch("worlds.ctr.custom_track_datapackage.location_aliases", return_value={}), \
+                patch("worlds.ctr.custom_track_datapackage.data_package_checksum", return_value="x"):
+            embed_track_names(mw, multidata, GAME)
+        return multidata["datapackage"][GAME]["item_name_to_id"]
+
+    def test_player_without_title_keeps_canonical_name_visible(self):
+        names = self.room({})
+        self.assertEqual(sorted(names.values()), [self.CODE])
+        (label,) = names
+        self.assertIn("Letter C (Baby T Park) (Ana, P1)", label)
+        self.assertIn("Letter C (Custom Track 1) (Bo, P2)", label)
+
+    def test_both_titled_players_are_named(self):
+        (label,) = self.room({1: "Neon Rush"})
+        self.assertIn("Baby T Park", label)
+        self.assertIn("Neon Rush", label)
+
+
 class FixtureRegistry:
     """Load the fixture rows as if a build had minted them (test data only)."""
 

@@ -195,6 +195,7 @@
           "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
         },
         "content_id": {
+          "description": "Stable content identity of the package. For a track in the CTR custom-track registry it carries the registry track_key verbatim (the apworld looks the named id block up by this string); the wire name is kept so schema 1 plans and the native registry stay compatible.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64,

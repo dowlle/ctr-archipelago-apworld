@@ -38,6 +38,12 @@ an offset, once shipped, keeps its family and spelling forever. Offsets 15 to
 cup leg victory, lap completion) and are minted only through the unfreeze
 register. FROZEN-NAME WARNING: once a block ships, its ids and names are
 permanent; freeze_violations() and test_named_tracks.py enforce that.
+The rule is checked against an independent baseline: the lock file
+(test/fixtures/named_tracks_lock.json) as last published. CI fetches the PR
+base's copy (the previous commit on a push) into CTR_NAMED_LOCK_BASELINE; a
+local run reads it from git (origin/dev/custom-pad-0.3.0, then origin/main).
+Regenerating the lock in the same branch therefore cannot hide a changed
+ap_name, block_index, name or id. Only appending is accepted.
 """
 import json
 import pkgutil

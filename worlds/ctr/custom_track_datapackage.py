@@ -65,6 +65,7 @@ def embed_track_names(multiworld, multidata, game: str) -> None:
     item_owners = defaultdict(list)
     changed = set()
     changed_items = set()
+    ctr_players = []
     for player in sorted(multiworld.player_ids):
         world = multiworld.worlds[player]
         if world.game != game:
@@ -80,12 +81,17 @@ def embed_track_names(multiworld, multidata, game: str) -> None:
             if label != canonical[code]:
                 changed.add(code)
         # #306 B+: generic custom letter items take the room title too.
-        renamed_items = item_aliases(world)
-        if renamed_items:
+        ctr_players.append((player, item_aliases(world)))
+    # Record every owner, canonical name when there is no alias, so a shared
+    # generic code is never labelled for a player who has no title. Needed only
+    # when some player renames items at all.
+    if any(renamed for _player, renamed in ctr_players):
+        for player, renamed_items in ctr_players:
             for code in sorted(_owned_item_codes(multiworld, player)):
-                if code in renamed_items and code in canonical_items:
-                    item_owners[code].append((player, renamed_items[code]))
-                    if renamed_items[code] != canonical_items[code]:
+                if code in canonical_items:
+                    label = renamed_items.get(code, canonical_items[code])
+                    item_owners[code].append((player, label))
+                    if label != canonical_items[code]:
                         changed_items.add(code)
     if not changed and not changed_items:
         return

@@ -159,7 +159,7 @@ def titles_from_wire(block, slots: Iterable[int]) -> Optional[Dict[int, str]]:
     one of the seed's custom slots, so a forged block cannot rename anything
     the seed does not own.
     """
-    if not isinstance(block, Mapping) or block.get("version") != TITLES_WIRE_VERSION:
+    if not isinstance(block, Mapping) or type(block.get("version")) is not int or block["version"] != TITLES_WIRE_VERSION:
         return None
     rows = block.get("tracks")
     if not isinstance(rows, (list, tuple)):

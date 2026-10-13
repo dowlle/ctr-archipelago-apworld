@@ -73,7 +73,8 @@ class TestTitlesWire(unittest.TestCase):
             {"slot": 1, "title": "Baby T Park"}, {"slot": 2, "title": "Crash Cove (Custom)"}]})
         self.assertEqual(ct.titles_from_wire(block, [1, 2]), titles)
         bad = [
-            None, {"version": 2, "tracks": []}, {"version": 1, "tracks": {}},
+            None, {"version": True, "tracks": []}, {"version": 1.0, "tracks": []}, {"version": "1", "tracks": []},
+            {"version": 2, "tracks": []}, {"version": 1, "tracks": {}},
             {"version": 1, "tracks": [{"slot": 3, "title": "X"}]},
             {"version": 1, "tracks": [{"slot": 1, "title": "[X]"}]},
             {"version": 1, "tracks": [{"slot": True, "title": "X"}]},

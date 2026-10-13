@@ -43,6 +43,22 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch the published named-track lock (freeze baseline)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The lock in this branch can be regenerated, so the freeze test
+          # compares against the copy from the PR base (or the previous
+          # commit on a push). Absent in the base means first introduction.
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          out="$RUNNER_TEMP/named_tracks_lock.baseline.json"
+          : > "$out"
+          if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ] \
+              && git fetch --depth=1 origin "$base" 2>/dev/null; then
+            git show "FETCH_HEAD:worlds/ctr/test/fixtures/named_tracks_lock.json" > "$out" 2>/dev/null || : > "$out"
+          fi
+          echo "CTR_NAMED_LOCK_BASELINE=$out" >> "$GITHUB_ENV"
+          wc -c "$out"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -105,6 +121,9 @@ jobs:
           # logic, so it needs the tracker world installed and its own hook. It
           # also forces accessibility: full, because a tracker divergence shows
           # up as locations the server reached and the tracker did not.
+          # Custom tracks stay out of this arm (ruling of 2026-10-13): the meta
+          # file pins `custom_tracks: {}`. Their Universal Tracker behaviour is
+          # covered by worlds/ctr/test/test_ut_room_names.py instead.
           - {check_name: check-ut,                    check_runs: 500,  check_hook: 'worlds.tracker.fuzzer_hook:Hook',                           check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
@@ -180,7 +199,7 @@ jobs:
             extra_args+=(--hook "$CHECK_HOOK")
           fi
           if [ "$CHECK_META" = "accessibility-full" ]; then
-            printf 'Crash Team Racing:\n  accessibility: full\n' > ci_meta.yaml
+            printf 'Crash Team Racing:\n  accessibility: full\n  custom_tracks: {}\n' > ci_meta.yaml
             cat ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi

@@ -142,6 +142,11 @@ def generate(world):
     packages = resolve_packages(tracks.get("custom", []))
     candidates = [dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i],
                        laps=3, modes=["trophy"], capabilities=["trophy"], field_size=8) for i in sorted(retail)]
+    # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
+    # `track_key`. The package descriptor carries it in its existing wire field
+    # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
+    # schema 1 plans and the native registry do not change. Lookups below are
+    # therefore by track_key.
     # #306: a package whose track key has a named block uses that block's
     # ids and frozen name; any other package keeps its generic slot ids and is
     # shown under its sanitized, clash-suffixed room title (B+).
