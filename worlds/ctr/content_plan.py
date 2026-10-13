@@ -11,7 +11,7 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
-from . import content_item_pool, characters, traps, wumpa_family
+from . import content_item_pool, characters, sphere0_guard, traps, wumpa_family
 from .custom_tracks import BABY_T_PARK_PROFILES
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
@@ -157,12 +157,21 @@ def generate(world):
     world.random.shuffle(chosen)
     registry = pad_registry()
     world.random.shuffle(registry)
-    # Empty pads are valid, but a fresh Adventure must have a playable entry.
-    # Keep content/counts and every physical gate unchanged. Only resolve an
-    # otherwise dead shuffled layout by exchanging an occupied and open seat.
-    if chosen and not any(keys == 0 for _, _, keys in registry[:len(chosen)]):
-        source = world.random.randrange(len(chosen))
-        destination = world.random.choice([i for i, (_, _, keys) in enumerate(registry) if keys == 0])
+    # Empty pads are valid, but a fresh Adventure must start with at least
+    # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
+    # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
+    # content/counts and every physical gate unchanged and grant no item: only
+    # a layout that falls short exchanges a gated occupied seat with an open
+    # empty one, until enough open seats hold content. A layout that already
+    # has enough takes no draw here, so its seed is unchanged.
+    need = min(len(chosen), sphere0_guard.MIN_STARTING_CHECKS)
+    while sum(keys == 0 for _, _, keys in registry[:len(chosen)]) < need:
+        gated = [i for i in range(len(chosen)) if registry[i][2] != 0]
+        empty = [i for i in range(len(chosen), len(registry)) if registry[i][2] == 0]
+        if not gated or not empty:
+            break
+        source = world.random.choice(gated)
+        destination = world.random.choice(empty)
         registry[source], registry[destination] = registry[destination], registry[source]
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]

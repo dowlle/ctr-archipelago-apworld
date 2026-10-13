@@ -86,15 +86,31 @@ class TestContentPlan(CTRTestBase):
 
     def test_empty_pad_draw_retains_a_playable_start(self):
         from Fill import distribute_items_restrictive
+        from .. import sphere0_guard
         # Before the feasible-placement guard, this real seed left all five
-        # N. Sanity pads empty, although nineteen entries were selected.
+        # N. Sanity pads empty, although nineteen entries were selected. A
+        # single exchanged seat then gave one starting check, which main's
+        # start-check guard refuses; the draw now fills two open seats.
         world = make_world(profile_options(), seed=693)
-        self.assertGreater(len(world.multiworld.get_reachable_locations()), 0)
+        self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world), sphere0_guard.MIN_STARTING_CHECKS)
         self.assertEqual(len(world.multiworld.precollected_items[1]), 0)
         distribute_items_restrictive(world.multiworld)
         self.assertTrue(world.multiworld.can_beat_game())
         self.assertEqual(len(world.ctr_content_plan["tracks"]), 19)
         self.assertEqual(world.ctr_content_plan["items"]["filler_count"], 5)
+
+    def test_profile_seeds_start_with_enough_checks(self):
+        from .. import sphere0_guard
+        # Seeds 0-999 of this profile: 16 of them drew fewer than two open
+        # starting checks before the draw guaranteed MIN_STARTING_CHECKS
+        # (2026-10-13). Every seed must now generate, through generate_basic's
+        # start-check guard, with no starting item.
+        for seed in range(1000):
+            with self.subTest(seed=seed):
+                world = make_world(profile_options(), seed=seed)
+                self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world),
+                                        sphere0_guard.MIN_STARTING_CHECKS)
+                self.assertEqual(len(world.multiworld.precollected_items[1]), 0)
 
     def test_wire_rejects_semantic_forgery(self):
         original = self.world.fill_slot_data()
