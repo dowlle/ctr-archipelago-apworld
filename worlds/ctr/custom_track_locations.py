@@ -13,11 +13,12 @@ by that seed's normal podium options.
 """
 from typing import List, Mapping
 
+from . import destinations
 from .location_class import LocationClass
 from .podium import SLOT_ORDER, created_rung_keys_from_options
 
 
-CUSTOM_TRACK_SLOT_COUNT = 32
+CUSTOM_TRACK_SLOT_COUNT = destinations.CUSTOM_TRACK_SLOT_COUNT
 CUSTOM_TROPHY_CODE_BASE = 35016300
 CUSTOM_PODIUM_CODE_BASE = 35016400
 
@@ -31,7 +32,7 @@ _RUNG_SUFFIX = {
 
 
 def slot_region(slot: int) -> str:
-    return f"Custom Track {slot}"
+    return destinations.custom_slot_region(slot)
 
 
 def slot_for_track_id(tracks: Mapping[str, Mapping], track_id: str) -> int:

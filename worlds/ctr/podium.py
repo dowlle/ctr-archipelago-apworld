@@ -47,9 +47,8 @@ module-level functions at the bottom are an unchanged facade over that class:
 shape (a dead-end "<track>: Podium" region with rule-True entrances) and its
 slot_data block stay HERE, because they are podium's, not the family's.
 """
-import json
-import pkgutil
 
+from . import destinations
 from .cortex_vortex_track import CORTEX_VORTEX
 from .cortex_vortex_track import PODIUM_CODE_BASE as CORTEX_VORTEX_PODIUM_CODE_BASE
 from .location_class import LocationClass
@@ -91,20 +90,15 @@ _RUNG_SUFFIX["finish_any"] = _RUNG_SUFFIX["any"]
 
 
 def _trophy_tracks():
-    """The 16 trophy-race track names in canonical (trophy-code) order, read from
-    data/locations.json so the podium codes/order can never drift from the
-    trophy block they parallel."""
-    data = json.loads(
-        pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
-    )
-    tt = [(loc["code"], loc["region"]) for loc in data
-          if loc["name"].endswith(": Trophy Race") and loc["code"] is not None]
-    return [region for _code, region in sorted(tt)]
+    """The 16 trophy-race track names in canonical (trophy-code) order, read
+    from data/locations.json through the destination table so the podium
+    codes/order can never drift from the trophy block they parallel."""
+    return destinations.tracks_with_suffix(": Trophy Race")
 
 
 # Canonical, stable track order (module import time). 16 entries.
 TROPHY_TRACKS = _trophy_tracks()
-TRIAL_TRACKS = ("Slide Coliseum", "Turbo Track")
+TRIAL_TRACKS = destinations.TRIAL_TRACKS
 TRIAL_PODIUM_CODE_BASE = 35015200
 #: Cortex Vortex as a pad track (2026-09-13 contract): one five-rung row in
 #: SLOT_ORDER at 35026010..014 (CORTEX_VORTEX_PODIUM_CODE_BASE, imported from

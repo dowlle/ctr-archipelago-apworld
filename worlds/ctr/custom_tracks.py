@@ -75,6 +75,8 @@ from typing import Dict, FrozenSet, List, Mapping, Tuple
 
 from Options import OptionError
 
+from . import destinations
+
 logger = logging.getLogger(__name__)
 
 #: Wire-block version, independent of the seed's `schema_version`. Bump this
@@ -111,7 +113,7 @@ TRACK_DISPLAY_NAMES: Dict[str, str] = {
 #: never inherits a rule it never asked for. Only the Purple Gem Cup is ruled
 #: today; any other value is refused.
 REPLACEABLE_DESTINATIONS: Dict[str, Tuple[str, int]] = {
-    "purple_gem_cup": ("Purple Gem Cup", 104),
+    "purple_gem_cup": destinations.cup_destination("Purple Gem Cup"),
 }
 
 #: The arcade slot the custom bytes borrow when the descriptor does not say.

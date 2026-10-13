@@ -19,6 +19,8 @@ later reads a design preference as evidence.
 from dataclasses import dataclass
 from typing import FrozenSet
 
+from . import destinations
+
 
 STATUS_CONFIRMED = "confirmed"
 STATUS_RULED = "ruled"
@@ -157,6 +159,12 @@ RULED_TROPHY_GROUP = DifficultyTrackGroup(
 #: measured flags say nothing about boost), so each created custom Trophy Race
 #: takes the ruled requirement too.
 CUSTOM_TRACK_SLOTS_RULED = True
+
+# Every track named by a record or group is a destination in the shared table,
+# so a rename or removal there fails here at import.
+destinations.require_all(record.track for record in CONFIRMED_FINISH_CAPABILITIES)
+destinations.require_all(OPTIONAL_TROPHY_TRACKS)
+destinations.require_all(EASY_TROPHY_GROUP.tracks | RULED_TROPHY_GROUP.tracks)
 
 assert not (EASY_TROPHY_GROUP.tracks & RULED_TROPHY_GROUP.tracks), \
     "a track cannot be both measured and ruled"
