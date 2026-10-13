@@ -9,7 +9,7 @@ slot_data is unchanged.
 from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
-               progressive_capability, version, wumpa_family)
+               progressive_capability, traps, version, wumpa_family)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
 from .custom_tracks import (custom_tracks_to_wire, resolved_custom_tracks)
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs_table
@@ -215,6 +215,11 @@ def resolve_itemsanity_checks(world) -> Dict[str, object]:
     }
 
 
+#: The global slot_data schema this apworld emits for a normal seed. The
+#: 0.3.0 wire changes share this one step; the number is fixed at integration.
+SLOT_DATA_SCHEMA = 18
+
+
 def fill_slot_data(world) -> Dict[str, object]:
     if hasattr(world, "ctr_content_plan"):
         from . import content_plan
@@ -275,7 +280,13 @@ def fill_slot_data(world) -> Dict[str, object]:
     # global schema 16: a block-2 client refuses a block-3 seed visibly,
     # while a global bump would only add the out-of-date banner to every
     # seed with Hit Character off.
-    schema = 16
+    # Schema 18 (0.3.0 wire step, issue #307 first): the required top-level
+    # `trap_identities` block names each trap item's effect by its stable key.
+    # A schema-18 native refuses every trap of a seed that lacks the block, so
+    # the number must move with it; a pre-18 client shows the out-of-date
+    # banner and applies its frozen trap table, which agrees because trap item
+    # ids never move. 17 is the separately admitted content-plan profile.
+    schema = SLOT_DATA_SCHEMA
     slot_data: Dict[str, object] = {
         "Seed": world.multiworld.seed_name,
         "Slot": world.multiworld.player_name[world.player],
@@ -633,4 +644,5 @@ def fill_slot_data(world) -> Dict[str, object]:
     # native ignores the key and keeps the 0.2.3 send behaviour.
     from .win_logic import wire_block
     slot_data["win_logic"] = wire_block(world)
+    slot_data["trap_identities"] = traps.trap_identities_block(world.item_name_to_id)
     return slot_data

@@ -67,8 +67,8 @@ class TestColorBoxesByItemOff(CTRTestBase):
 
     def test_schema_version_is_not_bumped(self):
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 16)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
+        self.assertEqual(slot_data["schema_version"], 18)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 18)
 
 
 class TestColorBoxesByItemIsGenerationNeutral(CTRTestBase):

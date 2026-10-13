@@ -50,8 +50,8 @@ class TestDeathLinkRaceLoss(CTRTestBase):
 
     def test_schema_version_is_not_bumped(self):
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 16)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
+        self.assertEqual(slot_data["schema_version"], 18)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 18)
 
     def test_ut_passthrough_and_restore(self):
         # interpret_slot_data hands the seed's slot_data back verbatim, so the

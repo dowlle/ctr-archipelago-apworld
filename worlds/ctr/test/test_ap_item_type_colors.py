@@ -72,8 +72,8 @@ class TestApItemTypeColorsOff(CTRTestBase):
         # unconditional #166 bump (Q28 ruling); this feature itself contributes
         # no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 16)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
+        self.assertEqual(slot_data["schema_version"], 18)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 18)
 
 
 class TestApItemTypeColorsIsGenerationNeutral(CTRTestBase):

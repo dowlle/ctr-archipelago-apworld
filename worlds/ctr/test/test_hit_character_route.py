@@ -649,8 +649,8 @@ class TestBuildIdentity(unittest.TestCase):
         co = wire["ctr_options"]
         self.assertEqual(co["build_version"], "0.2.4")
         self.assertEqual(co["world_version"], "0.2.4")
-        self.assertEqual(co["schema_version"], 16)
-        self.assertEqual(wire["schema_version"], 16)
+        self.assertEqual(co["schema_version"], 18)
+        self.assertEqual(wire["schema_version"], 18)
 
 
 if __name__ == "__main__":

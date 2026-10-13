@@ -29,7 +29,7 @@ class TestBits(CTRTestBase):
         self.assertEqual(set(self.world.options.death_link_send.value),
                          {"follow_death_link"})
         self.assertEqual(_emitted(self), 0)
-        self.assertEqual(self.world.fill_slot_data()["schema_version"], 16)
+        self.assertEqual(self.world.fill_slot_data()["schema_version"], 18)
 
     def test_from_any_distinguishes_unset_from_empty(self):
         # A YAML that omits the option gets the class default (sentinel); an

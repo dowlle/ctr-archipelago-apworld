@@ -14,10 +14,17 @@ between them is a player-visible bug:
   3. THE BUILDABLE FLAG. Whether native has an effect for this identity in the
      shipped build. Only buildable traps are ever drawn into a pool.
 
-The buildable entries are ORDER-LOAD-BEARING: their order is native's
-AP_TrapEffect enum order (ap/ap_traps.h), and native maps the received item
-index (AP_TRAP_ITEM_FIRST_INDEX + effect, ap_hooks.c) straight onto that enum.
-Reordering them here re-points every trap in the game.
+THE KEY IS THE WIRE IDENTITY (issue #307, slot_data schema 18). Each seed
+carries a `trap_identities` block mapping every trap item id to its key, and
+native applies a received trap only when that key is the one it has for the
+item; anything else is refused with a log line instead of firing a guessed
+effect. Neither side derives an effect from list position any more, so this
+registry's order is not load-bearing on the wire. It is still kept in native
+AP_TrapEffect enum order and pinned, row for row, by the shared fixture
+test/fixtures/trap_identities.json (a byte-identical copy of native's
+tools/fixtures/trap_identities.json). A new trap (#455, #248) appends one row
+here, one id in data/items.json and one fixture row in both repositories;
+nothing existing moves and no key is ever renamed.
 
 RENAMES, 0.2.0 (ruled 2026-08-19 in the trap rework design
 notebook). Names only; every id is unchanged:
@@ -59,7 +66,8 @@ class TrapEntry(NamedTuple):
     origin: str
 
 
-#: Every trap identity, in datapackage id order and native AP_TrapEffect order.
+#: Every trap identity, in datapackage id order and native AP_TrapEffect order
+#: (pinned by test/fixtures/trap_identities.json; append only).
 TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     # Native AP_TrapEffect 0-4, ids 35010016-35010020.
     TrapEntry("icy_road",         "Icy Road",         5, True,  "shipped"),
@@ -89,7 +97,7 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
 )
 
-#: The BUILDABLE draw list, pinned to native's AP_TrapEffect enum order.
+#: The BUILDABLE draw list, in registry order.
 TRAP_ITEM_NAMES: List[str] = [e.name for e in TRAP_REGISTRY if e.buildable]
 
 #: The 11 names the #177 freeze minted, in items.json append order.
@@ -113,6 +121,22 @@ TRAP_WEIGHT_KEYS: Tuple[str, ...] = tuple(e.key for e in TRAP_REGISTRY)
 DEFAULT_TRAP_WEIGHTS: Dict[str, int] = {e.key: e.weight for e in TRAP_REGISTRY}
 
 _KEY_TO_ENTRY: Dict[str, TrapEntry] = {e.key: e for e in TRAP_REGISTRY}
+
+#: Version of the slot_data `trap_identities` block (#307). Native refuses a
+#: block whose version it does not know, and with it every trap of the seed.
+TRAP_IDENTITIES_VERSION = 1
+
+
+def trap_identities_block(item_name_to_id: Dict[str, int]) -> Dict[str, object]:
+    """The slot_data `trap_identities` block: every registered trap item id
+    (as a decimal string, JSON object keys being strings) mapped to its stable
+    effect key. Emitted on every schema-18 seed, whether or not the pool holds
+    traps, so the wire never depends on trap_fill or on the draw."""
+    return {
+        "version": TRAP_IDENTITIES_VERSION,
+        "items": {str(item_name_to_id[e.name]): e.key for e in TRAP_REGISTRY},
+    }
+
 
 #: Highest legal weight. 0 disables an effect; the scale is relative, so the
 #: ceiling exists only to catch a value that is obviously not a weight.

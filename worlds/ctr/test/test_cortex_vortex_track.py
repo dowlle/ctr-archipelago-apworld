@@ -81,7 +81,7 @@ def _ut_regen(wire, seed=99):
 
 class TestOptionOff(unittest.TestCase):
     """With the option off nothing about the seed may change beyond the two
-    unconditional wire facts: the current schema (16 since Hit Character) and
+    unconditional wire facts: the current schema (18 since the 0.3.0 wire step) and
     the 0 scalar."""
 
     @classmethod
@@ -97,8 +97,8 @@ class TestOptionOff(unittest.TestCase):
 
     def test_wire_carries_only_the_scalar_and_schema(self):
         wire = _wire(self.mw)
-        self.assertEqual(wire["schema_version"], 16)
-        self.assertEqual(wire["ctr_options"]["schema_version"], 16)
+        self.assertEqual(wire["schema_version"], 18)
+        self.assertEqual(wire["ctr_options"]["schema_version"], 18)
         self.assertEqual(wire["ctr_options"]["cortex_vortex_track"], 0)
         self.assertNotIn("cortex_vortex_track", wire)
         self.assertNotIn(DESTINATION_ID, wire["warp_pad_map"].values())
