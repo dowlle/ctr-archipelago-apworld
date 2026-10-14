@@ -257,12 +257,110 @@ def boss_hub_level_ids() -> Dict[str, List[int]]:
 # -- custom tracks ----------------------------------------------------------
 
 #: Generic custom-track slots: one per destination surface. Named custom
-#: blocks for known tracks belong beside this, keyed by track id.
+#: blocks for known tracks sit beside them (below), keyed by track key.
 CUSTOM_TRACK_SLOT_COUNT = 32
 
 
 def custom_slot_region(slot: int) -> str:
     return f"Custom Track {slot}"
+
+
+# -- named custom tracks (#306) ---------------------------------------------
+#
+# A track the apworld knows gets its own named id block, the way Cortex Vortex
+# has one, so every surface shows its real name. The rows come from one data
+# file, data/named_tracks.json, generated from a pinned commit of the public
+# track registry. This module only reads and shape-checks the rows; the id
+# math, names, freeze and collision rules live in named_tracks.py.
+#
+# Identity per row: `track_key` (never changes, never reused), `block_index`
+# (assigned by the registry, monotonic, never reused) and `ap_name` (the frozen
+# name stem, fixed when the block first ships). Presentation titles are not
+# identity and are not stored here.
+
+NAMED_TRACKS_FILE = "data/named_tracks.json"
+NAMED_TRACKS_FORMAT = 1
+#: Room for 10,000 named tracks (ruled 2026-10-13).
+NAMED_TRACK_LIMIT = 10000
+_TRACK_KEY_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-")
+
+
+@dataclass(frozen=True)
+class NamedTrack:
+    track_key: str
+    block_index: int
+    ap_name: str
+    #: First apworld version that minted the block; None for an unshipped row.
+    shipped_in: Optional[str] = None
+    #: Revision ids the registry reviewed for this track (informational).
+    revisions: Tuple[str, ...] = ()
+
+
+def parse_named_tracks(document: Mapping) -> Tuple[NamedTrack, ...]:
+    """Shape-check one named-track data document; rows in block order.
+
+    Raises ValueError on anything malformed, so a bad generated file fails at
+    import instead of minting a wrong name.
+    """
+    if not isinstance(document, Mapping) or document.get("format") != NAMED_TRACKS_FORMAT:
+        raise ValueError(f"named tracks: format must be {NAMED_TRACKS_FORMAT}")
+    if set(document) - {"format", "registry", "test_data", "tracks"}:
+        raise ValueError("named tracks: unknown top-level field")
+    rows = document.get("tracks")
+    if not isinstance(rows, list):
+        raise ValueError("named tracks: tracks must be a list")
+    out: List[NamedTrack] = []
+    for row in rows:
+        if not isinstance(row, Mapping) or set(row) - {
+                "track_key", "block_index", "ap_name", "shipped_in", "revisions"}:
+            raise ValueError(f"named tracks: bad row {row!r}")
+        key, index, name = row.get("track_key"), row.get("block_index"), row.get("ap_name")
+        if (not isinstance(key, str) or not 1 <= len(key) <= 64
+                or set(key) - _TRACK_KEY_CHARS or key.startswith("-")
+                or key.endswith("-") or "--" in key):
+            raise ValueError(f"named tracks: invalid track_key {key!r}")
+        if type(index) is not int or not 0 <= index < NAMED_TRACK_LIMIT:
+            raise ValueError(f"named tracks: {key}: block_index outside "
+                             f"0..{NAMED_TRACK_LIMIT - 1}")
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise ValueError(f"named tracks: {key}: invalid ap_name {name!r}")
+        shipped = row.get("shipped_in")
+        if shipped is not None and not isinstance(shipped, str):
+            raise ValueError(f"named tracks: {key}: shipped_in must be a string or null")
+        revisions = row.get("revisions", [])
+        if not isinstance(revisions, list) or not all(isinstance(r, str) for r in revisions):
+            raise ValueError(f"named tracks: {key}: revisions must be a list of strings")
+        out.append(NamedTrack(key, index, name, shipped, tuple(revisions)))
+    for attr in ("track_key", "block_index"):
+        values = [getattr(t, attr) for t in out]
+        if len(set(values)) != len(values):
+            raise ValueError(f"named tracks: duplicate {attr}")
+    folded = [t.ap_name.casefold() for t in out]
+    if len(set(folded)) != len(folded):
+        raise ValueError("named tracks: duplicate ap_name")
+    # A stem equal to a destination name would put two families under one name.
+    destination_names = {d.key.casefold() for d in BY_KEY.values()}
+    destination_names |= {d.region_name.casefold() for d in BY_KEY.values()}
+    for t in out:
+        if t.ap_name.casefold() in destination_names:
+            raise ValueError(f"named tracks: {t.track_key}: ap_name {t.ap_name!r} "
+                             "is a retail destination name; it needs \"(Custom)\"")
+    return tuple(sorted(out, key=lambda t: t.block_index))
+
+
+def load_named_tracks() -> Tuple[NamedTrack, ...]:
+    return parse_named_tracks(json.loads(
+        pkgutil.get_data(__package__, NAMED_TRACKS_FILE).decode("utf-8")))
+
+
+#: The named tracks this build registers, in block order.
+NAMED_TRACKS: Tuple[NamedTrack, ...] = load_named_tracks()
+NAMED_BY_KEY: Dict[str, NamedTrack] = {t.track_key: t for t in NAMED_TRACKS}
+
+
+def named_track(track_key: str) -> Optional[NamedTrack]:
+    """The named block row for `track_key`, or None (the generic fallback)."""
+    return NAMED_BY_KEY.get(track_key)
 
 
 def cup_destination(region: str) -> Tuple[str, int]:

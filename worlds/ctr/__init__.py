@@ -18,6 +18,8 @@ from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
 from . import cortex_vortex_track
 from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
+from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
+                           validate_tracks as _validate_named_tracks)
 from . import wumpa_family
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
@@ -132,7 +134,7 @@ class ctrAPWorld(World):
     # Item + Location mapping
     _item_data_by_name = {item["name"]: item for item in
                           (*load_item_table(), *CUSTOM_LETTER_ITEM_DATA,
-                           *CORTEX_VORTEX_LETTER_ITEM_DATA)}
+                           *CORTEX_VORTEX_LETTER_ITEM_DATA, *NAMED_TRACK_ITEM_DATA)}
     item_name_to_id = {
         name: item["code"] for name, item in _item_data_by_name.items()
     }
@@ -141,6 +143,12 @@ class ctrAPWorld(World):
     # them rather than silently sharing a code.
     assert len(set(item_name_to_id.values())) == len(item_name_to_id), \
         "two CTR item names share one code"
+    # Named custom-track letter items (#306) sit in their own range; nothing
+    # else may use a name or code there.
+    _validate_named_tracks(
+        NAMED_TRACKS, None,
+        {n: c for n, c in item_name_to_id.items()
+         if n not in {row["name"] for row in NAMED_TRACK_ITEM_DATA}})
     location_name_to_id = get_location_names()
     location_name_groups = CTR_LOCATION_CLASSES.location_name_groups()
 
@@ -645,8 +653,13 @@ class ctrAPWorld(World):
         inventory, because AP's fill cannot begin there or runs out of early
         spots for the item that opens the next check (rulings 2026-10-01 and
         2026-10-02). Universal Tracker skips it: the connected seed already
-        generated."""
+        generated. Inside that regeneration only, aliased custom locations take
+        their room title as their name (#306 B+), so the Tracker Page shows
+        `Baby T Park: Trophy Race` instead of the generic name with the title
+        in brackets. generate_basic is the last step UT runs, after rules."""
         if getattr(self.multiworld, "generation_is_fake", False):
+            from .custom_track_presentation import apply_ut_room_names
+            apply_ut_room_names(self)
             return
         from . import sphere0_guard
         sphere0_guard.raise_if_narrow(self)

@@ -638,6 +638,12 @@ def fill_slot_data(world) -> Dict[str, object]:
         # understands this block's shape as it evolves.
         slot_data["custom_tracks"] = custom_tracks_to_wire(custom_tracks,
                                                             world.options)
+        # Schema 18 (#306 B+): the room title of every generic custom slot,
+        # sanitized and clash-suffixed, so Universal Tracker shows the same
+        # names the room does without a compiled title table.
+        from .custom_track_titles import titles_to_wire
+        slot_data["custom_track_titles"] = titles_to_wire(
+            getattr(world, "custom_track_titles", {}))
     # Race-loss DeathLink stakes (0.2.4, Contract 7m): every win check's
     # logic as data, serialised from the installed rule terms. Always
     # emitted with its own block version; no schema bump, because an older

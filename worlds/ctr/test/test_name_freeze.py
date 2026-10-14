@@ -68,6 +68,10 @@ EXPECTED_CLASSES = [
     # 0.2.1 candidate: the sixteen Hit Character encounter checks, appended
     # last so every earlier class keeps its datapackage order.
     ("hit_character", 16, (35025000,)),
+    # #306 named custom-track blocks, appended last. Phase 1 ships the
+    # mechanism with no tracks, so it registers nothing; the minting step
+    # updates this row with the minted count and blocks.
+    ("named_track", 0, ()),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
