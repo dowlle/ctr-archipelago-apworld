@@ -532,6 +532,9 @@ def create_regions(world: "ctrAPWorld"):
             "N. Oxide Garage: N. Oxide's Challenge",
             "N. Oxide Garage: N. Oxide's Final Challenge",
         }
+    _arena_removed_names = ({f"{track}: Crystal Bonus Round"
+                             for track in destinations.ARENA_TRACKS}
+                            if not opts.include_battle_arenas.value else set())
     # The Cortex Vortex pad track's dropped destination: every location it
     # owns leaves the seed, registered but not created, exactly like the two
     # removals above (Trophy Race, Time Trials, CTR Token Challenge, Crystal
@@ -541,7 +544,8 @@ def create_regions(world: "ctrAPWorld"):
         region = region_lookup[reg["name"]]
         for loc_data in reg.get("locations", []):
             name = loc_data["name"]
-            if name in _relic_removed_names or name in _oxide_removed_names:
+            if (name in _relic_removed_names or name in _oxide_removed_names
+                    or name in _arena_removed_names):
                 continue
             if reg["name"] == _dropped_region:
                 continue
@@ -953,9 +957,10 @@ def create_regions(world: "ctrAPWorld"):
     # vanilla "+1 Key" arena gate is stripped. The
     # hub-floor Key rule kept on the exit mirrors the trial/cup pattern (the hub
     # doors also enforce it structurally); the randomized single-stage requirement
-    # is ANDed on top in Rules.add_warp_pad_unlock_rules. Option OFF or vanilla
-    # mode: the vanilla has('Key', hub+1) gates stay untouched, matching native's
-    # arrKeysNeeded fallback. Native side needs NO code change: an included arena
+    # is ANDed on top in Rules.add_warp_pad_unlock_rules. Option OFF leaves the
+    # region exit in place but removes its location; native closes the physical
+    # pad from the schema-18 option. Vanilla mode with arenas on keeps the
+    # vanilla has('Key', hub+1) gates, matching native's fallback. An included arena
     # always reaches the wire with a non-type-0 stage-1 (a FREE pad emits the
     # explicit type-1/count-0, see to_slot_req), which the LInB battle-maps branch
     # and AP_PadStage1Met enforce verbatim with no vanilla-key AND; the type-0

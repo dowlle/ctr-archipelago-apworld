@@ -591,15 +591,10 @@ class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
 
     - **on** (default): their checks are normal locations and, with
       randomized unlocks, their warp pads get a randomized requirement.
-    - **off**: the arenas stay as in the retail game and nothing in the seed
-      requires them. You can still play them, but their Purple CTR Tokens are
-      out of logic and can open a pad that asks for any CTR Tokens earlier
-      than the tracker expects."""
-    # The off guarantees, precisely: crystal pads vanilla-fixed and never
-    # destination-shuffled; the four Crystal Bonus Round checks keep their
-    # vanilla Purple CTR Tokens LOCKED (no other world's item can hide there);
-    # randomized requirements never demand Purples directly NOR through an
-    # "any tokens" count that only arena play could reach (issue #118).
+    - **off**: the four Crystal Challenge locations leave the seed and the
+      four arena warp pads stay closed. Purple CTR Tokens remain in the item
+      pool and can be found anywhere, and the Purple Gem Cup still asks for
+      them."""
     display_name = "Include Battle Arena Warp Pads"
 
 
