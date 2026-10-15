@@ -37,8 +37,6 @@ import math
 import pkgutil
 import re
 
-from Options import OptionError
-
 from . import destinations, warp_pad_rules
 from .cortex_vortex_track import CORTEX_VORTEX
 
@@ -1264,17 +1262,6 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             _reachable_pads_and_collect(
                 inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
 
-    # Manual rules (#463) stay as written. For an item type fill cannot move
-    # (pinned: see _pinned_items) the synthetic sweep is authoritative, so it
-    # must open that manual pad from what it collected, otherwise the rule
-    # cannot be met and the seed is refused rather than silently weakened. A
-    # pool-shuffled item is seated by fill; the sweep under-approximates it,
-    # exactly as _revalidate_against_shuffle already treats it.
-    if fixed:
-        _require_fixed_open(exits, locations, pad_reqs, stage2_reqs, start,
-                            {t: r for t, r in fixed.items()
-                             if r is not None and r[0] in _pinned_items(world)})
-
     # 3) post-pass (ports lines 465-510), over a sorted copy. Only LOWERS counts,
     # so it cannot break the solvable DAG built above. Applied to both stages.
     # Stage 2 additionally gets a hard count CEILING: a tier-2 gate of "14 trophies"
@@ -1339,7 +1326,12 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # hold every gem). Pool-shuffled types (trophies, tokens, shuffled
         # keys/gems, slider-100 relics) stay lenient: fill seats them freely.
         _o = world.options
-        pinned_items = _pinned_items(world)
+        pinned_items = set()
+        if not bool(_o.shuffle_gems.value):
+            pinned_items.update(GEM_ITEMS)
+            pinned_items.add("AnyGem")
+        if not bool(_o.shuffle_keys.value):
+            pinned_items.add("Key")
         # Issue #152 C5/C6 (Q30 ruling: the drift fix folds into the
         # composition, corrected against intended-final semantics rather than
         # the partly-wrong baseline). The legacy `goal.value == 4` disjunct
@@ -1606,10 +1598,10 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     draw ("Key", 4) straight from the fixed-point inventory -- the exact gate
     the option promises never to produce.
     `fixed` (manual warp pad rules, #463) maps physical pads to rules that are
-    never relaxed, redrawn or counted as unvalidated. A fixed pad of a PINNED
-    item type (the sweep is authoritative there) that is still closed by its
-    own rule when nothing else can change is an OptionError naming the pad and
-    the rule; a pool-shuffled type is left to fill.
+    never relaxed, redrawn or counted as unvalidated, even when the sweep
+    cannot open them. The sweep under-approximates real fill, so a manual rule
+    it cannot open is left to fill and the accessibility check; the item
+    supply ceiling is checked up front (warp_pad_rules.check_supply).
     Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
     fixed = fixed or {}
     relaxed_s1 = {}
@@ -1633,7 +1625,6 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         seen = {start}
         frontier = [start]
         blocked_s1 = []
-        fixed_blocked = []
         while frontier:
             cur = frontier.pop()
             for exit_name, tgt, gate in exits.get(cur, []):
@@ -1648,10 +1639,8 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                         # their VANILLA hubs, so a pad's target being reachable
                         # through another path must not hide that this pad's
                         # own requirement is unsatisfiable.
-                        if track in fixed:
-                            if track not in fixed_blocked:
-                                fixed_blocked.append(track)
-                        elif track not in relaxed_s1 and track not in blocked_s1:
+                        if (track not in fixed and track not in relaxed_s1
+                                and track not in blocked_s1):
                             blocked_s1.append(track)
                         continue
                 if tgt in seen:
@@ -1760,68 +1749,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 pad_reqs[track] = new_req
                 continue
         break
-    fixed_blocked = [t for t in fixed_blocked
-                     if fixed[t] is not None and fixed[t][0] in pinned_items]
-    if fixed_blocked:
-        _raise_fixed_closed(fixed_blocked, fixed)
     return relaxed_s1, relaxed_s2
-
-
-def _pinned_items(world):
-    """Item types real fill cannot relocate this seed (gems with shuffle_gems
-    off, Keys with shuffle_keys off): the synthetic sweep's model of them is
-    authoritative. Every other type is pool-shuffled and fill seats it freely."""
-    o = world.options
-    pinned = set()
-    if not bool(o.shuffle_gems.value):
-        pinned.update(GEM_ITEMS)
-        pinned.add("AnyGem")
-    if not bool(o.shuffle_keys.value):
-        pinned.add("Key")
-    return pinned
-
-
-def _raise_fixed_closed(tracks, fixed):
-    track = sorted(tracks)[0]
-    raise OptionError(
-        f"CTR warp_pad_rules: {track!r} needs "
-        f"{warp_pad_rules.describe(fixed[track])}, but the items a seed can "
-        f"collect before that pad cannot meet it"
-        + (f" (also stuck: {', '.join(sorted(tracks)[1:])})" if len(tracks) > 1 else "")
-        + ". Lower the count, choose another item, or move the rule to a "
-        "pad that opens later.")
-
-
-def _require_fixed_open(exits, locations, pad_reqs, stage2_reqs, start, fixed):
-    """Refuse the seed unless the synthetic sweep opens every manual pad: its
-    host region reached, its hub gate passed and its own rule met by what the
-    sweep collected. Pure read of the same graph the sphere loop used."""
-    inv = Inv()
-    collected = set()
-    _reachable_pads_and_collect(
-        inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
-    pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
-    seen = {start}
-    frontier = [start]
-    opened = set()
-    while frontier:
-        cur = frontier.pop()
-        for exit_name, tgt, gate in exits.get(cur, []):
-            if not all(inv.count(i) >= c for i, c in gate):
-                continue
-            track = pad_exit_to_track.get(exit_name)
-            if track is not None:
-                req = pad_reqs.get(track)
-                if req is not None and inv.count(req[0]) < req[1]:
-                    continue
-                opened.add(track)
-            if tgt in seen:
-                continue
-            seen.add(tgt)
-            frontier.append(tgt)
-    closed = [t for t in fixed if t not in opened]
-    if closed:
-        _raise_fixed_closed(closed, fixed)
 
 
 def deny_four_key_gate(req, mode):

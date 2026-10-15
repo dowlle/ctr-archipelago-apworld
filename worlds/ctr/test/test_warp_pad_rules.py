@@ -258,14 +258,48 @@ class TestLegacyWire(unittest.TestCase):
         world = setup_multiworld(ctrAPWorld, EARLY, seed=1).worlds[1]
         self.assertEqual(world._ctr_pad_rules, {})
 
-    def test_pinned_item_rule_the_sweep_cannot_open_is_refused(self):
-        # Keys are pinned to boss races when shuffle_keys is off, so the sweep is
-        # authoritative: no boss can be reached while every starting pad needs
-        # all four of them.
+    def test_key_rule_with_pinned_keys_is_left_to_fill(self):
+        # The design note's own example. With shuffle_keys off the synthetic
+        # sweep cannot open a Key x 1 pad (the first Key needs four Trophies
+        # from the other three starting pads), but real fill places Trophy
+        # items anywhere, so the seed is solvable and must not be refused.
+        for seed in (1, 2, 3):
+            with self.subTest(seed=seed):
+                mw = build({"Roo's Tubes": rule("Key", 1)}, seed=seed, shuffle_keys=False)
+                self.assertEqual(stage1(mw.worlds[1], "Roo's Tubes"),
+                                 {"type": 2, "count": 1, "colour": -1})
+                distribute_items_restrictive(mw)
+                self.assertTrue(mw.can_beat_game(CollectionState(mw)))
+
+    def test_fill_dead_end_is_reported_with_the_rules_and_the_cause(self):
+        # Every starting pad needs four Keys, which sit behind bosses that need
+        # Trophies: nothing is reachable, so the start guard refuses, and the
+        # message names the rules instead of rescuing the seed.
         rules = {n: rule("Key", 4) for n in
-                 ("Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway")}
-        with self.assertRaisesRegex(OptionError, r"warp_pad_rules.*Key x 4"):
-            build(rules, steps=THROUGH_RULES, shuffle_keys=False)
+                 ("Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway", "Skull Rock")}
+        with self.assertRaisesRegex(OptionError, r"warp_pad_rules \(.*Key x 4"):
+            build(rules, steps=FULL, shuffle_keys=False)
+
+    def test_manual_rules_fill_check_reports_rules_and_cause_without_granting(self):
+        mw = build({"Roo's Tubes": rule("Trophy", 3), "Red Cup": rule("AnyGem", 2)},
+                   seed=1, steps=THROUGH_RULES + ("generate_basic",))
+        world = mw.worlds[1]
+        before = list(mw.precollected_items[1])
+
+        def dead_end(panic):
+            world._ctr_fill_failure = "Not enough locations for progression items."
+            return False
+
+        world._rollback_simulate_fill = dead_end
+        with self.assertRaises(OptionError) as ctx:
+            world._manual_rules_fill_check()
+        text = str(ctx.exception)
+        self.assertIn("Red Cup: AnyGem x 2", text)
+        self.assertIn("Roo's Tubes: Trophy x 3", text)
+        self.assertIn("Not enough locations for progression items.", text)
+        self.assertEqual(mw.precollected_items[1], before)
+        world._rollback_simulate_fill = lambda panic: True
+        world._manual_rules_fill_check()  # a green replay changes nothing
 
     def test_too_few_starting_checks_names_the_rules(self):
         rules = {n: rule("Trophy", 5) for n in
