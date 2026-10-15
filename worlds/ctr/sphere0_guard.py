@@ -114,6 +114,18 @@ def _narrow_cause(world) -> str:
     return "few of its first checks are open without items"
 
 
+def _manual_rules_note(world) -> str:
+    """Sentence naming the player's warp_pad_rules when the slot has any."""
+    from . import warp_pad_rules
+    rules = warp_pad_rules.fixed(world)
+    if not rules:
+        return ""
+    listed = ", ".join(f"{pad}: {warp_pad_rules.describe(rule)}"
+                       for pad, rule in sorted(rules.items()))
+    return (f" Your warp_pad_rules ({listed}) are fixed and were not changed; "
+            f"make one of them free or lower to open more starting checks.")
+
+
 def raise_if_narrow(world) -> None:
     """Refuse the slot when fewer than MIN_STARTING_CHECKS locations are
     reachable from its starting inventory."""
@@ -127,10 +139,11 @@ def raise_if_narrow(world) -> None:
     if breadth == 0:
         raise OptionError(
             f"CTR: {name} has no check it can reach at the start: "
-            f"{_cause(world)}, so the item fill cannot begin. {fix}")
+            f"{_cause(world)}, so the item fill cannot begin. {fix}"
+            f"{_manual_rules_note(world)}")
     raise OptionError(
         f"CTR: {name} can reach only {breadth} check"
         f"{'' if breadth == 1 else 's'} at the start (at least "
         f"{MIN_STARTING_CHECKS} needed): {_narrow_cause(world)}, so the item "
         f"fill can run out of early spots for the item that opens the next "
-        f"check. {fix}")
+        f"check. {fix}{_manual_rules_note(world)}")

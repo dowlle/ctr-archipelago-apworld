@@ -144,6 +144,31 @@ requirement_weights:
   Sapphire Relic: 40
 ```
 
+### Warp Pad Rules
+
+Set the first requirement of chosen warp pads yourself. Each entry names a pad
+(the pad's name without "Warp Pad") and gives an `item` and a `count`:
+
+```yaml
+warppad_unlock_requirements: randomized
+warp_pad_rules:
+  Crash Cove: {item: free, count: 0}
+  "Roo's Tubes": {item: Key, count: 1}
+  Red Cup: {item: Red CTR Token, count: 3}
+  Skull Rock: {item: AnyRelic, count: 2}
+```
+
+`free` needs `count: 0`. The other items are Trophy, Key, a CTR Token colour,
+a Relic tier, a Gem colour, and the sums `AnyCtrToken`, `AnyRelic` and
+`AnyGem`. Counts are whole numbers from 1 up to what the seed has of that item.
+Pads you leave out keep the randomized rule, and a track or cup shuffled onto a
+pad takes that pad's rule. Your rules ignore Requirement Weights, only set the
+first requirement of a pad (Two-Stage Gate Density still adds the second), and
+are never changed to make a seed work: a rule that cannot work stops
+generation with an error that names the pad, the item and the count. The
+option needs randomized or random_without_4_keys unlock requirements, and
+random_without_4_keys refuses a rule of 4 Keys.
+
 ### Custom Tracks
 
 The entry must match a track package this version of the apworld knows,

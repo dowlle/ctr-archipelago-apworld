@@ -37,7 +37,7 @@ import math
 import pkgutil
 import re
 
-from . import destinations
+from . import destinations, warp_pad_rules
 from .cortex_vortex_track import CORTEX_VORTEX
 
 
@@ -1137,10 +1137,20 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # their original relative weights.
     free_candidates = _free_candidates_live(exits, start)
     size = max(_FREE_MIN, _weighted_choice(rnd, FREE_SIZE_WEIGHTS))
+    # Manual warp pad rules (#463) are installed before anything is assigned
+    # to an unlisted pad. A pad the player made free counts toward the
+    # bootstrap size, and no manual pad is drawn into the random free subset.
+    # With no manual rules this block does nothing and draws nothing.
+    fixed = warp_pad_rules.fixed(world)
+    if fixed:
+        size -= sum(1 for t in free_candidates if t in fixed and fixed[t] is None)
+        size = max(0, size)
+        free_candidates = [t for t in free_candidates if t not in fixed]
     size = min(size, len(free_candidates))
     free = rnd.sample(free_candidates, size)
 
     pad_reqs = {t: None for t in free}  # stage-1 reqs (physical-track keyed)
+    pad_reqs.update(fixed)
     # stage2_reqs: dest-track keyed; only the 16 trophy tracks. When collapsed
     # (autounlock), pre-set every trophy track to None (= open, no stage-2 gate)
     # so the loop never assigns one and collection never holds rewards back.
@@ -1261,7 +1271,11 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # location opens). Capping tier-2 counts keeps a real, distinct second stage
     # while leaving fill enough ordering freedom. Counts only ever drop, so the
     # solvable-by-construction DAG is preserved.
+    # Manual rules (#463) are set aside so the post-pass neither lowers nor
+    # caps them, and takes no draw for them. With none, this is the old call.
+    held = {t: pad_reqs.pop(t) for t in fixed}
     _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
+    pad_reqs.update(held)
     _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
 
     # 3a) Issue #342: a REAL stage 2 must add a gate beyond its own pad's stage 1.
@@ -1313,6 +1327,11 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # keys/gems, slider-100 relics) stay lenient: fill seats them freely.
         _o = world.options
         pinned_items = set()
+        if not bool(_o.shuffle_gems.value):
+            pinned_items.update(GEM_ITEMS)
+            pinned_items.add("AnyGem")
+        if not bool(_o.shuffle_keys.value):
+            pinned_items.add("Key")
         # Issue #152 C5/C6 (Q30 ruling: the drift fix folds into the
         # composition, corrected against intended-final semantics rather than
         # the partly-wrong baseline). The legacy `goal.value == 4` disjunct
@@ -1323,11 +1342,6 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # create_items). Gem pin status is a pure function of shuffle_gems,
         # not of the goal, so the goal disjunct is dropped rather than
         # translated to gems_required_goal > 0.
-        if not bool(_o.shuffle_gems.value):
-            pinned_items.update(GEM_ITEMS)
-            pinned_items.add("AnyGem")
-        if not bool(_o.shuffle_keys.value):
-            pinned_items.add("Key")
         # Regions holding PINNED GOAL-PROGRESSION locations: when Gems
         # Required Goal is active AND the 5 Gems are pinned at their cups
         # (shuffle_gems off -- see the pinned_items correction just above),
@@ -1361,7 +1375,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
             dest_to_phys_real, start, allowed, keygate,
-            frozenset(pinned_items), critical_regions, mode)
+            frozenset(pinned_items), critical_regions, mode, fixed)
         world._ctr_s2_relaxed_s1 = relaxed_s1
         world._ctr_s2_relaxed_s2 = relaxed_s2
         # A relaxed stage 1 is redrawn from the fixed-point inventory and can
@@ -1534,7 +1548,8 @@ def run_sphere_search(world, mode, reward_track_for=None,
 def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                                 dest_to_phys, start, allowed, keygate,
                                 pinned_items=frozenset(),
-                                critical_regions=frozenset(), mode=1):
+                                critical_regions=frozenset(), mode=1,
+                                fixed=None):
     """Verify the identity-topology requirement DAG against the ACTUAL shuffled
     graph; relax ONLY the requirements that fail there.
 
@@ -1582,7 +1597,13 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     collapse goes through deny_four_key_gate. Without that, a relaxation could
     draw ("Key", 4) straight from the fixed-point inventory -- the exact gate
     the option promises never to produce.
+    `fixed` (manual warp pad rules, #463) maps physical pads to rules that are
+    never relaxed, redrawn or counted as unvalidated, even when the sweep
+    cannot open them. The sweep under-approximates real fill, so a manual rule
+    it cannot open is left to fill and the accessibility check; the item
+    supply ceiling is checked up front (warp_pad_rules.check_supply).
     Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
+    fixed = fixed or {}
     relaxed_s1 = {}
     relaxed_s2 = {}
     pad_exit_to_track = {_pad_exit_name(t): t for t in HUB_STATIC}
@@ -1618,7 +1639,8 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                         # their VANILLA hubs, so a pad's target being reachable
                         # through another path must not hide that this pad's
                         # own requirement is unsatisfiable.
-                        if track not in relaxed_s1 and track not in blocked_s1:
+                        if (track not in fixed and track not in relaxed_s1
+                                and track not in blocked_s1):
                             blocked_s1.append(track)
                         continue
                 if tgt in seen:
@@ -1679,7 +1701,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         if pinned_items:
             pinned_s1 = sorted(
                 t for t, req in pad_reqs.items()
-                if req is not None and t not in relaxed_s1
+                if req is not None and t not in relaxed_s1 and t not in fixed
                 and req[0] in pinned_items
                 and not _proven_open(t))
             if pinned_s1:
@@ -1713,7 +1735,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         if critical_regions and not critical_regions <= seen:
             unvalidated = sorted(
                 t for t, req in pad_reqs.items()
-                if req is not None and t not in relaxed_s1
+                if req is not None and t not in relaxed_s1 and t not in fixed
                 and not _proven_open(t))
             if unvalidated:
                 track = min(unvalidated,

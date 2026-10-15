@@ -11,13 +11,19 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
-from . import content_item_pool, characters, destinations, named_tracks, sphere0_guard, traps, wumpa_family
+from . import (content_item_pool, characters, destinations, named_tracks, sphere0_guard, traps,
+               warp_pad_rules, wumpa_family)
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
-SCHEMA = 17
+SCHEMA = 18
+MANUAL_FEATURE = "manual_pad_requirements_v1"
+#: Aggregate manual rule -> the counted item names it sums, in wire order.
+#: Native holds the same three lists; the parity fixtures compare them.
+SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
+                "AnyGem": warp_pad_rules.GEMS}
 PADS = json.loads(pkgutil.get_data(__package__, "data/warp_pad_ids.json"))["pads"]
 RETAIL = {row["level_id"]: name.removesuffix(" Warp Pad") for name, row in PADS.items()
           if row["kind"] in ("race", "trial")}
@@ -89,6 +95,76 @@ def _zero_count(value, path):
         return
     error(f"{path}: cups and crystals are not implemented in this experimental standalone profile; "
           "use an explicit zero count. The requested settings were not changed.")
+
+
+PAD_KEY_BY_LEVEL_ID = {d.level_id: d.key for d in destinations.DESTINATIONS}
+
+
+def manual_rules(options):
+    """{physical LevelID -> rule} from warp_pad_rules, or {} when unused.
+    Shape, names and the unlock-mode conflicts are checked here; the supply
+    check needs the item ledger and runs in manual_requirements."""
+    raw = options.warp_pad_rules.value
+    if not raw:
+        return {}
+    rules = warp_pad_rules.parse(raw)
+    mode = int(options.warppad_unlock_requirements.value)
+    if mode == 0:
+        error("warp_pad_rules needs warppad_unlock_requirements randomized or "
+              "random_without_4_keys; with vanilla, remove the rules or change the mode.")
+    for pad, rule in rules.items():
+        if mode == 2 and rule is not None and rule[0] == "Key" and rule[1] >= 4:
+            error(f"warp_pad_rules {pad!r}: Key x {rule[1]} is not allowed with "
+                  "random_without_4_keys.")
+    ids = {d.key: d.level_id for d in destinations.DESTINATIONS}
+    return {ids[pad]: rule for pad, rule in rules.items()}
+
+
+def starting_counts(options):
+    """Items the slot starts with: from-pool starts plus additional starts."""
+    held = {}
+    for source in (options.start_inventory_from_pool.value, options.start_inventory.value):
+        for name, count in source.items():
+            held[name] = held.get(name, 0) + count
+    return held
+
+
+def rule_met(rule, held):
+    if rule is None:
+        return True
+    item, count = rule
+    members = SUM_FAMILIES.get(item)
+    return (sum(held.get(m, 0) for m in members) if members else held.get(item, 0)) >= count
+
+
+def manual_requirements(manual, rows):
+    """One requirement record per named non-free pad, checked against the base
+    supply (`requirement_ceiling`). A concrete item is a count record; an Any
+    rule is a sum record over the items the seed has as base items."""
+    by_name = {row.name: row for row in rows}
+    out = []
+    for physical, rule in sorted(manual.items()):
+        if rule is None:
+            continue
+        pad, (item, count) = PAD_KEY_BY_LEVEL_ID[physical], rule
+        names = SUM_FAMILIES.get(item)
+        eligible = [n for n in (names or (item,)) if by_name[n].requirement_ceiling > 0]
+        have = sum(by_name[n].requirement_ceiling for n in eligible)
+        if not eligible:
+            error(f"warp_pad_rules {pad!r}: {item} x {count}, but this seed has no "
+                  f"{item if not names else 'items of that kind'}.")
+        if count > have:
+            error(f"warp_pad_rules {pad!r}: {item} x {count}, but the base item pool "
+                  f"holds only {have}.")
+        predicate = (dict(op="sum", items=[by_name[n].item for n in eligible], count=count)
+                     if names else dict(op="count", item=by_name[item].item, count=count))
+        out.append(dict(id=f"manual:{physical}", predicate=predicate))
+    return out
+
+
+def required_features(requirements):
+    manual = any(r["id"].startswith("manual:") for r in requirements)
+    return ["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
 
 
 def generate(world):
@@ -173,6 +249,17 @@ def generate(world):
     world.random.shuffle(chosen)
     registry = pad_registry()
     world.random.shuffle(registry)
+    manual = manual_rules(o)
+    if manual:
+        # Reserve every named physical seat for selected content, then keep the
+        # other seats in their shuffled order. A rule never disappears because
+        # its seat drew empty, and no content or item is added to fit it.
+        if len(manual) > len(chosen):
+            error(f"warp_pad_rules names {len(manual)} pads, but only {len(chosen)} "
+                  "entries are selected; name fewer pads or select more content. "
+                  "No content or items were added.")
+        registry = ([seat for seat in registry if seat[0] in manual]
+                    + [seat for seat in registry if seat[0] not in manual])
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
@@ -181,10 +268,24 @@ def generate(world):
     # empty one, until enough open seats hold content. A layout that already
     # has enough takes no draw here, so its seed is unchanged.
     need = min(len(chosen), sphere0_guard.MIN_STARTING_CHECKS)
-    while sum(keys == 0 for _, _, keys in registry[:len(chosen)]) < need:
-        gated = [i for i in range(len(chosen)) if registry[i][2] != 0]
+    held = starting_counts(o)
+
+    def opens_at_start(seat):
+        # Hub gate free, and a manual rule on this seat met by the real start.
+        physical, _hub, keys = seat
+        return keys == 0 and (physical not in manual or rule_met(manual[physical], held))
+
+    while sum(opens_at_start(seat) for seat in registry[:len(chosen)]) < need:
+        # A named seat is never exchanged, so its rule stays where it was set.
+        gated = [i for i in range(len(chosen))
+                 if registry[i][2] != 0 and registry[i][0] not in manual]
         empty = [i for i in range(len(chosen), len(registry)) if registry[i][2] == 0]
         if not gated or not empty:
+            if manual:
+                error(f"warp_pad_rules leave only "
+                      f"{sum(opens_at_start(seat) for seat in registry[:len(chosen)])} "
+                      f"of the {need} starting checks a slot needs. Rules are fixed and "
+                      "no item is granted; make a named pad free or lower its count.")
             break
         source = world.random.choice(gated)
         destination = world.random.choice(empty)
@@ -192,6 +293,8 @@ def generate(world):
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
+    gate_for = {physical: "free" if rule is None else f"manual:{physical}"
+                for physical, rule in manual.items()}
     for index, (physical, hub, keys) in enumerate(registry):
         pad = dict(id=f"pad:{physical}", hub_id=f"hub:{hub}", kind="normal", entry_id=None,
                    entrance_req=f"keys:{keys}" if keys else "free", mode_gates=[], racer_lock=None)
@@ -199,7 +302,8 @@ def generate(world):
             track = chosen[index]
             entry_id = "entry/" + track["id"]
             entries.append(dict(id=entry_id, kind="track", track_id=track["id"], modes=["trophy"], merged=False))
-            pad.update(entry_id=entry_id, mode_gates=[dict(mode="trophy", stage=1, requirement_id="free")])
+            pad.update(entry_id=entry_id, mode_gates=[dict(
+                mode="trophy", stage=1, requirement_id=gate_for.get(physical, "free"))])
             name, code, title = trophy_identity(track)
             checks.append(dict(location=code, owner=track["id"], kind="trophy",
                                display_name=title + ": Trophy Race",
@@ -212,13 +316,17 @@ def generate(world):
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, len(checks), starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value)
+    if manual:
+        requirements += manual_requirements(manual, world.ctr_content_items.rows)
+        world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
+                                if lid in manual}
     gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
                 tracks=chosen, entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=["content_plan_v1"])
+                required_features=required_features(requirements))
     validate(plan)
     world.ctr_content_plan = plan
     # Actual native 0.6.7 protocol/handshake validation is a release gate. This
@@ -248,6 +356,9 @@ def predicate(world, node):
         return lambda state: True
     if node["op"] == "count":
         return lambda state: state.has(ITEM_BY_CODE[node["item"]], player, node["count"])
+    if node["op"] == "sum":
+        names = [ITEM_BY_CODE[code] for code in node["items"]]
+        return lambda state: sum(state.count(name, player) for name in names) >= node["count"]
     if node["op"] == "distinct":
         return lambda state: sum(state.has(ITEM_BY_CODE[code], player) for code in node["items"]) >= node["count"]
     error("unsupported predicate in experimental content plan.")
@@ -264,7 +375,10 @@ def create_regions(world):
             continue
         region = Region(pad["entry_id"], player, mw)
         mw.regions.append(region)
-        menu.connect(region, pad["id"], predicate(world, req[pad["entrance_req"]]))
+        gates = [predicate(world, req[pad["entrance_req"]])]
+        gates += [predicate(world, req[g["requirement_id"]]) for g in pad["mode_gates"]]
+        menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
+                     (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
         check = by_pad[pad["id"]]
         region.locations.append(Location(player, LOCATION_BY_CODE[check["location"]], check["location"], region))
     from .custom_track_presentation import location_aliases
@@ -320,7 +434,11 @@ def validate(plan):
     require(not plan["encounters"], "encounter routes are not implemented by this profile")
     expected_requirements = {"free": {"id": "free", "predicate": {"op": "always"}}}
     expected_requirements.update({f"keys:{n}": dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)})
-    require(requirements == expected_requirements, "unsupported or changed physical hub requirements")
+    manual = {rid: row for rid, row in requirements.items() if rid.startswith("manual:")}
+    require({rid: row for rid, row in requirements.items() if rid not in manual} == expected_requirements,
+            "unsupported or changed physical hub requirements")
+    require(plan["required_features"] == (["content_plan_v1", MANUAL_FEATURE] if manual else ["content_plan_v1"]),
+            "required features do not match the manual pad requirements")
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
                      for physical, hub, keys in pad_registry()}
     expected_pads.update({f"garage:{i}": (f"hub:{26+i if i<4 else 25}", "free") for i in range(5)})
@@ -334,9 +452,13 @@ def validate(plan):
             require(not pad["mode_gates"], "empty pad has mode gates")
         else:
             require(pad["kind"] == "normal" and pad["entry_id"] in entries, "invalid normal entry")
-            require(pad["mode_gates"] == [dict(mode="trophy", stage=1, requirement_id="free")], "unsupported mode gates")
+            physical = pad_id.split(":")[1]
+            gate = f"manual:{physical}" if f"manual:{physical}" in manual else "free"
+            require(pad["mode_gates"] == [dict(mode="trophy", stage=1, requirement_id=gate)], "unsupported mode gates")
             occupied.append(pad["entry_id"])
     require(len(occupied) == len(set(occupied)) and set(occupied) == set(entries), "entry occurrence ownership mismatch")
+    require(all(f"pad:{rid.split(':')[1]}" in pads and pads[f"pad:{rid.split(':')[1]}"]["entry_id"] is not None
+                for rid in manual), "manual requirement without an occupied pad")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
     for entry in entries.values():
@@ -400,6 +522,21 @@ def validate(plan):
     gems = [i for i in range(35010009, 35010014) if rows[i]["base"]]
     require(goal["op"] == "distinct" and goal["items"] == gems and 1 <= goal["count"] <= len(gems),
             "goal must count selected distinct base Gem colours")
+    for rid, row in manual.items():
+        predicate_ = row["predicate"]
+        if predicate_["op"] == "count":
+            item = predicate_["item"]
+            require(item in rows and ITEM_BY_CODE.get(item) in content_item_pool.COUNTED_NAMES
+                    and 1 <= predicate_["count"] <= rows[item]["requirement_ceiling"],
+                    f"{rid}: count rule item or count outside the base supply")
+        else:
+            require(predicate_["op"] == "sum", f"{rid}: unsupported manual predicate")
+            family = next((names for names in SUM_FAMILIES.values()
+                           if predicate_["items"] == [rows[content_item_pool.ITEMS[n]]["item"] for n in names
+                                                      if rows[content_item_pool.ITEMS[n]]["requirement_ceiling"] > 0]), None)
+            require(family is not None and predicate_["items"] and
+                    1 <= predicate_["count"] <= sum(rows[code]["requirement_ceiling"] for code in predicate_["items"]),
+                    f"{rid}: sum rule items or count outside the base supply")
     return True
 
 

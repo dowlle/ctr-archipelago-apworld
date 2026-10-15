@@ -30,6 +30,7 @@ from . import characters
 from . import hit_character
 from . import relic_perfect
 from . import rung_sizer
+from . import warp_pad_rules
 from .spoiler_pad_map import changed_pad_destination_rows
 from . import version
 from .Regions import create_regions
@@ -631,6 +632,9 @@ class ctrAPWorld(World):
         self.ctr_starting_character = characters.resolve_starting_character(self)
         from . import forced_options
         forced_options.apply(self)
+        # Manual warp pad rules (#463): validated once the seed's pads and
+        # item supply are known. Takes no random draw.
+        warp_pad_rules.resolve(self)
         rung_sizer.apply_rung_sizing(self)
         # Hit Character encounters (0.2.1 candidate): draw the single roster
         # seed and cache the resolved block. No-op (and no RNG draw) when the
@@ -692,9 +696,13 @@ class ctrAPWorld(World):
         # Universal Tracker (issue #29): under a fake generation there is no real
         # fill to protect. Reachability is fixed by the rules reconstructed from
         # slot_data, and the server supplies the real item placements.
-        if hasattr(self, "ctr_content_plan"):
-            return  # Independent supply never uses automatic progression starts.
         if getattr(self.multiworld, "generation_is_fake", False):
+            return
+        if hasattr(self, "ctr_content_plan"):
+            # Independent supply never uses automatic progression starts. Manual
+            # pad rules still get the solo fill check, so a dead end names them.
+            if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:
+                self._manual_rules_fill_check()
             return
         # Solo only (replay fidelity: nothing consumes multiworld.random between
         # here and the fill). Vanilla and randomized both route through the same
@@ -703,9 +711,38 @@ class ctrAPWorld(World):
         if len(self.multiworld.worlds) == 1:
             mode = ("vanilla" if self.options.warppad_unlock_requirements.value == 0
                     else "randomized")
-            self._rollback_precollect_backstop(mode)
+            if warp_pad_rules.fixed(self):
+                # Manual warp pad rules (#463): the backstop would rescue a
+                # dead end by handing the player the stranded items, which
+                # weakens a rule the player wrote. Check the fill instead and
+                # report the failure with the rules.
+                self._manual_rules_fill_check()
+            else:
+                self._rollback_precollect_backstop(mode)
 
     _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40
+
+    def _manual_rules_fill_check(self) -> None:
+        """Solo seeds with manual warp pad rules: replay the upcoming fill and,
+        if it dead-ends, refuse with the fixed rules and the fill's own cause.
+        Grants no item, relaxes no rule. A green replay changes nothing."""
+        try:
+            from settings import get_settings
+            panic = get_settings().generator.panic_method
+        except Exception:
+            panic = "swap"
+        self._ctr_fill_failure = ""
+        if self._rollback_simulate_fill(panic) is True:
+            return
+        rules = ", ".join(
+            f"{pad}: {warp_pad_rules.describe(rule)}"
+            for pad, rule in sorted(warp_pad_rules.fixed(self).items()))
+        raise OptionError(
+            f"CTR warp_pad_rules: the item fill cannot place everything with "
+            f"your manual rules ({rules}). Cause: "
+            f"{self._ctr_fill_failure or 'not every location can be reached'} "
+            f"Loosen a rule, change its count, or move it to a pad that opens "
+            f"later.")
 
     def _vanilla_fill_backstop(self) -> None:
         """Vanilla-mode entry to the shared terminal backstop. Kept as a named
@@ -889,7 +926,8 @@ class ctrAPWorld(World):
                 # Main.py's output step also runs the accessibility check;
                 # green means both pass (fuzz 32541 filled but failed it).
                 return bool(self.multiworld.fulfills_accessibility())
-            except _FE:
+            except _FE as exc:
+                self._ctr_fill_failure = " ".join(str(exc).split())[:600]
                 return False
         finally:
             self._fill_rollback(snap)

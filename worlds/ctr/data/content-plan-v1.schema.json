@@ -69,9 +69,12 @@
     "required_features": {
       "type": "array",
       "items": {
-        "const": "content_plan_v1"
+        "enum": [
+          "content_plan_v1",
+          "manual_pad_requirements_v1"
+        ]
       },
-      "maxItems": 1,
+      "maxItems": 2,
       "minItems": 1,
       "uniqueItems": true
     }
@@ -992,6 +995,36 @@
           "properties": {
             "op": {
               "const": "distinct"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 1024,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "items",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "sum"
             },
             "items": {
               "type": "array",
