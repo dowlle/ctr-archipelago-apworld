@@ -331,7 +331,9 @@ def parse_wire(block) -> Dict[str, str]:
         if (row["location"] != code or row["home_track"] != VENUE_LEVEL_IDS[home]
                 or row["opponent"] != OPPONENT_RETAIL[key]
                 or row["ai_profile"] != AI_PROFILE_RETAIL
-                or row["attack"] != ATTACK_INHERITED or row["packages"] != []
+                or row["attack"] != ATTACK_INHERITED
+                # The multidata round trip hands Universal Tracker tuples.
+                or not isinstance(row["packages"], (list, tuple)) or len(row["packages"])
                 or not inherited_attack_certified(key, track)):
             raise ValueError(f"boss_encounters.{key}: record this build cannot race")
         out[key] = track

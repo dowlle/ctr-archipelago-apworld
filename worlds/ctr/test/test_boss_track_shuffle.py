@@ -330,6 +330,14 @@ class TestParseWire(unittest.TestCase):
     def test_round_trip(self):
         self.assertEqual(bts.parse_wire(self.block), SWAPPED)
 
+    def test_multidata_tuples_parse(self):
+        # A server round trip turns JSON arrays into tuples (seen in the
+        # Universal Tracker fuzz arm).
+        block = json.loads(json.dumps(self.block))
+        for row in block["garages"].values():
+            row["packages"] = ()
+        self.assertEqual(bts.parse_wire(block), SWAPPED)
+
     def _refused(self, mutate):
         block = json.loads(json.dumps(self.block))
         mutate(block)
