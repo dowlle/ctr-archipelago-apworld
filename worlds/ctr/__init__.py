@@ -411,6 +411,7 @@ class ctrAPWorld(World):
             inc_cups = inc_cups or _kind == "cup"
             inc_arenas = inc_arenas or _kind == "crystal"
         o.include_gem_cups.value = int(inc_cups)
+        o.crystalsanity.value = int(co.get("crystalsanity") is True)
         o.include_battle_arenas.value = int(bool(co["include_battle_arenas"])) \
             if type(co.get("schema_version")) is int and co["schema_version"] >= 18 \
             and "include_battle_arenas" in co \

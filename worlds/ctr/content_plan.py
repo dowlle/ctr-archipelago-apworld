@@ -198,7 +198,7 @@ def generate(world):
     pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
                "itemsanity", "lettersanity", "box_locations", "hit_character", "progressive_starting_wumpa",
                "podium_placement_checks", "wumpa_check", "turbo_grant", "tizi_helper", "relic_perfect_checks",
-               "boss_track_shuffle")
+               "boss_track_shuffle", "crystalsanity")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")

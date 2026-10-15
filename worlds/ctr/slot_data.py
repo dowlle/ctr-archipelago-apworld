@@ -586,6 +586,10 @@ def fill_slot_data(world) -> Dict[str, object]:
         # no-bump precedent: an old native keeps loading the vanilla legs
         # while this seed's podium logic follows the shuffled map.
         slot_data["gem_cup_legs"] = world._resolve_gem_cup_legs()
+    if o.crystalsanity.value:
+        from .crystal_checks import wire_block
+        slot_data["ctr_options"]["crystalsanity"] = True
+        slot_data["crystal_checks"] = wire_block(world)
     if o.itemsanity.value:
         # Additive under schema 7.  Omitted when off, so disabled seeds do
         # not gain a dormant 22-slot feature block.
