@@ -361,6 +361,22 @@ class TestContentPlan(unittest.TestCase):
                 distribute_items_restrictive(world.multiworld)
                 self.assertTrue(world.multiworld.can_beat_game(CollectionState(world.multiworld)))
 
+    def test_content_plan_fill_dead_end_names_the_rules(self):
+        world = self.world(seed=3)
+
+        def dead_end(panic):
+            world._ctr_fill_failure = "Unplaced items: Trophy"
+            return False
+
+        world._rollback_simulate_fill = dead_end
+        with self.assertRaisesRegex(OptionError, r"Crash Cove: Trophy x 3.*Unplaced items: Trophy"):
+            world.pre_fill()
+        world._rollback_simulate_fill = lambda panic: True
+        world.pre_fill()
+        plain = make_world(profile_options(), seed=3)
+        plain._rollback_simulate_fill = dead_end
+        plain.pre_fill()  # no manual rules: the content-plan path never replays the fill
+
     def test_hub_key_floor_stays_in_entrance_req(self):
         plan = self.world().ctr_content_plan
         pads = {p["id"]: p for p in plan["pads"]}

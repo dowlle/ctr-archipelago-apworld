@@ -684,9 +684,13 @@ class ctrAPWorld(World):
         # Universal Tracker (issue #29): under a fake generation there is no real
         # fill to protect. Reachability is fixed by the rules reconstructed from
         # slot_data, and the server supplies the real item placements.
-        if hasattr(self, "ctr_content_plan"):
-            return  # Independent supply never uses automatic progression starts.
         if getattr(self.multiworld, "generation_is_fake", False):
+            return
+        if hasattr(self, "ctr_content_plan"):
+            # Independent supply never uses automatic progression starts. Manual
+            # pad rules still get the solo fill check, so a dead end names them.
+            if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:
+                self._manual_rules_fill_check()
             return
         # Solo only (replay fidelity: nothing consumes multiworld.random between
         # here and the fill). Vanilla and randomized both route through the same
