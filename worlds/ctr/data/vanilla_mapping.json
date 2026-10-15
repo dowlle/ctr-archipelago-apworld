@@ -110,10 +110,10 @@
             "Oxide Station: CTR Token Challenge": "Yellow CTR Token"
         },
         "Bonus Round Tokens": {
-            "Skull Rock: Crystal Bonus Round": "Purple CTR Token",
-            "Rampage Ruins: Crystal Bonus Round": "Purple CTR Token",
-            "Rocky Road: Crystal Bonus Round": "Purple CTR Token",
-            "Nitro Court: Crystal Bonus Round": "Purple CTR Token"
+            "Skull Rock: Crystal Challenge": "Purple CTR Token",
+            "Rampage Ruins: Crystal Challenge": "Purple CTR Token",
+            "Rocky Road: Crystal Challenge": "Purple CTR Token",
+            "Nitro Court: Crystal Challenge": "Purple CTR Token"
         }
     }
 }

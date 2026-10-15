@@ -31,7 +31,9 @@ class TestCustomCheckNamespace(unittest.TestCase):
                     for variant in range(stride):
                         code = custom_check_code(family, slot, variant)
                         if code in registered:
-                            self.assertIn(family, ("letter_location", "letter_item", "ctr_location"))
+                            # relic and perfect were minted by the 0.3.0 id step.
+                            self.assertIn(family, ("letter_location", "letter_item", "ctr_location",
+                                                   "relic_location", "perfect_location"))
                             mapping = (ctrAPWorld.item_name_to_id if family ==
                                        "letter_item" else ctrAPWorld.location_name_to_id)
                             self.assertEqual(mapping[

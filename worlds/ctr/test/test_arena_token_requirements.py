@@ -99,14 +99,14 @@ class TestAnyTokenCollapseScoping(CTRTestBase):
         self.assertEqual(cnt, self._expected_collapse_count(20))
 
 
-_CRYSTAL_SUFFIX = "Crystal Bonus Round"
+_CRYSTAL_SUFFIX = "Crystal Challenge"
 
 
 class ArenaNotRequiredAtAPLevelMixin:
     """AP-level (post-fill) guard for #364.
 
     This pins what the finished multiworld MEANS. For a batch of arenas-off seeds we run the real
-    fill, verify the four Crystal Bonus Rounds are absent, and assert the
+    fill, verify the four Crystal Challenges are absent, and assert the
     seed's completion_condition remains reachable without them.
 
     Subclasses set `options` and (optionally) `seeds`."""
@@ -124,7 +124,7 @@ class ArenaNotRequiredAtAPLevelMixin:
                 arena = [loc for loc in mw.get_locations(player)
                          if loc.name.endswith(_CRYSTAL_SUFFIX)]
                 self.assertEqual(len(arena), 0,
-                                 "arena-off seeds must omit Crystal Bonus Rounds")
+                                 "arena-off seeds must omit Crystal Challenges")
 
                 # Collect advancement items from every created location in
                 # reachability order, then check the win condition.

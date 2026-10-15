@@ -18,6 +18,7 @@ from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
 from . import cortex_vortex_track
 from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
+from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITEM_NAMES
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
@@ -134,7 +135,8 @@ class ctrAPWorld(World):
     # Item + Location mapping
     _item_data_by_name = {item["name"]: item for item in
                           (*load_item_table(), *CUSTOM_LETTER_ITEM_DATA,
-                           *CORTEX_VORTEX_LETTER_ITEM_DATA, *NAMED_TRACK_ITEM_DATA)}
+                           *CORTEX_VORTEX_LETTER_ITEM_DATA, *NAMED_TRACK_ITEM_DATA,
+                           *MINTED_030_ITEM_DATA)}
     item_name_to_id = {
         name: item["code"] for name, item in _item_data_by_name.items()
     }
@@ -167,8 +169,10 @@ class ctrAPWorld(World):
         "Gems": {"Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem"},
         # Sourced from the trap registry so the group cannot drift from the
         # native effect enum (the buildable set), the #177 freeze or the #280
-        # rework. All 20 are in the group and buildable.
-        "Traps": set(ALL_TRAP_ITEM_NAMES),
+        # rework. All 20 are in the group and buildable. The two 0.3.0 traps
+        # (minted_items_030) join now, before their feature builds, because the
+        # group is part of the checksummed datapackage.
+        "Traps": set(ALL_TRAP_ITEM_NAMES) | set(MINTED_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
     }
 

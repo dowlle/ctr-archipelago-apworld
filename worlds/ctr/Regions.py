@@ -532,7 +532,7 @@ def create_regions(world: "ctrAPWorld"):
             "N. Oxide Garage: N. Oxide's Challenge",
             "N. Oxide Garage: N. Oxide's Final Challenge",
         }
-    _arena_removed_names = ({f"{track}: Crystal Bonus Round"
+    _arena_removed_names = ({f"{track}: Crystal Challenge"
                              for track in destinations.ARENA_TRACKS}
                             if not opts.include_battle_arenas.value else set())
     # The Cortex Vortex pad track's dropped destination: every location it

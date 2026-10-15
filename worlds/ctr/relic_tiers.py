@@ -47,16 +47,24 @@ def tier_location_pool(location_name_to_id, tier_label: str,
     dropped, plus Cortex Vortex when that option is on
     (`cortex_vortex_track.active_time_trial_tracks`). Without `options`, or
     with the option off, this is exactly the 18 retail names it always was, so
-    option-off seeds sample the identical pool."""
+    option-off seeds sample the identical pool.
+
+    Only those tracks are eligible: since the 0.3.0 id step the datapackage
+    also registers `Custom Track N: <tier> Time Trial` and the named custom
+    blocks' tiers, which no relic draw may pick up by suffix alone."""
     from .cortex_vortex_track import CORTEX_VORTEX, dropped_track, track_on
+    from .relic_perfect import RELIC_TRACKS
     suffix = f": {tier_label} Time Trial"
     dropped = dropped_track(options) if options is not None else None
     with_vortex = options is not None and track_on(options)
+    eligible = set(RELIC_TRACKS) | {CORTEX_VORTEX}
     out = []
     for name in location_name_to_id:
         if not name.endswith(suffix):
             continue
         track = name[: -len(suffix)]
+        if track not in eligible:
+            continue
         if track == dropped or (track == CORTEX_VORTEX and not with_vortex):
             continue
         out.append(name)

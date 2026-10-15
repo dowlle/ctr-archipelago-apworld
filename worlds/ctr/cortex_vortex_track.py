@@ -42,8 +42,10 @@ THE POOL MODEL, and where each piece lives.
 DATAPACKAGE STABILITY. This class claims the block 35026000 and registers its
 eight names UNCONDITIONALLY: Trophy 35026000, Sapphire/Gold/Platinum Time Trial
 35026001-003, CTR Token Challenge 35026004 and Letter C/T/R 35026006-008.
-35026005 is RESERVED for a later `Cortex Vortex: Relic Race Perfect` and is not
-minted. The five podium rungs 35026010-014 ride the podium class, which already
+35026005 (`Cortex Vortex: Relic Race Perfect`) and 35026009
+(`Cortex Vortex: Complete One Lap`) were minted by the 0.3.0 id step in
+custom_fallback_families.py and lap_checks.py; this class does not own them.
+The five podium rungs 35026010-014 ride the podium class, which already
 owns every rung name (the trial-track rung precedent). The three letter ITEMS
 35010200-202 live in `LETTER_ITEM_DATA` below, outside the positional
 `data/items.json` table, because that table is documented as the closed shipped
@@ -77,7 +79,8 @@ WIRE_VERSION = 1
 TROPHY_CODE = 35026000
 RELIC_CODES = (35026001, 35026002, 35026003)
 CTR_TOKEN_CODE = 35026004
-#: Reserved for `Cortex Vortex: Relic Race Perfect`; deliberately NOT minted.
+#: `Cortex Vortex: Relic Race Perfect`, registered by
+#: custom_fallback_families.CustomRelicLocationClass (0.3.0 id step).
 RELIC_PERFECT_RESERVED_CODE = 35026005
 LETTER_CODES = (35026006, 35026007, 35026008)
 #: The five podium rungs, registered by the podium class in SLOT_ORDER.
@@ -292,7 +295,7 @@ def _statically_eligible(world) -> List[int]:
       * never a cup a custom track already displaced (that destination is the
         custom track's);
       * a crystal arena only with `include_battle_arenas` on (off pins the
-        vanilla Purple Tokens onto the four Crystal Bonus Rounds, issue #50);
+        vanilla Purple Tokens onto the four Crystal Challenges, issue #50);
       * never Turbo Track while the comfort guard is active (vanilla unlock and
         Gems not shuffled): the pad keeps its vanilla five-Gem gate, and the
         guard's promise is that no check sits behind it.

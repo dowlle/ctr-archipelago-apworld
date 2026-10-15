@@ -68,10 +68,20 @@ EXPECTED_CLASSES = [
     # 0.2.1 candidate: the sixteen Hit Character encounter checks, appended
     # last so every earlier class keeps its datapackage order.
     ("hit_character", 16, (35025000,)),
-    # #306 named custom-track blocks, appended last. Phase 1 ships the
-    # mechanism with no tracks, so it registers nothing; the minting step
-    # updates this row with the minted count and blocks.
-    ("named_track", 0, ()),
+    # #306 named custom-track blocks: the 0.3.0 id step minted the 82 `mint`
+    # entries of registry commit e01959a, 32 names each (offsets 0..16, 20..34).
+    ("named_track", 82 * 32, tuple(range(35200000, 35217000, 1000))),
+    # The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST), appended
+    # after the named blocks. All inert until their feature PRs.
+    ("cup_win", 27, (35027000,)),
+    ("cup_sweep", 32, (35027200, 35028300)),
+    ("cup_leg_victory", 151, (35016800, 35027000)),
+    ("lap_completion", 151, (35028000, 35026000)),
+    ("crystalsanity", 80, (35028400,)),
+    ("custom_relic", 529, (35022000, 35024000, 35026000)),
+    ("custom_track_race_v2", 600, (35019000,)),
+    ("custom_wumpa", 132, (35016000,)),
+    ("custom_item_boxes", 1980, (35017000, 35018000)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -135,13 +145,15 @@ class TestNameFreezeCensus(unittest.TestCase):
         # 188 frozen by #177, plus the two ruled amendments (#223, #224), plus
         # the three trap identities the rework minted (#280).
         # + the three Cortex Vortex pad-track letter items (2026-09-13).
-        self.assertEqual(len(world_type.item_name_to_id), 599)
+        # + the 0.3.0 id step: five items and 82 x 3 named-block letters.
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
         # + 13 Cortex Vortex pad-track names (2026-09-13 unfreeze).
         # + the 16 Hit Character encounter names (0.2.1 candidate).
-        self.assertEqual(len(world_type.location_name_to_id), 1361)
+        # + the 0.3.0 id step: 3,682 fixed-family names and 82 x 32 named.
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 82 * 32)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
@@ -250,11 +262,12 @@ class TestNameFreezeInertness(unittest.TestCase):
         to its own group later would spend a second bump."""
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         trap_group = set(world_type.item_name_groups["Traps"])
+        # The two 0.3.0 traps are minted names without a registry row yet.
         self.assertEqual(
             trap_group,
             set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
-            | set(REWORK_TRAP_ITEM_NAMES))
-        self.assertEqual(len(trap_group), 20)
+            | set(REWORK_TRAP_ITEM_NAMES) | {"Clocked Out", "Reverse Camera"})
+        self.assertEqual(len(trap_group), 22)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):

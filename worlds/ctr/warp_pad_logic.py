@@ -228,7 +228,7 @@ def _reward_for(phys_track, dest_track, suffix):
         return "Platinum Relic"
     if suffix == "CTR Token Challenge":
         return f"{_token_colour(phys_track, dest_track)} CTR Token"
-    if suffix == "Crystal Bonus Round":
+    if suffix == "Crystal Challenge":
         return "Purple CTR Token"
     return None  # Boss Race / Gem / Oxide handled elsewhere
 
@@ -2074,7 +2074,7 @@ def _dest_trophy_capacity(dest_lid, id_kind, ctx):
     """Stage-2-independent lower bound on the trophy-CAPABLE fillable locations a
     destination LevelID exposes once its (physical) pad is reached:
       race    -> 1 Trophy Race + podium rungs (TTs/token excluded: stage-2-gated)
-      crystal -> 1 Crystal Bonus Round
+      crystal -> 1 Crystal Challenge
       trial   -> guaranteed-unpinned relic Time Trials actually kept for THIS
                  destination track (single-stage, no stage-2 gate; issue #28 R2 --
                  per-pad, not a seed-wide tier aggregate, see _capacity_context)
