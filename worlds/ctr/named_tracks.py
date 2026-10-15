@@ -151,7 +151,7 @@ RESERVED_ID_RANGES: Tuple[Tuple[int, int, str], ...] = (
     (35028100, 35028231, "lap completion, generic custom"),
     (35028300, 35028304, "cup sweeps, Gem Cups"),
     (35028400, 35028479, "crystals, retail arenas"),
-    (35028500, 35028599, "arcade arenas #259 (reserved)"),
+    (35028500, 35028599, "arcade arena checks and expansion"),
     (35028600, 35028799, "Wumpa Shop (reserved)"),
 )
 for _first, _last, _label in RESERVED_ID_RANGES:

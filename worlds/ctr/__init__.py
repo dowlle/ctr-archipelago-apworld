@@ -548,6 +548,8 @@ class ctrAPWorld(World):
             from . import content_plan
             content_plan.generate(self)
             return
+        if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
+            raise OptionError("include_arcade_arenas requires an explicit content_pool with Crystal entries; no silent legacy migration.")
         if self.options.item_pool.value or self.options.pad_layout.value:
             raise OptionError("CTR item_pool and pad_layout require an explicit content_pool; no silent legacy migration.")
         # Cortex Vortex pad track (2026-09-13 contract): draw the destination

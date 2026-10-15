@@ -457,6 +457,16 @@ class Itemsanity(Toggle):
     It changes how the whole game plays, not just what you collect."""
     display_name = "Itemsanity"
 
+class IncludeArcadeArenas(Toggle):
+    """Permit Parking Lot, The North Bowl and Lab Basement in the Crystal pool.
+
+    Uses the explicit content_pool profile and ordinary physical pad seats.
+    Does nothing when battle arenas are off. Each arena has twenty authored
+    crystals, a separate completion check and no Purple Token grant.
+    """
+    display_name = "Include Arcade Arenas"
+
+
 class Crystalsanity(Toggle):
     """Each authored crystal in an included Crystal Challenge is a check.
 
@@ -1424,6 +1434,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # warp pads: content & destination shuffle
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     crystalsanity: Crystalsanity
+    include_arcade_arenas: IncludeArcadeArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     # warp pads: display (issue #59)
@@ -1481,7 +1492,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                          RandomizeGemCupTracks, CustomTracks],
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
-    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity,
+    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity, IncludeArcadeArenas,
                      HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
