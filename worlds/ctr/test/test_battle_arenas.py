@@ -13,7 +13,7 @@ from .. import ctrAPWorld
 from ..destinations import ARENA_TRACKS
 
 
-ARENA_LOCATIONS = {f"{track}: Crystal Bonus Round" for track in ARENA_TRACKS}
+ARENA_LOCATIONS = {f"{track}: Crystal Challenge" for track in ARENA_TRACKS}
 
 
 def _purple_count(multiworld, player):

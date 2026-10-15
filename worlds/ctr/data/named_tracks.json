@@ -1,9 +1,801 @@
 {
   "format": 1,
   "registry": {
-    "repository": null,
-    "commit": null,
-    "digest": null
+    "repository": "https://github.com/dowlle/ctr-track-registry",
+    "commit": "e01959af45848777e11508e8bf357fd143f9f68b",
+    "digest": "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
   },
-  "tracks": []
+  "tracks": [
+    {
+      "track_key": "acid-lake",
+      "block_index": 0,
+      "ap_name": "Acid Lake",
+      "shipped_in": null,
+      "revisions": [
+        "8542c8ef94dfa0b1c1dc353aad8d0c4c92c8b8cadd9ae54cd734df8fad502254"
+      ]
+    },
+    {
+      "track_key": "ancient-lake",
+      "block_index": 1,
+      "ap_name": "Ancient Lake",
+      "shipped_in": null,
+      "revisions": [
+        "6a6110f19a00c62fef61cec8c9423a72a33a724e506f1ad86550101b50c1ae08",
+        "5d18efb6c58d2ff8474870d1b56bdb98d9aef36bcb666c80c8f7a12dd4f5c127",
+        "0938a63985faff72516d8f755865f25f692567a304cf7a36b76d6514caa3386f"
+      ]
+    },
+    {
+      "track_key": "android-alley-n-gage",
+      "block_index": 2,
+      "ap_name": "Android Alley N-Gage",
+      "shipped_in": null,
+      "revisions": [
+        "fc6b7aeea79a2beadd89283d13056805b7a954aac855e74a0badce3f754fc8e5"
+      ]
+    },
+    {
+      "track_key": "arabian-heights-day",
+      "block_index": 3,
+      "ap_name": "Arabian Heights Day",
+      "shipped_in": null,
+      "revisions": [
+        "1e115de66a9096f8e24c75b4a0ab9fed5fa38726b884567e34146dbd2ad70eca"
+      ]
+    },
+    {
+      "track_key": "arabian-heights-night",
+      "block_index": 4,
+      "ap_name": "Arabian Heights Night",
+      "shipped_in": null,
+      "revisions": [
+        "be84f93f8cfa6ff0c0d5c7321ed00eaeb29057f0e4c12ed51451c349f3af6e38",
+        "b852d44c609d2f4deca290a5ce8f8cb2e61a13a731555fef573730100dbf4b06"
+      ]
+    },
+    {
+      "track_key": "arcane-garden",
+      "block_index": 5,
+      "ap_name": "Arcane Garden",
+      "shipped_in": null,
+      "revisions": [
+        "875aa73374578a873381b5fe3916ccaacceb0e46a9087d7f6d86d4a13cd9d2ea",
+        "eeda79feb762d6d4b109ce7c7b94b9ad66427990ff422070a126b429531774ba",
+        "22665114708acfa16c8e8222ba6fdce1ce465f25f67728ec8d9a25b147405fb6"
+      ]
+    },
+    {
+      "track_key": "arctic-alleyway",
+      "block_index": 6,
+      "ap_name": "Arctic Alleyway",
+      "shipped_in": null,
+      "revisions": [
+        "8b0de5a5d54abf0d5cd1703627a01b2bf27f600e00bd5f5842b9ece24d3a891a"
+      ]
+    },
+    {
+      "track_key": "assembly-lane-n-gage",
+      "block_index": 7,
+      "ap_name": "Assembly Lane N-Gage",
+      "shipped_in": null,
+      "revisions": [
+        "7aca4e33a8763c00227ac99b1a18f6176e321bb8fe5913d93e97f518d99a637f"
+      ]
+    },
+    {
+      "track_key": "baby-t-park",
+      "block_index": 8,
+      "ap_name": "Baby T Park",
+      "shipped_in": null,
+      "revisions": [
+        "186973f9d7a1f02cf43eb80422ee677e8965c91d493e84ffbced09644cfc7fbc",
+        "64d588eb42a72cac2a18f8d0fcd92a18bceeb3e00ddcd1c62c1b9e84b7aff95b",
+        "b6014f70beed5fbfb7e62c2c19e757a319cea1cc2be5361ba88af964737159df"
+      ]
+    },
+    {
+      "track_key": "big-forest",
+      "block_index": 9,
+      "ap_name": "Big Forest",
+      "shipped_in": null,
+      "revisions": [
+        "04e2f20a78bb78b4ce440632ece8e38174ac805329a7393188fa5b0238340dc6"
+      ]
+    },
+    {
+      "track_key": "bowser-castle-1",
+      "block_index": 10,
+      "ap_name": "Bowser Castle 1",
+      "shipped_in": null,
+      "revisions": [
+        "92d481d56fcc6b9c06e541b8a9a089f54c768950012f4c233f9b1fbdc248c0ba"
+      ]
+    },
+    {
+      "track_key": "breeze-harbor",
+      "block_index": 11,
+      "ap_name": "Breeze Harbor",
+      "shipped_in": null,
+      "revisions": [
+        "f9d20cbd0dbaa411a9ced26ebf38d9411342732caa8bafe43cf13997152da5c7",
+        "51f4b4bfca9ff5a131d1d1aba37decbb018895928b6e90bbe53f220b810753e1",
+        "4ee230234c290d7882a10fadbe84189ac8245a899a6f961de28911336af33fc2"
+      ]
+    },
+    {
+      "track_key": "chasqui-rally",
+      "block_index": 12,
+      "ap_name": "Chasqui Rally",
+      "shipped_in": null,
+      "revisions": [
+        "7269c65fa238d1dad1f3b24490312d3d02c33bc452e5eaa19b488937506ca328",
+        "19b7ef809ae4924a8521f1572c19b659a6b3b2c51ff0be5a37b63994329debff",
+        "9bbaa6e074b407f1ad15199ef6aecdfe8ff60721b1d4bc9d420792a19a076b54",
+        "fbcb6b051f367cca5aa3061843ba4613aadfb8f45fe28aec2851bf7d9709c847",
+        "bcb582f29e65d9bdcb895dd5810522a27a15447324bfea6296b4468db7475056",
+        "5671c3d5bf2b20bd99bf29268fc461eca306559e6b072a34837b058d97865254"
+      ]
+    },
+    {
+      "track_key": "choco-island-2",
+      "block_index": 13,
+      "ap_name": "Choco Island 2",
+      "shipped_in": null,
+      "revisions": [
+        "abbda083712a04df04352353136711ef2d802be8dbe8d06e9369c0e74d827805"
+      ]
+    },
+    {
+      "track_key": "coco-park-2025",
+      "block_index": 15,
+      "ap_name": "Coco Park 2025",
+      "shipped_in": null,
+      "revisions": [
+        "6a12b07a5de3e421c7a77578bdf8f1c9216d6ed622a1615384a84caa66cdb141"
+      ]
+    },
+    {
+      "track_key": "country-speedway",
+      "block_index": 17,
+      "ap_name": "Country Speedway",
+      "shipped_in": null,
+      "revisions": [
+        "c87e79818be537c261f0d223fe75443c9a728b4675233a5432bf69e287622cd2",
+        "15416baffd043b0d6386899de2343791ab7d9083ddd92d849d7733a1d6572a70",
+        "07a627e0d2163470935a74d638e1fd530c12dfb3fd1d6a590f59d9a312d81095"
+      ]
+    },
+    {
+      "track_key": "crystal-caves",
+      "block_index": 18,
+      "ap_name": "Crystal Caves",
+      "shipped_in": null,
+      "revisions": [
+        "33fdb99169f99fe1797e4d0fb84c42536059ea00928bc9992af2d8f20c9ccfac"
+      ]
+    },
+    {
+      "track_key": "cubic-circuit",
+      "block_index": 19,
+      "ap_name": "Cubic Circuit",
+      "shipped_in": null,
+      "revisions": [
+        "9cd3b9648362e8fd4fff7bd71d3b0213949ff18d41391e2cbd200a5eed98a67d",
+        "ff85287df16aaeb1660b368dc9ef0713ecbc69d802f0bb42ac01c4a01db1af7c"
+      ]
+    },
+    {
+      "track_key": "cursed-trial-roulette",
+      "block_index": 20,
+      "ap_name": "Cursed Trial Roulette",
+      "shipped_in": null,
+      "revisions": [
+        "7ba88e5081821afd86714c83e72dcb4410ae39e4bfd3094c7b84404c547f0fdb"
+      ]
+    },
+    {
+      "track_key": "dark-ruins",
+      "block_index": 21,
+      "ap_name": "Dark Ruins",
+      "shipped_in": null,
+      "revisions": [
+        "57763c60096ff3acbbdfccb7c2a53a45a544c1cda37dd0bc8af2d33f011544ef",
+        "ccc738f6f867a69966ab20249b3f32fe79dacc43436ba7966ba97d0aec02bcfb",
+        "66eb9dedb7ea84077a31c7009891aa48c6a8d0f6597f9efb359653b09d977e53",
+        "d0cfad6e41bb3d68ad3bf9cbcf239e00450d96296e547ebd68c4acd142a6dd6b"
+      ]
+    },
+    {
+      "track_key": "deep-sea-driving-n-gage",
+      "block_index": 22,
+      "ap_name": "Deep Sea Driving N-Gage",
+      "shipped_in": null,
+      "revisions": [
+        "a7ea845f280c2ee8382f31f0cf8224137cc795a99899c29d2883fd28d7956ead",
+        "183c53355999cb888b3201a48b1ad9f744c8ca10d0cdd78cc926a773675395a6"
+      ]
+    },
+    {
+      "track_key": "diwali",
+      "block_index": 23,
+      "ap_name": "Diwali",
+      "shipped_in": null,
+      "revisions": [
+        "5c0c11c7d6f99b05a0e8b8cb2c70789dbc8e135c36d9329ca719bd37faa0352c"
+      ]
+    },
+    {
+      "track_key": "diwali-no-usf",
+      "block_index": 24,
+      "ap_name": "Diwali (no USF)",
+      "shipped_in": null,
+      "revisions": [
+        "e90242b89826aed7662ec597315d18303a30fb9790c7255f062b6301484fef8d"
+      ]
+    },
+    {
+      "track_key": "dk-pass",
+      "block_index": 25,
+      "ap_name": "DK Pass",
+      "shipped_in": null,
+      "revisions": [
+        "f573015405cef0b42e5c26e2cd61e84724b5f5bb0b762bf84e806d5f12f12af1"
+      ]
+    },
+    {
+      "track_key": "draculas-castle",
+      "block_index": 26,
+      "ap_name": "Draculas Castle",
+      "shipped_in": null,
+      "revisions": [
+        "ee668f9fbe5aa44c8b3419949b02b8f7143566d0441a05bff2ad3d1f1a27ece8"
+      ]
+    },
+    {
+      "track_key": "dreamy-heights",
+      "block_index": 27,
+      "ap_name": "Dreamy Heights",
+      "shipped_in": null,
+      "revisions": [
+        "52c084877f7ef8afddfa2be6a36c25c106b568514e66c32d88f3c723b1a8f295",
+        "dfbc2c48c3dfd1c027a446629153c055a97fe3ce05a1622521b81009c39a95c9",
+        "25cb6e833f3fbe6e83f1d2815cbc964569e94c8f6119a61a420d2d12c523d045"
+      ]
+    },
+    {
+      "track_key": "drive-thru-danger",
+      "block_index": 28,
+      "ap_name": "Drive Thru Danger",
+      "shipped_in": null,
+      "revisions": [
+        "c4e64dacb79a4d802a745109d46c463cbab9a10955ea0fb8ea6697ceb92835e8"
+      ]
+    },
+    {
+      "track_key": "ds-rainbow-road",
+      "block_index": 29,
+      "ap_name": "DS Rainbow Road",
+      "shipped_in": null,
+      "revisions": [
+        "2951edccd2d335c058fa4f98a999285b9fbb162f63b00c656ef6dccd899831c8"
+      ]
+    },
+    {
+      "track_key": "dust-keepers",
+      "block_index": 30,
+      "ap_name": "Dust Keepers",
+      "shipped_in": null,
+      "revisions": [
+        "25448ef964d4b1a3c4dde25bf7a7b0ebb567203ababb9d311321bd93c4922613"
+      ]
+    },
+    {
+      "track_key": "frozen-depths",
+      "block_index": 31,
+      "ap_name": "Frozen Depths",
+      "shipped_in": null,
+      "revisions": [
+        "e0a349e37cbd900c4ecd152a575ad0616ff1fcb9d0665d97754d874b7caed44b",
+        "e1832c62b0d58c16aca0c2f5d7f81aed2dbed1485b7b2555816bf5b82ee2b92d"
+      ]
+    },
+    {
+      "track_key": "garden-speedway",
+      "block_index": 32,
+      "ap_name": "Garden Speedway",
+      "shipped_in": null,
+      "revisions": [
+        "7326d1d16438d0fff5d80573ebbc15c277fd5e97ce7e28952bc64534abd8717c"
+      ]
+    },
+    {
+      "track_key": "glacier-lagoon",
+      "block_index": 33,
+      "ap_name": "Glacier Lagoon",
+      "shipped_in": null,
+      "revisions": [
+        "5e47c1023081c76f90ec2aaefcd60f3498d97d5c5401473d823ce7fcccbdb249"
+      ]
+    },
+    {
+      "track_key": "glazed-dessert",
+      "block_index": 34,
+      "ap_name": "Glazed Dessert",
+      "shipped_in": null,
+      "revisions": [
+        "fce5ace6cce049f2af86b6885556cd72ef1b1f6706fa3d31369e91ae468eca7e"
+      ]
+    },
+    {
+      "track_key": "green-hill-raceway",
+      "block_index": 35,
+      "ap_name": "Green Hill Raceway",
+      "shipped_in": null,
+      "revisions": [
+        "2ac8e63262c9d27f6ca6f0a4a57a2d967f0a84426ce2b3c8718604c705a4cda4"
+      ]
+    },
+    {
+      "track_key": "hangtime-harbor",
+      "block_index": 36,
+      "ap_name": "Hangtime Harbor",
+      "shipped_in": null,
+      "revisions": [
+        "75dfa0bce811c7471ac18e8232a4529e4754c7a293ee9e7b1e4b1a64bdf6c95d",
+        "e8a9133d231e4f01de8b556aee7a6f37f47757cad7bb2659d3f804c5839d9569"
+      ]
+    },
+    {
+      "track_key": "hasty-hedges",
+      "block_index": 37,
+      "ap_name": "Hasty Hedges",
+      "shipped_in": null,
+      "revisions": [
+        "0573c4e07019535926fb495b0ca47be81374c015f0cd2020699537dd1c6e4082"
+      ]
+    },
+    {
+      "track_key": "haven-stadium",
+      "block_index": 38,
+      "ap_name": "Haven Stadium",
+      "shipped_in": null,
+      "revisions": [
+        "016b443cbfc0fcba8ffae4b9c125e2943e58d336a4f4f05018ba343df80c183a"
+      ]
+    },
+    {
+      "track_key": "haven-stadium-reverse",
+      "block_index": 39,
+      "ap_name": "Haven Stadium - Reverse",
+      "shipped_in": null,
+      "revisions": [
+        "ce2106607f869817413d5ce6adcf3c7928340e93319698f0505e9d4ed4127e6e"
+      ]
+    },
+    {
+      "track_key": "holiday-hills",
+      "block_index": 40,
+      "ap_name": "Holiday Hills",
+      "shipped_in": null,
+      "revisions": [
+        "088699c3f1ef7e694d93c3f2adc640437449fdf38b1bab28dda25c02d654f225"
+      ]
+    },
+    {
+      "track_key": "inferno-island",
+      "block_index": 41,
+      "ap_name": "Inferno Island",
+      "shipped_in": null,
+      "revisions": [
+        "d0d6520aa5feda1a46ff8538fb3b82568b3d66dffbc99e45fef34ea2fd5e2556",
+        "210f27d55db40060705efad2523d2659f41ca39826215fb683570b589e108329",
+        "c4c52dd3000c952b1143d4bb01e1e37b90b19d6d5c05cb45eca745a2740c607d",
+        "73c9fd66879523f6faefb43782c3dcadfa0102661cccf016cc431f77f6efbe8e",
+        "5f9c0e5e249c7afb66982c439c501149c356d08eec2d6aff1a60518a638ce483"
+      ]
+    },
+    {
+      "track_key": "jungle-boogie-n-gage",
+      "block_index": 42,
+      "ap_name": "Jungle Boogie N-Gage",
+      "shipped_in": null,
+      "revisions": [
+        "587442b13c282354becd5561a59493fe7cc19972219e28c86be9ff4923dd5286"
+      ]
+    },
+    {
+      "track_key": "kong-dungeon",
+      "block_index": 43,
+      "ap_name": "Kong Dungeon",
+      "shipped_in": null,
+      "revisions": [
+        "065f5bc91613ada1e12d22655b38f9dc4c18fc7ce49e77dc223a02120623d792",
+        "7f28b6f7f8827855b4ddffcbe8c5281e711e7addaa9fdddf78c2e580c5f79bc5"
+      ]
+    },
+    {
+      "track_key": "lava-lane",
+      "block_index": 44,
+      "ap_name": "Lava Lane",
+      "shipped_in": null,
+      "revisions": [
+        "10c50506bbf4493f8d8b9d81bd4f1743d0725de4fa05d791b1e1b230094e061f",
+        "d0dc82068043c5b732dfca3e8c7b7f29710a69394d2349375613f94022b38f46",
+        "1a2e6e7d237a291d1cddeb5f9f8c57d8ed7c397573c7b506a39746c0d0e52935",
+        "6e21e7513ac65754481f9919979e5f6febfe923820d65e0baa5adc06b89e7bc3",
+        "5e4ad62f22858dd415cb7d743cd5ae06a24d3f0bb5b1f8aa92bd0b1890eb38e1",
+        "345166270397eaa04fed16ee7a4544af18704c7f9dc9bad87adca9b8a2b04e0d"
+      ]
+    },
+    {
+      "track_key": "lights-out",
+      "block_index": 45,
+      "ap_name": "Lights Out",
+      "shipped_in": null,
+      "revisions": [
+        "e34c7463d722189990a29abbd4be8b957c760f61779cfe0c0a2233cb9ee1b6fe"
+      ]
+    },
+    {
+      "track_key": "mario-circuit-1",
+      "block_index": 46,
+      "ap_name": "Mario Circuit 1",
+      "shipped_in": null,
+      "revisions": [
+        "6c8b4d876bab45f30d4268b81f869103b7e3cad57da77a59ced21f11c53bb213"
+      ]
+    },
+    {
+      "track_key": "mario-circuit-2",
+      "block_index": 47,
+      "ap_name": "Mario Circuit 2",
+      "shipped_in": null,
+      "revisions": [
+        "6d1ba613c97b6a3697e6161d904ae49de09fee6d102689815866b51e222ad789"
+      ]
+    },
+    {
+      "track_key": "mario-raceway-n64",
+      "block_index": 48,
+      "ap_name": "Mario Raceway N64",
+      "shipped_in": null,
+      "revisions": [
+        "e10705d47aee0ccda25df30280deada7c4f0a6610900c59397ae546ac5323c87"
+      ]
+    },
+    {
+      "track_key": "matsuri",
+      "block_index": 49,
+      "ap_name": "Matsuri",
+      "shipped_in": null,
+      "revisions": [
+        "7d7e81b2073991fb698d22e687f5a10a19bfda0ea53c36c480dd47c9a1969ab5"
+      ]
+    },
+    {
+      "track_key": "namek",
+      "block_index": 50,
+      "ap_name": "Namek",
+      "shipped_in": null,
+      "revisions": [
+        "7e14c15f985aac15891c6fbd182ce36afdc98191d35f56e3ccdb028e201c880b"
+      ]
+    },
+    {
+      "track_key": "neon-paradise",
+      "block_index": 51,
+      "ap_name": "Neon Paradise",
+      "shipped_in": null,
+      "revisions": [
+        "a77e490b9b34df4dfc6b146d77da68c30a9e9601946d5e0081131559497fcfc8",
+        "3360946215b627decb6b7802fa3af61eb404bdb040a5156ec215b3733010a1d1"
+      ]
+    },
+    {
+      "track_key": "neonstadion",
+      "block_index": 52,
+      "ap_name": "Neonstadion",
+      "shipped_in": null,
+      "revisions": [
+        "a4421fbb2490ea3f5ce1113ccaa52c9be759305b4c0e94dc2ee2680d93b1793e"
+      ]
+    },
+    {
+      "track_key": "north-pole",
+      "block_index": 53,
+      "ap_name": "North Pole",
+      "shipped_in": null,
+      "revisions": [
+        "dbb9402198c5db3b9a32b6eb87619391670a0210a3f991c3d25d40ea608b9736",
+        "b9b1b75e369a083a524a99da9cb82d5b0f40bfb0f43cff20c06bda33dbd9b296"
+      ]
+    },
+    {
+      "track_key": "out-of-time-n-gage",
+      "block_index": 54,
+      "ap_name": "Out Of Time N-Gage",
+      "shipped_in": null,
+      "revisions": [
+        "4eed5fbfd17126007cf34da7f6c7fd45f09c844fa82af04b84d8be8e9f08cc6e"
+      ]
+    },
+    {
+      "track_key": "papu-cave",
+      "block_index": 55,
+      "ap_name": "Papu Cave",
+      "shipped_in": null,
+      "revisions": [
+        "4bd2ea1945dda2eaa4932570524416fdef724ebd344ff0a558bf92494bc3a013"
+      ]
+    },
+    {
+      "track_key": "papu-s-sg-temple",
+      "block_index": 56,
+      "ap_name": "Papu's SG Temple",
+      "shipped_in": null,
+      "revisions": [
+        "9618524d4288be7bac2d9bb1f28c3600bcb862b038f00f858e433ea5f84593f7"
+      ]
+    },
+    {
+      "track_key": "pepsi-city",
+      "block_index": 57,
+      "ap_name": "Pepsi City",
+      "shipped_in": null,
+      "revisions": [
+        "c5a26630efd1106a8796817e3dc982b06f4f0274fbe44a902a0cc277eaf9c4c9"
+      ]
+    },
+    {
+      "track_key": "redrock-ravine",
+      "block_index": 58,
+      "ap_name": "Redrock Ravine",
+      "shipped_in": null,
+      "revisions": [
+        "579482fca246169c050114f41102736727fef622dce22eb6ab58f64e8c676054",
+        "c8c6d1cdf6089423d8ccfa0238e930b10dfdbfc9c155d5ca60b48733bf669b96"
+      ]
+    },
+    {
+      "track_key": "royal-raceway",
+      "block_index": 59,
+      "ap_name": "Royal Raceway",
+      "shipped_in": null,
+      "revisions": [
+        "ed4f1aeb2f31e004e95c72bad2bc3284ac91e87ce617ff9579abd652d6b650a7"
+      ]
+    },
+    {
+      "track_key": "sampa-run",
+      "block_index": 60,
+      "ap_name": "Sampa Run",
+      "shipped_in": null,
+      "revisions": [
+        "f7c6ec87d7b378da3d4a5cb565cc4396cbabc6f01a624d6e6e7fbba2f9683e6d"
+      ]
+    },
+    {
+      "track_key": "sid-house",
+      "block_index": 61,
+      "ap_name": "Sid House",
+      "shipped_in": null,
+      "revisions": [
+        "240962e3f99a4e3540bc8ccabbd67d76682149d1d0439f4256d98b48deb62736",
+        "cf3e19e6c9dc969fc69141ff7be2d2e3ad5c371761ac97d32d01282efaffa384",
+        "daaf9b674874315ecdbfd9f101062bd0da644bcbc05112b8d9a7606449494f37"
+      ]
+    },
+    {
+      "track_key": "skater-s-retreat",
+      "block_index": 62,
+      "ap_name": "Skater's Retreat",
+      "shipped_in": null,
+      "revisions": [
+        "287d93397738be6347e0ffec35f80aef5c24986e8eb734b65f032ec2f4707a84",
+        "f72c6fbbfb57b9e75833724ad250aad33001b43a8ded68f607c1270fe35a99ce"
+      ]
+    },
+    {
+      "track_key": "skull-cave",
+      "block_index": 63,
+      "ap_name": "Skull Cave",
+      "shipped_in": null,
+      "revisions": [
+        "1977484b2e0f2ba019ff8f505350746b33b09a2823bfdba872ef5a0a47988b2e"
+      ]
+    },
+    {
+      "track_key": "snes-bowser-s-castle-2",
+      "block_index": 64,
+      "ap_name": "SNES Bowser's Castle 2",
+      "shipped_in": null,
+      "revisions": [
+        "73cdb060d90286d24930ce8bd247013eb83b22e0adc197b750aa061495a81ab3"
+      ]
+    },
+    {
+      "track_key": "snowfall-keep",
+      "block_index": 65,
+      "ap_name": "Snowfall Keep",
+      "shipped_in": null,
+      "revisions": [
+        "782354b65bdd87a32d191a470d7e2b046e71fac4bc13f9046cb415900576ae9f"
+      ]
+    },
+    {
+      "track_key": "snowy-valley",
+      "block_index": 66,
+      "ap_name": "Snowy Valley",
+      "shipped_in": null,
+      "revisions": [
+        "d9c2e7984702dabcd0e8626b127ebcb1c7462b54b5022fe1f29e17bd0edd1b3b",
+        "5b7d1cd6949e648d12769c624abd53d389452261f3b301c51165e20cb2c5860a",
+        "b8cf7f26a69360e2c20cb26d2d6d1cda90a9ea7d4c2efeaf7b8408fc7b3c7e4c"
+      ]
+    },
+    {
+      "track_key": "space-labs",
+      "block_index": 67,
+      "ap_name": "Space Labs",
+      "shipped_in": null,
+      "revisions": [
+        "5900cc718a61300593b80b36ff61725d0ba2870ac5845cee9fcd6a66029d656a",
+        "cfaf92794436435bce1b54a2af7eee408bbec3d89f37d3809f52b3793adc6c3e"
+      ]
+    },
+    {
+      "track_key": "sunken-sprint",
+      "block_index": 69,
+      "ap_name": "Sunken Sprint",
+      "shipped_in": null,
+      "revisions": []
+    },
+    {
+      "track_key": "sunset-vista",
+      "block_index": 70,
+      "ap_name": "Sunset Vista",
+      "shipped_in": null,
+      "revisions": [
+        "c54f8c56e3b44ac2128609f6b7d880a6955e35c087e19c5b1315c408ba31084d",
+        "10327a6cade10acfb9bd7ca455cb4338b24a8269f509319f7383e0050930cdc1"
+      ]
+    },
+    {
+      "track_key": "super-snocross-2",
+      "block_index": 71,
+      "ap_name": "Super Snocross 2",
+      "shipped_in": null,
+      "revisions": [
+        "6fda6d2b5a089df9ec61d4bc60fae2891ed756e19bbebbd5075811a5d649ae7b",
+        "5dab8d2cbd9e99e6f1c2887b9bf71a0a35064fbe30f1ffcf15b2dc965c1064ed"
+      ]
+    },
+    {
+      "track_key": "the-dairy-track",
+      "block_index": 72,
+      "ap_name": "The Dairy Track",
+      "shipped_in": null,
+      "revisions": [
+        "efe7900a9c4905ce6e91b0d72e72b52966b621ce060155f7a8098f91720cf0ad"
+      ]
+    },
+    {
+      "track_key": "the-lab",
+      "block_index": 73,
+      "ap_name": "The Lab",
+      "shipped_in": null,
+      "revisions": [
+        "88d9cd71c8b030c46404c59c0cca50ce0e5d899433d4446aa30a96df3bcb2e29"
+      ]
+    },
+    {
+      "track_key": "toasty-terrace",
+      "block_index": 74,
+      "ap_name": "Toasty Terrace",
+      "shipped_in": null,
+      "revisions": [
+        "0bb48a836098d2b38409ab8f1bcf7931cb309bea0028e7caf514a6ff0e61ba23",
+        "8c7e3fddba0173d4bf7b01560594279f0181d3bb04598ca5b2494b644cf8ac65",
+        "6958bbfc0c810bdb26f2d717b0d54cfb9333a2a8d347f42a89971bf8cf2c1ab4"
+      ]
+    },
+    {
+      "track_key": "tomb-temple",
+      "block_index": 75,
+      "ap_name": "Tomb Temple",
+      "shipped_in": null,
+      "revisions": [
+        "9a34ae462ca0401a8286d48c23755c82707a25bbc58f7e2dab2d6fa205ca0b04",
+        "6e3b3b0fd7ef9c8b514cc22163b6536a5a5d4bfcd27f9060e7acf3d20818b4ed"
+      ]
+    },
+    {
+      "track_key": "towers",
+      "block_index": 76,
+      "ap_name": "Towers",
+      "shipped_in": null,
+      "revisions": [
+        "774cfbbed3f93af60595c38838da03c5f12edea84a4e4fb176964a123215d144"
+      ]
+    },
+    {
+      "track_key": "tribal-trials",
+      "block_index": 77,
+      "ap_name": "Tribal Trials",
+      "shipped_in": null,
+      "revisions": [
+        "c5b9ab490c3238d63873c9efb2e2127d683f423b7a7c5d34e9261cb0d65f973a",
+        "cfb3b940516aedf3ab6e57c686cda023dd11a55204700b008829c7071e884bf9"
+      ]
+    },
+    {
+      "track_key": "tv-world",
+      "block_index": 78,
+      "ap_name": "TV World",
+      "shipped_in": null,
+      "revisions": [
+        "5b02a6e67d04e5668b916a3497198108d4eeae88ed827933031a83c32f42b668",
+        "dcbe95233c733a43384c6586a587a048a64301cf52c2cdd9a35c728565d95636"
+      ]
+    },
+    {
+      "track_key": "ursa-glacier",
+      "block_index": 79,
+      "ap_name": "Ursa Glacier",
+      "shipped_in": null,
+      "revisions": [
+        "f2c43cafdb0a2b121285b94ff562a3c5b71f1d0a30c6d66635ef67566c7406bc",
+        "29dc79ec3d194813205b9f543b35e13e1aa9a9a6dc88a6f25fb93e46d12f3339",
+        "96387bbd0d826af72a46d48b6db5a9ebc2fc8c276e9b87e2f6e5439b31e7c6c1"
+      ]
+    },
+    {
+      "track_key": "vanilla-lake-2",
+      "block_index": 80,
+      "ap_name": "Vanilla Lake 2",
+      "shipped_in": null,
+      "revisions": [
+        "94e01d0a794ef232df1eaa10f14ab8364ef0853a4e8dd6dedad751da3da2d445"
+      ]
+    },
+    {
+      "track_key": "wario-stadium",
+      "block_index": 81,
+      "ap_name": "Wario Stadium",
+      "shipped_in": null,
+      "revisions": [
+        "30bf0115f020e9d3be8c212b0508241eb83076505e37e7b3db340914505e66d4"
+      ]
+    },
+    {
+      "track_key": "wumpa-world",
+      "block_index": 82,
+      "ap_name": "Wumpa World",
+      "shipped_in": null,
+      "revisions": [
+        "3d0f8d6fa00a4a936990590975bc389f0299ed1ea7b6a98d0d29e9cbdb7207f9"
+      ]
+    },
+    {
+      "track_key": "yoshi-circuit",
+      "block_index": 83,
+      "ap_name": "Yoshi Circuit",
+      "shipped_in": null,
+      "revisions": [
+        "30464464935c51c033b7e2bcc708995c783655776a741049e30b855db687e076",
+        "20b6ba105f3c6a2682d368e6239d7fd3c02a2a418cfdf817ea1c7332690154e7"
+      ]
+    },
+    {
+      "track_key": "yoshi-circuit-legacy",
+      "block_index": 84,
+      "ap_name": "Yoshi Circuit Legacy",
+      "shipped_in": null,
+      "revisions": [
+        "2cce90d7738f25438319b1ec25e54071bf2ba2580fabcec0839bf4f561afe5e3",
+        "671ab316cbdfb509699924218718761fd5b56cd995fd8eff497d8694d81b6bb6"
+      ]
+    }
+  ]
 }

@@ -32,6 +32,7 @@ maps are pinned in test_trap_rework.py, so each approved rename remains on the
 record in code.
 """
 import json
+import pkgutil
 import pathlib
 import unittest
 
@@ -44,6 +45,8 @@ FIXTURE_PATH = FIXTURE_DIR / "item_id_stability_v0_1_5.json"
 FIXTURE_PATHS = (
     FIXTURE_PATH,
     FIXTURE_DIR / "item_id_stability_v0_2_0.json",
+    # The 0.3.0 id step: five items and the named-block letters.
+    FIXTURE_DIR / "item_id_stability_2026_10_15_minting_030.json",
 )
 
 
@@ -83,8 +86,19 @@ class TestItemIdStability(unittest.TestCase):
                   "Letter R (Cortex Vortex)": 35010202}
         self.assertFalse(set(vortex.values()).intersection(explicit.values()))
         self.assertFalse(set(vortex.values()).intersection(custom.values()))
+        # The 0.3.0 id step: five items after the Cortex Vortex letters, also
+        # outside the positional table, and three letters per named block.
+        minted = {"Reserve Top-Up": 35010203, "Warp Pad Preview": 35010204,
+                  "AP Box Colours": 35010205, "Clocked Out": 35010206,
+                  "Reverse Camera": 35010207}
+        named_doc = json.loads(pkgutil.get_data(
+            "worlds.ctr", "data/named_tracks.json").decode("utf-8"))
+        named = {f"Letter {letter} ({row['ap_name']})": 35100000 + 5 * row["block_index"] + li
+                 for row in named_doc["tracks"]
+                 for li, letter in enumerate(("C", "T", "R"))}
+        self.assertEqual(len(named), 246)
         self.assertEqual(world_type.item_name_to_id,
-                         {**explicit, **custom, **vortex})
+                         {**explicit, **custom, **vortex, **minted, **named})
 
     def test_existing_items_keep_their_frozen_id(self) -> None:
         frozen: dict = {}

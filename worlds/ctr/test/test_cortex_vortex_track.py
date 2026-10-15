@@ -286,8 +286,10 @@ class TestPlacementWithoutShuffle(unittest.TestCase):
                      "Cortex Vortex: Reach 10 Wumpa", "Cortex Vortex: Letter C",
                      "Cortex Vortex: Letter T", "Cortex Vortex: Letter R"):
             self.assertIn(name, names)
+        # Minted by the 0.3.0 id step, but no seed creates it before #453.
         self.assertNotIn("Cortex Vortex: Relic Race Perfect", names)
-        self.assertNotIn(35026005, ctrAPWorld.location_name_to_id.values())
+        self.assertNotIn("Cortex Vortex: Complete One Lap", names)
+        self.assertEqual(ctrAPWorld.location_name_to_id["Cortex Vortex: Relic Race Perfect"], 35026005)
 
     def test_spoiler_names_the_dropped_destination_and_the_pad(self):
         buf = io.StringIO()
@@ -318,7 +320,7 @@ class TestPlacementWithShuffle(unittest.TestCase):
         crystal_values = {wire[str(lid)] for lid in (18, 19, 21, 23)}
         self.assertIn(DESTINATION_ID, crystal_values)
         self.assertNotIn(SKULL_ROCK, wire.values())
-        self.assertNotIn("Skull Rock: Crystal Bonus Round", _names(mw))
+        self.assertNotIn("Skull Rock: Crystal Challenge", _names(mw))
 
     def test_vanilla_unlock_trial_drop_keeps_the_physical_pad_gate(self):
         mw = _build(dropped=SLIDE_COLISEUM, warppad_unlock_requirements="vanilla",

@@ -65,10 +65,22 @@ CTR_LOCATION_CLASSES.register(CORTEX_VORTEX_TRACK_CLASS)
 # Cortex Vortex pad track, so every earlier class keeps its datapackage order.
 # Global Menu checks like itemsanity.
 CTR_LOCATION_CLASSES.register(HIT_CHARACTER_CLASS)
-# Named custom-track blocks (#306): appended last. Empty until the minting step
-# fills data/named_tracks.json, so this registers nothing yet.
+# Named custom-track blocks (#306), filled by the 0.3.0 id step from the pinned
+# registry commit in data/named_tracks.json.
 from .named_tracks import NAMED_TRACK_CLASS
 CTR_LOCATION_CLASSES.register(NAMED_TRACK_CLASS)
+# The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST): every approved
+# 0.3.0 name, appended after the named blocks. All INERT: each class creates
+# nothing until its feature PR builds the option, the logic and the native send.
+from .cup_checks import CUP_LEG_VICTORY_CLASS, CUP_SWEEP_CLASS, CUP_WIN_CLASS
+from .lap_checks import LAP_COMPLETION_CLASS
+from .crystal_checks import CRYSTAL_CLASS
+from .custom_fallback_families import (CUSTOM_ITEM_BOX_CLASS, CUSTOM_RACE_V2_CLASS,
+                                       CUSTOM_RELIC_CLASS, CUSTOM_WUMPA_CLASS)
+for _minted_030 in (CUP_WIN_CLASS, CUP_SWEEP_CLASS, CUP_LEG_VICTORY_CLASS, LAP_COMPLETION_CLASS,
+                    CRYSTAL_CLASS, CUSTOM_RELIC_CLASS, CUSTOM_RACE_V2_CLASS, CUSTOM_WUMPA_CLASS,
+                    CUSTOM_ITEM_BOX_CLASS):
+    CTR_LOCATION_CLASSES.register(_minted_030)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")

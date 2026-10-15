@@ -446,13 +446,16 @@ class TestCustomTrackHooks(unittest.TestCase):
         self.assertFalse(rp.CUSTOM_PERFECT_CREATION_ENABLED)
         self.assertEqual(rp.created_custom_perfect_slots(self._tracks(True)), [])
 
-    def test_reserved_codes_are_not_in_the_datapackage(self):
+    def test_minted_codes_are_registered_but_never_created(self):
+        """The 0.3.0 id step minted the custom and Cortex Vortex perfects;
+        creation stays off until the #453 feature PR."""
         self.assertEqual(rp.custom_perfect_reserved_code(1), 35024000)
         self.assertEqual(rp.custom_perfect_reserved_code(132), 35024131)
-        registered = set(CTR_LOCATION_IDS.values())
         for slot in (1, 4, 132):
-            self.assertNotIn(rp.custom_perfect_reserved_code(slot), registered)
-        self.assertNotIn(35026005, registered)  # Cortex Vortex perfect
+            self.assertEqual(CTR_LOCATION_IDS[f"Custom Track {slot}: Relic Race Perfect"],
+                             rp.custom_perfect_reserved_code(slot))
+        self.assertEqual(CTR_LOCATION_IDS["Cortex Vortex: Relic Race Perfect"], 35026005)
+        self.assertFalse(rp.CUSTOM_PERFECT_CREATION_ENABLED)
 
     def test_custom_seed_with_option_on_creates_only_retail_perfects(self):
         mw = _build(seed=4, relic_perfect_checks=True,

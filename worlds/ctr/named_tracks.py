@@ -10,9 +10,9 @@ WHERE THE ROWS COME FROM
 `destinations.NAMED_TRACKS`, read from data/named_tracks.json. That file is
 generated from one pinned commit of the public track registry; the registry
 assigns `block_index` when a track is promoted, so the apworld only reads it
-and never invents one. Phase 1 ships the file with no tracks: the mechanism
-exists, no name is minted. Tests use test/fixtures/named_tracks_fixture.json,
-which is test data and never a shipped name.
+and never invents one (tools/build_named_tracks.py). Tests use
+test/fixtures/named_tracks_fixture.json, which is test data and never a
+shipped name.
 
 ID MATH (codes are computed, never stored by hand)
 
@@ -29,13 +29,20 @@ Location `<ap_name>: <suffix>` and item `Letter <C/T/R> (<ap_name>)`, the
 same spellings Cortex Vortex uses. `ap_name` is frozen from the first release
 that ships the block; a later title change is display only.
 
+MINTED (0.3.0 id step, 2026-10-15): data/named_tracks.json holds the 82 `mint`
+entries of registry commit e01959af45848777e11508e8bf357fd143f9f68b, written
+by tools/build_named_tracks.py. Blocks 14 and 68 (reserved until a race mode is
+confirmed) and 16 (cortex-vortex, builtin: it maps to the hard-coded Cortex
+Vortex block) are not minted and their numbers are never reused.
+
 DATAPACKAGE STABILITY
 
 Every row's complete family registers unconditionally (all LOCATION_OFFSETS
 and ITEM_OFFSETS), whatever a seed creates. The offset tables are append only:
-an offset, once shipped, keeps its family and spelling forever. Offsets 15 to
-199 and item offsets 3 and 4 are unassigned room for later families (AP boxes,
-cup leg victory, lap completion) and are minted only through the unfreeze
+an offset, once shipped, keeps its family and spelling forever. The 0.3.0 step
+added 15 Cup Leg Victory, 16 Complete One Lap and 20 to 34 Item Box 1 to 15;
+RESERVED_LOCATION_OFFSETS lists the rest of the ruled layout. Item offsets 3
+and 4 are unassigned. New offsets are minted only through the unfreeze
 register. FROZEN-NAME WARNING: once a block ships, its ids and names are
 permanent; freeze_violations() and test_named_tracks.py enforce that.
 The rule is checked against an independent baseline: the lock file
@@ -79,6 +86,19 @@ LOCATION_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
     ("letter_t", 12, "Letter T"),
     ("letter_r", 13, "Letter R"),
     ("wumpa", 14, "Reach 10 Wumpa"),
+    # 0.3.0 minting step (ruled 2026-10-13 22:02 CEST, register answer 7).
+    # 17 to 19 stay spare for later per-track race checks.
+    ("cup_leg_victory", 15, "Cup Leg Victory"),
+    ("lap", 16, "Complete One Lap"),
+) + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(1, 16))
+#: Offsets reserved in the 0.3.0 layout and not minted: 17 to 19 spare race
+#: checks, Item Box 16 to 100 at 35 to 119, 120 to 140 certified custom arenas
+#: (crystals and completion; a race block never carries them), 141 to 199 spare.
+RESERVED_LOCATION_OFFSETS: Tuple[Tuple[int, int, str], ...] = (
+    (17, 19, "spare per-track race checks"),
+    (35, 119, "Item Box 16 to Item Box 100"),
+    (120, 140, "certified custom arenas only"),
+    (141, 199, "spare"),
 )
 #: (key, offset, letter). APPEND ONLY.
 ITEM_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
@@ -93,6 +113,8 @@ assert all(0 <= o < LOCATION_BUDGET for _k, o, _s in LOCATION_OFFSETS)
 assert all(0 <= o < ITEM_BUDGET for _k, o, _s in ITEM_OFFSETS)
 assert len({o for _k, o, _s in LOCATION_OFFSETS}) == len(LOCATION_OFFSETS)
 assert len({o for _k, o, _s in ITEM_OFFSETS}) == len(ITEM_OFFSETS)
+assert not {o for _k, o, _s in LOCATION_OFFSETS} & {
+    o for lo, hi, _l in RESERVED_LOCATION_OFFSETS for o in range(lo, hi + 1)}
 
 #: The two named ranges, inclusive.
 NAMED_LOCATION_RANGE = (NAMED_LOCATION_BASE,
@@ -110,18 +132,27 @@ RESERVED_ID_RANGES: Tuple[Tuple[int, int, str], ...] = (
     (35016100, 35016131, "Reach 10 Wumpa: global, retail, custom roles"),
     (35016200, 35016299, "trial trophy"),
     (35016300, 35016559, "custom race family v1 (32 slots)"),
-    (35016600, 35016731, "custom Reach 10 Wumpa, slot owned (reserved)"),
-    (35016800, 35016951, "cup-win substitutes (reserved)"),
-    (35017000, 35018979, "AP boxes on custom tracks (reserved)"),
-    (35019000, 35019791, "custom race family v2 (reserved)"),
+    (35016600, 35016731, "custom Reach 10 Wumpa, slot owned"),
+    (35016800, 35016951, "Cup Leg Victory, retail and generic custom"),
+    (35017000, 35018979, "AP boxes on custom tracks"),
+    (35019000, 35019791, "custom race family v2 (35019000..191 never used)"),
     (35020000, 35020395, "custom letter locations"),
     (35021000, 35021395, "custom letter items"),
-    (35022000, 35022395, "custom relic tiers (reserved)"),
+    (35022000, 35022395, "custom relic tiers"),
     (35023000, 35023131, "custom CTR Token Challenge"),
-    (35024000, 35024131, "custom Relic Race Perfect (reserved)"),
+    (35024000, 35024131, "custom Relic Race Perfect"),
     (35025000, 35025015, "Hit Character encounters"),
     (35026000, 35026014, "Cortex Vortex named block"),
-    (35027000, 35027027, "cup completion checks (working proposal)"),
+    (35027000, 35027027, "cup points wins and Cortex Vortex Cup Leg Victory"),
+    (35027100, 35027199, "cup points wins, later names (reserved)"),
+    (35027200, 35027226, "cup sweeps, named cups"),
+    (35027300, 35027399, "cup sweeps, later names (reserved)"),
+    (35028000, 35028017, "lap completion, retail"),
+    (35028100, 35028231, "lap completion, generic custom"),
+    (35028300, 35028304, "cup sweeps, Gem Cups"),
+    (35028400, 35028479, "crystals, retail arenas"),
+    (35028500, 35028599, "arcade arenas #259 (reserved)"),
+    (35028600, 35028799, "Wumpa Shop (reserved)"),
 )
 for _first, _last, _label in RESERVED_ID_RANGES:
     for _lo, _hi in (NAMED_LOCATION_RANGE, NAMED_ITEM_RANGE):

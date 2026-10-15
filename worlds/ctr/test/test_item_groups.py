@@ -19,6 +19,7 @@ from worlds.AutoWorld import AutoWorldRegister
 
 from . import CTRTestBase
 from ..Items import load_item_table
+from ..minted_items_030 import MINTED_TRAP_KEYS
 from ..itemsanity import ITEM_NAMES
 
 # The four groups exactly as issue #167 specifies them, with "Traps" extended by
@@ -51,6 +52,8 @@ EXPECTED_GROUPS = {
         "Reverse Steering", "Red Potion",
         # minted by #280, now buildable
         "Upside Down", "Mirror Mode", "Warpball Ambush", "Demo Camera",
+        # minted by the 0.3.0 id step, not buildable until #455 and #248
+        "Clocked Out", "Reverse Camera",
     },
     "Itemsanity Weapons": set(ITEM_NAMES),
 }
@@ -71,8 +74,10 @@ class TestItemGroups(CTRTestBase):
         self.assertEqual(declared, set(EXPECTED_GROUPS) | {"Everything"})
 
     def test_members_are_real_item_names(self) -> None:
-        """Every member resolves to an entry in data/items.json."""
+        """Every member resolves to a registered item: data/items.json, or the
+        0.3.0 minted items kept outside that closed table."""
         item_names = {item["name"] for item in load_item_table()}
+        item_names |= set(MINTED_TRAP_KEYS)
         for group_name, members in EXPECTED_GROUPS.items():
             for member in sorted(members):
                 with self.subTest(group=group_name, item=member):
