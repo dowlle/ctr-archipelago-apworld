@@ -648,6 +648,17 @@ def create_regions(world: "ctrAPWorld"):
         _cv.exits.append(_ret)
         mw.regions.entrance_cache[player][_ret.name] = _ret
 
+    # Crystals inherit precisely the arena region's physical entry gates. They
+    # have no completion, weapon, boost or stat requirement of their own.
+    from .crystal_checks import CRYSTAL_CLASS
+    for _name, _code, _region_name in CRYSTAL_CLASS.created_locations(opts):
+        _region = region_lookup[_region_name]
+        _loc = create_location(player, _name, _region)
+        _loc.type = "crystalsanity"
+        _loc.logic_text = "True"
+        _region.locations.append(_loc)
+        mw.regions.location_cache[player][_name] = _loc
+
     # Itemsanity is global: a player can fire a received weapon from any race,
     # so its checks belong to the always-reachable Menu region rather than a
     # track.  Their item ownership rules are installed in Rules.py after the

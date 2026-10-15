@@ -457,6 +457,15 @@ class Itemsanity(Toggle):
     It changes how the whole game plays, not just what you collect."""
     display_name = "Itemsanity"
 
+class Crystalsanity(Toggle):
+    """Each authored crystal in an included Crystal Challenge is a check.
+
+    Crystal numbers identify fixed positions, not pickup order. The arena's
+    completion check remains separate. Does nothing when battle arenas are off.
+    """
+    display_name = "Crystalsanity"
+
+
 class HitCharacter(Toggle):
     """Add a check for each of the 16 racers, paid the first time you hit
     them in an Adventure race.
@@ -1414,6 +1423,7 @@ class ctrAPOptions(PerGameCommonOptions):
     editable_stats: EditableStats
     # warp pads: content & destination shuffle
     include_battle_arenas: ShuffleWarpPadsBattleArenas
+    crystalsanity: Crystalsanity
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
     # warp pads: display (issue #59)
@@ -1471,7 +1481,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                          RandomizeGemCupTracks, CustomTracks],
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
-    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity,
+    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity,
                      HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
