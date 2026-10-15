@@ -68,6 +68,18 @@ class TestArcadeArenas(unittest.TestCase):
                         self.assertEqual(pickup.can_reach(state),complete.can_reach(state))
             self.assertEqual(*reached)
 
+    def test_tracker_restores_persisted_room_arrays(self):
+        from NetUtils import convert_to_base_types
+        wire=make_world(arena_options()).fill_slot_data()
+        persisted=convert_to_base_types(wire)
+        self.assertIs(type(persisted['content_plan']['packages']),tuple)
+        tracker=make_world({},seed=999,passthrough=persisted)
+        self.assertEqual(tracker.fill_slot_data(),wire)
+        # Normalization must not coerce forged scalar types into valid values.
+        forged=copy.deepcopy(wire)
+        next(e for e in forged['content_plan']['entries'] if e['kind']=='crystal')['target']=20.0
+        with self.assertRaises(OptionError):make_world({},passthrough=convert_to_base_types(forged))
+
     def test_pool_count_required_entries_and_invalid_requests(self):
         o=arena_options(2);o['content_pool']['crystals']={'pool':[20,22,24],'count':{'min':2,'max':2}}
         o['content_pool']['required_entries'].append('arena:24')

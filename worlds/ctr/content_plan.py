@@ -596,8 +596,26 @@ def validate(plan):
     return True
 
 
+def _tracker_arrays(value, depth=0, budget=None):
+    """AP room persistence stores JSON arrays as tuples; restore their JSON form.
+
+    Keep scalar types and object keys exact so normal admission still refuses
+    malformed numbers, booleans and fields. Bound this walk before copying.
+    """
+    if budget is None:
+        budget = [0]
+    budget[0] += 1
+    if depth > 32 or budget[0] > 500000:
+        error("content_plan: nesting/node budget")
+    if type(value) in (list, tuple):
+        return [_tracker_arrays(v, depth + 1, budget) for v in value]
+    if type(value) is dict:
+        return {k: _tracker_arrays(v, depth + 1, budget) for k, v in value.items()}
+    return value
+
+
 def restore(world, slot_data):
-    plan = copy.deepcopy(slot_data["content_plan"])
+    plan = _tracker_arrays(slot_data["content_plan"])
     validate(plan)
     co = slot_data.get("ctr_options", {})
     if (type(slot_data.get("schema_version")) is not int or slot_data["schema_version"] != SCHEMA or

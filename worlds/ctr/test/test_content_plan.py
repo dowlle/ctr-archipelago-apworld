@@ -75,6 +75,12 @@ class TestContentPlan(CTRTestBase):
                 target.extend(sorted(loc.address for loc in world.multiworld.get_reachable_locations(state, 1)))
             self.assertEqual(actual, expected)
 
+    def test_tracker_restores_persisted_room_arrays(self):
+        from NetUtils import convert_to_base_types
+        wire=self.world.fill_slot_data()
+        tracker=make_world({},seed=999,passthrough=convert_to_base_types(wire))
+        self.assertEqual(tracker.fill_slot_data(),wire)
+
     def test_exact_extras_do_not_change_selected_content(self):
         base = make_world(profile_options())
         options = profile_options()
