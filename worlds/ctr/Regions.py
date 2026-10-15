@@ -718,6 +718,10 @@ def create_regions(world: "ctrAPWorld"):
     from .wumpa_checks import (WUMPA_CLASS, WUMPA_CORTEX_VORTEX_LOCATION,
                                WUMPA_RETAIL_TRACKS)
     _wumpa_track_cups = track_to_cups(world.gem_cup_legs)
+    # Boss garages race onto their venue's Wumpa check: the retail table, or
+    # the #169 boss_track_shuffle draw.
+    from .boss_track_shuffle import garage_tracks as _garage_tracks
+    _boss_garage_tracks = _garage_tracks(world.options)
     _dropped_track = cvt.dropped_track(opts)
     from .wumpa_checks import cortex_vortex_venue_active
     for _name, _code, _region_name in WUMPA_CLASS.created_locations(opts):
@@ -767,7 +771,7 @@ def create_regions(world: "ctrAPWorld"):
                          for _cup in _wumpa_track_cups.get(_region_name, [])
                          if _cup in region_lookup]
             _sources += [region_lookup[_garage]
-                         for _garage, _track in BOSS_WUMPA_TRACKS.items()
+                         for _garage, _track in _boss_garage_tracks.items()
                          if _track == _region_name and _garage in region_lookup]
             if not _sources:
                 raise ValueError(
