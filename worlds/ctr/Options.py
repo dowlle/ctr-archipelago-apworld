@@ -828,6 +828,39 @@ class RequirementWeights(OptionDict):
     ]
 
 
+class WarpPadRules(OptionDict):
+    """Set the entry requirement of chosen warp pads yourself.
+
+    Each entry is `pad name: {item: ..., count: ...}`. The pad name is the
+    pad's own name without "Warp Pad", for example `Crash Cove`, `Roo's Tubes`,
+    `Red Cup` or `Skull Rock`. A track or cup that is shuffled onto a pad
+    uses that pad's requirement, and hub doors still need their Keys.
+
+    `item` is `free`, Trophy, Key, a CTR Token colour (Red CTR Token ...), a
+    Relic tier (Sapphire Relic, Gold Relic, Platinum Relic), a Gem colour
+    (Red Gem ...), or the sums AnyCtrToken, AnyRelic and AnyGem. `free` needs
+    `count: 0`; every other item needs a whole `count` of at least 1, no more
+    than the seed has of it. Wumpa Fruit and character items are not allowed.
+
+    The rule is the first requirement of the pad. A second requirement on the
+    pad still follows Two-Stage Gate Density. Pads you leave out keep the
+    randomized rule from Warp Pad Unlock Requirements. Your entries ignore
+    Requirement Weights, and random_without_4_keys refuses a rule of 4 Keys.
+    A seed with vanilla warp pad requirements refuses any entry, and so does a
+    rule for a pad this seed does not have (arena pads without battle arenas,
+    cup pads without gem cups).
+
+    Example:
+    ```yaml
+    warp_pad_rules:
+      Crash Cove: {item: free, count: 0}
+      Red Cup: {item: Red CTR Token, count: 3}
+      Skull Rock: {item: AnyRelic, count: 2}
+    ```"""
+    display_name = "Warp Pad Rules"
+    default = {}
+
+
 class BossGarageRequirements(Choice):
     """Boss garages unlock on trophy counts: Roo, Papu, Joe and Pinstripe open
     with 4, 8, 12, 16 trophies respectively."""
@@ -1344,6 +1377,7 @@ class ctrAPOptions(PerGameCommonOptions):
     two_stage_density: TwoStageDensity
     requirement_variety: RequirementVariety
     requirement_weights: RequirementWeights
+    warp_pad_rules: WarpPadRules
     # extra location checks (podium position rungs)
     podium_placement_checks: PodiumPlacementChecks
     podium_finish_rungs: PodiumFinishRungs
@@ -1379,7 +1413,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
              FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
-                           BossGarageRequirements],
+                           WarpPadRules, BossGarageRequirements],
     "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
                          ShuffleWarpPadsBattleArenas, ShuffleWarpPadsGemCups,
                          RandomizeGemCupTracks, CustomTracks],
