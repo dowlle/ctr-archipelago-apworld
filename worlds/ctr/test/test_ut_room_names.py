@@ -27,6 +27,11 @@ from .test_content_plan import make_world, profile_options
 from .test_named_tracks import fixture_tracks
 
 GAME = ctrAPWorld.game
+#: Legacy-path room title of the compiled Baby T Park package: its plain title is
+#: the named block's frozen stem, so the clash rule adds the track key as author.
+LEGACY_TITLE = "Baby T Park (Custom, baby-t-park)"
+#: Registry block of baby-t-park in data/named_tracks.json.
+BABY_T_PARK_BLOCK = 8
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 
 
@@ -56,6 +61,9 @@ def reachable(multiworld, names):
 
 
 class TestLegacyPathTitles(unittest.TestCase):
+    """Baby T Park has a named block since the 0.3.0 id step (block 8), so on
+    the legacy generic path its room title takes the named-block clash suffix:
+    a generic slot never shows a named track's own name (#306 clash rule)."""
     seed = 20261013
 
     def source(self, **extra):
@@ -66,7 +74,7 @@ class TestLegacyPathTitles(unittest.TestCase):
         _mw, wire = self.source()
         self.assertEqual(wire["schema_version"], 18)
         self.assertEqual(wire["custom_track_titles"],
-                         {"version": 1, "tracks": [{"slot": 1, "title": "Baby T Park"}]})
+                         {"version": 1, "tracks": [{"slot": 1, "title": LEGACY_TITLE}]})
         _mw, wire = self.source(title="Crash  Cove", author="Ana")
         self.assertEqual(wire["custom_track_titles"]["tracks"][0]["title"], "Crash Cove (Custom)")
         self.assertNotIn("title", wire["custom_tracks"]["tracks"][0])
@@ -80,10 +88,10 @@ class TestLegacyPathTitles(unittest.TestCase):
         tracker = tracker_for(wire, self.seed)
         world = tracker.worlds[1]
         by_address = {loc.address: loc.name for loc in tracker.get_locations(1)}
-        self.assertEqual(by_address[35016300], "Baby T Park: Trophy Race")
-        self.assertEqual(by_address[35016400], "Baby T Park: Held 1st")
+        self.assertEqual(by_address[35016300], f"{LEGACY_TITLE}: Trophy Race")
+        self.assertEqual(by_address[35016400], f"{LEGACY_TITLE}: Held 1st")
         self.assertEqual(by_address[custom_check_code("ctr_location", 1)],
-                         "Baby T Park: CTR Token Challenge")
+                         f"{LEGACY_TITLE}: CTR Token Challenge")
         self.assertEqual(world.location_id_to_alias, {})
         self.assertNotIn("Custom Track 1: Trophy Race", tracker.regions.location_cache[1])
         self.assertEqual(set(by_address), {loc.address for loc in source.get_locations(1)})
@@ -98,7 +106,7 @@ class TestLegacyPathTitles(unittest.TestCase):
         _source, wire = self.source(title="Neon Rush")
         old = {k: v for k, v in wire.items() if k != "custom_track_titles"}
         names = {loc.address: loc.name for loc in tracker_for(old, self.seed).get_locations(1)}
-        self.assertEqual(names[35016300], "Baby T Park: Trophy Race")
+        self.assertEqual(names[35016300], f"{LEGACY_TITLE}: Trophy Race")
         names = {loc.address: loc.name for loc in tracker_for(wire, self.seed).get_locations(1)}
         self.assertEqual(names[35016300], "Neon Rush: Trophy Race")
 
@@ -119,9 +127,9 @@ class TestLegacyPathTitles(unittest.TestCase):
         self.assertTrue(placed & set(letters), "the seed pools a custom letter item")
         for code, letter in zip(letters, "CTR"):
             if code in placed:
-                self.assertEqual(room["item_name_to_id"][f"Letter {letter} (Baby T Park)"], code)
+                self.assertEqual(room["item_name_to_id"][f"Letter {letter} ({LEGACY_TITLE})"], code)
                 self.assertNotIn(f"Letter {letter} (Custom Track 1)", room["item_name_to_id"])
-        self.assertEqual(room["location_name_to_id"]["Baby T Park: Trophy Race"], 35016300)
+        self.assertEqual(room["location_name_to_id"][f"{LEGACY_TITLE}: Trophy Race"], 35016300)
         self.assertEqual(set(room["item_name_to_id"].values()), set(package["item_name_to_id"].values()))
         self.assertNotEqual(room["checksum"], package["checksum"])
         self.assertEqual(package, ctrAPWorld.get_data_package_data(), "registered package mutated")
@@ -184,18 +192,49 @@ class FixtureRegistry:
             p.stop()
 
 
+class WithoutNamedBlock:
+    """A build without baby-t-park's block, to exercise the generic content-plan
+    addressing (B+) with the only package the content plan admits. Test only."""
+
+    def __enter__(self):
+        rest = tuple(t for t in destinations.NAMED_TRACKS if t.track_key != "baby-t-park")
+        self.patches = [patch.object(destinations, "NAMED_TRACKS", rest),
+                        patch.object(destinations, "NAMED_BY_KEY", {t.track_key: t for t in rest})]
+        for p in self.patches:
+            p.start()
+        return self
+
+    def __exit__(self, *exc):
+        for p in reversed(self.patches):
+            p.stop()
+
+
 class TestContentPlanAddressing(unittest.TestCase):
-    def test_generic_package_carries_its_room_title(self):
+    def test_shipped_package_uses_its_named_block(self):
         world = make_world(profile_options())
         track = next(t for t in world.ctr_content_plan["tracks"] if t["origin"] == "custom")
-        self.assertEqual(track["room_title"], "Baby T Park")
-        self.assertNotIn("named_block", track)
+        self.assertEqual((track["named_block"], track["room_title"]), (BABY_T_PARK_BLOCK, "Baby T Park"))
+        code = location_code(BABY_T_PARK_BLOCK, "trophy")
         check = next(c for c in world.ctr_content_plan["checks"] if c["owner"] == track["id"])
-        self.assertEqual((check["location"], check["display_name"]), (35016300, "Baby T Park: Trophy Race"))
+        self.assertEqual((check["location"], check["display_name"]), (code, "Baby T Park: Trophy Race"))
+        self.assertNotIn(code, world.location_id_to_alias)
         tracker = make_world(profile_options(), passthrough=world.fill_slot_data())
         tracker.generate_basic()
         names = {loc.address: loc.name for loc in tracker.multiworld.get_locations(1)}
-        self.assertEqual(names[35016300], "Baby T Park: Trophy Race")
+        self.assertEqual(names[code], "Baby T Park: Trophy Race")
+
+    def test_generic_package_carries_its_room_title(self):
+        with WithoutNamedBlock():
+            world = make_world(profile_options())
+            track = next(t for t in world.ctr_content_plan["tracks"] if t["origin"] == "custom")
+            self.assertEqual(track["room_title"], "Baby T Park")
+            self.assertNotIn("named_block", track)
+            check = next(c for c in world.ctr_content_plan["checks"] if c["owner"] == track["id"])
+            self.assertEqual((check["location"], check["display_name"]), (35016300, "Baby T Park: Trophy Race"))
+            tracker = make_world(profile_options(), passthrough=world.fill_slot_data())
+            tracker.generate_basic()
+            names = {loc.address: loc.name for loc in tracker.multiworld.get_locations(1)}
+            self.assertEqual(names[35016300], "Baby T Park: Trophy Race")
 
     def test_fixture_named_block_is_used_and_needs_no_alias(self):
         with FixtureRegistry():
