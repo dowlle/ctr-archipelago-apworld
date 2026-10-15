@@ -86,6 +86,18 @@ their Trophy Race is in the seed. If Cortex Vortex Track takes the pad of a
 boss track, that track keeps its Wumpa check, paid from the boss race. The old
 `true` and `false` values still work and mean `global` and `off`.
 
+### Boss Track Shuffle
+
+Each of the four boss garages races on a track drawn for your seed: any of
+the 16 trophy tracks, Slide Coliseum or Turbo Track. The boss, its attacks,
+its Key and the garage door requirement do not change. The garage shows the
+drawn track, and so does the in-game tracker. A boss race on another track
+pays that track's Wumpa check, and its finish needs whatever that track
+needs, such as Ultimate Sacred Fire on Hot Air Skyway with Progressive Boost
+on. N. Oxide and the Purple Gem Cup are not affected. Allowlist and
+Blocklist narrow the tracks; if they leave too few tracks for four different
+boss tracks, generation stops with an error.
+
 ### Cortex Vortex Track
 
 Destination shuffle can move Cortex Vortex like any other destination, and it

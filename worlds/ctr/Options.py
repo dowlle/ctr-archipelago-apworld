@@ -8,6 +8,7 @@ from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
 from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
+from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
 
 
 class OxideGoal(Choice):
@@ -163,6 +164,50 @@ class OxideFinalTrack(Choice):
     display_name = "Oxide Final Challenge Track"
     option_cortex_vortex = 0
     option_oxide_station = 1
+    default = 0
+
+
+class BossTrackShuffle(Toggle):
+    """Race each of the four boss garages on a randomly drawn track.
+
+    Ripper Roo, Papu Papu, Komodo Joe and Pinstripe keep their garage, their
+    Key, their door requirement and their own attacks; only the track they
+    race on changes. Each boss gets a different track unless Boss Encounter
+    Repeats allows repeats. N. Oxide is not affected, and the Purple Gem Cup
+    keeps its own tracks."""
+    # #169 tier 1 (0.3.0). Wire: ctr_options.boss_track_shuffle plus the
+    # boss_encounters block (schema 18). See boss_track_shuffle.py.
+    display_name = "Boss Track Shuffle"
+
+
+class BossTrackAllowlist(OptionSet):
+    """With Boss Track Shuffle on, draw boss tracks only from these tracks.
+    Leave empty to allow every track. Ignored when Boss Track Shuffle is
+    off."""
+    display_name = "Boss Track Allowlist"
+    valid_keys = sorted(BOSS_VENUE_TRACKS)
+    default = frozenset()
+
+
+class BossTrackBlocklist(OptionSet):
+    """With Boss Track Shuffle on, never draw these tracks for a boss race.
+    Applied after the allowlist. Ignored when Boss Track Shuffle is off."""
+    display_name = "Boss Track Blocklist"
+    valid_keys = sorted(BOSS_VENUE_TRACKS)
+    default = frozenset()
+
+
+class BossEncounterRepeats(Choice):
+    """Whether two boss garages may use the same drawn track.
+
+    - **disallow** (default): the four bosses race on four different tracks.
+    - **allow**: each garage draws on its own, so tracks can repeat.
+
+    A track that is also an ordinary race or a Gem Cup leg never counts as a
+    repeat."""
+    display_name = "Boss Encounter Repeats"
+    option_disallow = 0
+    option_allow = 1
     default = 0
 
 
@@ -1318,6 +1363,11 @@ class ctrAPOptions(PerGameCommonOptions):
     oxide_final_challenge_unlock: FinalOxideUnlock
     oxide_final_challenge_relic_count: FinalOxideRelicCount
     oxide_final_track: OxideFinalTrack
+    # boss encounters (#169 tier 1: track switch)
+    boss_track_shuffle: BossTrackShuffle
+    boss_track_allowlist: BossTrackAllowlist
+    boss_track_blocklist: BossTrackBlocklist
+    boss_encounter_repeats: BossEncounterRepeats
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -1411,6 +1461,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
              FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
+    "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
+                        BossTrackBlocklist, BossEncounterRepeats],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            WarpPadRules, BossGarageRequirements],
