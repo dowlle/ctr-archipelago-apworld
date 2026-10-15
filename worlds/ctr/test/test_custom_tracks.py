@@ -647,11 +647,14 @@ class TestCustomLetterGeneration(CTRTestBase):
         self.assertEqual([row["slot"] for row in wire["tracks"]], [1])
         self.assertEqual({c for c in wire["tracks"][0]["locations"] if c >= 0},
                          {loc.address for loc in custom})
+        # Baby T Park has a named block since the 0.3.0 id step, so the
+        # generic slot takes the #306 clash suffix in its room title.
+        title = "Baby T Park (Custom, baby-t-park)"
         for loc in custom:
             self.assertEqual(self.world.location_id_to_alias[loc.address],
-                             f"Baby T Park: Letter {loc.name[-1]}")
+                             f"{title}: Letter {loc.name[-1]}")
         self.assertEqual(self.world.location_id_to_alias[35023000],
-                         "Baby T Park: CTR Token Challenge")
+                         f"{title}: CTR Token Challenge")
         package = {"item_name_to_id": dict(self.world.item_name_to_id),
                    "location_name_to_id": dict(self.world.location_name_to_id),
                    "location_name_groups": {"All": list(self.world.location_name_to_id)},
@@ -660,7 +663,7 @@ class TestCustomLetterGeneration(CTRTestBase):
         room = {"datapackage": {self.game: package}}
         type(self.world).stage_modify_multidata(self.multiworld, room)
         named = room["datapackage"][self.game]
-        self.assertEqual(named["location_name_to_id"]["Baby T Park: CTR Token Challenge"], 35023000)
+        self.assertEqual(named["location_name_to_id"][f"{title}: CTR Token Challenge"], 35023000)
         self.assertEqual(package, original)
         self.assertEqual(set(named["location_name_to_id"].values()),
                          set(original["location_name_to_id"].values()))

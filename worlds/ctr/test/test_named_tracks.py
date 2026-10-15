@@ -189,10 +189,8 @@ class TestRegistryRows(unittest.TestCase):
         self.assertIn("TEST DATA ONLY", fixture_document()["test_data"])
         shipped = json.loads(pkgutil.get_data("worlds.ctr", destinations.NAMED_TRACKS_FILE))
         self.assertNotIn("test_data", shipped)
-        self.assertEqual(shipped["tracks"], [], "phase 1 mints no named block")
-        self.assertEqual(destinations.NAMED_TRACKS, ())
-        self.assertEqual(nt.NAMED_TRACK_CLASS.all_locations(), [])
-        self.assertEqual(nt.NAMED_TRACK_ITEM_DATA, ())
+        shipped_names = {row["ap_name"] for row in shipped["tracks"]}
+        self.assertFalse(shipped_names & {t.ap_name for t in fixture_tracks()})
 
     def test_fixture_family_is_complete_and_collision_free(self):
         tracks = fixture_tracks()

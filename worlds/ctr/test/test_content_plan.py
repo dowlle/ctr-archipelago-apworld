@@ -53,7 +53,8 @@ class TestContentPlan(CTRTestBase):
         self.assertEqual(len(self.multiworld.itempool), 19)
         self.assertEqual(plan["items"]["filler_count"], 5)
         self.assertEqual(len([p for p in plan["pads"] if p["kind"] == "normal" and p["entry_id"] is None]), 8)
-        self.assertIn("Custom Track 1: Trophy Race", [loc.name for loc in self.multiworld.get_locations(1)])
+        # baby-t-park has a named block since the 0.3.0 id step (#306).
+        self.assertIn("Baby T Park: Trophy Race", [loc.name for loc in self.multiworld.get_locations(1)])
         self.assertEqual(plan["packages"], [content_plan.PACKAGES[1]])
         self.assertEqual(sum(item.name == "Key" for item in self.multiworld.itempool), 4)
         self.assertEqual(sum(item.name.endswith(" Gem") for item in self.multiworld.itempool), 5)

@@ -35,13 +35,13 @@ family, and the podium 35015000 / 35015100 blocks. Nothing shipped is renumbered
 name and no id.
 
 CORTEX VORTEX AND CUSTOM TRACKS. `Cortex Vortex: Relic Race Perfect`
-(35026005) is reserved but not minted, and the custom-track perfect family
-(`Custom Track N: Relic Race Perfect`, 35024000 + N - 1) is reserved in
-custom_check_namespace but not registered. Neither is created here. The
+(35026005) and the custom-track perfect family (`Custom Track N: Relic Race
+Perfect`, 35024000 + N - 1) were minted by the 0.3.0 id step and are
+registered by custom_fallback_families.py. Neither is created here. The
 custom-track side is prepared by `relic_capable_custom_slots` below, which
 enumerates the packages whose measured capability says they carry relic time
-crates; creation stays off (`CUSTOM_PERFECT_CREATION_ENABLED`) until the
-identity is minted and a custom Relic Race mode is admitted.
+crates; creation stays off (`CUSTOM_PERFECT_CREATION_ENABLED`) until the #453
+feature PR admits a custom Relic Race mode.
 """
 
 from . import destinations
@@ -187,9 +187,9 @@ def _as_lists(value):
 # ---------------------------------------------------------------------------
 
 #: Creation switch for custom-track perfect checks. Off, and must stay off,
-#: until (1) the reserved family `perfect_location` (35024000 + slot - 1,
-#: "Custom Track N: Relic Race Perfect") is minted into the datapackage by an
-#: approved unfreeze, and (2) a custom Relic Race mode is admitted in the
+#: until (1) the family `perfect_location` (35024000 + slot - 1,
+#: "Custom Track N: Relic Race Perfect", minted by the 0.3.0 id step) has its
+#: feature build, and (2) a custom Relic Race mode is admitted in the
 #: custom_tracks descriptor (today `modes` admits only `ctr_challenge`), with
 #: its own Time Trial family (`relic_location`, 35022000) minted alongside.
 #: TODO(#49, custom tracks): flip only together with both of those.
@@ -213,9 +213,9 @@ def relic_capable_custom_slots(custom_tracks):
 
 
 def custom_perfect_reserved_code(slot: int) -> int:
-    """The RESERVED (unminted) code a custom slot's perfect check would use.
-    Reservation only: this id is not in the datapackage and must never be
-    sent or created while CUSTOM_PERFECT_CREATION_ENABLED is False."""
+    """The code a custom slot's perfect check uses (minted by the 0.3.0 id
+    step). It must never be sent or created while
+    CUSTOM_PERFECT_CREATION_ENABLED is False."""
     from .custom_check_namespace import custom_check_code
     return custom_check_code("perfect_location", slot)
 
