@@ -126,11 +126,14 @@ class TestOptionOff(unittest.TestCase):
         bts.draw(world)
         self.assertEqual(world.random.method_calls, [])
 
-    def test_filters_without_the_switch_are_refused(self):
+    def test_filters_without_the_switch_are_ignored(self):
+        base = _wire(_build(seed=4))
         for name in ("boss_track_allowlist", "boss_track_blocklist"):
             with self.subTest(option=name):
-                with self.assertRaises(OptionError):
-                    _build(**{name: ["Crash Cove"]})
+                mw = _build(seed=4, **{name: ["Crash Cove"]})
+                self.assertEqual(_wire(mw), base)
+                label = name.replace("_", " ").title() + " (Boss Track Shuffle off)"
+                self.assertIn(label, mw.worlds[PLAYER].options._ctr_notices["ignored"])
 
     def test_content_plan_path_refuses_the_switch(self):
         from .. import content_plan

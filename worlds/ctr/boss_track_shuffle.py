@@ -176,21 +176,20 @@ def enabled(options) -> bool:
 # --------------------------------------------------------------------- options
 
 def validate_options(world) -> None:
-    """Raise-guards for subordinate controls (design: reject a nonempty track
-    filter while track shuffle is off). `boss_encounter_repeats: allow`
-    without a draw is noted as ignored rather than refused: it narrows
-    nothing and the design names no rejection for it."""
+    """Subordinate controls without the switch are ignored, not refused
+    (ruling 2026-10-15, the DeathLink Send pattern): a random or hand-written
+    YAML that rolls the lists with the switch off still generates, and the
+    lists are noted as ignored. Filters that leave too few tracks with the
+    switch on still stop generation (see `draw`)."""
     o = world.options
     if enabled(o):
         return
-    used = [name for name in ("boss_track_allowlist", "boss_track_blocklist")
-            if getattr(o, name).value]
-    if used:
-        raise OptionError(
-            f"CTR ({_who(world)}): {', '.join(used)} only apply with "
-            "boss_track_shuffle on; turn it on or empty the list.")
+    from .notices import note_ignored
+    for name, label in (("boss_track_allowlist", "Boss Track Allowlist"),
+                        ("boss_track_blocklist", "Boss Track Blocklist")):
+        if getattr(o, name).value:
+            note_ignored(world, f"{label} (Boss Track Shuffle off)")
     if o.boss_encounter_repeats.value:
-        from .notices import note_ignored
         note_ignored(world, "Boss Encounter Repeats (no boss draw is on)")
 
 

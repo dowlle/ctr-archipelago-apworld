@@ -182,7 +182,7 @@ class BossTrackShuffle(Toggle):
 
 class BossTrackAllowlist(OptionSet):
     """With Boss Track Shuffle on, draw boss tracks only from these tracks.
-    Leave empty to allow every track. Must be empty when Boss Track Shuffle is
+    Leave empty to allow every track. Ignored when Boss Track Shuffle is
     off."""
     display_name = "Boss Track Allowlist"
     valid_keys = sorted(BOSS_VENUE_TRACKS)
@@ -191,8 +191,7 @@ class BossTrackAllowlist(OptionSet):
 
 class BossTrackBlocklist(OptionSet):
     """With Boss Track Shuffle on, never draw these tracks for a boss race.
-    Applied after the allowlist. Must be empty when Boss Track Shuffle is
-    off."""
+    Applied after the allowlist. Ignored when Boss Track Shuffle is off."""
     display_name = "Boss Track Blocklist"
     valid_keys = sorted(BOSS_VENUE_TRACKS)
     default = frozenset()
