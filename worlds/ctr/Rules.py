@@ -779,9 +779,11 @@ def add_boss_garage_rules(world, player):
     mw = world.multiworld
     for door, thr in HUB_BOSS.items():
         set_term(mw.get_entrance(door, player), Has("Trophy", thr, player))
-    from .Regions import BOSS_WUMPA_TRACKS
+    # The finish term follows the track this garage's boss race is actually
+    # run on: the retail table, or the #169 boss_track_shuffle draw.
+    from .boss_track_shuffle import garage_tracks
     from .usf_finish import ALL_USF_FINISH_TRACKS, track_finish_t
-    for garage, track in BOSS_WUMPA_TRACKS.items():
+    for garage, track in garage_tracks(world.options).items():
         if garage == "N. Oxide Garage":
             continue  # Both Oxide encounters are ruled below with their goals.
         floor = boost_cap(world, None, 1)

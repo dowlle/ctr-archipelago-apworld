@@ -16,6 +16,7 @@ from .Locations import CTR_LOCATION_CLASSES, get_location_names
 from .Items import load_item_table
 from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
+from . import boss_track_shuffle
 from . import cortex_vortex_track
 from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
 from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITEM_NAMES
@@ -266,6 +267,8 @@ class ctrAPWorld(World):
         mirrors (one_lap_cups, death_link, ...) are skipped."""
         o = self.options
         co = passthrough.get("ctr_options", {})
+        # #169 tier 1: pin the seed's boss venues from the wire, never redraw.
+        boss_track_shuffle.restore_from_wire(self, passthrough)
 
         def _restore(opt_name: str, key: str) -> None:
             if key in co:
@@ -566,6 +569,11 @@ class ctrAPWorld(World):
             _forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups(self)
             # No one-way DeathLink (2026-09-30): sending implies receiving.
             _forced_options.resolve_death_link_off_when_send_conditions_set(self)
+            # Boss track shuffle (#169 tier 1): freeze the four garage venues
+            # before the Cortex Vortex draw, whose supply check counts Wumpa
+            # locations a boss venue can keep. Draws nothing with the option
+            # off, so such a seed keeps its RNG stream.
+            boss_track_shuffle.draw(self)
             cortex_vortex_track.draw_dropped_destination(self)
         if not hasattr(self.options, "_lettersanity_selected"):
             mode = int(self.options.lettersanity.value)
@@ -1360,6 +1368,11 @@ class ctrAPWorld(World):
         spoiler_handle.write(
             f"\n\nCTR starting character ({_player_name}): "
             f"{getattr(self, 'ctr_starting_character', '?')}\n")
+        _boss_venues = boss_track_shuffle.spoiler_lines(self.options)
+        if _boss_venues:
+            spoiler_handle.write(f"CTR boss tracks ({_player_name}):\n")
+            for _line in _boss_venues:
+                spoiler_handle.write(f"  {_line}\n")
         _locks = getattr(self, "ctr_racer_locks", {}) or {}
         if _locks:
             spoiler_handle.write(

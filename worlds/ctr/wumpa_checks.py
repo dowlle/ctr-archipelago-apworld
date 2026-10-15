@@ -180,15 +180,15 @@ def dropped_boss_wumpa_track(options) -> Optional[str]:
 
     Returns the track name, or None when the dropped destination hosts no boss
     race, when this seed removed that race, or when nothing is dropped. The
-    garage-to-track mapping is read from `Regions.BOSS_WUMPA_TRACKS` rather
-    than retyped, so a later boss shuffle moves this answer with it.
+    garage-to-track mapping is `boss_track_shuffle.garage_tracks`: the retail
+    table, or this seed's #169 boss track draw, which moves this answer.
     """
     from .cortex_vortex_track import dropped_track
-    from .Regions import BOSS_WUMPA_TRACKS
+    from .boss_track_shuffle import garage_tracks
     dropped = dropped_track(options)
     if dropped is None or dropped not in WUMPA_RETAIL_TRACKS:
         return None
-    garages = [garage for garage, track in BOSS_WUMPA_TRACKS.items()
+    garages = [garage for garage, track in garage_tracks(options).items()
                if track == dropped]
     if not garages:
         return None
@@ -196,7 +196,9 @@ def dropped_boss_wumpa_track(options) -> Optional[str]:
     # (issue #320), so a dropped Oxide Station then has no race left to award
     # the check. Every other setting keeps N. Oxide's Challenge, which is raced
     # on Oxide Station whatever `oxide_final_track` says, so the check survives.
-    if "N. Oxide Garage" in garages and not _oxide_content_present(options):
+    if not _oxide_content_present(options):
+        garages = [garage for garage in garages if garage != "N. Oxide Garage"]
+    if not garages:
         return None
     return dropped
 
