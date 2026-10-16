@@ -35,7 +35,21 @@ class TestCupSweeps(unittest.TestCase):
             wire=w.fill_slot_data()
             for code in range(35028300,35028305):
                 self.assertEqual(wire['win_logic']['checks'][str(code)]['kind'],'gem')
-            check_seed(w.multiworld,random.Random(42),states_per_seed=20)
+            self.assertEqual(check_seed(w.multiworld,random.Random(42),states_per_seed=20),[])
+
+    def test_cortex_dropped_cup_has_no_unreachable_sweep(self):
+        from .test_cortex_vortex_track import _build, _ut_regen
+        for i,cup in enumerate(GEM_CUPS):
+            with self.subTest(cup=cup):
+                mw=_build(dropped=100+i,cup_sweep_checks=True)
+                names={loc.name for loc in mw.get_locations(1)}
+                self.assertNotIn(CUP_SWEEP_CLASS.location_name(cup),names)
+                wire=mw.worlds[1].fill_slot_data()
+                self.assertEqual(len(wire['cup_sweep_checks']['cups']),4)
+                self.assertNotIn(str(100+i),wire['cup_sweep_checks']['cups'])
+                self.assertEqual(len(mw.itempool),len(mw.get_unfilled_locations(1)))
+                tracker=_ut_regen(convert_to_base_types(wire))
+                self.assertEqual(tracker.worlds[1].fill_slot_data()['cup_sweep_checks'],wire['cup_sweep_checks'])
 
     def test_displaced_cup_has_no_sweep(self):
         from .test_custom_tracks import BABY_T_PARK

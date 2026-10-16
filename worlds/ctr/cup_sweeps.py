@@ -30,9 +30,11 @@ def create_locations(world, regions):
     if not o.cup_sweep_checks.value:
         return
     legs=getattr(world,'gem_cup_legs',{})
+    from .cortex_vortex_track import dropped_region
+    dropped=dropped_region(o)
     selected=[]
     for cup in GEM_CUPS:
-        if cup not in regions or len(legs.get(cup,()))!=4:
+        if cup==dropped or cup not in regions or len(legs.get(cup,()))!=4:
             continue
         name=CUP_SWEEP_CLASS.location_name(cup)
         loc=create_location(world.player,name,regions[cup])
