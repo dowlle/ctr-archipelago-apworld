@@ -260,7 +260,7 @@ class TestRungSizingGeneration(unittest.TestCase):
                 expected = rung_sizer.predicted_mandatory_pool(world)
                 actual = sum(
                     1 for item in mw.itempool if item.player == world.player
-                    and item.name != "Wumpa Fruit"
+                    and item.name not in {"Wumpa Fruit", "Reserve Top-Up"}
                     and item.name not in rung_sizer._SURFACE_ITEM_NAMES
                     and item.name not in traps.ALL_TRAP_ITEM_NAMES)
                 self.assertEqual(actual, expected)

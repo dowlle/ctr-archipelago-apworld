@@ -87,6 +87,7 @@ class _FakeWorld:
     def __init__(self, bundles):
         self.options = self._Options()
         self.options.wumpa_bundles = _FakeOption(bundles)
+        self.options.reserve_top_up = _FakeOption(0)
         self.random = None  # any draw would raise, which is the point below
 
 
