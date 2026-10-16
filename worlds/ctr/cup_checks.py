@@ -118,7 +118,8 @@ class CupSweepLocationClass(LocationClass):
         return cup_sweep_name(cup)
 
     def created_location_names(self, options) -> List[str]:
-        return []
+        return list(getattr(options, "_cup_sweep_selected", ())) if getattr(
+            getattr(options, "cup_sweep_checks", None), "value", 0) else []
 
 
 class CupLegVictoryLocationClass(LocationClass):

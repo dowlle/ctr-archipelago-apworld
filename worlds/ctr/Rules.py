@@ -169,6 +169,8 @@ def set_rules(world):
     # impossible target raises a clear OptionError. See hit_character.install_rules.
     from . import hit_character
     hit_character.install_rules(world, player)
+    from .cup_sweeps import install_rules as install_cup_sweep_rules
+    install_cup_sweep_rules(world, player)
 
 
 def add_capability_difficulty_rules(world, player):
