@@ -66,6 +66,7 @@ FIXTURE_PATHS = (
     # The 0.3.0 id step (2026-10-15): 2,624 named-block names and 3,682
     # fixed-family names, every one approved in the 0.3.0 minting register.
     FIXTURE_DIR / "location_class_id_stability_2026_10_15_minting_030.json",
+    FIXTURE_DIR / "location_class_id_stability_2026_10_16_arcade_259.json",
 )
 
 PODIUM_TOGGLES = (
@@ -496,7 +497,7 @@ class TestLocationClassIdStability(unittest.TestCase):
         # 112 podium + 361 frozen by #177 + 19 from the approved 2026-08-29
         # per-track Wumpa unfreeze + 13 from the approved 2026-09-13 Cortex
         # Vortex pad-track unfreeze + 6,306 from the 0.3.0 id step.
-        self.assertEqual(len(frozen), 505 + 6306)
+        self.assertEqual(len(frozen), 505 + 6306 + 63)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(

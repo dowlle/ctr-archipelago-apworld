@@ -71,10 +71,13 @@
       "items": {
         "enum": [
           "content_plan_v1",
-          "manual_pad_requirements_v1"
+          "manual_pad_requirements_v1",
+          "crystal_entries_v1",
+          "crystal_pickups_v1",
+          "arcade_crystals_v1"
         ]
       },
-      "maxItems": 2,
+      "maxItems": 5,
       "minItems": 1,
       "uniqueItems": true
     }
@@ -794,7 +797,8 @@
             "trophy",
             "ctr",
             "relic",
-            "merged"
+            "merged",
+            "crystal"
           ]
         },
         "stage": {

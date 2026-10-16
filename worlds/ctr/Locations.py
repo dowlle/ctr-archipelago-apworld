@@ -82,6 +82,10 @@ for _minted_030 in (CUP_WIN_CLASS, CUP_SWEEP_CLASS, CUP_LEG_VICTORY_CLASS, LAP_C
                     CUSTOM_ITEM_BOX_CLASS):
     CTR_LOCATION_CLASSES.register(_minted_030)
 
+# #259 second mint: sixty authored anchors and three independent completions.
+from .arena_content import ARCADE_ARENA_CLASS
+CTR_LOCATION_CLASSES.register(ARCADE_ARENA_CLASS)
+
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
 )

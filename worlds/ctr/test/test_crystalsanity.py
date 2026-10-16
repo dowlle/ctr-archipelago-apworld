@@ -74,8 +74,8 @@ class TestCrystalReconstruction(unittest.TestCase):
                 self.assertEqual({loc.name for loc in tracker.get_locations(1)}, names)
                 self.assertEqual(tracker.worlds[1].fill_slot_data()['crystal_checks'], wire['crystal_checks'])
 
-    def test_pending_content_profile_refuses_the_option(self):
+    def test_content_profile_without_arenas_keeps_wire_shape(self):
         options = profile_options()
         options['crystalsanity'] = True
-        with self.assertRaisesRegex(OptionError, 'crystalsanity'):
-            make_world(options)
+        world = make_world(options)
+        self.assertEqual(world.fill_slot_data(), make_world(profile_options()).fill_slot_data())

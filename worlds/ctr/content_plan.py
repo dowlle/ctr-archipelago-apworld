@@ -15,6 +15,7 @@ from . import (content_item_pool, characters, destinations, named_tracks, sphere
                warp_pad_rules, wumpa_family)
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
+from . import arena_content
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -162,9 +163,36 @@ def manual_requirements(manual, rows):
     return out
 
 
-def required_features(requirements):
+def required_features(requirements, entries=(), checks=()):
     manual = any(r["id"].startswith("manual:") for r in requirements)
-    return ["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
+    return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
+            + (["crystal_entries_v1"] if any(e['kind']=='crystal' for e in entries) else [])
+            + (["crystal_pickups_v1"] if any(c['kind']=='crystal_pickup' for c in checks) else [])
+            + (["arcade_crystals_v1"] if any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in entries) else []))
+
+
+def crystal_selection(world, raw):
+    o=world.options
+    pool=raw.get('pool','all')
+    allowed=list(arena_content.ARENAS)
+    if pool!='all' and (not isinstance(pool,list) or any(type(i) is not int or i not in allowed for i in pool) or len(set(pool))!=len(pool)):
+        error('crystals.pool must be all or distinct arena LevelIDs 18 through 24.')
+    eligible=(list(arena_content.ARENAS) if pool=='all' else list(pool))
+    if not o.include_battle_arenas.value:
+        return [],0
+    if not o.include_arcade_arenas.value:
+        if pool!='all' and any(i in arena_content.ARCADE for i in eligible):
+            error('an arcade arena in crystals.pool requires include_arcade_arenas.')
+        eligible=[i for i in eligible if i not in arena_content.ARCADE]
+    count=raw.get('count',0)
+    if isinstance(count,dict) and set(count)=={'min','max'}:
+        low,high=count['min'],count['max']
+        if type(low) is not int or type(high) is not int or not 0<=low<=high<=len(eligible):
+            error('crystals.count range exceeds the eligible arena pool.')
+        count=low if low==high else world.random.randint(low,high)
+    if type(count) is not int or not 0<=count<=len(eligible):
+        error('crystals.count must fit the eligible arena pool.')
+    return eligible,count
 
 
 def generate(world):
@@ -179,11 +207,7 @@ def generate(world):
         error("Cortex Vortex content-plan routes are not implemented yet.")
     _zero_count(closed(raw.get("cups", {}), ("count",), "cups").get("count"), "cups.count")
     crystals = closed(raw.get("crystals", {}), ("pool", "count"), "crystals")
-    _zero_count(crystals.get("count"), "crystals.count")
-    arenas = crystals.get("pool", "all")
-    if arenas != "all" and (not isinstance(arenas, list) or
-            any(type(i) is not int or i not in (18, 19, 21, 23) for i in arenas) or len(set(arenas)) != len(arenas)):
-        error("crystals.pool must be all or distinct retail arena IDs 18, 19, 21, 23.")
+    arena_pool, arena_count = crystal_selection(world, crystals)
     bosses = closed(raw.get("bosses", {}), ("enabled",), "bosses")
     if bosses.get("enabled") is not False:
         error("the experimental profile needs explicit bosses: {enabled: false}; encounter routes are pending.")
@@ -198,7 +222,7 @@ def generate(world):
     pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
                "itemsanity", "lettersanity", "box_locations", "hit_character", "progressive_starting_wumpa",
                "podium_placement_checks", "wumpa_check", "turbo_grant", "tizi_helper", "relic_perfect_checks",
-               "boss_track_shuffle", "crystalsanity")
+               "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
@@ -239,13 +263,21 @@ def generate(world):
                                display_name=package["display_name"], laps=7, modes=["trophy"],
                                capabilities=["trophy"], field_size=8, **addressing))
     required = raw.get("required_entries", [])
-    ids = {t["id"] for t in candidates}
+    arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
+    ids = {t["id"] for t in candidates+arena_candidates}
     if (not isinstance(required, list) or any(type(i) is not str or i not in ids for i in required)
             or len(set(required)) != len(required) or len(required) > 27):
         error("required_entries must be distinct eligible logical track IDs, fitting the 27 normal pads.")
+    chosen_arenas=[a for a in arena_candidates if a['id'] in required]
+    if len(chosen_arenas)>arena_count:
+        error('required arena entries exceed crystals.count; no content count was changed.')
+    chosen_arenas+=world.random.sample([a for a in arena_candidates if a['id'] not in required],arena_count-len(chosen_arenas))
     chosen = [t for t in candidates if t["id"] in required]
+    if len(chosen)+arena_count>27:
+        error('required entries and selected arenas exceed the 27 normal pads.')
     optional = [t for t in candidates if t["id"] not in required]
-    chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen)))
+    chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen)-arena_count))
+    chosen += chosen_arenas
     world.random.shuffle(chosen)
     registry = pad_registry()
     world.random.shuffle(registry)
@@ -301,14 +333,19 @@ def generate(world):
         if index < len(chosen):
             track = chosen[index]
             entry_id = "entry/" + track["id"]
-            entries.append(dict(id=entry_id, kind="track", track_id=track["id"], modes=["trophy"], merged=False))
-            pad.update(entry_id=entry_id, mode_gates=[dict(
-                mode="trophy", stage=1, requirement_id=gate_for.get(physical, "free"))])
-            name, code, title = trophy_identity(track)
-            checks.append(dict(location=code, owner=track["id"], kind="trophy",
-                               display_name=title + ": Trophy Race",
-                               routes=[dict(entry_id=entry_id, mode="trophy", leg_id=None,
-                                            encounter_id=None, own_pad_id=pad["id"], award="win")]))
+            crystal='arena_id' in track
+            mode='crystal' if crystal else 'trophy'
+            entry=(dict(id=entry_id,kind='crystal',arena_id=track['arena_id'],target=20,
+                        time_limit_ticks=arena_content.TIMERS[track['arena_id']]) if crystal else
+                   dict(id=entry_id,kind='track',track_id=track['id'],modes=['trophy'],merged=False))
+            entries.append(entry)
+            pad.update(entry_id=entry_id,mode_gates=[dict(mode=mode,stage=1,requirement_id=gate_for.get(physical,'free'))])
+            if crystal:
+                checks.extend(arena_content.checks(entry,pad['id'],bool(o.crystalsanity.value)))
+            else:
+                name,code,title=trophy_identity(track)
+                checks.append(dict(location=code,owner=track['id'],kind='trophy',display_name=title+': Trophy Race',
+                    routes=[dict(entry_id=entry_id,mode='trophy',leg_id=None,encounter_id=None,own_pad_id=pad['id'],award='win')]))
         pads.append(pad)
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
@@ -324,9 +361,9 @@ def generate(world):
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
-                tracks=chosen, entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
+                tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=required_features(requirements))
+                required_features=required_features(requirements,entries,checks))
     validate(plan)
     world.ctr_content_plan = plan
     # Actual native 0.6.7 protocol/handshake validation is a release gate. This
@@ -369,7 +406,9 @@ def create_regions(world):
     menu = Region("Menu", player, mw)
     mw.regions.append(menu)
     req = {r["id"]: r["predicate"] for r in plan["requirements"]}
-    by_pad = {r["routes"][0]["own_pad_id"]: r for r in plan["checks"]}
+    by_pad={}
+    for check in plan['checks']:
+        by_pad.setdefault(check['routes'][0]['own_pad_id'],[]).append(check)
     for pad in plan["pads"]:
         if pad["entry_id"] is None:
             continue
@@ -379,8 +418,8 @@ def create_regions(world):
         gates += [predicate(world, req[g["requirement_id"]]) for g in pad["mode_gates"]]
         menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
-        check = by_pad[pad["id"]]
-        region.locations.append(Location(player, LOCATION_BY_CODE[check["location"]], check["location"], region))
+        for check in by_pad[pad['id']]:
+            region.locations.append(Location(player,LOCATION_BY_CODE[check['location']],check['location'],region))
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 
@@ -402,12 +441,17 @@ def set_rules(world):
 
 def wire(world):
     o = world.options
+    plan=world.ctr_content_plan
+    extra=({'include_battle_arenas':True,
+            'include_arcade_arenas':any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
+            'crystalsanity':any(c['kind']=='crystal_pickup' for c in plan['checks'])}
+           if any(e['kind']=='crystal' for e in plan['entries']) else {})
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
                                  goal=-1, goal_oxide=3, goal_bosses=0, goal_gems=o.gems_required_goal.value,
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character], character_unlocks=False,
                                  progressive_boost=0, progressive_stats=0, hit_character=False,
-                                 death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value))
+                                 death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra))
 
 
 def validate(plan):
@@ -437,8 +481,9 @@ def validate(plan):
     manual = {rid: row for rid, row in requirements.items() if rid.startswith("manual:")}
     require({rid: row for rid, row in requirements.items() if rid not in manual} == expected_requirements,
             "unsupported or changed physical hub requirements")
-    require(plan["required_features"] == (["content_plan_v1", MANUAL_FEATURE] if manual else ["content_plan_v1"]),
-            "required features do not match the manual pad requirements")
+    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks']),
+            'required features do not match the selected content/checks')
+    crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
                      for physical, hub, keys in pad_registry()}
     expected_pads.update({f"garage:{i}": (f"hub:{26+i if i<4 else 25}", "free") for i in range(5)})
@@ -454,14 +499,25 @@ def validate(plan):
             require(pad["kind"] == "normal" and pad["entry_id"] in entries, "invalid normal entry")
             physical = pad_id.split(":")[1]
             gate = f"manual:{physical}" if f"manual:{physical}" in manual else "free"
-            require(pad["mode_gates"] == [dict(mode="trophy", stage=1, requirement_id=gate)], "unsupported mode gates")
+            mode='crystal' if entries[pad['entry_id']]['kind']=='crystal' else 'trophy'
+            require(pad['mode_gates']==[dict(mode=mode,stage=1,requirement_id=gate)],'unsupported mode gates')
             occupied.append(pad["entry_id"])
     require(len(occupied) == len(set(occupied)) and set(occupied) == set(entries), "entry occurrence ownership mismatch")
     require(all(f"pad:{rid.split(':')[1]}" in pads and pads[f"pad:{rid.split(':')[1]}"]["entry_id"] is not None
                 for rid in manual), "manual requirement without an occupied pad")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
+    arena_ids=set()
     for entry in entries.values():
+        if entry['kind']=='crystal':
+            lid=entry['arena_id']
+            require(lid in arena_content.ARENAS and lid not in arena_ids,'unknown or repeated arena')
+            arena_ids.add(lid)
+            require(entry['id']==f'entry/arena:{lid}' and entry['target']==20 and entry['time_limit_ticks']==arena_content.TIMERS[lid],
+                    'arena metadata mismatch')
+            pad_id=next(p['id'] for p in pads.values() if p['entry_id']==entry['id'])
+            expected_checks.update({c['location']:c for c in arena_content.checks(entry,pad_id,crystalsanity)})
+            continue
         require(entry["kind"] == "track" and entry["modes"] == ["trophy"] and entry["merged"] is False,
                 "unsupported entry kind or modes")
         require(entry["track_id"] in tracks and entry["track_id"] not in used_tracks, "missing or repeated standalone track")
@@ -499,7 +555,7 @@ def validate(plan):
                                     routes=[dict(entry_id=entry["id"], mode="trophy", leg_id=None,
                                                  encounter_id=None, own_pad_id=pad_id, award="win")])
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
-    require(not tracks or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
+    require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
             "content layout has no playable starting pad")
     require(checks == expected_checks, "check registry or route ownership mismatch")
     item_plan = plan["items"]
@@ -540,13 +596,39 @@ def validate(plan):
     return True
 
 
+def _tracker_arrays(value, depth=0, budget=None):
+    """AP room persistence stores JSON arrays as tuples; restore their JSON form.
+
+    Keep scalar types and object keys exact so normal admission still refuses
+    malformed numbers, booleans and fields. Bound this walk before copying.
+    """
+    if budget is None:
+        budget = [0]
+    budget[0] += 1
+    if depth > 32 or budget[0] > 500000:
+        error("content_plan: nesting/node budget")
+    if type(value) in (list, tuple):
+        return [_tracker_arrays(v, depth + 1, budget) for v in value]
+    if type(value) is dict:
+        return {k: _tracker_arrays(v, depth + 1, budget) for k, v in value.items()}
+    return value
+
+
 def restore(world, slot_data):
-    plan = copy.deepcopy(slot_data["content_plan"])
+    plan = _tracker_arrays(slot_data["content_plan"])
     validate(plan)
     co = slot_data.get("ctr_options", {})
     if (type(slot_data.get("schema_version")) is not int or slot_data["schema_version"] != SCHEMA or
             type(co.get("schema_version")) is not int or co["schema_version"] != SCHEMA or co.get("content_plan") is not True):
         error("content-plan envelope is missing or inconsistent")
+    has_crystals=any(e['kind']=='crystal' for e in plan['entries'])
+    for key,want in dict(include_battle_arenas=has_crystals,
+                         include_arcade_arenas=any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
+                         crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])).items():
+        if has_crystals and co.get(key) is not want:
+            error('Crystal option envelope disagrees with plan: '+key)
+        if not has_crystals and key in co:
+            error('Crystal option without selected Crystal entries: '+key)
     starting = co.get("starting_character")
     if type(starting) is not int or not 0 <= starting < 16:
         error("invalid starting racer")
@@ -559,6 +641,9 @@ def restore(world, slot_data):
     world.options.start_inventory_from_pool.value = copy.deepcopy(world.ctr_content_original_starts)
     world.options.start_inventory.value = {r.name: r.start_additional for r in rows if r.start_additional}
     world.options.gems_required_goal.value = plan["goal"]["count"]
+    world.options.crystalsanity.value=int(any(c['kind']=='crystal_pickup' for c in plan['checks']))
+    world.options.include_battle_arenas.value=int(any(e['kind']=='crystal' for e in plan['entries']))
+    world.options.include_arcade_arenas.value=int(any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']))
     world.options.death_link.value = co.get("death_link", 0)
     world.options.deathlink_amnesty.value = co.get("deathlink_amnesty", 1)
     # Optional legacy classifiers must not read the tracking player's unrelated YAML.

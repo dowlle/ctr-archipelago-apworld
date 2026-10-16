@@ -10,11 +10,9 @@ WHY 20. Counted from the retail NTSC-U BIGFILE (sha256 98779a79...fce7) on
 Nitro Court carries exactly 20 STATIC_CRYSTAL (model 0x60) instances, the
 same count INSTANCE.c adds into numCrystalsInLEV.
 
-THE ARCADE ARENAS ARE NOT MINTED. Parking Lot, The North Bowl and Lab Basement
-carry 0 crystal instances in every LEV variant, so `<Arena>: Crystal NN` and a
-Crystal Challenge on them name nothing in the retail data. Their block
-35028500..35028599 (#259) stays reserved without names until the #259 design
-says where their crystals come from.
+The arcade arenas have no retail crystals. Their sixty authored anchors and
+three completions are registered separately by arena_content (#259), and are
+selected only through the content plan.
 
 WHO OWNS THE SEMANTICS. The apworld owns names, codes and the per-seed subset
 (option `crystalsanity`); native owns the pickup send in

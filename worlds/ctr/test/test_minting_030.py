@@ -96,7 +96,8 @@ class TestReservedNotMinted(unittest.TestCase):
         (35019000, 35019191, "race v2 codes of slots 1..32, never used"),
         (35027100, 35027199, "later cup names, Win"),
         (35027300, 35027399, "later cup names, Win All Legs"),
-        (35028500, 35028599, "arcade arenas #259"),
+        (35028503, 35028519, "arcade completion expansion"),
+        (35028580, 35028599, "arcade crystal expansion"),
         (35028600, 35028799, "Wumpa Shop"),
     )
 
@@ -116,9 +117,11 @@ class TestReservedNotMinted(unittest.TestCase):
         self.assertEqual([(lo, hi) for lo, hi, _l in nt.RESERVED_LOCATION_OFFSETS],
                          [(17, 19), (35, 119), (120, 140), (141, 199)])
 
-    def test_no_arcade_arena_names(self):
-        for arena in ("Parking Lot", "The North Bowl", "Lab Basement"):
-            self.assertFalse([n for n in L if n.startswith(arena + ":")], arena)
+    def test_arcade_names_belong_to_the_separate_259_mint(self):
+        for a,arena in enumerate(("Parking Lot", "The North Bowl", "Lab Basement")):
+            self.assertEqual(L[arena+": Crystal Challenge"],35028500+a)
+            self.assertEqual([L[f"{arena}: Crystal {n:02d}"] for n in range(1,21)],
+                             list(range(35028520+20*a,35028540+20*a)))
 
 
 class TestNamedBatch(unittest.TestCase):
