@@ -214,6 +214,81 @@ class TestOpenAdmissionGeneration(unittest.TestCase):
                 make_world({}, passthrough=forged)
 
 
+class TestTrackIdentityForgery(unittest.TestCase):
+    """#133 PR 2 review: a forged plan cannot move a track between its named
+    block and a generic slot, claim another track's block, or give a generic
+    track a title that clashes in the room. Native refuses the same plans
+    (native tools/test-content-plan-parity.py)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.plan = make_world(options_with([named_fixture(), UNKNOWN]), seed=3).ctr_content_plan
+
+    def forged(self, change):
+        plan = copy.deepcopy(self.plan)
+        change(plan)
+        plan["checks"].sort(key=lambda c: c["location"])
+        return plan
+
+    @staticmethod
+    def track(plan, key):
+        return next(t for t in plan["tracks"] if t.get("package_id", "").startswith(f"package/{key}/"))
+
+    @staticmethod
+    def check(plan, track):
+        return next(c for c in plan["checks"] if c["owner"] == track["id"])
+
+    def refuses(self, change, message):
+        with self.assertRaisesRegex(OptionError, message):
+            content_plan.validate(self.forged(change))
+
+    def test_named_key_cannot_take_a_generic_slot(self):
+        def change(plan):
+            track = self.track(plan, "tv-world")
+            del track["named_block"]
+            self.check(plan, track)["location"] = 35016301  # Custom Track 2: Trophy Race
+        self.refuses(change, "a track with a named block must use it")
+
+    def test_unnamed_key_cannot_claim_another_block(self):
+        north_pole = content_plan.destinations.named_track("north-pole")
+
+        def change(plan):
+            track = self.track(plan, "fixture-loop")
+            track.update(named_block=north_pole.block_index, room_title=north_pole.ap_name)
+            check = self.check(plan, track)
+            check.update(location=named_tracks.location_code(north_pole.block_index, "trophy"),
+                         display_name=north_pole.ap_name + ": Trophy Race")
+        self.refuses(change, "named block does not match")
+
+    def test_generic_room_title_cannot_clash(self):
+        for title in ("Crash Cove", "TV World", "North Pole", "fixture loop", "Fixture Loop (Custom)"):
+            def change(plan, title=title):
+                track = self.track(plan, "fixture-loop")
+                track["room_title"] = title
+                self.check(plan, track)["display_name"] = title + ": Trophy Race"
+            with self.subTest(title=title):
+                self.refuses(change, "clash-suffixed title")
+
+    def test_suffixed_titles_are_recomputed_per_seed(self):
+        retail = copy.deepcopy(UNKNOWN)
+        retail.update(display_name="Crash Cove")
+        twin = copy.deepcopy(UNKNOWN)
+        twin.update(id="package/fixture-twin/1", content_id="fixture-twin", revision="1",
+                    uuid="1f0e0d0c-0b0a-4908-8706-050403020100", author="Other Author", display_name="Crash Cove")
+        twin["files"][0]["sha256"] = "e5" * 32
+        twin["files"][1]["sha256"] = "f6" * 32
+        plan = make_world(options_with([retail, twin])).ctr_content_plan
+        titles = {t["package_id"]: t["room_title"] for t in plan["tracks"] if t["origin"] == "custom"}
+        self.assertEqual(titles, {"package/fixture-loop/2.1": "Crash Cove (Custom)",
+                                  "package/fixture-twin/1": "Crash Cove (Custom, Other Author)"})
+        self.assertTrue(content_plan.validate(plan))
+        # A track the seed does not draw takes no name: alone, the second one
+        # needs only the retail suffix.
+        twin_track = next(t for t in plan["tracks"] if t.get("package_id") == "package/fixture-twin/1")
+        self.assertEqual(content_plan.generic_room_titles([twin_track], {twin["id"]: twin}),
+                         {twin_track["custom_slot"]: "Crash Cove (Custom)"})
+
+
 class TestDocumentedFixture(unittest.TestCase):
     def test_documented_yaml_generates(self):
         import os

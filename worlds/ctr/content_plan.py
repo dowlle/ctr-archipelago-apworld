@@ -260,14 +260,12 @@ def generate(world):
     # therefore by track_key.
     # #306: a package whose track key has a named block uses that block's
     # ids and frozen name; any other package keeps its generic slot ids and is
-    # shown under its sanitized, clash-suffixed room title (B+).
-    named = {p["id"]: destinations.named_track(p["content_id"]) for p in packages}
-    titles = seed_titles([(slot, p["display_name"], p["author"], p["content_id"])
-                          for slot, p in enumerate(packages, 1) if named[p["id"]] is None])
+    # shown under its sanitized, clash-suffixed room title (B+). Room titles
+    # are assigned once the seed's tracks are chosen (below), so validate can
+    # recompute them from the plan alone.
     for slot, package in enumerate(packages, 1):
-        block = named[package["id"]]
-        addressing = (dict(named_block=block.block_index, room_title=block.ap_name) if block
-                      else dict(room_title=titles.get(slot, f"Custom Track {slot}")))
+        block = destinations.named_track(package["content_id"])
+        addressing = dict(named_block=block.block_index, room_title=block.ap_name) if block else {}
         candidates.append(dict(id="custom/" + package["content_id"] + "/" + package["revision"],
                                origin="custom", package_id=package["id"], custom_slot=slot,
                                display_name=package["display_name"], laps=package["laps"], modes=["trophy"],
@@ -288,6 +286,11 @@ def generate(world):
     optional = [t for t in candidates if t["id"] not in required]
     chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen)-arena_count))
     chosen += chosen_arenas
+    package_by_id = {p["id"]: p for p in packages}
+    titles = generic_room_titles([t for t in chosen if t.get("origin") == "custom"], package_by_id)
+    for track in chosen:
+        if track.get("origin") == "custom" and "named_block" not in track:
+            track["room_title"] = titles[track["custom_slot"]]
     world.random.shuffle(chosen)
     registry = pad_registry()
     world.random.shuffle(registry)
@@ -382,6 +385,19 @@ def generate(world):
     world.ctr_content_original_starts = copy.deepcopy(o.start_inventory_from_pool.value)
     world.ctr_starting_character = characters.resolve_starting_character(world)
     return plan
+
+
+def generic_room_titles(tracks, packages):
+    """{custom_slot: room title} for the generic-slot (B+) tracks among `tracks`.
+
+    Only the seed's own tracks take part, in slot order, so a title clashes
+    only with names in the same room: retail stems, every named block and an
+    earlier generic track (custom_track_titles.seed_titles). A track with no
+    usable title keeps its generic name."""
+    rows = [(t["custom_slot"], packages[t["package_id"]]) for t in tracks
+            if destinations.named_track(packages[t["package_id"]]["content_id"]) is None]
+    titles = seed_titles([(slot, p["display_name"], p["author"], p["content_id"]) for slot, p in rows])
+    return {slot: titles.get(slot, f"Custom Track {slot}") for slot, _ in rows}
 
 
 def trophy_identity(track):
@@ -520,6 +536,14 @@ def validate(plan):
                 for rid in manual), "manual requirement without an occupied pad")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
+    # Generic-slot room titles are recomputed from the plan's own tracks; a
+    # forged title (a retail or named track's name, or a repeated one) differs.
+    try:
+        expected_titles = generic_room_titles([t for t in plan["tracks"] if t["origin"] == "custom"
+                                               and t["package_id"] in packages
+                                               and type(t["custom_slot"]) is int], packages)
+    except (KeyError, TypeError):
+        expected_titles = {}
     arena_ids=set()
     for entry in entries.values():
         if entry['kind']=='crystal':
@@ -562,6 +586,8 @@ def validate(plan):
             else:
                 require(block is None, "a track with a named block must use it")
                 require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
+                require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
+                        "room title is not the seed's clash-suffixed title for this track")
         _name, code, title = trophy_identity(track)
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
         expected_checks[code] = dict(location=code, owner=track["id"], kind="trophy",
