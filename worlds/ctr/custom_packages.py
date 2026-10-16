@@ -199,8 +199,3 @@ def admit_all(raw, where="tracks.custom"):
             seen[label, value] = i
         result.append(package)
     return sorted(result, key=lambda p: p["id"])
-
-
-def trophy_ready(package):
-    """A Trophy Race needs an eight-kart race: the measured `arcade` capability."""
-    return package["capabilities"]["arcade"]
