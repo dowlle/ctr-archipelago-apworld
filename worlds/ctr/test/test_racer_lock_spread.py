@@ -214,7 +214,9 @@ class TestPlacementRule(unittest.TestCase):
         original = Rules.add_racer_unlock_placement_rules
         Rules.add_racer_unlock_placement_rules = lambda world, player: None
         try:
-            mw = _filled(5, **CONFIG_D)
+            # Preserve the research seed's historical filler draw. New trap
+            # outcomes can change restrictive-fill ordering without changing locks.
+            mw = _filled(5, **CONFIG_D, trap_weights={"reverse_camera": 0})
         finally:
             Rules.add_racer_unlock_placement_rules = original
         world = mw.worlds[1]

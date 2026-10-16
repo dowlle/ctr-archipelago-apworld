@@ -422,8 +422,8 @@ class TrapWeights(OptionDict):
     `reverse_camera` defaults to 2 and forces rear view with normal steering,
     using the local Trap Duration setting.
 
-    `first_person`, `wireframe`, `upside_down`, `mirror_mode` and
-    `demo_camera`, `reverse_camera` change the camera or the screen and can be visually
+    `first_person`, `wireframe`, `upside_down`, `mirror_mode`, `demo_camera`
+    and `reverse_camera` change the camera or the screen and can be visually
     intense. Set a trap to 0 to turn it off; `upside_down` is 0 by default.
 
     Setting every trap to 0 while Trap Fill Percentage is above 0 is an

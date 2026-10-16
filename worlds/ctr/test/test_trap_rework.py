@@ -428,8 +428,8 @@ class TestTrapWeightsAccessibilityHelpText(unittest.TestCase):
 
     def test_help_text_names_the_camera_and_visual_traps(self):
         self.assertIn(
-            "`first_person`, `wireframe`, `upside_down`, `mirror_mode` and "
-            "`demo_camera` change the camera or the screen and can be "
+            "`first_person`, `wireframe`, `upside_down`, `mirror_mode`, `demo_camera` "
+            "and `reverse_camera` change the camera or the screen and can be "
             "visually intense.",
             self._doc())
 
