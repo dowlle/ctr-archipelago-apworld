@@ -251,7 +251,7 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
         """The completed native roster activates every reserved identity."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 20)
+        self.assertEqual(len(TRAP_ITEM_NAMES), 21)  # #455 activates the minted Clocked Out entry
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
         self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 4)
         newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)

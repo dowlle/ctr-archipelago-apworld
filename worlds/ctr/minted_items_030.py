@@ -1,4 +1,4 @@
-"""Item names minted in the 0.3.0 id step. Names only; no seed creates them yet.
+"""Item names minted in the 0.3.0 id step. Feature modules own their creation.
 
   * `Reserve Top-Up` (#451), filler: adds 983 raw reserve units and may cross
     into Saffi fire (ruled 2026-10-13 21:19 CEST).
@@ -13,8 +13,9 @@ The ids continue the positional item index after the Cortex Vortex letters
 which stays the closed 0..199 table. Every entry has count 0, so the item pool
 is unchanged until a feature PR adds copies.
 
-The two traps are NOT in traps.TRAP_REGISTRY yet: a registry row would put them
-in every schema-18 `trap_identities` block and in the buildable draw. Their
+Clocked Out is now active in traps.TRAP_REGISTRY (#455); Reverse Camera waits
+for its feature implementation. Active rows appear in schema-18
+`trap_identities` and the buildable draw. Their
 feature PRs append the registry row, the native enum value and the shared
 fixture row together, as the slot_data Contract's trap rules require. They are
 in the `Traps` item group now, because item groups are part of the checksummed
