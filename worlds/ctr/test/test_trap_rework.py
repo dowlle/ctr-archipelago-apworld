@@ -252,7 +252,7 @@ class TestWeightedDraw(unittest.TestCase):
         return {name: hits / len(drawn) for name, hits in counted.items()}
 
     def test_default_weights_produce_their_documented_ratios(self):
-        # The reviewed 20-effect table totals 73 relative-weight points.
+        # Explicit reviewed weights, including Clocked Out.
         # Upside Down defaults to weight 0 (off), so it draws zero share and
         # is excluded from the expected table below, not listed at 0.
         world = _world(seed=280)
@@ -267,7 +267,7 @@ class TestWeightedDraw(unittest.TestCase):
             "Warpball Ambush": 3,
             "Demo Camera": 3, "Clocked Out": 3,
         }
-        expected = {name: weight / 76
+        expected = {name: weight / sum(expected_weights.values())
                     for name, weight in expected_weights.items()}
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
