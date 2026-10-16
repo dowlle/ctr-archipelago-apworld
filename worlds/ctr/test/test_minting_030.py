@@ -178,7 +178,7 @@ class TestInert(unittest.TestCase):
             if location_class.key in NEW_CLASSES:
                 with self.subTest(location_class.key):
                     self.assertFalse(created & set(location_class.names()))
-        minted = {row["name"] for row in ITEM_DATA} - {"Clocked Out"}
+        minted = {row["name"] for row in ITEM_DATA} - {"Clocked Out", "Reserve Top-Up"}
         self.assertFalse({item.name for item in mw.itempool} & minted)
 
 

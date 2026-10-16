@@ -214,7 +214,8 @@ class TestPlacementRule(unittest.TestCase):
         original = Rules.add_racer_unlock_placement_rules
         Rules.add_racer_unlock_placement_rules = lambda world, player: None
         try:
-            mw = _filled(5, **CONFIG_D)
+            # Keep the historical research seed's filler stream pinned.
+            mw = _filled(5, **CONFIG_D, reserve_top_up=False)
         finally:
             Rules.add_racer_unlock_placement_rules = original
         world = mw.worlds[1]

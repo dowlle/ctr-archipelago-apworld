@@ -96,6 +96,20 @@ def created_item_total(world) -> int:
     return sum(created_item_counts(world).values())
 
 
+def reserve_top_up_enabled(world) -> bool:
+    """Read the seed's value on Tracker restore, including the content-plan path.
+
+    That path bypasses the ordinary option restorer. Resolve this additive
+    option here so both filler draw and wire emission use the connected seed.
+    """
+    passthrough = getattr(getattr(world, "multiworld", None), "re_gen_passthrough", {}).get(
+        getattr(world, "game", ""))
+    if passthrough:
+        world.options.reserve_top_up.value = int(bool(
+            passthrough.get("ctr_options", {}).get("reserve_top_up", False)))
+    return bool(world.options.reserve_top_up.value)
+
+
 def filler_weights(world) -> Dict[str, int]:
     """The weighted filler name pool for this seed.
 
@@ -105,9 +119,13 @@ def filler_weights(world) -> Dict[str, int]:
     bundles-off seed byte-identical to a pre-activation seed, the same
     generation-neutrality property `trap_fill_percentage = 0` has.
     """
-    if not world.options.wumpa_bundles.value:
+    top_up = reserve_top_up_enabled(world)
+    if not world.options.wumpa_bundles.value and not top_up:
         return {"Wumpa Fruit": 1}
-    return dict(FILLER_WEIGHTS)
+    weights = dict(FILLER_WEIGHTS) if world.options.wumpa_bundles.value else {"Wumpa Fruit": 6}
+    if top_up:
+        weights["Reserve Top-Up"] = 1
+    return weights
 
 
 def draw_filler_name(world) -> str:
@@ -145,6 +163,7 @@ def fill_slot_data(world) -> Dict[str, object]:
     o = world.options
     return {
         "wumpa_bundles": bool(o.wumpa_bundles.value),
+        "reserve_top_up": reserve_top_up_enabled(world),
         "progressive_starting_wumpa": int(o.progressive_starting_wumpa.value),
     }
 
@@ -156,6 +175,7 @@ def restore_slot_data(options, ctr_options) -> None:
     the honest answer: such a seed created none of these items.
     """
     options.wumpa_bundles.value = int(bool(ctr_options.get("wumpa_bundles", 0)))
+    options.reserve_top_up.value = int(bool(ctr_options.get("reserve_top_up", 0)))
     options.progressive_starting_wumpa.value = min(
         PROGRESSIVE_WUMPA_MAX,
         max(0, int(ctr_options.get("progressive_starting_wumpa", 0) or 0)))
