@@ -80,6 +80,7 @@ class TestAdmission(unittest.TestCase):
             (set_(["display_name"], ""), "display_name"),
             (set_(["display_name"], "é" * 65), "display_name"),
             (set_(["author"], "\x7f"), "author"),
+            (set_(["author"], "Fixture \ud800"), "author"),
             (set_(["author"], None), "author"),
             (set_(["laps"], 0), "laps"),
             (set_(["laps"], 8), "laps"),

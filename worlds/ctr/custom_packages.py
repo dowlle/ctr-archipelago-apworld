@@ -85,10 +85,17 @@ def _integer(value, low, high, where):
     return value
 
 
+def _utf8_size(value, where):
+    try:
+        return len(value.encode("utf-8"))
+    except UnicodeError:
+        _fail(where, "is not valid Unicode text")
+
+
 def _string(value, pattern, max_bytes, where, hint=""):
     if type(value) is not str:
         _fail(where, "must be a text value" + (f" ({hint})" if hint else ""))
-    if not value or len(value.encode("utf-8")) > max_bytes:
+    if not value or _utf8_size(value, where) > max_bytes:
         _fail(where, f"must be 1 to {max_bytes} bytes")
     if pattern is not None and pattern.fullmatch(value) is None:
         _fail(where, "has characters this field does not allow" + (f" ({hint})" if hint else ""))
@@ -98,7 +105,7 @@ def _string(value, pattern, max_bytes, where, hint=""):
 def _label(value, where):
     if type(value) is not str:
         _fail(where, "must be a text value")
-    if not value or len(value.encode("utf-8")) > 128:
+    if not value or _utf8_size(value, where) > 128:
         _fail(where, "must be 1 to 128 UTF-8 bytes")
     if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
         _fail(where, "contains a control character")
