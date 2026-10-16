@@ -165,8 +165,8 @@ class TestMintedItems(unittest.TestCase):
         """No registry row until the feature PR: the trap_identities block and
         the trap draw stay as they are."""
         registered = {e.name for e in traps.TRAP_REGISTRY}
-        self.assertEqual(registered & set(MINTED_TRAP_KEYS), {"Clocked Out"})
-        self.assertEqual({e.key for e in traps.TRAP_REGISTRY} & set(MINTED_TRAP_KEYS.values()), {"clocked_out"})
+        self.assertEqual(registered & set(MINTED_TRAP_KEYS), {"Clocked Out", "Reverse Camera"})
+        self.assertEqual({e.key for e in traps.TRAP_REGISTRY} & set(MINTED_TRAP_KEYS.values()), {"clocked_out", "reverse_camera"})
         self.assertLessEqual(set(MINTED_TRAP_KEYS), set(ctrAPWorld.item_name_groups["Traps"]))
 
 
@@ -178,7 +178,7 @@ class TestInert(unittest.TestCase):
             if location_class.key in NEW_CLASSES:
                 with self.subTest(location_class.key):
                     self.assertFalse(created & set(location_class.names()))
-        minted = {row["name"] for row in ITEM_DATA} - {"Clocked Out", "Reserve Top-Up"}
+        minted = {row["name"] for row in ITEM_DATA} - {"Clocked Out", "Reverse Camera", "Reserve Top-Up"}
         self.assertFalse({item.name for item in mw.itempool} & minted)
 
 

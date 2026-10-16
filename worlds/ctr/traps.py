@@ -96,6 +96,7 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("warpball_ambush",  "Warpball Ambush",  3, True, "rework"),
     TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
     TrapEntry("clocked_out",      "Clocked Out",      3, True, "030"),
+    TrapEntry("reverse_camera",   "Reverse Camera",   2, True, "030"),
 )
 
 #: The BUILDABLE draw list, in registry order.
