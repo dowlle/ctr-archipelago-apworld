@@ -648,6 +648,9 @@ def create_regions(world: "ctrAPWorld"):
         _cv.exits.append(_ret)
         mw.regions.entrance_cache[player][_ret.name] = _ret
 
+    from .cup_sweeps import create_locations as create_cup_sweeps
+    create_cup_sweeps(world, region_lookup)
+
     # Crystals inherit precisely the arena region's physical entry gates. They
     # have no completion, weapon, boost or stat requirement of their own.
     from .crystal_checks import CRYSTAL_CLASS
