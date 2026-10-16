@@ -224,7 +224,7 @@ class TestChallengeBoostCustomTracks(CTRTestBase):
         self.world_setup(seed=7)
 
     def test_custom_challenge_needs_the_first_boost(self):
-        name = "Custom Track 1: CTR Token Challenge"
+        name = "Baby T Park: CTR Token Challenge"
         loc = self.multiworld.get_location(name, self.player)
         blocked = _state(self.multiworld, boost=0)
         cleared = _state(self.multiworld, boost=1)

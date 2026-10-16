@@ -562,35 +562,39 @@ def create_regions(world: "ctrAPWorld"):
             region.locations.append(location)
             mw.regions.location_cache[player][name] = location
 
-    # Custom packages use frozen generic identities, never creator/title names.
+    # Custom packages use frozen identities, never creator/title names: the
+    # track's named block when it has one (#133, one identity per track), else
+    # the generic slot. The region is named like the checks' stem (the block's
+    # ap_name, or `Custom Track N`).
     # The dedicated dead-end region inherits reachability from the destination
     # surface it replaces.  For Alpha6 that surface is a Gem Cup, so winning the
     # one custom race is the surface's sole check and no absent retail leg can
     # leak reachability into it.
     if world.custom_tracks:
-        from .custom_track_locations import (
-            CUSTOM_TRACK_LOCATION_CLASS, slot_region,
-        )
+        from . import custom_track_ids as _ids
         from .podium import created_rung_keys_from_options
         _custom_rungs = created_rung_keys_from_options(opts)
+        _letter_names = set(_ids.created_letter_location_names(opts))
+        _ctr_slots = set(getattr(opts, "_custom_ctr_admitted_slots", ()) or ())
+        _letters_selected = getattr(opts, "_custom_lettersanity_selected", {}) or {}
         for _track_id, _entry in sorted(world.custom_tracks.items()):
             _slot = int(_entry["slot"])
-            _custom = Region(slot_region(_slot), player, mw)
+            _custom = Region(_ids.track_label(_entry), player, mw)
             _custom.type = "custom_track"
             mw.regions.append(_custom)
             regions.append(_custom)
             region_lookup[_custom.name] = _custom
 
-            _custom_names = [CUSTOM_TRACK_LOCATION_CLASS.trophy_name(_slot)]
-            _custom_names += [CUSTOM_TRACK_LOCATION_CLASS.location_name(_slot, rung)
+            _custom_names = [_ids.location_name(_entry, "trophy")]
+            _custom_names += [_ids.location_name(_entry, rung)
                               for rung in _custom_rungs]
-            from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
-            _letter_names = set(CUSTOM_LETTERSANITY_CLASS.created_location_names(opts))
-            _custom_names += [name for name in sorted(_letter_names)
-                              if name.startswith(f"Custom Track {_slot}: ")]
-            from .custom_lettersanity import CUSTOM_CTR_CHALLENGE_CLASS
-            _custom_names += [name for name in CUSTOM_CTR_CHALLENGE_CLASS.created_location_names(opts)
-                              if name.startswith(f"Custom Track {_slot}: ")]
+            _custom_names += sorted(
+                name for name in (_ids.letter_location_name(_entry, _li)
+                                  for _li, _letter in enumerate("CTR")
+                                  if _letter in _letters_selected.get(_slot, ()))
+                if name in _letter_names)
+            if _slot in _ctr_slots:
+                _custom_names.append(_ids.ctr_name(_entry))
             for _name in _custom_names:
                 _loc = create_location(player, _name, _custom)
                 _loc.type = ("custom_track_trophy" if _name.endswith(": Trophy Race")
@@ -805,6 +809,22 @@ def create_regions(world: "ctrAPWorld"):
         _loc.logic_text = "True"
         _region.locations.append(_loc)
         mw.regions.location_cache[player][_name] = _loc
+    # A custom track with a named block owns its Wumpa check in that block
+    # (#133). It sits in the same destination region the generic role check
+    # uses, so its route is unchanged.
+    from .wumpa_checks import WUMPA_PER_TRACK, _mode as _wumpa_mode, eligible_custom_roles
+    if _wumpa_mode(opts) == WUMPA_PER_TRACK:
+        from .custom_track_ids import wumpa_name as _named_wumpa_name
+        for _role, _label, _region_name, _entry in eligible_custom_roles(opts):
+            _name = _named_wumpa_name(_entry)
+            if _name is None:
+                continue
+            _region = region_lookup[_region_name]
+            _loc = create_location(player, _name, _region)
+            _loc.type = "wumpa"
+            _loc.logic_text = "True"
+            _region.locations.append(_loc)
+            mw.regions.location_cache[player][_name] = _loc
 
     # Item-box checks (#109) parent to their TRACK's region, which is what
     # hands every box its track's pad-access rules for free (region

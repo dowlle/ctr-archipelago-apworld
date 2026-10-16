@@ -295,9 +295,11 @@ def layout_violations(frozen_layout: Mapping[str, Sequence]) -> List[str]:
 class NamedTrackLocationClass(LocationClass):
     """Every named track's complete location family, registered unconditionally.
 
-    Creation is decided by the content plan's check registry, which picks a
-    named code when a package's track key has a block. The legacy option path
-    never creates these.
+    On the content-plan path creation is decided by the plan's check
+    registry, which picks a named code when a package's track key has a block.
+    On the legacy `custom_tracks` path (#133) a track with a block creates its
+    Trophy Race, podium rungs, letters, CTR Token Challenge and Reach 10 Wumpa
+    from the block; `created_location_names` lists those.
     """
     key = "named_track"
     display_name = "Named Custom Track Checks"
@@ -313,7 +315,8 @@ class NamedTrackLocationClass(LocationClass):
                 for track in self.tracks for name, code in track_locations(track)]
 
     def created_location_names(self, options) -> List[str]:
-        return []
+        from .custom_track_ids import created_named_location_names
+        return created_named_location_names(options)
 
     def location_name(self, track_key: str, key: str = "trophy") -> str:
         for track in self.tracks:

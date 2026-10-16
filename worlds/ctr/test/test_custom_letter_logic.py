@@ -14,9 +14,9 @@ from test.general import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld
-from ..custom_check_namespace import LETTERS, custom_check_name
 from ..custom_tracks import BABY_T_PARK_CURRENT
 from ..itemsanity import ITEM_NAMES
+from ..custom_check_namespace import LETTERS
 from ..lettersanity import LETTERSANITY_CLASS
 from ..progressive_capability import track_required_character
 from .test_lettersanity import _chain_index, _wrapper_chain
@@ -24,7 +24,8 @@ from .test_lettersanity import _chain_index, _wrapper_chain
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
 BOOST = "Progressive Boost"
-CUSTOM = "Custom Track 1"
+#: Baby T Park has named block 8, so its letters use the block (#133).
+CUSTOM = "Baby T Park"
 RETAIL = "Dingo Canyon"  # same ruled capability group, no per-letter gate
 
 
@@ -110,8 +111,7 @@ class TestCustomLettersFollowTheirTrophyRace(unittest.TestCase):
     def test_mode_2_keeps_the_own_letter_guard_on_the_entry_rule(self):
         mw = _build(lettersanity="locations_and_items")
         for name in _custom_letters(mw):
-            own = custom_check_name("letter_item", 1,
-                                    LETTERS.index(name[-1]))
+            own = f"Letter {name[-1]} ({CUSTOM})"
             with self.subTest(location=name):
                 self.assertFalse(_reach(_state(mw), name))
                 self.assertFalse(_reach(_state(mw, boost=2, exclude=(own,)),
@@ -155,8 +155,7 @@ class TestUniversalTrackerBuildsTheSameCustomLetterRules(unittest.TestCase):
         self.assertEqual(_custom_letters(tracker), _custom_letters(source))
         for label, mw in (("source", source), ("tracker", tracker)):
             for name in _custom_letters(mw):
-                own = custom_check_name("letter_item", 1,
-                                        LETTERS.index(name[-1]))
+                own = f"Letter {name[-1]} ({CUSTOM})"
                 with self.subTest(world=label, location=name):
                     self.assertFalse(_reach(_state(mw), name))
                     self.assertFalse(_reach(

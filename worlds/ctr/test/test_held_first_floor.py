@@ -114,11 +114,11 @@ class TestHeldFirstFloor(unittest.TestCase):
                     logic_difficulty="medium",
                     custom_tracks={"baby-t-park":
                                    copy.deepcopy(BABY_T_PARK_CURRENT)})
-        name = "Custom Track 1: Held 1st"
+        name = "Baby T Park: Held 1st"
         self.assertIn(name, {loc.name for loc in mw.get_locations(PLAYER)})
         self.assertFalse(_reach(_state(mw), name))
         self.assertTrue(_reach(_state(mw, boost=1), name))
-        self.assertTrue(_reach(_state(mw), "Custom Track 1: Held 3rd"))
+        self.assertTrue(_reach(_state(mw), "Baby T Park: Held 3rd"))
 
     def test_cortex_vortex_held_first(self):
         mw = _build(progressive_boost="shared_global", itemsanity=False,
@@ -180,4 +180,4 @@ class TestHardHasNoHeldFirstFloor(unittest.TestCase):
                     logic_difficulty="hard",
                     custom_tracks={"baby-t-park":
                                    copy.deepcopy(BABY_T_PARK_CURRENT)})
-        self.assertTrue(_reach(_state(mw), "Custom Track 1: Held 1st"))
+        self.assertTrue(_reach(_state(mw), "Baby T Park: Held 1st"))

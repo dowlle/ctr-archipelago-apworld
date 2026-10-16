@@ -365,9 +365,12 @@ class WumpaLocationClass(LocationClass):
             return []
         names = [retail_location_name(track)
                  for track in eligible_retail_tracks(options)]
+        # A track with a named block owns its Wumpa check in that block
+        # (`<ap_name>: Reach 10 Wumpa`, #133); named_tracks creates it.
         names += [custom_location_name(label)
-                  for _role, label, _region, _entry
-                  in eligible_custom_roles(options)]
+                  for _role, label, _region, entry
+                  in eligible_custom_roles(options)
+                  if entry.get("named_block") is None]
         if cortex_vortex_wumpa_active(options):
             names.append(WUMPA_CORTEX_VORTEX_LOCATION)
         return names
@@ -414,13 +417,19 @@ class WumpaLocationClass(LocationClass):
         }
         block["custom_destinations"] = {
             role: {
-                "code": self.custom_code(role),
+                "code": (self.custom_code(role) if entry.get("named_block") is None
+                         else _named_wumpa_code(entry)),
                 "package_uuid": entry["package_uuid"],
                 WUMPA_COLLECTIBLE_FLAG: True,
             }
             for role, _label, _region, entry in eligible_custom_roles(options)
         }
         return block
+
+
+def _named_wumpa_code(entry) -> int:
+    from .custom_track_ids import wumpa_code
+    return wumpa_code(entry)
 
 
 #: The registered wumpa class. `Locations.py` registers this instance.

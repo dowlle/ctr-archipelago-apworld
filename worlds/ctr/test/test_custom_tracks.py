@@ -3,8 +3,10 @@
 Ruled behaviour (corrected 2026-08-30): the option is an early instance of the
 self-describing `custom_tracks` descriptor and it DISPLACES the destination it
 names. The Alpha6 placement is the Purple Gem Cup, but the AP identity is the
-frozen generic `Custom Track 1: Trophy Race` plus enabled podium rungs, not the
-retail `Purple Gem Cup: Gem` location and not the mutable package title. The cup
+track's own frozen identity plus enabled podium rungs, not the retail `Purple
+Gem Cup: Gem` location and not the mutable package title. Since #133 that is
+Baby T Park's named block (`Baby T Park: Trophy Race`); a track without a block
+keeps the generic `Custom Track N: Trophy Race`. The cup
 keeps its four-Purple-CTR-Token pad rule but runs one 7-lap custom race instead
 of four retail legs. Option off leaves the block absent while Alpha6's
 unconditional current-schema declaration remains.
@@ -61,6 +63,8 @@ from . import CTRTestBase
 
 #: The event descriptor as a YAML would carry it.
 BABY_T_PARK = {"baby-t-park": copy.deepcopy(BABY_T_PARK_EXAMPLE)}
+#: Frozen stem of Baby T Park's named block 8 (#133: one identity per track).
+NAMED = "Baby T Park"
 
 
 class TestCustomModeDescriptor(unittest.TestCase):
@@ -84,10 +88,14 @@ class TestCustomModeDescriptor(unittest.TestCase):
         option["baby-t-park"]["modes"] = {"ctr_challenge": True}
         normalized = normalize_custom_tracks(option)
         wire = custom_tracks_to_wire(normalized)
-        self.assertEqual(wire["tracks"][0]["locations"]["ctr"], 35023000)
+        # Baby T Park's named block 8 owns the challenge (#133): offset 9.
+        self.assertEqual(wire["tracks"][0]["named_block"], 8)
+        self.assertEqual(wire["tracks"][0]["locations"]["ctr"], 35201609)
         self.assertEqual(reconstruct_custom_tracks_from_wire({"custom_tracks": wire}), normalized)
-        wire["tracks"][0]["locations"]["ctr"] = 35012500
-        self.assertEqual(reconstruct_custom_tracks_from_wire({"custom_tracks": wire}), {})
+        for forged in (35023000, 35012500):
+            tampered = copy.deepcopy(wire)
+            tampered["tracks"][0]["locations"]["ctr"] = forged
+            self.assertEqual(reconstruct_custom_tracks_from_wire({"custom_tracks": tampered}), {})
 
     def test_modes_are_strict_and_absent_is_unchanged(self):
         self.assertNotIn("modes", normalize_custom_tracks(BABY_T_PARK)["baby-t-park"])
@@ -627,11 +635,11 @@ class TestCustomLetterGeneration(CTRTestBase):
 
     def test_generated_letters_are_slot_owned_and_item_gated(self):
         names = self.world.multiworld.get_locations(self.world.player)
-        custom = [loc for loc in names if loc.name.startswith("Custom Track 1: Letter ")]
+        custom = [loc for loc in names if loc.name.startswith(f"{NAMED}: Letter ")]
         self.assertEqual(len(custom), 2)
         # Letters share the custom CTR Token Challenge's entry rule (Trophy
         # Race reachable), so the own-letter guard is checked on a full state.
-        own_names = {f"Letter {loc.name[-1]} (Custom Track 1)" for loc in custom}
+        own_names = {f"Letter {loc.name[-1]} ({NAMED})" for loc in custom}
         state = self.world.multiworld.get_all_state(False)
         for item in [i for i in self.world.multiworld.itempool
                      if i.name in own_names]:
@@ -639,7 +647,7 @@ class TestCustomLetterGeneration(CTRTestBase):
         for loc in custom:
             self.assertFalse(loc.access_rule(state))
             self.assertFalse(loc.access_rule(CollectionState(self.world.multiworld)))
-            own = self.world.create_item(f"Letter {loc.name[-1]} (Custom Track 1)")
+            own = self.world.create_item(f"Letter {loc.name[-1]} ({NAMED})")
             state.collect(own, True)
             self.assertTrue(loc.access_rule(state))
         del state
@@ -647,14 +655,15 @@ class TestCustomLetterGeneration(CTRTestBase):
         self.assertEqual([row["slot"] for row in wire["tracks"]], [1])
         self.assertEqual({c for c in wire["tracks"][0]["locations"] if c >= 0},
                          {loc.address for loc in custom})
-        # Baby T Park has a named block since the 0.3.0 id step, so the
-        # generic slot takes the #306 clash suffix in its room title.
-        title = "Baby T Park (Custom, baby-t-park)"
-        for loc in custom:
-            self.assertEqual(self.world.location_id_to_alias[loc.address],
-                             f"{title}: Letter {loc.name[-1]}")
-        self.assertEqual(self.world.location_id_to_alias[35023000],
-                         f"{title}: CTR Token Challenge")
+        # Baby T Park's checks use its named block (#133): real names, no
+        # alias, no room rename and no generic slot checks.
+        self.assertEqual({loc.address for loc in custom},
+                         {35201600 + 11 + "CTR".index(loc.name[-1]) for loc in custom})
+        self.assertEqual(self.world.location_id_to_alias, {})
+        self.assertNotIn("Custom Track 1: CTR Token Challenge",
+                         self.multiworld.regions.location_cache[self.player])
+        self.assertEqual(self.multiworld.get_location(f"{NAMED}: CTR Token Challenge",
+                                                      self.player).address, 35201609)
         package = {"item_name_to_id": dict(self.world.item_name_to_id),
                    "location_name_to_id": dict(self.world.location_name_to_id),
                    "location_name_groups": {"All": list(self.world.location_name_to_id)},
@@ -662,11 +671,7 @@ class TestCustomLetterGeneration(CTRTestBase):
         original = copy.deepcopy(package)
         room = {"datapackage": {self.game: package}}
         type(self.world).stage_modify_multidata(self.multiworld, room)
-        named = room["datapackage"][self.game]
-        self.assertEqual(named["location_name_to_id"][f"{title}: CTR Token Challenge"], 35023000)
-        self.assertEqual(package, original)
-        self.assertEqual(set(named["location_name_to_id"].values()),
-                         set(original["location_name_to_id"].values()))
+        self.assertEqual(room["datapackage"][self.game], original)
 
 
 class TestCustomLetterModeMatrix(CTRTestBase):
@@ -682,12 +687,12 @@ class TestCustomLetterModeMatrix(CTRTestBase):
                                     "lettersanity": mode, "letters_per_track": count}
                     self.world_setup(seed=SEED)
                     locations = [loc for loc in self.multiworld.get_locations(self.player)
-                                 if loc.name.startswith("Custom Track 1: Letter ")]
+                                 if loc.name.startswith(f"{NAMED}: Letter ")]
                     self.assertEqual(len(locations), count if mode in (1, 2) else 0)
                     items = [item for item in self.multiworld.itempool
-                             if item.name.endswith("(Custom Track 1)")]
+                             if item.name.endswith(f"({NAMED})")]
                     self.assertEqual(len(items), count if mode == 2 else 3 if mode == 3 else 0)
-                    challenge = self.multiworld.get_location("Custom Track 1: CTR Token Challenge", self.player)
+                    challenge = self.multiworld.get_location(f"{NAMED}: CTR Token Challenge", self.player)
                     state = self.multiworld.get_all_state(False)
                     for item in items:
                         state.remove(item)
@@ -733,24 +738,26 @@ class TestDisplacementIntegration(CTRTestBase):
         self.assertEqual(self.world.gem_cup_legs_table["Purple Gem Cup"],
                          list(PURPLE_LEGS))
 
-    def test_the_cup_is_replaced_by_a_generic_trophy_and_podium_region(self):
+    def test_the_cup_is_replaced_by_a_named_trophy_and_podium_region(self):
         region = self.multiworld.get_region("Purple Gem Cup", self.player)
         self.assertEqual([loc.name for loc in region.locations], [])
         self.assertEqual(
             len([e for e in self.multiworld.get_entrances(self.player)
                  if e.connected_region is region]), 1)
-        custom = self.multiworld.get_region("Custom Track 1", self.player)
+        custom = self.multiworld.get_region(NAMED, self.player)
         self.assertEqual(
-            [loc.name for loc in custom.locations],
-            ["Custom Track 1: Trophy Race", "Custom Track 1: Held 1st",
-             "Custom Track 1: Held 3rd", "Custom Track 1: Finish on Podium",
-             "Custom Track 1: Finish (Any Position)"])
+            [(loc.name, loc.address) for loc in custom.locations],
+            [(f"{NAMED}: Trophy Race", 35201600), (f"{NAMED}: Held 1st", 35201601),
+             (f"{NAMED}: Held 3rd", 35201602), (f"{NAMED}: Finish on Podium", 35201604),
+             (f"{NAMED}: Finish (Any Position)", 35201605)])
+        self.assertFalse({loc.name for loc in self.multiworld.get_locations(self.player)
+                          if loc.name.startswith("Custom Track ")})
         self.assertEqual({e.parent_region.name for e in custom.entrances},
                          {"Purple Gem Cup"})
 
     def test_unshuffled_purple_gem_is_pinned_to_the_custom_trophy(self):
         trophy = self.multiworld.get_location(
-            "Custom Track 1: Trophy Race", self.player)
+            f"{NAMED}: Trophy Race", self.player)
         self.assertTrue(trophy.locked)
         self.assertEqual(trophy.item.name, "Purple Gem")
 
@@ -817,7 +824,7 @@ class TestShuffledGemDisplacement(CTRTestBase):
 
     def test_custom_trophy_is_not_a_locked_purple_gem(self):
         trophy = self.multiworld.get_location(
-            "Custom Track 1: Trophy Race", self.player)
+            f"{NAMED}: Trophy Race", self.player)
         self.assertFalse(trophy.locked)
         self.assertNotIn("Purple Gem Cup: Gem",
                          self.multiworld.regions.location_cache[self.player])
@@ -906,12 +913,12 @@ class TestUTPinsTheDisplacement(CTRTestBase):
         wire = copy.deepcopy(self.world.fill_slot_data())
         selected = copy.deepcopy(self.world.options._custom_lettersanity_selected)
         expected = {loc.name: loc.address for loc in self.multiworld.get_locations(self.player)
-                    if loc.name.startswith("Custom Track 1: Letter ")}
+                    if loc.name.startswith(f"{NAMED}: Letter ")}
         self._setup_with_passthrough(SEED + 1, wire, {
             "lettersanity": 3, "letters_per_track": 1, "custom_tracks": {}})
         self.assertEqual(self.world.options._custom_lettersanity_selected, selected)
         self.assertEqual({loc.name: loc.address for loc in self.multiworld.get_locations(self.player)
-                          if loc.name.startswith("Custom Track 1: Letter ")}, expected)
+                          if loc.name.startswith(f"{NAMED}: Letter ")}, expected)
         self.assertEqual(self.world.fill_slot_data()["custom_lettersanity_checks"],
                          wire["custom_lettersanity_checks"])
 

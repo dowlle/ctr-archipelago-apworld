@@ -236,7 +236,7 @@ class TestRuledTrophyGroup(unittest.TestCase):
                         custom_tracks={"baby-t-park": custom})
             races = sorted(loc.name for loc in mw.get_locations(PLAYER)
                            if loc.name.endswith(": Trophy Race"))
-            self.assertIn("Custom Track 1: Trophy Race", races)
+            self.assertIn("Baby T Park: Trophy Race", races)
             self.assertIn("Cortex Vortex: Trophy Race", races)
             self.assertGreaterEqual(len(races), 18)
             bare, usf = _state(mw), _state(mw, boost=2)
@@ -598,7 +598,7 @@ class TestItemsanityOffDifficulty(unittest.TestCase):
             mw = _build(logic_difficulty=difficulty,
                         custom_tracks={"baby-t-park": custom},
                         **_ITEMSANITY_OFF)
-            name = "Custom Track 1: Trophy Race"
+            name = "Baby T Park: Trophy Race"
             with self.subTest(difficulty=difficulty):
                 self.assertEqual(_state(mw).can_reach(name, "Location", PLAYER),
                                  not gated)

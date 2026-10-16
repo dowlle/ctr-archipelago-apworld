@@ -5,8 +5,10 @@ the self-describing `custom_tracks` descriptor -- id, per-file SHA-256s and
 the track's MEASURED capability flags -- not a throwaway toggle. When the
 option is active, the Purple Gem Cup DESTINATION is displaced: instead of four
 retail leg tracks it becomes a single 7-lap race on the custom track. Its AP
-check is the frozen generic `Custom Track 1: Trophy Race` identity, plus the
-seed's enabled podium rungs. The removed retail `Purple Gem Cup: Gem` identity
+check is the track's own frozen Trophy Race identity, plus the seed's enabled
+podium rungs: the track's named block when it has one (`Baby T Park: Trophy
+Race`, #133, one identity per track, ruled 2026-10-15), else the generic
+`Custom Track N: Trophy Race`. The removed retail `Purple Gem Cup: Gem` identity
 never coexists with it. Native still records the cup's ordinary adventure Gem
 bit for presentation and progression bookkeeping, but sends the generic Trophy
 location; therefore `shuffle_gems: true` leaves the Purple Gem in the normal
@@ -91,6 +93,10 @@ logger = logging.getLogger(__name__)
 #: exact Trophy/podium location codes. Native must know which stable AP
 #: identities the selected package serves; neither field may be inferred from
 #: a mutable title or array position.
+#: Still 4 under schema 18 (#133): an entry gains optional `named_block` when
+#: the track has a named block, and then every code it carries (and its CTR,
+#: letter and Wumpa codes in their own blocks) comes from that block. Native
+#: recomputes those codes from the index and refuses a mismatch.
 CUSTOM_TRACKS_WIRE_VERSION = 4
 
 #: Track ids this build knows how to bind. Each id selects one complete,
@@ -461,8 +467,20 @@ def normalize_custom_tracks(mapping) -> Dict[str, Dict[str, object]]:
             },
             **({"modes": dict(entry["modes"])} if "modes" in entry else {}),
             **{k: entry[k] for k in ("title", "author") if k in entry},
+            # One identity per track (#133, ruled 2026-10-15): a track id with
+            # a named block uses that block for every check and item. Decided
+            # here from this build's registry, never from YAML or the wire.
+            **_named_identity(track_id),
         }
     return normalized
+
+
+def _named_identity(track_id: str) -> Dict[str, object]:
+    """`named_block` and `ap_name` for a track id that has a named block."""
+    track = destinations.named_track(track_id)
+    if track is None:
+        return {}
+    return {"named_block": track.block_index, "ap_name": track.ap_name}
 
 
 def resolve_custom_tracks(world) -> Dict[str, Dict[str, object]]:
@@ -523,17 +541,17 @@ def effective_custom_destinations(tracks: Mapping[str, Mapping],
 
 def replacement_trophy_location(tracks: Mapping[str, Mapping],
                                 vanilla_location: str) -> str:
-    """Return the generic custom Trophy identity replacing a cup Gem check.
+    """Return the custom Trophy identity replacing a cup Gem check: the named
+    block's Trophy Race when the track has one, else the generic slot's.
 
     Non-displaced names pass through unchanged.  This lets every pinned-Gem
     path share one redirect and prevents a removed ``<Colour> Gem Cup: Gem``
     Location from being looked up after custom-region creation.
     """
-    from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
+    from .custom_track_ids import location_name
     for cup_region, track_id in displaced_cups(tracks).items():
         if vanilla_location == f"{cup_region}: Gem":
-            return CUSTOM_TRACK_LOCATION_CLASS.trophy_name(
-                int(tracks[track_id]["slot"]))
+            return location_name(tracks[track_id], "trophy")
     return vanilla_location
 
 
@@ -561,8 +579,7 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping], options=None) -> Dict[s
     `warp_pad_map`, `warp_pad_unlock` and `gem_cup_legs` already use, rather
     than the YAML's human-facing `replaces` word.
     """
-    from .custom_check_namespace import custom_check_code
-    from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
+    from . import custom_track_ids as ids
     from .podium import created_rung_keys_from_options
     created_rungs = (created_rung_keys_from_options(options)
                      if options is not None else [])
@@ -573,6 +590,11 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping], options=None) -> Dict[s
             {
                 "id": track_id,
                 "slot": entry["slot"],
+                # #133: present exactly when the track has a named block; every
+                # code below then comes from that block and native recomputes
+                # them from this index.
+                **({"named_block": entry["named_block"]}
+                   if "named_block" in entry else {}),
                 "package_uuid": entry["package_uuid"],
                 "package_version": entry["package_version"],
                 "minimum_client_version": entry["minimum_client_version"],
@@ -588,11 +610,9 @@ def custom_tracks_to_wire(tracks: Mapping[str, Mapping], options=None) -> Dict[s
                 "flags": dict(entry["flags"]),
                 **({"modes": dict(entry["modes"])} if "modes" in entry else {}),
                 "locations": {
-                    "trophy": CUSTOM_TRACK_LOCATION_CLASS.code_for(
-                        entry["slot"], "trophy"),
-                    "podium": CUSTOM_TRACK_LOCATION_CLASS.slot_codes(
-                        entry["slot"], created_rungs),
-                    **({"ctr": custom_check_code("ctr_location", entry["slot"])}
+                    "trophy": ids.location_code(entry, "trophy"),
+                    "podium": ids.podium_codes(entry, created_rungs),
+                    **({"ctr": ids.ctr_code(entry)}
                        if entry.get("modes", {}).get("ctr_challenge", False) else {}),
                 },
             }
@@ -684,6 +704,16 @@ def reconstruct_custom_tracks_from_wire(
         # tracker can never reconstruct a seed shape generation would have
         # refused.
         normalized = normalize_custom_tracks(rebuilt)
+        # #133: the wire's `named_block` must be the block this build gives
+        # the track id, or absent when it has none. A seed from a build with a
+        # different registry would otherwise restore under different ids.
+        for wire_entry in entries:
+            wanted = normalized[wire_entry["id"]].get("named_block")
+            got = wire_entry.get("named_block")
+            if ("named_block" in wire_entry) != (wanted is not None) or (
+                    wanted is not None and (type(got) is not int or got != wanted)):
+                return _give_up(f"names block {got!r} for track {wire_entry['id']!r}, "
+                                f"and this build has {wanted!r}")
         from .custom_lettersanity import admitted_custom_ctr_wire_slots
         admitted_custom_ctr_wire_slots(passthrough)
         if any(normalized[k]["slot"] != next(

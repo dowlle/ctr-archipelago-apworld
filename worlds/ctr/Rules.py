@@ -196,7 +196,7 @@ def add_capability_difficulty_rules(world, player):
     """
     from .capability_contract import (CUSTOM_TRACK_SLOTS_RULED,
                                       difficulty_gated_tracks)
-    from .custom_track_locations import slot_region
+    from .custom_track_ids import track_label
     from .itemsanity import DIFFICULTY_WEAPON_FAMILY_MIN, USEFUL_WEAPON_FAMILIES
     from .podium import location_name
     from .progressive_capability import track_required_character
@@ -211,7 +211,7 @@ def add_capability_difficulty_rules(world, player):
     names = {loc.name for loc in world.multiworld.get_locations(player)}
     tracks = set(difficulty_gated_tracks())
     if CUSTOM_TRACK_SLOTS_RULED:
-        tracks.update(slot_region(int(entry["slot"])) for entry in
+        tracks.update(track_label(entry) for entry in
                       (getattr(world, "custom_tracks", None) or {}).values())
     for track in sorted(tracks):
         required_character = track_required_character(world, track)
@@ -291,7 +291,7 @@ def add_held_first_minimum_rules(world, player):
     branch. Stricter gates (the USF `held_first_term`, the easy-difficulty
     gate) stay ANDed on top of it. Nothing is installed at logic difficulty
     hard (ruling 2026-09-29, see `held_first_minimum_term`)."""
-    from .custom_track_locations import slot_region
+    from .custom_track_ids import track_label
     from .podium import enabled_trophy_tracks, location_name
 
     if not bool(world.options.progressive_boost.value):
@@ -300,7 +300,7 @@ def add_held_first_minimum_rules(world, player):
         return
     names = {loc.name for loc in world.multiworld.get_locations(player)}
     tracks = list(enabled_trophy_tracks(world.options))
-    tracks.extend(slot_region(int(entry["slot"])) for entry in
+    tracks.extend(track_label(entry) for entry in
                   (getattr(world, "custom_tracks", None) or {}).values())
     for track in tracks:
         name = location_name(track, "held_1st")
@@ -425,13 +425,14 @@ def add_lettersanity_rules(world, player):
                 previous = loc.access_rule
                 loc.access_rule = lambda state, previous=previous, own=own, p=player: \
                     previous(state) and state.has(own, p)
-        from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
-        from .custom_check_namespace import custom_check_name, LETTERS
+        from . import custom_track_ids as ids
+        from .custom_check_namespace import LETTERS
+        entries = ids.entries_by_slot(world.options)
         for slot, chosen in getattr(world.options, "_custom_lettersanity_selected", {}).items():
             for letter in chosen:
                 loc = world.multiworld.get_location(
-                    CUSTOM_LETTERSANITY_CLASS.location_name(slot, letter), player)
-                own = custom_check_name("letter_item", slot, LETTERS.index(letter))
+                    ids.letter_location_name(entries[slot], LETTERS.index(letter)), player)
+                own = ids.letter_item_name(entries[slot], LETTERS.index(letter))
                 previous = loc.access_rule
                 loc.access_rule = lambda state, previous=previous, own=own, p=player: \
                     previous(state) and state.has(own, p)
@@ -463,12 +464,15 @@ def _add_cortex_vortex_letter_rules(world, player, mode):
 
 
 def add_custom_ctr_challenge_rules(world, player):
-    from .custom_check_namespace import custom_check_name, LETTERS
+    from . import custom_track_ids as ids
+    from .custom_check_namespace import LETTERS
     mode = int(world.options.lettersanity.value)
-    for slot in getattr(world.options, "_custom_ctr_admitted_slots", ()):
-        loc = world.multiworld.get_location(custom_check_name("ctr_location", slot), player)
+    slots = getattr(world.options, "_custom_ctr_admitted_slots", ())
+    entries = ids.entries_by_slot(world.options) if slots else {}
+    for slot in slots:
+        loc = world.multiworld.get_location(ids.ctr_name(entries[slot]), player)
         chosen = getattr(world.options, "_custom_lettersanity_selected", {}).get(slot, ())
-        required = tuple(custom_check_name("letter_item", slot, LETTERS.index(letter))
+        required = tuple(ids.letter_item_name(entries[slot], LETTERS.index(letter))
                          for letter in chosen) if mode in (2, 3) else ()
         and_term(loc, HasEach(required, player, style="has_all"))
 
@@ -1146,13 +1150,13 @@ def _created_letter_names_for(world, track):
     if track == CORTEX_VORTEX:
         return CORTEX_VORTEX_TRACK_CLASS.created_letter_names(world.options)
     prefix = f"{track}: Letter "
-    if track.startswith("Custom Track "):
-        # Custom-track slots: their letters sit inside that slot's own CTR
-        # Token Challenge exactly like a retail track's, so they take the
-        # same shared entry rule (ruling 2026-09-27). Same source list as
-        # create_regions uses for these locations.
-        from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
-        source = CUSTOM_LETTERSANITY_CLASS.created_location_names(world.options)
+    from .custom_track_ids import created_letter_location_names, is_custom_label
+    if is_custom_label(world, track):
+        # Custom tracks (generic slot or named block): their letters sit inside
+        # that track's own CTR Token Challenge exactly like a retail track's,
+        # so they take the same shared entry rule (ruling 2026-09-27). Same
+        # source list as create_regions uses for these locations.
+        source = created_letter_location_names(world.options)
     else:
         source = LETTERSANITY_CLASS.created_location_names(world.options)
     return [name for name in source if name.startswith(prefix)]

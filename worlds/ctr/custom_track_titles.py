@@ -138,13 +138,22 @@ TITLES_WIRE_VERSION = 1
 
 
 def legacy_titles(tracks: Mapping[str, Mapping]) -> Dict[int, str]:
-    """Room titles for the normalized legacy descriptor: the descriptor's own
-    `title` and `author` when present, else the compiled title table."""
+    """Room titles for the normalized legacy descriptor.
+
+    A track on a named block (#133) is titled by the block's frozen `ap_name`,
+    which is already the stem of its location names. A generic-slot track
+    uses the descriptor's own `title` and `author` when present, else the
+    compiled title table, with the clash suffixes above."""
     from .custom_tracks import TRACK_DISPLAY_NAMES
-    return seed_titles([(int(entry["slot"]),
-                         entry.get("title", TRACK_DISPLAY_NAMES.get(track_id)),
-                         entry.get("author"), track_id)
-                        for track_id, entry in tracks.items()])
+    named = {int(entry["slot"]): entry["ap_name"] for entry in tracks.values()
+             if entry.get("named_block") is not None}
+    out = seed_titles([(int(entry["slot"]),
+                        entry.get("title", TRACK_DISPLAY_NAMES.get(track_id)),
+                        entry.get("author"), track_id)
+                       for track_id, entry in tracks.items()
+                       if int(entry["slot"]) not in named])
+    out.update(named)
+    return dict(sorted(out.items()))
 
 
 def titles_to_wire(titles: Mapping[int, str]) -> Dict[str, object]:

@@ -30,6 +30,8 @@ def location_aliases(world, *, escape_markup: bool = True) -> dict[int, str]:
     roles = {role: label for role, label, _region in CUSTOM_DESTINATION_ROLES}
     titles = getattr(world, "custom_track_titles", None)
     for track_id, entry in resolved_custom_tracks(world).items():
+        if entry.get("named_block") is not None:
+            continue  # its checks already carry the block's real names (#133)
         if titles is not None:
             title = titles.get(int(entry["slot"]))
             if title is None:
@@ -61,8 +63,12 @@ def item_aliases(world) -> dict[int, str]:
     """
     from .custom_check_namespace import LETTERS, custom_check_code
     titles = getattr(world, "custom_track_titles", None) or {}
+    named = {int(entry["slot"]) for entry in (getattr(world, "custom_tracks", None) or {}).values()
+             if entry.get("named_block") is not None}
     aliases = {}
     for slot, title in titles.items():
+        if slot in named:
+            continue
         for variant, letter in enumerate(LETTERS):
             aliases[custom_check_code("letter_item", slot, variant)] = f"Letter {letter} ({title})"
     return aliases
