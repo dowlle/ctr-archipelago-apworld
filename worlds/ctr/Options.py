@@ -553,6 +553,17 @@ class TiziHelper(Toggle):
     display_name = "Tizi Helper"
 
 
+class ReserveTopUp(DefaultOnToggle):
+    """Let non-trap filler include Reserve Top-Up at relative weight 1
+    beside Wumpa Fruit at weight 6 (bundles retain weights 3 and 1).
+
+    One copy adds 983 raw reserve units to active positive reserves in a live
+    race. It waits in the hub or without a boost, preserves the fire cap and
+    can cross into purple Saffi fire, including with Progressive Boost.
+    It gives no weapon. Off preserves the existing filler draw."""
+    display_name = "Reserve Top-Up"
+
+
 class WumpaBundles(Toggle):
     """Let filler contain bundles of Wumpa Fruit.
 
@@ -1427,6 +1438,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # The wumpa family (2026-08-10 ruling): two bundle fillers, the starting
     # ladder, and the one global check.
     wumpa_bundles: WumpaBundles
+    reserve_top_up: ReserveTopUp
     progressive_starting_wumpa: ProgressiveStartingWumpa
     wumpa_check: WumpaCheck
     # in-race Turbo hand-out (#224), the second ruled namespace amendment
@@ -1519,7 +1531,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                      PodiumAnyPositionRung, PodiumHeldRungs,
                      PodiumHeldFifthRung],
     "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TrapWeights,
-                     TiziHelper, WumpaBundles, ProgressiveStartingWumpa,
+                     TiziHelper, WumpaBundles, ReserveTopUp, ProgressiveStartingWumpa,
                      WumpaCheck, TurboGrant],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
