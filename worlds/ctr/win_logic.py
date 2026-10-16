@@ -46,6 +46,7 @@ _KIND_SUFFIXES = (
     (": CTR Token Challenge", "ctr"),
     (": Boss Race", "boss"),
     (" Gem Cup: Gem", "gem"),
+    (" Gem Cup: Win All Legs", "gem"),
     (": Crystal Challenge", "crystal"),
     (": N. Oxide's Final Challenge", "oxide_final"),
     (": N. Oxide's Challenge", "oxide"),

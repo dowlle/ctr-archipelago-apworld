@@ -268,6 +268,8 @@ class ctrAPWorld(World):
         mirrors (one_lap_cups, death_link, ...) are skipped."""
         o = self.options
         co = passthrough.get("ctr_options", {})
+        from .cup_sweeps import restore_options as restore_sweep_options
+        restore_sweep_options(o, passthrough)
         # #169 tier 1: pin the seed's boss venues from the wire, never redraw.
         boss_track_shuffle.restore_from_wire(self, passthrough)
 

@@ -467,6 +467,15 @@ class IncludeArcadeArenas(Toggle):
     display_name = "Include Arcade Arenas"
 
 
+class CupSweepChecks(Toggle):
+    """Winning first place in all four races of a Gem Cup sends a separate check.
+
+    The four wins must belong to one uninterrupted Cup attempt. Points wins
+    remain separate. Displaced one-race destinations cannot earn a sweep.
+    """
+    display_name = "Cup Sweep Checks"
+
+
 class Crystalsanity(Toggle):
     """Each authored crystal in an included Crystal Challenge is a check.
 
@@ -1434,6 +1443,7 @@ class ctrAPOptions(PerGameCommonOptions):
     # warp pads: content & destination shuffle
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     crystalsanity: Crystalsanity
+    cup_sweep_checks: CupSweepChecks
     include_arcade_arenas: IncludeArcadeArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
@@ -1492,7 +1502,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                          RandomizeGemCupTracks, CustomTracks],
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
-    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity, IncludeArcadeArenas,
+    "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity, IncludeArcadeArenas, CupSweepChecks,
                      HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
