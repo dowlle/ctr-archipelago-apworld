@@ -15,7 +15,7 @@ from . import (content_item_pool, characters, destinations, named_tracks, sphere
                warp_pad_rules, wumpa_family)
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import arena_content
+from . import arena_content, custom_packages
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -43,7 +43,13 @@ def closed(value, keys, path):
 
 
 def package_descriptor(profile):
-    """Exact portable Package record, also consumed by the native registry."""
+    """Complete descriptor of a Baby T Park revision this build has measured.
+
+    Open admission (#133 PR 2) accepts any complete descriptor; these two stay
+    as known-good examples for tests, fixtures and the fuzz meta file. The
+    flags were measured on the pinned bytes (8 spawns, AI paths, 35
+    checkpoints, C/T/R letters, 8 fruit crates); relic is false because the
+    package has no relic target times."""
     revision = profile["package_version"]
     sizes = (2579256, 458808) if revision == "1.0.0" else (2558168, 458808)
     files = [dict(role=role, sha256=profile[role + "_sha256"], bytes=size,
@@ -51,31 +57,29 @@ def package_descriptor(profile):
              for role, size in zip(("lev", "vrm"), sizes)]
     return dict(id="package/baby-t-park/" + revision, content_id="baby-t-park",
                 uuid=profile["package_uuid"], revision=revision, display_name="Baby T Park",
-                author="Lockheart", files=files,
+                author="Lockheart", laps=profile["laps"],
+                capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True),
+                files=files,
                 evidence=[dict(capability="trophy", file_hashes=[f["sha256"] for f in files],
                                verifier="ctr-managed-profile", revision=1, level="structural")])
 
 
 PACKAGES = tuple(package_descriptor(p) for p in BABY_T_PARK_PROFILES)
+#: Retail tracks race their authored three laps.
+RETAIL_LAPS = 3
 
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw):
-    if not isinstance(raw, list) or len(raw) > 32:
-        error("tracks.custom must be a list of at most 32 complete package descriptors.")
-    result = []
-    for package in raw:
-        matched = next((known for known in PACKAGES if canonical(known) == canonical(package)), None)
-        if matched is None:
-            error("custom package does not match a supported complete immutable revision. "
-                  "Export its Package descriptor; legacy Gem Cup placement descriptors are not this format.")
-        if matched in result:
-            error("the custom package list contains a duplicate revision.")
-        result.append(copy.deepcopy(matched))
-    return sorted(result, key=lambda p: p["id"])
+def resolve_packages(raw, where="tracks.custom"):
+    """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
+    try:
+        return custom_packages.admit_all(raw, where)
+    except custom_packages.PackageError as exc:
+        error(f"{exc}. Export the package descriptor again from the Custom Content page "
+              "or the AP-Pie track picker; legacy Gem Cup placement descriptors are not this format.")
 
 
 def pad_registry():
@@ -241,8 +245,14 @@ def generate(world):
             or len(set(retail)) != len(retail)):
         error("tracks.retail must be all or a list of distinct retail engine track IDs 0..17.")
     packages = resolve_packages(tracks.get("custom", []))
+    for package in packages:
+        if not custom_packages.trophy_ready(package):
+            error(f"custom track {package['id']} cannot run a Trophy Race: its descriptor says "
+                  "arcade: false (no eight-kart grid with AI paths). Trophy is the only mode this "
+                  "profile builds yet; remove the track from tracks.custom. No content was changed.")
     candidates = [dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i],
-                       laps=3, modes=["trophy"], capabilities=["trophy"], field_size=8) for i in sorted(retail)]
+                       laps=RETAIL_LAPS, modes=["trophy"], capabilities=["trophy"], field_size=8)
+                  for i in sorted(retail)]
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
@@ -260,7 +270,7 @@ def generate(world):
                       else dict(room_title=titles.get(slot, f"Custom Track {slot}")))
         candidates.append(dict(id="custom/" + package["content_id"] + "/" + package["revision"],
                                origin="custom", package_id=package["id"], custom_slot=slot,
-                               display_name=package["display_name"], laps=7, modes=["trophy"],
+                               display_name=package["display_name"], laps=package["laps"], modes=["trophy"],
                                capabilities=["trophy"], field_size=8, **addressing))
     required = raw.get("required_entries", [])
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
@@ -472,7 +482,10 @@ def validate(plan):
         return result
 
     packages = table("packages")
-    resolve_packages(plan["packages"])
+    # The wire is canonical: an admitted copy of each record must equal it.
+    require(resolve_packages(plan["packages"], "content_plan.packages") == sorted(plan["packages"], key=lambda p: p["id"])
+            and [p["id"] for p in plan["packages"]] == sorted(packages),
+            "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
     checks, requirements = table("checks", "location"), table("requirements")
     require(not plan["encounters"], "encounter routes are not implemented by this profile")
@@ -529,7 +542,7 @@ def validate(plan):
             i = track["retail_id"]
             require(i in RETAIL and i not in retail_ids, "unknown or duplicate retail track")
             retail_ids.add(i)
-            require(track["display_name"] == RETAIL[i] and track["laps"] == 3 and track["id"] == f"retail:{i}",
+            require(track["display_name"] == RETAIL[i] and track["laps"] == RETAIL_LAPS and track["id"] == f"retail:{i}",
                     "retail track metadata mismatch")
             name = RETAIL[i] + ": Trophy Race"
         else:
@@ -539,7 +552,8 @@ def validate(plan):
             slot = track["custom_slot"]
             require(1 <= slot <= 32 and slot not in slots, "unregistered or duplicate custom slot")
             slots.add(slot)
-            require(track["laps"] == 7 and track["display_name"] == package["display_name"] and
+            require(custom_packages.trophy_ready(package), "custom Trophy track without the arcade capability")
+            require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
             block = destinations.named_track(package["content_id"])
             if "named_block" in track:

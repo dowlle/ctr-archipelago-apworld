@@ -3,18 +3,21 @@ name: CTR world
 # The CTR world's own checks. The inherited upstream Archipelago workflows stay
 # disabled on this fork; this one runs only what the world needs: its pytest
 # suite, and the same eleven-arm fuzz matrix the Archipelago-index runs at
-# publication time, against a .apworld packed from this commit.
+# publication time, against a .apworld packed from this commit, plus a forced
+# content-plan arm (#133 PR 2) that the index does not run.
 
 on:
   pull_request:
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
+      - '.github/fuzz/**'
   push:
     branches: [main, 'release/**', 'ci/**']
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
+      - '.github/fuzz/**'
 
 permissions:
   contents: read
@@ -125,12 +128,23 @@ jobs:
           # file pins `custom_tracks: {}`. Their Universal Tracker behaviour is
           # covered by worlds/ctr/test/test_ut_room_names.py instead.
           - {check_name: check-ut,                    check_runs: 500,  check_hook: 'worlds.tracker.fuzzer_hook:Hook',                           check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
+          # Forced content plan (#133 PR 2): the default options never build
+          # one, so this arm pins an explicit content_pool with two custom
+          # tracks (one named block, one generic B+ slot) from
+          # .github/fuzz/content-plan-meta.yaml and randomizes the rest.
+          - {check_name: content-plan,                check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
         with:
           repository: dowlle/Archipelago-index
           path: index-repo
+      - name: Checkout the content-plan meta file
+        if: matrix.check_meta == 'content-plan'
+        uses: actions/checkout@v4
+        with:
+          path: world-src
+          sparse-checkout: .github/fuzz
       - name: Checkout fuzz hooks
         if: matrix.check_mode == 'fuzz'
         uses: actions/checkout@v4
@@ -203,7 +217,22 @@ jobs:
             cat ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
-          uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}"
+          if [ "$CHECK_META" = "content-plan" ]; then
+            cp ../world-src/.github/fuzz/content-plan-meta.yaml ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
+          uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
+          if [ "$CHECK_META" = "content-plan" ]; then
+            # A refused option set is "ignored", not a failure. If the meta file
+            # stopped matching the profile, every seed would be ignored and the
+            # arm would pass without testing anything, so cap the ignored share.
+            ignored="$(grep -oE '[0-9]+ ignored' fuzz.log | tail -1 | cut -d' ' -f1)"
+            echo "content-plan ignored: ${ignored:-unknown} of ${CHECK_RUNS}"
+            if [ -z "$ignored" ] || [ "$ignored" -gt $((CHECK_RUNS / 10)) ]; then
+              echo "::error::content-plan arm: too many ignored generations (${ignored:-unknown} of ${CHECK_RUNS})"
+              exit 1
+            fi
+          fi
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

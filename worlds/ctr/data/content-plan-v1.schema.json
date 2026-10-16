@@ -201,11 +201,11 @@
           "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
         },
         "content_id": {
-          "description": "Stable content identity of the package. For a track in the CTR custom-track registry it carries the registry track_key verbatim (the apworld looks the named id block up by this string); the wire name is kept so schema 1 plans and the native registry stay compatible.",
+          "description": "Registry track key, carried verbatim. The apworld looks the named id block up by this string; a key without a block uses a generic Custom Track slot (path B+). The wire name is kept so schema 1 plans stay compatible. The package id is \"package/<content_id>/<revision>\" and fits 64 bytes.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64,
-          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
         },
         "uuid": {
           "type": "string",
@@ -215,7 +215,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64,
-          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
         },
         "display_name": {
           "type": "string",
@@ -229,13 +229,76 @@
           "maxLength": 128,
           "pattern": "^[^\\x00-\\x1f\\x7f]+$"
         },
+        "laps": {
+          "description": "Authored race laps (#133 PR 2). The Track record repeats it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "capabilities": {
+          "description": "Measured capability flags. Native measures the pinned bytes on load and refuses the package when a flag set to true is not there.",
+          "type": "object",
+          "properties": {
+            "time_trial": {
+              "type": "boolean"
+            },
+            "arcade": {
+              "type": "boolean"
+            },
+            "relic": {
+              "type": "boolean"
+            },
+            "ctr_tokens": {
+              "type": "boolean"
+            },
+            "wumpa": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "time_trial",
+            "arcade",
+            "relic",
+            "ctr_tokens",
+            "wumpa"
+          ],
+          "additionalProperties": false
+        },
+        "relic_targets": {
+          "description": "Present exactly when capabilities.relic is true. Ticks at 960 per second; sapphire > gold > platinum.",
+          "type": "object",
+          "properties": {
+            "sapphire": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            },
+            "gold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            },
+            "platinum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            }
+          },
+          "required": [
+            "sapphire",
+            "gold",
+            "platinum"
+          ],
+          "additionalProperties": false
+        },
         "files": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/FilePin"
           },
-          "maxItems": 6,
-          "minItems": 2
+          "maxItems": 2,
+          "minItems": 2,
+          "description": "Exactly the LEV pin, then the VRM pin."
         },
         "evidence": {
           "type": "array",
@@ -243,7 +306,8 @@
             "$ref": "#/$defs/Evidence"
           },
           "maxItems": 16,
-          "minItems": 0
+          "minItems": 0,
+          "description": "Informational. Every hash must be one of this package's file pins."
         }
       },
       "required": [
@@ -253,6 +317,8 @@
         "revision",
         "display_name",
         "author",
+        "laps",
+        "capabilities",
         "files",
         "evidence"
       ],
