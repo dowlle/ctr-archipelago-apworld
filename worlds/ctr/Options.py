@@ -419,9 +419,11 @@ class TrapWeights(OptionDict):
     Weights are relative: higher means more often, 0 means never. Traps you
     leave out keep their default weight. `clocked_out` defaults to 3 and
     applies the retail clock to the receiving player for 7.7 seconds.
+    `reverse_camera` defaults to 2 and forces rear view with normal steering,
+    using the local Trap Duration setting.
 
     `first_person`, `wireframe`, `upside_down`, `mirror_mode` and
-    `demo_camera` change the camera or the screen and can be visually
+    `demo_camera`, `reverse_camera` change the camera or the screen and can be visually
     intense. Set a trap to 0 to turn it off; `upside_down` is 0 by default.
 
     Setting every trap to 0 while Trap Fill Percentage is above 0 is an
