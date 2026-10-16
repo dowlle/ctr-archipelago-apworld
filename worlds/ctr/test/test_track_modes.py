@@ -314,3 +314,58 @@ class TestFill(unittest.TestCase):
                 distribute_items_restrictive(world.multiworld)
                 self.assertTrue(world.multiworld.can_beat_game())
                 self.assertEqual(len(world.multiworld.precollected_items[1]), 0)
+
+
+def artifact_244_options(stages="two"):
+    """The CI content-plan profile that dead-ended (fuzz artifact 244), without
+    custom packages: 5 Trophies, 6/4/2 relics, two of each red, green and blue
+    Token, all five Gems and the four Keys."""
+    options = mode_options(custom=[], stages=stages, order="per_pad")
+    options["item_pool"] = {"base": {"trophies": 5, "relics": {"sapphire": 6, "gold": 4, "platinum": 2},
+                                     "tokens": {"red": 2, "green": 2, "blue": 2, "yellow": 0, "purple": 0},
+                                     "gems": ["red", "green", "blue", "yellow", "purple"], "keys": 4}}
+    return options
+
+
+class TestNarrowStartEarlyOpener(unittest.TestCase):
+    """Ruling 2026-10-17: a narrow start under second-stage gates gets one local
+    early opener instead of a fill simulation; nothing is precollected."""
+
+    def test_seed_710_places_an_early_key_and_fills(self):
+        from Fill import distribute_items_restrictive
+        from .. import sphere0_guard
+        world = make_world(artifact_244_options(), seed=710)
+        mw = world.multiworld
+        start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
+        self.assertLess(len(start), sphere0_guard.NARROW_START_CHECKS)
+        self.assertEqual(mw.local_early_items[1], {"Key": 1})
+        distribute_items_restrictive(mw)
+        self.assertTrue(mw.can_beat_game())
+        self.assertIn("Key", [loc.item.name for loc in start])
+        self.assertEqual(len(mw.precollected_items[1]), 0)
+
+    def test_wide_start_takes_no_early_item(self):
+        world = make_world(artifact_244_options(), seed=711)
+        self.assertEqual(world.multiworld.local_early_items[1], {})
+
+    def test_plan_without_second_stage_gates_takes_no_early_item(self):
+        world = make_world(artifact_244_options(stages="single"), seed=710)
+        self.assertEqual(world.multiworld.local_early_items[1], {})
+
+    def test_without_a_key_opener_the_widest_opener_is_chosen(self):
+        from .. import sphere0_guard
+        world = make_world(artifact_244_options(), seed=710)
+        mw = world.multiworld
+        mw.itempool = [item for item in mw.itempool if item.name != "Key"]
+        state = sphere0_guard._base_state(world)
+        start = sphere0_guard._reachable_empty(world, state)
+        reach = {}
+        for item in mw.itempool:
+            if item.advancement and item.name not in reach:
+                trial = state.copy()
+                trial.collect(item, True)
+                reach[item.name] = sphere0_guard._reachable_empty(world, trial)
+        chosen = sphere0_guard.early_opener(world)
+        self.assertIsNotNone(chosen)
+        self.assertGreater(reach[chosen], start)
+        self.assertEqual(reach[chosen], max(reach.values()))
