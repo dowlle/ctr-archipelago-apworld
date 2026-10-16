@@ -415,7 +415,8 @@ class TrapWeights(OptionDict):
     item into a trap.
 
     Weights are relative: higher means more often, 0 means never. Traps you
-    leave out keep their default weight.
+    leave out keep their default weight. `clocked_out` defaults to 3 and
+    applies the retail clock to the receiving player for 7.7 seconds.
 
     `first_person`, `wireframe`, `upside_down`, `mirror_mode` and
     `demo_camera` change the camera or the screen and can be visually
