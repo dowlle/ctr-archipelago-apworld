@@ -57,6 +57,17 @@ BABY_T_PARK = {"baby-t-park": copy.deepcopy(BABY_T_PARK_EXAMPLE)}
 #: renumbering a permanent code.
 CUSTOM_ROLE = "purple_gem_cup"
 CUSTOM_LOCATION = "Purple Gem Cup Custom Race: Reach 10 Wumpa"
+#: Since #133 a track with a named block owns its Wumpa check in that block:
+#: Baby T Park is block 8, offset 14. The role identity above is the generic
+#: path, exercised with `without_named_block()`.
+NAMED_LOCATION = "Baby T Park: Reach 10 Wumpa"
+NAMED_CODE = 35201614
+
+
+def without_named_block():
+    """A build where baby-t-park has no named block (test only)."""
+    from .. import destinations
+    return mock.patch.dict(destinations.NAMED_BY_KEY, {}, clear=True)
 
 
 def _no_wumpa_collectible():
@@ -222,7 +233,7 @@ class TestCreationCounts(unittest.TestCase):
         options = _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK)
         with mock.patch.object(
                 TRIAL_TROPHY_CLASS, "created_location_names",
-                return_value=[slide_trophy]):
+                return_value=[slide_trophy]), without_named_block():
             names = WUMPA_CLASS.created_location_names(options)
             block = WUMPA_CLASS.wire_block(options)
         self.assertEqual(len(names), 18)
@@ -234,10 +245,21 @@ class TestCreationCounts(unittest.TestCase):
         self.assertIn(CUSTOM_ROLE, block["custom_destinations"])
 
     def test_an_eligible_custom_track_adds_exactly_one_location(self):
-        names = WUMPA_CLASS.created_location_names(
-            _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK))
+        with without_named_block():
+            names = WUMPA_CLASS.created_location_names(
+                _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK))
         self.assertEqual(len(names), 17)
         self.assertEqual(names[-1], CUSTOM_LOCATION)
+
+    def test_a_named_track_owns_its_check_in_its_block(self):
+        """#133: the check moves to the named block; the role check is not
+        created and the wire carries the block's code for the role."""
+        options = _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK)
+        names = WUMPA_CLASS.created_location_names(options)
+        self.assertEqual(len(names), 16)
+        self.assertNotIn(CUSTOM_LOCATION, names)
+        self.assertEqual(WUMPA_CLASS.wire_block(options)["custom_destinations"][CUSTOM_ROLE]["code"],
+                         NAMED_CODE)
 
     def test_a_custom_track_adds_nothing_in_global_mode(self):
         self.assertEqual(
@@ -533,18 +555,20 @@ class TestPerTrackWithCustomTrack(CTRTestBase):
 
     def test_the_custom_destination_location_exists(self):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
-        self.assertIn(CUSTOM_LOCATION, names)
+        self.assertIn(NAMED_LOCATION, names)
+        self.assertNotIn(CUSTOM_LOCATION, names)
 
     def test_it_lives_in_the_displaced_cup_region(self):
-        location = self.multiworld.get_location(CUSTOM_LOCATION, self.player)
+        location = self.multiworld.get_location(NAMED_LOCATION, self.player)
         self.assertEqual(location.parent_region.name, "Purple Gem Cup")
+        self.assertEqual(location.address, NAMED_CODE)
 
     def test_the_wire_carries_the_package_identity_and_the_capability(self):
         block = self.world.fill_slot_data()["wumpa_checks"]
         self.assertEqual(
             block["custom_destinations"],
             {CUSTOM_ROLE: {
-                "code": WUMPA_CUSTOM_CODE_BASE,
+                "code": NAMED_CODE,
                 "package_uuid": BABY_T_PARK_EXAMPLE["package_uuid"],
                 WUMPA_COLLECTIBLE_FLAG: True,
             }})
@@ -555,7 +579,7 @@ class TestPerTrackWithCustomTrack(CTRTestBase):
         which is what makes that impossible rather than merely unlikely."""
         block = self.world.fill_slot_data()["wumpa_checks"]
         code = block["custom_destinations"][CUSTOM_ROLE]["code"]
-        self.assertEqual(code, WUMPA_CUSTOM_CODE_BASE)
+        self.assertEqual(code, NAMED_CODE)
         self.assertNotIn(code, set(block["retail_tracks"].values()))
         self.assertNotEqual(code, WUMPA_CODE_BASE)
 

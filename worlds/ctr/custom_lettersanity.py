@@ -2,12 +2,36 @@
 
 No borrowed retail LevelID, mutable package title, or cup-leg number contributes
 to the address. Repeated routes to the same seed slot share these identities.
+
+Selection stays keyed by the seed's logical slot. A slot whose track has a
+named block (#133) takes its letter and CTR codes from that block instead of
+the generic families below (custom_track_ids); the classes here create only
+the generic slots' locations and items, and `named_tracks.NAMED_TRACK_CLASS`
+creates the named ones.
 """
 from .custom_check_namespace import (
     CUSTOM_SLOT_COUNT, LETTERS, custom_check_code, custom_check_name,
 )
 from .location_class import LocationClass
 from BaseClasses import ItemClassification
+
+
+def _letter_codes(entries, slot, letter_index):
+    """(location code, item code) of one letter: the slot's named block when
+    `entries` maps the slot to a named entry, else the generic family."""
+    entry = (entries or {}).get(slot)
+    if entry is not None and entry.get("named_block") is not None:
+        from . import custom_track_ids as ids
+        return ids.letter_location_code(entry, letter_index), ids.letter_item_code(entry, letter_index)
+    return (custom_check_code("letter_location", slot, letter_index),
+            custom_check_code("letter_item", slot, letter_index))
+
+
+def _generic_slots(options):
+    """Slots whose track has no named block."""
+    from .custom_track_ids import named_slots
+    named = named_slots(options)
+    return lambda slot: slot not in named
 
 # Separate from positional data/items.json: these addresses deliberately use
 # their own reserved block and must not shift the shipped 0..199 index table.
@@ -40,7 +64,15 @@ def admitted_custom_ctr_wire_slots(slot_data):
         if not requested:
             continue
         slot = track.get("slot")
-        expected = custom_check_code("ctr_location", slot)
+        if "named_block" in track:
+            # #133: the parent descriptor's named block owns the challenge.
+            from .named_tracks import location_code
+            block = track["named_block"]
+            if type(block) is not int:
+                raise ValueError("custom named block must be an integer")
+            expected = location_code(block, "ctr_token")
+        else:
+            expected = custom_check_code("ctr_location", slot)
         flags, locations = track.get("flags", {}), track.get("locations", {})
         code = locations.get("ctr")
         if flags.get("ctr_letters") is not True or type(code) is not int or code != expected:
@@ -68,8 +100,11 @@ def select_custom_letters(mode, count, admitted_slots, rng):
             else LETTERS for slot in sorted(slots)}
 
 
-def custom_letter_wire(mode, count, selection):
-    """Encode slot-owned required items/checks without any retail host keys."""
+def custom_letter_wire(mode, count, selection, entries=None):
+    """Encode slot-owned required items/checks without any retail host keys.
+
+    `entries` ({slot: normalized descriptor entry}) supplies a named block's
+    codes for slots that have one; without it every slot is generic."""
     # Validate scalar types even when there are no admitted slots.
     select_custom_letters(mode, count, (), None)
     if mode == 0:
@@ -84,17 +119,17 @@ def custom_letter_wire(mode, count, selection):
                 len(selected) != (3 if mode == 3 else count)):
             raise ValueError("custom selection does not match the mode/count")
         tracks.append({"slot": slot,
-                       "locations": [custom_check_code("letter_location", slot, li)
+                       "locations": [_letter_codes(entries, slot, li)[0]
                                      if mode in (1, 2) and letter in selected else -1
                                      for li, letter in enumerate(LETTERS)],
-                       "items": [custom_check_code("letter_item", slot, li)
+                       "items": [_letter_codes(entries, slot, li)[1]
                                  if mode in (2, 3) and letter in selected else -1
                                  for li, letter in enumerate(LETTERS)]})
     return {"version": 1, "mode": mode, "letters_per_track": count,
             "tracks": tracks}
 
 
-def restore_custom_letter_wire(block, admitted_slots):
+def restore_custom_letter_wire(block, admitted_slots, entries=None):
     """UT restores exact selection and rejects forged addresses/slot ownership.
 
     Caller admits slots using the pinned package/mode descriptors, not this
@@ -124,7 +159,7 @@ def restore_custom_letter_wire(block, admitted_slots):
                 raise ValueError("custom letter arrays require three integer codes")
         source = items if mode == 3 else locations
         selection[slot] = tuple(letter for letter, code in zip(LETTERS, source) if code >= 0)
-    canonical = custom_letter_wire(mode, count, selection)
+    canonical = custom_letter_wire(mode, count, selection, entries)
     normalized = {"version": block["version"], "mode": mode,
                   "letters_per_track": count,
                   "tracks": [{"slot": t["slot"], "locations": list(t["locations"]),
@@ -149,7 +184,8 @@ def restore_custom_letter_options(options, slot_data, validated_slots):
             raise ValueError("admitted custom CTR mode is missing its letter block")
         selection = {}
     else:
-        selection = restore_custom_letter_wire(block, admitted)
+        from .custom_track_ids import entries_by_slot
+        selection = restore_custom_letter_wire(block, admitted, entries_by_slot(options))
         if block["mode"] != int(options.lettersanity.value):
             raise ValueError("custom letter mode differs from seed lettersanity")
         if block["letters_per_track"] != int(options.letters_per_track.value):
@@ -177,8 +213,9 @@ class CustomLettersanityLocationClass(LocationClass):
         block = self.wire_block(options)
         if block is None or block["mode"] not in (1, 2):
             return []
+        generic = _generic_slots(options)
         return [self.location_name(track["slot"], letter)
-                for track in block["tracks"]
+                for track in block["tracks"] if generic(track["slot"])
                 for letter, code in zip(LETTERS, track["locations"]) if code >= 0]
 
     def wire_block(self, options):
@@ -189,9 +226,11 @@ class CustomLettersanityLocationClass(LocationClass):
         mode = int(options.lettersanity.value)
         count = int(options.letters_per_track.value)
         selected = getattr(options, "_custom_lettersanity_selected", {})
-        block = custom_letter_wire(mode, count, selected)
+        from .custom_track_ids import entries_by_slot
+        entries = entries_by_slot(options)
+        block = custom_letter_wire(mode, count, selected, entries)
         if block is not None:
-            restore_custom_letter_wire(block, options._custom_ctr_admitted_slots)
+            restore_custom_letter_wire(block, options._custom_ctr_admitted_slots, entries)
         elif options._custom_ctr_admitted_slots and selected:
             raise ValueError("off mode cannot create custom letters")
         return block
@@ -200,8 +239,9 @@ class CustomLettersanityLocationClass(LocationClass):
         block = self.wire_block(options)
         if block is None:
             return []
+        generic = _generic_slots(options)
         return [custom_check_name("letter_item", track["slot"], li)
-                for track in block["tracks"]
+                for track in block["tracks"] if generic(track["slot"])
                 for li, code in enumerate(track["items"]) if code >= 0]
 
 
@@ -219,8 +259,11 @@ class CustomCtrChallengeLocationClass(LocationClass):
                 for slot in range(1, CUSTOM_SLOT_COUNT + 1)]
 
     def created_location_names(self, options):
-        return [custom_check_name("ctr_location", slot)
-                for slot in getattr(options, "_custom_ctr_admitted_slots", ())]
+        slots = getattr(options, "_custom_ctr_admitted_slots", ())
+        if not slots:
+            return []
+        generic = _generic_slots(options)
+        return [custom_check_name("ctr_location", slot) for slot in slots if generic(slot)]
 
 
 CUSTOM_CTR_CHALLENGE_CLASS = CustomCtrChallengeLocationClass()

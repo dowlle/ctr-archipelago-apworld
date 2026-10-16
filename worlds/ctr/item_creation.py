@@ -435,6 +435,10 @@ def create_items(world):
     # positional retail item table. Include before capacity/overflow checks.
     pool.extend(world.create_item(name) for name in
                 CUSTOM_LETTERSANITY_CLASS.created_item_names(world.options))
+    # A track with a named block pools its block's letter items instead (#133).
+    from .custom_track_ids import created_named_item_names
+    pool.extend(world.create_item(name) for name in
+                created_named_item_names(world.options))
     # Cortex Vortex's letter items live outside the positional table, like
     # the custom ones above. Empty with the option off.
     pool.extend(world.create_item(name) for name in

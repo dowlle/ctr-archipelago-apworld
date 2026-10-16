@@ -274,7 +274,9 @@ class CustomTracks(OptionDict):
     The only known track is baby-t-park, and only purple_gem_cup can be
     replaced.
 
-    An entry may also carry a `title` and an `author`. They only change the
+    A track this version knows by name keeps that name for its checks
+    everywhere (for example "Baby T Park: Trophy Race"). For any other
+    track, an entry may carry a `title` and an `author`. They only change the
     name the room and Universal Tracker show for the track's checks; a title
     that matches a retail track gets "(Custom)" added."""
     # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
