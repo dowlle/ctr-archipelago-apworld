@@ -1,5 +1,8 @@
 # Internal development fixture. Requires the matching content-plan native build.
 # Not compatible with rc1. Other content/mode/pack routes are still being added.
+# Any complete package descriptor is accepted (#133 PR 2): track key (content_id),
+# file pins, authored laps and measured capability flags. relic: true also needs
+# relic_targets {sapphire, gold, platinum} in ticks (960 per second).
 name: CustomPadTest
 game: Crash Team Racing
 Crash Team Racing:
@@ -18,9 +21,11 @@ Crash Team Racing:
         - id: package/baby-t-park/1.0.2
           content_id: baby-t-park
           uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
-          revision: 1.0.2
+          revision: "1.0.2"
           display_name: Baby T Park
           author: Lockheart
+          laps: 7
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true}
           files:
             - role: lev
               sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8

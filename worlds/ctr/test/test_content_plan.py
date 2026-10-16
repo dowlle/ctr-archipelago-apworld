@@ -124,6 +124,7 @@ class TestContentPlan(CTRTestBase):
         def corrupt_pad(w): w["content_plan"]["pads"][0]["hub_id"] = "hub:99"
         def corrupt_check(w): w["content_plan"]["checks"][0]["location"] = 35011204
         def corrupt_route(w): w["content_plan"]["checks"][0]["routes"][0]["award"] = "finish_any"
+        # Open admission accepts other pins, but this evidence row still names the old hash.
         def corrupt_package(w): w["content_plan"]["packages"][0]["files"][0]["sha256"] = "0" * 64
         def corrupt_supply(w): w["content_plan"]["items"]["rows"][0]["remaining"] += 1
         def corrupt_keys(w): w["content_plan"]["items"]["rows"][-1]["base"] = 3
