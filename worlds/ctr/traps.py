@@ -23,7 +23,7 @@ registry's order is not load-bearing on the wire. It is still kept in native
 AP_TrapEffect enum order and pinned, row for row, by the shared fixture
 test/fixtures/trap_identities.json (a byte-identical copy of native's
 tools/fixtures/trap_identities.json). A new trap (#455, #248) appends one row
-here, one id in data/items.json and one fixture row in both repositories;
+here, its already-minted item id and one fixture row in both repositories;
 nothing existing moves and no key is ever renamed.
 
 RENAMES, 0.2.0 (ruled 2026-08-19 in the trap rework design
@@ -95,6 +95,7 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("mirror_mode",      "Mirror Mode",      3, True, "rework"),
     TrapEntry("warpball_ambush",  "Warpball Ambush",  3, True, "rework"),
     TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
+    TrapEntry("clocked_out",      "Clocked Out",      3, True, "030"),
 )
 
 #: The BUILDABLE draw list, in registry order.

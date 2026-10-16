@@ -102,7 +102,7 @@ BUILDABLE_KEYS = (
     "forced_use", "empty_crates", "weakened_kart", "boost_blocker",
     "wireframe", "nitro", "reverse_steering", "red_potion",
     "upside_down", "mirror_mode", "warpball_ambush",
-    "demo_camera",
+    "demo_camera", "clocked_out",
 )
 
 
@@ -176,12 +176,12 @@ class TestTrapNames(unittest.TestCase):
         self.assertIn("demo_camera", traps.TRAP_WEIGHT_KEYS)
 
     def test_the_weight_keys_cover_every_trap_exactly_once(self):
-        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 20)
-        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 20)
+        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 21)
+        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 21)
         self.assertEqual(set(traps.DEFAULT_TRAP_WEIGHTS),
                          set(traps.TRAP_WEIGHT_KEYS))
         self.assertEqual(sorted(traps.ALL_TRAP_ITEM_NAMES),
-                         sorted(EXPECTED_TRAP_IDS))
+                         sorted([*EXPECTED_TRAP_IDS, "Clocked Out"]))
 
 
 class TestTrapWeightResolution(unittest.TestCase):
@@ -265,9 +265,9 @@ class TestWeightedDraw(unittest.TestCase):
             "Wireframe": 2, "Nitro Drop": 5, "Reverse Steering": 4,
             "Red Potion": 3, "Mirror Mode": 3,
             "Warpball Ambush": 3,
-            "Demo Camera": 3,
+            "Demo Camera": 3, "Clocked Out": 3,
         }
-        expected = {name: weight / 73
+        expected = {name: weight / 76
                     for name, weight in expected_weights.items()}
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
