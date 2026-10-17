@@ -54,6 +54,27 @@ def tracker_for(wire, seed):
     return tracker
 
 
+def assert_tracker_resolves_every_address(case, tracker):
+    """UT finds the location of each received item by id: the world's
+    `location_id_to_name`, then `get_location(name)`. A renamed check must
+    still resolve, or UT v0.2.x drops the item from its state. The class maps
+    (the datapackage) keep the generic names."""
+    world = tracker.worlds[1]
+    renamed = 0
+    for location in tracker.get_locations(1):
+        if location.address is None:
+            continue
+        name = world.location_id_to_name[location.address]
+        case.assertIs(tracker.get_location(name, 1), location)
+        case.assertEqual(world.location_name_to_id[location.name], location.address)
+        generic = ctrAPWorld.location_id_to_name[location.address]
+        if generic != location.name:
+            renamed += 1
+            case.assertEqual(world.location_name_to_id[generic], location.address)
+    case.assertGreater(renamed, 0, "the fixture renames at least one check")
+    case.assertEqual(ctrAPWorld.location_id_to_name[35016300], "Custom Track 1: Trophy Race")
+
+
 def reachable(multiworld, names):
     state = CollectionState(multiworld)
     for name in names:
@@ -112,6 +133,7 @@ class TestLegacyPathTitles(unittest.TestCase):
         for cut in (0, len(pool) // 3, 2 * len(pool) // 3, len(pool)):
             with self.subTest(items=cut):
                 self.assertEqual(reachable(tracker, pool[:cut]), reachable(source, pool[:cut]))
+        assert_tracker_resolves_every_address(self, tracker)
 
     def test_tracker_without_title_block_uses_compiled_titles(self):
         _source, wire = self.source(title="Neon Rush")
@@ -320,6 +342,7 @@ class TestContentPlanAddressing(unittest.TestCase):
             tracker.generate_basic()
             names = {loc.address: loc.name for loc in tracker.multiworld.get_locations(1)}
             self.assertEqual(names[35016300], "Baby T Park: Trophy Race")
+            assert_tracker_resolves_every_address(self, tracker.multiworld)
 
     def test_fixture_named_block_is_used_and_needs_no_alias(self):
         with FixtureRegistry():
