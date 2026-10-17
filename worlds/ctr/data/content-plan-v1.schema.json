@@ -79,15 +79,19 @@
           "podium_rungs_v1",
           "wumpa_checks_v1",
           "lettersanity_v1",
-          "relic_perfect_v1"
+          "relic_perfect_v1",
+          "item_packs_v1"
         ]
       },
-      "maxItems": 10,
+      "maxItems": 11,
       "minItems": 1,
       "uniqueItems": true
     },
     "track_checks": {
       "$ref": "#/$defs/TrackChecks"
+    },
+    "item_packs": {
+      "$ref": "#/$defs/ItemPacks"
     }
   },
   "required": [
@@ -1463,6 +1467,25 @@
           "maximum": 3
         },
         "relic_perfect": {
+          "const": true
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ItemPacks": {
+      "description": "Pool-only packs (#133 PR 4a), present only when one is on: progressive_starting_wumpa copies of Progressive Starting Wumpa, one Turbo Grant, one Tizi Helper. Each takes an item ledger row and no location; content_plan.validate checks the rows and the key order.",
+      "type": "object",
+      "properties": {
+        "progressive_starting_wumpa": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "turbo_grant": {
+          "const": true
+        },
+        "tizi_helper": {
           "const": true
         }
       },
