@@ -126,13 +126,21 @@ jobs:
           # up as locations the server reached and the tracker did not.
           # Custom tracks stay out of this arm (ruling of 2026-10-13): the meta
           # file pins `custom_tracks: {}`. Their Universal Tracker behaviour is
-          # covered by worlds/ctr/test/test_ut_room_names.py instead.
+          # covered by worlds/ctr/test/test_ut_room_names.py and the
+          # content-plan-ut arm below instead.
           - {check_name: check-ut,                    check_runs: 500,  check_hook: 'worlds.tracker.fuzzer_hook:Hook',                           check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
           # Forced content plan (#133 PR 2): the default options never build
           # one, so this arm pins an explicit content_pool with two custom
           # tracks (one named block, one generic B+ slot) from
           # .github/fuzz/content-plan-meta.yaml and randomizes the rest.
           - {check_name: content-plan,                check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan'}
+          # Universal Tracker on the forced content plan (#133). The meta has a
+          # generic-slot (B+) track, whose checks the tracker shows under their
+          # room title. The upstream hook compares checks by name, so this arm
+          # runs .github/fuzz/ctr_ut_hook.py, which runs that hook and compares
+          # by location id instead. It uses the content-plan meta and its
+          # ignored-share cap, and the same pinned tracker as check-ut.
+          - {check_name: content-plan-ut,             check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -181,6 +189,10 @@ jobs:
           # the hook inspects fails. A developer's own Archipelago install has
           # one already, which is why the local fuzz matrix never saw this.
           mkdir -p archipelago/Players
+      - name: Stage the CTR tracker hook (compares by location id)
+        if: matrix.check_hook == 'hooks.ctr_ut_hook:Hook'
+        shell: bash
+        run: cp world-src/.github/fuzz/ctr_ut_hook.py archipelago/hooks/ctr_ut_hook.py
       - uses: actions/download-artifact@v4
         with:
           name: ctr.apworld
