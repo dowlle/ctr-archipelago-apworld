@@ -13,9 +13,15 @@
 # Grant, Tizi Helper, an explicit DeathLink send list and the warp-pad display
 # settings (PR 4a) are left to the fuzzer, and so are Character Unlocks,
 # Remove Playable Oxide, Racer-Locked Warp Pads, Starting Stat Class, Penta
-# Penguin Stats and Editable Stats (PR 4b). The options pinned below are the
-# ones the content-plan profile still refuses; everything else is randomized
-# by the fuzzer as in the other arms.
+# Penguin Stats and Editable Stats (PR 4b), and Progressive Boost with Blue
+# Fire, Progressive Stats, Logic Difficulty and Shortcut Knowledge (PR 4c).
+# Baby T Park states its measured super turbo pads (true, six trigger quads)
+# and the fixture loop states none, so both custom-track boost rules reach
+# the fill. Progressive Stats is drawn off or shared only: its 192 per-racer
+# copies do not fit this profile's checks, so per_character would only be
+# refused by the item ledger. The options pinned below are the ones the
+# content-plan profile still refuses; everything else is randomized by the
+# fuzzer as in the other arms.
 Crash Team Racing:
   accessibility: full
   content_pool:
@@ -32,7 +38,7 @@ Crash Team Racing:
           display_name: Baby T Park
           author: Lockheart
           laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true}
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true}
           files:
             - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
             - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
@@ -44,7 +50,7 @@ Crash Team Racing:
           display_name: Fuzz Fixture Loop
           author: Fixture Author
           laps: 3
-          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false}
+          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: false}
           relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
           files:
             - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
@@ -67,8 +73,8 @@ Crash Team Racing:
   gems_required_goal: {1: 1, 3: 1, 5: 2}
   custom_tracks: {}
   cortex_vortex_track: false
-  progressive_boost: "off"
-  progressive_stats: "off"
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_stats: {"off": 1, shared_global: 1}
   itemsanity: false
   lettersanity: {"off": 1, locations_only: 1, locations_and_items: 2, items_only: 2}
   letters_per_track: {1: 1, 2: 1, 3: 1}

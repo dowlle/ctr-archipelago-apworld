@@ -81,10 +81,11 @@
           "lettersanity_v1",
           "relic_perfect_v1",
           "item_packs_v1",
-          "character_unlocks_v1"
+          "character_unlocks_v1",
+          "capability_packs_v1"
         ]
       },
-      "maxItems": 12,
+      "maxItems": 13,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -96,6 +97,9 @@
     },
     "racers": {
       "$ref": "#/$defs/Racers"
+    },
+    "capability": {
+      "$ref": "#/$defs/Capability"
     }
   },
   "required": [
@@ -268,6 +272,10 @@
               "type": "boolean"
             },
             "wumpa": {
+              "type": "boolean"
+            },
+            "super_turbo_pads": {
+              "description": "Optional (#133 PR 4c): the LEV has a trigger quad whose terrain byte carries the super turbo pad step flag. Native measures it and refuses a stated value the bytes disagree with. Absent counts as true in logic.",
               "type": "boolean"
             }
           },
@@ -1321,6 +1329,12 @@
           "maxItems": 132,
           "minItems": 1,
           "uniqueItems": true
+        },
+        "boost": {
+          "description": "Progressive Boost ranks the check needs (#133 PR 4c), present only when the plan's capability record has Progressive Boost on and the rank is above 0. Bound to the pad's racer lock. content_capability.check_boost decides it; content_plan.validate recomputes it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
         }
       },
       "required": [
@@ -1518,6 +1532,43 @@
         "starting_character",
         "remove_playable_oxide",
         "requested_locks"
+      ],
+      "additionalProperties": false
+    },
+    "Capability": {
+      "description": "Capability packs (#133 PR 4c), present only when Progressive Boost or Progressive Stats is on: the two modes (0 off, 1 shared, 2 per racer), Blue Fire (only with boost), Logic Difficulty (0 easy, 1 medium, 2 hard) and Shortcut Knowledge (0 easy, 1 medium, 2 hard). The item ledger pools the chains; checks carry their boost rank.",
+      "type": "object",
+      "properties": {
+        "boost_mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "boost_blue_fire": {
+          "type": "boolean"
+        },
+        "stats_mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "logic_difficulty": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "shortcut_knowledge": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "boost_mode",
+        "boost_blue_fire",
+        "stats_mode",
+        "logic_difficulty",
+        "shortcut_knowledge"
       ],
       "additionalProperties": false
     }
