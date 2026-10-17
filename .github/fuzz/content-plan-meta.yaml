@@ -9,9 +9,11 @@
 # rungs, Reach 10 Wumpa and Lettersanity are drawn per seed with weights that
 # turn each family on in most seeds. Cortex Vortex is selected as a track (the
 # 21 candidate tracks all fit the 27 pads, so it is in every plan) and Relic
-# Race Perfect checks are on in most seeds. The options pinned below are the ones the
-# content-plan profile still refuses; everything else is randomized by the
-# fuzzer as in the other arms.
+# Race Perfect checks are on in most seeds. Progressive Starting Wumpa, Turbo
+# Grant, Tizi Helper, an explicit DeathLink send list and the warp-pad display
+# settings (PR 4a) are left to the fuzzer. The options pinned below are the
+# ones the content-plan profile still refuses; everything else is randomized
+# by the fuzzer as in the other arms.
 Crash Team Racing:
   accessibility: full
   content_pool:
@@ -72,16 +74,12 @@ Crash Team Racing:
   letters_per_track: {1: 1, 2: 1, 3: 1}
   box_locations: false
   hit_character: false
-  progressive_starting_wumpa: 0
   podium_placement_checks: {true: 3, false: 1}
   podium_held_rungs: {true: 1, false: 1}
   podium_held_fifth_rung: {true: 1, false: 1}
   podium_finish_rungs: {true: 1, false: 1}
   podium_any_position_rung: {true: 1, false: 1}
   wumpa_check: {"off": 1, global: 1, per_track: 2}
-  turbo_grant: false
-  tizi_helper: false
   relic_perfect_checks: {true: 3, false: 1}
   boss_track_shuffle: false
-  death_link_send: [follow_death_link]
   warp_pad_rules: {}

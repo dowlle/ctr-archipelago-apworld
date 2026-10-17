@@ -16,12 +16,14 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
+from .Options import DL_SEND_BITS
+
 from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
                sphere0_guard, traps, warp_pad_rules, wumpa_family)
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import arena_content, custom_packages
+from . import arena_content, custom_packages, tizi_helper, turbo_grant
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -96,6 +98,25 @@ RETAIL = {row["level_id"]: name.removesuffix(" Warp Pad") for name, row in PADS.
           if row["kind"] in ("race", "trial")}
 ITEM_BY_CODE = {code: name for name, code in content_item_pool.ITEMS.items()}
 LOCATION_BY_CODE = {code: name for name, code in CTR_LOCATION_IDS.items()}
+
+
+#: Pool-only packs (#133 PR 4a): items that add no location and no rule, so
+#: the plan only sizes them in the item ledger. The plan's optional
+#: `item_packs` record carries the seed's settings; it is
+#: absent when all three are off, so such a plan keeps its earlier wire.
+#: (setting, item name).
+PACK_FEATURE = "item_packs_v1"
+PACK_ITEMS = (("progressive_starting_wumpa", "Progressive Starting Wumpa"),
+              ("turbo_grant", turbo_grant.TURBO_GRANT_ITEM),
+              ("tizi_helper", tizi_helper.TIZI_HELPER_ITEM))
+#: Highest Progressive Starting Wumpa count (Options.ProgressiveStartingWumpa).
+STARTING_WUMPA_MAX = 10
+#: Envelope keys a content plan carries only when the option is not at the
+#: content plan's earlier fixed behaviour (#133 PR 4a): an explicit DeathLink
+#: send list, and the two warp-pad display settings. Native reads each one;
+#: absent keys mean the legacy send coupling, the one-pile glow and AP item
+#: type colours on, as before.
+ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors")
 
 
 def error(message):
@@ -233,7 +254,7 @@ def manual_requirements(manual, rows):
     return out
 
 
-def required_features(requirements, entries=(), checks=(), settings=None):
+def required_features(requirements, entries=(), checks=(), settings=None, packs=None):
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -244,7 +265,8 @@ def required_features(requirements, entries=(), checks=(), settings=None):
             + ([PODIUM_FEATURE] if "podium_rungs" in settings else [])
             + ([WUMPA_FEATURE] if "wumpa" in settings else [])
             + ([LETTER_FEATURE] if "lettersanity" in settings else [])
-            + ([PERFECT_FEATURE] if "relic_perfect" in settings else []))
+            + ([PERFECT_FEATURE] if "relic_perfect" in settings else [])
+            + ([PACK_FEATURE] if packs else []))
 
 
 def family_settings(options):
@@ -293,6 +315,65 @@ def check_settings(settings):
             "letters_per_track" in settings and (type(count) is not int or count not in (1, 2, 3))):
         error("track_checks.letters_per_track (1 to 3) belongs to Lettersanity modes 1 and 2 only.")
     return settings
+
+
+def pack_settings(options):
+    """The plan's `item_packs` record from the seed's options; {} when
+    Progressive Starting Wumpa, Turbo Grant and Tizi Helper are all off
+    (#133 PR 4a). The counts are the legacy item creator's: the slider's
+    value, and one copy of each grant."""
+    out = {}
+    if options.progressive_starting_wumpa.value:
+        out["progressive_starting_wumpa"] = int(options.progressive_starting_wumpa.value)
+    if options.turbo_grant.value:
+        out["turbo_grant"] = True
+    if options.tizi_helper.value:
+        out["tizi_helper"] = True
+    return out
+
+
+def check_pack_settings(packs):
+    """Shape and values of a plan's `item_packs` record. Key order is not a
+    rule: JSON objects carry none, and native reads them sorted."""
+    if not isinstance(packs, dict) or not packs or set(packs) - {key for key, _item in PACK_ITEMS}:
+        error("item_packs must be a nonempty mapping of progressive_starting_wumpa, turbo_grant and "
+              "tizi_helper.")
+    count = packs.get("progressive_starting_wumpa", 1)
+    if type(count) is not int or not 1 <= count <= STARTING_WUMPA_MAX:
+        error(f"item_packs.progressive_starting_wumpa must be 1 to {STARTING_WUMPA_MAX} when present.")
+    if any(packs[key] is not True for key in ("turbo_grant", "tizi_helper") if key in packs):
+        error("item_packs.turbo_grant and item_packs.tizi_helper must be true when present.")
+    return packs
+
+
+def pack_counts(packs):
+    """{item name: copies} the ledger pools for an `item_packs` record."""
+    return {item: (packs[key] if key == "progressive_starting_wumpa" else 1)
+            for key, item in PACK_ITEMS if key in packs}
+
+
+def envelope_options(options):
+    """The optional content-plan `ctr_options` keys this seed sets (#133 PR
+    4a), see ENVELOPE_OPTIONAL. Values use the normal seed's encoding."""
+    out = {}
+    if set(options.death_link_send.value) != {"follow_death_link"}:
+        out["death_link_send"] = options.death_link_send.send_mask(options.death_link.value)
+    if options.warp_pad_item_display.value:
+        out["warp_pad_item_display"] = int(options.warp_pad_item_display.value)
+    if not options.ap_item_type_colors.value:
+        out["ap_item_type_colors"] = False
+    return out
+
+
+def check_envelope_options(co):
+    """Types and bounds of the optional envelope keys, as native reads them."""
+    if "death_link_send" in co and (type(co["death_link_send"]) is not int or not 0 <= co["death_link_send"] <= 7):
+        error("ctr_options.death_link_send must be a send bitmask 0 to 7.")
+    if "warp_pad_item_display" in co and (type(co["warp_pad_item_display"]) is not int
+                                          or co["warp_pad_item_display"] not in (0, 1)):
+        error("ctr_options.warp_pad_item_display must be 0 or 1.")
+    if "ap_item_type_colors" in co and type(co["ap_item_type_colors"]) is not bool:
+        error("ctr_options.ap_item_type_colors must be true or false.")
 
 
 def supported_modes(origin, package=None):
@@ -606,17 +687,16 @@ def generate(world):
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
     pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
-               "itemsanity", "box_locations", "hit_character", "progressive_starting_wumpa",
-               "turbo_grant", "tizi_helper", "boss_track_shuffle")
+               "itemsanity", "box_locations", "hit_character", "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
-    # The content-plan wire carries death_link only, so native applies the
-    # legacy send coupling. An explicit send list would be dropped silently.
-    if set(o.death_link_send.value) != {"follow_death_link"}:
-        error("an explicit death_link_send list has no content-plan route yet; leave it unset.")
     if o.custom_tracks.value or o.cortex_vortex_track.value:
         error("legacy custom_tracks/cortex_vortex_track cannot be mixed with content_pool.")
+    # An explicit death_link_send list rides the envelope (#133 PR 4a). No
+    # one-way DeathLink (ruling 2026-09-30): the normal seed's resolution, no draw.
+    from . import forced_options
+    forced_options.resolve_death_link_off_when_send_conditions_set(world)
     if o.plando_items.value or o.item_links.value:
         error("plando and item-link accounting are not validated for this experimental profile yet.")
     retail = tracks.get("retail", "all")
@@ -763,11 +843,15 @@ def generate(world):
     if settings.get("wumpa") == "global" and any(
             wumpa_modes(t, package_by_id.get(t.get("package_id"))) for t in chosen if "arena_id" not in t):
         check_count += 1
+    # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
+    # use slots that would otherwise be filler, as on the legacy path.
+    packs = pack_settings(o)
+    selected = {name: 1 for name in letter_packs}
+    selected.update(pack_counts(packs))
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
-        **(dict(selected_packs={name: 1 for name in letter_packs}, pack_codes=letter_packs)
-           if letter_packs else {}))
+        **(dict(selected_packs=selected, pack_codes=letter_packs) if selected else {}))
     # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
     # the whole seed; or one per pad. Only entries with two or more modes take a
     # draw, so a Trophy-only plan draws nothing here.
@@ -847,9 +931,11 @@ def generate(world):
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
                 tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=required_features(requirements,entries,checks,settings))
+                required_features=required_features(requirements,entries,checks,settings,packs))
     if settings:
         plan["track_checks"] = settings
+    if packs:
+        plan["item_packs"] = packs
     validate(plan)
     world.ctr_content_plan = plan
     # Actual native 0.6.7 protocol/handshake validation is a release gate. This
@@ -996,12 +1082,17 @@ def wire(world):
             'include_arcade_arenas':any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
             'crystalsanity':any(c['kind']=='crystal_pickup' for c in plan['checks'])}
            if any(e['kind']=='crystal' for e in plan['entries']) else {})
+    # #133 PR 4a: the optional envelope keys (ENVELOPE_OPTIONAL) and the
+    # trap_identities block every schema-18 seed carries, so a content-plan
+    # room names its trap effects the same way a normal room does.
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
                                  goal=-1, goal_oxide=3, goal_bosses=0, goal_gems=o.gems_required_goal.value,
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character], character_unlocks=False,
                                  progressive_boost=0, progressive_stats=0, hit_character=False,
-                                 death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra))
+                                 death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
+                                 **envelope_options(o)),
+                trap_identities=traps.trap_identities_block(world.item_name_to_id))
 
 
 def validate(plan):
@@ -1036,7 +1127,8 @@ def validate(plan):
     require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later}
             == expected_requirements, "unsupported or changed physical hub requirements")
     settings = check_settings(plan["track_checks"]) if "track_checks" in plan else {}
-    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings),
+    packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
+    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1153,10 +1245,14 @@ def validate(plan):
     rows = {row["item"]: row for row in item_plan["rows"]}
     # Lettersanity modes 2 and 3 pool one copy of each letter item they use.
     letter_items = plan_letter_items(plan)
+    # Pool-only packs (#133 PR 4a): one row per pack item, its count from item_packs.
+    pack_rows = {content_item_pool.ITEMS[name]: count for name, count in pack_counts(packs).items()}
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
-            | set(letter_items), "item family registry mismatch")
+            | set(letter_items) | set(pack_rows), "item family registry mismatch")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
+    require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
+            "a pack item row disagrees with item_packs")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")
@@ -1227,6 +1323,7 @@ def restore(world, slot_data):
     starting = co.get("starting_character")
     if type(starting) is not int or not 0 <= starting < 16:
         error("invalid starting racer")
+    check_envelope_options(co)
     names = {**ITEM_BY_CODE, **plan_letter_items(plan)}
     rows = tuple(content_item_pool.ItemRow(name=names[r["item"]], **r) for r in plan["items"]["rows"])
     world.ctr_content_items = content_item_pool.ItemPlan(rows, **{k: v for k, v in plan["items"].items() if k != "rows"})
@@ -1241,6 +1338,11 @@ def restore(world, slot_data):
     world.options.include_battle_arenas.value=int(any(e['kind']=='crystal' for e in plan['entries']))
     world.options.include_arcade_arenas.value=int(any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']))
     world.options.death_link.value = co.get("death_link", 0)
+    # An explicit send list (#133 PR 4a) is the bits of the mask; an absent key
+    # is the default, which follows death_link.
+    if "death_link_send" in co:
+        world.options.death_link_send.value = {key for key, bit in DL_SEND_BITS.items()
+                                               if co["death_link_send"] & bit}
     world.options.deathlink_amnesty.value = co.get("deathlink_amnesty", 1)
     # Optional legacy classifiers must not read the tracking player's unrelated YAML.
     world.options.character_unlocks.value = 0
@@ -1260,3 +1362,11 @@ def restore(world, slot_data):
     if "letters_per_track" in settings:
         world.options.letters_per_track.value = settings["letters_per_track"]
     world.options.relic_perfect_checks.value = int(settings.get("relic_perfect", False))
+    # Pool-only packs (#133 PR 4a): the ledger rows above are the items; the
+    # options follow them for code that reads options.
+    packs = plan.get("item_packs", {})
+    world.options.progressive_starting_wumpa.value = packs.get("progressive_starting_wumpa", 0)
+    world.options.turbo_grant.value = int("turbo_grant" in packs)
+    world.options.tizi_helper.value = int("tizi_helper" in packs)
+    world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
+    world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
