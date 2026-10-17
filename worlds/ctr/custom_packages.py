@@ -20,7 +20,10 @@ Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`)
     author        1 to 128 UTF-8 bytes, no control characters
     laps          authored race laps, 1 to 7
     capabilities  measured flags, each true or false: time_trial, arcade, relic,
-                  ctr_tokens, wumpa
+                  ctr_tokens, wumpa; optional super_turbo_pads (#133 PR 4c),
+                  whether the LEV has any super turbo pad trigger quad. Native
+                  measures it and refuses a stated value the bytes disagree
+                  with; an absent value counts as true in logic.
     relic_targets optional; required exactly when relic is true. Sapphire, gold
                   and platinum times in ticks (960 per second), strictly faster
                   from sapphire to platinum, at most one hour
@@ -36,6 +39,12 @@ import copy
 import re
 
 CAPABILITIES = ("time_trial", "arcade", "relic", "ctr_tokens", "wumpa")
+#: Optional measured flags (#133 PR 4c). `super_turbo_pads`: the LEV has at
+#: least one trigger quad whose terrain byte carries the super turbo pad step
+#: flag (native COLL_STEP_TRIGGER_SUPER_TURBO_PAD). Such a track takes the Hot
+#: Air Skyway finish rule (ruling 2026-10-17); an absent flag is treated as
+#: true, the safe direction (content_capability.finish_boost).
+OPTIONAL_CAPABILITIES = ("super_turbo_pads",)
 RELIC_TIERS = ("sapphire", "gold", "platinum")
 REQUIRED = ("id", "content_id", "uuid", "revision", "display_name", "author", "laps",
             "capabilities", "files", "evidence")
@@ -129,15 +138,16 @@ def admit(descriptor, where="package"):
     _label(d["author"], where + ".author")
     laps = _integer(d["laps"], 1, MAX_LAPS, where + ".laps")
     caps = d["capabilities"]
-    _closed(caps, CAPABILITIES, (), where + ".capabilities")
-    for name in CAPABILITIES:
+    _closed(caps, CAPABILITIES, OPTIONAL_CAPABILITIES, where + ".capabilities")
+    for name in CAPABILITIES + tuple(n for n in OPTIONAL_CAPABILITIES if n in caps):
         if type(caps[name]) is not bool:
             _fail(f"{where}.capabilities.{name}", "must be true or false")
     if caps["relic"] != ("relic_targets" in d):
         _fail(where, "relic_targets is required exactly when capabilities.relic is true")
     out = dict(id=expected_id, content_id=key, uuid=d["uuid"], revision=revision,
                display_name=d["display_name"], author=d["author"], laps=laps,
-               capabilities={name: caps[name] for name in CAPABILITIES})
+               capabilities={name: caps[name] for name in CAPABILITIES + OPTIONAL_CAPABILITIES
+                             if name in caps})
     if "relic_targets" in d:
         targets = d["relic_targets"]
         _closed(targets, RELIC_TIERS, (), where + ".relic_targets")

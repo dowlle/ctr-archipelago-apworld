@@ -25,7 +25,7 @@ Crash Team Racing:
           display_name: Baby T Park
           author: Lockheart
           laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true}
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true}
           files:
             - role: lev
               sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
