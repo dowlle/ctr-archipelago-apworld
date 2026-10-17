@@ -1,10 +1,12 @@
-# Content-plan fuzz arm (#133 PR 2, modes from PR 3), used by
-# .github/workflows/ctr-world.yml. Every seed builds an explicit content plan
-# with two custom tracks: Baby T Park 1.0.2 on its named block (Trophy and CTR
-# Challenge), and a made-up track key with no block (path B+, Trophy and Relic
-# Race, test data, its pins name no real files). All three modes are selected,
-# with two stages and a mode order drawn per pad, so second-stage gates and
-# every mode reach the fill. The options pinned below are the ones the
+# Content-plan fuzz arm (#133 PR 2, modes from PR 3, per-track checks from PR
+# 3b), used by .github/workflows/ctr-world.yml. Every seed builds an explicit
+# content plan with two custom tracks: Baby T Park 1.0.2 on its named block
+# (Trophy and CTR Challenge, measured Wumpa), and a made-up track key with no
+# block (path B+, Trophy and Relic Race, no Wumpa, test data, its pins name no
+# real files). All three modes are selected, with two stages and a mode order
+# drawn per pad, so second-stage gates and every mode reach the fill. Podium
+# rungs, Reach 10 Wumpa and Lettersanity are drawn per seed with weights that
+# turn each family on in most seeds. The options pinned below are the ones the
 # content-plan profile still refuses; everything else is randomized by the
 # fuzzer as in the other arms.
 Crash Team Racing:
@@ -62,12 +64,17 @@ Crash Team Racing:
   progressive_boost: "off"
   progressive_stats: "off"
   itemsanity: false
-  lettersanity: "off"
+  lettersanity: {"off": 1, locations_only: 1, locations_and_items: 2, items_only: 2}
+  letters_per_track: {1: 1, 2: 1, 3: 1}
   box_locations: false
   hit_character: false
   progressive_starting_wumpa: 0
-  podium_placement_checks: false
-  wumpa_check: "off"
+  podium_placement_checks: {true: 3, false: 1}
+  podium_held_rungs: {true: 1, false: 1}
+  podium_held_fifth_rung: {true: 1, false: 1}
+  podium_finish_rungs: {true: 1, false: 1}
+  podium_any_position_rung: {true: 1, false: 1}
+  wumpa_check: {"off": 1, global: 1, per_track: 2}
   turbo_grant: false
   tizi_helper: false
   relic_perfect_checks: false

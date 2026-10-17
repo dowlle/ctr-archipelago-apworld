@@ -106,7 +106,7 @@ class ItemPlan:
 
 
 def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
-            locked_checks=0, trap_percentage=0, selected_packs=None):
+            locked_checks=0, trap_percentage=0, selected_packs=None, pack_codes=None):
     """Resolve B+E-S-Q and capacity, without changing caller options or RNG.
 
     `locked` describes selected copies already placed by their owner. Future
@@ -114,10 +114,14 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
     `selected_packs` supplies exact registered identities from the existing
     capability/racer/weapon/letter controls; it never changes counted families.
     Filler includes traps; trap_count is the portion replaced with traps.
+    `pack_codes` names the codes of pack identities outside data/items.json
+    (the named-block and generic custom letter items, #133 PR 3b).
     """
     base, extra = normalize(raw)
+    codes = dict(ITEMS)
+    codes.update(pack_codes or {})
     for name, count in (selected_packs or {}).items():
-        if name not in ITEMS or name in base:
+        if name not in codes or name in base:
             fail(f"selected pack identity {name!r} is unknown or overlaps a counted family.")
         base[name] = exact_count(count, f"selected pack {name}")
         extra[name] = 0
@@ -139,7 +143,7 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
     if sum((locked or {}).values()) > locked_checks:
         fail("locked selected copies exceed realized locked checks.")
     rows = []
-    for name in sorted(base, key=ITEMS.__getitem__):
+    for name in sorted(base, key=codes.__getitem__):
         b, e = base[name], extra[name]
         s, a, q = (starts or {}).get(name, 0), (additional or {}).get(name, 0), (locked or {}).get(name, 0)
         remaining = b + e - s - q
@@ -148,7 +152,7 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
                  f"and {q} locked selected copies. Your settings were not changed.")
         if b + e + a > MAX_COUNT:
             fail(f"{name}: total receipt count exceeds {MAX_COUNT}.")
-        rows.append(ItemRow(name, ITEMS[name], b, e, s, a, q, remaining, b + e + a, b))
+        rows.append(ItemRow(name, codes[name], b, e, s, a, q, remaining, b + e + a, b))
     demand = sum(row.remaining for row in rows)
     free = coded_checks - locked_checks
     if demand > free:
