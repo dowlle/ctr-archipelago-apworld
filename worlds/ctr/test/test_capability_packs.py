@@ -194,6 +194,35 @@ class TestRanks(unittest.TestCase):
         self.assertEqual(self.need(track, "perfect", "perfect", none, logic_difficulty=2), 2)
         self.assertEqual(self.need(track, "podium", "held_1st", pads, logic_difficulty=2), 0)
 
+    def test_per_track_rulings(self):
+        # the project's per-track rulings (2026-10-18), by content id, decide before
+        # the measured flag, whatever the package states.
+        self.assertEqual(content_capability.USF_FINISH_RULINGS, {
+            "arabian-heights-night": True, "cortex-vortex": True,
+            "tv-world": False, "north-pole": False, "baby-t-park": False})
+        track = dict(origin="custom", display_name="Loop")
+        for key, stated, want in (("arabian-heights-night", False, 2), ("cortex-vortex", None, 2),
+                                  ("tv-world", True, 0), ("north-pole", True, 0), ("baby-t-park", True, 0)):
+            caps = {} if stated is None else dict(super_turbo_pads=stated)
+            package = dict(content_id=key, capabilities=caps)
+            with self.subTest(key=key):
+                self.assertEqual(content_capability.finish_boost(track, RECORD, package), want)
+                self.assertEqual(self.need(track, "relic", "sapphire", package, logic_difficulty=2), want)
+        # The bundled Cortex Vortex track keeps its confirmed USF finish.
+        cortex = dict(origin="cortex_vortex", display_name="Cortex Vortex")
+        self.assertEqual(self.need(cortex, "trophy", "win", logic_difficulty=2), 2)
+        # A track with no ruling keeps the measured default: super pads
+        # stated or unstated need USF, none stated take the generic terms.
+        for caps, want in (({"super_turbo_pads": True}, 2), ({}, 2), ({"super_turbo_pads": False}, 0)):
+            package = dict(content_id="arabian-heights-night-bplus", capabilities=caps)
+            self.assertEqual(content_capability.finish_boost(track, RECORD, package), want)
+
+    def test_rulings_file_shape_is_enforced(self):
+        import json as _json
+        raw = _json.loads(open(content_capability.__file__.replace("content_capability.py",
+                                                                    "data/usf_finish_rulings.json")).read())
+        self.assertTrue(all("2026-10-18" in row["ruling"] for row in raw["rulings"]))
+
     def test_boost_off_means_no_rank(self):
         self.assertEqual(self.need(retail("Hot Air Skyway"), "trophy", boost_mode=0, stats_mode=1), 0)
 
@@ -249,6 +278,46 @@ class TestPlanRanks(unittest.TestCase):
             if item.name == f"Progressive Boost ({racer})":
                 state.collect(item, True)
         self.assertTrue(location.can_reach(state))
+
+
+class TestEarlyBoost(unittest.TestCase):
+    """Ruling 2026-10-18: with boost on and a narrow start (fewer than
+    sphere0_guard.BOOST_NARROW_START_CHECKS checks reachable without boost),
+    the starting racer's first Progressive Boost is a local early item."""
+
+    def worlds(self, **extra):
+        from .. import sphere0_guard
+        out = []
+        for seed in range(40):
+            try:
+                world = make_world(cap_options(**extra), seed=seed)
+            except OptionError:
+                continue
+            out.append((world, sphere0_guard.sphere0_breadth(world)))
+        return out
+
+    def test_narrow_boost_starts_mark_the_starting_racers_boost(self):
+        from .. import sphere0_guard
+        seen = {True: 0, False: 0}
+        for boost in ("shared_global", "per_character"):
+            for world, breadth in self.worlds(boost=boost, character_unlocks=True, racer_locked_pads=21):
+                early = world.multiworld.local_early_items.get(1, {})
+                name = sphere0_guard.starting_boost_item(world)
+                narrow = breadth < sphere0_guard.BOOST_NARROW_START_CHECKS
+                seen[narrow] += 1
+                with self.subTest(boost=boost, breadth=breadth):
+                    self.assertEqual(early.get(name, 0), 1 if narrow else 0)
+                    self.assertEqual(getattr(world, "_ctr_early_boost", None), name if narrow else None)
+                    self.assertFalse(world.multiworld.precollected_items[1])
+                    if boost == "per_character":
+                        self.assertEqual(name, f"Progressive Boost ({world.ctr_starting_character})")
+        self.assertTrue(seen[True] and seen[False], seen)
+
+    def test_boost_off_never_marks_a_boost(self):
+        for world, _ in self.worlds(boost="off", stats="shared_global"):
+            self.assertIsNone(getattr(world, "_ctr_early_boost", None))
+            self.assertFalse(any(n.startswith("Progressive Boost")
+                                 for n in world.multiworld.local_early_items.get(1, {})))
 
 
 class TestForgedPlans(unittest.TestCase):

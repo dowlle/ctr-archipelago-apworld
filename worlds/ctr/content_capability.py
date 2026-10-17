@@ -20,8 +20,12 @@ term does carry over, because every one of those checks crosses the line.
   * finish term F: two ranks (USF) on the confirmed finish tracks (Hot Air
     Skyway, Cortex Castle, Cortex Vortex; Oxide Station unless Shortcut
     Knowledge is hard), and on a custom track whose LEV has a super turbo pad
-    (ruling 2026-10-17). A custom package that does not state
-    `super_turbo_pads` is treated as having one, the safe direction;
+    (ruling 2026-10-17). the project's per-track rulings in
+    `data/usf_finish_rulings.json` (2026-10-18) decide first, by content id:
+    Arabian Heights Night and Cortex Vortex need USF; TV World, North Pole and
+    Baby T Park take the generic terms only. A custom package that is not
+    ruled and does not state `super_turbo_pads` is treated as having one, the
+    safe direction;
   * Trophy Race: F, and on easy and medium the first rank on every
     difficulty-gated track (all retail tracks outside the finish set, and every
     custom track, `CUSTOM_TRACK_SLOTS_RULED`);
@@ -45,6 +49,8 @@ The rank binds the pad's racer lock when it has one (the legacy
 Progressive Stats adds no term: no content-plan location reads a stat chain
 until Item Box Locations come (#133 PR 4e).
 """
+import json
+import pkgutil
 from types import SimpleNamespace
 
 from Options import OptionError
@@ -64,6 +70,27 @@ LETTER_BOOST = {("Papu's Pyramid", "letter_c"): FIRST_BOOST_COUNT,
                 ("Oxide Station", "letter_t"): USF_BOOST_COUNT,
                 ("Oxide Station", "letter_r"): USF_BOOST_COUNT}
 OXIDE = "Oxide Station"
+
+
+def _load_rulings():
+    """{content id: needs USF to finish} from the project's per-track rulings on
+    the super turbo pad finish rule (ruling 2026-10-18: "they require USF
+    UNLESS I say otherwise"). Project-owned data, never a descriptor field;
+    every entry cites its ruling. A track not listed keeps the measured
+    default (`super_turbo_pads`)."""
+    raw = json.loads(pkgutil.get_data(__package__, "data/usf_finish_rulings.json"))
+    out = {}
+    for row in raw["rulings"]:
+        if (set(row) != {"content_id", "usf_finish", "ruling"} or type(row["usf_finish"]) is not bool
+                or not row["content_id"] or "2026-" not in row["ruling"] or row["content_id"] in out):
+            raise ValueError("usf_finish_rulings.json: each entry needs content_id, a Boolean usf_finish "
+                             "and a dated ruling, once per track")
+        out[row["content_id"]] = row["usf_finish"]
+    return out
+
+
+#: the project's per-track rulings: {content id: needs USF to finish}.
+USF_FINISH_RULINGS = _load_rulings()
 
 
 def error(message):
@@ -125,7 +152,11 @@ def finish_boost(track, record, package=None):
     """F: the ranks crossing this track's finish line needs."""
     name = _name(track)
     if name is None:
-        stated = (package or {}).get("capabilities", {}).get("super_turbo_pads", True)
+        package = package or {}
+        ruled = USF_FINISH_RULINGS.get(package.get("content_id"))
+        if ruled is not None:
+            return USF_BOOST_COUNT if ruled else 0
+        stated = package.get("capabilities", {}).get("super_turbo_pads", True)
         return USF_BOOST_COUNT if stated else 0
     if name in capability_contract.unconditional_usf_finish_tracks():
         return USF_BOOST_COUNT
