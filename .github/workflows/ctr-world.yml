@@ -124,11 +124,16 @@ jobs:
           # logic, so it needs the tracker world installed and its own hook. It
           # also forces accessibility: full, because a tracker divergence shows
           # up as locations the server reached and the tracker did not.
-          # Custom tracks stay out of this arm (ruling of 2026-10-13): the meta
-          # file pins `custom_tracks: {}`. Their Universal Tracker behaviour is
-          # covered by worlds/ctr/test/test_ut_room_names.py and the
-          # content-plan-ut arm below instead.
-          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'worlds.tracker.fuzzer_hook:Hook',                           check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
+          # Both tracker arms run .github/fuzz/ctr_ut_hook.py, which runs the
+          # tracker's own hook and compares checks by location id, because the
+          # tracker shows generic-slot custom-track checks under their room
+          # title (#306 B+). check-ut keeps the plain world (`custom_tracks: {}`);
+          # check-ut-custom-tracks replaces the Purple Gem Cup with the legacy
+          # `custom_tracks` Baby T Park entry on every seed, from
+          # .github/fuzz/check-ut-custom-tracks-meta.yaml (ruling of 2026-10-18,
+          # superseding the 2026-10-13 exclusion).
+          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
+          - {check_name: check-ut-custom-tracks,      check_runs: 1000, check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'check-ut-custom-tracks'}
           # Forced content plan (#133 PR 2): the default options never build
           # one, so this arm pins an explicit content_pool with two custom
           # tracks (one named block, one generic B+ slot) from
@@ -147,8 +152,8 @@ jobs:
         with:
           repository: dowlle/Archipelago-index
           path: index-repo
-      - name: Checkout the content-plan meta file
-        if: matrix.check_meta == 'content-plan'
+      - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
+        if: matrix.check_meta == 'content-plan' || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -227,6 +232,10 @@ jobs:
           if [ "$CHECK_META" = "accessibility-full" ]; then
             printf 'Crash Team Racing:\n  accessibility: full\n  custom_tracks: {}\n' > ci_meta.yaml
             cat ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
+          if [ "$CHECK_META" = "check-ut-custom-tracks" ]; then
+            cp ../world-src/.github/fuzz/check-ut-custom-tracks-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
           if [ "$CHECK_META" = "content-plan" ]; then

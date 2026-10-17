@@ -1,0 +1,33 @@
+# Universal Tracker arm with a legacy custom track (check-ut-custom-tracks in
+# .github/workflows/ctr-world.yml). Every seed replaces the Purple Gem Cup with
+# the known Baby T Park package through the legacy `custom_tracks` option, the
+# exact descriptor the apworld ships (custom_tracks.BABY_T_PARK_CURRENT); its
+# pins name the published package files. Everything else is randomized by the
+# fuzzer, as in the check-ut arm. accessibility: full makes a tracker
+# divergence show up as checks the server reached and the tracker did not.
+Crash Team Racing:
+  accessibility: full
+  custom_tracks:
+    baby-t-park:
+      package_uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+      package_version: 1.0.2
+      minimum_client_version: 0.3.0-letters1
+      minimum_apworld_version: 0.3.0-letters1
+      lev_sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+      vrm_sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+      navigation:
+        uuid: 07395277-d2c2-5544-9cde-5ad9976c06fd
+        revision: 1
+      laps: 7
+      replaces: purple_gem_cup
+      flags:
+        crates: true
+        ctr_letters: true
+        relic_crates: true
+        ai_nav: true
+        minimap: false
+        ghosts: false
+        wumpa_collectible: true
+        spawns: 8
+        checkpoints: 35
+      boxes: false
