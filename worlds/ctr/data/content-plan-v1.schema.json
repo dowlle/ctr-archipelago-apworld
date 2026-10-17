@@ -78,10 +78,11 @@
           "track_modes_v1",
           "podium_rungs_v1",
           "wumpa_checks_v1",
-          "lettersanity_v1"
+          "lettersanity_v1",
+          "relic_perfect_v1"
         ]
       },
-      "maxItems": 9,
+      "maxItems": 10,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -1427,7 +1428,7 @@
       "additionalProperties": false
     },
     "TrackChecks": {
-      "description": "Per-track check families (#133 PR 3b), present only when one is on. podium_rungs: the created rung keys in podium SLOT_ORDER; wumpa: Reach 10 Wumpa as one global check or one per track; lettersanity: mode 1 locations, 2 locations and items, 3 items, with letters_per_track for modes 1 and 2. content_plan.validate checks the combinations.",
+      "description": "Per-track check families (#133 PR 3b), present only when one is on. podium_rungs: the created rung keys in podium SLOT_ORDER; wumpa: Reach 10 Wumpa as one global check or one per track; lettersanity: mode 1 locations, 2 locations and items, 3 items, with letters_per_track for modes 1 and 2; relic_perfect: Relic Race Perfect checks on every Relic Race (#133 PR 3c). content_plan.validate checks the combinations.",
       "type": "object",
       "properties": {
         "podium_rungs": {
@@ -1460,6 +1461,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 3
+        },
+        "relic_perfect": {
+          "const": true
         }
       },
       "required": [],

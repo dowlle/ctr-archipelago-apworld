@@ -1,12 +1,15 @@
 # Content-plan fuzz arm (#133 PR 2, modes from PR 3, per-track checks from PR
-# 3b), used by .github/workflows/ctr-world.yml. Every seed builds an explicit
+# 3b, Cortex Vortex and Relic Race Perfect from PR 3c), used by
+# .github/workflows/ctr-world.yml. Every seed builds an explicit
 # content plan with two custom tracks: Baby T Park 1.0.2 on its named block
 # (Trophy and CTR Challenge, measured Wumpa), and a made-up track key with no
 # block (path B+, Trophy and Relic Race, no Wumpa, test data, its pins name no
 # real files). All three modes are selected, with two stages and a mode order
 # drawn per pad, so second-stage gates and every mode reach the fill. Podium
 # rungs, Reach 10 Wumpa and Lettersanity are drawn per seed with weights that
-# turn each family on in most seeds. The options pinned below are the ones the
+# turn each family on in most seeds. Cortex Vortex is selected as a track (the
+# 21 candidate tracks all fit the 27 pads, so it is in every plan) and Relic
+# Race Perfect checks are on in most seeds. The options pinned below are the ones the
 # content-plan profile still refuses; everything else is randomized by the
 # fuzzer as in the other arms.
 Crash Team Racing:
@@ -15,6 +18,7 @@ Crash Team Racing:
     preset: mixed
     tracks:
       retail: all
+      cortex_vortex: true
       modes: [trophy, ctr, relic]
       custom:
         - id: package/baby-t-park/1.0.2
@@ -77,7 +81,7 @@ Crash Team Racing:
   wumpa_check: {"off": 1, global: 1, per_track: 2}
   turbo_grant: false
   tizi_helper: false
-  relic_perfect_checks: false
+  relic_perfect_checks: {true: 3, false: 1}
   boss_track_shuffle: false
   death_link_send: [follow_death_link]
   warp_pad_rules: {}

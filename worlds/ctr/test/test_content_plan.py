@@ -151,8 +151,8 @@ class TestContentPlan(CTRTestBase):
         # Options added on main after the experiment refuse instead of being
         # dropped from the content-plan wire.
         options = profile_options()
-        options["relic_perfect_checks"] = True
-        with self.assertRaisesRegex(OptionError, "relic_perfect_checks"):
+        options["tizi_helper"] = True
+        with self.assertRaisesRegex(OptionError, "tizi_helper"):
             make_world(options)
         for send in ([], ["weapon_hit"]):
             options = profile_options()
