@@ -75,12 +75,18 @@
           "crystal_entries_v1",
           "crystal_pickups_v1",
           "arcade_crystals_v1",
-          "track_modes_v1"
+          "track_modes_v1",
+          "podium_rungs_v1",
+          "wumpa_checks_v1",
+          "lettersanity_v1"
         ]
       },
-      "maxItems": 6,
+      "maxItems": 9,
       "minItems": 1,
       "uniqueItems": true
+    },
+    "track_checks": {
+      "$ref": "#/$defs/TrackChecks"
     }
   },
   "required": [
@@ -1418,6 +1424,45 @@
         "filler_count",
         "trap_count"
       ],
+      "additionalProperties": false
+    },
+    "TrackChecks": {
+      "description": "Per-track check families (#133 PR 3b), present only when one is on. podium_rungs: the created rung keys in podium SLOT_ORDER; wumpa: Reach 10 Wumpa as one global check or one per track; lettersanity: mode 1 locations, 2 locations and items, 3 items, with letters_per_track for modes 1 and 2. content_plan.validate checks the combinations.",
+      "type": "object",
+      "properties": {
+        "podium_rungs": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "held_1st",
+              "held_3rd",
+              "held_5th",
+              "finish_podium",
+              "finish_any"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "wumpa": {
+          "enum": [
+            "global",
+            "per_track"
+          ]
+        },
+        "lettersanity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "letters_per_track": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        }
+      },
+      "required": [],
       "additionalProperties": false
     }
   }

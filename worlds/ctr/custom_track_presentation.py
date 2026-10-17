@@ -62,6 +62,21 @@ def item_aliases(world) -> dict[int, str]:
     hook. Named blocks need none, their item names are already real.
     """
     from .custom_check_namespace import LETTERS, custom_check_code
+    plan = getattr(world, "ctr_content_plan", None)
+    if plan is not None:
+        # Content plans (#133 PR 3b): the generic-slot letter items the plan
+        # pools take their track's room title.
+        from .content_plan import plan_letter_items
+        pooled = plan_letter_items(plan)
+        aliases = {}
+        for track in plan["tracks"]:
+            if track["origin"] != "custom" or "named_block" in track:
+                continue
+            for variant, letter in enumerate(LETTERS):
+                code = custom_check_code("letter_item", track["custom_slot"], variant)
+                if code in pooled:
+                    aliases[code] = f"Letter {letter} ({track.get('room_title', track['display_name'])})"
+        return aliases
     titles = getattr(world, "custom_track_titles", None) or {}
     named = {int(entry["slot"]) for entry in (getattr(world, "custom_tracks", None) or {}).values()
              if entry.get("named_block") is not None}
