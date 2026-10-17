@@ -99,11 +99,22 @@ def apply_ut_room_names(world) -> int:
     and clears the alias map. CTR rules hold Location objects, not names
     (logic_terms.Ref), so they keep working after the rename. Returns the
     number of renamed locations. Never runs in a real generation.
+
+    UT also resolves the location of every received item through the world's
+    `location_id_to_name` and then `get_location(name)`. The class map still
+    gives the generic name, which no longer exists in this world, and UT
+    v0.2.x then drops the item from its state, so an item found on a renamed
+    check went missing from the tracker's logic. This world instance therefore
+    gets its own copies of both maps with the renamed entries. The class maps
+    and the datapackage are unchanged, and the generic names still resolve in
+    `location_name_to_id`.
     """
     if not getattr(world.multiworld, "generation_is_fake", False):
         return 0
     aliases = dict(getattr(world, "location_id_to_alias", {}) or {})
     cache = world.multiworld.regions.location_cache[world.player]
+    id_to_name = dict(world.location_id_to_name)
+    name_to_id = dict(world.location_name_to_id)
     renamed = 0
     for location in list(world.multiworld.get_locations(world.player)):
         title = aliases.get(location.address)
@@ -114,6 +125,11 @@ def apply_ut_room_names(world) -> int:
         cache.pop(location.name, None)
         location.name = title
         region.locations.append(location)
+        id_to_name[location.address] = title
+        name_to_id[title] = location.address
         renamed += 1
     world.location_id_to_alias = {}
+    if renamed:
+        world.location_id_to_name = id_to_name
+        world.location_name_to_id = name_to_id
     return renamed
