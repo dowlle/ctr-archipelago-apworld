@@ -2,7 +2,8 @@
 
 The executable profile builds standalone track entries with their Trophy Race,
 CTR Challenge and Relic Race modes (#133 PR 3), their podium rungs, Reach 10
-Wumpa and C/T/R letter checks (#133 PR 3b), and Crystal Challenge entries.
+Wumpa and C/T/R letter checks (#133 PR 3b), Cortex Vortex as a track and the
+Relic Race Perfect checks (#133 PR 3c, #453), and Crystal Challenge entries.
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -15,8 +16,8 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
-from . import (content_item_pool, characters, destinations, named_tracks, podium, sphere0_guard, traps,
-               warp_pad_rules, wumpa_family)
+from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
+               sphere0_guard, traps, warp_pad_rules, wumpa_family)
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
@@ -66,6 +67,26 @@ WUMPA_SUFFIX = "Reach 10 Wumpa"
 #: route, as on the legacy trial tracks (wumpa_checks.py).
 WUMPA_MODES = ("trophy", "ctr")
 WUMPA_GLOBAL_NAME = "Wumpa: Reach 10 Wumpa"
+#: Relic Race Perfect (#453, #133 PR 3c): breaking every time crate in a Relic
+#: Race. The plan's `track_checks.relic_perfect` says the option is on; every
+#: track entry with a Relic Race then owns one perfect check on that route.
+PERFECT_FEATURE = "relic_perfect_v1"
+PERFECT_SUFFIX = "Relic Race Perfect"
+#: Cortex Vortex as a content-plan track (#133 PR 3c): the bundled Lockheart
+#: pair the legacy pad track and the Oxide 2 venue use (pinned in
+#: cortex_vortex_track), under its own frozen `Cortex Vortex:` names and the
+#: 35026000 block. It is not a `packages` row: `package_id` names the bundled
+#: pair, which native locates and hashes itself, and it takes no custom slot.
+CORTEX_ORIGIN = "cortex_vortex"
+CORTEX_TRACK_ID = "cortex_vortex"
+CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
+CORTEX_LAPS = 3
+
+
+def cortex_track():
+    """The Cortex Vortex track record, without its modes."""
+    return dict(id=CORTEX_TRACK_ID, origin=CORTEX_ORIGIN, package_id=CORTEX_PACKAGE_ID,
+                display_name=destinations.CORTEX_VORTEX, laps=CORTEX_LAPS)
 #: Aggregate manual rule -> the counted item names it sums, in wire order.
 #: Native holds the same three lists; the parity fixtures compare them.
 SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
@@ -222,7 +243,8 @@ def required_features(requirements, entries=(), checks=(), settings=None):
             + ([MODE_FEATURE] if any(e["kind"] == "track" and e["modes"] != ["trophy"] for e in entries) else [])
             + ([PODIUM_FEATURE] if "podium_rungs" in settings else [])
             + ([WUMPA_FEATURE] if "wumpa" in settings else [])
-            + ([LETTER_FEATURE] if "lettersanity" in settings else []))
+            + ([LETTER_FEATURE] if "lettersanity" in settings else [])
+            + ([PERFECT_FEATURE] if "relic_perfect" in settings else []))
 
 
 def family_settings(options):
@@ -232,7 +254,8 @@ def family_settings(options):
     `podium_rungs` lists the created rung keys in podium.SLOT_ORDER (the
     sub-toggles decide them, as on the legacy path); `wumpa` is `global` or
     `per_track`; `lettersanity` is the mode 1 to 3, with `letters_per_track`
-    only for the two location-bearing modes."""
+    only for the two location-bearing modes. `relic_perfect` is true when
+    Relic Race Perfect checks are on (#133 PR 3c)."""
     out = {}
     rungs = podium.created_rung_keys_from_options(options)
     if rungs:
@@ -245,15 +268,19 @@ def family_settings(options):
         out["lettersanity"] = letters
         if letters in (1, 2):
             out["letters_per_track"] = int(options.letters_per_track.value)
+    if options.relic_perfect_checks.value:
+        out["relic_perfect"] = True
     return out
 
 
 def check_settings(settings):
     """Shape and values of a plan's `track_checks` record."""
     if (not isinstance(settings, dict) or not settings
-            or set(settings) - {"podium_rungs", "wumpa", "lettersanity", "letters_per_track"}):
-        error("track_checks must be a nonempty mapping of podium_rungs, wumpa, lettersanity "
-              "and letters_per_track.")
+            or set(settings) - {"podium_rungs", "wumpa", "lettersanity", "letters_per_track", "relic_perfect"}):
+        error("track_checks must be a nonempty mapping of podium_rungs, wumpa, lettersanity, "
+              "letters_per_track and relic_perfect.")
+    if "relic_perfect" in settings and settings["relic_perfect"] is not True:
+        error("track_checks.relic_perfect must be true when present.")
     if "podium_rungs" in settings and tuple(settings["podium_rungs"]) not in RUNG_SETS:
         error("track_checks.podium_rungs is not a rung set the podium options create.")
     if "wumpa" in settings and settings["wumpa"] not in ("global", "per_track"):
@@ -271,13 +298,16 @@ def check_settings(settings):
 def supported_modes(origin, package=None):
     """Modes a track can run, in MODES order (#133 PR 3).
 
-    Retail tracks run all three. A custom package's measured capability flags
+    Retail tracks and Cortex Vortex run all three (Cortex Vortex's bundled
+    pair has AI paths, the three letters and 100 time crates; its relic
+    targets are compiled placeholders, as on the legacy pad track). A custom
+    package's measured capability flags
     decide: Trophy needs an eight-kart grid with AI paths (`arcade`), the CTR
     Challenge also needs the C, T and R letters (`ctr_tokens`), and the Relic
     Race needs time crates with target times (`relic`) on a timed lap graph
     (`time_trial`). Native measures the same flags on the bytes before a
     package is admitted (ap_content_capability.h)."""
-    if origin == "retail":
+    if origin in ("retail", CORTEX_ORIGIN):
         return list(MODES)
     caps = package["capabilities"]
     out = []
@@ -292,8 +322,8 @@ def supported_modes(origin, package=None):
 
 def track_location(track, key, suffix):
     """(location name, code) of one of a track's checks: the named block's
-    offset `key`, else the frozen `<retail track>: <suffix>` or
-    `Custom Track N: <suffix>` name."""
+    offset `key`, else the frozen `<retail track>: <suffix>`,
+    `Cortex Vortex: <suffix>` or `Custom Track N: <suffix>` name."""
     if track["origin"] == "custom" and "named_block" in track:
         code = named_tracks.location_code(track["named_block"], key)
         return LOCATION_BY_CODE[code], code
@@ -322,7 +352,8 @@ def letter_code(track, index):
 
 def letter_item(track, index):
     """(item name, code) of a track's Letter C, T or R item: the named block's
-    item offset, the generic `Letter C (Custom Track N)` family, or the retail
+    item offset, the generic `Letter C (Custom Track N)` family, Cortex
+    Vortex's `Letter C (Cortex Vortex)` items, or the retail
     `Letter C (<track>)` item."""
     if track["origin"] == "custom" and "named_block" in track:
         return (named_tracks.item_name(track["room_title"], LETTER_KEYS[index]),
@@ -330,6 +361,9 @@ def letter_item(track, index):
     if track["origin"] == "custom":
         return (custom_check_name("letter_item", track["custom_slot"], index),
                 custom_check_code("letter_item", track["custom_slot"], index))
+    if track["origin"] == CORTEX_ORIGIN:
+        return (cortex_vortex_track.letter_item_name(LETTERS[index]),
+                cortex_vortex_track.LETTER_ITEM_CODES[index])
     name = f"Letter {LETTERS[index]} ({track['display_name']})"
     return name, content_item_pool.ITEMS[name]
 
@@ -410,7 +444,13 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     Each mode's own checks come first; a Trophy Race adds the seed's podium
     rungs, a CTR Challenge its letter checks (`letters`, Lettersanity modes 1
     and 2). A per-track Reach 10 Wumpa check comes last, with one route per
-    mode that can reach ten fruit (#133 PR 3b)."""
+    mode that can reach ten fruit (#133 PR 3b). With `relic_perfect`, a Relic
+    Race adds its Relic Race Perfect check after the three tiers (#133 PR 3c).
+
+    Logic note: the perfect takes its Relic Race's route and gate only. The
+    USF ruling for perfects (2026-10-13, #453 answer 1) is a Progressive
+    Boost term, and content plans refuse progressive_boost until the pack
+    composition PR, so the starting kart satisfies it here."""
     title = room_title(track)
     settings = settings or {}
 
@@ -429,6 +469,9 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
             for index in letter_layout(track, settings, letters)[0]:
                 out.append(check(letter_code(track, index), "letter", letter_suffix(index),
                                  [("ctr", LETTER_KEYS[index])]))
+        if mode == "relic" and settings.get("relic_perfect"):
+            out.append(check(track_location(track, "relic_perfect", PERFECT_SUFFIX)[1], "perfect",
+                             PERFECT_SUFFIX, [("relic", "perfect")]))
     if settings.get("wumpa") == "per_track":
         reach = wumpa_modes(track, package)
         if reach:
@@ -539,8 +582,9 @@ def generate(world):
         error("the experimental standalone profile currently requires preset: mixed.")
     tracks = closed(raw.get("tracks", {}), ("retail", "custom", "cortex_vortex", "modes", "overrides"), "tracks")
     selected_modes, overrides = track_modes(tracks)
-    if tracks.get("cortex_vortex", False) is not False:
-        error("Cortex Vortex content-plan routes are not implemented yet.")
+    with_cortex = tracks.get("cortex_vortex", False)
+    if type(with_cortex) is not bool:
+        error("tracks.cortex_vortex must be true or false.")
     _zero_count(closed(raw.get("cups", {}), ("count",), "cups").get("count"), "cups.count")
     crystals = closed(raw.get("crystals", {}), ("pool", "count"), "crystals")
     arena_pool, arena_count = crystal_selection(world, crystals)
@@ -563,7 +607,7 @@ def generate(world):
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
     pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
                "itemsanity", "box_locations", "hit_character", "progressive_starting_wumpa",
-               "turbo_grant", "tizi_helper", "relic_perfect_checks", "boss_track_shuffle")
+               "turbo_grant", "tizi_helper", "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
@@ -595,6 +639,10 @@ def generate(world):
     # (track record without its modes, package or None, named-block fields).
     pool = [(dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i], laps=RETAIL_LAPS),
              None, {}) for i in sorted(retail)]
+    # Cortex Vortex is a candidate only when selected, so a plan without it
+    # draws exactly as before (#133 PR 3c).
+    if with_cortex:
+        pool.append((cortex_track(), None, {}))
     for slot, package in enumerate(packages, 1):
         block = destinations.named_track(package["content_id"])
         pool.append((dict(id="custom/" + package["content_id"] + "/" + package["revision"],
@@ -1059,6 +1107,10 @@ def validate(plan):
             require(track["display_name"] == RETAIL[i] and track["laps"] == RETAIL_LAPS and track["id"] == f"retail:{i}",
                     "retail track metadata mismatch")
             name = RETAIL[i] + ": Trophy Race"
+        elif track["origin"] == CORTEX_ORIGIN:
+            # The bundled pair under its own identity; one per plan.
+            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
+                     == cortex_track(), "Cortex Vortex track metadata mismatch")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
@@ -1207,3 +1259,4 @@ def restore(world, slot_data):
     world.options.lettersanity.value = settings.get("lettersanity", 0)
     if "letters_per_track" in settings:
         world.options.letters_per_track.value = settings["letters_per_track"]
+    world.options.relic_perfect_checks.value = int(settings.get("relic_perfect", False))

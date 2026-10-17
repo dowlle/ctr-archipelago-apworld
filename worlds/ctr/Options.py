@@ -1377,7 +1377,9 @@ class ContentPool(OptionDict):
     when it loads them. Trophy needs arcade, CTR needs arcade and ctr_tokens,
     Relic needs relic and time_trial. A track key with a named id block uses that
     block's checks; any other track uses a generic Custom Track slot under its
-    own title. Unsupported selected content fails clearly.
+    own title. `tracks.cortex_vortex: true` adds Cortex Vortex as a track with
+    all three modes, from the Cortex Vortex files bundled with the game.
+    Unsupported selected content fails clearly.
     """
     display_name = "Content Pool (Experimental)"
     default = {}
