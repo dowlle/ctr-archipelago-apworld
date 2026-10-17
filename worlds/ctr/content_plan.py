@@ -727,13 +727,23 @@ def generate(world):
     seed_order = list(MODES)
     if mode_order == "per_seed" and multi:
         world.random.shuffle(seed_order)
+    # With Lettersanity 2 or 3 a CTR Challenge needs letter items, so it is
+    # never a pad's first mode when the pad has another (ruling 2026-10-17):
+    # a CTR-first start would open no check. A fixed or per-seed order moves
+    # it one place back; a per-pad order puts it at a uniformly drawn later
+    # place. Seeds without those Lettersanity modes draw exactly as before.
+    ctr_last = settings.get("lettersanity") in (2, 3)
     entry_modes = {}
     for index in multi:
         modes = list(chosen[index]["modes"])
         if mode_order == "per_pad":
             world.random.shuffle(modes)
+            if ctr_last and modes[0] == "ctr":
+                modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
         else:
             modes.sort(key=seed_order.index)
+            if ctr_last and modes[0] == "ctr":
+                modes[0], modes[1] = modes[1], modes[0]
         entry_modes[index] = modes
     stage2 = {}
     if stages == "two":

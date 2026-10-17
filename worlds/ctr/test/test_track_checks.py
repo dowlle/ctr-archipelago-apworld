@@ -268,6 +268,40 @@ class TestLettersanity(unittest.TestCase):
         self.assertEqual(item_aliases(world)[custom_check_code("letter_item", 1, 0)], f"Letter C ({title})")
 
 
+class TestCtrNeverFirstWithLetterItems(unittest.TestCase):
+    """Ruling 2026-10-17 (option B): with Lettersanity 2 or 3 the CTR Challenge
+    is never the first mode of a pad that has another mode, so no start is
+    narrowed to a CTR-first pad that opens nothing without letter items."""
+
+    def test_no_ctr_first_and_every_seed_generates(self):
+        for letters in (2, 3):
+            for order in ("per_seed", "per_pad", "fixed"):
+                for seed in range(40):
+                    options = check_options(rungs=False, letters=letters, per_track=2, order=order)
+                    if order == "fixed":
+                        options["content_pool"]["tracks"]["overrides"] = {"retail:3": ["ctr", "relic"]}
+                    with self.subTest(letters=letters, order=order, seed=seed):
+                        plan = make_world(options, seed=seed).ctr_content_plan
+                        for entry in plan["entries"]:
+                            if len(entry["modes"]) > 1:
+                                self.assertNotEqual(entry["modes"][0], "ctr")
+
+    def test_per_pad_keeps_every_other_order(self):
+        seen = set()
+        for seed in range(30):
+            plan = make_world(check_options(letters=3, order="per_pad"), seed=seed).ctr_content_plan
+            seen.update(tuple(e["modes"]) for e in plan["entries"] if len(e["modes"]) == 3)
+        self.assertEqual(seen, {("trophy", "ctr", "relic"), ("trophy", "relic", "ctr"),
+                                ("relic", "ctr", "trophy"), ("relic", "trophy", "ctr")})
+
+    def test_other_modes_still_draw_ctr_first(self):
+        firsts = set()
+        for seed in range(10):
+            plan = make_world(check_options(letters=1, order="per_pad"), seed=seed).ctr_content_plan
+            firsts.update(e["modes"][0] for e in plan["entries"] if len(e["modes"]) > 1)
+        self.assertIn("ctr", firsts)
+
+
 class TestValidateRefuses(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
