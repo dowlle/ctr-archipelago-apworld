@@ -102,6 +102,61 @@ def _cause(world) -> str:
 MIN_STARTING_CHECKS = 2
 
 
+# Content plans with second-stage gates (#133 PR 3a). A stage-2 gate on a
+# starting pad keeps that pad's later modes shut, so the start can hold only two
+# or three open checks. The fill then dead-ends when it puts items that open
+# nothing new in every one of them (CI fuzz artifact 244; seed 710 of the
+# two-stage per-pad profile puts a Sapphire Relic in all three). Measured
+# 2026-10-17 on 6,000 seeds of that profile: 3 dead ends, all with 2 or 3 open
+# starting checks, none with 4 or more. Ruling 2026-10-17: no fill
+# simulation (the Ionium generation cost); a narrow start gets one local early
+# Key, or the item that opens the most checks when the seed has no Key opener.
+# Nothing is precollected and supply and gates stay as drawn.
+NARROW_START_CHECKS = 4
+
+
+def early_opener(world):
+    """Name of the item to place early for a narrow content-plan start, or
+    None when the start is wide enough or no single item opens a check."""
+    base = _base_state(world)
+    start = _reachable_empty(world, base)
+    if start >= NARROW_START_CHECKS:
+        return None
+    reach = {}
+    for item in world.multiworld.itempool:
+        if (item.player != world.player or not item.advancement
+                or item.name in reach):
+            continue
+        state = base.copy()
+        state.collect(item, True)
+        reach[item.name] = _reachable_empty(world, state)
+    opening = {name: n for name, n in reach.items() if n > start}
+    if not opening:
+        return None
+    if "Key" in opening:
+        return "Key"
+    return max(sorted(opening), key=opening.get)
+
+
+def mark_early_opener(world) -> None:
+    """Narrow content-plan start with second-stage gates: ask AP's early-item
+    step to place one opener in this slot's starting checks. Takes no random
+    draw; a wide start, or a plan without second-stage gates, is unchanged."""
+    from .content_plan import STAGE2_PREFIX
+    plan = world.ctr_content_plan
+    if not any(row["id"].startswith(STAGE2_PREFIX) for row in plan["requirements"]):
+        return
+    name = early_opener(world)
+    if name is None:
+        return
+    mw, player = world.multiworld, world.player
+    target = (mw.early_items if name in world.options.non_local_items.value
+              else mw.local_early_items)
+    slot = target.setdefault(player, {})
+    slot[name] = max(slot.get(name, 0), 1)
+    world._ctr_early_opener = name
+
+
 def _narrow_cause(world) -> str:
     from .progressive_capability import BOOST_CHAIN
     difficulty = world.options.logic_difficulty.current_key

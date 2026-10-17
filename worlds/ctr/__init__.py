@@ -679,13 +679,18 @@ class ctrAPWorld(World):
         generated. Inside that regeneration only, aliased custom locations take
         their room title as their name (#306 B+), so the Tracker Page shows
         `Baby T Park: Trophy Race` instead of the generic name with the title
-        in brackets. generate_basic is the last step UT runs, after rules."""
+        in brackets. generate_basic is the last step UT runs, after rules.
+        A content plan with second-stage gates and a narrow start then marks
+        one local early opener (sphere0_guard.mark_early_opener, ruling
+        2026-10-17)."""
         if getattr(self.multiworld, "generation_is_fake", False):
             from .custom_track_presentation import apply_ut_room_names
             apply_ut_room_names(self)
             return
         from . import sphere0_guard
         sphere0_guard.raise_if_narrow(self)
+        if hasattr(self, "ctr_content_plan"):
+            sphere0_guard.mark_early_opener(self)
 
     def pre_fill(self) -> None:
         """Terminal fill backstop for solo generations, in both warp-pad modes.

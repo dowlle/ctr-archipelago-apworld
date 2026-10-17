@@ -182,10 +182,10 @@ class TestOpenAdmissionGeneration(unittest.TestCase):
         self.assertEqual(tracker.ctr_content_plan, world.ctr_content_plan)
         self.assertEqual(tracker.fill_slot_data(), wire)
 
-    def test_track_without_arcade_is_refused_not_dropped(self):
+    def test_track_without_a_selected_mode_is_refused_not_dropped(self):
         descriptor = copy.deepcopy(UNKNOWN)
         descriptor["capabilities"]["arcade"] = False
-        with self.assertRaisesRegex(OptionError, "arcade: false"):
+        with self.assertRaisesRegex(OptionError, "can run none of the selected modes"):
             make_world(options_with([descriptor]))
 
     def test_malformed_descriptor_names_the_field(self):

@@ -1,8 +1,10 @@
 """Experimental content-plan generation, independent of legacy cup displacement.
 
-The first executable profile is standalone Trophy races. Unsupported content
-and check families fail explicitly while their native consumers are developed.
-This is an internal integration path, not completion of the full rewrite.
+The executable profile builds standalone track entries with their Trophy Race,
+CTR Challenge and Relic Race modes (#133 PR 3), and Crystal Challenge entries.
+Unsupported content and check families fail explicitly while their native
+consumers are developed. This is an internal integration path, not completion
+of the full rewrite.
 """
 import copy
 import json
@@ -21,6 +23,24 @@ from .warp_pad_logic import HUB_STATIC
 
 SCHEMA = 18
 MANUAL_FEATURE = "manual_pad_requirements_v1"
+#: Track modes (#133 PR 3). A plan whose track entries are all Trophy-only keeps
+#: the earlier wire exactly; any other entry declares this feature.
+MODE_FEATURE = "track_modes_v1"
+MODES = ("trophy", "ctr", "relic")
+#: Second-stage gate record of a physical pad: `stage2:<physical LevelID>`.
+STAGE2_PREFIX = "stage2:"
+#: Highest count a drawn second-stage gate asks for. The legacy generator caps
+#: its stage-2 counts the same way (warp_pad_logic._STAGE2_COUNT_CEILING).
+STAGE2_COUNT_CEILING = 4
+RELIC_TIERS = ("Sapphire", "Gold", "Platinum")
+#: (route award, named-block key, location suffix) of every check a mode owns.
+#: Codes come from the frozen names: retail `<Track>: <suffix>`, named blocks by
+#: key, generic slots `Custom Track N: <suffix>`.
+MODE_CHECKS = {
+    "trophy": (("win", "trophy", "Trophy Race"),),
+    "ctr": (("win_letters", "ctr_token", "CTR Token Challenge"),),
+    "relic": tuple((tier.lower(), "relic_" + tier.lower(), tier + " Time Trial") for tier in RELIC_TIERS),
+}
 #: Aggregate manual rule -> the counted item names it sums, in wire order.
 #: Native holds the same three lists; the parity fixtures compare them.
 SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
@@ -172,7 +192,99 @@ def required_features(requirements, entries=(), checks=()):
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
             + (["crystal_entries_v1"] if any(e['kind']=='crystal' for e in entries) else [])
             + (["crystal_pickups_v1"] if any(c['kind']=='crystal_pickup' for c in checks) else [])
-            + (["arcade_crystals_v1"] if any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in entries) else []))
+            + (["arcade_crystals_v1"] if any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in entries) else [])
+            + ([MODE_FEATURE] if any(e["kind"] == "track" and e["modes"] != ["trophy"] for e in entries) else []))
+
+
+def supported_modes(origin, package=None):
+    """Modes a track can run, in MODES order (#133 PR 3).
+
+    Retail tracks run all three. A custom package's measured capability flags
+    decide: Trophy needs an eight-kart grid with AI paths (`arcade`), the CTR
+    Challenge also needs the C, T and R letters (`ctr_tokens`), and the Relic
+    Race needs time crates with target times (`relic`) on a timed lap graph
+    (`time_trial`). Native measures the same flags on the bytes before a
+    package is admitted (ap_content_capability.h)."""
+    if origin == "retail":
+        return list(MODES)
+    caps = package["capabilities"]
+    out = []
+    if caps["arcade"]:
+        out.append("trophy")
+        if caps["ctr_tokens"]:
+            out.append("ctr")
+    if caps["relic"] and caps["time_trial"]:
+        out.append("relic")
+    return out
+
+
+def mode_checks(track, mode):
+    """[(award, location name, code, display suffix)] a track's mode owns."""
+    out = []
+    for award, key, suffix in MODE_CHECKS[mode]:
+        if track["origin"] == "custom" and "named_block" in track:
+            code = named_tracks.location_code(track["named_block"], key)
+            name = LOCATION_BY_CODE[code]
+        else:
+            stem = (f"Custom Track {track['custom_slot']}" if track["origin"] == "custom"
+                    else track["display_name"])
+            name = f"{stem}: {suffix}"
+            code = CTR_LOCATION_IDS[name]
+        out.append((award, name, code, suffix))
+    return out
+
+
+def room_title(track):
+    """What the room and Universal Tracker call a track's checks."""
+    return track.get("room_title", track["display_name"]) if track["origin"] == "custom" else track["display_name"]
+
+
+def track_checks(track, entry_id, pad_id, modes):
+    """Every check of a standalone track entry, in its entry's mode order."""
+    title = room_title(track)
+    out = []
+    for mode in modes:
+        for award, _name, code, suffix in mode_checks(track, mode):
+            out.append(dict(location=code, owner=track["id"], kind=mode, display_name=f"{title}: {suffix}",
+                            routes=[dict(entry_id=entry_id, mode=mode, leg_id=None, encounter_id=None,
+                                         own_pad_id=pad_id, award=award)]))
+    return out
+
+
+def mode_gates(modes, first_requirement, stages, physical):
+    """The pad's mode gates: the first mode uses the entrance requirement; with
+    two stages the others share `stage2:<physical>`, otherwise they use the
+    entrance requirement too (Wayfinder ticket 16, 2026-09-22)."""
+    gates = [dict(mode=modes[0], stage=1, requirement_id=first_requirement)]
+    for mode in modes[1:]:
+        gates.append(dict(mode=mode, stage=2, requirement_id=f"{STAGE2_PREFIX}{physical}") if stages == "two"
+                     else dict(mode=mode, stage=1, requirement_id=first_requirement))
+    return gates
+
+
+def draw_stage2(world, rows):
+    """One second-stage gate predicate from the base supply.
+
+    Concrete counted items with a base copy, plus an Any family when two or
+    more of its items have one; never Keys, which already gate the hubs. The
+    count is 1 up to STAGE2_COUNT_CEILING and never above the base supply
+    (`requirement_ceiling`), so a gate cannot ask for items the seed lacks.
+    Returns None when the seed has no eligible base item."""
+    by_name = {row.name: row for row in rows}
+    candidates = [(name, (name,)) for name in content_item_pool.COUNTED_NAMES
+                  if name != "Key" and by_name[name].requirement_ceiling > 0]
+    for family, names in SUM_FAMILIES.items():
+        eligible = tuple(n for n in names if by_name[n].requirement_ceiling > 0)
+        if len(eligible) >= 2:
+            candidates.append((family, eligible))
+    if not candidates:
+        return None
+    label, names = world.random.choice(candidates)
+    supply = sum(by_name[n].requirement_ceiling for n in names)
+    count = world.random.randint(1, min(STAGE2_COUNT_CEILING, supply))
+    if label in SUM_FAMILIES:
+        return dict(op="sum", items=[by_name[n].item for n in names], count=count)
+    return dict(op="count", item=by_name[label].item, count=count)
 
 
 def crystal_selection(world, raw):
@@ -199,14 +311,36 @@ def crystal_selection(world, raw):
     return eligible,count
 
 
+def track_modes(raw_tracks):
+    """(global modes, overrides) from content_pool.tracks, shape-checked.
+
+    `modes` is a nonempty list of distinct modes (default all three). An
+    override maps a logical track id to a nonempty narrower list; it never
+    adds a mode the global list leaves out."""
+    modes = raw_tracks.get("modes", list(MODES))
+    if (not isinstance(modes, list) or not modes or any(m not in MODES for m in modes)
+            or len(set(modes)) != len(modes)):
+        error("tracks.modes must be a nonempty list of distinct modes from trophy, ctr and relic.")
+    overrides = raw_tracks.get("overrides", {})
+    if not isinstance(overrides, dict):
+        error("tracks.overrides must map logical track ids to mode lists.")
+    for track_id, narrowed in overrides.items():
+        if (not isinstance(narrowed, list) or not narrowed or any(m not in MODES for m in narrowed)
+                or len(set(narrowed)) != len(narrowed)):
+            error(f"tracks.overrides[{track_id!r}] must be a nonempty list of distinct modes.")
+        if set(narrowed) - set(modes):
+            error(f"tracks.overrides[{track_id!r}] adds {', '.join(m for m in narrowed if m not in modes)}, "
+                  "which tracks.modes leaves out; an override can only narrow the selected modes.")
+    return modes, overrides
+
+
 def generate(world):
     o = world.options
     raw = closed(o.content_pool.value, ("preset", "tracks", "cups", "crystals", "bosses", "required_entries"), "content_pool")
     if raw.get("preset", "mixed") != "mixed":
         error("the experimental standalone profile currently requires preset: mixed.")
     tracks = closed(raw.get("tracks", {}), ("retail", "custom", "cortex_vortex", "modes", "overrides"), "tracks")
-    if tracks.get("modes") != ["trophy"] or tracks.get("overrides", {}) != {}:
-        error("the experimental profile currently supports explicit modes: [trophy] without overrides.")
+    selected_modes, overrides = track_modes(tracks)
     if tracks.get("cortex_vortex", False) is not False:
         error("Cortex Vortex content-plan routes are not implemented yet.")
     _zero_count(closed(raw.get("cups", {}), ("count",), "cups").get("count"), "cups.count")
@@ -216,11 +350,17 @@ def generate(world):
     if bosses.get("enabled") is not False:
         error("the experimental profile needs explicit bosses: {enabled: false}; encounter routes are pending.")
     layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
-    if (layout.get("placement", "shuffle") != "shuffle" or
-            layout.get("stages", "single") != "single" or
-            layout.get("mode_order", "fixed") != "fixed" or
-            layout.get("merge_trophy_ctr", False) is not False):
-        error("the experimental Trophy profile currently needs shuffle placement, single stage, fixed order and merge off.")
+    stages = layout.get("stages", "two")
+    mode_order = layout.get("mode_order", "fixed")
+    if layout.get("placement", "shuffle") != "shuffle":
+        error("pad_layout.placement: only shuffle is built yet; vanilla placement is pending.")
+    if stages not in ("single", "two"):
+        error("pad_layout.stages must be single or two.")
+    if mode_order not in ("fixed", "per_seed", "per_pad"):
+        error("pad_layout.mode_order must be fixed, per_seed or per_pad.")
+    if layout.get("merge_trophy_ctr", False) is not False:
+        error("pad_layout.merge_trophy_ctr: the merged Trophy/CTR race is not built yet; it comes in a "
+              "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
     pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
@@ -245,14 +385,6 @@ def generate(world):
             or len(set(retail)) != len(retail)):
         error("tracks.retail must be all or a list of distinct retail engine track IDs 0..17.")
     packages = resolve_packages(tracks.get("custom", []))
-    for package in packages:
-        if not custom_packages.trophy_ready(package):
-            error(f"custom track {package['id']} cannot run a Trophy Race: its descriptor says "
-                  "arcade: false (no eight-kart grid with AI paths). Trophy is the only mode this "
-                  "profile builds yet; remove the track from tracks.custom. No content was changed.")
-    candidates = [dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i],
-                       laps=RETAIL_LAPS, modes=["trophy"], capabilities=["trophy"], field_size=8)
-                  for i in sorted(retail)]
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
@@ -263,13 +395,37 @@ def generate(world):
     # shown under its sanitized, clash-suffixed room title (B+). Room titles
     # are assigned once the seed's tracks are chosen (below), so validate can
     # recompute them from the plan alone.
+    # (track record without its modes, package or None, named-block fields).
+    pool = [(dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i], laps=RETAIL_LAPS),
+             None, {}) for i in sorted(retail)]
     for slot, package in enumerate(packages, 1):
         block = destinations.named_track(package["content_id"])
-        addressing = dict(named_block=block.block_index, room_title=block.ap_name) if block else {}
-        candidates.append(dict(id="custom/" + package["content_id"] + "/" + package["revision"],
-                               origin="custom", package_id=package["id"], custom_slot=slot,
-                               display_name=package["display_name"], laps=package["laps"], modes=["trophy"],
-                               capabilities=["trophy"], field_size=8, **addressing))
+        pool.append((dict(id="custom/" + package["content_id"] + "/" + package["revision"],
+                          origin="custom", package_id=package["id"], custom_slot=slot,
+                          display_name=package["display_name"], laps=package["laps"]),
+                     package, dict(named_block=block.block_index, room_title=block.ap_name) if block else {}))
+    package_by_id = {p["id"]: p for p in packages}
+    unknown = sorted(set(overrides) - {track["id"] for track, _package, _addressing in pool})
+    if unknown:
+        error(f"tracks.overrides names {', '.join(unknown)}, which is not a selected retail or custom track.")
+    candidates = []
+    for track, package, addressing in pool:
+        wanted = overrides.get(track["id"], selected_modes)
+        supported = supported_modes(track["origin"], package)
+        if track["id"] in overrides and set(wanted) - set(supported):
+            error(f"tracks.overrides[{track['id']!r}] asks for "
+                  f"{', '.join(m for m in wanted if m not in supported)}, which this track cannot run "
+                  "(its package capabilities do not allow it). No content was changed.")
+        modes = [m for m in MODES if m in wanted and m in supported]
+        if not modes:
+            if package is not None:
+                error(f"custom track {package['id']} can run none of the selected modes "
+                      f"({', '.join(selected_modes)}): Trophy needs arcade, CTR needs arcade and ctr_tokens, "
+                      "Relic needs relic and time_trial. Remove it from tracks.custom or select a mode it "
+                      "supports. No content was changed.")
+            continue
+        # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
+        candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     required = raw.get("required_entries", [])
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
     ids = {t["id"] for t in candidates+arena_candidates}
@@ -286,7 +442,6 @@ def generate(world):
     optional = [t for t in candidates if t["id"] not in required]
     chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen)-arena_count))
     chosen += chosen_arenas
-    package_by_id = {p["id"]: p for p in packages}
     titles = generic_room_titles([t for t in chosen if t.get("origin") == "custom"], package_by_id)
     for track in chosen:
         if track.get("origin") == "custom" and "named_block" not in track:
@@ -335,6 +490,37 @@ def generate(world):
         source = world.random.choice(gated)
         destination = world.random.choice(empty)
         registry[source], registry[destination] = registry[destination], registry[source]
+    # Every check exists before the item ledger is sized; mode order and the
+    # second-stage gates only decide which race and gate reaches each one.
+    check_count = sum(sum(len(MODE_CHECKS[m]) for m in t["modes"]) if "arena_id" not in t
+                      else len(arena_content.checks(dict(id="entry/" + t["id"], kind="crystal", arena_id=t["arena_id"],
+                                                         target=20, time_limit_ticks=arena_content.TIMERS[t["arena_id"]]),
+                                                    "pad:0", bool(o.crystalsanity.value)))
+                      for t in chosen)
+    world.ctr_content_items = content_item_pool.resolve(
+        o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
+        additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value)
+    # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
+    # the whole seed; or one per pad. Only entries with two or more modes take a
+    # draw, so a Trophy-only plan draws nothing here.
+    multi = [index for index in range(len(chosen)) if len(chosen[index].get("modes", ())) > 1]
+    seed_order = list(MODES)
+    if mode_order == "per_seed" and multi:
+        world.random.shuffle(seed_order)
+    entry_modes = {}
+    for index in multi:
+        modes = list(chosen[index]["modes"])
+        if mode_order == "per_pad":
+            world.random.shuffle(modes)
+        else:
+            modes.sort(key=seed_order.index)
+        entry_modes[index] = modes
+    stage2 = {}
+    if stages == "two":
+        for index in multi:
+            drawn = draw_stage2(world, world.ctr_content_items.rows)
+            if drawn is not None:
+                stage2[registry[index][0]] = drawn
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
@@ -347,29 +533,31 @@ def generate(world):
             track = chosen[index]
             entry_id = "entry/" + track["id"]
             crystal='arena_id' in track
-            mode='crystal' if crystal else 'trophy'
-            entry=(dict(id=entry_id,kind='crystal',arena_id=track['arena_id'],target=20,
-                        time_limit_ticks=arena_content.TIMERS[track['arena_id']]) if crystal else
-                   dict(id=entry_id,kind='track',track_id=track['id'],modes=['trophy'],merged=False))
+            first = gate_for.get(physical, 'free')
+            if crystal:
+                entry=dict(id=entry_id,kind='crystal',arena_id=track['arena_id'],target=20,
+                           time_limit_ticks=arena_content.TIMERS[track['arena_id']])
+                gates=[dict(mode='crystal',stage=1,requirement_id=first)]
+            else:
+                modes = entry_modes.get(index, track["modes"])
+                entry = dict(id=entry_id, kind='track', track_id=track['id'], modes=modes, merged=False)
+                gates = mode_gates(modes, first, "two" if physical in stage2 else "single", physical)
             entries.append(entry)
-            pad.update(entry_id=entry_id,mode_gates=[dict(mode=mode,stage=1,requirement_id=gate_for.get(physical,'free'))])
+            pad.update(entry_id=entry_id,mode_gates=gates)
             if crystal:
                 checks.extend(arena_content.checks(entry,pad['id'],bool(o.crystalsanity.value)))
             else:
-                name,code,title=trophy_identity(track)
-                checks.append(dict(location=code,owner=track['id'],kind='trophy',display_name=title+': Trophy Race',
-                    routes=[dict(entry_id=entry_id,mode='trophy',leg_id=None,encounter_id=None,own_pad_id=pad['id'],award='win')]))
+                checks.extend(track_checks(track, entry_id, pad['id'], entry['modes']))
         pads.append(pad)
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
-    world.ctr_content_items = content_item_pool.resolve(
-        o.item_pool.value, len(checks), starts=o.start_inventory_from_pool.value,
-        additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value)
+    assert len(checks) == check_count
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
                                 if lid in manual}
+    requirements += [dict(id=f"{STAGE2_PREFIX}{physical}", predicate=stage2[physical]) for physical in sorted(stage2)]
     gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
@@ -400,19 +588,6 @@ def generic_room_titles(tracks, packages):
     return {slot: titles.get(slot, f"Custom Track {slot}") for slot, _ in rows}
 
 
-def trophy_identity(track):
-    """(location name, code, room title) of a track's Trophy Race check."""
-    if track["origin"] == "custom":
-        title = track.get("room_title", track["display_name"])
-        if "named_block" in track:
-            code = named_tracks.location_code(track["named_block"], "trophy")
-            return LOCATION_BY_CODE[code], code, title
-        name = f"Custom Track {track['custom_slot']}: Trophy Race"
-        return name, CTR_LOCATION_IDS[name], title
-    name = track["display_name"] + ": Trophy Race"
-    return name, CTR_LOCATION_IDS[name], track["display_name"]
-
-
 def predicate(world, node):
     player = world.player
     if node["op"] == "always":
@@ -440,12 +615,20 @@ def create_regions(world):
             continue
         region = Region(pad["entry_id"], player, mw)
         mw.regions.append(region)
-        gates = [predicate(world, req[pad["entrance_req"]])]
-        gates += [predicate(world, req[g["requirement_id"]]) for g in pad["mode_gates"]]
+        # The pad opens on its hub gate and its stage-1 requirement (every
+        # stage-1 gate of a pad shares one record). A stage-2 mode's checks
+        # also need that mode's own gate; no mode needs a win in another one.
+        first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
+        gates = [predicate(world, req[rid]) for rid in [pad["entrance_req"]] + first]
         menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
+        later = {g["mode"]: g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 2}
         for check in by_pad[pad['id']]:
-            region.locations.append(Location(player,LOCATION_BY_CODE[check['location']],check['location'],region))
+            location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
+            rid = later.get(check["routes"][0]["mode"])
+            if rid is not None:
+                location.access_rule = predicate(world, req[rid])
+            region.locations.append(location)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 
@@ -508,8 +691,9 @@ def validate(plan):
     expected_requirements = {"free": {"id": "free", "predicate": {"op": "always"}}}
     expected_requirements.update({f"keys:{n}": dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)})
     manual = {rid: row for rid, row in requirements.items() if rid.startswith("manual:")}
-    require({rid: row for rid, row in requirements.items() if rid not in manual} == expected_requirements,
-            "unsupported or changed physical hub requirements")
+    later = {rid: row for rid, row in requirements.items() if rid.startswith(STAGE2_PREFIX)}
+    require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later}
+            == expected_requirements, "unsupported or changed physical hub requirements")
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks']),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
@@ -528,12 +712,22 @@ def validate(plan):
             require(pad["kind"] == "normal" and pad["entry_id"] in entries, "invalid normal entry")
             physical = pad_id.split(":")[1]
             gate = f"manual:{physical}" if f"manual:{physical}" in manual else "free"
-            mode='crystal' if entries[pad['entry_id']]['kind']=='crystal' else 'trophy'
-            require(pad['mode_gates']==[dict(mode=mode,stage=1,requirement_id=gate)],'unsupported mode gates')
+            entry = entries[pad['entry_id']]
+            if entry['kind'] == 'crystal':
+                expected_gates = [dict(mode='crystal', stage=1, requirement_id=gate)]
+            else:
+                stage = "two" if f"{STAGE2_PREFIX}{physical}" in later else "single"
+                expected_gates = (mode_gates(entry["modes"], gate, stage, physical)
+                                  if type(entry["modes"]) is list and entry["modes"] else None)
+            require(pad['mode_gates'] == expected_gates, 'unsupported mode gates')
             occupied.append(pad["entry_id"])
     require(len(occupied) == len(set(occupied)) and set(occupied) == set(entries), "entry occurrence ownership mismatch")
     require(all(f"pad:{rid.split(':')[1]}" in pads and pads[f"pad:{rid.split(':')[1]}"]["entry_id"] is not None
                 for rid in manual), "manual requirement without an occupied pad")
+    # A second-stage record belongs to exactly one pad, which uses it for its
+    # later modes (checked by the gate comparison above).
+    require(all(any(g["requirement_id"] == rid and g["stage"] == 2 for g in pads.get(f"pad:{rid[len(STAGE2_PREFIX):]}", {}).get("mode_gates", ()))
+                for rid in later), "second-stage requirement without a pad that uses it")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
     # Generic-slot room titles are recomputed from the plan's own tracks; a
@@ -555,13 +749,15 @@ def validate(plan):
             pad_id=next(p['id'] for p in pads.values() if p['entry_id']==entry['id'])
             expected_checks.update({c['location']:c for c in arena_content.checks(entry,pad_id,crystalsanity)})
             continue
-        require(entry["kind"] == "track" and entry["modes"] == ["trophy"] and entry["merged"] is False,
-                "unsupported entry kind or modes")
+        require(entry["kind"] == "track" and entry["merged"] is False, "unsupported entry kind or merged mode")
         require(entry["track_id"] in tracks and entry["track_id"] not in used_tracks, "missing or repeated standalone track")
         used_tracks.add(entry["track_id"])
         track = tracks[entry["track_id"]]
-        require(track["modes"] == ["trophy"] and track["capabilities"] == ["trophy"] and track["field_size"] == 8,
-                "unsupported track capabilities")
+        # Track modes are canonical (MODES order); the entry lists the same
+        # modes in its pad's resolved order.
+        require(track["modes"] == [m for m in MODES if m in track["modes"]] and track["capabilities"] == track["modes"]
+                and track["field_size"] == 8 and sorted(entry["modes"]) == sorted(track["modes"]),
+                "unsupported track modes or capabilities")
         if track["origin"] == "retail":
             i = track["retail_id"]
             require(i in RETAIL and i not in retail_ids, "unknown or duplicate retail track")
@@ -576,7 +772,6 @@ def validate(plan):
             slot = track["custom_slot"]
             require(1 <= slot <= 32 and slot not in slots, "unregistered or duplicate custom slot")
             slots.add(slot)
-            require(custom_packages.trophy_ready(package), "custom Trophy track without the arcade capability")
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
             block = destinations.named_track(package["content_id"])
@@ -588,12 +783,12 @@ def validate(plan):
                 require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
                 require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
                         "room title is not the seed's clash-suffixed title for this track")
-        _name, code, title = trophy_identity(track)
+        require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")))),
+                "a track mode its capabilities do not allow")
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
-        expected_checks[code] = dict(location=code, owner=track["id"], kind="trophy",
-                                    display_name=title + ": Trophy Race",
-                                    routes=[dict(entry_id=entry["id"], mode="trophy", leg_id=None,
-                                                 encounter_id=None, own_pad_id=pad_id, award="win")])
+        for check in track_checks(track, entry["id"], pad_id, entry["modes"]):
+            require(check["location"] not in expected_checks, "duplicate check identity")
+            expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
             "content layout has no playable starting pad")
@@ -618,7 +813,7 @@ def validate(plan):
     gems = [i for i in range(35010009, 35010014) if rows[i]["base"]]
     require(goal["op"] == "distinct" and goal["items"] == gems and 1 <= goal["count"] <= len(gems),
             "goal must count selected distinct base Gem colours")
-    for rid, row in manual.items():
+    for rid, row in {**manual, **later}.items():
         predicate_ = row["predicate"]
         if predicate_["op"] == "count":
             item = predicate_["item"]

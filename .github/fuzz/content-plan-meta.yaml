@@ -1,16 +1,19 @@
-# Content-plan fuzz arm (#133 PR 2), used by .github/workflows/ctr-world.yml.
-# Every seed builds an explicit content plan with two custom tracks: Baby T Park
-# 1.0.2 on its named block, and a made-up track key with no block (path B+,
-# test data, its pins name no real files). The options pinned below are the
-# ones the content-plan profile still refuses; everything else is randomized
-# by the fuzzer as in the other arms.
+# Content-plan fuzz arm (#133 PR 2, modes from PR 3), used by
+# .github/workflows/ctr-world.yml. Every seed builds an explicit content plan
+# with two custom tracks: Baby T Park 1.0.2 on its named block (Trophy and CTR
+# Challenge), and a made-up track key with no block (path B+, Trophy and Relic
+# Race, test data, its pins name no real files). All three modes are selected,
+# with two stages and a mode order drawn per pad, so second-stage gates and
+# every mode reach the fill. The options pinned below are the ones the
+# content-plan profile still refuses; everything else is randomized by the
+# fuzzer as in the other arms.
 Crash Team Racing:
   accessibility: full
   content_pool:
     preset: mixed
     tracks:
       retail: all
-      modes: [trophy]
+      modes: [trophy, ctr, relic]
       custom:
         - id: package/baby-t-park/1.0.2
           content_id: baby-t-park
@@ -41,12 +44,12 @@ Crash Team Racing:
     crystals: {count: 0}
     bosses: {enabled: false}
     required_entries: [custom/baby-t-park/1.0.2, custom/fuzz-fixture-loop/1.0]
-  pad_layout: {placement: shuffle, stages: single, mode_order: fixed, merge_trophy_ctr: false}
+  pad_layout: {placement: shuffle, stages: two, mode_order: per_pad, merge_trophy_ctr: false}
   item_pool:
     base:
       trophies: 5
-      relics: {sapphire: 0, gold: 0, platinum: 0}
-      tokens: {red: 0, green: 0, blue: 0, yellow: 0, purple: 0}
+      relics: {sapphire: 6, gold: 4, platinum: 2}
+      tokens: {red: 2, green: 2, blue: 2, yellow: 0, purple: 0}
       gems: [red, green, blue, yellow, purple]
       keys: 4
   oxide_goal: disabled

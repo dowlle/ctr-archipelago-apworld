@@ -74,10 +74,11 @@
           "manual_pad_requirements_v1",
           "crystal_entries_v1",
           "crystal_pickups_v1",
-          "arcade_crystals_v1"
+          "arcade_crystals_v1",
+          "track_modes_v1"
         ]
       },
-      "maxItems": 5,
+      "maxItems": 6,
       "minItems": 1,
       "uniqueItems": true
     }

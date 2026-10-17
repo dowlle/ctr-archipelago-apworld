@@ -1368,19 +1368,30 @@ class EditableStats(Choice):
 class ContentPool(OptionDict):
     """Experimental independent content selection. Empty keeps the legacy generator.
 
-    The development profile currently supports standalone Trophy races. Custom
-    tracks are complete package descriptors (track key, file pins, authored laps,
-    measured capability flags): any track is accepted, and the game checks the
-    files against the pins when it loads them. A track key with a named id block
-    uses that block's checks; any other track uses a generic Custom Track slot
-    under its own title. Unsupported selected content fails clearly.
+    The development profile builds standalone track entries and Crystal
+    Challenges. `tracks.modes` selects Trophy Race, CTR Challenge and Relic Race
+    (default all three); each track gets the selected modes it can run, and
+    `tracks.overrides` can narrow them per track. Custom tracks are complete
+    package descriptors (track key, file pins, authored laps, measured capability
+    flags): any track is accepted, and the game checks the files against the pins
+    when it loads them. Trophy needs arcade, CTR needs arcade and ctr_tokens,
+    Relic needs relic and time_trial. A track key with a named id block uses that
+    block's checks; any other track uses a generic Custom Track slot under its
+    own title. Unsupported selected content fails clearly.
     """
     display_name = "Content Pool (Experimental)"
     default = {}
 
 
 class ContentPadLayout(OptionDict):
-    """Physical pad placement and mode stages for content_pool."""
+    """Physical pad placement and mode stages for content_pool.
+
+    `stages`: two (default) or single. With two, a pad's first mode opens with
+    the pad and its other modes share one second requirement; with single,
+    every mode opens with the pad. `mode_order`: fixed (Trophy, CTR, Relic),
+    per_seed (one random order for the seed) or per_pad. `placement` is shuffle;
+    `merge_trophy_ctr` must stay false for now.
+    """
     display_name = "Content Pad Layout (Experimental)"
     default = {}
 
