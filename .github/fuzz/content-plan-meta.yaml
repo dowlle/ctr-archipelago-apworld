@@ -11,7 +11,9 @@
 # 21 candidate tracks all fit the 27 pads, so it is in every plan) and Relic
 # Race Perfect checks are on in most seeds. Progressive Starting Wumpa, Turbo
 # Grant, Tizi Helper, an explicit DeathLink send list and the warp-pad display
-# settings (PR 4a) are left to the fuzzer. The options pinned below are the
+# settings (PR 4a) are left to the fuzzer, and so are Character Unlocks,
+# Remove Playable Oxide, Racer-Locked Warp Pads, Starting Stat Class, Penta
+# Penguin Stats and Editable Stats (PR 4b). The options pinned below are the
 # ones the content-plan profile still refuses; everything else is randomized
 # by the fuzzer as in the other arms.
 Crash Team Racing:
@@ -65,8 +67,6 @@ Crash Team Racing:
   gems_required_goal: {1: 1, 3: 1, 5: 2}
   custom_tracks: {}
   cortex_vortex_track: false
-  character_unlocks: false
-  racer_locked_pads: 0
   progressive_boost: "off"
   progressive_stats: "off"
   itemsanity: false

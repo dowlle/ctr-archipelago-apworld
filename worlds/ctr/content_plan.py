@@ -3,7 +3,9 @@
 The executable profile builds standalone track entries with their Trophy Race,
 CTR Challenge and Relic Race modes (#133 PR 3), their podium rungs, Reach 10
 Wumpa and C/T/R letter checks (#133 PR 3b), Cortex Vortex as a track and the
-Relic Race Perfect checks (#133 PR 3c, #453), and Crystal Challenge entries.
+Relic Race Perfect checks (#133 PR 3c, #453), pool-only packs (#133 PR 4a),
+character unlocks with racer-locked pads and the stat settings (#133 PR 4b),
+and Crystal Challenge entries.
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -117,6 +119,20 @@ STARTING_WUMPA_MAX = 10
 #: absent keys mean the legacy send coupling, the one-pile glow and AP item
 #: type colours on, as before.
 ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors")
+#: Character packs (#133 PR 4b). With Character Unlocks on, the plan's
+#: optional `racers` record names the starting racer (engine character id),
+#: whether Remove Playable Oxide is on and the requested racer-lock maximum.
+#: The item ledger then pools one row per unlock racer (the roster minus the
+#: starting racer, and minus Oxide when he is removed), and a pad that does not
+#: open at the start may carry a `racer_lock`. The record is absent when
+#: Character Unlocks is off, so such a plan keeps its earlier wire.
+RACER_FEATURE = "character_unlocks_v1"
+RACER_KEYS = ("starting_character", "remove_playable_oxide", "requested_locks")
+#: The client stat settings (#133 PR 4b): optional envelope keys, present only
+#: when set. The stat trio is the resolved outcome of
+#: characters.effective_stat_config, sent together; native never re-derives
+#: the precedence. Progressive Stats (source 1) waits for PR 4c.
+STAT_ENVELOPE = ("starting_stat_class", "penta_stats", "stat_source", "stat_owner", "stat_editing_allowed")
 
 
 def error(message):
@@ -254,7 +270,7 @@ def manual_requirements(manual, rows):
     return out
 
 
-def required_features(requirements, entries=(), checks=(), settings=None, packs=None):
+def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None):
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -266,7 +282,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([WUMPA_FEATURE] if "wumpa" in settings else [])
             + ([LETTER_FEATURE] if "lettersanity" in settings else [])
             + ([PERFECT_FEATURE] if "relic_perfect" in settings else [])
-            + ([PACK_FEATURE] if packs else []))
+            + ([PACK_FEATURE] if packs else [])
+            + ([RACER_FEATURE] if racers else []))
 
 
 def family_settings(options):
@@ -374,6 +391,131 @@ def check_envelope_options(co):
         error("ctr_options.warp_pad_item_display must be 0 or 1.")
     if "ap_item_type_colors" in co and type(co["ap_item_type_colors"]) is not bool:
         error("ctr_options.ap_item_type_colors must be true or false.")
+    if "starting_stat_class" in co and (type(co["starting_stat_class"]) is not int
+                                        or not 1 <= co["starting_stat_class"] <= 4):
+        error("ctr_options.starting_stat_class must be 1 to 4 when present.")
+    if "penta_stats" in co and (type(co["penta_stats"]) is not int or co["penta_stats"] != characters.PENTA_PAL):
+        error("ctr_options.penta_stats must be 1 when present.")
+    trio = [key in co for key in STAT_ENVELOPE[2:]]
+    if any(trio) and not (all(trio) and type(co["stat_source"]) is int and co["stat_source"] == characters.STAT_SOURCE_EDITABLE
+                          and type(co["stat_owner"]) is int and co["stat_owner"] in (1, 2)
+                          and co["stat_editing_allowed"] is True):
+        error("ctr_options.stat_source, stat_owner and stat_editing_allowed must be editable stats "
+              "(2, 1 or 2, true) together when present.")
+
+
+def check_racer_envelope(plan, co):
+    """Character packs (#133 PR 4b): the envelope's `character_unlocks` is
+    true exactly when the plan has its `racers` record, and then its
+    `starting_character` is the record's."""
+    racers = plan.get("racers")
+    if co.get("character_unlocks") is not (racers is not None) or (
+            racers is not None and (type(co.get("starting_character")) is not int
+                                    or co["starting_character"] != racers["starting_character"])):
+        error("character envelope disagrees with the plan's racers record")
+
+
+def stat_envelope(world):
+    """The optional stat keys of the content-plan envelope (#133 PR 4b), see
+    STAT_ENVELOPE. Absent keys mean the racer's own class, Penta's ordinary
+    table and vanilla stats, as before."""
+    o = world.options
+    out = {}
+    if o.starting_stat_class.value:
+        out["starting_stat_class"] = int(o.starting_stat_class.value)
+    if o.penta_stats.value:
+        out["penta_stats"] = int(o.penta_stats.value)
+    source, owner, editable = characters.effective_stat_config(world)
+    if source:
+        out.update(stat_source=source, stat_owner=owner, stat_editing_allowed=bool(editable))
+    return out
+
+
+def check_racer_settings(racers):
+    """Shape and values of a plan's `racers` record (#133 PR 4b)."""
+    if not isinstance(racers, dict) or set(racers) != set(RACER_KEYS):
+        error("racers must be a mapping of exactly starting_character, remove_playable_oxide and requested_locks.")
+    start, removed, requested = (racers[key] for key in RACER_KEYS)
+    if type(start) is not int or start not in characters.CHARACTER_ID_TO_NAME:
+        error("racers.starting_character must be an engine character id 0 to 15.")
+    if type(removed) is not bool:
+        error("racers.remove_playable_oxide must be true or false.")
+    if removed and characters.CHARACTER_ID_TO_NAME[start] == characters.OXIDE:
+        error("racers: Nitros Oxide cannot be removed and be the starting racer.")
+    if type(requested) is not int or not 0 <= requested <= characters.PHYSICAL_PAD_COUNT:
+        error(f"racers.requested_locks must be 0 to {characters.PHYSICAL_PAD_COUNT}.")
+    return racers
+
+
+def racer_excluded(racers, name):
+    """A racer the plan never pools nor locks: the starting racer, and Oxide
+    when Remove Playable Oxide is on (characters._excluded_racer)."""
+    cid = characters.ROSTER_CHARACTER_ID[name]
+    return cid == racers["starting_character"] or (racers["remove_playable_oxide"] and name == characters.OXIDE)
+
+
+def unlock_names(racers):
+    """The unlock items a `racers` record pools, in roster order: the
+    roster minus the starting racer, and minus Oxide when removed."""
+    return [name for name in characters.ROSTER_CHARACTER_ID if not racer_excluded(racers, name)]
+
+
+def predicate_met(node, held):
+    """A requirement predicate against {item code: count} the slot starts with."""
+    if node["op"] == "always":
+        return True
+    if node["op"] == "count":
+        return held.get(node["item"], 0) >= node["count"]
+    return sum(held.get(code, 0) for code in node["items"]) >= node["count"]
+
+
+def lock_eligible(plan):
+    """Pad ids, in physical order, that may carry a racer lock (#133 PR 4b).
+
+    An occupied normal pad that does not open at the start: its hub gate needs
+    Keys, or its manual stage-1 rule (#463) is not met by the items the slot
+    starts with (from-pool and additional starts in the item ledger). Pads that
+    open at the start never take a lock, so the starting checks are the same
+    with locks on or off (the legacy rule in characters.eligible_lock_pads:
+    never a pad left free). Read from the plan alone."""
+    held = {row["item"]: row["start_from_pool"] + row["start_additional"] for row in plan["items"]["rows"]}
+    req = {row["id"]: row["predicate"] for row in plan["requirements"]}
+    out = []
+    for pad in plan["pads"]:
+        if pad["kind"] != "normal" or pad["entry_id"] is None:
+            continue
+        first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
+        opens = pad["entrance_req"] == "free" and all(predicate_met(req[rid], held) for rid in first)
+        if not opens:
+            out.append(pad["id"])
+    return sorted(out, key=lambda pad_id: int(pad_id.split(":")[1]))
+
+
+def plan_racer_locks(plan):
+    """{pad id: roster name} of the plan's racer-locked pads."""
+    return {pad["id"]: characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]]
+            for pad in plan["pads"] if pad["racer_lock"] is not None}
+
+
+def draw_racer_locks(world, plan, racers):
+    """Seat the seed's racer locks on the plan's pads (#133 PR 4b).
+
+    The legacy rule (characters.resolve_racer_locks): the player's count is a
+    maximum, the seed takes min(requested, eligible), the pads are a sample of
+    the eligible ones and the racers are spread so no racer locks a second pad
+    before every candidate locks one. Never the starting racer, never Oxide
+    when removed. No draw when no lock is taken."""
+    pads = lock_eligible(plan)
+    requested = racers["requested_locks"]
+    world.ctr_racer_lock_counts = {"requested": requested, "eligible": len(pads)}
+    n = min(requested, len(pads))
+    if n <= 0:
+        return
+    chosen = sorted(world.random.sample(pads, n), key=lambda pad_id: int(pad_id.split(":")[1]))
+    candidates = [name for name in characters.ROSTER_CHARACTER_ID if not racer_excluded(racers, name)]
+    by_id = {pad["id"]: pad for pad in plan["pads"]}
+    for pad_id, name in zip(chosen, characters.spread_lock_racers(world, candidates, n)):
+        by_id[pad_id]["racer_lock"] = characters.ROSTER_CHARACTER_ID[name]
 
 
 def supported_modes(origin, package=None):
@@ -686,7 +828,7 @@ def generate(world):
               "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
-    pending = ("character_unlocks", "racer_locked_pads", "progressive_boost", "progressive_stats",
+    pending = ("progressive_boost", "progressive_stats",
                "itemsanity", "box_locations", "hit_character", "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
@@ -697,6 +839,15 @@ def generate(world):
     # one-way DeathLink (ruling 2026-09-30): the normal seed's resolution, no draw.
     from . import forced_options
     forced_options.resolve_death_link_off_when_send_conditions_set(world)
+    # Character packs (#133 PR 4b): the normal seed's refusal and notes for
+    # the character options. They take no draw.
+    forced_options.raise_if_starting_as_removed_oxide(world)
+    for note in (forced_options.warn_editable_stats_overridden_by_progressive,
+                 forced_options.warn_penta_stats_without_vanilla_stats,
+                 forced_options.warn_racer_locked_pads_boolean_normalized,
+                 forced_options.warn_racer_locks_without_character_unlocks,
+                 forced_options.warn_remove_playable_oxide_without_character_unlocks):
+        note(world)
     if o.plando_items.value or o.item_links.value:
         error("plando and item-link accounting are not validated for this experimental profile yet.")
     retail = tracks.get("retail", "all")
@@ -848,6 +999,15 @@ def generate(world):
     packs = pack_settings(o)
     selected = {name: 1 for name in letter_packs}
     selected.update(pack_counts(packs))
+    # Character unlocks (#133 PR 4b): one ledger row per unlock racer, which
+    # needs the starting racer first. A plan with unlocks off keeps its draw
+    # at the end, so its seed is unchanged.
+    racers = None
+    if characters.unlocks_enabled(world):
+        world.ctr_starting_character = characters.resolve_starting_character(world)
+        racers = dict(starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
+                      remove_playable_oxide=characters.oxide_removed(world), requested_locks=0)
+        selected.update({name: 1 for name in unlock_names(racers)})
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
@@ -931,18 +1091,27 @@ def generate(world):
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
                 tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=required_features(requirements,entries,checks,settings,packs))
+                required_features=required_features(requirements,entries,checks,settings,packs,racers))
     if settings:
         plan["track_checks"] = settings
     if packs:
         plan["item_packs"] = packs
+    world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
+    if racers:
+        # Racer locks (#133 PR 4b) go on pads that do not open at the start,
+        # once the layout and the ledger are final.
+        racers["requested_locks"] = characters.requested_lock_count(world, len(lock_eligible(plan)))
+        plan["racers"] = racers
+        draw_racer_locks(world, plan, racers)
+        world.ctr_racer_locks = plan_racer_locks(plan)
     validate(plan)
     world.ctr_content_plan = plan
     # Actual native 0.6.7 protocol/handshake validation is a release gate. This
     # room barrier already prevents the rc1 client's default 0.6.4 admission.
     world.required_client_version = (0, 6, 7)
     world.ctr_content_original_starts = copy.deepcopy(o.start_inventory_from_pool.value)
-    world.ctr_starting_character = characters.resolve_starting_character(world)
+    if racers is None:
+        world.ctr_starting_character = characters.resolve_starting_character(world)
     return plan
 
 
@@ -1029,6 +1198,11 @@ def create_regions(world):
         # also need that mode's own gate; no mode needs a win in another one.
         first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
         gates = [predicate(world, req[rid]) for rid in [pad["entrance_req"]] + first]
+        # A racer lock (#133 PR 4b) is ANDed onto the pad's own gates, never in
+        # place of them (Rules.add_racer_lock_rules on the legacy path).
+        if pad["racer_lock"] is not None:
+            racer = characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]]
+            gates.append(lambda state, racer=racer: state.has(racer, player))
         menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
         for check in by_pad[pad['id']]:
@@ -1073,6 +1247,31 @@ def create_items(world):
 
 def set_rules(world):
     world.multiworld.completion_condition[world.player] = predicate(world, world.ctr_content_plan["goal"])
+    add_racer_unlock_placement_rules(world)
+
+
+def add_racer_unlock_placement_rules(world):
+    """Keep each racer's unlock item off every check with a route on a pad
+    that racer locks (#133 PR 4b), the legacy design b
+    (Rules.add_racer_unlock_placement_rules). A check whose only routes are
+    on that pad is already out of logic without the racer; this also covers a
+    shared check (`wumpa: global`) that the locked pad is one route of, so the
+    pad that says "requires X" never glows with X's own unlock. Item links
+    count, as on the legacy path. No rule when no pad is locked."""
+    from worlds.generic.Rules import add_item_rule
+    plan, player = world.ctr_content_plan, world.player
+    locks = {pad["id"]: characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]]
+             for pad in plan["pads"] if pad["racer_lock"] is not None}
+    if not locks:
+        return
+    for check in plan["checks"]:
+        racers = sorted({locks[r["own_pad_id"]] for r in check["routes"] if r["own_pad_id"] in locks})
+        if not racers:
+            continue
+        location = world.multiworld.get_location(LOCATION_BY_CODE[check["location"]], player)
+        for racer in racers:
+            owners = (player,) + characters.racer_link_groups(world.multiworld, player, racer)
+            add_item_rule(location, lambda item, n=racer, o=owners: not (item.name == n and item.player in o))
 
 
 def wire(world):
@@ -1088,10 +1287,12 @@ def wire(world):
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
                                  goal=-1, goal_oxide=3, goal_bosses=0, goal_gems=o.gems_required_goal.value,
-                                 starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character], character_unlocks=False,
+                                 starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
+                                 # True exactly when the plan has its `racers` record (#133 PR 4b).
+                                 character_unlocks="racers" in plan,
                                  progressive_boost=0, progressive_stats=0, hit_character=False,
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
-                                 **envelope_options(o)),
+                                 **envelope_options(o), **stat_envelope(world)),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id))
 
 
@@ -1128,18 +1329,40 @@ def validate(plan):
             == expected_requirements, "unsupported or changed physical hub requirements")
     settings = check_settings(plan["track_checks"]) if "track_checks" in plan else {}
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
-    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs),
+    racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
+    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
                      for physical, hub, keys in pad_registry()}
     expected_pads.update({f"garage:{i}": (f"hub:{26+i if i<4 else 25}", "free") for i in range(5)})
     require(set(pads) == set(expected_pads), "physical pad registry mismatch")
+    # Racer locks (#133 PR 4b): only with Character Unlocks, only on a pad that
+    # does not open at the start, never the starting racer or a removed Oxide,
+    # and exactly min(requested, eligible) of them.
+    locks = {pad_id: pad["racer_lock"] for pad_id, pad in pads.items() if pad["racer_lock"] is not None}
+    if locks:
+        require(racers is not None, "a racer lock needs Character Unlocks (the racers record)")
+        try:
+            eligible = set(lock_eligible(plan))
+        except (KeyError, TypeError, ValueError, IndexError, AttributeError):
+            eligible = set()
+        for pad_id, cid in locks.items():
+            require(pad_id in eligible, "a racer lock on a pad that opens at the start or holds no entry")
+            require(cid in characters.CHARACTER_ID_TO_NAME
+                    and not racer_excluded(racers, characters.CHARACTER_ID_TO_NAME[cid]),
+                    "a racer lock names the starting racer, a removed Oxide or no racer")
+    if racers is not None:
+        try:
+            eligible_count = len(lock_eligible(plan))
+        except (KeyError, TypeError, ValueError, IndexError, AttributeError):
+            eligible_count = -1
+        require(len(locks) == min(racers["requested_locks"], eligible_count),
+                "racer lock count is not min(requested_locks, eligible pads)")
     occupied = []
     for pad_id, pad in pads.items():
         require((pad["hub_id"], pad["entrance_req"]) == expected_pads[pad_id], "pad has wrong hub or hub gate")
         require(pad["kind"] == ("garage" if pad_id.startswith("garage:") else "normal"), "pad kind mismatch")
-        require(pad["racer_lock"] is None, "racer-lock routes are not implemented")
         if pad["entry_id"] is None:
             require(not pad["mode_gates"], "empty pad has mode gates")
         else:
@@ -1247,12 +1470,14 @@ def validate(plan):
     letter_items = plan_letter_items(plan)
     # Pool-only packs (#133 PR 4a): one row per pack item, its count from item_packs.
     pack_rows = {content_item_pool.ITEMS[name]: count for name, count in pack_counts(packs).items()}
+    # Character unlocks (#133 PR 4b): one row per unlock racer.
+    pack_rows.update({content_item_pool.ITEMS[name]: 1 for name in (unlock_names(racers) if racers else ())})
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
             | set(letter_items) | set(pack_rows), "item family registry mismatch")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
     require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
-            "a pack item row disagrees with item_packs")
+            "a pack or racer item row disagrees with item_packs or racers")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")
@@ -1324,6 +1549,8 @@ def restore(world, slot_data):
     if type(starting) is not int or not 0 <= starting < 16:
         error("invalid starting racer")
     check_envelope_options(co)
+    check_racer_envelope(plan, co)
+    racers = plan.get("racers")
     names = {**ITEM_BY_CODE, **plan_letter_items(plan)}
     rows = tuple(content_item_pool.ItemRow(name=names[r["item"]], **r) for r in plan["items"]["rows"])
     world.ctr_content_items = content_item_pool.ItemPlan(rows, **{k: v for k, v in plan["items"].items() if k != "rows"})
@@ -1345,8 +1572,17 @@ def restore(world, slot_data):
                                                if co["death_link_send"] & bit}
     world.options.deathlink_amnesty.value = co.get("deathlink_amnesty", 1)
     # Optional legacy classifiers must not read the tracking player's unrelated YAML.
-    world.options.character_unlocks.value = 0
-    world.options.racer_locked_pads.value = 0
+    # Character packs (#133 PR 4b) come from the plan and the envelope.
+    world.options.character_unlocks.value = int(racers is not None)
+    world.options.remove_playable_oxide.value = int(bool(racers and racers["remove_playable_oxide"]))
+    world.options.racer_locked_pads.value = racers["requested_locks"] if racers else 0
+    world.options.racer_locked_pads.legacy_boolean_auto = False
+    world.ctr_racer_locks = plan_racer_locks(plan)
+    world.ctr_racer_lock_counts = {"requested": racers["requested_locks"] if racers else 0,
+                                   "eligible": len(lock_eligible(plan)) if racers else 0}
+    world.options.starting_stat_class.value = co.get("starting_stat_class", 0)
+    world.options.penta_stats.value = co.get("penta_stats", 0)
+    world.options.editable_stats.value = co.get("stat_owner", 0)
     world.options.progressive_boost.value = 0
     world.options.progressive_stats.value = 0
     # The plan's own check families (#133 PR 3b), for code that reads options.
