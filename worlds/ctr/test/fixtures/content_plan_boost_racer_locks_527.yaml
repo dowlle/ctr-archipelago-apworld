@@ -1,0 +1,130 @@
+# Fill regression for #133 PR 4c (second early item, ruling 2026-10-18).
+# Options drawn for seed 527 from the racer stress profile: the content-plan
+# fuzz meta with Character Unlocks, 21 racer-locked pads and Progressive Boost.
+# Per-racer boost, a start of 2 checks and 19 locked pads. Generated with seed
+# 527, the fill dead-ended with only the early first boost.
+Crash Team Racing:
+  accessibility: full
+  content_pool:
+    preset: mixed
+    tracks:
+      retail: all
+      cortex_vortex: true
+      modes:
+      - trophy
+      - ctr
+      - relic
+      custom:
+      - id: package/baby-t-park/1.0.2
+        content_id: baby-t-park
+        uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+        revision: 1.0.2
+        display_name: Baby T Park
+        author: Lockheart
+        laps: 7
+        capabilities:
+          time_trial: true
+          arcade: true
+          relic: false
+          ctr_tokens: true
+          wumpa: true
+          super_turbo_pads: true
+        files:
+        - role: lev
+          sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+          bytes: 2558168
+          format: ctr-lev
+          format_version: 1
+        - role: vrm
+          sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+          bytes: 458808
+          format: ctr-vrm
+          format_version: 1
+        evidence: []
+      - id: package/fuzz-fixture-loop/1.0
+        content_id: fuzz-fixture-loop
+        uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+        revision: '1.0'
+        display_name: Fuzz Fixture Loop
+        author: Fixture Author
+        laps: 3
+        capabilities:
+          time_trial: true
+          arcade: true
+          relic: true
+          ctr_tokens: false
+          wumpa: false
+          super_turbo_pads: true
+        relic_targets:
+          sapphire: 96000
+          gold: 86400
+          platinum: 76800
+        files:
+        - role: lev
+          sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
+          bytes: 1234567
+          format: ctr-lev
+          format_version: 1
+        - role: vrm
+          sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+          bytes: 458808
+          format: ctr-vrm
+          format_version: 1
+        evidence: []
+    cups:
+      count: 0
+    crystals:
+      count: 0
+    bosses:
+      enabled: false
+    required_entries:
+    - custom/baby-t-park/1.0.2
+    - custom/fuzz-fixture-loop/1.0
+  pad_layout:
+    placement: shuffle
+    stages: two
+    mode_order: per_pad
+    merge_trophy_ctr: false
+  item_pool:
+    base:
+      trophies: 5
+      relics:
+        sapphire: 6
+        gold: 4
+        platinum: 2
+      tokens:
+        red: 2
+        green: 2
+        blue: 2
+        yellow: 0
+        purple: 0
+      gems:
+      - red
+      - green
+      - blue
+      - yellow
+      - purple
+      keys: 4
+  oxide_goal: disabled
+  bosses_required_goal: 0
+  gems_required_goal: 5
+  custom_tracks: {}
+  cortex_vortex_track: false
+  progressive_boost: per_character
+  progressive_stats: shared_global
+  itemsanity: false
+  lettersanity: locations_and_items
+  letters_per_track: 3
+  box_locations: false
+  hit_character: false
+  podium_placement_checks: true
+  podium_held_rungs: false
+  podium_held_fifth_rung: true
+  podium_finish_rungs: false
+  podium_any_position_rung: true
+  wumpa_check: global
+  relic_perfect_checks: true
+  boss_track_shuffle: false
+  warp_pad_rules: {}
+  character_unlocks: true
+  racer_locked_pads: 21

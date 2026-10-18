@@ -5,7 +5,9 @@ CTR Challenge and Relic Race modes (#133 PR 3), their podium rungs, Reach 10
 Wumpa and C/T/R letter checks (#133 PR 3b), Cortex Vortex as a track and the
 Relic Race Perfect checks (#133 PR 3c, #453), pool-only packs (#133 PR 4a),
 character unlocks with racer-locked pads and the stat settings (#133 PR 4b),
-and Crystal Challenge entries.
+Progressive Boost, Progressive Stats and Logic Difficulty with the boost terms
+on every check (#133 PR 4c, content_capability.py), and Crystal Challenge
+entries.
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -25,7 +27,7 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import arena_content, custom_packages, tizi_helper, turbo_grant
+from . import arena_content, content_capability, custom_packages, tizi_helper, turbo_grant
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -131,7 +133,7 @@ RACER_KEYS = ("starting_character", "remove_playable_oxide", "requested_locks")
 #: The client stat settings (#133 PR 4b): optional envelope keys, present only
 #: when set. The stat trio is the resolved outcome of
 #: characters.effective_stat_config, sent together; native never re-derives
-#: the precedence. Progressive Stats (source 1) waits for PR 4c.
+#: the precedence. Progressive Stats (source 1) joined with #133 PR 4c.
 STAT_ENVELOPE = ("starting_stat_class", "penta_stats", "stat_source", "stat_owner", "stat_editing_allowed")
 
 
@@ -152,7 +154,8 @@ def package_descriptor(profile):
     as known-good examples for tests, fixtures and the fuzz meta file. The
     flags were measured on the pinned bytes (8 spawns, AI paths, 35
     checkpoints, C/T/R letters, 8 fruit crates); relic is false because the
-    package has no relic target times."""
+    package has no relic target times. Both revisions measure six super turbo
+    pad trigger quads (#133 PR 4c)."""
     revision = profile["package_version"]
     sizes = (2579256, 458808) if revision == "1.0.0" else (2558168, 458808)
     files = [dict(role=role, sha256=profile[role + "_sha256"], bytes=size,
@@ -161,7 +164,8 @@ def package_descriptor(profile):
     return dict(id="package/baby-t-park/" + revision, content_id="baby-t-park",
                 uuid=profile["package_uuid"], revision=revision, display_name="Baby T Park",
                 author="Lockheart", laps=profile["laps"],
-                capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True),
+                capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True,
+                                  super_turbo_pads=True),
                 files=files,
                 evidence=[dict(capability="trophy", file_hashes=[f["sha256"] for f in files],
                                verifier="ctr-managed-profile", revision=1, level="structural")])
@@ -270,7 +274,7 @@ def manual_requirements(manual, rows):
     return out
 
 
-def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None):
+def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None):
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -283,7 +287,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([LETTER_FEATURE] if "lettersanity" in settings else [])
             + ([PERFECT_FEATURE] if "relic_perfect" in settings else [])
             + ([PACK_FEATURE] if packs else [])
-            + ([RACER_FEATURE] if racers else []))
+            + ([RACER_FEATURE] if racers else [])
+            + ([content_capability.FEATURE] if capability else []))
 
 
 def family_settings(options):
@@ -397,11 +402,16 @@ def check_envelope_options(co):
     if "penta_stats" in co and (type(co["penta_stats"]) is not int or co["penta_stats"] != characters.PENTA_PAL):
         error("ctr_options.penta_stats must be 1 when present.")
     trio = [key in co for key in STAT_ENVELOPE[2:]]
-    if any(trio) and not (all(trio) and type(co["stat_source"]) is int and co["stat_source"] == characters.STAT_SOURCE_EDITABLE
-                          and type(co["stat_owner"]) is int and co["stat_owner"] in (1, 2)
-                          and co["stat_editing_allowed"] is True):
+    # Editable stats (2, owner 1 or 2, editing on), or Progressive Stats (1,
+    # owner its mode, editing off, #133 PR 4c), which wins over editable stats.
+    if any(trio) and not (all(trio) and type(co["stat_source"]) is int and type(co["stat_owner"]) is int
+                          and co["stat_owner"] in (1, 2)
+                          and ((co["stat_source"] == characters.STAT_SOURCE_EDITABLE
+                                and co["stat_editing_allowed"] is True)
+                               or (co["stat_source"] == characters.STAT_SOURCE_PROGRESSIVE
+                                   and co["stat_editing_allowed"] is False))):
         error("ctr_options.stat_source, stat_owner and stat_editing_allowed must be editable stats "
-              "(2, 1 or 2, true) together when present.")
+              "(2, 1 or 2, true) or Progressive Stats (1, 1 or 2, false) together when present.")
 
 
 def check_racer_envelope(plan, co):
@@ -661,7 +671,7 @@ def route(entry_id, mode, pad_id, award):
     return dict(entry_id=entry_id, mode=mode, leg_id=None, encounter_id=None, own_pad_id=pad_id, award=award)
 
 
-def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None):
+def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -670,10 +680,9 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     mode that can reach ten fruit (#133 PR 3b). With `relic_perfect`, a Relic
     Race adds its Relic Race Perfect check after the three tiers (#133 PR 3c).
 
-    Logic note: the perfect takes its Relic Race's route and gate only. The
-    USF ruling for perfects (2026-10-13, #453 answer 1) is a Progressive
-    Boost term, and content plans refuse progressive_boost until the pack
-    composition PR, so the starting kart satisfies it here."""
+    With Progressive Boost on (#133 PR 4c), every check whose race needs a
+    boost rank carries it as `boost` (content_capability.check_boost), among
+    them the USF term of the perfect ruling (2026-10-13, #453 answer 1)."""
     title = room_title(track)
     settings = settings or {}
 
@@ -700,6 +709,15 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
         if reach:
             out.append(check(track_location(track, "wumpa", WUMPA_SUFFIX)[1], "wumpa", WUMPA_SUFFIX,
                              [(mode, "wumpa") for mode in reach]))
+    if capability and capability["boost_mode"]:
+        # Lettersanity mode 2: only the drawn letters must be picked up (an
+        # undrawn one is transparent); otherwise all three.
+        picked = ({LETTER_KEYS[i] for i in letters} if settings.get("lettersanity") == 2 else None)
+        for item in out:
+            need = content_capability.check_boost(track, item["kind"], item["routes"][0]["award"],
+                                                  capability, package, picked)
+            if need:
+                item["boost"] = need
     return out
 
 
@@ -828,8 +846,7 @@ def generate(world):
               "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
-    pending = ("progressive_boost", "progressive_stats",
-               "itemsanity", "box_locations", "hit_character", "boss_track_shuffle")
+    pending = ("itemsanity", "box_locations", "hit_character", "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
@@ -984,6 +1001,7 @@ def generate(world):
                 letter_packs[name] = code
     # Every check exists before the item ledger is sized; mode order and the
     # second-stage gates only decide which race and gate reaches each one.
+    capability = content_capability.settings(o)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id"))))
                       if "arena_id" not in t
@@ -1008,6 +1026,9 @@ def generate(world):
         racers = dict(starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
                       remove_playable_oxide=characters.oxide_removed(world), requested_locks=0)
         selected.update({name: 1 for name in unlock_names(racers)})
+    # Capability packs (#133 PR 4c): the boost and stat chains, as many copies
+    # as on the legacy path (progressive_capability.created_item_counts).
+    selected.update(content_capability.item_counts(capability))
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
@@ -1070,7 +1091,8 @@ def generate(world):
                 checks.extend(arena_content.checks(entry,pad['id'],bool(o.crystalsanity.value)))
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
-                                           letters.get(index, ()), package_by_id.get(track.get("package_id"))))
+                                           letters.get(index, ()), package_by_id.get(track.get("package_id")),
+                                           capability))
         pads.append(pad)
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(chosen, entries, pads, package_by_id))
@@ -1091,11 +1113,13 @@ def generate(world):
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
                 tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=required_features(requirements,entries,checks,settings,packs,racers))
+                required_features=required_features(requirements,entries,checks,settings,packs,racers,capability))
     if settings:
         plan["track_checks"] = settings
     if packs:
         plan["item_packs"] = packs
+    if capability:
+        plan["capability"] = capability
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -1165,6 +1189,19 @@ def create_regions(world):
     pad_by_id = {pad["id"]: pad for pad in plan["pads"]}
     # Lettersanity items a check needs on top of its route (#133 PR 3b).
     letters_needed = letter_requirements(plan)
+    from .progressive_capability import gate_satisfied
+
+    def with_boost(rule, check):
+        """A check's boost rank (#133 PR 4c), bound to its pad's racer lock."""
+        need = check.get("boost", 0)
+        if not need:
+            return rule
+        lock = pad_by_id[check["routes"][0]["own_pad_id"]]["racer_lock"]
+        racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
+
+        def has_boost(state, need=need, racer=racer):
+            return gate_satisfied(world, state, player, boost_min=need, required_character=racer)
+        return has_boost if rule is None else (lambda state, rule=rule: rule(state) and has_boost(state))
 
     def stage_gate(route):
         """The second-stage requirement id of a route's mode, or None."""
@@ -1214,7 +1251,7 @@ def create_regions(world):
             if all(rid is not None for rid in later):
                 tests = [predicate(world, req[rid]) for rid in dict.fromkeys(later)]
                 rule = tests[0] if len(tests) == 1 else (lambda state, tests=tuple(tests): any(t(state) for t in tests))
-            rule = with_letters(rule, check)
+            rule = with_boost(with_letters(rule, check), check)
             if rule is not None:
                 location.access_rule = rule
             region.locations.append(location)
@@ -1228,7 +1265,7 @@ def create_regions(world):
         def any_route(state, opens=tuple(opens)):
             return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
                        for entry, test in opens)
-        location.access_rule = with_letters(any_route, check)
+        location.access_rule = with_boost(with_letters(any_route, check), check)
         menu.locations.append(location)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
@@ -1290,7 +1327,10 @@ def wire(world):
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
                                  # True exactly when the plan has its `racers` record (#133 PR 4b).
                                  character_unlocks="racers" in plan,
-                                 progressive_boost=0, progressive_stats=0, hit_character=False,
+                                 # The capability record's modes (#133 PR 4c), 0 without it.
+                                 progressive_boost=plan.get("capability", {}).get("boost_mode", 0),
+                                 progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
+                                 hit_character=False,
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
                                  **envelope_options(o), **stat_envelope(world)),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id))
@@ -1330,7 +1370,8 @@ def validate(plan):
     settings = check_settings(plan["track_checks"]) if "track_checks" in plan else {}
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
-    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers),
+    capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
+    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1452,7 +1493,7 @@ def validate(plan):
                                    and "ctr" in track["modes"] else 0),
                 "letter checks do not match letters_per_track")
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
-                                  packages.get(track.get("package_id"))):
+                                  packages.get(track.get("package_id")), capability):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
@@ -1472,12 +1513,15 @@ def validate(plan):
     pack_rows = {content_item_pool.ITEMS[name]: count for name, count in pack_counts(packs).items()}
     # Character unlocks (#133 PR 4b): one row per unlock racer.
     pack_rows.update({content_item_pool.ITEMS[name]: 1 for name in (unlock_names(racers) if racers else ())})
+    # Capability packs (#133 PR 4c): the boost and stat chains.
+    pack_rows.update({content_item_pool.ITEMS[name]: count
+                      for name, count in content_capability.item_counts(capability).items()})
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
             | set(letter_items) | set(pack_rows), "item family registry mismatch")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
     require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
-            "a pack or racer item row disagrees with item_packs or racers")
+            "a pack, racer or capability item row disagrees with its record")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")
@@ -1550,6 +1594,8 @@ def restore(world, slot_data):
         error("invalid starting racer")
     check_envelope_options(co)
     check_racer_envelope(plan, co)
+    capability = plan.get("capability", {})
+    content_capability.check_envelope(capability, co)
     racers = plan.get("racers")
     names = {**ITEM_BY_CODE, **plan_letter_items(plan)}
     rows = tuple(content_item_pool.ItemRow(name=names[r["item"]], **r) for r in plan["items"]["rows"])
@@ -1582,9 +1628,15 @@ def restore(world, slot_data):
                                    "eligible": len(lock_eligible(plan)) if racers else 0}
     world.options.starting_stat_class.value = co.get("starting_stat_class", 0)
     world.options.penta_stats.value = co.get("penta_stats", 0)
-    world.options.editable_stats.value = co.get("stat_owner", 0)
-    world.options.progressive_boost.value = 0
-    world.options.progressive_stats.value = 0
+    world.options.editable_stats.value = co.get("stat_owner", 0) if co.get("stat_source") == characters.STAT_SOURCE_EDITABLE else 0
+    # Capability packs (#133 PR 4c) come from the plan's record; Logic
+    # Difficulty and Shortcut Knowledge matter only with it.
+    world.options.progressive_boost.value = capability.get("boost_mode", 0)
+    world.options.progressive_boost_blue_fire.value = int(capability.get("boost_blue_fire", False))
+    world.options.progressive_stats.value = capability.get("stats_mode", 0)
+    if capability:
+        world.options.logic_difficulty.value = capability["logic_difficulty"]
+        world.options.shortcut_knowledge.value = capability["shortcut_knowledge"]
     # The plan's own check families (#133 PR 3b), for code that reads options.
     settings = plan.get("track_checks", {})
     rungs = settings.get("podium_rungs", ())
