@@ -3,6 +3,9 @@
 # Any complete package descriptor is accepted (#133 PR 2): track key (content_id),
 # file pins, authored laps and measured capability flags. relic: true also needs
 # relic_targets {sapphire, gold, platinum} in ticks (960 per second).
+# Optional measured weapon_crates (#133 PR 4e): with box_locations on, a track on
+# a named block gets Item Box 1 to min(weapon_crates, 15), seated on its own weapon
+# crates; the client counts them and refuses a wrong count.
 name: CustomPadTest
 game: Crash Team Racing
 Crash Team Racing:
@@ -25,7 +28,7 @@ Crash Team Racing:
           display_name: Baby T Park
           author: Lockheart
           laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true}
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8}
           files:
             - role: lev
               sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8

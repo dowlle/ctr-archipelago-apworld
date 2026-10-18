@@ -8,7 +8,8 @@ character unlocks with racer-locked pads and the stat settings (#133 PR 4b),
 Progressive Boost, Progressive Stats and Logic Difficulty with the boost terms
 on every check (#133 PR 4c, content_capability.py), Itemsanity and Hit
 Character as global checks routed from every race (#133 PR 4d,
-content_global_checks.py), and Crystal Challenge entries.
+content_global_checks.py), Item Box Locations on retail and named-block custom
+tracks (#133 PR 4e, content_item_boxes.py), and Crystal Challenge entries.
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -28,7 +29,8 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import arena_content, content_capability, content_global_checks, custom_packages, tizi_helper, turbo_grant
+from . import (arena_content, content_capability, content_global_checks, content_item_boxes, custom_packages,
+               tizi_helper, turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -156,7 +158,7 @@ def package_descriptor(profile):
     flags were measured on the pinned bytes (8 spawns, AI paths, 35
     checkpoints, C/T/R letters, 8 fruit crates); relic is false because the
     package has no relic target times. Both revisions measure six super turbo
-    pad trigger quads (#133 PR 4c)."""
+    pad trigger quads (#133 PR 4c) and eight weapon crates (#133 PR 4e)."""
     revision = profile["package_version"]
     sizes = (2579256, 458808) if revision == "1.0.0" else (2558168, 458808)
     files = [dict(role=role, sha256=profile[role + "_sha256"], bytes=size,
@@ -166,7 +168,7 @@ def package_descriptor(profile):
                 uuid=profile["package_uuid"], revision=revision, display_name="Baby T Park",
                 author="Lockheart", laps=profile["laps"],
                 capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True,
-                                  super_turbo_pads=True),
+                                  super_turbo_pads=True, weapon_crates=8),
                 files=files,
                 evidence=[dict(capability="trophy", file_hashes=[f["sha256"] for f in files],
                                verifier="ctr-managed-profile", revision=1, level="structural")])
@@ -276,7 +278,7 @@ def manual_requirements(manual, rows):
 
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
-                      global_checks=None):
+                      global_checks=None, item_boxes=None):
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -291,7 +293,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([PACK_FEATURE] if packs else [])
             + ([RACER_FEATURE] if racers else [])
             + ([content_capability.FEATURE] if capability else [])
-            + ([content_global_checks.FEATURE] if global_checks else []))
+            + ([content_global_checks.FEATURE] if global_checks else [])
+            + ([content_item_boxes.FEATURE] if item_boxes else []))
 
 
 def family_settings(options):
@@ -415,6 +418,26 @@ def check_envelope_options(co):
                                    and co["stat_editing_allowed"] is False))):
         error("ctr_options.stat_source, stat_owner and stat_editing_allowed must be editable stats "
               "(2, 1 or 2, true) or Progressive Stats (1, 1 or 2, false) together when present.")
+
+
+def box_envelope(world):
+    """Item Box Locations (#133 PR 4e): `box_locations` and the seed's
+    `color_boxes_by_item`, present exactly when the plan has its `item_boxes`
+    record, so plans without boxes keep their envelope. Native reads an absent
+    `color_boxes_by_item` as off (pink boxes)."""
+    if "item_boxes" not in world.ctr_content_plan:
+        return {}
+    return dict(box_locations=True, color_boxes_by_item=bool(world.options.color_boxes_by_item.value))
+
+
+def check_box_envelope(plan, co):
+    """The envelope's box keys are present exactly with the `item_boxes`
+    record: `box_locations` true and `color_boxes_by_item` true or false."""
+    if "item_boxes" in plan:
+        if co.get("box_locations") is not True or type(co.get("color_boxes_by_item")) is not bool:
+            error("box envelope disagrees with the plan's item_boxes record")
+    elif "box_locations" in co or "color_boxes_by_item" in co:
+        error("box envelope keys without the plan's item_boxes record")
 
 
 def check_racer_envelope(plan, co):
@@ -674,7 +697,8 @@ def route(entry_id, mode, pad_id, award):
     return dict(entry_id=entry_id, mode=mode, leg_id=None, encounter_id=None, own_pad_id=pad_id, award=award)
 
 
-def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None):
+def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None,
+                 item_boxes=None):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -685,7 +709,11 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
 
     With Progressive Boost on (#133 PR 4c), every check whose race needs a
     boost rank carries it as `boost` (content_capability.check_boost), among
-    them the USF term of the perfect ruling (2026-10-13, #453 answer 1)."""
+    them the USF term of the perfect ruling (2026-10-13, #453 answer 1).
+
+    With Item Box Locations on (#133 PR 4e), the track's box checks come
+    last, each with a route per mode of the entry and its legacy box terms
+    (content_item_boxes)."""
     title = room_title(track)
     settings = settings or {}
 
@@ -721,6 +749,14 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
                                                   capability, package, picked)
             if need:
                 item["boost"] = need
+    for slot, code, suffix in content_item_boxes.track_boxes(track, item_boxes, package):
+        box = check(code, content_item_boxes.KIND, suffix, [(mode, content_item_boxes.AWARD) for mode in modes])
+        need, stats = content_item_boxes.box_terms(track, slot, capability, package)
+        if need:
+            box["boost"] = need
+        if stats:
+            box["stats"] = True
+        out.append(box)
     return out
 
 
@@ -849,7 +885,7 @@ def generate(world):
               "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
-    pending = ("box_locations", "boss_track_shuffle")
+    pending = ("boss_track_shuffle",)
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
@@ -1005,8 +1041,10 @@ def generate(world):
     # Every check exists before the item ledger is sized; mode order and the
     # second-stage gates only decide which race and gate reaches each one.
     capability = content_capability.settings(o)
+    # Item Box Locations (#133 PR 4e): per-track box checks.
+    item_boxes = content_item_boxes.settings(o)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
-                                       package_by_id.get(t.get("package_id"))))
+                                       package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
                       if "arena_id" not in t
                       else len(arena_content.checks(dict(id="entry/" + t["id"], kind="crystal", arena_id=t["arena_id"],
                                                          target=20, time_limit_ticks=arena_content.TIMERS[t["arena_id"]]),
@@ -1018,7 +1056,7 @@ def generate(world):
     # Itemsanity and Hit Character (#133 PR 4d): global checks, routed from
     # every race that can earn them once the pads are assigned.
     global_checks = content_global_checks.settings(o)
-    check_count += content_global_checks.check_count(global_checks, chosen)
+    check_count += content_global_checks.check_count(global_checks, chosen, package_by_id)
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -1101,14 +1139,14 @@ def generate(world):
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
                                            letters.get(index, ()), package_by_id.get(track.get("package_id")),
-                                           capability))
+                                           capability, item_boxes))
         pads.append(pad)
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(chosen, entries, pads, package_by_id))
         if wumpa:
             checks.append(wumpa)
     checks.extend(content_global_checks.checks(global_checks, [t for t in chosen if "arena_id" not in t],
-                                               entries, pads))
+                                               entries, pads, package_by_id))
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
@@ -1125,7 +1163,7 @@ def generate(world):
                 tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
-                                                    global_checks))
+                                                    global_checks,item_boxes))
     if settings:
         plan["track_checks"] = settings
     if packs:
@@ -1134,6 +1172,8 @@ def generate(world):
         plan["capability"] = capability
     if global_checks:
         plan["global_checks"] = global_checks
+    if item_boxes:
+        plan["item_boxes"] = item_boxes
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -1224,10 +1264,15 @@ def create_regions(world):
     package_by_id = {p["id"]: p for p in plan["packages"]}
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
 
+    from .progressive_capability import STAT_CHAINS
+
     def with_boost(rule, check):
-        """A check's boost rank (#133 PR 4c), bound to its pad's racer lock."""
+        """A check's boost rank (#133 PR 4c), and an Item Box check's stat
+        term (#133 PR 4e, one copy of each stat chain), bound to its pad's racer
+        lock: one racer must meet both, as the legacy box gate reads it."""
         need = check.get("boost", 0)
-        if not need:
+        stat_mins = {chain: 1 for chain in STAT_CHAINS} if check.get("stats") else None
+        if not need and not stat_mins:
             return rule
         lock = pad_by_id[check["routes"][0]["own_pad_id"]]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
@@ -1236,8 +1281,8 @@ def create_regions(world):
                                              package_by_id.get(track.get("package_id")))
                if weapons and track is not None and need == 1 else None)
 
-        def has_boost(state, need=need, racer=racer, arm=arm):
-            if gate_satisfied(world, state, player, boost_min=need, required_character=racer):
+        def has_boost(state, need=need, racer=racer, arm=arm, stat_mins=stat_mins):
+            if gate_satisfied(world, state, player, boost_min=need, stat_mins=stat_mins, required_character=racer):
                 return True
             if arm is None:
                 return False
@@ -1394,7 +1439,7 @@ def wire(world):
                                  progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
                                  hit_character=bool(plan.get("global_checks", {}).get("hit_character")),
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
-                                 **envelope_options(o), **stat_envelope(world)),
+                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world)),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
 
 
@@ -1434,8 +1479,10 @@ def validate(plan):
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
+    item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
+                  if "item_boxes" in plan else {})
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
-                                                         global_checks),
+                                                         global_checks,item_boxes),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1557,7 +1604,7 @@ def validate(plan):
                                    and "ctr" in track["modes"] else 0),
                 "letter checks do not match letters_per_track")
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
-                                  packages.get(track.get("package_id")), capability):
+                                  packages.get(track.get("package_id")), capability, item_boxes):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
@@ -1567,7 +1614,7 @@ def validate(plan):
             require(wumpa["location"] not in expected_checks, "duplicate check identity")
             expected_checks[wumpa["location"]] = wumpa
     # Itemsanity and Hit Character (#133 PR 4d), recomputed from the layout.
-    for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"]):
+    for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"], packages):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
     require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
@@ -1665,6 +1712,7 @@ def restore(world, slot_data):
         error("invalid starting racer")
     check_envelope_options(co)
     check_racer_envelope(plan, co)
+    check_box_envelope(plan, co)
     capability = plan.get("capability", {})
     content_capability.check_envelope(capability, co)
     racers = plan.get("racers")
@@ -1734,6 +1782,13 @@ def restore(world, slot_data):
     # the plan's unlock wins.
     global_checks = plan.get("global_checks", {})
     content_global_checks.check_encounter_block(plan, slot_data)
+    # Item Box Locations (#133 PR 4e): the record's tier and the envelope's
+    # colour setting.
+    item_boxes = plan.get("item_boxes")
+    world.options.box_locations.value = int(item_boxes is not None)
+    if item_boxes is not None:
+        world.options.shortcut_knowledge.value = item_boxes["shortcut_knowledge"]
+        world.options.color_boxes_by_item.value = int(co["color_boxes_by_item"])
     world.options.itemsanity.value = int(bool(global_checks.get("itemsanity")))
     world.options.hit_character.value = int(bool(global_checks.get("hit_character")))
     world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}

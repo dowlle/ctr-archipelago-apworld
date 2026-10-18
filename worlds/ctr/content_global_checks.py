@@ -36,6 +36,11 @@ the four boss guests always take the content-plan Key fallback
 
 The room carries the normal `hit_character_encounters` block (schema 3) when
 Hit Character is on, with the fallback derived from the plan's checks.
+
+WEAPON CRATES (#133 PR 4e). A custom track whose package states
+`capabilities.weapon_crates: 0` rolls no weapon, so it is no route for either
+family: nothing can be fired or hit there. A package that does not state the
+count keeps the earlier routes (every real package measured has crates).
 """
 from Options import OptionError
 
@@ -83,10 +88,18 @@ def _route(entry_id, mode, pad_id, award):
     return dict(entry_id=entry_id, mode=mode, leg_id=None, encounter_id=None, own_pad_id=pad_id, award=award)
 
 
-def race_routes(tracks, entries, pads):
+def no_crates(track, packages):
+    """True for a custom track whose package states no weapon crates."""
+    package = (packages or {}).get(track.get("package_id"))
+    return track.get("origin") == "custom" and bool(package) and \
+        package["capabilities"].get("weapon_crates", 1) == 0
+
+
+def race_routes(tracks, entries, pads, packages=None):
     """[(physical pad, entry id, pad id, mode, origin)] of every Trophy Race and
-    CTR Challenge in the plan, in physical pad order, then mode order."""
-    by_track = {track["id"]: track for track in tracks}
+    CTR Challenge in the plan, in physical pad order, then mode order. A custom
+    track with no weapon crates is skipped."""
+    by_track = {track["id"]: track for track in tracks if not no_crates(track, packages)}
     pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
     out = []
     for entry in entries:
@@ -105,13 +118,13 @@ def hit_routes(routes, target):
     return [r for r in routes if r[4] == "retail" or target in hit_character.DEFAULT_RACER_IDS]
 
 
-def checks(record, tracks, entries, pads):
+def checks(record, tracks, entries, pads, packages=None):
     """Every global check of the record, Itemsanity first (frozen class order),
     then Hit Character (engine id order). Refuses a plan in which a check has no
     route."""
     if not record:
         return []
-    routes = race_routes(tracks, entries, pads)
+    routes = race_routes(tracks, entries, pads, packages)
     out = []
     if record.get("itemsanity"):
         if not routes:
@@ -135,12 +148,13 @@ def checks(record, tracks, entries, pads):
     return out
 
 
-def check_count(record, tracks):
+def check_count(record, tracks, packages=None):
     """How many global checks a plan with these tracks holds (before the pads
     are assigned), refusing a family with no route as `checks` does."""
     if not record:
         return 0
-    racing = [t for t in tracks if "arena_id" not in t and set(t.get("modes", ())) & set(RACE_MODES)]
+    racing = [t for t in tracks if "arena_id" not in t and set(t.get("modes", ())) & set(RACE_MODES)
+              and not no_crates(t, packages)]
     count = 0
     if record.get("itemsanity"):
         if not racing:
@@ -288,7 +302,9 @@ def tiger_temple_door(world):
     Itemsanity on, picking it up needs one of the door-opener weapons
     (Rules.add_lettersanity_rules, item_boxes.TIGER_TEMPLE_DOOR_OPENERS): on its
     Letter R check, and on its CTR Token Challenge unless Lettersanity 2 left the
-    R undrawn. Applies to the retail Tiger Temple only."""
+    R undrawn. Item Box 5 sits behind the same door (item_boxes.BOX_RULES,
+    #133 PR 4e) and takes the same term. Applies to the retail Tiger Temple
+    only."""
     plan = world.ctr_content_plan
     if not plan.get("global_checks", {}).get("itemsanity"):
         return
@@ -303,6 +319,9 @@ def tiger_temple_door(world):
         names.append(letter_r)
     if CTR_LOCATION_IDS[token] in codes and (mode != 2 or CTR_LOCATION_IDS[letter_r] in codes):
         names.append(token)
+    door_box = "Tiger Temple: Item Box 5"
+    if CTR_LOCATION_IDS[door_box] in codes:
+        names.append(door_box)
     for name in names:
         location = world.multiworld.get_location(name, player)
         previous = location.access_rule

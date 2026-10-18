@@ -23,7 +23,14 @@ Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`)
                   ctr_tokens, wumpa; optional super_turbo_pads (#133 PR 4c),
                   whether the LEV has any super turbo pad trigger quad. Native
                   measures it and refuses a stated value the bytes disagree
-                  with; an absent value counts as true in logic.
+                  with; an absent value counts as true in logic. Optional
+                  weapon_crates (#133 PR 4e), a whole number 0 to 65536: how
+                  many weapon crates (the "?" item crate) the LEV holds. Native
+                  counts them and refuses a stated count the bytes disagree
+                  with. It decides the track's Item Box checks on a named
+                  block (min(count, 15)) and, at 0, that the track is no
+                  Itemsanity route; absent means no Item Box checks and the
+                  earlier Itemsanity routes.
     relic_targets optional; required exactly when relic is true. Sapphire, gold
                   and platinum times in ticks (960 per second), strictly faster
                   from sapphire to platinum, at most one hour
@@ -44,7 +51,14 @@ CAPABILITIES = ("time_trial", "arcade", "relic", "ctr_tokens", "wumpa")
 #: flag (native COLL_STEP_TRIGGER_SUPER_TURBO_PAD). Such a track takes the Hot
 #: Air Skyway finish rule (ruling 2026-10-17); an absent flag is treated as
 #: true, the safe direction (content_capability.finish_boost).
-OPTIONAL_CAPABILITIES = ("super_turbo_pads",)
+#: `weapon_crates` (#133 PR 4e): the number of weapon crate instances
+#: (PU_RANDOM_CRATE) in the LEV, a measured count rather than a flag. Item Box
+#: checks on a named-block track take their seats from these crates
+#: (content_item_boxes.py); native counts them on load and refuses a mismatch.
+OPTIONAL_CAPABILITIES = ("super_turbo_pads", "weapon_crates")
+#: The instance-table ceiling native measures against
+#: (native_custom_content_verify.c refuses a LEV with more instances).
+WEAPON_CRATES_MAX = 65536
 RELIC_TIERS = ("sapphire", "gold", "platinum")
 REQUIRED = ("id", "content_id", "uuid", "revision", "display_name", "author", "laps",
             "capabilities", "files", "evidence")
@@ -140,7 +154,9 @@ def admit(descriptor, where="package"):
     caps = d["capabilities"]
     _closed(caps, CAPABILITIES, OPTIONAL_CAPABILITIES, where + ".capabilities")
     for name in CAPABILITIES + tuple(n for n in OPTIONAL_CAPABILITIES if n in caps):
-        if type(caps[name]) is not bool:
+        if name == "weapon_crates":
+            _integer(caps[name], 0, WEAPON_CRATES_MAX, f"{where}.capabilities.{name}")
+        elif type(caps[name]) is not bool:
             _fail(f"{where}.capabilities.{name}", "must be true or false")
     if caps["relic"] != ("relic_targets" in d):
         _fail(where, "relic_targets is required exactly when capabilities.relic is true")

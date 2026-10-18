@@ -83,10 +83,11 @@
           "item_packs_v1",
           "character_unlocks_v1",
           "capability_packs_v1",
-          "global_checks_v1"
+          "global_checks_v1",
+          "item_boxes_v1"
         ]
       },
-      "maxItems": 14,
+      "maxItems": 15,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -104,6 +105,9 @@
     },
     "global_checks": {
       "$ref": "#/$defs/GlobalChecks"
+    },
+    "item_boxes": {
+      "$ref": "#/$defs/ItemBoxes"
     }
   },
   "required": [
@@ -281,6 +285,12 @@
             "super_turbo_pads": {
               "description": "Optional (#133 PR 4c): the LEV has a trigger quad whose terrain byte carries the super turbo pad step flag. Native measures it and refuses a stated value the bytes disagree with. Absent counts as true in logic.",
               "type": "boolean"
+            },
+            "weapon_crates": {
+              "description": "Optional (#133 PR 4e): how many weapon crates (PU_RANDOM_CRATE instances) the LEV holds. Native counts them and refuses a stated count the bytes disagree with. Item Box checks on a named-block track take min(count, 15) of them as seats; 0 also means the track is no Itemsanity route.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65536
             }
           },
           "required": [
@@ -1339,6 +1349,10 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 3
+        },
+        "stats": {
+          "description": "Item Box Locations (#133 PR 4e): true when the check needs one copy of each stat chain (the hard-tier box rule), present only when the plan's capability record has Progressive Stats on. Bound to the pad's racer lock with the check's boost rank. content_item_boxes decides it; content_plan.validate recomputes it.",
+          "const": true
         }
       },
       "required": [
@@ -1588,6 +1602,21 @@
         }
       },
       "required": [],
+      "additionalProperties": false
+    },
+    "ItemBoxes": {
+      "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none.",
+      "type": "object",
+      "properties": {
+        "shortcut_knowledge": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "shortcut_knowledge"
+      ],
       "additionalProperties": false
     }
   }
