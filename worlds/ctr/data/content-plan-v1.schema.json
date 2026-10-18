@@ -82,10 +82,11 @@
           "relic_perfect_v1",
           "item_packs_v1",
           "character_unlocks_v1",
-          "capability_packs_v1"
+          "capability_packs_v1",
+          "global_checks_v1"
         ]
       },
-      "maxItems": 13,
+      "maxItems": 14,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -100,6 +101,9 @@
     },
     "capability": {
       "$ref": "#/$defs/Capability"
+    },
+    "global_checks": {
+      "$ref": "#/$defs/GlobalChecks"
     }
   },
   "required": [
@@ -1570,6 +1574,20 @@
         "logic_difficulty",
         "shortcut_knowledge"
       ],
+      "additionalProperties": false
+    },
+    "GlobalChecks": {
+      "description": "Global check families (#133 PR 4d), present only when one is on: itemsanity (22 use checks and one ledger row per weapon item) and hit_character (16 checks, with the room's hit_character_encounters block). Their checks have owner global and a route per Trophy Race and CTR Challenge that can earn them; content_global_checks.checks decides them and content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "itemsanity": {
+          "const": true
+        },
+        "hit_character": {
+          "const": true
+        }
+      },
+      "required": [],
       "additionalProperties": false
     }
   }

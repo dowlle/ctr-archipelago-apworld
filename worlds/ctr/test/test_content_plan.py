@@ -151,8 +151,9 @@ class TestContentPlan(CTRTestBase):
         # Options added on main after the experiment refuse instead of being
         # dropped from the content-plan wire.
         # Tizi Helper and an explicit death_link_send list have routes since
-        # #133 PR 4a (test_item_packs.py); Hit Character still refuses.
+        # #133 PR 4a (test_item_packs.py), Hit Character and Itemsanity since
+        # #133 PR 4d (test_global_checks.py); Item Box Locations still refuse.
         options = profile_options()
-        options["hit_character"] = True
-        with self.assertRaisesRegex(OptionError, "hit_character"):
+        options["box_locations"] = True
+        with self.assertRaisesRegex(OptionError, "box_locations"):
             make_world(options)

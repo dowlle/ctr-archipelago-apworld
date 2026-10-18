@@ -121,6 +121,21 @@ FALLBACK_KEYS: Dict[int, int] = {
     15: 4,  # Nitros Oxide
 }
 
+#: Key fallback on content plans (#133 PR 4d). A content plan has no boss
+#: encounters yet (bosses come with #133 PR 6), so the four boss guests have no
+#: boss race and no unlock win either; they join through Keys like the other
+#: guests. The counts follow the retail boss order (Ripper Roo, Papu Papu,
+#: Komodo Joe, Pinstripe) over the same 1..4 Key range. Not a ruling yet: the
+#: counts are an open question in the #133 slice plan, PR 4d section. Normal
+#: rooms keep `FALLBACK_KEYS`, where a fallback on a boss guest is refused.
+CONTENT_PLAN_FALLBACK_KEYS: Dict[int, int] = {
+    **FALLBACK_KEYS,
+    10: 1,  # Ripper Roo
+    9: 2,   # Papu Papu
+    11: 3,  # Komodo Joe
+    8: 4,   # Pinstripe
+}
+
 #: Inclusive bounds the wire accepts for `fallback_keys`.
 FALLBACK_KEYS_MIN = 1
 FALLBACK_KEYS_MAX = 4
@@ -388,18 +403,19 @@ def slot_data(world) -> Dict[str, object] | None:
 # any of the functions below, so the existing RNG consumption order is
 # untouched and generation stays deterministic.
 
-def fallback_guests(created_codes) -> Dict[int, int]:
+def fallback_guests(created_codes, table=None) -> Dict[int, int]:
     """`{guest engine id: Key count}` for the guests with no unlock win here.
 
     Pure function of the seed's created AP location codes, so it is directly
     testable without a world. A guest qualifies only when it has a
     `FALLBACK_KEYS` entry (the four bosses never do) and none of its
-    authoritative `UNLOCK_TRIGGERS` codes is in `created_codes`.
+    authoritative `UNLOCK_TRIGGERS` codes is in `created_codes`. A content
+    plan passes `CONTENT_PLAN_FALLBACK_KEYS` as `table`.
     """
     created = {int(code) for code in created_codes}
     return {
         guest: keys
-        for guest, keys in sorted(FALLBACK_KEYS.items())
+        for guest, keys in sorted((FALLBACK_KEYS if table is None else table).items())
         if not created.intersection(UNLOCK_TRIGGERS[guest][0])
     }
 
@@ -519,7 +535,7 @@ def _validate_order(entry, label: str) -> None:
                           expected_set=ALL_RACER_IDS, exact_length=16)
 
 
-def _validate_block(block) -> None:
+def _validate_block(block, table=None) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
     Every structural commitment of the schema-3 contract is enforced exactly:
@@ -532,7 +548,11 @@ def _validate_block(block) -> None:
     on a guest with no table entry. The ORDER itself is not constrained -- any
     permutation is accepted and preserved verbatim -- so a tracker can
     round-trip a block it did not draw.
+
+    `table` is the fallback table the room uses: `FALLBACK_KEYS` for a normal
+    room (the default), `CONTENT_PLAN_FALLBACK_KEYS` for a content plan.
     """
+    fallback_table = FALLBACK_KEYS if table is None else table
     if not isinstance(block, dict):
         _fail("block must be an object")
     if set(block) != {"schema", "locations", "policy", "tracks", "cups",
@@ -602,7 +622,7 @@ def _validate_block(block) -> None:
             _fail(f"unlock_triggers[{cid!r}] must carry exactly kind and "
                   "any_of, optionally plus fallback_keys")
         if "fallback_keys" in entry:
-            if cid not in FALLBACK_KEYS:
+            if cid not in fallback_table:
                 _fail(f"unlock_triggers[{cid!r}] must not carry fallback_keys: "
                       "this guest always has its own boss race and has no "
                       "fallback entry")
@@ -613,9 +633,9 @@ def _validate_block(block) -> None:
             if not FALLBACK_KEYS_MIN <= count <= FALLBACK_KEYS_MAX:
                 _fail(f"unlock_triggers[{cid!r}].fallback_keys must be in "
                       f"{FALLBACK_KEYS_MIN}..{FALLBACK_KEYS_MAX}, got {count}")
-            if count != FALLBACK_KEYS[cid]:
+            if count != fallback_table[cid]:
                 _fail(f"unlock_triggers[{cid!r}].fallback_keys must be the "
-                      f"table value {FALLBACK_KEYS[cid]}, got {count}")
+                      f"table value {fallback_table[cid]}, got {count}")
         expected_codes, expected_kind = UNLOCK_TRIGGERS[cid]
         if entry.get("kind") != expected_kind:
             _fail(f"unlock_triggers[{cid!r}].kind must be {expected_kind!r}")
@@ -645,7 +665,7 @@ def _validate_block(block) -> None:
 # Universal Tracker restore
 # ---------------------------------------------------------------------------
 
-def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
+def restore_from_wire(world, passthrough: Dict[str, object], table=None) -> None:
     """Pin the connected seed's Hit Character block instead of re-drawing.
 
     The scalar, the global schema and the block must agree, and every malformed
@@ -676,7 +696,8 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
     schema. `ctr_options.hit_character`, when present, must be an actual JSON
     boolean. The restored block is kept verbatim: no seed and no array is
     redrawn. Any previously cached block is cleared before validation so a
-    refused restore never leaves a stale valid seed active.
+    refused restore never leaves a stale valid seed active. A content plan
+    passes `CONTENT_PLAN_FALLBACK_KEYS` as `table`.
     """
     world.ctr_hit_character_encounters = None
     world.ctr_hit_character_seed = None
@@ -731,7 +752,7 @@ def restore_from_wire(world, passthrough: Dict[str, object]) -> None:
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    _validate_block(block)
+    _validate_block(block, table)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
     # The fallback determination is part of the restored data, not something a
