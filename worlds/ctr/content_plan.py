@@ -6,8 +6,9 @@ Wumpa and C/T/R letter checks (#133 PR 3b), Cortex Vortex as a track and the
 Relic Race Perfect checks (#133 PR 3c, #453), pool-only packs (#133 PR 4a),
 character unlocks with racer-locked pads and the stat settings (#133 PR 4b),
 Progressive Boost, Progressive Stats and Logic Difficulty with the boost terms
-on every check (#133 PR 4c, content_capability.py), and Crystal Challenge
-entries.
+on every check (#133 PR 4c, content_capability.py), Itemsanity and Hit
+Character as global checks routed from every race (#133 PR 4d,
+content_global_checks.py), and Crystal Challenge entries.
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -27,7 +28,7 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import arena_content, content_capability, custom_packages, tizi_helper, turbo_grant
+from . import arena_content, content_capability, content_global_checks, custom_packages, tizi_helper, turbo_grant
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -274,7 +275,8 @@ def manual_requirements(manual, rows):
     return out
 
 
-def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None):
+def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
+                      global_checks=None):
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -288,7 +290,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([PERFECT_FEATURE] if "relic_perfect" in settings else [])
             + ([PACK_FEATURE] if packs else [])
             + ([RACER_FEATURE] if racers else [])
-            + ([content_capability.FEATURE] if capability else []))
+            + ([content_capability.FEATURE] if capability else [])
+            + ([content_global_checks.FEATURE] if global_checks else []))
 
 
 def family_settings(options):
@@ -846,7 +849,7 @@ def generate(world):
               "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
     if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
         error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
-    pending = ("itemsanity", "box_locations", "hit_character", "boss_track_shuffle")
+    pending = ("box_locations", "boss_track_shuffle")
     enabled = [name for name in pending if getattr(o, name).value]
     if enabled:
         error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
@@ -1012,6 +1015,10 @@ def generate(world):
     if settings.get("wumpa") == "global" and any(
             wumpa_modes(t, package_by_id.get(t.get("package_id"))) for t in chosen if "arena_id" not in t):
         check_count += 1
+    # Itemsanity and Hit Character (#133 PR 4d): global checks, routed from
+    # every race that can earn them once the pads are assigned.
+    global_checks = content_global_checks.settings(o)
+    check_count += content_global_checks.check_count(global_checks, chosen)
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -1029,6 +1036,8 @@ def generate(world):
     # Capability packs (#133 PR 4c): the boost and stat chains, as many copies
     # as on the legacy path (progressive_capability.created_item_counts).
     selected.update(content_capability.item_counts(capability))
+    # Itemsanity (#133 PR 4d): one row per weapon item.
+    selected.update(content_global_checks.item_counts(global_checks))
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
@@ -1098,6 +1107,8 @@ def generate(world):
         wumpa = global_wumpa_check(global_wumpa_routes(chosen, entries, pads, package_by_id))
         if wumpa:
             checks.append(wumpa)
+    checks.extend(content_global_checks.checks(global_checks, [t for t in chosen if "arena_id" not in t],
+                                               entries, pads))
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
@@ -1113,13 +1124,16 @@ def generate(world):
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
                 tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
-                required_features=required_features(requirements,entries,checks,settings,packs,racers,capability))
+                required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
+                                                    global_checks))
     if settings:
         plan["track_checks"] = settings
     if packs:
         plan["item_packs"] = packs
     if capability:
         plan["capability"] = capability
+    if global_checks:
+        plan["global_checks"] = global_checks
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -1136,6 +1150,18 @@ def generate(world):
     world.ctr_content_original_starts = copy.deepcopy(o.start_inventory_from_pool.value)
     if racers is None:
         world.ctr_starting_character = characters.resolve_starting_character(world)
+    # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
+    # draw, and the fallback from the plan's checks. Itemsanity: one weapon
+    # type marked early, the legacy draw (item_creation.create_items). Neither
+    # draws while its option is off, so other plans are unchanged.
+    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
+    if global_checks.get("hit_character"):
+        content_global_checks.encounter_block(world, plan)
+    if global_checks.get("itemsanity"):
+        from .itemsanity import WEAPONS
+        early_count = world.random.randint(1, 2)
+        weapon = world.random.sample(WEAPONS, early_count)[0]
+        world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
     return plan
 
 
@@ -1191,6 +1217,13 @@ def create_regions(world):
     letters_needed = letter_requirements(plan)
     from .progressive_capability import gate_satisfied
 
+    # With Itemsanity on (#133 PR 4d), the legacy weapon alternatives to a
+    # first-boost floor (content_capability.weapon_arm).
+    weapons = bool(plan.get("global_checks", {}).get("itemsanity"))
+    track_by_id = {t["id"]: t for t in plan["tracks"]}
+    package_by_id = {p["id"]: p for p in plan["packages"]}
+    from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
+
     def with_boost(rule, check):
         """A check's boost rank (#133 PR 4c), bound to its pad's racer lock."""
         need = check.get("boost", 0)
@@ -1198,9 +1231,19 @@ def create_regions(world):
             return rule
         lock = pad_by_id[check["routes"][0]["own_pad_id"]]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
+        track = track_by_id.get(check["owner"])
+        arm = (content_capability.weapon_arm(track, check["kind"], check["routes"][0]["award"], plan["capability"],
+                                             package_by_id.get(track.get("package_id")))
+               if weapons and track is not None and need == 1 else None)
 
-        def has_boost(state, need=need, racer=racer):
-            return gate_satisfied(world, state, player, boost_min=need, required_character=racer)
+        def has_boost(state, need=need, racer=racer, arm=arm):
+            if gate_satisfied(world, state, player, boost_min=need, required_character=racer):
+                return True
+            if arm is None:
+                return False
+            if arm[0] == "families":
+                return family_count(state, player, USEFUL_WEAPON_FAMILIES) >= arm[1]
+            return state.has_any(arm[1], player)
         return has_boost if rule is None else (lambda state, rule=rule: rule(state) and has_boost(state))
 
     def stage_gate(route):
@@ -1255,12 +1298,18 @@ def create_regions(world):
             if rule is not None:
                 location.access_rule = rule
             region.locations.append(location)
+    # Itemsanity and Hit Character checks (#133 PR 4d) take their rules in
+    # set_rules, once every trigger location exists.
+    world.ctr_global_routes = []
     for check in shared:
         location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
         opens = []
         for r in check["routes"]:
             rid = stage_gate(r)
             opens.append((r["entry_id"], predicate(world, req[rid]) if rid is not None else None))
+        if check["kind"] in ("itemsanity", "hit"):
+            world.ctr_global_routes.append((check, location, [(entry, test, r) for (entry, test), r
+                                                              in zip(opens, check["routes"])]))
 
         def any_route(state, opens=tuple(opens)):
             return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
@@ -1284,6 +1333,9 @@ def create_items(world):
 
 def set_rules(world):
     world.multiworld.completion_condition[world.player] = predicate(world, world.ctr_content_plan["goal"])
+    for check, location, route_tests in getattr(world, "ctr_global_routes", ()):
+        content_global_checks.install(world, check, location, route_tests)
+    content_global_checks.tiger_temple_door(world)
     add_racer_unlock_placement_rules(world)
 
 
@@ -1302,6 +1354,12 @@ def add_racer_unlock_placement_rules(world):
     if not locks:
         return
     for check in plan["checks"]:
+        # Itemsanity and Hit Character checks (#133 PR 4d) route from every
+        # race and glow on no pad, so a lock gives them no self-lock to guard:
+        # the rule would only bar each locked racer's unlock from all 38 of
+        # them, which left fills with nowhere to put the last racer item.
+        if check["kind"] in ("itemsanity", "hit"):
+            continue
         racers = sorted({locks[r["own_pad_id"]] for r in check["routes"] if r["own_pad_id"] in locks})
         if not racers:
             continue
@@ -1321,6 +1379,10 @@ def wire(world):
     # #133 PR 4a: the optional envelope keys (ENVELOPE_OPTIONAL) and the
     # trap_identities block every schema-18 seed carries, so a content-plan
     # room names its trap effects the same way a normal room does.
+    # Hit Character (#133 PR 4d): the normal room's encounter block, with the
+    # plan's fallback, and the envelope flag that admits it.
+    hit = dict(hit_character_encounters=copy.deepcopy(world.ctr_hit_character_encounters)) \
+        if plan.get("global_checks", {}).get("hit_character") else {}
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
                                  goal=-1, goal_oxide=3, goal_bosses=0, goal_gems=o.gems_required_goal.value,
@@ -1330,10 +1392,10 @@ def wire(world):
                                  # The capability record's modes (#133 PR 4c), 0 without it.
                                  progressive_boost=plan.get("capability", {}).get("boost_mode", 0),
                                  progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
-                                 hit_character=False,
+                                 hit_character=bool(plan.get("global_checks", {}).get("hit_character")),
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
                                  **envelope_options(o), **stat_envelope(world)),
-                trap_identities=traps.trap_identities_block(world.item_name_to_id))
+                trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
 
 
 def validate(plan):
@@ -1371,7 +1433,9 @@ def validate(plan):
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
-    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability),
+    global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
+    require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
+                                                         global_checks),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1502,6 +1566,10 @@ def validate(plan):
         if wumpa:
             require(wumpa["location"] not in expected_checks, "duplicate check identity")
             expected_checks[wumpa["location"]] = wumpa
+    # Itemsanity and Hit Character (#133 PR 4d), recomputed from the layout.
+    for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"]):
+        require(check["location"] not in expected_checks, "duplicate check identity")
+        expected_checks[check["location"]] = check
     require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
             "content layout has no playable starting pad")
     require(checks == expected_checks, "check registry or route ownership mismatch")
@@ -1516,12 +1584,15 @@ def validate(plan):
     # Capability packs (#133 PR 4c): the boost and stat chains.
     pack_rows.update({content_item_pool.ITEMS[name]: count
                       for name, count in content_capability.item_counts(capability).items()})
+    # Itemsanity (#133 PR 4d): one row per weapon item.
+    pack_rows.update({content_item_pool.ITEMS[name]: count
+                      for name, count in content_global_checks.item_counts(global_checks).items()})
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
             | set(letter_items) | set(pack_rows), "item family registry mismatch")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
     require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
-            "a pack, racer or capability item row disagrees with its record")
+            "a pack, racer, capability or weapon item row disagrees with its record")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")
@@ -1658,3 +1729,14 @@ def restore(world, slot_data):
     world.options.tizi_helper.value = int("tizi_helper" in packs)
     world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
     world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
+    # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
+    # room's encounter block verbatim (no redraw), its fallback checked against
+    # the plan's unlock wins.
+    global_checks = plan.get("global_checks", {})
+    content_global_checks.check_encounter_block(plan, slot_data)
+    world.options.itemsanity.value = int(bool(global_checks.get("itemsanity")))
+    world.options.hit_character.value = int(bool(global_checks.get("hit_character")))
+    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
+    if global_checks.get("hit_character"):
+        from . import hit_character
+        hit_character.restore_from_wire(world, slot_data, hit_character.CONTENT_PLAN_FALLBACK_KEYS)

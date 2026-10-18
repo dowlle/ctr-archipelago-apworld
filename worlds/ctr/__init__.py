@@ -1411,6 +1411,14 @@ class ctrAPWorld(World):
             spoiler_handle.write("\nCTR independent content/item plan:\n")
             json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
             spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            # Hit Character Key fallback on content plans (#133 PR 4d): the
+            # same lines as a normal seed's; nothing when Hit Character is off.
+            for _guest, _keys in sorted((getattr(self, "ctr_hit_character_fallback", {}) or {}).items(),
+                                        key=lambda item: (item[1], item[0])):
+                spoiler_handle.write(
+                    f"CTR Hit Character ({self.multiworld.player_name[self.player]}): "
+                    f"{characters.CHARACTER_ID_TO_NAME[int(_guest)]} has no unlock race in this seed and "
+                    f"joins races at {_keys} {'Key' if _keys == 1 else 'Keys'}.\n")
             return
         # Character phase (#54/#209): which racer this seed starts you as, and
         # which pads demand a specific racer. Both are per-seed DRAWS rather

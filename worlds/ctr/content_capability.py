@@ -36,8 +36,8 @@ term does carry over, because every one of those checks crosses the line.
   * CTR Token Challenge: F and the first rank (ruling 2026-09-20); on Oxide
     Station USF whenever its T or R letter must be picked up;
   * letters: F, Papu's Pyramid C and T the first rank, Oxide Station T and R
-    USF (the legacy letter rulings without their weapon arms, since Itemsanity
-    is not on content plans yet);
+    USF (the legacy letter rulings; with Itemsanity on, #133 PR 4d, the
+    legacy weapon alternatives join the first-boost floors, `weapon_arm`);
   * Time Trials: Sapphire F, Gold and Platinum also `relic_tier_boost_min`
     (the difficulty-aware Platinum floor, three ranks on easy with Blue Fire);
   * Relic Race Perfect: USF on every track (ruling 2026-09-29, #453 answer 1);
@@ -217,6 +217,50 @@ def check_boost(track, kind, award, record, package=None, letters=None):
     if kind == "perfect":
         return max(finish, relic_perfect_boost_min(name or ""))
     return 0
+
+
+#: Weapons that open Papu's Pyramid's C and T routes instead of boost
+#: (Rules.add_lettersanity_rules).
+PAPU_LETTER_WEAPONS = ("Turbo", "Mask")
+
+
+def weapon_arm(track, kind, award, record, package=None):
+    """The legacy Itemsanity alternative to a check's first-boost floor (#133 PR
+    4d), or None. Only for a check whose rank is the first boost and comes
+    from a floor the legacy rules let weapons replace; a finish term or a USF
+    gate never has one, and the CTR Token Challenge's first boost has none.
+    Returns ("families", n): n distinct useful weapon families
+    (itemsanity.USEFUL_WEAPON_FAMILIES); or ("any", names): one of the named
+    weapon items.
+
+      * Trophy Race on a difficulty-gated track below hard: three families
+        (Rules.add_capability_difficulty_rules, ruling 2026-09-20);
+      * Held 1st below hard without a USF gate: one family (ruling
+        2026-09-28), three on easy on a gated track, where the difficulty
+        term also binds it;
+      * Finish on Podium on easy on a gated track: three families;
+      * Papu's Pyramid Letter C and T: Turbo or Mask.
+
+    The caller applies it only with Itemsanity on. Native's race-loss stakes
+    read the rank alone, so a loss can stay exempt while a weapon arm already
+    has the check in logic."""
+    from .itemsanity import DIFFICULTY_WEAPON_FAMILY_MIN, HELD_FIRST_WEAPON_FAMILY_MIN
+    if not record or not record["boost_mode"]:
+        return None
+    if finish_boost(track, record, package):
+        return None
+    difficulty = record["logic_difficulty"]
+    gated = _difficulty_track(track)
+    if kind == "trophy" and difficulty < HARD and gated:
+        return ("families", DIFFICULTY_WEAPON_FAMILY_MIN)
+    if kind == "podium" and award == "held_1st" and difficulty < HARD and not _held_first_usf(track, record):
+        return ("families", DIFFICULTY_WEAPON_FAMILY_MIN if difficulty == EASY and gated
+                else HELD_FIRST_WEAPON_FAMILY_MIN)
+    if kind == "podium" and award == "finish_podium" and difficulty == EASY and gated:
+        return ("families", DIFFICULTY_WEAPON_FAMILY_MIN)
+    if kind == "letter" and LETTER_BOOST.get((_name(track), award)) == FIRST_BOOST_COUNT:
+        return ("any", PAPU_LETTER_WEAPONS)
+    return None
 
 
 def check_envelope(record, co):
