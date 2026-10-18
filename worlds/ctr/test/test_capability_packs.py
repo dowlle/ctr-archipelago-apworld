@@ -305,8 +305,10 @@ class TestEarlyBoost(unittest.TestCase):
                 name = sphere0_guard.starting_boost_item(world)
                 narrow = breadth < sphere0_guard.BOOST_NARROW_START_CHECKS
                 seen[narrow] += 1
+                # A second boost rank can be the second early item (racer locks).
+                second = 1 if getattr(world, "_ctr_early_second", None) == name else 0
                 with self.subTest(boost=boost, breadth=breadth):
-                    self.assertEqual(early.get(name, 0), 1 if narrow else 0)
+                    self.assertEqual(early.get(name, 0), 1 + second if narrow else 0)
                     self.assertEqual(getattr(world, "_ctr_early_boost", None), name if narrow else None)
                     self.assertFalse(world.multiworld.precollected_items[1])
                     if boost == "per_character":
@@ -318,6 +320,46 @@ class TestEarlyBoost(unittest.TestCase):
             self.assertIsNone(getattr(world, "_ctr_early_boost", None))
             self.assertFalse(any(n.startswith("Progressive Boost")
                                  for n in world.multiworld.local_early_items.get(1, {})))
+
+    def test_second_opener_only_with_racer_locks_and_a_narrow_start(self):
+        """Second ruling 2026-10-18: with racer locks as well, a narrow boost
+        start also marks the next widest opener early. Wide starts and seeds
+        without racer locks mark nothing more."""
+        from .. import sphere0_guard
+        seen = 0
+        for locks in (0, 21):
+            for world, breadth in self.worlds(boost="per_character", character_unlocks=True,
+                                              racer_locked_pads=locks):
+                second = getattr(world, "_ctr_early_second", None)
+                with self.subTest(locks=locks, breadth=breadth):
+                    if locks and world.ctr_racer_locks and breadth < sphere0_guard.BOOST_NARROW_START_CHECKS:
+                        self.assertIsNotNone(second)
+                        seen += 1
+                    else:
+                        self.assertIsNone(second)
+                    self.assertFalse(world.multiworld.precollected_items[1])
+        self.assertTrue(seen)
+
+    def test_seed_527_fills_with_the_second_early_item(self):
+        """Seed 527 of the racer stress profile dead-ended with the early first
+        boost alone (start of 2 checks, 19 locked pads). The second early item
+        is a second Tiny Tiger boost rank, and the seed fills."""
+        import yaml
+        from pathlib import Path
+        from Fill import distribute_early_items, distribute_items_restrictive
+        from .. import sphere0_guard
+        path = Path(__file__).parent / "fixtures" / "content_plan_boost_racer_locks_527.yaml"
+        options = yaml.safe_load(path.read_text())["Crash Team Racing"]
+        world = make_world(options, seed=527)
+        mw = world.multiworld
+        self.assertEqual(sphere0_guard.sphere0_breadth(world), 2)
+        self.assertEqual(len(world.ctr_racer_locks), 19)
+        self.assertEqual(mw.local_early_items[1], {"Progressive Boost (Tiny Tiger)": 2})
+        self.assertEqual(world._ctr_early_second, "Progressive Boost (Tiny Tiger)")
+        self.assertFalse(mw.precollected_items[1])
+        _, mw.itempool = distribute_early_items(mw, mw.get_unfilled_locations(), mw.itempool)
+        distribute_items_restrictive(mw)
+        self.assertTrue(mw.can_beat_game())
 
 
 class TestForgedPlans(unittest.TestCase):

@@ -179,7 +179,9 @@ def starting_boost_item(world):
 def mark_early_boost(world) -> None:
     """Content plan with Progressive Boost and a narrow start: ask AP's
     early-item step to place the starting racer's first boost in this slot's
-    starting checks (ruling 2026-10-18). Takes no random draw."""
+    starting checks (ruling 2026-10-18). With racer locks as well, the next
+    widest opener is marked early too (second ruling 2026-10-18). Takes no
+    random draw."""
     plan = world.ctr_content_plan
     if not plan.get("capability", {}).get("boost_mode"):
         return
@@ -192,6 +194,68 @@ def mark_early_boost(world) -> None:
     slot = target.setdefault(player, {})
     slot[name] = max(slot.get(name, 0), 1)
     world._ctr_early_boost = name
+    from .characters import racer_locks_effective
+    if racer_locks_effective(world):
+        _mark_second_opener(world)
+
+
+# Boost and racer locks together (#133 PR 4c, second ruling 2026-10-18). With
+# the early first boost alone, narrow starts behind many racer-locked pads still
+# dead-ended: 6 FillErrors in 3000 runs of the racer stress arm, and none of the
+# 3 reproduced seeds (527, 1140, 1971) filled. Ruling: when the seed has racer
+# locks too, the next widest opener is also a local early item. It is measured
+# with the slot's early items already collected; a further copy of an item
+# already marked early (a second boost rank) can be the one chosen. Nothing is
+# precollected.
+def second_opener(world):
+    """Name of the pool item that opens the most further checks once this
+    slot's early items are collected, or None when no item opens one. A
+    further copy of an item already marked early counts as a candidate, but
+    loses a tie to an item that is not marked yet."""
+    mw, player = world.multiworld, world.player
+    early = _early_counts(world)
+    pool = {}
+    for item in mw.itempool:
+        if item.player == player and item.advancement:
+            pool.setdefault(item.name, []).append(item)
+    base = _base_state(world)
+    for name in sorted(early):
+        for item in pool.get(name, [])[:early[name]]:
+            base.collect(item, True)
+    start = _reachable_empty(world, base)
+    reach = {}
+    for name, copies in pool.items():
+        if len(copies) <= early.get(name, 0):
+            continue
+        state = base.copy()
+        state.collect(copies[early.get(name, 0)], True)
+        reach[name] = _reachable_empty(world, state)
+    opening = {name: n for name, n in reach.items() if n > start}
+    if not opening:
+        return None
+    # On a tie, an item not yet marked early wins (seed 1140: a Gem and a
+    # second boost rank open the same count), then the first name.
+    return max(sorted(opening), key=lambda name: (opening[name], name not in early))
+
+
+def _early_counts(world):
+    mw, player = world.multiworld, world.player
+    counts = dict(mw.early_items.get(player, {}))
+    for name, n in mw.local_early_items.get(player, {}).items():
+        counts[name] = counts.get(name, 0) + n
+    return counts
+
+
+def _mark_second_opener(world) -> None:
+    name = second_opener(world)
+    if name is None:
+        return
+    mw, player = world.multiworld, world.player
+    target = (mw.early_items if name in world.options.non_local_items.value
+              else mw.local_early_items)
+    slot = target.setdefault(player, {})
+    slot[name] = slot.get(name, 0) + 1
+    world._ctr_early_second = name
 
 
 def _narrow_cause(world) -> str:

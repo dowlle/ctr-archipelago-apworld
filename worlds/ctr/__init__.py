@@ -684,7 +684,8 @@ class ctrAPWorld(World):
         one local early opener (sphere0_guard.mark_early_opener, ruling
         2026-10-17), and a content plan with Progressive Boost and a narrow
         start marks the starting racer's first boost early
-        (sphere0_guard.mark_early_boost, ruling 2026-10-18)."""
+        (sphere0_guard.mark_early_boost, ruling 2026-10-18), and with racer
+        locks as well the next widest opener too (second ruling 2026-10-18)."""
         if getattr(self.multiworld, "generation_is_fake", False):
             from .custom_track_presentation import apply_ut_room_names
             apply_ut_room_names(self)
