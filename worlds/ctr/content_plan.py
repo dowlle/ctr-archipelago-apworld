@@ -1354,6 +1354,12 @@ def add_racer_unlock_placement_rules(world):
     if not locks:
         return
     for check in plan["checks"]:
+        # Itemsanity and Hit Character checks (#133 PR 4d) route from every
+        # race and glow on no pad, so a lock gives them no self-lock to guard:
+        # the rule would only bar each locked racer's unlock from all 38 of
+        # them, which left fills with nowhere to put the last racer item.
+        if check["kind"] in ("itemsanity", "hit"):
+            continue
         racers = sorted({locks[r["own_pad_id"]] for r in check["routes"] if r["own_pad_id"] in locks})
         if not racers:
             continue

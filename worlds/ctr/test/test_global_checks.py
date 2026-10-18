@@ -230,6 +230,17 @@ class TestHitCharacter(unittest.TestCase):
         self.assertFalse(crash.can_reach(state_with(world, *keys, "Turbo", "Mask")))
         self.assertTrue(crash.can_reach(state_with(world, *keys, "Missile x3")))
 
+    def test_locked_racers_may_sit_on_global_checks(self):
+        # Global checks glow on no pad and route from every race, so the
+        # racer-lock placement rule (#133 PR 4b) leaves them out.
+        world = first_world(global_options(character_unlocks=True, racer_locked_pads=6), seed=7)
+        locks = world.ctr_racer_locks
+        self.assertTrue(locks)
+        racer = next(iter(locks.values()))
+        item = world.create_item(racer)
+        for name in ("Itemsanity: Bomb", "Hit Crash Bandicoot"):
+            self.assertTrue(world.multiworld.get_location(name, 1).item_rule(item), name)
+
     def test_custom_track_appearance(self):
         # On a custom-served race the stock pack holds the other defaults for
         # a default player and 0..6 for a guest player, never a guest target.
