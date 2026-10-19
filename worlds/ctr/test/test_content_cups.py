@@ -36,6 +36,8 @@ def cup_options(seed=0):
     if seed % 7 == 4 and seed % 3 != 2:
         composition["sources"] = ["custom", "retail"]
         composition["custom_legs"] = dict(min=1, max=2)
+    if seed % 8 == 7:
+        composition.pop("repeats", None)  # eight or more cups need repeats across cups
     if composition:
         pool["cups"]["composition"] = composition
     pool["crystals"] = dict(count=dict(min=0, max=seed % 4))
