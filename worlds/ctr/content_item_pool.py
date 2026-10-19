@@ -5,6 +5,7 @@ selected items. The immutable ledger is shared by generation and wire restore.
 From-pool starts are granted by Main.py; the caller consumes its later depletion
 request after materializing this post-start ledger, so subtraction happens once.
 """
+from collections import Counter
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -166,3 +167,189 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
     filler = free - demand
     return ItemPlan(tuple(rows), coded_checks, locked_checks, filler,
                     (filler * trap_percentage) // 100)
+
+
+# Framework phases after item creation (#133 PR 4f): plando_items and
+# item_links on content plans, per the Final phase ownership contract of the
+# 2026-09-22 accounting design. The wire ledger above stays the immutable
+# creation plan: plando and item links run later, in the framework, so they
+# never change its rows. These checks keep the framework from inventing or
+# dropping a selected copy around them.
+
+def ledger_names(world):
+    return {row.name for row in world.ctr_content_items.rows}
+
+
+def filler_family(world):
+    """Names this seed creates as filler or traps: the only items an explicit
+    (`from_pool: false`) plando block may add, and the only ones removed to
+    make room for it. Plain filler first, then traps."""
+    from . import wumpa_family
+    return tuple(wumpa_family.filler_weights(world)), tuple(sorted(world.item_name_groups["Traps"]))
+
+
+def player_label(world):
+    return world.multiworld.get_player_name(world.player)
+
+
+def check_item_links(world):
+    """Generation-time refusal: a link group's replacement item for this
+    player must not be a selected (ledger) item. Each member would receive
+    extra copies outside the item ledger, above its receipt cap."""
+    names = ledger_names(world)
+    for group in getattr(world.multiworld, "groups", {}).values():
+        if world.player not in group["players"]:
+            continue
+        replacement = group.get("replacement_items", {}).get(world.player)
+        if replacement in names:
+            fail(f"item link {group['name']!r} of {player_label(world)} names {replacement!r} as its "
+                 "replacement_item. That item is in this content plan's item ledger, and every linked copy "
+                 "can bring a replacement copy outside it. Use a filler item or leave replacement_item empty. "
+                 "Your settings were not changed.")
+
+
+def _block_names(world, block):
+    return [name for name in block.items if name in world.item_name_to_id]
+
+
+def check_planned_blocks(world):
+    """Before plando (generate_basic, after Main.py parsed the blocks).
+
+    A `from_pool` block takes copies this world created; Fill.py silently
+    creates a new copy when one is missing, which would add an unselected
+    item. So the most copies any block could take must exist, counting every
+    block's worst case. An item one of this player's links shares leaves the
+    player's pool before plando runs, so a from-pool block may not name it.
+    An explicit (`from_pool: false`) block may only add filler or traps,
+    which pre_fill then pays for with this world's own filler."""
+    blocks = getattr(world.multiworld, "plando_item_blocks", {}).get(world.player, ())
+    if not blocks:
+        return
+    created = Counter(item.name for item in world.ctr_created_items)
+    linked = set()
+    for group in getattr(world.multiworld, "groups", {}).values():
+        if world.player in group["players"]:
+            linked |= set(group["item_pool"])
+    plain, traps = filler_family(world)
+    demand = Counter()
+    for block in blocks:
+        names = _block_names(world, block)
+        most = block.count["max"] if isinstance(block.count, dict) else block.count
+        # Fill.py clamps the count to the block's locations when it names some
+        # and asks for no early/non-early set, so the worst case does too.
+        if block.resolved_locations and not {"early_locations", "non_early_locations"} & set(block.locations):
+            most = min(most, len(block.resolved_locations))
+        if not block.from_pool:
+            extra = sorted(set(names) - set(plain) - set(traps))
+            if extra:
+                fail(f"plando_items of {player_label(world)} adds {', '.join(extra)} with from_pool: false. "
+                     "On a content plan an explicit plando block may only add filler or traps, because "
+                     "every other item is counted in the item ledger. Use from_pool: true. "
+                     "Your settings were not changed.")
+            continue
+        for name, count in Counter(names).items():
+            demand[name] += min(count, most)
+    for name, need in sorted(demand.items()):
+        if name in linked:
+            fail(f"plando_items of {player_label(world)} takes {name!r} from the pool, but an item link "
+                 "of this player shares that item, so the copy leaves the player's pool before plando. "
+                 "Remove it from the link or from the plando block. Your settings were not changed.")
+        if need > created[name]:
+            fail(f"plando_items of {player_label(world)} may take {need} {name!r} from the pool, but this "
+                 f"content plan creates {created[name]}. Plando would create the missing copies itself, "
+                 "outside the item ledger. Lower the plando count or select more copies in item_pool. "
+                 "Your settings were not changed.")
+
+
+def settle_after_plando(world):
+    """pre_fill, after item links and plando.
+
+    Every created copy is still in the pool or on a location (plando from the
+    pool, or an item link's receipt event). A copy of this player on a real
+    location that this world did not create is an explicit plando addition:
+    it occupies a check that one of this world's items was counted for, so
+    one of this world's own filler items leaves the pool for each. Returns
+    the accounting for the spoiler."""
+    mw, player = world.multiworld, world.player
+    created = world.ctr_created_items
+    created_ids = {id(item) for item in created}
+    pool_ids = {id(item) for item in mw.itempool}
+    placed, added = [], []
+    for location in mw.get_filled_locations():
+        item = location.item
+        if item.player != player:
+            continue
+        if id(item) in created_ids:
+            placed.append(location)
+        elif location.address is not None:
+            added.append(location)
+    on_location = {id(location.item) for location in placed}
+    lost = [item.name for item in created if id(item) not in pool_ids and id(item) not in on_location]
+    if lost:
+        fail(f"{len(lost)} selected or filler copies of {player_label(world)} left the item pool without "
+             f"a location ({', '.join(sorted(set(lost)))}). Nothing may remove them before the fill.")
+    names = ledger_names(world)
+    invented = sorted({location.item.name for location in added if location.item.name in names})
+    if invented:
+        fail(f"plando placed a new copy of {', '.join(invented)} for {player_label(world)}. That item is in "
+             "the item ledger and was not taken from the pool.")
+    plain, traps = filler_family(world)
+    removed = []
+    for family in (plain, traps):
+        for item in reversed(mw.itempool):
+            if len(removed) == len(added):
+                break
+            if item.player == player and item.name in family and id(item) in created_ids:
+                removed.append(item)
+    # By identity: Item equality is name and player, so list.remove could
+    # take an equal copy instead of the one counted here.
+    gone = {id(item) for item in removed}
+    mw.itempool[:] = [item for item in mw.itempool if id(item) not in gone]
+    if len(removed) < len(added):
+        fail(f"{len(added)} explicit plando items of {player_label(world)} need as many filler items to "
+             f"make room, but only {len(removed)} filler or trap items are left in the pool. Removing a "
+             "selected item instead is not allowed. Use from_pool: true or fewer explicit items.")
+    world.ctr_plando_removed = removed
+    linked = [location for location in placed if location.address is None and location.player in mw.groups]
+    plando = [location for location in placed if location.address is not None]
+    return dict(from_pool=Counter(location.item.name for location in plando),
+                added=Counter(location.item.name for location in added),
+                removed=Counter(item.name for item in removed),
+                linked=Counter(location.item.name for location in linked))
+
+
+def audit_before_output(world):
+    """post_fill: every created copy (less the filler pre_fill removed) is on
+    a location, and the precollected items are exactly the plan's starts. A
+    fill that dropped a selected copy or moved one to the start inventory
+    repaired the seed outside the ledger, so the seed is refused."""
+    mw, player = world.multiworld, world.player
+    removed = {id(item) for item in getattr(world, "ctr_plando_removed", ())}
+    unplaced = sorted({item.name for item in world.ctr_created_items
+                       if id(item) not in removed and item.location is None})
+    if unplaced:
+        fail(f"the fill left created items of {player_label(world)} without a location "
+             f"({', '.join(unplaced)}). Refusing the seed instead of dropping them.")
+    starts = Counter({row.name: row.start_from_pool + row.start_additional
+                      for row in world.ctr_content_items.rows if row.start_from_pool + row.start_additional})
+    held = Counter(item.name for item in mw.precollected_items[player])
+    if held != starts:
+        fail(f"the start inventory of {player_label(world)} differs from the content plan's starts "
+             f"(extra {dict(held - starts)}, missing {dict(starts - held)}). An automatic start-inventory "
+             "repair is not allowed on a content plan.")
+
+
+def audit_room_before_output(multiworld):
+    """stage_post_fill, once per room with a content-plan slot: no item of any
+    slot may be left without a location. Fill.py only warns and drops the
+    rest when a room has more items than locations, which an explicit plando
+    block of another slot into a content-plan check can cause."""
+    worlds = [w for w in multiworld.get_game_worlds("Crash Team Racing") if hasattr(w, "ctr_content_plan")]
+    if not worlds or getattr(multiworld, "generation_is_fake", False):
+        return
+    unplaced = [item for item in multiworld.itempool if item.location is None]
+    if unplaced:
+        names = sorted({f"{item.name} ({multiworld.get_player_name(item.player)})" for item in unplaced})
+        fail(f"the fill left {len(unplaced)} items without a location ({', '.join(names[:10])}). "
+             "The room has more items than locations, usually from an explicit (from_pool: false) "
+             "plando block. Refusing the seed instead of dropping them.")

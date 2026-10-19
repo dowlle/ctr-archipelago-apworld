@@ -33,6 +33,9 @@
 # every retail track keeps its frozen boxes, Baby T Park states its eight
 # measured weapon crates and takes Item Box 1 to 8 on its named block, and the
 # fixture loop states twelve crates but has no box ids on its generic slot.
+# plando_items and item_links (PR 4f) are no longer refused; the fuzzer never
+# randomizes either and generates one slot per seed, so a separate
+# multi-slot run covers them (see the PR).
 # The options pinned below
 # are the ones the
 # content-plan profile still refuses; everything else is randomized by the
