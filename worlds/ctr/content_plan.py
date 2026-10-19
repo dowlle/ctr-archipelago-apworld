@@ -10,8 +10,9 @@ on every check (#133 PR 4c, content_capability.py), Itemsanity and Hit
 Character as global checks routed from every race (#133 PR 4d,
 content_global_checks.py), Item Box Locations on retail and named-block custom
 tracks (#133 PR 4e, content_item_boxes.py), plando_items and item_links
-checked around the framework phases (#133 PR 4f, content_item_pool.py), and
-Crystal Challenge entries. Unsupported content and check families fail explicitly while their native
+checked around the framework phases (#133 PR 4f, content_item_pool.py),
+four-leg cups with their Win, sweep and Cup Leg Victory checks (#133 PR 5,
+content_cups.py), and Crystal Challenge entries. Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
 """
@@ -30,8 +31,8 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import (arena_content, content_capability, content_global_checks, content_item_boxes, custom_packages,
-               tizi_helper, turbo_grant)
+from . import (arena_content, content_capability, content_cups, content_global_checks, content_item_boxes,
+               custom_packages, tizi_helper, turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -280,6 +281,7 @@ def manual_requirements(manual, rows):
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None):
+    # Cups (#133 PR 5a) declare their feature last, after Item Box Locations.
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -295,7 +297,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([RACER_FEATURE] if racers else [])
             + ([content_capability.FEATURE] if capability else [])
             + ([content_global_checks.FEATURE] if global_checks else [])
-            + ([content_item_boxes.FEATURE] if item_boxes else []))
+            + ([content_item_boxes.FEATURE] if item_boxes else [])
+            + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else []))
 
 
 def family_settings(options):
@@ -810,6 +813,14 @@ def draw_stage2(world, rows):
 
 
 def crystal_selection(world, raw):
+    """(eligible arenas, count): a range draws its count here, as before cups."""
+    eligible, (low, high) = crystal_bounds(world, raw)
+    return eligible, (low if low == high else world.random.randint(low, high))
+
+
+def crystal_bounds(world, raw):
+    """(eligible arenas, (low, high)) without a draw. With cups (#133 PR 5a)
+    the count is drawn together with the cup count (content_cups.feasible_pairs)."""
     o=world.options
     pool=raw.get('pool','all')
     allowed=list(arena_content.ARENAS)
@@ -817,7 +828,7 @@ def crystal_selection(world, raw):
         error('crystals.pool must be all or distinct arena LevelIDs 18 through 24.')
     eligible=(list(arena_content.ARENAS) if pool=='all' else list(pool))
     if not o.include_battle_arenas.value:
-        return [],0
+        return [],(0,0)
     if not o.include_arcade_arenas.value:
         if pool!='all' and any(i in arena_content.ARCADE for i in eligible):
             error('an arcade arena in crystals.pool requires include_arcade_arenas.')
@@ -827,10 +838,10 @@ def crystal_selection(world, raw):
         low,high=count['min'],count['max']
         if type(low) is not int or type(high) is not int or not 0<=low<=high<=len(eligible):
             error('crystals.count range exceeds the eligible arena pool.')
-        count=low if low==high else world.random.randint(low,high)
+        return eligible,(low,high)
     if type(count) is not int or not 0<=count<=len(eligible):
         error('crystals.count must fit the eligible arena pool.')
-    return eligible,count
+    return eligible,(count,count)
 
 
 def track_modes(raw_tracks):
@@ -866,9 +877,14 @@ def generate(world):
     with_cortex = tracks.get("cortex_vortex", False)
     if type(with_cortex) is not bool:
         error("tracks.cortex_vortex must be true or false.")
-    _zero_count(closed(raw.get("cups", {}), ("count",), "cups").get("count"), "cups.count")
+    # Cups (#133 PR 5): a count or range and the composition. A plan without
+    # cups draws its crystal count exactly as before.
+    cup_spec = content_cups.settings(raw.get("cups", {}))
     crystals = closed(raw.get("crystals", {}), ("pool", "count"), "crystals")
-    arena_pool, arena_count = crystal_selection(world, crystals)
+    if cup_spec["bounds"][1] == 0:
+        arena_pool, arena_count = crystal_selection(world, crystals)
+    else:
+        arena_pool, crystal_range = crystal_bounds(world, crystals)
     bosses = closed(raw.get("bosses", {}), ("enabled",), "bosses")
     if bosses.get("enabled") is not False:
         error("the experimental profile needs explicit bosses: {enabled: false}; encounter routes are pending.")
@@ -964,19 +980,47 @@ def generate(world):
             or len(set(required)) != len(required) or len(required) > 27):
         error("required_entries must be distinct eligible logical track IDs, fitting the 27 normal pads.")
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
+    cup_count = 0
+    if cup_spec["bounds"][1]:
+        # One uniform draw among the feasible (cups, crystals) pairs (#133 PR
+        # 5), never one count drawn first and the other trimmed.
+        legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
+        pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
+                                            len(required) - len(chosen_arenas), legs_other, legs_custom)
+        if not pairs:
+            repeats = cup_spec["repeats"]
+            error(f"no cup and crystal counts fit: cups.count {cup_spec['bounds'][0]} to {cup_spec['bounds'][1]}, "
+                  f"crystals.count {crystal_range[0]} to {crystal_range[1]} of {len(arena_pool)} eligible arenas, "
+                  f"{len(required)} required entries, {len(legs_other)} retail and {len(legs_custom)} custom or "
+                  f"Cortex Vortex leg tracks, custom_legs {cup_spec['custom_legs'][0]} to "
+                  f"{cup_spec['custom_legs'][1]} per cup (repeats within a cup "
+                  f"{'on' if repeats['within_cup'] else 'off'}, across cups "
+                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads. No content count was changed.")
+        cup_count, arena_count = world.random.choice(pairs)
     if len(chosen_arenas)>arena_count:
         error('required arena entries exceed crystals.count; no content count was changed.')
     chosen_arenas+=world.random.sample([a for a in arena_candidates if a['id'] not in required],arena_count-len(chosen_arenas))
     chosen = [t for t in candidates if t["id"] in required]
-    if len(chosen)+arena_count>27:
+    if len(chosen)+arena_count+cup_count>27:
         error('required entries and selected arenas exceed the 27 normal pads.')
     optional = [t for t in candidates if t["id"] not in required]
-    chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen)-arena_count))
+    chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen) - arena_count - cup_count))
     chosen += chosen_arenas
-    titles = generic_room_titles([t for t in chosen if t.get("origin") == "custom"], package_by_id)
-    for track in chosen:
-        if track.get("origin") == "custom" and "named_block" not in track:
+    cups = []
+    if cup_count:
+        # Cups take their legs from the seed's tracks and a name from the pool
+        # (#133 PR 5); they are seated with the other entries.
+        cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
+                                      bool(o.one_lap_cups.value))
+    # Room titles of the seed's custom tracks, also those raced only as cup legs.
+    raced = [t for t in chosen if t.get("origin") == "custom"]
+    for cup in cups:
+        raced += [t for t in cup["legs"] if t.get("origin") == "custom" and t not in raced]
+    titles = generic_room_titles(sorted(raced, key=lambda t: t["custom_slot"]), package_by_id)
+    for track in raced:
+        if "named_block" not in track:
             track["room_title"] = titles[track["custom_slot"]]
+    chosen += cups
     world.random.shuffle(chosen)
     registry = pad_registry()
     world.random.shuffle(registry)
@@ -1033,10 +1077,13 @@ def generate(world):
                                               world.random.sample(LETTERS, settings["letters_per_track"])))
     letter_packs = {}
     for index, track in enumerate(chosen):
-        if "arena_id" not in track:
+        if is_track(track):
             for i in letter_layout(track, settings, letters.get(index, ()))[1]:
                 name, code = letter_item(track, i)
                 letter_packs[name] = code
+    # Cups (#133 PR 5): the leg tracks' records, and the sweep check switch.
+    track_records = {t["id"]: t for t in candidates}
+    sweep = bool(o.cup_sweep_checks.value) and bool(cup_count)
     # Every check exists before the item ledger is sized; mode order and the
     # second-stage gates only decide which race and gate reaches each one.
     capability = content_capability.settings(o)
@@ -1044,18 +1091,23 @@ def generate(world):
     item_boxes = content_item_boxes.settings(o)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
-                      if "arena_id" not in t
+                      if is_track(t)
+                      else len(content_cups.checks(content_cups.entry(t), "pad:0", track_records, None, None,
+                                                   sweep)) if "cup_index" in t
                       else len(arena_content.checks(dict(id="entry/" + t["id"], kind="crystal", arena_id=t["arena_id"],
                                                          target=20, time_limit_ticks=arena_content.TIMERS[t["arena_id"]]),
                                                     "pad:0", bool(o.crystalsanity.value)))
                       for index, t in enumerate(chosen))
     if settings.get("wumpa") == "global" and any(
-            wumpa_modes(t, package_by_id.get(t.get("package_id"))) for t in chosen if "arena_id" not in t):
+            wumpa_modes(t, package_by_id.get(t.get("package_id"))) for t in chosen if is_track(t)):
         check_count += 1
+    # Cup Leg Victory (#133 PR 5): one per leg track without a Trophy Race pad.
+    check_count += len(cup_leg_tracks(chosen))
     # Itemsanity and Hit Character (#133 PR 4d): global checks, routed from
     # every race that can earn them once the pads are assigned.
     global_checks = content_global_checks.settings(o)
-    check_count += content_global_checks.check_count(global_checks, chosen, package_by_id)
+    check_count += content_global_checks.check_count(global_checks, [t for t in chosen if "cup_index" not in t],
+                                                     package_by_id)
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -1122,8 +1174,13 @@ def generate(world):
             track = chosen[index]
             entry_id = "entry/" + track["id"]
             crystal='arena_id' in track
+            cup = "cup_index" in track
             first = gate_for.get(physical, 'free')
-            if crystal:
+            if cup:
+                entry = content_cups.entry(track)
+                entry_id = entry["id"]
+                gates = content_cups.mode_gates(first)
+            elif crystal:
                 entry=dict(id=entry_id,kind='crystal',arena_id=track['arena_id'],target=20,
                            time_limit_ticks=arena_content.TIMERS[track['arena_id']])
                 gates=[dict(mode='crystal',stage=1,requirement_id=first)]
@@ -1133,19 +1190,24 @@ def generate(world):
                 gates = mode_gates(modes, first, "two" if physical in stage2 else "single", physical)
             entries.append(entry)
             pad.update(entry_id=entry_id,mode_gates=gates)
-            if crystal:
+            if cup:
+                checks.extend(content_cups.checks(entry, pad["id"], track_records, capability, package_by_id, sweep))
+            elif crystal:
                 checks.extend(arena_content.checks(entry,pad['id'],bool(o.crystalsanity.value)))
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
                                            letters.get(index, ()), package_by_id.get(track.get("package_id")),
                                            capability, item_boxes))
         pads.append(pad)
+    standalone = [t for t in chosen if is_track(t)]
+    plan_tracks = standalone + cup_only_tracks(standalone, entries, track_records)
+    checks.extend(content_cups.leg_victories({t["id"]: t for t in plan_tracks}, entries, pads,
+                                             {t["id"]: room_title(t) for t in plan_tracks}))
     if settings.get("wumpa") == "global":
-        wumpa = global_wumpa_check(global_wumpa_routes(chosen, entries, pads, package_by_id))
+        wumpa = global_wumpa_check(global_wumpa_routes(standalone, entries, pads, package_by_id))
         if wumpa:
             checks.append(wumpa)
-    checks.extend(content_global_checks.checks(global_checks, [t for t in chosen if "arena_id" not in t],
-                                               entries, pads, package_by_id))
+    checks.extend(content_global_checks.checks(global_checks, standalone, entries, pads, package_by_id))
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
@@ -1158,8 +1220,8 @@ def generate(world):
     gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
-    plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in chosen)],
-                tracks=[t for t in chosen if 'arena_id' not in t], entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
+    plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in plan_tracks)],
+                tracks=plan_tracks, entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
                 items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes))
@@ -1204,6 +1266,32 @@ def generate(world):
         weapon = world.random.sample(WEAPONS, early_count)[0]
         world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
     return plan
+
+
+def is_track(item):
+    """A drawn standalone track, not a crystal arena or a cup (#133 PR 5)."""
+    return "arena_id" not in item and "cup_index" not in item
+
+
+def cup_leg_tracks(chosen):
+    """Ids of the leg tracks of the drawn cups that hold no standalone Trophy
+    Race, each once: the tracks that take a Cup Leg Victory check."""
+    trophy = {t["id"] for t in chosen if is_track(t) and "trophy" in t["modes"]}
+    return {leg["id"] for cup in chosen if "cup_index" in cup for leg in cup["legs"]} - trophy
+
+
+def cup_only_tracks(standalone, entries, records):
+    """Track records of cup legs whose track holds no standalone pad (#133 PR
+    5), in order of first leg. Their modes are `trophy` only: a cup leg is a
+    Trophy-style race, and no mode-owned check exists for them."""
+    have = {t["id"] for t in standalone}
+    out = []
+    for entry in entries:
+        for leg in entry["legs"] if entry["kind"] == content_cups.KIND else ():
+            if leg["track_id"] not in have:
+                have.add(leg["track_id"])
+                out.append(dict(records[leg["track_id"]], modes=["trophy"], capabilities=["trophy"]))
+    return out
 
 
 def global_wumpa_routes(tracks, entries, pads, packages):
@@ -1308,7 +1396,11 @@ def create_regions(world):
 
     by_pad = {}
     shared = []
+    legs = []
     for check in plan['checks']:
+        if check["kind"] == content_cups.LEG_KIND:
+            legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
+            continue
         pads_of = {r["own_pad_id"] for r in check["routes"]}
         if len(pads_of) == 1:
             by_pad.setdefault(check['routes'][0]['own_pad_id'], []).append(check)
@@ -1331,7 +1423,7 @@ def create_regions(world):
             gates.append(lambda state, racer=racer: state.has(racer, player))
         menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
-        for check in by_pad[pad['id']]:
+        for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
@@ -1361,6 +1453,27 @@ def create_regions(world):
             return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
                        for entry, test in opens)
         location.access_rule = with_boost(with_letters(any_route, check), check)
+        menu.locations.append(location)
+    # Cup Leg Victory (#133 PR 5): any occurrence, each needing its cup's pad,
+    # the finish of every earlier leg and its own leg's Trophy rank, bound to
+    # the cup pad's racer lock (content_cups.route_boost).
+    entry_by_id = {e["id"]: e for e in plan["entries"]}
+    capability = plan.get("capability", {})
+    for check in legs:
+        location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
+        tests = []
+        for r in check["routes"]:
+            need = content_cups.route_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id, capability,
+                                            package_by_id)
+            lock = pad_by_id[r["own_pad_id"]]["racer_lock"]
+            racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
+            tests.append((r["entry_id"], need, racer))
+
+        def any_leg(state, tests=tuple(tests)):
+            return any(state.can_reach(entry, "Region", player)
+                       and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
+                       for entry, need, racer in tests)
+        location.access_rule = any_leg
         menu.locations.append(location)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
@@ -1528,6 +1641,8 @@ def validate(plan):
             entry = entries[pad['entry_id']]
             if entry['kind'] == 'crystal':
                 expected_gates = [dict(mode='crystal', stage=1, requirement_id=gate)]
+            elif entry["kind"] == content_cups.KIND:
+                expected_gates = content_cups.mode_gates(gate)
             else:
                 stage = "two" if f"{STAGE2_PREFIX}{physical}" in later else "single"
                 expected_gates = (mode_gates(entry["modes"], gate, stage, physical)
@@ -1552,7 +1667,32 @@ def validate(plan):
     except (KeyError, TypeError):
         expected_titles = {}
     arena_ids=set()
+    # Cups (#133 PR 5): sweeps exist for every cup or none; leg laps share one
+    # switch; leg tracks need no standalone entry.
+    sweep = any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"])
+    shortened, cup_names, leg_tracks = None, set(), set()
+    standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
     for entry in entries.values():
+        if entry["kind"] != content_cups.KIND:
+            continue
+        index, shortened = content_cups.check_entry(entry, tracks, packages, shortened)
+        require(index not in cup_names, "two cups share a name")
+        cup_names.add(index)
+        pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
+        for check in content_cups.checks(entry, pad_id, tracks, capability, packages, sweep):
+            require(check["location"] not in expected_checks, "duplicate check identity")
+            expected_checks[check["location"]] = check
+        for leg in entry["legs"]:
+            leg_tracks.add(leg["track_id"])
+            if tracks[leg["track_id"]].get("package_id") in packages:
+                used_packages.add(tracks[leg["track_id"]]["package_id"])
+    for track_id in leg_tracks - standalone_ids:
+        track = tracks[track_id]
+        require(track["modes"] == ["trophy"] and track["capabilities"] == ["trophy"] and track["field_size"] == 8,
+                "a track raced only in cups lists the trophy mode only")
+    for entry in entries.values():
+        if entry["kind"] == content_cups.KIND:
+            continue
         if entry['kind']=='crystal':
             lid=entry['arena_id']
             require(lid in arena_content.ARENAS and lid not in arena_ids,'unknown or repeated arena')
@@ -1611,6 +1751,40 @@ def validate(plan):
                                   packages.get(track.get("package_id")), capability, item_boxes):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
+    # A track raced only in cups is checked like a standalone one (#133 PR 5).
+    for track_id in sorted(leg_tracks - used_tracks):
+        track = tracks[track_id]
+        if track["origin"] == "retail":
+            i = track["retail_id"]
+            require(i in RETAIL and i not in retail_ids, "unknown or duplicate retail track")
+            retail_ids.add(i)
+            require(track["display_name"] == RETAIL[i] and track["laps"] == RETAIL_LAPS and track["id"] == f"retail:{i}",
+                    "retail track metadata mismatch")
+        elif track["origin"] == CORTEX_ORIGIN:
+            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
+                    == cortex_track(), "Cortex Vortex track metadata mismatch")
+        else:
+            require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
+            package = packages[track["package_id"]]
+            slot = track["custom_slot"]
+            require(1 <= slot <= 32 and slot not in slots, "unregistered or duplicate custom slot")
+            slots.add(slot)
+            require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
+                    track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
+            block = destinations.named_track(package["content_id"])
+            if "named_block" in track:
+                require(block is not None and track["named_block"] == block.block_index and
+                        track.get("room_title") == block.ap_name, "named block does not match this build's registry")
+            else:
+                require(block is None, "a track with a named block must use it")
+                require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
+                require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
+                        "room title is not the seed's clash-suffixed title for this track")
+        used_tracks.add(track_id)
+    for check in content_cups.leg_victories(tracks, plan["entries"], plan["pads"],
+                                            {t["id"]: room_title(t) for t in plan["tracks"]}):
+        require(check["location"] not in expected_checks, "duplicate check identity")
+        expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
@@ -1773,6 +1947,17 @@ def restore(world, slot_data):
     if "letters_per_track" in settings:
         world.options.letters_per_track.value = settings["letters_per_track"]
     world.options.relic_perfect_checks.value = int(settings.get("relic_perfect", False))
+    # Cups (#133 PR 5): the sweep checks and the shortened legs follow the plan.
+    world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
+    shortened = None
+    tracks_by_id = {t["id"]: t for t in plan["tracks"]}
+    for entry in plan["entries"]:
+        for leg in entry.get("legs", ()):
+            full = content_cups.base_laps(tracks_by_id[leg["track_id"]])
+            if full != max(1, full // 2):
+                shortened = leg["laps"] != full
+    if shortened is not None:
+        world.options.one_lap_cups.value = int(shortened)
     # Pool-only packs (#133 PR 4a): the ledger rows above are the items; the
     # options follow them for code that reads options.
     packs = plan.get("item_packs", {})
