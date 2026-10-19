@@ -9,8 +9,9 @@ Progressive Boost, Progressive Stats and Logic Difficulty with the boost terms
 on every check (#133 PR 4c, content_capability.py), Itemsanity and Hit
 Character as global checks routed from every race (#133 PR 4d,
 content_global_checks.py), Item Box Locations on retail and named-block custom
-tracks (#133 PR 4e, content_item_boxes.py), and Crystal Challenge entries.
-Unsupported content and check families fail explicitly while their native
+tracks (#133 PR 4e, content_item_boxes.py), plando_items and item_links
+checked around the framework phases (#133 PR 4f, content_item_pool.py), and
+Crystal Challenge entries. Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
 """
@@ -904,8 +905,6 @@ def generate(world):
                  forced_options.warn_racer_locks_without_character_unlocks,
                  forced_options.warn_remove_playable_oxide_without_character_unlocks):
         note(world)
-    if o.plando_items.value or o.item_links.value:
-        error("plando and item-link accounting are not validated for this experimental profile yet.")
     retail = tracks.get("retail", "all")
     if retail == "all":
         retail = sorted(RETAIL)
@@ -1184,6 +1183,8 @@ def generate(world):
         world.ctr_racer_locks = plan_racer_locks(plan)
     validate(plan)
     world.ctr_content_plan = plan
+    # Item links (#133 PR 4f): Main.py has already formed the groups.
+    content_item_pool.check_item_links(world)
     # Actual native 0.6.7 protocol/handshake validation is a release gate. This
     # room barrier already prevents the rc1 client's default 0.6.4 admission.
     world.required_client_version = (0, 6, 7)
@@ -1370,7 +1371,10 @@ def create_items(world):
     names = plan.selected_names()
     names += traps.draw_trap_names(world, plan.trap_count)
     names += [wumpa_family.draw_filler_name(world) for _ in range(plan.filler_count - plan.trap_count)]
-    world.multiworld.itempool.extend(world.create_item(name) for name in names)
+    # The created copies, so the framework phases after creation (plando and
+    # item links, #133 PR 4f) can be audited against them.
+    world.ctr_created_items = [world.create_item(name) for name in names]
+    world.multiworld.itempool.extend(world.ctr_created_items)
     # Main.py has granted these starts. Consume only this world's local removal
     # request; retain the original configuration for spoiler/Tracker diagnostics.
     world.options.start_inventory_from_pool.value = {}

@@ -695,6 +695,10 @@ class ctrAPWorld(World):
         if hasattr(self, "ctr_content_plan"):
             sphere0_guard.mark_early_opener(self)
             sphere0_guard.mark_early_boost(self)
+            # Plando on content plans (#133 PR 4f): Main.py has parsed the
+            # blocks; check them before plando runs.
+            from . import content_item_pool
+            content_item_pool.check_planned_blocks(self)
 
     def pre_fill(self) -> None:
         """Terminal fill backstop for solo generations, in both warp-pad modes.
@@ -713,6 +717,10 @@ class ctrAPWorld(World):
         if getattr(self.multiworld, "generation_is_fake", False):
             return
         if hasattr(self, "ctr_content_plan"):
+            # Item links and plando have run (#133 PR 4f): audit the created
+            # copies and pay for explicit plando items with this world's filler.
+            from . import content_item_pool
+            self.ctr_framework_accounting = content_item_pool.settle_after_plando(self)
             # Independent supply never uses automatic progression starts. Manual
             # pad rules still get the solo fill check, so a dead end names them.
             if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:
@@ -733,6 +741,13 @@ class ctrAPWorld(World):
                 self._manual_rules_fill_check()
             else:
                 self._rollback_precollect_backstop(mode)
+
+    def post_fill(self) -> None:
+        """Content plans (#133 PR 4f): refuse a fill that dropped a created
+        copy or moved one to the start inventory."""
+        if hasattr(self, "ctr_content_plan") and not getattr(self.multiworld, "generation_is_fake", False):
+            from . import content_item_pool
+            content_item_pool.audit_before_output(self)
 
     _ROLLBACK_BACKSTOP_MAX_ROUNDS = 40
 
@@ -1411,6 +1426,17 @@ class ctrAPWorld(World):
             spoiler_handle.write("\nCTR independent content/item plan:\n")
             json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
             spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            # Plando and item links (#133 PR 4f): only when either moved an item.
+            accounting = getattr(self, "ctr_framework_accounting", None)
+            if accounting and any(accounting.values()):
+                spoiler_handle.write(
+                    "Plando and item links: "
+                    + "; ".join(f"{label} {dict(sorted(accounting[key].items()))}"
+                                for key, label in (("from_pool", "plando from the pool"),
+                                                   ("added", "explicit plando items"),
+                                                   ("removed", "filler removed for them"),
+                                                   ("linked", "linked copies"))
+                                if accounting[key]) + "\n")
             # Hit Character Key fallback on content plans (#133 PR 4d): the
             # same lines as a normal seed's; nothing when Hit Character is off.
             for _guest, _keys in sorted((getattr(self, "ctr_hit_character_fallback", {}) or {}).items(),
