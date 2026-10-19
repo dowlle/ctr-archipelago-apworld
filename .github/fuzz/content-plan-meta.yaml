@@ -28,7 +28,12 @@
 # cap. Itemsanity and Hit Character (PR 4d) are left to the fuzzer: their
 # global checks route from every race of the plan, and with both custom
 # tracks and every retail track in each plan, the custom-track routes and the
-# guest routes on retail races both reach the fill. The options pinned below
+# guest routes on retail races both reach the fill. Item Box Locations with
+# Shortcut Knowledge and Item Box Colours (PR 4e) are left to the fuzzer:
+# every retail track keeps its frozen boxes, Baby T Park states its eight
+# measured weapon crates and takes Item Box 1 to 8 on its named block, and the
+# fixture loop states twelve crates but has no box ids on its generic slot.
+# The options pinned below
 # are the ones the
 # content-plan profile still refuses; everything else is randomized by the
 # fuzzer as in the other arms.
@@ -48,7 +53,7 @@ Crash Team Racing:
           display_name: Baby T Park
           author: Lockheart
           laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true}
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8}
           files:
             - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
             - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
@@ -60,7 +65,7 @@ Crash Team Racing:
           display_name: Fuzz Fixture Loop
           author: Fixture Author
           laps: 3
-          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true}
+          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 12}
           relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
           files:
             - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
@@ -87,7 +92,6 @@ Crash Team Racing:
   progressive_stats: {"off": 1, shared_global: 1}
   lettersanity: {"off": 1, locations_only: 2, locations_and_items: 2, items_only: 1}
   letters_per_track: {1: 1, 2: 1, 3: 1}
-  box_locations: false
   podium_placement_checks: {true: 7, false: 1}
   podium_held_rungs: {true: 3, false: 1}
   podium_held_fifth_rung: {true: 1, false: 1}

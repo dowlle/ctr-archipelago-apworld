@@ -46,8 +46,9 @@ term does carry over, because every one of those checks crosses the line.
 The rank binds the pad's racer lock when it has one (the legacy
 `track_required_character`), else any driveable racer, exactly as
 `progressive_capability.gate_satisfied` and the `win_logic` cap leaf read it.
-Progressive Stats adds no term: no content-plan location reads a stat chain
-until Item Box Locations come (#133 PR 4e).
+Progressive Stats adds no rank here: the only content-plan locations that read
+a stat chain are the hard-tier Item Box checks (#133 PR 4e), which carry it as
+their own `stats` term (content_item_boxes.py).
 """
 import json
 import pkgutil

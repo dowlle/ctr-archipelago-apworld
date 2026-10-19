@@ -152,8 +152,9 @@ class TestContentPlan(CTRTestBase):
         # dropped from the content-plan wire.
         # Tizi Helper and an explicit death_link_send list have routes since
         # #133 PR 4a (test_item_packs.py), Hit Character and Itemsanity since
-        # #133 PR 4d (test_global_checks.py); Item Box Locations still refuse.
+        # #133 PR 4d (test_global_checks.py), Item Box Locations since #133 PR
+        # 4e (test_content_item_boxes.py); Boss Track Shuffle still refuses (PR 6).
         options = profile_options()
-        options["box_locations"] = True
-        with self.assertRaisesRegex(OptionError, "box_locations"):
+        options["boss_track_shuffle"] = True
+        with self.assertRaisesRegex(OptionError, "boss_track_shuffle"):
             make_world(options)
