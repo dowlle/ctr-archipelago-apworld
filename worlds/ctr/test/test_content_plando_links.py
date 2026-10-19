@@ -106,6 +106,13 @@ class TestPlandoFromPool(unittest.TestCase):
         with self.assertRaisesRegex(OptionError, "may take 2 'Red Gem'"):
             room(plando={1: [block("Red Gem", TROPHY[:1]), block("Red Gem", TROPHY[1:2])]})
 
+    def test_the_count_is_clamped_to_the_named_locations(self):
+        # Review finding 3: Fill.py clamps a count to the block's locations, so
+        # two Red Gems on one location take one copy and are not refused.
+        mw = room(plando={1: [dict(block(["Red Gem", "Red Gem"], TROPHY[:1], count=2), force=False)]})
+        self.assertEqual(mw.get_location(TROPHY[0], 1).item.name, "Red Gem")
+        self.assertEqual(len(holder(mw, "Red Gem")), 1)
+
     def test_an_unselected_item_is_refused(self):
         with self.assertRaisesRegex(OptionError, "'Purple CTR Token' from the pool, but this content plan creates 0"):
             room(plando={1: [block("Purple CTR Token", TROPHY[:1])]})
@@ -206,6 +213,15 @@ class TestBeforeOutput(unittest.TestCase):
         location.item.location = None
         location.item = None
         with self.assertRaisesRegex(OptionError, "without a location \\(Key\\)"):
+            call_all(mw, "post_fill")
+
+    def test_a_dropped_item_of_another_slot_is_refused(self):
+        # Review finding 1: an explicit plando item of another slot on a
+        # content-plan check leaves one item too many; Fill.py would drop one.
+        mw = room(stop="post_fill")
+        extra = mw.worlds[1].create_item("Wumpa Fruit")
+        mw.itempool.append(extra)
+        with self.assertRaisesRegex(OptionError, "left 1 items without a location \\(Wumpa Fruit \\(Slot1\\)\\)"):
             call_all(mw, "post_fill")
 
     def test_an_extra_start_is_refused(self):

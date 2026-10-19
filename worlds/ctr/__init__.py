@@ -1411,6 +1411,9 @@ class ctrAPWorld(World):
         slot. No-op when racer locks are off.
         """
         characters.verify_room_no_self_lock(multiworld)
+        # Content plans (#133 PR 4f): no item of any slot is dropped.
+        from . import content_item_pool
+        content_item_pool.audit_room_before_output(multiworld)
 
     def write_spoiler(self, spoiler_handle) -> None:
         """Record this seed's per-pad unlock requirements (stage 1 + stage 2) with

@@ -203,8 +203,8 @@ def check_item_links(world):
         replacement = group.get("replacement_items", {}).get(world.player)
         if replacement in names:
             fail(f"item link {group['name']!r} of {player_label(world)} names {replacement!r} as its "
-                 "replacement_item. That item is in this content plan's item ledger, so the link would "
-                 "add copies outside it. Use a filler item or leave replacement_item empty. "
+                 "replacement_item. That item is in this content plan's item ledger, and every linked copy "
+                 "can bring a replacement copy outside it. Use a filler item or leave replacement_item empty. "
                  "Your settings were not changed.")
 
 
@@ -235,6 +235,10 @@ def check_planned_blocks(world):
     for block in blocks:
         names = _block_names(world, block)
         most = block.count["max"] if isinstance(block.count, dict) else block.count
+        # Fill.py clamps the count to the block's locations when it names some
+        # and asks for no early/non-early set, so the worst case does too.
+        if block.resolved_locations and not {"early_locations", "non_early_locations"} & set(block.locations):
+            most = min(most, len(block.resolved_locations))
         if not block.from_pool:
             extra = sorted(set(names) - set(plain) - set(traps))
             if extra:
@@ -333,3 +337,19 @@ def audit_before_output(world):
         fail(f"the start inventory of {player_label(world)} differs from the content plan's starts "
              f"(extra {dict(held - starts)}, missing {dict(starts - held)}). An automatic start-inventory "
              "repair is not allowed on a content plan.")
+
+
+def audit_room_before_output(multiworld):
+    """stage_post_fill, once per room with a content-plan slot: no item of any
+    slot may be left without a location. Fill.py only warns and drops the
+    rest when a room has more items than locations, which an explicit plando
+    block of another slot into a content-plan check can cause."""
+    worlds = [w for w in multiworld.get_game_worlds("Crash Team Racing") if hasattr(w, "ctr_content_plan")]
+    if not worlds or getattr(multiworld, "generation_is_fake", False):
+        return
+    unplaced = [item for item in multiworld.itempool if item.location is None]
+    if unplaced:
+        names = sorted({f"{item.name} ({multiworld.get_player_name(item.player)})" for item in unplaced})
+        fail(f"the fill left {len(unplaced)} items without a location ({', '.join(names[:10])}). "
+             "The room has more items than locations, usually from an explicit (from_pool: false) "
+             "plando block. Refusing the seed instead of dropping them.")
