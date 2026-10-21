@@ -85,6 +85,14 @@ ALL_RACER_IDS: Tuple[int, ...] = tuple(range(16))
 TRACK_LEVEL_IDS: Tuple[int, ...] = tuple(range(18))
 CUP_IDS: Tuple[int, ...] = (100, 101, 102, 103, 104)
 
+#: Content-plan cups (#133 PR 5b): a content plan seats its cups on the 27
+#: normal pads, each named from the 27-name pool (cup_checks.CUP_NAMES). Each
+#: cup draws its frozen field from its own order, carried in the block's
+#: optional `content_cups` object keyed by the cup's name index. The order is
+#: `destination_order(seed, CONTENT_CUP_DESTINATION_BASE + name index)`, so it
+#: consumes no world RNG. A normal room never carries the key.
+CONTENT_CUP_DESTINATION_BASE = 200
+
 #: Guest unlock triggers, keyed by guest engine id:
 #:     (authoritative any-of AP win codes, kind)
 #: A guest joins the draw pool of every Hit-supported race once ANY listed win is
@@ -220,13 +228,16 @@ def destination_order(seed: int, destination: int) -> List[int]:
     return order
 
 
-def build_encounters(seed: int, fallback=None) -> Dict[str, object]:
+def build_encounters(seed: int, fallback=None, content_cups=()) -> Dict[str, object]:
     """Build the `hit_character_encounters` block (schema 3) for a uint32 seed.
 
     `fallback` is the optional `{guest engine id: Key count}` mapping produced
     by `fallback_guests`. It cannot be decided here -- it depends on which
     locations the seed created -- so `resolve_for_generation` builds the block
     without it and `apply_fallback` stamps it in once locations are final.
+
+    `content_cups` is the name indices of a content plan's cups (#133 PR 5b);
+    when nonempty the block gains `content_cups` with one order per cup.
     """
     locations = {
         str(cid): HIT_CHARACTER_CODE_BASE + cid
@@ -246,7 +257,7 @@ def build_encounters(seed: int, fallback=None) -> Dict[str, object]:
         triggers[str(guest)] = entry
     bosses = {str(code): opponent
               for code, opponent in sorted(BOSS_WIN_OPPONENTS.items())}
-    return {
+    block = {
         "schema": HIT_CHARACTER_SCHEMA,
         "locations": locations,
         "policy": {
@@ -260,6 +271,11 @@ def build_encounters(seed: int, fallback=None) -> Dict[str, object]:
         "unlock_triggers": triggers,
         "bosses": bosses,
     }
+    if content_cups:
+        block["content_cups"] = {
+            str(index): {"order": destination_order(seed, CONTENT_CUP_DESTINATION_BASE + index)}
+            for index in sorted(int(i) for i in content_cups)}
+    return block
 
 
 # ---------------------------------------------------------------------------
@@ -535,7 +551,7 @@ def _validate_order(entry, label: str) -> None:
                           expected_set=ALL_RACER_IDS, exact_length=16)
 
 
-def _validate_block(block, table=None) -> None:
+def _validate_block(block, table=None, content_cups=()) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
     Every structural commitment of the schema-3 contract is enforced exactly:
@@ -551,14 +567,29 @@ def _validate_block(block, table=None) -> None:
 
     `table` is the fallback table the room uses: `FALLBACK_KEYS` for a normal
     room (the default), `CONTENT_PLAN_FALLBACK_KEYS` for a content plan.
+
+    `content_cups` is the name indices of a content plan's cups (#133 PR 5b):
+    the block carries `content_cups` exactly when it is nonempty, with exactly
+    those keys, each one order. A normal room passes nothing and is refused
+    the key.
     """
     fallback_table = FALLBACK_KEYS if table is None else table
+    expected_cups = {str(int(i)) for i in content_cups}
     if not isinstance(block, dict):
         _fail("block must be an object")
-    if set(block) != {"schema", "locations", "policy", "tracks", "cups",
-                      "unlock_triggers", "bosses"}:
+    keys = {"schema", "locations", "policy", "tracks", "cups",
+            "unlock_triggers", "bosses"}
+    if set(block) != (keys | {"content_cups"} if expected_cups else keys):
         _fail("block must carry exactly schema, locations, policy, tracks, "
-              "cups, unlock_triggers and bosses")
+              "cups, unlock_triggers and bosses, plus content_cups exactly "
+              "when the content plan has cups")
+    if expected_cups:
+        orders = block["content_cups"]
+        if not isinstance(orders, dict) or set(orders) != expected_cups:
+            _fail("content_cups must map exactly the plan's cup name indices "
+                  f"{sorted(expected_cups, key=int)}")
+        for index in sorted(expected_cups, key=int):
+            _validate_order(orders[index], f"content_cups[{index!r}]")
     schema = block.get("schema")
     if type(schema) is not int or schema != HIT_CHARACTER_SCHEMA:
         _fail(f"unknown schema {schema!r}; expected integer "
@@ -665,7 +696,8 @@ def _validate_block(block, table=None) -> None:
 # Universal Tracker restore
 # ---------------------------------------------------------------------------
 
-def restore_from_wire(world, passthrough: Dict[str, object], table=None) -> None:
+def restore_from_wire(world, passthrough: Dict[str, object], table=None,
+                      content_cups=()) -> None:
     """Pin the connected seed's Hit Character block instead of re-drawing.
 
     The scalar, the global schema and the block must agree, and every malformed
@@ -697,7 +729,8 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None) -> None
     boolean. The restored block is kept verbatim: no seed and no array is
     redrawn. Any previously cached block is cleared before validation so a
     refused restore never leaves a stale valid seed active. A content plan
-    passes `CONTENT_PLAN_FALLBACK_KEYS` as `table`.
+    passes `CONTENT_PLAN_FALLBACK_KEYS` as `table` and its cups' name indices
+    as `content_cups` (#133 PR 5b).
     """
     world.ctr_hit_character_encounters = None
     world.ctr_hit_character_seed = None
@@ -752,7 +785,7 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None) -> None
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    _validate_block(block, table)
+    _validate_block(block, table, content_cups)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
     # The fallback determination is part of the restored data, not something a

@@ -18,24 +18,29 @@ Turbo Grant and Tizi Helper companions) on the server holding `35016000`, so a
 content-plan room needs no other wire for it.
 
 HIT CHARACTER. The 16 checks of hit_character.py (`35025000` + engine id).
-Native seats the encounter draw only on retail track races (levels 0..17,
-Trophy Race and CTR Challenge); a custom-served race, which a content-plan
-custom track is, keeps its own permutation of the seven stock opponents of the
-player's arcade pack. So a guest (engine id 8..15) is routed from the retail
-races only, and a default racer (0..7) from every Trophy Race and CTR
-Challenge. On a custom track the stock pack is the seven other defaults for a
-default player and defaults 0..6 for a guest player, so Pura (7) appears there
-only under a default player. The rule is the legacy one (hit_character.py
-encounter predicates): a hit method while Itemsanity models weapons; for a
-guest, one of its unlock wins reachable, or its Key fallback when none of them
-is in the plan; and a route whose pad is open with a selectable racer the
-target can be drawn against (never the target itself, the pad's racer lock
-when it has one). Content plans have no boss encounters yet (#133 PR 6), so
-the four boss guests always take the content-plan Key fallback
-(hit_character.CONTENT_PLAN_FALLBACK_KEYS).
+Native seats the encounter draw on every Trophy Race and CTR Challenge of a
+content plan, retail, Cortex Vortex and custom tracks alike (#133 PR 5b,
+ruling of 2026-10-21: no logic or check differences between custom and retail
+tracks where possible), so every target, guest or default racer, is routed
+from every such race. A content-plan cup (#133 PR 5b, cup roster ruling of
+2026-10-21) draws its field once at cup start from its own order (the block's
+`content_cups`) and keeps it for every leg and retry, custom legs included,
+so each leg of a cup is a route too (mode `cup`, the leg's `leg_id`). A leg
+route needs the finish of every earlier leg, as a Cup Leg Victory route does,
+but not a win, by a racer the target can be drawn against. The rule is the legacy one (hit_character.py encounter
+predicates): a hit method while Itemsanity models weapons; for a guest, one of
+its unlock wins reachable, or its Key fallback when none of them is in the
+plan; and a route whose pad is open with a selectable racer the target can be
+drawn against (never the target itself, the pad's racer lock when it has
+one). Content plans have no boss encounters yet (#133 PR 6), so the four boss
+guests always take the content-plan Key fallback
+(hit_character.CONTENT_PLAN_FALLBACK_KEYS). Before PR 5b a guest was routed
+from retail races only and a custom-served race kept the stock field of the
+player's arcade pack.
 
 The room carries the normal `hit_character_encounters` block (schema 3) when
-Hit Character is on, with the fallback derived from the plan's checks.
+Hit Character is on, with the fallback derived from the plan's checks, and,
+when the plan has cups, `content_cups`: one order per cup name index.
 
 WEAPON CRATES (#133 PR 4e). A custom track whose package states
 `capabilities.weapon_crates: 0` rolls no weapon, so it is no route for either
@@ -44,13 +49,13 @@ count keeps the earlier routes (every real package measured has crates).
 """
 from Options import OptionError
 
-from . import characters, hit_character, itemsanity, progressive_capability
+from . import characters, content_cups, hit_character, itemsanity, progressive_capability
 
 FEATURE = "global_checks_v1"
 KEYS = ("itemsanity", "hit_character")
 #: Modes whose race seats AI opponents and rolls weapon crates.
 RACE_MODES = ("trophy", "ctr")
-MODE_ORDER = ("trophy", "ctr", "relic")
+MODE_ORDER = ("trophy", "ctr", "relic", "cup")
 OWNER = "global"
 
 
@@ -84,8 +89,8 @@ def item_counts(record):
     return {name: 1 for name in itemsanity.ITEM_NAMES}
 
 
-def _route(entry_id, mode, pad_id, award):
-    return dict(entry_id=entry_id, mode=mode, leg_id=None, encounter_id=None, own_pad_id=pad_id, award=award)
+def _route(entry_id, mode, pad_id, award, leg_id=None):
+    return dict(entry_id=entry_id, mode=mode, leg_id=leg_id, encounter_id=None, own_pad_id=pad_id, award=award)
 
 
 def no_crates(track, packages):
@@ -112,16 +117,35 @@ def race_routes(tracks, entries, pads, packages=None):
     return sorted(out, key=lambda r: (r[0], MODE_ORDER.index(r[3])))
 
 
-def hit_routes(routes, target):
-    """The race routes a Hit target can be drawn on: retail races for every
-    target, and custom and Cortex Vortex races for a default racer (0..7)."""
-    return [r for r in routes if r[4] == "retail" or target in hit_character.DEFAULT_RACER_IDS]
+def cup_routes(tracks, entries, pads, packages=None):
+    """[(physical pad, entry id, pad id, "cup", leg id)] of every leg of every
+    cup in the plan (#133 PR 5b), in physical pad order, then leg order. A leg
+    on a custom track with no weapon crates is skipped: nothing can be hit
+    there."""
+    by_track = {track["id"]: track for track in tracks}
+    pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
+    out = []
+    for entry in entries:
+        if entry["kind"] != content_cups.KIND or entry["id"] not in pad_of:
+            continue
+        pad_id = pad_of[entry["id"]]
+        out.extend((int(pad_id.split(":")[1]), entry["id"], pad_id, content_cups.MODE, leg["id"])
+                   for leg in entry["legs"] if not no_crates(by_track[leg["track_id"]], packages))
+    return sorted(out, key=lambda r: r[0])
+
+
+def hit_routes(routes, legs):
+    """Every route a Hit target can be drawn on: every Trophy Race and CTR
+    Challenge, and every cup leg, in physical pad order, then mode order, then
+    leg order (a pad holds one entry). The same for every target."""
+    out = [(r[0], r[1], r[2], r[3], None) for r in routes] + list(legs)
+    return sorted(out, key=lambda r: (r[0], MODE_ORDER.index(r[3])))
 
 
 def checks(record, tracks, entries, pads, packages=None):
     """Every global check of the record, Itemsanity first (frozen class order),
     then Hit Character (engine id order). Refuses a plan in which a check has no
-    route."""
+    route. `tracks` holds every plan track, cup-only leg tracks included."""
     if not record:
         return []
     routes = race_routes(tracks, entries, pads, packages)
@@ -135,22 +159,22 @@ def checks(record, tracks, entries, pads, packages=None):
             out.append(dict(location=code, owner=OWNER, kind="itemsanity", display_name=name,
                             routes=[_route(e, m, p, award) for _phys, e, p, m, _o in routes]))
     if record.get("hit_character"):
+        own = hit_routes(routes, cup_routes(tracks, entries, pads, packages))
+        if not own:
+            error("hit_character needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
+                  "trophy or ctr mode or a cup, or turn hit_character off. No content was changed.")
         for cid in sorted(characters.CHARACTER_ID_TO_NAME):
-            own = hit_routes(routes, cid)
             name = hit_character.HIT_CHARACTER_CLASS.location_name(cid)
-            if not own:
-                error(f"hit_character: {name} has no race to be hit in. Guests are drawn only in retail "
-                      "Trophy Races and CTR Challenges; select a retail track with the trophy or ctr mode, "
-                      "or turn hit_character off. No content was changed.")
             out.append(dict(location=hit_character.HIT_CHARACTER_CODE_BASE + cid, owner=OWNER, kind="hit",
                             display_name=name,
-                            routes=[_route(e, m, p, "hit") for _phys, e, p, m, _o in own]))
+                            routes=[_route(e, m, p, "hit", leg) for _phys, e, p, m, leg in own]))
     return out
 
 
-def check_count(record, tracks, packages=None):
+def check_count(record, tracks, packages=None, cup_legs=()):
     """How many global checks a plan with these tracks holds (before the pads
-    are assigned), refusing a family with no route as `checks` does."""
+    are assigned), refusing a family with no route as `checks` does.
+    `cup_legs` is the track record of every leg of the plan's cups."""
     if not record:
         return 0
     racing = [t for t in tracks if "arena_id" not in t and set(t.get("modes", ())) & set(RACE_MODES)
@@ -162,10 +186,9 @@ def check_count(record, tracks, packages=None):
                   "trophy or ctr mode, or turn itemsanity off. No content was changed.")
         count += len(itemsanity.ITEMSANITY_CLASS.all_locations())
     if record.get("hit_character"):
-        if not any(t["origin"] == "retail" for t in racing):
-            error("hit_character: guest racers are drawn only in retail Trophy Races and CTR Challenges; "
-                  "select a retail track with the trophy or ctr mode, or turn hit_character off. "
-                  "No content was changed.")
+        if not racing and all(no_crates(t, packages) for t in cup_legs):
+            error("hit_character needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
+                  "trophy or ctr mode or a cup, or turn hit_character off. No content was changed.")
         count += len(characters.CHARACTER_ID_TO_NAME)
     return count
 
@@ -179,13 +202,19 @@ def fallback(plan):
     return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS)
 
 
+def cup_indices(plan):
+    """The name indices of the plan's cups (#133 PR 5b), the keys of the
+    encounter block's `content_cups`."""
+    return sorted(int(e["id"].removeprefix("entry/cup:")) for e in plan["entries"] if e["kind"] == content_cups.KIND)
+
+
 def encounter_block(world, plan):
     """Draw the roster seed once and build the `hit_character_encounters` block
-    with the plan's fallback. The block's only draw, taken only with Hit
-    Character on."""
+    with the plan's fallback and one order per cup. The block's only draw,
+    taken only with Hit Character on; the cup orders derive from the seed."""
     seed = int(world.random.getrandbits(32))
-    block = hit_character.build_encounters(seed, fallback(plan))
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan))
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
     world.ctr_hit_character_seed = seed
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_fallback = fallback(plan)
@@ -205,7 +234,7 @@ def check_encounter_block(plan, slot_data):
         return
     block = slot_data.get("hit_character_encounters")
     block = hit_character._tuples_to_lists(block) if hit_character._has_tuple(block) else block
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
     got = {int(g): e["fallback_keys"] for g, e in block["unlock_triggers"].items() if "fallback_keys" in e}
     if got != fallback(plan):
         error("hit_character_encounters fallback disagrees with the plan's unlock wins")
@@ -215,16 +244,12 @@ def check_encounter_block(plan, slot_data):
 # Logic
 # ---------------------------------------------------------------------------
 
-def _appearance(target, origin, lock):
+def _appearance(target, lock):
     """Player racers the draw can seat `target` against on one route: any racer
-    but the target on a retail race; on a custom-served race the racers whose
-    stock pack holds the target. A racer-locked pad narrows that to its lock."""
+    but the target, on every race (#133 PR 5b). A racer-locked pad narrows that
+    to its lock, and a pad locked to the target proves nothing."""
     target_name = characters.CHARACTER_ID_TO_NAME[target]
-    if origin == "retail":
-        players = [n for n in progressive_capability.ROSTER if n != target_name]
-    else:
-        players = [n for n in progressive_capability.ROSTER if n != target_name
-                   and target in hit_character.stock(characters.ROSTER_CHARACTER_ID[n])]
+    players = [n for n in progressive_capability.ROSTER if n != target_name]
     if lock is not None:
         return (lock,) if lock in players else ()
     return tuple(players)
@@ -254,14 +279,22 @@ def install(world, check, location, route_tests):
     target = check["location"] - hit_character.HIT_CHARACTER_CODE_BASE
     plan = world.ctr_content_plan
     pads = {pad["id"]: pad for pad in plan["pads"]}
-    origin_of = {entry["id"]: _origin(plan, entry) for entry in plan["entries"]}
+    entries = {entry["id"]: entry for entry in plan["entries"]}
+    tracks = {track["id"]: track for track in plan["tracks"]}
+    packages = {package["id"]: package for package in plan["packages"]}
+    capability = plan.get("capability", {})
     legs = []
     for entry, test, route in route_tests:
         lock = pads[route["own_pad_id"]]["racer_lock"]
         lock = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
-        players = _appearance(target, origin_of[route["entry_id"]], lock)
+        players = _appearance(target, lock)
+        # A cup leg (#133 PR 5b) needs the finish of every earlier leg, and
+        # the racer that finishes them is the one the field is drawn against,
+        # so the boost term binds to the same appearance racer.
+        need = (content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks, capability, packages)
+                if route["mode"] == content_cups.MODE else 0)
         if players:
-            legs.append((entry, test, players))
+            legs.append((entry, test, players, need))
     legs = tuple(legs)
     fallback_keys = world.ctr_hit_character_fallback.get(target)
     triggers = ()
@@ -286,15 +319,12 @@ def install(world, check, location, route_tests):
         elif triggers and not any(t.can_reach(state) for t in triggers):
             return False
         return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
-                   and any(selectable(state, name) for name in players)
-                   for entry, test, players in legs)
+                   and any(selectable(state, name)
+                           and (not need or progressive_capability.gate_satisfied(world, state, player, boost_min=need,
+                                                                                 required_character=name))
+                           for name in players)
+                   for entry, test, players, need in legs)
     location.access_rule = rule
-
-
-def _origin(plan, entry):
-    tracks = {track["id"]: track for track in plan["tracks"]}
-    track = tracks.get(entry.get("track_id"))
-    return track["origin"] if track else "crystal"
 
 
 def tiger_temple_door(world):

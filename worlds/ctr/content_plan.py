@@ -1107,7 +1107,8 @@ def generate(world):
     # every race that can earn them once the pads are assigned.
     global_checks = content_global_checks.settings(o)
     check_count += content_global_checks.check_count(global_checks, [t for t in chosen if "cup_index" not in t],
-                                                     package_by_id)
+                                                     package_by_id,
+                                                     [leg for t in chosen if "cup_index" in t for leg in t["legs"]])
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -1207,7 +1208,7 @@ def generate(world):
         wumpa = global_wumpa_check(global_wumpa_routes(standalone, entries, pads, package_by_id))
         if wumpa:
             checks.append(wumpa)
-    checks.extend(content_global_checks.checks(global_checks, standalone, entries, pads, package_by_id))
+    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id))
     for boss in range(5):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
@@ -1983,4 +1984,5 @@ def restore(world, slot_data):
     world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
     if global_checks.get("hit_character"):
         from . import hit_character
-        hit_character.restore_from_wire(world, slot_data, hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+        hit_character.restore_from_wire(world, slot_data, hit_character.CONTENT_PLAN_FALLBACK_KEYS,
+                                        content_global_checks.cup_indices(plan))
