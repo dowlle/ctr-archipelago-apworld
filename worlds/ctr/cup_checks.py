@@ -1,5 +1,7 @@
 """Cup check names minted in the 0.3.0 id step: cup points wins, cup sweeps
-(#246) and Cup Leg Victory. Names only; no seed creates them yet.
+(#246) and Cup Leg Victory. The legacy path creates only the Gem Cup sweeps;
+content plans create the named cups' Win and Win All Legs checks and the Cup
+Leg Victory checks (#133 PR 5, content_cups.py).
 
 WHAT THESE CHECK. `<Cup>: Win` is the points win of one logical Cup drawn from
 the named cup pool. `<Cup>: Win All Legs` (#246) is winning all four legs of
@@ -9,8 +11,8 @@ track that appears only as a Cup leg in a seed, with no standalone Trophy Race;
 repeated legs share it (ruling 17, 2026-09-01; semantics ruling 29).
 
 WHO OWNS THE SEMANTICS. The apworld owns the names, codes and the per-seed
-subset; native owns the leg results and the sends. Neither half is built here:
-every class below returns an empty per-seed subset, so no seed changes.
+subset; native owns the leg results and the sends. The classes below keep
+their legacy per-seed subsets; a content plan lists its own cup checks.
 
 THE CUP NAME POOL (ruled 2026-10-13 21:47 CEST). Every cup name is a real,
 frozen location name, and each seed draws which named cups it uses from the

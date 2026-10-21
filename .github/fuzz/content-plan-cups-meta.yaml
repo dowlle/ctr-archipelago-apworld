@@ -1,0 +1,73 @@
+# Content-plan cups arm (#133 PR 5), used by .github/workflows/ctr-world.yml.
+# The content-plan meta (content-plan-meta.yaml, which explains every pinned
+# option) with one to eight cups and zero to four Crystal Challenges, drawn
+# together as one feasible pair. Cup legs come from every source: the retail
+# race tracks, Baby T Park and the fixture loop (both can run a Trophy race)
+# and Cortex Vortex. one_lap_cups (shortened legs) and cup_sweep_checks are
+# left to the fuzzer, so both lap rules and the Win All Legs checks reach the
+# fill; with eight cups some leg tracks hold no standalone pad and take a Cup
+# Leg Victory check.
+Crash Team Racing:
+  accessibility: full
+  content_pool:
+    preset: mixed
+    tracks:
+      retail: all
+      cortex_vortex: true
+      modes: [trophy, ctr, relic]
+      custom:
+        - id: package/baby-t-park/1.0.2
+          content_id: baby-t-park
+          uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+          revision: "1.0.2"
+          display_name: Baby T Park
+          author: Lockheart
+          laps: 7
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8}
+          files:
+            - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
+            - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
+          evidence: []
+        - id: package/fuzz-fixture-loop/1.0
+          content_id: fuzz-fixture-loop
+          uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+          revision: "1.0"
+          display_name: Fuzz Fixture Loop
+          author: Fixture Author
+          laps: 3
+          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 12}
+          relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
+          files:
+            - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
+            - {role: vrm, sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2, bytes: 458808, format: ctr-vrm, format_version: 1}
+          evidence: []
+    cups: {count: {min: 1, max: 8}}
+    crystals: {count: {min: 0, max: 4}}
+    bosses: {enabled: false}
+    required_entries: [custom/baby-t-park/1.0.2, custom/fuzz-fixture-loop/1.0]
+  pad_layout: {placement: shuffle, stages: two, mode_order: per_pad, merge_trophy_ctr: false}
+  item_pool:
+    base:
+      trophies: 5
+      relics: {sapphire: 6, gold: 4, platinum: 2}
+      tokens: {red: 2, green: 2, blue: 2, yellow: 0, purple: 0}
+      gems: [red, green, blue, yellow, purple]
+      keys: 4
+  oxide_goal: disabled
+  bosses_required_goal: 0
+  gems_required_goal: {1: 1, 3: 1, 5: 2}
+  custom_tracks: {}
+  cortex_vortex_track: false
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_stats: {"off": 1, shared_global: 1}
+  lettersanity: {"off": 1, locations_only: 2, locations_and_items: 2, items_only: 1}
+  letters_per_track: {1: 1, 2: 1, 3: 1}
+  podium_placement_checks: {true: 7, false: 1}
+  podium_held_rungs: {true: 3, false: 1}
+  podium_held_fifth_rung: {true: 1, false: 1}
+  podium_finish_rungs: {true: 1, false: 1}
+  podium_any_position_rung: {true: 1, false: 1}
+  wumpa_check: {"off": 1, global: 1, per_track: 6}
+  relic_perfect_checks: {true: 7, false: 1}
+  boss_track_shuffle: false
+  warp_pad_rules: {}

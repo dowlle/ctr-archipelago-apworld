@@ -145,8 +145,10 @@ class TestContentPlan(CTRTestBase):
         with self.assertRaisesRegex(OptionError, "Short by 1 checks"):
             make_world(options)
         options = profile_options()
-        options["content_pool"]["cups"]["count"] = 1
-        with self.assertRaisesRegex(OptionError, "not implemented"):
+        # Cups are built since #133 PR 5 (test_content_cups.py); the count
+        # stays required.
+        del options["content_pool"]["cups"]["count"]
+        with self.assertRaisesRegex(OptionError, "cups.count is required"):
             make_world(options)
         # Options added on main after the experiment refuse instead of being
         # dropped from the content-plan wire.

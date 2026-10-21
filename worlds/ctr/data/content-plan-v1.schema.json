@@ -84,10 +84,11 @@
           "character_unlocks_v1",
           "capability_packs_v1",
           "global_checks_v1",
-          "item_boxes_v1"
+          "item_boxes_v1",
+          "cup_entries_v1"
         ]
       },
-      "maxItems": 15,
+      "maxItems": 16,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -902,7 +903,8 @@
             "ctr",
             "relic",
             "merged",
-            "crystal"
+            "crystal",
+            "cup"
           ]
         },
         "stage": {
