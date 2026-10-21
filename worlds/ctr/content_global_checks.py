@@ -27,7 +27,7 @@ from every such race. A content-plan cup (#133 PR 5b, cup roster ruling of
 `content_cups`) and keeps it for every leg and retry, custom legs included,
 so each leg of a cup is a route too (mode `cup`, the leg's `leg_id`). A leg
 route needs the finish of every earlier leg, as a Cup Leg Victory route does,
-but not a win. The rule is the legacy one (hit_character.py encounter
+but not a win, by a racer the target can be drawn against. The rule is the legacy one (hit_character.py encounter
 predicates): a hit method while Itemsanity models weapons; for a guest, one of
 its unlock wins reachable, or its Key fallback when none of them is in the
 plan; and a route whose pad is open with a selectable racer the target can be
@@ -288,12 +288,13 @@ def install(world, check, location, route_tests):
         lock = pads[route["own_pad_id"]]["racer_lock"]
         lock = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         players = _appearance(target, lock)
-        # A cup leg (#133 PR 5b) needs the finish of every earlier leg, bound
-        # to the cup pad's racer lock like a Cup Leg Victory route.
+        # A cup leg (#133 PR 5b) needs the finish of every earlier leg, and
+        # the racer that finishes them is the one the field is drawn against,
+        # so the boost term binds to the same appearance racer.
         need = (content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks, capability, packages)
                 if route["mode"] == content_cups.MODE else 0)
         if players:
-            legs.append((entry, test, players, need, lock))
+            legs.append((entry, test, players, need))
     legs = tuple(legs)
     fallback_keys = world.ctr_hit_character_fallback.get(target)
     triggers = ()
@@ -318,10 +319,11 @@ def install(world, check, location, route_tests):
         elif triggers and not any(t.can_reach(state) for t in triggers):
             return False
         return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
-                   and any(selectable(state, name) for name in players)
-                   and (not need or progressive_capability.gate_satisfied(world, state, player, boost_min=need,
-                                                                         required_character=lock))
-                   for entry, test, players, need, lock in legs)
+                   and any(selectable(state, name)
+                           and (not need or progressive_capability.gate_satisfied(world, state, player, boost_min=need,
+                                                                                 required_character=name))
+                           for name in players)
+                   for entry, test, players, need in legs)
     location.access_rule = rule
 
 

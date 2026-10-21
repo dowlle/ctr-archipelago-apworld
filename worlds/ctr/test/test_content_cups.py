@@ -292,6 +292,44 @@ class TestCupHitCharacter(unittest.TestCase):
             everything.collect(item, prevent_sweep=True)
         self.assertTrue(crash.can_reach(everything))
 
+    def test_leg_boost_binds_to_the_drawn_against_racer(self):
+        # Per-character boost: only Crash can finish the first leg, and the
+        # field never seats the player, so Hit Crash has no racer that both
+        # reaches the second leg and can be drawn against him.
+        from types import SimpleNamespace as NS
+        from .. import progressive_capability as pc
+
+        class State:
+            boosted = "Crash Bandicoot"
+
+            def can_reach(self, *args):
+                return True
+
+            def has(self, *args):
+                return False
+
+            def count(self, name, player):
+                return 2 if name == pc.BOOST_NAME_BY_CHARACTER[self.boosted] else 0
+
+        cup = dict(id="entry/cup:0", legs=[dict(id="leg:0", track_id="first"), dict(id="leg:1", track_id="second")])
+        plan = dict(global_checks=dict(hit_character=True), pads=[dict(id="pad:0", racer_lock=None)], entries=[cup],
+                    tracks=[dict(id="first", origin="custom", package_id="p"),
+                            dict(id="second", origin="retail", display_name="Crash Cove")],
+                    packages=[dict(id="p", content_id="probe", capabilities=dict(weapon_crates=0, super_turbo_pads=True))],
+                    capability=dict(boost_mode=2, shortcut_knowledge=0))
+        world = NS(player=1, ctr_content_plan=plan, ctr_starting_character="Coco Bandicoot",
+                   ctr_hit_character_fallback={},
+                   options=NS(progressive_boost=NS(value=2), progressive_stats=NS(value=0),
+                              character_unlocks=NS(value=0)))
+        route = dict(own_pad_id="pad:0", entry_id="entry/cup:0", leg_id="leg:1", mode="cup")
+        self.assertEqual(content_cups.prefix_boost(cup, "leg:1", {t["id"]: t for t in plan["tracks"]},
+                                                   plan["capability"], {"p": plan["packages"][0]}), 2)
+        for target, expected in ((35025000, False), (35025001, True)):  # Crash, then Cortex
+            location = NS(access_rule=None)
+            content_global_checks.install(world, dict(location=target, kind="hit"), location,
+                                          [("entry/cup:0", None, route)])
+            self.assertIs(location.access_rule(State()), expected, target)
+
     def test_forged_cup_orders_refuse(self):
         world = None
         for seed in range(10):
