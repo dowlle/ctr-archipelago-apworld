@@ -32,7 +32,11 @@ does not carry the option, the legs' laps do.
 ROSTER. The player slot only, with the engine's eight-kart Adventure field:
 the opponents follow the player's racer at cup start, as in a retail Gem
 Cup, and stay the same for all four legs (slice plan, open question on the
-roster, option A built).
+roster, option A built). With Hit Character on (cup roster ruling of
+2026-10-21, #133 PR 5b) native seats the cup's field from the encounter draw
+instead: drawn once at cup start from the cup's own order (the encounter
+block's `content_cups`), frozen for every leg and retry, custom legs
+included; every leg is then a Hit route (content_global_checks).
 
 CHECKS.
   * `<Cup>: Win` (35027000 + name index) on a points win. Each cup takes one
@@ -347,6 +351,21 @@ def route_boost(cup_entry, leg_id, tracks, capability, packages=None):
         if leg["id"] == leg_id:
             return max(need, check_boost(track, "trophy", "win", capability, package))
         need = max(need, finish_boost(track, capability, package))
+    raise KeyError(leg_id)
+
+
+def prefix_boost(cup_entry, leg_id, tracks, capability, packages=None):
+    """The rank reaching a leg needs (#133 PR 5b, a Hit route): the finish of
+    every earlier leg, without the leg's own win."""
+    if not capability or not capability.get("boost_mode"):
+        return 0
+    packages = packages or {}
+    need = 0
+    for leg in cup_entry["legs"]:
+        if leg["id"] == leg_id:
+            return need
+        track = tracks[leg["track_id"]]
+        need = max(need, finish_boost(track, capability, packages.get(track.get("package_id"))))
     raise KeyError(leg_id)
 
 

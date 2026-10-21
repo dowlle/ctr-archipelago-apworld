@@ -3,8 +3,9 @@
 Both families are global: each check is a shared check with a route per race
 that can earn it. Itemsanity's 22 use checks route from every Trophy Race and
 CTR Challenge, and its 11 weapon items take ledger rows. Hit Character's 16
-checks route a default racer from every such race and a guest from retail
-races only (custom-served races keep the stock field); a guest joins through
+checks route every target from every such race, retail, Cortex Vortex and
+custom alike (#133 PR 5b: native seats the encounter draw on custom-served
+races too), and from every cup leg (test_content_cups); a guest joins through
 its unlock win when the plan has one, else through its Key fallback, and the
 four boss guests always take the content-plan fallback because content plans
 have no boss encounters yet. The paired native parser reads the same records
@@ -192,14 +193,15 @@ class TestHitCharacter(unittest.TestCase):
         hits = [c for c in plan["checks"] if c["kind"] == "hit"]
         self.assertEqual([c["location"] for c in hits], list(range(35025000, 35025016)))
         everything = [(e, m) for _p, e, m, _o in race_routes(plan)]
-        retail_only = [(e, m) for _p, e, m, o in race_routes(plan) if o == "retail"]
+        self.assertTrue({BTP, LOOP} <= {e for e, _m in everything})
         for check in hits:
-            target = check["location"] - 35025000
             routes = [(r["entry_id"], r["mode"]) for r in check["routes"]]
-            self.assertEqual(routes, everything if target < 8 else retail_only, check["display_name"])
+            self.assertEqual(routes, everything, check["display_name"])
+            self.assertEqual({r["leg_id"] for r in check["routes"]}, {None})
         self.assertIs(wire["ctr_options"]["hit_character"], True)
         block = wire["hit_character_encounters"]
         hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+        self.assertNotIn("content_cups", block)  # no cups in this plan
         fallback = {int(g): e.get("fallback_keys") for g, e in block["unlock_triggers"].items()}
         self.assertEqual(fallback, {8: 4, 9: 2, 10: 1, 11: 3, 12: None, 13: 2, 14: None, 15: 4})
 
@@ -241,22 +243,31 @@ class TestHitCharacter(unittest.TestCase):
         for name in ("Itemsanity: Bomb", "Hit Crash Bandicoot"):
             self.assertTrue(world.multiworld.get_location(name, 1).item_rule(item), name)
 
-    def test_custom_track_appearance(self):
-        # On a custom-served race the stock pack holds the other defaults for
-        # a default player and 0..6 for a guest player, never a guest target.
-        self.assertEqual(content_global_checks._appearance(7, "custom", None),
-                         tuple(n for n in content_global_checks.progressive_capability.ROSTER
-                               if hit_character.characters.ROSTER_CHARACTER_ID[n] < 7))
-        self.assertEqual(content_global_checks._appearance(12, "custom", None), ())
-        self.assertEqual(content_global_checks._appearance(0, "custom", "N. Tropy"), ("N. Tropy",))
-        self.assertEqual(content_global_checks._appearance(7, "custom", "N. Tropy"), ())
-        self.assertEqual(content_global_checks._appearance(7, "retail", "N. Tropy"), ("N. Tropy",))
-        self.assertEqual(content_global_checks._appearance(0, "retail", "Crash Bandicoot"), ())
+    def test_appearance_is_the_same_on_every_race(self):
+        # #133 PR 5b: custom-served races seat the encounter draw too, so a
+        # target appears against any racer but itself, or the pad's lock.
+        roster = content_global_checks.progressive_capability.ROSTER
+        self.assertEqual(content_global_checks._appearance(12, None),
+                         tuple(n for n in roster if n != "N. Tropy"))
+        self.assertEqual(content_global_checks._appearance(7, "N. Tropy"), ("N. Tropy",))
+        self.assertEqual(content_global_checks._appearance(0, "Crash Bandicoot"), ())
 
-    def test_no_retail_race_refuses(self):
+    def test_guests_route_from_custom_tracks(self):
+        # A plan without a retail track: guests are hit on the custom tracks.
         options = global_options(items=False, retail=[])
         options["content_pool"]["required_entries"] = []
-        with self.assertRaisesRegex(OptionError, "guest racers are drawn only in retail"):
+        world = first_world(options, seed=1)
+        plan = world.ctr_content_plan
+        guest = check_at(plan, 35025012)
+        self.assertTrue(guest["routes"])
+        self.assertTrue(all(r["entry_id"].startswith("entry/custom/") for r in guest["routes"]))
+        self.assertEqual(guest["routes"], check_at(plan, 35025000)["routes"])
+
+    def test_no_race_refuses(self):
+        options = global_options(items=False, retail=[3, 4], modes=("relic",))
+        options["content_pool"]["tracks"]["custom"] = []
+        options["content_pool"]["required_entries"] = []
+        with self.assertRaisesRegex(OptionError, "hit_character needs at least one Trophy Race, CTR Challenge or cup"):
             make_world(options, seed=1)
 
     def test_legacy_rooms_keep_the_boss_refusal(self):
@@ -274,9 +285,9 @@ class TestForgeryAndTracker(unittest.TestCase):
     def test_forged_plans_refuse(self):
         plan = self.wire["content_plan"]
 
-        def guest_custom_route(p):
-            route = next(r for r in check_at(p, 35025000)["routes"] if r["entry_id"] == BTP)
-            check_at(p, 35025008)["routes"].append(route)
+        def guest_without_custom_route(p):
+            check = check_at(p, 35025008)
+            check["routes"] = [r for r in check["routes"] if r["entry_id"] != BTP]
 
         def weapon_row(p):
             row = next(r for r in p["items"]["rows"] if r["item"] == content_item_pool.ITEMS["Mask"])
@@ -289,7 +300,7 @@ class TestForgeryAndTracker(unittest.TestCase):
 
         for change in (lambda p: check_at(p, 35016000)["routes"].pop(),
                        lambda p: check_at(p, 35016003).update(owner="retail:3"),
-                       guest_custom_route, weapon_row, drop_record,
+                       guest_without_custom_route, weapon_row, drop_record,
                        lambda p: p["required_features"].remove(content_global_checks.FEATURE),
                        lambda p: p["global_checks"].update(box_locations=True),
                        lambda p: p["global_checks"].update(itemsanity=1)):

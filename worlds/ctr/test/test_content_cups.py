@@ -1,12 +1,16 @@
 """Cups on content plans (#133 PR 5): counts, composition, laps, checks,
-logic and the Universal Tracker restore."""
+logic and the Universal Tracker restore. With Hit Character on (#133 PR 5b),
+each cup's frozen field comes from its own encounter order and every leg is
+a Hit route."""
 import copy
 import json
 import unittest
 
 from Options import OptionError
 
-from .. import content_cups, content_plan, cup_checks
+from BaseClasses import CollectionState
+
+from .. import content_cups, content_global_checks, content_plan, cup_checks, hit_character
 from .test_content_plan import make_world, profile_options
 from .test_custom_packages import UNKNOWN, named_fixture
 
@@ -193,6 +197,143 @@ class TestCupChecks(unittest.TestCase):
         self.assertEqual(content_cups.route_boost(cup, "entry/cup:0/leg:1", tracks, record), 2)
         cup["legs"].reverse()  # now Dingo Canyon (leg:1) races first
         self.assertEqual(content_cups.route_boost(cup, "entry/cup:0/leg:1", tracks, record), 0)
+
+
+    def test_prefix_rank_stops_before_the_leg(self):
+        # A Hit route on a leg (#133 PR 5b) needs every earlier leg's finish,
+        # never the leg's own win.
+        record = dict(boost_mode=1, boost_blue_fire=False, stats_mode=0, logic_difficulty=2, shortcut_knowledge=0)
+        tracks = {f"retail:{i}": dict(id=f"retail:{i}", origin="retail", retail_id=i,
+                                      display_name=content_plan.RETAIL[i], laps=3) for i in (0, 7)}
+        cup = dict(id="entry/cup:0", legs=[dict(id="entry/cup:0/leg:0", track_id="retail:0"),
+                                           dict(id="entry/cup:0/leg:1", track_id="retail:7"),
+                                           dict(id="entry/cup:0/leg:2", track_id="retail:0")])
+        self.assertEqual(content_cups.prefix_boost(cup, "entry/cup:0/leg:0", tracks, record), 0)
+        self.assertEqual(content_cups.prefix_boost(cup, "entry/cup:0/leg:1", tracks, record), 0)
+        self.assertEqual(content_cups.prefix_boost(cup, "entry/cup:0/leg:2", tracks, record), 2)
+        self.assertEqual(content_cups.prefix_boost(cup, "entry/cup:0/leg:2", tracks, None), 0)
+
+
+def hit_cup_options(seed=0, **extra):
+    options = cup_options(seed)
+    options.update(hit_character=True, itemsanity=False)
+    options.update(extra)
+    return options
+
+
+class TestCupHitCharacter(unittest.TestCase):
+    def test_orders_routes_and_restore(self):
+        seen_custom_leg = False
+        for seed in range(16):
+            with self.subTest(seed=seed):
+                try:
+                    world = make_world(hit_cup_options(seed), seed=seed)
+                except OptionError as exc:
+                    self.assertIn("at the start", str(exc))
+                    continue
+                plan = world.ctr_content_plan
+                wire = json.loads(json.dumps(world.fill_slot_data()))
+                block = wire["hit_character_encounters"]
+                indices = sorted(int(e["id"].split(":")[1]) for e in cups_of(plan))
+                self.assertEqual(sorted(map(int, block["content_cups"])), indices)
+                seed32 = block["policy"]["seed"]
+                for index in indices:
+                    self.assertEqual(block["content_cups"][str(index)]["order"],
+                                     hit_character.destination_order(seed32, 200 + index))
+                tracks = {t["id"]: t for t in plan["tracks"]}
+                pad_of = {p["entry_id"]: p["id"] for p in plan["pads"] if p["entry_id"]}
+                expected_legs = sorted(
+                    ((int(pad_of[c["id"]].split(":")[1]), n), (c["id"], leg["id"]))
+                    for c in cups_of(plan) for n, leg in enumerate(c["legs"]))
+                hits = [c for c in plan["checks"] if c["kind"] == "hit"]
+                self.assertEqual(len(hits), 16)
+                for check in hits:
+                    # Every target the same routes, guests included.
+                    self.assertEqual(check["routes"], hits[0]["routes"])
+                    legs = [(r["entry_id"], r["leg_id"]) for r in check["routes"] if r["mode"] == "cup"]
+                    self.assertEqual(legs, [x for _k, x in expected_legs])
+                seen_custom_leg |= any(tracks[leg["track_id"]]["origin"] != "retail"
+                                       for c in cups_of(plan) for leg in c["legs"])
+                restored = make_world({}, passthrough=copy.deepcopy(wire))
+                self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        self.assertTrue(seen_custom_leg)
+
+    def test_hit_off_keeps_the_cup_wire(self):
+        world = make_world(cup_options(3), seed=3)
+        self.assertNotIn("hit_character_encounters", world.fill_slot_data())
+        self.assertFalse(any(c["kind"] == "hit" for c in world.ctr_content_plan["checks"]))
+
+    def test_a_cup_alone_routes_every_hit(self):
+        # Standalone tracks hold relic races only, so the cup is the only race.
+        options = hit_cup_options(0)
+        pool = options["content_pool"]
+        pool["tracks"]["modes"] = ["relic"]
+        pool["tracks"]["custom"] = []
+        pool["tracks"]["retail"] = [0, 1, 2, 3, 4, 5]
+        pool["cups"] = dict(count=1, composition=dict(sources=["retail"]))
+        pool["crystals"] = dict(count=0)
+        options["progressive_boost"] = "off"
+        world = None
+        for seed in range(20):
+            try:
+                world = make_world(options, seed=seed)
+                break
+            except OptionError as exc:
+                self.assertIn("at the start", str(exc))
+        plan = world.ctr_content_plan
+        cup = cups_of(plan)[0]
+        crash = world.multiworld.get_location("Hit Crash Bandicoot", 1)
+        self.assertEqual([r["mode"] for r in next(c for c in plan["checks"] if c["kind"] == "hit")["routes"]],
+                         ["cup"] * 4)
+        state = CollectionState(world.multiworld)
+        self.assertEqual(crash.can_reach(state), state.can_reach(cup["id"], "Region", 1))
+        everything = CollectionState(world.multiworld)
+        for item in world.multiworld.itempool:
+            everything.collect(item, prevent_sweep=True)
+        self.assertTrue(crash.can_reach(everything))
+
+    def test_forged_cup_orders_refuse(self):
+        world = None
+        for seed in range(10):
+            try:
+                world = make_world(hit_cup_options(1), seed=seed)
+                break
+            except OptionError:
+                continue
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        plan = wire["content_plan"]
+        block = wire["hit_character_encounters"]
+        index = next(iter(block["content_cups"]))
+
+        def drop_all(b):
+            b.pop("content_cups")
+
+        def extra_cup(b):
+            b["content_cups"]["26" if index != "26" else "25"] = copy.deepcopy(b["content_cups"][index])
+
+        def short_order(b):
+            b["content_cups"][index]["order"].pop()
+
+        def drop_leg_route(p):
+            check = next(c for c in p["checks"] if c["location"] == 35025009)
+            check["routes"] = [r for r in check["routes"] if r["mode"] != "cup"]
+
+        for change in (drop_all, extra_cup, short_order):
+            bad = copy.deepcopy(wire)
+            change(bad["hit_character_encounters"])
+            with self.assertRaises(OptionError):
+                content_global_checks.check_encounter_block(bad["content_plan"], bad)
+            with self.assertRaises(OptionError):
+                make_world({}, passthrough=bad)
+        forged = copy.deepcopy(plan)
+        drop_leg_route(forged)
+        with self.assertRaises(OptionError):
+            content_plan.validate(forged)
+        # A normal room never carries the key.
+        normal = hit_character.build_encounters(5)
+        normal["content_cups"] = copy.deepcopy(block["content_cups"])
+        with self.assertRaises(OptionError):
+            hit_character._validate_block(normal)
 
 
 if __name__ == "__main__":
