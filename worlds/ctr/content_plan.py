@@ -1139,6 +1139,14 @@ def generate(world):
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
         **(dict(selected_packs=selected, pack_codes=letter_packs) if selected else {}))
+    # Boss garages (#133 PR 6): the Oxide goal location holds filler only
+    # (issue #27, excluded from progression), so the ledger keeps one filler
+    # slot for it, as the legacy rung sizer reserves one.
+    if (boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)
+            and world.ctr_content_items.filler_count < 1):
+        error("the Oxide goal check holds only filler, but the item pool fills every check: "
+              f"{check_count} checks for {check_count} selected copies. Lower an item_pool count or extra, or add "
+              "content, so one filler slot is left. Your settings were not changed.")
     # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
     # the whole seed; or one per pad. Only entries with two or more modes take a
     # draw, so a Trophy-only plan draws nothing here.

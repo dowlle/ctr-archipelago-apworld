@@ -196,6 +196,14 @@ class TestBossEncounters(unittest.TestCase):
         flag = profile_options()
         flag["content_pool"]["bosses"] = dict(enabled="yes")
         cases.append((flag, "must be true or false"))
+        # Review finding 1: a ledger with no filler cannot hold the excluded
+        # Oxide goal check; refused before fill (98 checks, 61 extra Trophies).
+        tight = boss_options()
+        tight["item_pool"]["extra"] = dict(trophies=61)
+        cases.append((tight, "holds only filler"))
+        loose = boss_options(oxide_goal="none", bosses_required_goal=1)
+        loose["item_pool"]["extra"] = dict(trophies=61)
+        cases.append((loose, None))
         for options, message in cases:
             with self.subTest(message=message):
                 if message is None:
