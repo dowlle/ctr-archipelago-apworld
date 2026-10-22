@@ -129,13 +129,15 @@ FALLBACK_KEYS: Dict[int, int] = {
     15: 4,  # Nitros Oxide
 }
 
-#: Key fallback on content plans (#133 PR 4d). A content plan has no boss
-#: encounters yet (bosses come with #133 PR 6), so the four boss guests have no
-#: boss race and no unlock win either; they join through Keys like the other
+#: Key fallback on content plans (#133 PR 4d). A content plan with its garages
+#: empty (`content_pool.bosses.enabled: false`) has no boss race, so the four
+#: boss guests have no unlock win either; they join through Keys like the other
 #: guests. The counts follow the retail boss order (Ripper Roo, Papu Papu,
-#: Komodo Joe, Pinstripe) over the same 1..4 Key range. Not a ruling yet: the
-#: counts are an open question in the #133 slice plan, PR 4d section. Normal
-#: rooms keep `FALLBACK_KEYS`, where a fallback on a boss guest is refused.
+#: Komodo Joe, Pinstripe) over the same 1..4 Key range (ruled 2026-10-18).
+#: With bosses on (#133 PR 6) their boss races are in the plan, so
+#: `fallback_guests` gives them no fallback and they join through their wins,
+#: as in a normal room. Normal rooms keep `FALLBACK_KEYS`, where a fallback on
+#: a boss guest is refused.
 CONTENT_PLAN_FALLBACK_KEYS: Dict[int, int] = {
     **FALLBACK_KEYS,
     10: 1,  # Ripper Roo

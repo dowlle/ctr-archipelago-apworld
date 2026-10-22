@@ -6,6 +6,9 @@
 # Optional measured weapon_crates (#133 PR 4e): with box_locations on, a track on
 # a named block gets Item Box 1 to min(weapon_crates, 15), seated on its own weapon
 # crates; the client counts them and refuses a wrong count.
+# bosses: {enabled: true} (#133 PR 6) puts the boss races in the garages, with
+# oxide_goal and bosses_required_goal; the garages open on 4, 8, 12 and 16
+# Trophies, so item_pool.base.trophies must be at least 16.
 name: CustomPadTest
 game: Crash Team Racing
 Crash Team Racing:

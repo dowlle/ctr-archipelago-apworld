@@ -12,7 +12,8 @@ content_global_checks.py), Item Box Locations on retail and named-block custom
 tracks (#133 PR 4e, content_item_boxes.py), plando_items and item_links
 checked around the framework phases (#133 PR 4f, content_item_pool.py),
 four-leg cups with their Win, sweep and Cup Leg Victory checks (#133 PR 5,
-content_cups.py), and Crystal Challenge entries. Unsupported content and check families fail explicitly while their native
+content_cups.py), boss garages with their encounters and the Oxide and Boss
+goals (#133 PR 6, content_bosses.py), and Crystal Challenge entries. Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
 """
@@ -31,8 +32,8 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import (arena_content, content_capability, content_cups, content_global_checks, content_item_boxes,
-               custom_packages, tizi_helper, turbo_grant)
+from . import (arena_content, content_bosses, content_capability, content_cups, content_global_checks,
+               content_item_boxes, custom_packages, tizi_helper, turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -280,8 +281,9 @@ def manual_requirements(manual, rows):
 
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
-                      global_checks=None, item_boxes=None):
-    # Cups (#133 PR 5a) declare their feature last, after Item Box Locations.
+                      global_checks=None, item_boxes=None, bosses=None):
+    # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
+    # garages (#133 PR 6) last.
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -298,7 +300,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_capability.FEATURE] if capability else [])
             + ([content_global_checks.FEATURE] if global_checks else [])
             + ([content_item_boxes.FEATURE] if item_boxes else [])
-            + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else []))
+            + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
+            + ([content_bosses.FEATURE] if bosses is not None else []))
 
 
 def family_settings(options):
@@ -885,9 +888,8 @@ def generate(world):
         arena_pool, arena_count = crystal_selection(world, crystals)
     else:
         arena_pool, crystal_range = crystal_bounds(world, crystals)
-    bosses = closed(raw.get("bosses", {}), ("enabled",), "bosses")
-    if bosses.get("enabled") is not False:
-        error("the experimental profile needs explicit bosses: {enabled: false}; encounter routes are pending.")
+    # Boss garages (#133 PR 6): the encounter settings, or None with bosses off.
+    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled",), "bosses"))
     layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
     stages = layout.get("stages", "two")
     mode_order = layout.get("mode_order", "fixed")
@@ -900,12 +902,6 @@ def generate(world):
     if layout.get("merge_trophy_ctr", False) is not False:
         error("pad_layout.merge_trophy_ctr: the merged Trophy/CTR race is not built yet; it comes in a "
               "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
-    if o.oxide_goal.value != 3 or o.bosses_required_goal.value != 0 or o.gems_required_goal.value == 0:
-        error("this profile needs Oxide disabled, no Boss goal, and a positive Gem goal.")
-    pending = ("boss_track_shuffle",)
-    enabled = [name for name in pending if getattr(o, name).value]
-    if enabled:
-        error("these selected packs/checks do not have content-plan routes yet: " + ", ".join(enabled) + ".")
     if o.custom_tracks.value or o.cortex_vortex_track.value:
         error("legacy custom_tracks/cortex_vortex_track cannot be mixed with content_pool.")
     # An explicit death_link_send list rides the envelope (#133 PR 4a). No
@@ -1089,6 +1085,14 @@ def generate(world):
     capability = content_capability.settings(o)
     # Item Box Locations (#133 PR 4e): per-track box checks.
     item_boxes = content_item_boxes.settings(o)
+    # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
+    # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
+    # Challenge venue. Nothing is drawn with bosses off.
+    boss_venues, boss_final = ({}, None)
+    if boss_record is not None:
+        boss_venues = content_bosses.draw_venues(world, boss_record)
+        boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
+                      else content_bosses.OXIDE_STATION)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
                       if is_track(t)
@@ -1103,6 +1107,9 @@ def generate(world):
         check_count += 1
     # Cup Leg Victory (#133 PR 5): one per leg track without a Trophy Race pad.
     check_count += len(cup_leg_tracks(chosen))
+    # Boss garages (#133 PR 6): one check per encounter.
+    if boss_record is not None:
+        check_count += len(content_bosses.encounter_rows(boss_record, boss_venues, boss_final))
     # Itemsanity and Hit Character (#133 PR 4d): global checks, routed from
     # every race that can earn them once the pads are assigned.
     global_checks = content_global_checks.settings(o)
@@ -1208,24 +1215,47 @@ def generate(world):
         wumpa = global_wumpa_check(global_wumpa_routes(standalone, entries, pads, package_by_id))
         if wumpa:
             checks.append(wumpa)
-    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id))
+    gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
+    gem_term = (dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value)
+                if o.gems_required_goal.value else None)
+    # Boss garages (#133 PR 6): the encounters, their boss race entries,
+    # requirements and checks, and the venues raced nowhere else as plan
+    # tracks (the trophy mode only, like a track raced only in cups).
+    encounters, boss_entries, boss_requirements, boss_checks, boss_hits = [], [], [], [], {}
+    if boss_record is not None:
+        content_bosses.resolve_relic_count(world, boss_record, world.ctr_content_items.rows)
+        have = {t["id"] for t in plan_tracks}
+        for name in list(boss_venues.values()) + ([content_bosses.OXIDE_STATION, boss_final]
+                                                  if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []):
+            record = content_bosses.venue_record(name, RETAIL, cortex_track())
+            if record["id"] not in have:
+                have.add(record["id"])
+                plan_tracks.append(record)
+        encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
+            boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
+            {t["id"]: t for t in plan_tracks})
+        boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
+    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
+    checks.extend(boss_checks)
     for boss in range(5):
+        gate = content_bosses.garage_gate(boss, any(e["pad_id"] == f"garage:{boss}" for e in encounters))
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
-                         kind="garage", entry_id=None, entrance_req="free", mode_gates=[], racer_lock=None))
+                         kind="garage", entry_id=None, entrance_req=gate, mode_gates=[], racer_lock=None))
     assert len(checks) == check_count
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
                                 if lid in manual}
     requirements += [dict(id=f"{STAGE2_PREFIX}{physical}", predicate=stage2[physical]) for physical in sorted(stage2)]
-    gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
+    requirements += boss_requirements
+    entries += boss_entries
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in plan_tracks)],
-                tracks=plan_tracks, entries=entries, pads=pads, encounters=[], requirements=requirements, checks=checks,
-                items=world.ctr_content_items.wire(), goal=dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value),
+                tracks=plan_tracks, entries=entries, pads=pads, encounters=encounters, requirements=requirements,
+                checks=checks, items=world.ctr_content_items.wire(), goal=content_bosses.goal(boss_record, gem_term),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
-                                                    global_checks,item_boxes))
+                                                    global_checks,item_boxes,boss_record))
     if settings:
         plan["track_checks"] = settings
     if packs:
@@ -1236,6 +1266,8 @@ def generate(world):
         plan["global_checks"] = global_checks
     if item_boxes:
         plan["item_boxes"] = item_boxes
+    if boss_record is not None:
+        plan["bosses"] = boss_record
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -1334,6 +1366,16 @@ def predicate(world, node):
         return lambda state: sum(state.count(name, player) for name in names) >= node["count"]
     if node["op"] == "distinct":
         return lambda state: sum(state.has(ITEM_BY_CODE[code], player) for code in node["items"]) >= node["count"]
+    if node["op"] == "checked":
+        # Encounters the player personally won (#133 PR 6): their companion
+        # events, never the location's checked state (content_bosses.EVENTS).
+        events = [content_bosses.EVENTS[code] for code in node["locations"]]
+        return lambda state: sum(state.has(name, player) for name in events) >= node["count"]
+    if node["op"] in ("all", "any"):
+        tests = tuple(predicate(world, term) for term in node["terms"])
+        if node["op"] == "all":
+            return lambda state: all(t(state) for t in tests)
+        return lambda state: any(t(state) for t in tests)
     error("unsupported predicate in experimental content plan.")
 
 
@@ -1395,10 +1437,16 @@ def create_regions(world):
             return state.has_all(names, player)
         return has_letters if rule is None else (lambda state, rule=rule: rule(state) and has_letters(state))
 
+    # Boss garages (#133 PR 6): one region per encounter, behind its garage's
+    # hub gate and its own requirement, with its check and companion event.
+    if plan["encounters"]:
+        content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check))
     by_pad = {}
     shared = []
     legs = []
     for check in plan['checks']:
+        if check["kind"] == content_bosses.KIND:
+            continue
         if check["kind"] == content_cups.LEG_KIND:
             legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
             continue
@@ -1548,7 +1596,7 @@ def wire(world):
         if plan.get("global_checks", {}).get("hit_character") else {}
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
-                                 goal=-1, goal_oxide=3, goal_bosses=0, goal_gems=o.gems_required_goal.value,
+                                 goal=-1, **goal_envelope(plan),
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
                                  # True exactly when the plan has its `racers` record (#133 PR 4b).
                                  character_unlocks="racers" in plan,
@@ -1559,6 +1607,16 @@ def wire(world):
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
                                  **envelope_options(o), **stat_envelope(world), **box_envelope(world)),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
+
+
+def goal_envelope(plan):
+    """The envelope's goal keys from the plan (#133 PR 6): `goal_oxide` and
+    `goal_bosses` from the `bosses` record (3 and 0 without one, as before)
+    and `goal_gems` the Gem arm's count (0 when the goal has none)."""
+    record = plan.get("bosses")
+    gem = content_bosses.gem_term_of(plan["goal"])
+    return dict(goal_oxide=record["oxide_goal"] if record else content_bosses.GOAL_DISABLED,
+                goal_bosses=record["bosses_required"] if record else 0, goal_gems=gem["count"] if gem else 0)
 
 
 def validate(plan):
@@ -1585,12 +1643,30 @@ def validate(plan):
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
     checks, requirements = table("checks", "location"), table("requirements")
-    require(not plan["encounters"], "encounter routes are not implemented by this profile")
+    # Boss garages (#133 PR 6): encounters exist exactly with the `bosses`
+    # record, and every encounter, boss entry, boss requirement and boss check
+    # is recomputed from it, the venues its entries name and the ledger.
+    boss_record = plan.get("bosses")
+    require((boss_record is None) == (not plan["encounters"]), "encounters without the bosses record, or the reverse")
+    boss_encounters, boss_entries, boss_requirements, boss_checks, boss_tracks = [], [], [], [], {}
+    if boss_record is not None:
+        try:
+            boss_encounters, boss_entries, boss_requirements, boss_checks, boss_tracks = content_bosses.expected(
+                plan, RETAIL, cortex_track())
+        except (KeyError, TypeError, ValueError, IndexError, AttributeError):
+            error("boss encounter records do not match the bosses record")
+        require(plan["encounters"] == boss_encounters, "encounter records do not match the bosses record")
+    boss_entry_ids = {e["id"] for e in boss_entries}
+    require([e for e in plan["entries"] if e["kind"] == content_bosses.KIND] == boss_entries,
+            "boss race entries do not match the encounters")
+    require({rid: row for rid, row in requirements.items() if rid.startswith(("boss:", "oxide:"))}
+            == {row["id"]: row for row in boss_requirements}, "boss requirement records do not match the encounters")
     expected_requirements = {"free": {"id": "free", "predicate": {"op": "always"}}}
     expected_requirements.update({f"keys:{n}": dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)})
     manual = {rid: row for rid, row in requirements.items() if rid.startswith("manual:")}
     later = {rid: row for rid, row in requirements.items() if rid.startswith(STAGE2_PREFIX)}
-    require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later}
+    require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later
+             and not rid.startswith(("boss:", "oxide:"))}
             == expected_requirements, "unsupported or changed physical hub requirements")
     settings = check_settings(plan["track_checks"]) if "track_checks" in plan else {}
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
@@ -1600,12 +1676,15 @@ def validate(plan):
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
-                                                         global_checks,item_boxes),
+                                                         global_checks,item_boxes,boss_record),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
                      for physical, hub, keys in pad_registry()}
-    expected_pads.update({f"garage:{i}": (f"hub:{26+i if i<4 else 25}", "free") for i in range(5)})
+    expected_pads.update({f"garage:{i}": (f"hub:{26+i if i<4 else 25}",
+                                          content_bosses.garage_gate(i, any(e["pad_id"] == f"garage:{i}"
+                                                                            for e in boss_encounters)))
+                          for i in range(5)})
     require(set(pads) == set(expected_pads), "physical pad registry mismatch")
     # Racer locks (#133 PR 4b): only with Character Unlocks, only on a pad that
     # does not open at the start, never the starting racer or a removed Oxide,
@@ -1650,7 +1729,8 @@ def validate(plan):
                                   if type(entry["modes"]) is list and entry["modes"] else None)
             require(pad['mode_gates'] == expected_gates, 'unsupported mode gates')
             occupied.append(pad["entry_id"])
-    require(len(occupied) == len(set(occupied)) and set(occupied) == set(entries), "entry occurrence ownership mismatch")
+    require(len(occupied) == len(set(occupied)) and set(occupied) | boss_entry_ids == set(entries)
+            and not set(occupied) & boss_entry_ids, "entry occurrence ownership mismatch")
     require(all(f"pad:{rid.split(':')[1]}" in pads and pads[f"pad:{rid.split(':')[1]}"]["entry_id"] is not None
                 for rid in manual), "manual requirement without an occupied pad")
     # A second-stage record belongs to exactly one pad, which uses it for its
@@ -1692,7 +1772,7 @@ def validate(plan):
         require(track["modes"] == ["trophy"] and track["capabilities"] == ["trophy"] and track["field_size"] == 8,
                 "a track raced only in cups lists the trophy mode only")
     for entry in entries.values():
-        if entry["kind"] == content_cups.KIND:
+        if entry["kind"] in (content_cups.KIND, content_bosses.KIND):
             continue
         if entry['kind']=='crystal':
             lid=entry['arena_id']
@@ -1786,6 +1866,20 @@ def validate(plan):
                                             {t["id"]: room_title(t) for t in plan["tracks"]}):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
+    # Boss venues (#133 PR 6): a venue raced nowhere else is listed once, the
+    # trophy mode only; a venue that is also a pad track or a cup leg keeps
+    # that record.
+    for track_id, venue in boss_tracks.items():
+        if track_id in used_tracks:
+            continue
+        require(tracks.get(track_id) == venue, "a boss venue raced nowhere else is not its trophy-only record")
+        if venue["origin"] == "retail":
+            require(venue["retail_id"] not in retail_ids, "unknown or duplicate retail track")
+            retail_ids.add(venue["retail_id"])
+        used_tracks.add(track_id)
+    for check in boss_checks:
+        require(check["location"] not in expected_checks, "duplicate check identity")
+        expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
@@ -1793,7 +1887,9 @@ def validate(plan):
             require(wumpa["location"] not in expected_checks, "duplicate check identity")
             expected_checks[wumpa["location"]] = wumpa
     # Itemsanity and Hit Character (#133 PR 4d), recomputed from the layout.
-    for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"], packages):
+    boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=boss_encounters))
+    for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"], packages,
+                                              boss_hits):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
     require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
@@ -1833,8 +1929,19 @@ def validate(plan):
             item_plan["trap_count"] <= item_plan["filler_count"], "item/check capacity mismatch")
     goal = plan["goal"]
     gems = [i for i in range(35010009, 35010014) if rows[i]["base"]]
-    require(goal["op"] == "distinct" and goal["items"] == gems and 1 <= goal["count"] <= len(gems),
+    # The Gem arm counts the selected distinct base Gem colours; boss garages
+    # (#133 PR 6) add the Oxide and Boss arms and allow no Gem arm.
+    gem = content_bosses.gem_term_of(goal)
+    require(gem is None or (gem["items"] == gems and 1 <= gem["count"] <= len(gems)),
             "goal must count selected distinct base Gem colours")
+    if boss_record is None:
+        require(gem is not None and goal == gem, "goal must count selected distinct base Gem colours")
+    else:
+        try:
+            want = content_bosses.goal(boss_record, gem)
+        except OptionError:
+            want = None
+        require(goal == want, "goal does not match the bosses record")
     for rid, row in {**manual, **later}.items():
         predicate_ = row["predicate"]
         if predicate_["op"] == "count":
@@ -1889,6 +1996,9 @@ def restore(world, slot_data):
     starting = co.get("starting_character")
     if type(starting) is not int or not 0 <= starting < 16:
         error("invalid starting racer")
+    if co.get("goal") != -1 or any(type(co.get(key)) is not int or co[key] != value
+                                   for key, value in goal_envelope(plan).items()):
+        error("goal envelope disagrees with the plan")
     check_envelope_options(co)
     check_racer_envelope(plan, co)
     check_box_envelope(plan, co)
@@ -1904,7 +2014,8 @@ def restore(world, slot_data):
     world.ctr_content_original_starts = {r.name: r.start_from_pool for r in rows if r.start_from_pool}
     world.options.start_inventory_from_pool.value = copy.deepcopy(world.ctr_content_original_starts)
     world.options.start_inventory.value = {r.name: r.start_additional for r in rows if r.start_additional}
-    world.options.gems_required_goal.value = plan["goal"]["count"]
+    # The goal and the boss options (#133 PR 6) follow the plan.
+    content_bosses.restore_options(world, plan)
     world.options.crystalsanity.value=int(any(c['kind']=='crystal_pickup' for c in plan['checks']))
     world.options.include_battle_arenas.value=int(any(e['kind']=='crystal' for e in plan['entries']))
     world.options.include_arcade_arenas.value=int(any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']))

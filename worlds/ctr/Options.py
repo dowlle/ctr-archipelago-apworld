@@ -1379,7 +1379,10 @@ class ContentPool(OptionDict):
     block's checks; any other track uses a generic Custom Track slot under its
     own title. `tracks.cortex_vortex: true` adds Cortex Vortex as a track with
     all three modes, from the Cortex Vortex files bundled with the game.
-    Unsupported selected content fails clearly.
+    `bosses.enabled: true` puts the boss races back in the five garages: each
+    boss on its home track, or on its Boss Track Shuffle track, and N. Oxide's
+    two challenges, with Oxide Goal and Bosses Required Goal; false leaves the
+    garages empty. Unsupported selected content fails clearly.
     """
     display_name = "Content Pool (Experimental)"
     default = {}
