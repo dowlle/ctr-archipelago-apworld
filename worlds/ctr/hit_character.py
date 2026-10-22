@@ -851,6 +851,9 @@ def _tuples_to_lists(value):
 # destination and hitting each seated unchecked target seats every eligible
 # target within a bounded number of races, and native keeps a won pad offering
 # a Trophy re-race while any eligible non-player target has an unchecked Hit.
+# Since #133 PR 5c the legacy custom content counts the same way: the Cortex
+# Vortex pad track and a custom track that took a Gem Cup over seat the same
+# pool draw (`_build_custom_routes`).
 # A guest additionally needs its authoritative any-of trigger (a reachable
 # completed win), captured once after every Trophy rule is installed. A boss is
 # therefore in the pool only after its clear. Cups are extra opportunities and
@@ -1080,6 +1083,59 @@ def _build_ordinary_routes(world, player: int, target_id: int,
     return routes
 
 
+def _build_custom_routes(world, player: int, target_id: int) -> List[HitRoute]:
+    """Hit routes on legacy custom content (#133 PR 5c, ruling of 2026-10-21:
+    the same Hit rule on custom tracks as on retail tracks).
+
+    * The Cortex Vortex pad track (`cortex_vortex_track`): destination 110,
+      raced on host 13, seats the encounter draw like a retail race. Its pad
+      is resolved through the seed's destination -> physical pad map like a
+      retail track's.
+    * A custom track that took a Gem Cup over (`custom_tracks`): one custom
+      race in that cup's context, its field drawn at each pad entry from the
+      cup's order. Reached through its own dead-end region, whose access is
+      the cup pad's. A package whose measured `crates` flag is false rolls no
+      weapon, so nothing can be hit there and it is no route.
+
+    Each appears for any selectable racer except the target, or the pad's
+    racer lock. Native keeps both pads raceable while an eligible target is
+    unhit (AP_HitPadOpportunity).
+    """
+    from . import cortex_vortex_track as cvt
+    target_name = characters.CHARACTER_ID_TO_NAME[target_id]
+    routes: List[HitRoute] = []
+    if cvt.track_on(world.options):
+        resolved = retail_route(world, player, cvt.CORTEX_VORTEX)
+        if resolved is not None:
+            _pad_name, hub, entrance_rule = resolved
+            pad_lock = progressive_capability.track_required_character(world, cvt.CORTEX_VORTEX)
+            players = _appearance_players(target_name, pad_lock)
+            if players:
+                routes.append(HitRoute(
+                    target_id=target_id, kind="ordinary", track=cvt.CORTEX_VORTEX,
+                    level_id=cvt.DESTINATION_ID, hub=hub, entrance_rule=entrance_rule,
+                    pad_lock=pad_lock, appearance_players=players))
+    custom = getattr(world, "custom_tracks", None) or {}
+    if custom:
+        from . import custom_track_ids
+        from .custom_tracks import REPLACEABLE_DESTINATIONS
+        for _track_id, entry in sorted(custom.items()):
+            if not entry.get("flags", {}).get("crates", False):
+                continue
+            cup_region, cup_lid = REPLACEABLE_DESTINATIONS[entry["replaces"]]
+            region = world.multiworld.regions.region_cache[player].get(custom_track_ids.track_label(entry))
+            if region is None:
+                continue
+            pad_lock = progressive_capability.track_required_character(world, cup_region)
+            players = _appearance_players(target_name, pad_lock)
+            if players:
+                routes.append(HitRoute(
+                    target_id=target_id, kind="ordinary", track=region.name,
+                    level_id=cup_lid, hub=region, entrance_rule=lambda state: True,
+                    pad_lock=pad_lock, appearance_players=players))
+    return routes
+
+
 def _build_boss_routes(world, player: int, target_id: int,
                        block) -> List[HitRoute]:
     """Resolve the enabled boss encounters whose identity is `target_id`.
@@ -1143,7 +1199,8 @@ def _install_target(world, player: int, target_id: int, block,
     triggers: Tuple[Tuple[object, object], ...] = ()
     fallback_count = fallback.get(target_id)
     if target_id in DEFAULT_RACER_IDS:
-        ordinary = _build_ordinary_routes(world, player, target_id, block)
+        ordinary = (_build_ordinary_routes(world, player, target_id, block)
+                    + _build_custom_routes(world, player, target_id))
         boss: List[HitRoute] = []
         if not ordinary:
             _fail(f"default racer {target_name!r} has no structurally "
@@ -1155,7 +1212,8 @@ def _install_target(world, player: int, target_id: int, block,
         # Ordinary routes are built for a fallback guest too, even though it has
         # no trigger: `Key >= N` replaces the trigger term, so the routes are
         # exactly what the rule leans on.
-        ordinary = (_build_ordinary_routes(world, player, target_id, block)
+        ordinary = ((_build_ordinary_routes(world, player, target_id, block)
+                     + _build_custom_routes(world, player, target_id))
                     if (triggers or fallback_count is not None) else [])
         boss = _build_boss_routes(world, player, target_id, block)
         if not ordinary and not boss:
