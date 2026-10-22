@@ -1935,6 +1935,9 @@ def validate(plan):
     require(item_plan["coded_checks"] == len(checks) and item_plan["locked_checks"] == 0 and
             sum(r["remaining"] for r in rows.values()) + item_plan["filler_count"] == len(checks) and
             item_plan["trap_count"] <= item_plan["filler_count"], "item/check capacity mismatch")
+    # Boss garages (#133 PR 6): the excluded Oxide goal check needs one filler slot.
+    require(boss_record is None or boss_record["oxide_goal"] not in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)
+            or item_plan["filler_count"] >= 1, "the Oxide goal check needs one filler slot")
     goal = plan["goal"]
     gems = [i for i in range(35010009, 35010014) if rows[i]["base"]]
     # The Gem arm counts the selected distinct base Gem colours; boss garages

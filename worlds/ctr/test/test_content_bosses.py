@@ -311,8 +311,16 @@ class TestBossEncounters(unittest.TestCase):
         def final(w):
             entry(w, 4)["track_id"] = "cortex_vortex"
 
+        def no_filler(w):
+            # Review round 2: the excluded Oxide goal check needs a filler slot.
+            items = w["content_plan"]["items"]
+            row = next(r for r in items["rows"] if r["item"] == content_bosses.TROPHY_ITEM)
+            row.update(extra=items["filler_count"], remaining=16 + items["filler_count"],
+                       receipt_cap=16 + items["filler_count"])
+            items.update(filler_count=0, trap_count=0)
+
         for mutate in (venue, opponent, kit, requirement, gate, goal, record, drop, check, envelope, unfeature,
-                       no_record, final):
+                       no_record, final, no_filler):
             wire = copy.deepcopy(original)
             mutate(wire)
             with self.subTest(mutation=mutate.__name__), self.assertRaises((OptionError, ValueError)):
