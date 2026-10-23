@@ -297,9 +297,9 @@ def install(world, check, location, route_tests):
     by_code = {code: name for name, code in CTR_LOCATION_IDS.items()}
     encounters = {enc["id"]: enc for enc in plan.get("encounters", ())}
     boss = tuple(world.multiworld.get_location(by_code[encounters[route["encounter_id"]]["completion_location"]], player)
-                 for _entry, _test, route in route_tests if route["mode"] == content_bosses.MODE)
+                 for _entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
     for entry, test, route in route_tests:
-        if route["mode"] == content_bosses.MODE:
+        if route["mode"] in content_bosses.MODES:
             continue
         lock = pads[route["own_pad_id"]]["racer_lock"]
         lock = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None

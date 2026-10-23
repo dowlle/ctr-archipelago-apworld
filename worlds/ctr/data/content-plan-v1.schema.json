@@ -296,6 +296,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 65536
+            },
+            "checkpoints": {
+              "description": "Optional (#133 PR 6b): the LEV's restart point count. Native measures it and refuses a stated count the bytes disagree with. With ai_nav true it lets the track race a boss under Boss Track Shuffle when the count carries the garage's attack schedule.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255
+            },
+            "ai_nav": {
+              "description": "Optional (#133 PR 6b): the LEV has AI navigation paths. Native measures it and refuses a stated value the bytes disagree with. A boss venue needs it.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -895,6 +905,63 @@
             "opponent"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "boss_cup"
+            },
+            "legs": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "track_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "laps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7
+                  }
+                },
+                "required": [
+                  "id",
+                  "track_id",
+                  "laps"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "opponent": {
+              "$ref": "#/$defs/Opponent"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "legs",
+            "opponent"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1256,7 +1323,8 @@
             "merged",
             "cup",
             "crystal",
-            "boss_race"
+            "boss_race",
+            "boss_cup"
           ]
         },
         "leg_id": {
@@ -1626,7 +1694,7 @@
       "additionalProperties": false
     },
     "Bosses": {
-      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), and Boss Track Shuffle with its repeat policy. content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
+      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), Boss Track Shuffle with its repeat policy, and the garage requirement level of the mixed-item roll (#133 PR 6b). content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
       "type": "object",
       "properties": {
         "oxide_goal": {
@@ -1657,6 +1725,26 @@
         },
         "repeats": {
           "type": "boolean"
+        },
+        "requirement_level": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "high",
+            "very_high",
+            "chaotic"
+          ]
+        },
+        "cups": {
+          "description": "#133 PR 6b: the ordinary garages (0 to 3, in order) that hold a boss cup instead of a boss race.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "maxItems": 4,
+          "uniqueItems": true
         }
       },
       "required": [
@@ -1666,7 +1754,9 @@
         "oxide_final_unlock",
         "oxide_final_count",
         "track_shuffle",
-        "repeats"
+        "repeats",
+        "requirement_level",
+        "cups"
       ],
       "additionalProperties": false
     }

@@ -20,6 +20,9 @@ def boss_options(**overrides):
     options = profile_options()
     pool = options["content_pool"]
     pool["bosses"] = dict(enabled=True)
+    # Baby T Park's measured restart points and AI paths (#133 PR 6b), so
+    # Boss Track Shuffle and boss cups may race a boss on it.
+    pool["tracks"]["custom"][0]["capabilities"].update(checkpoints=35, ai_nav=True)
     pool["tracks"]["modes"] = ["trophy", "ctr", "relic"]
     options["item_pool"]["base"]["trophies"] = 16
     options["item_pool"]["base"]["relics"] = dict(sapphire=6, gold=4, platinum=2)
@@ -57,6 +60,14 @@ def encounters(plan):
     return plan["encounters"]
 
 
+def collect_requirement(world, state, predicate):
+    """Collect the items a garage requirement asks for (one family)."""
+    by_code = {code: name for name, code in content_bosses.content_item_pool.ITEMS.items()}
+    items = [predicate["item"]] if predicate["op"] == "count" else predicate["items"]
+    for n in range(predicate["count"]):
+        state.collect(world.create_item(by_code[items[n % len(items)]]), prevent_sweep=True)
+
+
 class TestBossEncounters(unittest.TestCase):
     def test_retail_pairs_by_default(self):
         world = make_world(boss_options())
@@ -65,7 +76,7 @@ class TestBossEncounters(unittest.TestCase):
         self.assertEqual(plan["required_features"][-1], content_bosses.FEATURE)
         self.assertEqual(plan["bosses"], dict(oxide_goal=1, bosses_required=0, oxide_1_optional=False,
                                               oxide_final_unlock=0, oxide_final_count=6, track_shuffle=False,
-                                              repeats=False))
+                                              repeats=False, requirement_level="high", cups=[]))
         entries = {e["id"]: e for e in plan["entries"]}
         venues = [entries[e["entry_id"]]["track_id"] for e in encounters(plan)]
         home = boss_track_shuffle.VENUE_LEVEL_IDS
@@ -79,7 +90,9 @@ class TestBossEncounters(unittest.TestCase):
         self.assertEqual(sorted(checks), list(range(35011100, 35011106)))
         self.assertEqual([checks[c]["display_name"] for c in sorted(checks)], BOSS_NAMES)
         req = {r["id"]: r["predicate"] for r in plan["requirements"]}
-        self.assertEqual([req[f"boss:{g}"]["count"] for g in range(4)], [4, 8, 12, 16])
+        # The mixed-item roll (#133 PR 6b): one checked family per garage.
+        for g in range(4):
+            content_bosses.check_garage_requirement(req[f"boss:{g}"], plan["items"]["rows"], g)
         self.assertEqual(req["oxide:final"], dict(op="count", item=content_bosses.RELIC_ITEMS[0], count=6))
         self.assertNotIn("oxide:first", req)
         gates = {p["id"]: p["entrance_req"] for p in plan["pads"] if p["kind"] == "garage"}
@@ -147,7 +160,7 @@ class TestBossEncounters(unittest.TestCase):
             world = make_world(boss_options(boss_track_shuffle=True,
                                             boss_encounter_repeats="allow" if seed % 2 else "disallow"), seed=seed)
             plan = world.ctr_content_plan
-            venues, final = content_bosses.plan_venues(plan)
+            venues, final, _cups = content_bosses.plan_venues(plan)
             for g, track in venues.items():
                 self.assertTrue(boss_track_shuffle.inherited_attack_certified(content_bosses.GARAGES[g][1], track))
             if seed % 2 == 0:
@@ -159,7 +172,7 @@ class TestBossEncounters(unittest.TestCase):
 
     def test_final_on_oxide_station(self):
         world = make_world(boss_options(oxide_final_track="oxide_station"))
-        venues, final = content_bosses.plan_venues(world.ctr_content_plan)
+        venues, final, _cups = content_bosses.plan_venues(world.ctr_content_plan)
         self.assertEqual(final, "Oxide Station")
         self.assertNotIn("cortex_vortex", {t["id"] for t in world.ctr_content_plan["tracks"]})
 
@@ -187,9 +200,13 @@ class TestBossEncounters(unittest.TestCase):
             (boss_options(oxide_goal="none"), "no goal"),
             (boss_options(), None),
         ]
+        # PR 6b: a small Trophy pool no longer refuses; Trophy rolls need four.
         few = boss_options()
-        few["item_pool"]["base"]["trophies"] = 12
-        cases.append((few, "Raise base.trophies"))
+        few["item_pool"]["base"]["trophies"] = 3
+        cases.append((few, None))
+        level = boss_options()
+        level["content_pool"]["bosses"]["requirement_level"] = "extreme"
+        cases.append((level, "requirement_level must be one of"))
         none = boss_options(oxide_final_challenge_unlock="platinum_relics")
         none["item_pool"]["base"]["relics"] = dict(sapphire=6, gold=4, platinum=0)
         cases.append((none, "no base relic"))
@@ -229,14 +246,14 @@ class TestBossEncounters(unittest.TestCase):
         roo = mw.get_location(BOSS_NAMES[0], 1)
         papu = mw.get_location(BOSS_NAMES[1], 1)
         oxide = mw.get_location(BOSS_NAMES[4], 1)
+        req = {r["id"]: r["predicate"] for r in world.ctr_content_plan["requirements"]}
         self.assertFalse(roo.can_reach(state))
-        for _ in range(4):
-            state.collect(world.create_item("Trophy"), prevent_sweep=True)
+        collect_requirement(world, state, req["boss:0"])
         self.assertTrue(roo.can_reach(state))
-        for _ in range(4):
-            state.collect(world.create_item("Trophy"), prevent_sweep=True)
-        self.assertFalse(papu.can_reach(state))  # Lost Ruins needs a Key
-        state.collect(world.create_item("Key"), prevent_sweep=True)
+        collect_requirement(world, state, req["boss:1"])
+        if req["boss:1"].get("item") != content_bosses.KEY_ITEM:
+            self.assertFalse(papu.can_reach(state))  # Lost Ruins needs a Key
+            state.collect(world.create_item("Key"), prevent_sweep=True)
         self.assertTrue(papu.can_reach(state))
         for _ in range(3):
             state.collect(world.create_item("Key"), prevent_sweep=True)
@@ -282,7 +299,7 @@ class TestBossEncounters(unittest.TestCase):
             entry(w, 2)["opponent"]["attack_profile"] = "mixed"
 
         def requirement(w):
-            next(r for r in w["content_plan"]["requirements"] if r["id"] == "boss:3")["predicate"]["count"] = 4
+            next(r for r in w["content_plan"]["requirements"] if r["id"] == "boss:3")["predicate"]["count"] = 99
 
         def gate(w):
             next(p for p in w["content_plan"]["pads"] if p["id"] == "garage:2")["entrance_req"] = "free"
@@ -349,9 +366,9 @@ class TestBossHits(unittest.TestCase):
         mw = world.multiworld
         state = CollectionState(mw)
         hit_roo = mw.get_location("Hit Ripper Roo", 1)
-        for _ in range(4):
-            state.collect(world.create_item("Trophy"), prevent_sweep=True)
-        # Roo's garage is open with four Trophies: his Hit check is in logic
+        req = {r["id"]: r["predicate"] for r in world.ctr_content_plan["requirements"]}
+        collect_requirement(world, state, req["boss:0"])
+        # Roo's garage is open with its requirement: his Hit check is in logic
         # through his boss race even before he joins the draw.
         self.assertTrue(hit_roo.can_reach(state))
 
@@ -362,6 +379,181 @@ class TestBossHits(unittest.TestCase):
         self.assertEqual({g: world.ctr_hit_character_fallback[g] for g in (8, 9, 10, 11)},
                          {g: hit_character.CONTENT_PLAN_FALLBACK_KEYS[g] for g in (8, 9, 10, 11)})
 
+
+class TestGarageRoll(unittest.TestCase):
+    """The mixed-item garage roll (#133 PR 6b, design 2026-09-01)."""
+
+    def test_bands_rise_with_depth_and_level(self):
+        for supply in (1, 2, 5, 12, 16):
+            for level in ("standard", "high", "very_high"):
+                bands = [content_bosses.garage_band(level, d, supply) for d in range(4)]
+                self.assertEqual(bands, sorted(bands), (level, supply))
+                self.assertTrue(all(1 <= lo <= hi <= supply for lo, hi in bands))
+            self.assertEqual(content_bosses.garage_band("chaotic", 0, supply), (1, supply))
+        self.assertEqual(content_bosses.garage_band("very_high", 3, 5)[1], 4)  # one copy of margin
+
+    def test_rolls_are_valid_never_free_and_vary(self):
+        seen = set()
+        for seed in range(40):
+            options = boss_options()
+            options["content_pool"]["bosses"]["requirement_level"] = content_bosses.LEVELS[seed % 4]
+            world = make_world(options, seed=seed)
+            plan = world.ctr_content_plan
+            req = {r["id"]: r["predicate"] for r in plan["requirements"]}
+            for g in range(4):
+                pred = req[f"boss:{g}"]
+                content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g)
+                if pred.get("item") == content_bosses.TROPHY_ITEM:
+                    self.assertEqual(pred["count"], 4)
+                if pred.get("item") == content_bosses.KEY_ITEM:
+                    self.assertTrue(content_bosses.GARAGES[g][2] < pred["count"] <= 3)
+                seen.add(json.dumps(pred, sort_keys=True))
+        self.assertGreater(len(seen), 10)
+
+    def test_forged_garage_requirements_refuse(self):
+        rows = make_world(boss_options()).ctr_content_plan["items"]["rows"]
+        trophy, key = content_bosses.TROPHY_ITEM, content_bosses.KEY_ITEM
+        for pred, g in ((dict(op="count", item=trophy, count=8), 0),
+                        (dict(op="count", item=key, count=1), 2),
+                        (dict(op="count", item=key, count=4), 0),
+                        (dict(op="always"), 1),
+                        (dict(op="sum", items=[35010001], count=1), 1),
+                        (dict(op="count", item=trophy, count=4, extra=1), 0)):
+            with self.subTest(pred=pred), self.assertRaises(OptionError):
+                content_bosses.check_garage_requirement(pred, rows, g)
+
+
+
+class TestCustomBossVenues(unittest.TestCase):
+    """Custom tracks and Cortex Vortex as boss venues (#133 PR 6b)."""
+    BTP = "custom/baby-t-park/1.0.2"
+
+    def drawn(self, options, seeds=range(12)):
+        out = set()
+        for seed in seeds:
+            world = make_world(copy.deepcopy(options), seed=seed)
+            plan = world.ctr_content_plan
+            self.assertTrue(content_plan.validate(plan))
+            entries = {e["id"]: e for e in plan["entries"]}
+            out |= {entries[e["entry_id"]]["track_id"] for e in plan["encounters"][:4]}
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            restored = make_world({}, passthrough=copy.deepcopy(wire))
+            self.assertEqual(restored.ctr_content_plan, plan)
+        return out
+
+    def test_custom_tracks_and_cortex_vortex_join_the_draw(self):
+        options = boss_options(boss_track_shuffle=True)
+        options["content_pool"]["tracks"]["cortex_vortex"] = True
+        drawn = self.drawn(options)
+        self.assertIn(self.BTP, drawn)
+        self.assertIn("cortex_vortex", drawn)
+
+    def test_a_package_without_navigation_or_count_stays_out(self):
+        options = boss_options(boss_track_shuffle=True)
+        del options["content_pool"]["tracks"]["custom"][0]["capabilities"]["checkpoints"]
+        self.assertNotIn(self.BTP, self.drawn(options))
+
+    def test_an_allowlist_keeps_custom_tracks_out(self):
+        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow",
+                               boss_track_allowlist=["Crash Cove", "Dingo Canyon"])
+        ids = boss_track_shuffle.VENUE_LEVEL_IDS
+        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids['Crash Cove']}", f"retail:{ids['Dingo Canyon']}"})
+
+    def test_off_keeps_the_retail_pairs(self):
+        options = boss_options()
+        options["content_pool"]["tracks"]["cortex_vortex"] = True
+        self.assertNotIn(self.BTP, self.drawn(options, range(3)))
+
+    def test_schedule_fits_by_count(self):
+        for key, *_ in boss_track_shuffle.GARAGES:
+            self.assertTrue(boss_track_shuffle.schedule_fits(key, 35))
+            self.assertTrue(boss_track_shuffle.schedule_fits(key, content_bosses.CORTEX_RESTART_POINTS))
+            self.assertFalse(boss_track_shuffle.schedule_fits(key, 3))
+            self.assertFalse(boss_track_shuffle.schedule_fits(key, None))
+
+    def test_a_forged_count_is_refused(self):
+        options = boss_options(boss_track_shuffle=True)
+        for seed in range(40):
+            world = make_world(copy.deepcopy(options), seed=seed)
+            plan = world.ctr_content_plan
+            entries = {e["id"]: e for e in plan["entries"]}
+            if any(entries[e["entry_id"]]["track_id"] == self.BTP for e in plan["encounters"][:4]):
+                break
+        else:
+            self.fail("no seed drew Baby T Park")
+        forged = copy.deepcopy(plan)
+        next(p for p in forged["packages"] if p["content_id"] == "baby-t-park")["capabilities"]["checkpoints"] = 3
+        with self.assertRaises(OptionError):
+            content_plan.validate(forged)
+
+
+class TestBossCups(unittest.TestCase):
+    """Boss cups (#133 PR 6b): four legs against the garage's boss."""
+
+    def cup_world(self, cups=2, seed=1, **overrides):
+        options = boss_options(**overrides)
+        options["content_pool"]["bosses"]["cups"] = cups
+        return make_world(options, seed=seed)
+
+    def test_cup_garages_hold_four_certified_legs(self):
+        for seed in range(8):
+            world = self.cup_world(cups=dict(min=1, max=4), seed=seed)
+            plan = world.ctr_content_plan
+            self.assertTrue(content_plan.validate(plan))
+            entries = {e["id"]: e for e in plan["entries"]}
+            cups = plan["bosses"]["cups"]
+            self.assertTrue(1 <= len(cups) <= 4)
+            for enc in plan["encounters"][:4]:
+                g = int(enc["pad_id"][-1])
+                entry = entries[enc["entry_id"]]
+                self.assertEqual(entry["kind"], content_bosses.CUP_KIND if g in cups else content_bosses.KIND)
+                if g in cups:
+                    legs = [leg["track_id"] for leg in entry["legs"]]
+                    self.assertEqual(len(set(legs)), 4)
+                    self.assertTrue(all(leg["laps"] == 3 for leg in entry["legs"]))
+                    check = next(c for c in plan["checks"] if c["location"] == enc["completion_location"])
+                    self.assertEqual((check["kind"], check["routes"][0]["mode"]), ("boss_cup", "boss_cup"))
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            restored = make_world({}, passthrough=copy.deepcopy(wire))
+            self.assertEqual(restored.ctr_content_plan, plan)
+            all_state = world.multiworld.get_all_state(False)
+            for location in world.multiworld.get_locations(1):
+                self.assertTrue(location.can_reach(all_state), location.name)
+
+    def test_no_cups_by_default_and_draws_nothing(self):
+        plan = make_world(boss_options()).ctr_content_plan
+        self.assertEqual(plan["bosses"]["cups"], [])
+        self.assertFalse(any(e["kind"] == content_bosses.CUP_KIND for e in plan["entries"]))
+
+    def test_the_cup_check_takes_the_strictest_leg(self):
+        world = self.cup_world(cups=4, progressive_boost="shared_global")
+        plan = world.ctr_content_plan
+        tracks = {t["id"]: t for t in plan["tracks"]}
+        entries = {e["id"]: e for e in plan["entries"]}
+        from ..content_capability import finish_boost
+        for enc in plan["encounters"][:4]:
+            check = next(c for c in plan["checks"] if c["location"] == enc["completion_location"])
+            legs = entries[enc["entry_id"]]["legs"]
+            self.assertEqual(check["boost"], max([1] + [finish_boost(tracks[l["track_id"]], plan["capability"]) for l in legs]))
+
+    def test_forged_cups_refuse(self):
+        world = self.cup_world(cups=1)
+        plan = world.ctr_content_plan
+        g = plan["bosses"]["cups"][0]
+        for change in (lambda p: p["bosses"].__setitem__("cups", []),
+                       lambda p: next(e for e in p["entries"] if e["id"] == f"entry/boss:{g}/0")["legs"].pop(),
+                       lambda p: next(e for e in p["entries"] if e["id"] == f"entry/boss:{g}/0")["legs"][1].__setitem__(
+                           "track_id", next(e for e in p["entries"] if e["id"] == f"entry/boss:{g}/0")["legs"][0]["track_id"])):
+            forged = copy.deepcopy(plan)
+            change(forged)
+            with self.subTest(), self.assertRaises(OptionError):
+                content_plan.validate(forged)
+
+    def test_cup_count_refusal(self):
+        options = boss_options()
+        options["content_pool"]["bosses"]["cups"] = 5
+        with self.assertRaisesRegex(OptionError, "bosses.cups"):
+            make_world(options)
 
 if __name__ == "__main__":
     unittest.main()

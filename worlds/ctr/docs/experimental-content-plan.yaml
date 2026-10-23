@@ -6,9 +6,14 @@
 # Optional measured weapon_crates (#133 PR 4e): with box_locations on, a track on
 # a named block gets Item Box 1 to min(weapon_crates, 15), seated on its own weapon
 # crates; the client counts them and refuses a wrong count.
+# Optional measured checkpoints and ai_nav (#133 PR 6b): the LEV's restart point
+# count and AI paths; with both, Boss Track Shuffle may race a boss there.
 # bosses: {enabled: true} (#133 PR 6) puts the boss races in the garages, with
-# oxide_goal and bosses_required_goal; the garages open on 4, 8, 12 and 16
-# Trophies, so item_pool.base.trophies must be at least 16.
+# oxide_goal and bosses_required_goal. Each ordinary garage rolls one item
+# requirement from the base supply (#133 PR 6b): bosses.requirement_level is
+# standard, high (default), very_high or chaotic; a Trophy roll asks four.
+# bosses.cups (a count or {min, max}, 0 to 4) puts that many boss cups in the
+# garages: four races against the boss, won on points.
 name: CustomPadTest
 game: Crash Team Racing
 Crash Team Racing:
