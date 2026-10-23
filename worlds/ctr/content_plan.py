@@ -161,8 +161,10 @@ def package_descriptor(profile):
     flags were measured on the pinned bytes (8 spawns, AI paths, 35
     checkpoints, C/T/R letters, 8 fruit crates); relic is false because the
     package has no relic target times. Both revisions measure six super turbo
-    pad trigger quads (#133 PR 4c), eight weapon crates (#133 PR 4e), and
-    35 restart points with AI navigation (#133 PR 6b, a boss venue)."""
+    pad trigger quads (#133 PR 4c) and eight weapon crates (#133 PR 4e).
+    They also measure 35 restart points with AI navigation; the optional
+    `checkpoints` and `ai_nav` (#133 PR 6b) stay out of these examples so
+    rooms that do not race a boss on them keep their bytes."""
     revision = profile["package_version"]
     sizes = (2579256, 458808) if revision == "1.0.0" else (2558168, 458808)
     files = [dict(role=role, sha256=profile[role + "_sha256"], bytes=size,
@@ -172,7 +174,7 @@ def package_descriptor(profile):
                 uuid=profile["package_uuid"], revision=revision, display_name="Baby T Park",
                 author="Lockheart", laps=profile["laps"],
                 capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True,
-                                  super_turbo_pads=True, weapon_crates=8, checkpoints=35, ai_nav=True),
+                                  super_turbo_pads=True, weapon_crates=8),
                 files=files,
                 evidence=[dict(capability="trophy", file_hashes=[f["sha256"] for f in files],
                                verifier="ctr-managed-profile", revision=1, level="structural")])

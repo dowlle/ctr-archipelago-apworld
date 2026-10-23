@@ -20,6 +20,9 @@ def boss_options(**overrides):
     options = profile_options()
     pool = options["content_pool"]
     pool["bosses"] = dict(enabled=True)
+    # Baby T Park's measured restart points and AI paths (#133 PR 6b), so
+    # Boss Track Shuffle and boss cups may race a boss on it.
+    pool["tracks"]["custom"][0]["capabilities"].update(checkpoints=35, ai_nav=True)
     pool["tracks"]["modes"] = ["trophy", "ctr", "relic"]
     options["item_pool"]["base"]["trophies"] = 16
     options["item_pool"]["base"]["relics"] = dict(sapphire=6, gold=4, platinum=2)
