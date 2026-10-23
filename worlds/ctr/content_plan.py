@@ -890,7 +890,7 @@ def generate(world):
     else:
         arena_pool, crystal_range = crystal_bounds(world, crystals)
     # Boss garages (#133 PR 6): the encounter settings, or None with bosses off.
-    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled", "requirement_level"), "bosses"))
+    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled", "requirement_level", "cups"), "bosses"))
     layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
     stages = layout.get("stages", "two")
     mode_order = layout.get("mode_order", "fixed")
@@ -1089,19 +1089,21 @@ def generate(world):
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
     # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
     # Challenge venue. Nothing is drawn with bosses off.
-    boss_venues, boss_final = ({}, None)
+    boss_venues, boss_final, boss_cups = ({}, None, {})
     if boss_record is not None:
         # A custom track is a boss venue only where the plan also races it
         # on a pad or in a cup (#133 PR 6b; native checks its record there).
         raced = ({t["id"] for t in chosen if is_track(t)}
                  | {leg["id"] for cup in chosen if "cup_index" in cup for leg in cup["legs"]})
-        boss_venues = content_bosses.draw_venues(
-            world, boss_record,
-            [(content_bosses.venue_key(t), content_bosses.custom_venue_points(t, package_by_id.get(t.get("package_id"))))
-             for t in candidates if t.get("origin") == "cortex_vortex"
-             or (t.get("origin") == "custom" and t["id"] in raced)])
+        boss_custom = [(content_bosses.venue_key(t),
+                        content_bosses.custom_venue_points(t, package_by_id.get(t.get("package_id"))))
+                       for t in candidates if t.get("origin") == "cortex_vortex"
+                       or (t.get("origin") == "custom" and t["id"] in raced)]
+        boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom)
         boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
                       else content_bosses.OXIDE_STATION)
+        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs.
+        boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
                       if is_track(t)
@@ -1242,7 +1244,8 @@ def generate(world):
     if boss_record is not None:
         content_bosses.resolve_relic_count(world, boss_record, world.ctr_content_items.rows)
         have = {t["id"] for t in plan_tracks}
-        for name in list(boss_venues.values()) + ([content_bosses.OXIDE_STATION, boss_final]
+        for name in [v for g, v in boss_venues.items() if g not in boss_cups] \
+                + [leg for g in sorted(boss_cups) for leg in boss_cups[g]] + ([content_bosses.OXIDE_STATION, boss_final]
                                                   if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []):
             record = content_bosses.venue_record(name, RETAIL, cortex_track(),
                                                  {t["id"]: t for t in candidates if t.get("origin") == "custom"})
@@ -1252,7 +1255,7 @@ def generate(world):
         garage_reqs = content_bosses.draw_requirements(world, boss_record, world.ctr_content_items.rows)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
-            {t["id"]: t for t in plan_tracks}, garage_reqs)
+            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups)
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
@@ -1464,7 +1467,7 @@ def create_regions(world):
     shared = []
     legs = []
     for check in plan['checks']:
-        if check["kind"] == content_bosses.KIND:
+        if check["kind"] in content_bosses.KINDS:
             continue
         if check["kind"] == content_cups.LEG_KIND:
             legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
@@ -1676,7 +1679,7 @@ def validate(plan):
             error("boss encounter records do not match the bosses record")
         require(plan["encounters"] == boss_encounters, "encounter records do not match the bosses record")
     boss_entry_ids = {e["id"] for e in boss_entries}
-    require([e for e in plan["entries"] if e["kind"] == content_bosses.KIND] == boss_entries,
+    require([e for e in plan["entries"] if e["kind"] in content_bosses.KINDS] == boss_entries,
             "boss race entries do not match the encounters")
     require({rid: row for rid, row in requirements.items() if rid.startswith(("boss:", "oxide:"))}
             == {row["id"]: row for row in boss_requirements}, "boss requirement records do not match the encounters")
@@ -1791,7 +1794,7 @@ def validate(plan):
         require(track["modes"] == ["trophy"] and track["capabilities"] == ["trophy"] and track["field_size"] == 8,
                 "a track raced only in cups lists the trophy mode only")
     for entry in entries.values():
-        if entry["kind"] in (content_cups.KIND, content_bosses.KIND):
+        if entry["kind"] in (content_cups.KIND,) + content_bosses.KINDS:
             continue
         if entry['kind']=='crystal':
             lid=entry['arena_id']

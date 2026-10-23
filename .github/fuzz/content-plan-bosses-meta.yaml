@@ -9,10 +9,13 @@
 # Final Challenge track, its relic mode and count, and oxide_1_optional
 # (mandatory or optional; filler refuses on content plans) are drawn too.
 # The venue allow and block lists stay empty: random lists refuse most draws.
-# Boss garages open on 4, 8, 12 and 16 Trophies, so the base Trophy count is
-# 16 here (5 in the other content-plan metas). Zero to four cups keep the
-# cups and the boss checks in one fill. A goal with no arm is refused, about
-# one roll in forty.
+# Since #133 PR 6b each ordinary garage rolls its own requirement from the
+# base supply (content_bosses.draw_requirements, level high), Baby T Park
+# states its restart points and AI navigation so Boss Track Shuffle can draw
+# it as a venue, and zero to two garages hold a boss cup. The base Trophy
+# count stays 16 (5 in the other content-plan metas). Zero to four cups keep
+# the cups and the boss checks in one fill. A goal with no arm is refused,
+# about one roll in forty.
 Crash Team Racing:
   accessibility: full
   content_pool:
@@ -29,7 +32,7 @@ Crash Team Racing:
           display_name: Baby T Park
           author: Lockheart
           laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8}
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8, checkpoints: 35, ai_nav: true}
           files:
             - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
             - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
@@ -49,7 +52,7 @@ Crash Team Racing:
           evidence: []
     cups: {count: {min: 0, max: 4}}
     crystals: {count: {min: 0, max: 4}}
-    bosses: {enabled: true}
+    bosses: {enabled: true, cups: {min: 0, max: 2}}
     required_entries: [custom/baby-t-park/1.0.2, custom/fuzz-fixture-loop/1.0]
   pad_layout: {placement: shuffle, stages: two, mode_order: per_pad, merge_trophy_ctr: false}
   item_pool:

@@ -905,6 +905,63 @@
             "opponent"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "boss_cup"
+            },
+            "legs": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "track_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "laps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7
+                  }
+                },
+                "required": [
+                  "id",
+                  "track_id",
+                  "laps"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "opponent": {
+              "$ref": "#/$defs/Opponent"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "legs",
+            "opponent"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1266,7 +1323,8 @@
             "merged",
             "cup",
             "crystal",
-            "boss_race"
+            "boss_race",
+            "boss_cup"
           ]
         },
         "leg_id": {
@@ -1676,6 +1734,17 @@
             "very_high",
             "chaotic"
           ]
+        },
+        "cups": {
+          "description": "#133 PR 6b: the ordinary garages (0 to 3, in order) that hold a boss cup instead of a boss race.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "maxItems": 4,
+          "uniqueItems": true
         }
       },
       "required": [
@@ -1686,7 +1755,8 @@
         "oxide_final_count",
         "track_shuffle",
         "repeats",
-        "requirement_level"
+        "requirement_level",
+        "cups"
       ],
       "additionalProperties": false
     }

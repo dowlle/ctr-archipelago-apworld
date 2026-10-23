@@ -28,7 +28,18 @@ ENCOUNTERS. One record per encounter (implementation packet, `Encounter`):
 
 Each encounter names a `boss_race` entry (`entry/boss:<g>/<index>`: the venue
 track, its three laps and the opponent with the retail driving profile and
-the inherited attack kit) and a requirement record. Venue tracks are plan
+the inherited attack kit) and a requirement record.
+
+BOSS CUPS (#133 PR 6b, ruling 2026-10-23: boss AI on every leg). With
+`content_pool.bosses.cups` (an exact count or {min, max}, 0 to 4, default 0)
+that many ordinary garages, drawn uniformly, hold a `boss_cup` entry instead:
+four legs against the garage's own boss alone, who drives and attacks as in
+his boss race on every leg; a points win completes the garage's encounter
+(its frozen check, its personal-win event), as the 2026-09-22 cup ruling
+says. The legs are four different tracks of the garage's certified venue
+pool (the retail venues that carry its attack schedule, and the plan's
+certified custom tracks and Cortex Vortex as for Boss Track Shuffle), three
+laps each. Its check's boost is the strictest of its legs' boss win rules. Venue tracks are plan
 tracks; a venue raced nowhere else lists the trophy mode only, like a track
 raced only in cups.
 
@@ -87,6 +98,7 @@ from Options import OptionError
 from . import boss_track_shuffle, content_item_pool, destinations
 from .content_capability import finish_boost
 from .Locations import CTR_LOCATION_IDS
+from .content_cups import LEG_RETAIL_IDS
 from .usf_finish import FIRST_BOOST_COUNT
 
 FEATURE = "boss_encounters_v1"
@@ -117,7 +129,12 @@ EVENTS = {**{row[5]: row[6] for row in GARAGES},
           OXIDE_FIRST: "N. Oxide's Challenge Cleared", OXIDE_FINAL: "N. Oxide's Final Challenge Cleared"}
 OXIDE_STATION = "Oxide Station"
 RECORD_KEYS = ("oxide_goal", "bosses_required", "oxide_1_optional", "oxide_final_unlock",
-               "oxide_final_count", "track_shuffle", "repeats", "requirement_level")
+               "oxide_final_count", "track_shuffle", "repeats", "requirement_level", "cups")
+CUP_KIND = "boss_cup"
+CUP_MODE = "boss_cup"
+CUP_LEGS = 4
+KINDS = (KIND, CUP_KIND)
+MODES = (MODE, CUP_MODE)
 #: content_pool.bosses.requirement_level (2026-09-01 Wayfinder ruling C3a).
 LEVELS = ("standard", "high", "very_high", "chaotic")
 DEFAULT_LEVEL = "high"
@@ -193,10 +210,12 @@ def settings(world, raw):
               "have no locked placements yet. Use mandatory or optional. No content was changed.")
     shuffle = bool(o.boss_track_shuffle.value)
     oxide = goal != GOAL_DISABLED
+    from .content_cups import _bounds
+    cup_bounds = _bounds(raw.get("cups", 0), "content_pool.bosses.cups", 4)
     level = raw.get("requirement_level", DEFAULT_LEVEL)
     if level not in LEVELS:
         error("content_pool.bosses.requirement_level must be one of " + ", ".join(LEVELS) + ". No content was changed.")
-    return dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level,
+    return dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level, cups=cup_bounds,
                 oxide_1_optional=goal == GOAL_FINAL and optional == 1,
                 oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
                 oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
@@ -224,6 +243,9 @@ def check_settings(record):
         error("bosses.oxide_final_unlock must be 0 to 4.")
     if type(count) is not int or not 1 <= count <= (54 if unlock == UNLOCK_TOTAL else SINGLE_TIER_MAX):
         error("bosses.oxide_final_count must be 1 to 18, or to 54 with total_relics.")
+    if not isinstance(record["cups"], list) or len(record["cups"]) > 4 or \
+            any(type(g) is not int or not 0 <= g < 4 for g in record["cups"]) or record["cups"] != sorted(set(record["cups"])):
+        error("bosses.cups must list distinct ordinary garages 0 to 3 in order.")
     if record["requirement_level"] not in LEVELS:
         error("bosses.requirement_level must be one of " + ", ".join(LEVELS) + ".")
     if goal == GOAL_DISABLED and (unlock, count) != (0, SINGLE_TIER_MAX):
@@ -507,6 +529,33 @@ def draw_venues(world, record, custom=()):
     return dict(enumerate(picked))
 
 
+def draw_cups(world, record, custom=()):
+    """{garage: [leg venue]} of the garages that hold a boss cup. One
+    world.random draw for how many (in the record's bounds) and which, then
+    four different certified legs per cup; nothing is drawn with no cups.
+    Writes the resolved garage list into the record."""
+    low, high = record["cups"]
+    if high == 0:
+        record["cups"] = []
+        return {}
+    count = world.random.randint(low, high)
+    garages = sorted(world.random.sample(range(4), count))
+    o = world.options
+    # Cup legs are the 16 retail race tracks (content_cups.LEG_RETAIL_IDS), so
+    # the trial tracks Slide Coliseum and Turbo Track stay out.
+    retail = [t for t, lid in boss_track_shuffle.VENUE_LEVEL_IDS.items() if lid in LEG_RETAIL_IDS]
+    out = {}
+    for g in garages:
+        pool = [t for t in retail if boss_track_shuffle.inherited_attack_certified(_venue_key(g), t)]
+        pool += [name for name, points in custom
+                 if points is not None and boss_track_shuffle.schedule_fits(_venue_key(g), points)]
+        if len(pool) < CUP_LEGS:
+            error(f"garage {g}: a boss cup needs four tracks that carry the boss's attack.")
+        out[g] = world.random.sample(pool, CUP_LEGS)
+    record["cups"] = garages
+    return out
+
+
 def venue_record(name, retail, cortex, custom_records=None):
     """A plan track record for a venue raced nowhere else: the trophy mode
     only, like a track raced only in cups. `custom_records` maps a custom
@@ -537,14 +586,16 @@ def encounter_rows(record, venues, final_track):
     return rows
 
 
-def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs):
+def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
     Challenge venue, `rows` the item ledger rows (base supply), `gem_term`
     the goal's distinct-Gem term or None, `track_records` {track id: record}
     of the venues, `garage_reqs` {garage: predicate} of the four ordinary
-    garages (draw_requirements, or a plan's own records once checked)."""
+    garages (draw_requirements, or a plan's own records once checked),
+    `cups` {garage: [leg venue]} of the garages holding a boss cup."""
+    cups = cups or {}
     encounters, entries, requirements, checks = [], [], [], []
     companions = companion_terms(record, gem_term)
     for g, index, venue, opponent, code in encounter_rows(record, venues, final_track):
@@ -563,17 +614,24 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
             terms = (list(companions) if record["oxide_goal"] in (GOAL_ANY, GOAL_FINAL) else []) \
                 + [relic_term(record, rows)]
             requirements.append(dict(id=rid, predicate=_all(terms)))
-        tid = track_id_of(venue)
-        entries.append(dict(id=nid, kind=KIND, track_id=tid, laps=LAPS,
-                            opponent=dict(role="opponent", slot=1, character_id=opponent,
-                                          driving_profile=DRIVING_PROFILE, attack_profile=ATTACK_PROFILE)))
+        opponent_record = dict(role="opponent", slot=1, character_id=opponent,
+                               driving_profile=DRIVING_PROFILE, attack_profile=ATTACK_PROFILE)
+        cup = g < OXIDE_GARAGE and g in cups
+        if cup:
+            leg_ids = [track_id_of(leg) for leg in cups[g]]
+            entries.append(dict(id=nid, kind=CUP_KIND,
+                                legs=[dict(id=f"{nid}/leg:{n}", track_id=tid, laps=LAPS) for n, tid in enumerate(leg_ids)],
+                                opponent=opponent_record))
+        else:
+            leg_ids = [track_id_of(venue)]
+            entries.append(dict(id=nid, kind=KIND, track_id=leg_ids[0], laps=LAPS, opponent=opponent_record))
         encounters.append(dict(id=eid, pad_id=f"garage:{g}", index=index, entry_id=nid, requirement_id=rid,
                                completion_location=code))
-        check = dict(location=code, owner=eid, kind=KIND, display_name=CTR_LOCATION_ID_NAMES[code],
-                     routes=[dict(entry_id=nid, mode=MODE, leg_id=None, encounter_id=eid,
+        check = dict(location=code, owner=eid, kind=CUP_KIND if cup else KIND, display_name=CTR_LOCATION_ID_NAMES[code],
+                     routes=[dict(entry_id=nid, mode=CUP_MODE if cup else MODE, leg_id=None, encounter_id=eid,
                                   own_pad_id=f"garage:{g}", award=AWARD)])
         if capability and capability.get("boost_mode"):
-            check["boost"] = max(FIRST_BOOST_COUNT, finish_boost(track_records[tid], capability))
+            check["boost"] = max([FIRST_BOOST_COUNT] + [finish_boost(track_records[tid], capability) for tid in leg_ids])
         checks.append(check)
     return encounters, entries, requirements, checks
 
@@ -596,35 +654,52 @@ def hit_routes(plan):
     out = {}
     entries = {e["id"]: e for e in plan["entries"]}
     for enc in plan["encounters"]:
-        opponent = entries[enc["entry_id"]]["opponent"]["character_id"]
-        out.setdefault(opponent, []).append(dict(entry_id=enc["entry_id"], mode=MODE, leg_id=None,
+        entry = entries[enc["entry_id"]]
+        opponent = entry["opponent"]["character_id"]
+        out.setdefault(opponent, []).append(dict(entry_id=enc["entry_id"], mode=CUP_MODE if entry["kind"] == CUP_KIND else MODE,
+                                                 leg_id=None,
                                                  encounter_id=enc["id"], own_pad_id=enc["pad_id"], award=HIT_AWARD))
     return out
 
 
 def plan_venues(plan):
-    """({garage: track name}, Final Challenge track name) read from a plan's
-    boss entries, refusing a venue this build cannot race."""
+    """({garage: track name}, Final Challenge track name, {garage: [leg]})
+    read from a plan's boss entries, refusing a venue this build cannot race.
+    A boss cup garage's venue is its first leg."""
     entries = {e["id"]: e for e in plan["entries"]}
     by_id = {track_id_of(name): name for name in boss_track_shuffle.VENUES}
     by_id["cortex_vortex"] = destinations.CORTEX_VORTEX
     by_id.update({t["id"]: t["id"] for t in plan["tracks"] if t.get("origin") == "custom"})
-    venues, final = {}, None
+    venues, final, cups = {}, None, {}
     for enc in plan["encounters"]:
         entry = entries.get(enc.get("entry_id"))
+        garage = enc["pad_id"].removeprefix("garage:")
+        if entry is not None and entry.get("kind") == CUP_KIND and garage in ("0", "1", "2", "3") and enc["index"] == 0:
+            legs = entry.get("legs")
+            if (not isinstance(legs, list) or len(legs) != CUP_LEGS
+                    or any(not isinstance(l, dict) or l.get("track_id") not in by_id for l in legs)):
+                error("a boss cup names no four legs or an unknown venue")
+            cups[int(garage)] = [by_id[l["track_id"]] for l in legs]
+            venues[int(garage)] = cups[int(garage)][0]
+            continue
         if entry is None or entry.get("kind") != KIND or entry.get("track_id") not in by_id:
             error("an encounter names no boss race entry or an unknown venue")
         name = by_id[entry["track_id"]]
-        garage = enc["pad_id"].removeprefix("garage:")
         if garage == str(OXIDE_GARAGE):
             if enc["index"] == 1:
                 final = name
         elif garage in ("0", "1", "2", "3") and enc["index"] == 0:
             venues[int(garage)] = name
-    return venues, final
+    return venues, final, cups
 
 
-def check_venues(record, venues, final, points=None, raced=None):
+def _certified(g, name, points):
+    if name == destinations.CORTEX_VORTEX or name.startswith("custom/"):
+        return boss_track_shuffle.schedule_fits(_venue_key(g), points.get(name))
+    return boss_track_shuffle.inherited_attack_certified(_venue_key(g), name)
+
+
+def check_venues(record, venues, final, points=None, raced=None, cups=None):
     """The venues a record allows: retail pairs, or certified drawn venues
     (distinct unless repeats), a custom venue or Cortex Vortex by its
     restart point count (`points`: {venue: count}); the Final Challenge on
@@ -632,18 +707,30 @@ def check_venues(record, venues, final, points=None, raced=None):
     if sorted(venues) != [0, 1, 2, 3]:
         error("the four ordinary garages need one encounter each")
     points = points or {}
-    for g, name in venues.items():
+    cups = cups or {}
+    if sorted(cups) != record["cups"]:
+        error("the boss cup garages do not match the bosses record")
+    for g, legs in cups.items():
+        if len(set(legs)) != CUP_LEGS:
+            error(f"garage {g}: a boss cup races four different tracks")
+        for name in legs:
+            if name in boss_track_shuffle.VENUE_LEVEL_IDS and \
+                    boss_track_shuffle.VENUE_LEVEL_IDS[name] not in LEG_RETAIL_IDS:
+                error(f"garage {g}: a boss cup leg is a retail race track")
+            if name.startswith("custom/") and name not in (raced or ()):
+                error(f"garage {g}: a custom boss cup leg the plan does not race on a pad or in a cup")
+            if not _certified(g, name, points):
+                error(f"garage {g}: {name} is not a certified venue for this boss")
+    race_venues = {g: name for g, name in venues.items() if g not in cups}
+    for g, name in race_venues.items():
         if name.startswith("custom/") and name not in (raced or ()):
             error(f"garage {g}: a custom boss venue the plan does not race on a pad or in a cup")
         if record["track_shuffle"]:
-            certified = (boss_track_shuffle.schedule_fits(_venue_key(g), points.get(name))
-                         if name == destinations.CORTEX_VORTEX or name.startswith("custom/")
-                         else boss_track_shuffle.inherited_attack_certified(_venue_key(g), name))
-            if not certified:
+            if not _certified(g, name, points):
                 error(f"garage {g}: {name} is not a certified venue for this boss")
         elif name != home_track(g):
             error(f"garage {g}: without track_shuffle a boss races its home track")
-    if record["track_shuffle"] and not record["repeats"] and len(set(venues.values())) != 4:
+    if record["track_shuffle"] and not record["repeats"] and len(set(race_venues.values())) != len(race_venues):
         error("boss venues repeat without repeats")
     if record["oxide_goal"] != GOAL_DISABLED and final not in (destinations.CORTEX_VORTEX, OXIDE_STATION):
         error("N. Oxide's Final Challenge races Cortex Vortex or Oxide Station")
@@ -702,7 +789,7 @@ def restore_options(world, plan):
     o.boss_encounter_repeats.value = int(record["repeats"])
     o.boss_track_allowlist.value = set()
     o.boss_track_blocklist.value = set()
-    venues, final = plan_venues(plan)
+    venues, final, _cups = plan_venues(plan)
     o._boss_track_venues = {_venue_key(g): name for g, name in venues.items()}
     if final is not None:
         o.oxide_final_track.value = 0 if final == destinations.CORTEX_VORTEX else 1
@@ -714,16 +801,16 @@ def expected(plan, retail, cortex):
     item ledger and its goal (content_plan.validate and the Tracker restore).
     Returns (encounters, entries, requirements, checks, venue track records)."""
     record = check_settings(plan["bosses"])
-    venues, final = plan_venues(plan)
+    venues, final, cups = plan_venues(plan)
     packages = {p["id"]: p for p in plan.get("packages", [])}
     points = {venue_key(t): custom_venue_points(t, packages.get(t.get("package_id")))
               for t in plan["tracks"] if t.get("origin") in ("custom", "cortex_vortex")}
     points.setdefault(destinations.CORTEX_VORTEX, CORTEX_RESTART_POINTS)
     raced = {e["track_id"] for e in plan["entries"] if e.get("kind") == "track"} \
         | {leg["track_id"] for e in plan["entries"] if e.get("kind") == "cup" for leg in e.get("legs", ())}
-    check_venues(record, venues, final, points, raced)
+    check_venues(record, venues, final, points, raced, cups)
     gem = gem_term_of(plan["goal"])
-    names = list(venues[g] for g in range(4))
+    names = list(venues[g] for g in range(4) if g not in cups) + [leg for g in sorted(cups) for leg in cups[g]]
     if record["oxide_goal"] != GOAL_DISABLED:
         names += [OXIDE_STATION, final]
     known = {t["id"]: t for t in plan["tracks"]}
@@ -734,5 +821,5 @@ def expected(plan, retail, cortex):
     own = {r["id"]: r["predicate"] for r in plan["requirements"]}
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
-                  {g: own.get(f"boss:{g}") for g in range(4)})
+                  {g: own.get(f"boss:{g}") for g in range(4)}, cups)
     return built + (tracks,)
