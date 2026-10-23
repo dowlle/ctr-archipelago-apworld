@@ -889,7 +889,7 @@ def generate(world):
     else:
         arena_pool, crystal_range = crystal_bounds(world, crystals)
     # Boss garages (#133 PR 6): the encounter settings, or None with bosses off.
-    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled",), "bosses"))
+    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled", "requirement_level"), "bosses"))
     layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
     stages = layout.get("stages", "two")
     mode_order = layout.get("mode_order", "fixed")
@@ -1239,9 +1239,10 @@ def generate(world):
             if record["id"] not in have:
                 have.add(record["id"])
                 plan_tracks.append(record)
+        garage_reqs = content_bosses.draw_requirements(world, boss_record, world.ctr_content_items.rows)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
-            {t["id"]: t for t in plan_tracks})
+            {t["id"]: t for t in plan_tracks}, garage_reqs)
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)

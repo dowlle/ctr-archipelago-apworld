@@ -1626,7 +1626,7 @@
       "additionalProperties": false
     },
     "Bosses": {
-      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), and Boss Track Shuffle with its repeat policy. content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
+      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), Boss Track Shuffle with its repeat policy, and the garage requirement level of the mixed-item roll (#133 PR 6b). content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
       "type": "object",
       "properties": {
         "oxide_goal": {
@@ -1657,6 +1657,15 @@
         },
         "repeats": {
           "type": "boolean"
+        },
+        "requirement_level": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "high",
+            "very_high",
+            "chaotic"
+          ]
         }
       },
       "required": [
@@ -1666,7 +1675,8 @@
         "oxide_final_unlock",
         "oxide_final_count",
         "track_shuffle",
-        "repeats"
+        "repeats",
+        "requirement_level"
       ],
       "additionalProperties": false
     }
