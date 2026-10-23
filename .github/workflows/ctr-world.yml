@@ -150,6 +150,11 @@ jobs:
           # with one to eight cups over every leg source, from
           # .github/fuzz/content-plan-cups-meta.yaml, under the same cap.
           - {check_name: content-plan-cups,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-cups'}
+          # Boss garages on the forced content plan (#133 PR 6): the cups meta
+          # with bosses on and the goal and boss options drawn, from
+          # .github/fuzz/content-plan-bosses-meta.yaml, under the same cap.
+          - {check_name: content-plan-bosses,         check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-bosses'}
+          - {check_name: content-plan-bosses-ut,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-bosses'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -157,7 +162,7 @@ jobs:
           repository: dowlle/Archipelago-index
           path: index-repo
       - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
-        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_tracker == 'yes'
+        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -250,8 +255,12 @@ jobs:
             cp ../world-src/.github/fuzz/content-plan-cups-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [ "$CHECK_META" = "content-plan-bosses" ]; then
+            cp ../world-src/.github/fuzz/content-plan-bosses-meta.yaml ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
-          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ]; then
+          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ]; then
             # A refused option set is "ignored", not a failure. If the meta file
             # stopped matching the profile, every seed would be ignored and the
             # arm would pass without testing anything, so cap the ignored share.

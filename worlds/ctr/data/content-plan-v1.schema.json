@@ -85,10 +85,11 @@
           "capability_packs_v1",
           "global_checks_v1",
           "item_boxes_v1",
-          "cup_entries_v1"
+          "cup_entries_v1",
+          "boss_encounters_v1"
         ]
       },
-      "maxItems": 16,
+      "maxItems": 17,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -109,6 +110,9 @@
     },
     "item_boxes": {
       "$ref": "#/$defs/ItemBoxes"
+    },
+    "bosses": {
+      "$ref": "#/$defs/Bosses"
     }
   },
   "required": [
@@ -1618,6 +1622,51 @@
       },
       "required": [
         "shortcut_knowledge"
+      ],
+      "additionalProperties": false
+    },
+    "Bosses": {
+      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), and Boss Track Shuffle with its repeat policy. content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "oxide_goal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "bosses_required": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "oxide_1_optional": {
+          "type": "boolean"
+        },
+        "oxide_final_unlock": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "oxide_final_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 54
+        },
+        "track_shuffle": {
+          "type": "boolean"
+        },
+        "repeats": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "oxide_goal",
+        "bosses_required",
+        "oxide_1_optional",
+        "oxide_final_unlock",
+        "oxide_final_count",
+        "track_shuffle",
+        "repeats"
       ],
       "additionalProperties": false
     }

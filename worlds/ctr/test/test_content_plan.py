@@ -155,7 +155,8 @@ class TestContentPlan(CTRTestBase):
         # Tizi Helper and an explicit death_link_send list have routes since
         # #133 PR 4a (test_item_packs.py), Hit Character and Itemsanity since
         # #133 PR 4d (test_global_checks.py), Item Box Locations since #133 PR
-        # 4e (test_content_item_boxes.py); Boss Track Shuffle still refuses (PR 6).
+        # 4e (test_content_item_boxes.py); Boss Track Shuffle refuses while the
+        # garages are empty (bosses on since PR 6, test_content_bosses.py).
         options = profile_options()
         options["boss_track_shuffle"] = True
         with self.assertRaisesRegex(OptionError, "boss_track_shuffle"):

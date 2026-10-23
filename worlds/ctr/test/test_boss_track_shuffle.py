@@ -135,10 +135,18 @@ class TestOptionOff(unittest.TestCase):
                 label = name.replace("_", " ").title() + " (Boss Track Shuffle off)"
                 self.assertIn(label, mw.worlds[PLAYER].options._ctr_notices["ignored"])
 
-    def test_content_plan_path_refuses_the_switch(self):
-        from .. import content_plan
-        with open(content_plan.__file__, encoding="utf-8") as f:
-            self.assertIn('"boss_track_shuffle"', f.read())
+    def test_content_plan_path_needs_its_garages(self):
+        # A content plan with empty garages refuses the switch; with boss
+        # garages (#133 PR 6) the plan draws the venues (test_content_bosses).
+        from Options import OptionError
+        from .test_content_plan import make_world, profile_options
+        from .test_content_bosses import boss_options
+        options = profile_options()
+        options["boss_track_shuffle"] = True
+        with self.assertRaisesRegex(OptionError, "boss_track_shuffle needs content_pool.bosses.enabled"):
+            make_world(options)
+        world = make_world(boss_options(boss_track_shuffle=True))
+        self.assertTrue(world.ctr_content_plan["bosses"]["track_shuffle"])
 
 
 class TestDraw(unittest.TestCase):

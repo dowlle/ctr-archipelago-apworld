@@ -32,9 +32,11 @@ predicates): a hit method while Itemsanity models weapons; for a guest, one of
 its unlock wins reachable, or its Key fallback when none of them is in the
 plan; and a route whose pad is open with a selectable racer the target can be
 drawn against (never the target itself, the pad's racer lock when it has
-one). Content plans have no boss encounters yet (#133 PR 6), so the four boss
-guests always take the content-plan Key fallback
-(hit_character.CONTENT_PLAN_FALLBACK_KEYS). Before PR 5b a guest was routed
+one). With bosses off the four boss guests have no boss race, so they take the
+content-plan Key fallback (hit_character.CONTENT_PLAN_FALLBACK_KEYS); with
+bosses on (#133 PR 6) each joins through its own boss race win like a normal
+room, and a boss can also be hit in its boss race (one `boss_race` route per
+encounter, after the others). Before PR 5b a guest was routed
 from retail races only and a custom-served race kept the stock field of the
 player's arcade pack.
 
@@ -49,7 +51,8 @@ count keeps the earlier routes (every real package measured has crates).
 """
 from Options import OptionError
 
-from . import characters, content_cups, hit_character, itemsanity, progressive_capability
+from . import characters, content_bosses, content_cups, hit_character, itemsanity, progressive_capability
+from .Locations import CTR_LOCATION_IDS
 
 FEATURE = "global_checks_v1"
 KEYS = ("itemsanity", "hit_character")
@@ -142,10 +145,13 @@ def hit_routes(routes, legs):
     return sorted(out, key=lambda r: (r[0], MODE_ORDER.index(r[3])))
 
 
-def checks(record, tracks, entries, pads, packages=None):
+def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
     """Every global check of the record, Itemsanity first (frozen class order),
     then Hit Character (engine id order). Refuses a plan in which a check has no
-    route. `tracks` holds every plan track, cup-only leg tracks included."""
+    route. `tracks` holds every plan track, cup-only leg tracks included.
+    `boss_hits` maps an opponent engine id to its boss race routes (#133 PR 6,
+    content_bosses.hit_routes): a boss can be hit in its own boss race, so
+    its Hit check takes those routes after the others."""
     if not record:
         return []
     routes = race_routes(tracks, entries, pads, packages)
@@ -167,7 +173,8 @@ def checks(record, tracks, entries, pads, packages=None):
             name = hit_character.HIT_CHARACTER_CLASS.location_name(cid)
             out.append(dict(location=hit_character.HIT_CHARACTER_CODE_BASE + cid, owner=OWNER, kind="hit",
                             display_name=name,
-                            routes=[_route(e, m, p, "hit", leg) for _phys, e, p, m, leg in own]))
+                            routes=[_route(e, m, p, "hit", leg) for _phys, e, p, m, leg in own]
+                            + list((boss_hits or {}).get(cid, ()))))
     return out
 
 
@@ -284,7 +291,16 @@ def install(world, check, location, route_tests):
     packages = {package["id"]: package for package in plan["packages"]}
     capability = plan.get("capability", {})
     legs = []
+    # Boss races (#133 PR 6): the boss can be hit in its own boss race once
+    # that race is in logic, whether or not it joined the draw
+    # (hit_character._boss_predicate on the legacy path).
+    by_code = {code: name for name, code in CTR_LOCATION_IDS.items()}
+    encounters = {enc["id"]: enc for enc in plan.get("encounters", ())}
+    boss = tuple(world.multiworld.get_location(by_code[encounters[route["encounter_id"]]["completion_location"]], player)
+                 for _entry, _test, route in route_tests if route["mode"] == content_bosses.MODE)
     for entry, test, route in route_tests:
+        if route["mode"] == content_bosses.MODE:
+            continue
         lock = pads[route["own_pad_id"]]["racer_lock"]
         lock = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         players = _appearance(target, lock)
@@ -313,6 +329,8 @@ def install(world, check, location, route_tests):
     def rule(state):
         if weapons and not state.has_any(hit_character.HIT_METHOD_ITEMS, player):
             return False
+        if boss and any(location.can_reach(state) for location in boss):
+            return True
         if fallback_keys is not None:
             if not state.has(hit_character.KEY_ITEM, player, fallback_keys):
                 return False
