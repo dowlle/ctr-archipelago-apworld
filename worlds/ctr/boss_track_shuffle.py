@@ -143,15 +143,25 @@ def translated_schedule(garage: str, track: str) -> Tuple[int, ...]:
                  for cp in RETAIL_ATTACK_CHECKPOINTS[garage])
 
 
-def inherited_attack_certified(garage: str, track: str) -> bool:
-    """Can `track` carry `garage`'s retail attack schedule? Every translated
-    segment must start on a real checkpoint and strictly after the previous
-    one; a collapsed or reordered segment would drop or reorder an attack."""
-    if track not in VENUES:
+def schedule_fits(garage: str, restart_points: int) -> bool:
+    """Can a track with `restart_points` restart points carry `garage`'s
+    retail attack schedule? Every translated segment must start on a real
+    checkpoint and strictly after the previous one; a collapsed or reordered
+    segment would drop or reorder an attack. Native
+    `AP_BossVenueScheduleFits` is the twin."""
+    if type(restart_points) is not int or restart_points < 1:
         return False
-    mapped = translated_schedule(garage, track)
-    return (all(0 <= cp < VENUES[track] for cp in mapped)
+    home_last = VENUES[_home_track(garage)] - 1
+    mapped = tuple(translate_checkpoint(cp, home_last, restart_points - 1)
+                   for cp in RETAIL_ATTACK_CHECKPOINTS[garage])
+    return (all(0 <= cp < restart_points for cp in mapped)
             and all(a < b for a, b in zip(mapped, mapped[1:])))
+
+
+def inherited_attack_certified(garage: str, track: str) -> bool:
+    """Can retail race track `track` carry `garage`'s retail attack schedule
+    (`schedule_fits` on its recorded restart point count)?"""
+    return track in VENUES and schedule_fits(garage, VENUES[track])
 
 
 def _home_track(garage: str) -> str:

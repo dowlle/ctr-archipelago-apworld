@@ -161,7 +161,8 @@ def package_descriptor(profile):
     flags were measured on the pinned bytes (8 spawns, AI paths, 35
     checkpoints, C/T/R letters, 8 fruit crates); relic is false because the
     package has no relic target times. Both revisions measure six super turbo
-    pad trigger quads (#133 PR 4c) and eight weapon crates (#133 PR 4e)."""
+    pad trigger quads (#133 PR 4c), eight weapon crates (#133 PR 4e), and
+    35 restart points with AI navigation (#133 PR 6b, a boss venue)."""
     revision = profile["package_version"]
     sizes = (2579256, 458808) if revision == "1.0.0" else (2558168, 458808)
     files = [dict(role=role, sha256=profile[role + "_sha256"], bytes=size,
@@ -171,7 +172,7 @@ def package_descriptor(profile):
                 uuid=profile["package_uuid"], revision=revision, display_name="Baby T Park",
                 author="Lockheart", laps=profile["laps"],
                 capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=True, wumpa=True,
-                                  super_turbo_pads=True, weapon_crates=8),
+                                  super_turbo_pads=True, weapon_crates=8, checkpoints=35, ai_nav=True),
                 files=files,
                 evidence=[dict(capability="trophy", file_hashes=[f["sha256"] for f in files],
                                verifier="ctr-managed-profile", revision=1, level="structural")])
@@ -1090,7 +1091,15 @@ def generate(world):
     # Challenge venue. Nothing is drawn with bosses off.
     boss_venues, boss_final = ({}, None)
     if boss_record is not None:
-        boss_venues = content_bosses.draw_venues(world, boss_record)
+        # A custom track is a boss venue only where the plan also races it
+        # on a pad or in a cup (#133 PR 6b; native checks its record there).
+        raced = ({t["id"] for t in chosen if is_track(t)}
+                 | {leg["id"] for cup in chosen if "cup_index" in cup for leg in cup["legs"]})
+        boss_venues = content_bosses.draw_venues(
+            world, boss_record,
+            [(content_bosses.venue_key(t), content_bosses.custom_venue_points(t, package_by_id.get(t.get("package_id"))))
+             for t in candidates if t.get("origin") == "cortex_vortex"
+             or (t.get("origin") == "custom" and t["id"] in raced)])
         boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
                       else content_bosses.OXIDE_STATION)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
@@ -1235,7 +1244,8 @@ def generate(world):
         have = {t["id"] for t in plan_tracks}
         for name in list(boss_venues.values()) + ([content_bosses.OXIDE_STATION, boss_final]
                                                   if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []):
-            record = content_bosses.venue_record(name, RETAIL, cortex_track())
+            record = content_bosses.venue_record(name, RETAIL, cortex_track(),
+                                                 {t["id"]: t for t in candidates if t.get("origin") == "custom"})
             if record["id"] not in have:
                 have.add(record["id"])
                 plan_tracks.append(record)

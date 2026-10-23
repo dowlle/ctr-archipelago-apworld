@@ -420,5 +420,68 @@ class TestGarageRoll(unittest.TestCase):
                 content_bosses.check_garage_requirement(pred, rows, g)
 
 
+
+class TestCustomBossVenues(unittest.TestCase):
+    """Custom tracks and Cortex Vortex as boss venues (#133 PR 6b)."""
+    BTP = "custom/baby-t-park/1.0.2"
+
+    def drawn(self, options, seeds=range(12)):
+        out = set()
+        for seed in seeds:
+            world = make_world(copy.deepcopy(options), seed=seed)
+            plan = world.ctr_content_plan
+            self.assertTrue(content_plan.validate(plan))
+            entries = {e["id"]: e for e in plan["entries"]}
+            out |= {entries[e["entry_id"]]["track_id"] for e in plan["encounters"][:4]}
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            restored = make_world({}, passthrough=copy.deepcopy(wire))
+            self.assertEqual(restored.ctr_content_plan, plan)
+        return out
+
+    def test_custom_tracks_and_cortex_vortex_join_the_draw(self):
+        options = boss_options(boss_track_shuffle=True)
+        options["content_pool"]["tracks"]["cortex_vortex"] = True
+        drawn = self.drawn(options)
+        self.assertIn(self.BTP, drawn)
+        self.assertIn("cortex_vortex", drawn)
+
+    def test_a_package_without_navigation_or_count_stays_out(self):
+        options = boss_options(boss_track_shuffle=True)
+        del options["content_pool"]["tracks"]["custom"][0]["capabilities"]["checkpoints"]
+        self.assertNotIn(self.BTP, self.drawn(options))
+
+    def test_an_allowlist_keeps_custom_tracks_out(self):
+        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow",
+                               boss_track_allowlist=["Crash Cove", "Dingo Canyon"])
+        ids = boss_track_shuffle.VENUE_LEVEL_IDS
+        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids['Crash Cove']}", f"retail:{ids['Dingo Canyon']}"})
+
+    def test_off_keeps_the_retail_pairs(self):
+        options = boss_options()
+        options["content_pool"]["tracks"]["cortex_vortex"] = True
+        self.assertNotIn(self.BTP, self.drawn(options, range(3)))
+
+    def test_schedule_fits_by_count(self):
+        for key, *_ in boss_track_shuffle.GARAGES:
+            self.assertTrue(boss_track_shuffle.schedule_fits(key, 35))
+            self.assertTrue(boss_track_shuffle.schedule_fits(key, content_bosses.CORTEX_RESTART_POINTS))
+            self.assertFalse(boss_track_shuffle.schedule_fits(key, 3))
+            self.assertFalse(boss_track_shuffle.schedule_fits(key, None))
+
+    def test_a_forged_count_is_refused(self):
+        options = boss_options(boss_track_shuffle=True)
+        for seed in range(40):
+            world = make_world(copy.deepcopy(options), seed=seed)
+            plan = world.ctr_content_plan
+            entries = {e["id"]: e for e in plan["entries"]}
+            if any(entries[e["entry_id"]]["track_id"] == self.BTP for e in plan["encounters"][:4]):
+                break
+        else:
+            self.fail("no seed drew Baby T Park")
+        forged = copy.deepcopy(plan)
+        next(p for p in forged["packages"] if p["content_id"] == "baby-t-park")["capabilities"]["checkpoints"] = 3
+        with self.assertRaises(OptionError):
+            content_plan.validate(forged)
+
 if __name__ == "__main__":
     unittest.main()

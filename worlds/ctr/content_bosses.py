@@ -12,7 +12,14 @@ ENCOUNTERS. One record per encounter (implementation packet, `Encounter`):
     own boss as the opponent, on its home track, or with `boss_track_shuffle`
     on, on the track the #169 tier 1 draw gives that garage
     (boss_track_shuffle.draw, the certified venue table, its allow and block
-    lists and `boss_encounter_repeats`). The opponent never changes: opponent
+    lists and `boss_encounter_repeats`). Since #133 PR 6b the draw also
+    takes the plan's selected custom tracks and Cortex Vortex (ruling
+    2026-10-15: custom tracks join the Boss Track Shuffle pool): a package
+    joins when it states `ai_nav: true` and a `checkpoints` count that
+    carries the garage's attack schedule (`boss_track_shuffle.schedule_fits`;
+    native measures both on load and refuses a mismatch). A non-empty
+    `boss_track_allowlist` names retail tracks only, so it keeps custom
+    tracks out; the blocklist does not touch them. The opponent never changes: opponent
     and kit shuffle (#169 tiers 2 and 3) are not built, so neither are the
     `home_track` and `independent` pairings of the implementation packet;
   * N. Oxide's two encounters in the Oxide garage, `encounter/garage:4/0` on
@@ -448,19 +455,66 @@ def check_garage_requirement(predicate, rows, garage):
     error(f"garage {garage}: sum requirement items are not exactly one family's base items")
 
 
-def draw_venues(world, record):
-    """{garage: track name} of the four ordinary garages: the retail pairs, or
-    the #169 tier 1 draw (one world.random draw, only with the switch on)."""
-    boss_track_shuffle.draw(world)
-    venues = boss_track_shuffle.venues(world.options)
-    return {g: venues[_venue_key(g)] for g in range(4)}
+#: Cortex Vortex's restart point count (the bundled LEV, measured with the
+#: retail editor's levtool on 2026-10-23; native re-measures it on load).
+CORTEX_RESTART_POINTS = 255
 
 
-def venue_record(name, retail, cortex):
+def custom_venue_points(track, package):
+    """The restart point count a plan track may race a boss on, or None:
+    Cortex Vortex, or a custom package stating AI navigation and its count."""
+    if track.get("origin") == "cortex_vortex":
+        return CORTEX_RESTART_POINTS
+    caps = (package or {}).get("capabilities", {})
+    if track.get("origin") == "custom" and caps.get("ai_nav") is True and type(caps.get("checkpoints")) is int:
+        return caps["checkpoints"]
+    return None
+
+
+def venue_key(track):
+    """The venue name content_bosses uses for a plan track: the retail or
+    Cortex Vortex name, or a custom track's own id (`custom/...`)."""
+    return track["id"] if track.get("origin") == "custom" else track["display_name"]
+
+
+def draw_venues(world, record, custom=()):
+    """{garage: venue} of the four ordinary garages: the retail pairs, or the
+    #169 tier 1 draw (one world.random draw, only with the switch on).
+    `custom` is [(venue, restart points)] of the plan's selected custom
+    tracks and Cortex Vortex that may race a boss; without any the draw is
+    exactly the retail one."""
+    import itertools
+    o = world.options
+    custom = [(name, points) for name, points in custom if points is not None]
+    if not record["track_shuffle"] or not custom or o.boss_track_allowlist.value:
+        boss_track_shuffle.draw(world)
+        venues = boss_track_shuffle.venues(o)
+        return {g: venues[_venue_key(g)] for g in range(4)}
+    boss_track_shuffle.validate_options(world)
+    retail = boss_track_shuffle.garage_candidates(o)
+    pools = [retail[_venue_key(g)] + [name for name, points in custom
+                                      if boss_track_shuffle.schedule_fits(_venue_key(g), points)]
+             for g in range(4)]
+    if record["repeats"]:
+        picked = [world.random.choice(pool) for pool in pools]
+    else:
+        assignments = [combo for combo in itertools.product(*pools) if len(set(combo)) == 4]
+        if not assignments:
+            error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks "
+                  "or set boss_encounter_repeats: allow.")
+        picked = list(world.random.choice(assignments))
+    o._boss_track_venues = {_venue_key(g): picked[g] for g in range(4)}
+    return dict(enumerate(picked))
+
+
+def venue_record(name, retail, cortex, custom_records=None):
     """A plan track record for a venue raced nowhere else: the trophy mode
-    only, like a track raced only in cups."""
+    only, like a track raced only in cups. `custom_records` maps a custom
+    venue to its candidate track record."""
     if name == destinations.CORTEX_VORTEX:
         return dict(cortex, modes=["trophy"], capabilities=["trophy"], field_size=8)
+    if name.startswith("custom/"):
+        return dict(custom_records[name], modes=["trophy"], capabilities=["trophy"], field_size=8)
     lid = boss_track_shuffle.VENUE_LEVEL_IDS[name]
     return dict(id=f"retail:{lid}", origin="retail", retail_id=lid, display_name=retail[lid], laps=LAPS,
                 modes=["trophy"], capabilities=["trophy"], field_size=8)
@@ -469,6 +523,8 @@ def venue_record(name, retail, cortex):
 def track_id_of(name):
     if name == destinations.CORTEX_VORTEX:
         return "cortex_vortex"
+    if name.startswith("custom/"):
+        return name
     return f"retail:{boss_track_shuffle.VENUE_LEVEL_IDS[name]}"
 
 
@@ -552,6 +608,7 @@ def plan_venues(plan):
     entries = {e["id"]: e for e in plan["entries"]}
     by_id = {track_id_of(name): name for name in boss_track_shuffle.VENUES}
     by_id["cortex_vortex"] = destinations.CORTEX_VORTEX
+    by_id.update({t["id"]: t["id"] for t in plan["tracks"] if t.get("origin") == "custom"})
     venues, final = {}, None
     for enc in plan["encounters"]:
         entry = entries.get(enc.get("entry_id"))
@@ -567,15 +624,22 @@ def plan_venues(plan):
     return venues, final
 
 
-def check_venues(record, venues, final):
+def check_venues(record, venues, final, points=None, raced=None):
     """The venues a record allows: retail pairs, or certified drawn venues
-    (distinct unless repeats); the Final Challenge on Cortex Vortex or Oxide
-    Station."""
+    (distinct unless repeats), a custom venue or Cortex Vortex by its
+    restart point count (`points`: {venue: count}); the Final Challenge on
+    Cortex Vortex or Oxide Station."""
     if sorted(venues) != [0, 1, 2, 3]:
         error("the four ordinary garages need one encounter each")
+    points = points or {}
     for g, name in venues.items():
+        if name.startswith("custom/") and name not in (raced or ()):
+            error(f"garage {g}: a custom boss venue the plan does not race on a pad or in a cup")
         if record["track_shuffle"]:
-            if not boss_track_shuffle.inherited_attack_certified(_venue_key(g), name):
+            certified = (boss_track_shuffle.schedule_fits(_venue_key(g), points.get(name))
+                         if name == destinations.CORTEX_VORTEX or name.startswith("custom/")
+                         else boss_track_shuffle.inherited_attack_certified(_venue_key(g), name))
+            if not certified:
                 error(f"garage {g}: {name} is not a certified venue for this boss")
         elif name != home_track(g):
             error(f"garage {g}: without track_shuffle a boss races its home track")
@@ -651,16 +715,22 @@ def expected(plan, retail, cortex):
     Returns (encounters, entries, requirements, checks, venue track records)."""
     record = check_settings(plan["bosses"])
     venues, final = plan_venues(plan)
-    check_venues(record, venues, final)
+    packages = {p["id"]: p for p in plan.get("packages", [])}
+    points = {venue_key(t): custom_venue_points(t, packages.get(t.get("package_id")))
+              for t in plan["tracks"] if t.get("origin") in ("custom", "cortex_vortex")}
+    points.setdefault(destinations.CORTEX_VORTEX, CORTEX_RESTART_POINTS)
+    raced = {e["track_id"] for e in plan["entries"] if e.get("kind") == "track"} \
+        | {leg["track_id"] for e in plan["entries"] if e.get("kind") == "cup" for leg in e.get("legs", ())}
+    check_venues(record, venues, final, points, raced)
     gem = gem_term_of(plan["goal"])
     names = list(venues[g] for g in range(4))
     if record["oxide_goal"] != GOAL_DISABLED:
         names += [OXIDE_STATION, final]
+    known = {t["id"]: t for t in plan["tracks"]}
     tracks = {}
     for name in names:
-        venue = venue_record(name, retail, cortex)
+        venue = venue_record(name, retail, cortex, known)
         tracks.setdefault(venue["id"], venue)
-    known = {t["id"]: t for t in plan["tracks"]}
     own = {r["id"]: r["predicate"] for r in plan["requirements"]}
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},

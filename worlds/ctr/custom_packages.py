@@ -30,7 +30,11 @@ Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`)
                   with. It decides the track's Item Box checks on a named
                   block (min(count, 15)) and, at 0, that the track is no
                   Itemsanity route; absent means no Item Box checks and the
-                  earlier Itemsanity routes.
+                  earlier Itemsanity routes. Optional checkpoints (#133
+                  PR 6b), 1 to 255, the LEV's restart point count, and
+                  ai_nav, whether it has AI navigation paths; native
+                  measures both and refuses a mismatch. With both a track
+                  may race a boss under Boss Track Shuffle.
     relic_targets optional; required exactly when relic is true. Sapphire, gold
                   and platinum times in ticks (960 per second), strictly faster
                   from sapphire to platinum, at most one hour
@@ -55,7 +59,12 @@ CAPABILITIES = ("time_trial", "arcade", "relic", "ctr_tokens", "wumpa")
 #: (PU_RANDOM_CRATE) in the LEV, a measured count rather than a flag. Item Box
 #: checks on a named-block track take their seats from these crates
 #: (content_item_boxes.py); native counts them on load and refuses a mismatch.
-OPTIONAL_CAPABILITIES = ("super_turbo_pads", "weapon_crates")
+#: `checkpoints` and `ai_nav` (#133 PR 6b): the LEV's restart point count
+#: (1 to 255) and whether it has AI navigation paths. Together they let the
+#: track race a boss under Boss Track Shuffle (content_bosses); native
+#: measures both on load and refuses a mismatch.
+OPTIONAL_CAPABILITIES = ("super_turbo_pads", "weapon_crates", "checkpoints", "ai_nav")
+CHECKPOINTS_MAX = 255
 #: The instance-table ceiling native measures against
 #: (native_custom_content_verify.c refuses a LEV with more instances).
 WEAPON_CRATES_MAX = 65536
@@ -156,6 +165,8 @@ def admit(descriptor, where="package"):
     for name in CAPABILITIES + tuple(n for n in OPTIONAL_CAPABILITIES if n in caps):
         if name == "weapon_crates":
             _integer(caps[name], 0, WEAPON_CRATES_MAX, f"{where}.capabilities.{name}")
+        elif name == "checkpoints":
+            _integer(caps[name], 1, CHECKPOINTS_MAX, f"{where}.capabilities.{name}")
         elif type(caps[name]) is not bool:
             _fail(f"{where}.capabilities.{name}", "must be true or false")
     if caps["relic"] != ("relic_targets" in d):

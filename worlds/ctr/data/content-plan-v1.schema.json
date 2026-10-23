@@ -296,6 +296,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 65536
+            },
+            "checkpoints": {
+              "description": "Optional (#133 PR 6b): the LEV's restart point count. Native measures it and refuses a stated count the bytes disagree with. With ai_nav true it lets the track race a boss under Boss Track Shuffle when the count carries the garage's attack schedule.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255
+            },
+            "ai_nav": {
+              "description": "Optional (#133 PR 6b): the LEV has AI navigation paths. Native measures it and refuses a stated value the bytes disagree with. A boss venue needs it.",
+              "type": "boolean"
             }
           },
           "required": [
