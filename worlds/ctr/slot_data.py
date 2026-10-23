@@ -287,7 +287,8 @@ def fill_slot_data(world) -> Dict[str, object]:
     # A schema-18 native refuses every trap of a seed that lacks the block, so
     # the number must move with it; a pre-18 client shows the out-of-date
     # banner and applies its frozen trap table, which agrees because trap item
-    # ids never move. 17 is the separately admitted content-plan profile.
+    # ids never move. A content-plan room declares the same 18
+    # (content_plan.SCHEMA); native no longer admits a content plan at 17.
     schema = SLOT_DATA_SCHEMA
     slot_data: Dict[str, object] = {
         "Seed": world.multiworld.seed_name,

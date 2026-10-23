@@ -61,6 +61,17 @@ class TestContentPlan(CTRTestBase):
         self.assertEqual(len(self.multiworld.precollected_items[1]), 0)
         self.assertFalse(hasattr(self.world, "_ctr_backstop_fired"))
 
+    def test_envelope_shares_the_normal_schema_and_version(self):
+        # #133 PR 9: both room shapes declare the one 0.3.0 schema step and the
+        # apworld's own manifest version, so the client's update notice works
+        # for content-plan rooms too.
+        from ..slot_data import SLOT_DATA_SCHEMA
+        self.assertEqual(content_plan.SCHEMA, SLOT_DATA_SCHEMA)
+        wire = self.world.fill_slot_data()
+        self.assertEqual(wire["schema_version"], SLOT_DATA_SCHEMA)
+        self.assertEqual(wire["ctr_options"]["schema_version"], SLOT_DATA_SCHEMA)
+        self.assertEqual(wire["ctr_options"]["world_version"], self.world.world_version.as_simple_string())
+
     def test_tracker_uses_wire_without_reroll(self):
         wire = json.loads(json.dumps(self.world.fill_slot_data()))
         other = make_world({}, seed=999, passthrough=wire)
