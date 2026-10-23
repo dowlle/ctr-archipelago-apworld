@@ -37,6 +37,8 @@ from . import (arena_content, content_bosses, content_capability, content_cups, 
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
+#: Equal to slot_data.SLOT_DATA_SCHEMA: both room shapes share the 0.3.0 step
+#: (test_content_plan checks it).
 SCHEMA = 18
 MANUAL_FEATURE = "manual_pad_requirements_v1"
 #: Track modes (#133 PR 3). A plan whose track entries are all Trophy-only keeps
@@ -1619,7 +1621,7 @@ def wire(world):
     hit = dict(hit_character_encounters=copy.deepcopy(world.ctr_hit_character_encounters)) \
         if plan.get("global_checks", {}).get("hit_character") else {}
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
-                ctr_options=dict(schema_version=SCHEMA, world_version="0.3.0-content-dev", content_plan=True,
+                ctr_options=dict(schema_version=SCHEMA, world_version=world.world_version.as_simple_string(), content_plan=True,
                                  goal=-1, **goal_envelope(plan),
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
                                  # True exactly when the plan has its `racers` record (#133 PR 4b).
