@@ -336,9 +336,9 @@ def resolve_death_link_off_when_send_conditions_set(world):
               f"CTR ({_name(world)}): DeathLink turned on as mask_reset, "
               f"because DeathLink Send lists at least one trigger and "
               f"DeathLink was off. A slot that sends deaths also receives "
-              f"them (set DeathLink to mask_reset or race_loss yourself to "
-              f"drop this line, or set DeathLink Send to [] to send "
-              f"nothing).")
+              f"them (set DeathLink to mask_reset, weapon_hit or race_loss "
+              f"yourself to drop this line, or set DeathLink Send to [] to "
+              f"send nothing).")
 
 
 def raise_if_oxidefinal_goal_has_no_progression_tier(world):

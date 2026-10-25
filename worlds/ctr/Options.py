@@ -622,12 +622,16 @@ class WumpaCheck(Choice):
 
 
 class TurboGrant(Toggle):
-    """Add one useful item that puts a Turbo into your weapon slot.
+    """Add one useful item that puts a Turbo into your weapon slot at the start
+    of every race, once you have received it.
 
-    If you are outside a race or your slot is occupied, it waits until it can
-    be delivered. With Itemsanity on, it also waits for the Turbo weapon to be
-    unlocked. Progressive Boost still controls how strong the fired Turbo is.
-    This uses one filler slot and adds no location."""
+    One Turbo per race; a restart counts as a new race. If your slot is
+    occupied, that race's Turbo waits until the slot is free. With Itemsanity
+    on, it also waits for the Turbo weapon to be unlocked. Progressive Boost
+    still controls how strong the fired Turbo is. This uses one filler slot and
+    adds no location.
+
+    Changed in 0.3.0: before, the item gave a single Turbo once."""
     display_name = "Turbo Grant"
 
 
@@ -994,14 +998,18 @@ class DeathLink(Choice):
       trophy, relic, and similar checks) is awarded. In a Gem Cup the cup
       carries on, and if that was the last race and you still win the cup on
       points, the cup reward is still paid.
+    - **weapon_hit**: a received death spins you out as if a weapon hit you.
+      A shield, an Aku Aku mask or the short invincibility after a hit stop
+      it, just as they stop a weapon.
     - **any_hit**: legacy value, kept so older YAML files still load. It
       receives exactly like mask_reset. While DeathLink Send is left at its
       default it also sends on every weapon hit.
 
     While DeathLink Send is left at its default, this option also decides what
-    you send, as it did before DeathLink Send existed: mask_reset sends on
-    mask grabs, any_hit on mask grabs and weapon hits, race_loss on mask grabs
-    and race losses. Set DeathLink Send to choose sending yourself; listing
+    you send, as it did before DeathLink Send existed: mask_reset and
+    weapon_hit send on mask grabs, any_hit on mask grabs and weapon hits,
+    race_loss on mask grabs and race losses. Set DeathLink Send to choose
+    sending yourself; listing
     any trigger there while this is off turns this on as mask_reset, because
     a slot that sends deaths also receives them. Deaths are
     only sent and received during adventure-mode races; a received death is
@@ -1013,7 +1021,9 @@ class DeathLink(Choice):
     # off. The integer values are the wire contract with native
     # (ap_deathlink.h CTR_DL_*): race_loss = 3 (issue #286) ends the attempt
     # as a forced loss on receive; a native build predating it falls back to
-    # the mask reset for any unknown nonzero value. Send conditions live in
+    # the mask reset for any unknown nonzero value; weapon_hit = 4 (issue
+    # #483) spins the kart out on receive, and a native predating it receives
+    # it as the mask reset by the same fallback. Send conditions live in
     # DeathLinkSend below; this option only couples to them through the legacy
     # fallback (DL_LEGACY_SEND).
     display_name = "DeathLink"
@@ -1021,6 +1031,7 @@ class DeathLink(Choice):
     option_mask_reset = 1
     option_any_hit = 2
     option_race_loss = 3
+    option_weapon_hit = 4
     default = 0
 
 
@@ -1038,11 +1049,16 @@ DL_SEND_BITS = {
 
 # Legacy coupling, used while DeathLink Send is left at its default: the send
 # side that each death_link value implied before death_link_send existed.
+# weapon_hit (#483) is newer than death_link_send and has no history to keep;
+# it couples like mask_reset (mask grabs only), the mildest choice, so a
+# weapon_hit slot does not broadcast a death for every hit it takes. Native's
+# AP_DeathLinkLegacySendMask maps 4 the same way.
 DL_LEGACY_SEND = {
     DeathLink.option_off: 0,
     DeathLink.option_mask_reset: DL_SEND_MASK_GRAB,
     DeathLink.option_any_hit: DL_SEND_MASK_GRAB | DL_SEND_WEAPON_HIT,
     DeathLink.option_race_loss: DL_SEND_MASK_GRAB | DL_SEND_RACE_LOSS,
+    DeathLink.option_weapon_hit: DL_SEND_MASK_GRAB,
 }
 
 
@@ -1058,9 +1074,9 @@ class DeathLinkSend(OptionSet):
       already won, or one you are not expected to win yet, sends nothing.
 
     Default: **follow_death_link**, the only value that is not a trigger. It
-    sends what DeathLink used to imply: mask_reset sends on mask grabs,
-    any_hit on mask grabs and weapon hits, race_loss on mask grabs and race
-    losses, off sends nothing. Any list you write replaces that, so every
+    sends what DeathLink implies: mask_reset and weapon_hit send on mask
+    grabs, any_hit on mask grabs and weapon hits, race_loss on mask grabs and
+    race losses, off sends nothing. Any list you write replaces that, so every
     trigger you want must be in it (follow_death_link listed together with
     triggers is ignored). To receive DeathLinks without sending any,
     use an empty list (`death_link_send: []`). A death that was forced on you
@@ -1068,8 +1084,8 @@ class DeathLinkSend(OptionSet):
 
     There is no send-only DeathLink: if you list any trigger while DeathLink
     is off, DeathLink is turned on as mask_reset (the mildest receive effect)
-    and generation prints a notice. Set DeathLink to mask_reset or race_loss
-    yourself to choose the receive effect."""
+    and generation prints a notice. Set DeathLink to mask_reset, weapon_hit
+    or race_loss yourself to choose the receive effect."""
     # Unset vs explicitly empty: the default is the one-element sentinel set
     # {"follow_death_link"}, so a YAML that omits the option (every YAML written
     # before it existed) gets the legacy coupling, while an explicit empty list

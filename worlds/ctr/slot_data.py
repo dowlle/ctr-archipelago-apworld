@@ -388,8 +388,8 @@ def fill_slot_data(world) -> Dict[str, object]:
             # predating these keys reads neither and DeathLink stays off (the
             # one_lap_cups precedent: absent additive key degrades to the 0/off
             # default). death_link is 0 off / 1 mask_reset / 2 any_hit /
-            # 3 race_loss (#286: native falls back to mask reset for any
-            # nonzero value it does not know, so no bump); amnesty
+            # 3 race_loss (#286) / 4 weapon_hit (#483); native falls back to
+            # mask reset for any nonzero value it does not know, so no bump; amnesty
             # is send-every-Nth (>=1). Native enables the "DeathLink" connection
             # tag and its send/receive plumbing only when death_link != 0.
             "death_link": o.death_link.value,
@@ -397,8 +397,9 @@ def fill_slot_data(world) -> Dict[str, object]:
             # convention, always emitted. int bitmask: 1 mask_grab,
             # 2 weapon_hit, 4 race_loss. While the option is left at its
             # default this is the legacy coupling derived from death_link
-            # (mask_reset 1, any_hit 1|2, race_loss 1|4, off 0); a native
-            # that finds the key absent applies the same fallback itself.
+            # (mask_reset 1, any_hit 1|2, race_loss 1|4, weapon_hit 1, off 0);
+            # a native that finds the key absent applies the same fallback
+            # itself.
             # An explicit empty list is 0: receive only.
             "death_link_send": o.death_link_send.send_mask(
                 o.death_link.value),

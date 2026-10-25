@@ -31,6 +31,7 @@ class TestDeathLinkValues(CTRTestBase):
         self.assertEqual(DeathLink.option_mask_reset, 1)
         self.assertEqual(DeathLink.option_any_hit, 2)
         self.assertEqual(DeathLink.option_race_loss, 3)
+        self.assertEqual(DeathLink.option_weapon_hit, 4)
 
     def test_default_is_off(self):
         opt = self.world.options.death_link
@@ -67,3 +68,22 @@ class TestDeathLinkRaceLoss(CTRTestBase):
         world._ut_restore_options(passthrough)
         self.assertEqual(world.options.death_link.value,
                          DeathLink.option_mask_reset)
+
+
+class TestDeathLinkWeaponHit(CTRTestBase):
+    """weapon_hit (#483) reaches the wire as 4 and couples to mask grabs only."""
+
+    options = {"death_link": "weapon_hit"}
+
+    def test_wire_value_is_four(self):
+        slot_data = self.world.fill_slot_data()
+        self.assertEqual(slot_data["ctr_options"][WIRE_KEY], 4)
+        self.assertEqual(slot_data["schema_version"], 18)
+
+    def test_default_send_is_mask_grab_only(self):
+        slot_data = self.world.fill_slot_data()
+        self.assertEqual(slot_data["ctr_options"]["death_link_send"], 1)
+
+    def test_any_hit_still_parses_and_keeps_its_value(self):
+        self.assertEqual(DeathLink.from_any("any_hit").value, 2)
+        self.assertEqual(DeathLink.from_any("weapon_hit").value, 4)

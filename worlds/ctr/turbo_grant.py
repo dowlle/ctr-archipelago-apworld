@@ -1,10 +1,11 @@
 """Turbo Grant: the in-race Turbo hand-out (issue #224).
 
-WHAT IT IS. One received AP item. Receiving it rolls a normal Turbo straight
-into the player's weapon slot and plays the usual item-pickup ping, as if a
-weapon box had just paid out a Turbo. It is fired on demand through the ordinary
-held-item path -- circle press, same as any Turbo -- so it adds no inventory
-interface and no second firing path.
+WHAT IT IS. One received AP item. Since #487 (0.3.0), once it has been
+received, a normal Turbo is put straight into the player's weapon slot at the
+start of every race, with the usual item-pickup ping, as if a weapon box had
+just paid out a Turbo. Before 0.3.0 it gave a single Turbo once. It is fired on
+demand through the ordinary held-item path -- circle press, same as any Turbo --
+so it adds no inventory interface and no second firing path.
 
 THE RULED GATE (ruled 2026-08-11, "Mask and Turbo filler interactions",
 restated in the #224 body):
@@ -12,7 +13,7 @@ restated in the #224 body):
   * itemsanity OFF -> a received grant is deliverable with no weapon-item gate.
   * itemsanity ON  -> a grant is deliverable only once the slot has also
     received the separate progression `Turbo` weapon item (the itemsanity item
-    at 35010095). Until then the grant queues; it is never discarded.
+    at 35010095). Until then each race's Turbo waits for it.
 
 WHY THE SIBLING MASK GRANT IS NOT HERE. The ruling names the already-frozen
 `Invincibility Mask` (35010118) as the Mask half of the same family and forbids
@@ -22,8 +23,8 @@ nothing else.
 DELIVERY, QUEUEING AND FIRING ARE ALL NATIVE'S. This side owns the name, the
 code, the option and one diagnostic wire scalar. Native owns every runtime rule:
 the race window, the empty-weapon-slot precondition, the itemsanity ownership
-check, the per-slot queue that survives reconnects and race restarts, and the
-progressive-boost behaviour at fire time. Native reads "is itemsanity on for
+check, one Turbo per race attempt, and the progressive-boost behaviour at fire
+time. Native reads "is itemsanity on for
 this seed" off server location membership (the 35016000 block), exactly as #223
 does, so this side emits no wire key for the gate.
 
