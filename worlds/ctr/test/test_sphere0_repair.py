@@ -218,8 +218,12 @@ class TestVanillaModeSkipsSphereSearch(CTRTestBase):
     def test_all_pads_stay_free_and_ungated(self):
         world = self.world
         self.assertEqual(getattr(world, "_ctr_unlock_mode", 0), 0)
-        self.assertFalse(getattr(world, "_ctr_two_stage_active", False),
-                         "vanilla mode reported an active two-stage gate")
+        # Since #499 vanilla mode does carry a stage 2: the hub Key count,
+        # never a sphere-search draw (test_vanilla_stage2_keys pins the values).
+        for track, req in (getattr(world, "warp_pad_unlock_stage2_concrete",
+                                   {}) or {}).items():
+            self.assertEqual(req[0], "Key",
+                             f"{track} has a non-Key stage 2 in vanilla mode")
         self.assertFalse(getattr(world, "warp_pad_unlock_concrete", {}),
                          "vanilla mode produced sphere-search requirements")
         for pad, req in (getattr(world, "warp_pad_unlock", {}) or {}).items():

@@ -269,6 +269,57 @@ def _ut_reconstruct_warp_pad_map(world, passthrough):
     return out
 
 
+def _vanilla_stage2_key_counts(data):
+    """Track name -> hub Key count for its stage-2 locations, read from the
+    has('Key', N) text world.json puts on each trophy track's CTR Token
+    Challenge and relic Time Trials (the retail boss-beaten gate). Tracks
+    without such a rule (trial tracks) are absent."""
+    import re
+    pattern = re.compile(r"^has\('Key',\s*(\d+)\)$")
+    counts = {}
+    for reg in data["regions"]:
+        for loc in reg.get("locations", []):
+            if loc.get("type") not in ("relic", "token"):
+                continue
+            m = pattern.match(str(loc.get("requires", "")).strip())
+            if m is None:
+                continue
+            n = int(m.group(1))
+            prev = counts.setdefault(reg["name"], n)
+            if prev != n:
+                raise ValueError(
+                    f"world.json: {reg['name']} stage-2 locations disagree on "
+                    f"their Key count ({prev} vs {n})")
+    return counts
+
+
+def _apply_vanilla_stage2_keys(world, data):
+    """Vanilla unlock mode (#499): give every race pad a Key stage 2.
+
+    Keyed like the randomized path: the slot_data requirement on the PHYSICAL
+    pad, the logic term on the DESTINATION track it loads, with the count taken
+    from that destination's hub. A pad whose destination has no hub Key rule
+    (Cortex Vortex, trial tracks) keeps no stage 2, as before. Only race pads
+    (LevelID 0..27) are touched, so cup pads keep their fixed native rule."""
+    counts = _vanilla_stage2_key_counts(data)
+    reward_track_for = _build_reward_track_resolver(world)
+    active = False
+    for pad_name, meta in world.warp_pad_ids.items():
+        if not isinstance(meta, dict) or meta.get("kind") != "race":
+            continue
+        if not pad_name.endswith(" Warp Pad"):
+            continue
+        dest_track = reward_track_for(pad_name[: -len(" Warp Pad")])
+        n = counts.get(dest_track)
+        if not n:
+            continue
+        req = ("Key", n)
+        world.warp_pad_unlock_stage2[pad_name] = to_slot_req(req)
+        world.warp_pad_unlock_stage2_concrete[dest_track] = req
+        active = True
+    world._ctr_two_stage_active = active
+
+
 def _ut_reconstruct_unlock(world, passthrough):
     """Rebuild the per-pad unlock state the sphere search would have produced,
     read back from slot_data.warp_pad_unlock (physical-pad keyed):
@@ -1097,6 +1148,21 @@ def create_regions(world: "ctrAPWorld"):
         # collapses a pad's tier 2 to equal its tier 1 when nothing is ownable. AP's
         # fill_restrictive then seats the required progression in the (now un-pinned,
         # plentiful) reachable location frontier. stage2_pin stays empty.
+
+    else:
+        # Vanilla unlock mode (issue #499): the retail game opens a track's
+        # CTR Token Challenge and relic Time Trials only after that hub's boss
+        # is beaten. world.json carries that as has('Key', N) on those
+        # locations, but add_time_trial_and_ctr_requirements replaces their
+        # rule with the Trophy Race reference, and native opened stage 2 with
+        # the trophy. Emit the hub Key count as a real stage 2 instead, so
+        # native gates the pad and Rules gates the locations on the same term.
+        # two_stage_density: off keeps the old behaviour (stage 2 opens with
+        # the trophy), the same "no second stage" meaning it has in
+        # randomized mode.
+        if getattr(world.options.two_stage_density, "current_key",
+                   "full") != "off":
+            _apply_vanilla_stage2_keys(world, data)
 
     # --- Vanilla-hub return-exit drift fix (Option 1b) -----------------------
     # Under destination shuffle the wiring loop above rewires only the FORWARD
