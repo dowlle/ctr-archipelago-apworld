@@ -165,7 +165,7 @@ class TestEnvelope(unittest.TestCase):
 
     def test_bad_envelope_values_refuse_on_restore(self):
         wire = json.loads(json.dumps(make_world(pack_options(), seed=3).fill_slot_data()))
-        for key, value in (("death_link_send", 8), ("death_link_send", True), ("death_link_send", -1),
+        for key, value in (("death_link", 5), ("death_link", True), ("death_link_send", 8), ("death_link_send", True), ("death_link_send", -1),
                            ("warp_pad_item_display", 2), ("warp_pad_item_display", False),
                            ("ap_item_type_colors", 1)):
             forged = copy.deepcopy(wire)
