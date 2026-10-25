@@ -150,13 +150,22 @@ class TestEnvelope(unittest.TestCase):
         co = make_world(pack_options(death_link="off", death_link_send=["mask_grab"]), seed=3).fill_slot_data()["ctr_options"]
         self.assertEqual((co["death_link"], co["death_link_send"]), (1, 1))
 
+    def test_weapon_hit_rides_the_envelope(self):
+        # #483: death_link 4 on a content-plan room, coupled to mask grabs, and
+        # the tracker restores the room from it.
+        world = make_world(pack_options(death_link="weapon_hit"), seed=3)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        self.assertEqual((wire["ctr_options"]["death_link"], wire["ctr_options"].get("death_link_send")), (4, None))
+        other = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(other.fill_slot_data(), wire)
+
     def test_trap_identities_on_every_room(self):
         world = make_world(profile_options(), seed=3)
         self.assertEqual(world.fill_slot_data()["trap_identities"], traps.trap_identities_block(world.item_name_to_id))
 
     def test_bad_envelope_values_refuse_on_restore(self):
         wire = json.loads(json.dumps(make_world(pack_options(), seed=3).fill_slot_data()))
-        for key, value in (("death_link_send", 8), ("death_link_send", True), ("death_link_send", -1),
+        for key, value in (("death_link", 5), ("death_link", True), ("death_link_send", 8), ("death_link_send", True), ("death_link_send", -1),
                            ("warp_pad_item_display", 2), ("warp_pad_item_display", False),
                            ("ap_item_type_colors", 1)):
             forged = copy.deepcopy(wire)

@@ -407,6 +407,9 @@ def envelope_options(options):
 
 def check_envelope_options(co):
     """Types and bounds of the optional envelope keys, as native reads them."""
+    # death_link is always emitted; native admits 0 off to 4 weapon_hit (#483).
+    if "death_link" in co and (type(co["death_link"]) is not int or not 0 <= co["death_link"] <= 4):
+        error("ctr_options.death_link must be 0 to 4.")
     if "death_link_send" in co and (type(co["death_link_send"]) is not int or not 0 <= co["death_link_send"] <= 7):
         error("ctr_options.death_link_send must be a send bitmask 0 to 7.")
     if "warp_pad_item_display" in co and (type(co["warp_pad_item_display"]) is not int

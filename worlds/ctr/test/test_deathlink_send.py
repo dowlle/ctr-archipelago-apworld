@@ -66,6 +66,7 @@ class TestLegacyFollow(CTRTestBase):
         self._check(DeathLink.option_mask_reset, 1)
         self._check(DeathLink.option_any_hit, 1 | 2)
         self._check(DeathLink.option_race_loss, 1 | 4)
+        self._check(DeathLink.option_weapon_hit, 1)
 
     def test_any_hit_yaml_value_still_parses(self):
         self.assertEqual(DeathLink.from_any("any_hit").value, 2)
