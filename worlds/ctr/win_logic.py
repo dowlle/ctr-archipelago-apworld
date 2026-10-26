@@ -19,7 +19,11 @@ module only serialises what is installed:
 
 A win check or entrance whose rule is not term-backed (someone installed a
 plain lambda) raises `WinLogicExportError` rather than exporting stale
-logic. `test_win_logic_parity` evaluates the emitted JSON with an
+logic. When the rule WAS term-backed at the end of CTR's `set_rules` and
+another world replaced it later (SlotLock wraps the exits of a locked slot's
+origin region in `stage_pre_fill`), the error is `ForeignRuleError`:
+`fill_slot_data` then omits the block, and native keeps the 0.2.3 send
+behaviour for that slot, instead of failing the whole generation. `test_win_logic_parity` evaluates the emitted JSON with an
 independent reference evaluator and compares it with `location.can_reach`.
 
 Wire format: the slot_data Contract section 7m, the native implementation
@@ -65,6 +69,31 @@ _GATE_REQ.update({name: (5, c) for c, name in enumerate(_GEMS)})
 
 class WinLogicExportError(RuntimeError):
     """A win check or an entrance on its path has no term-backed rule."""
+
+
+class ForeignRuleError(WinLogicExportError):
+    """A term-backed rule was replaced after CTR's `set_rules` finished,
+    so another world wrapped it (SlotLock does this to a locked slot)."""
+
+
+_SNAPSHOT_ATTR = "_ctr_win_logic_rules"
+
+
+def snapshot_rules(world) -> None:
+    """Record every entrance and location rule as `set_rules` left it, so
+    the exporter can tell a later foreign wrapper from a CTR plain lambda."""
+    spots = list(world.multiworld.get_entrances(world.player))
+    spots += world.multiworld.get_locations(world.player)
+    setattr(world, _SNAPSHOT_ATTR,
+            {id(spot): (spot, spot.access_rule, term_of(spot)) for spot in spots})
+
+
+def _unexportable(world, spot, message: str) -> WinLogicExportError:
+    entry = getattr(world, _SNAPSHOT_ATTR, {}).get(id(spot))
+    if (entry is not None and entry[0] is spot and entry[2] is not None
+            and spot.access_rule is not entry[1]):
+        return ForeignRuleError(message + " (replaced by another world after set_rules)")
+    return WinLogicExportError(message)
 
 
 def win_kind(location_name: str) -> Optional[str]:
@@ -294,7 +323,8 @@ def _region_wire(world, enc, region, stack, memo):
             continue
         term = term_of(ent)
         if term is None:
-            raise WinLogicExportError(
+            raise _unexportable(
+                world, ent,
                 f"CTR win_logic: entrance {ent.name!r} has no term-backed rule")
         upstream = _region_wire(world, enc, parent, inner, memo)
         if upstream is False:
@@ -346,7 +376,8 @@ def wire_block(world) -> Dict[str, object]:
     for loc, kind in win_locations(world):
         term = term_of(loc)
         if term is None:
-            raise WinLogicExportError(
+            raise _unexportable(
+                world, loc,
                 f"CTR win_logic: win check {loc.name!r} has no term-backed rule")
         region = loc.parent_region
         if region.name not in region_index:
