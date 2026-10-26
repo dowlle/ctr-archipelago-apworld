@@ -618,6 +618,8 @@ class ctrAPWorld(World):
 
     def set_rules(self):
         set_rules(self)
+        from .win_logic import snapshot_rules
+        snapshot_rules(self)
 
     def generate_basic(self) -> None:
         """Starting-check guard (sphere0_guard.py): refuse a slot that can
