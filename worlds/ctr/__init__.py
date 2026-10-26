@@ -667,8 +667,10 @@ class ctrAPWorld(World):
         if hasattr(self, "ctr_content_plan"):
             from . import content_plan
             content_plan.set_rules(self)
-            return
-        set_rules(self)
+        else:
+            set_rules(self)
+        from .win_logic import snapshot_rules
+        snapshot_rules(self)
 
     def generate_basic(self) -> None:
         """Starting-check guard (sphere0_guard.py): refuse a slot that can

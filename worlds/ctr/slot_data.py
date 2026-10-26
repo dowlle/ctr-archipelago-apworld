@@ -6,6 +6,7 @@ and delegates to these functions with itself as `world`, so the emitted
 slot_data is unchanged.
 """
 
+import logging
 from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
@@ -664,8 +665,16 @@ def fill_slot_data(world) -> Dict[str, object]:
     # logic as data, serialised from the installed rule terms. Always
     # emitted with its own block version; no schema bump, because an older
     # native ignores the key and keeps the 0.2.3 send behaviour.
-    from .win_logic import wire_block
-    slot_data["win_logic"] = wire_block(world)
+    # A rule another world wrapped after set_rules (SlotLock) cannot be
+    # exported; the block is then omitted, which native reads as the same
+    # 0.2.3 behaviour, rather than failing generation for every slot.
+    from .win_logic import ForeignRuleError, wire_block
+    try:
+        slot_data["win_logic"] = wire_block(world)
+    except ForeignRuleError as error:
+        logging.getLogger(__name__).warning(
+            "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
+            world.player_name, error)
     slot_data["trap_identities"] = traps.trap_identities_block(world.item_name_to_id)
     # #169 tier 1 (schema 18): the four resolved boss garage encounters,
     # keyed by physical garage. Absent = retail encounters.
