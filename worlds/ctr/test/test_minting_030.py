@@ -150,6 +150,15 @@ class TestSecondPassWumpaShop(unittest.TestCase):
         self.assertTrue(all(" Shop: Slot " in n for n in codes))
         self.assertFalse({c for c in I.values() if 35028600 <= c <= 35028799})
 
+    def test_shop_stems_are_reserved_for_custom_titles(self):
+        """Like every minted stem, `<Hub> Shop` now clashes with a custom
+        title of that exact name, which gets the `(Custom)` suffix (#306)."""
+        from ..custom_track_titles import reserved_stems, room_title
+        for hub in self.HUBS:
+            self.assertIn(f"{hub} Shop".casefold(), reserved_stems())
+        self.assertEqual(room_title("Glacier Park Shop"), "Glacier Park Shop (Custom)")
+        self.assertEqual(room_title("Glacier Park Shopping"), "Glacier Park Shopping")
+
     def test_no_event_or_item_identity(self):
         self.assertNotIn("Wumpa Income", L)
         self.assertNotIn("Wumpa Income", I)
