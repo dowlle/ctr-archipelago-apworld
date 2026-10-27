@@ -183,7 +183,8 @@ def raise_if_restored_block_differs(world, passthrough) -> None:
         return
     if rebuilt is None:
         raise OptionError("CTR Tracker: the room has a race_structure block but is not ctr_first")
-    if not isinstance(saved, dict) or saved.get("version") != RACE_STRUCTURE_VERSION:
+    version = saved.get("version") if isinstance(saved, dict) else None
+    if type(version) is not int or version != RACE_STRUCTURE_VERSION:
         raise OptionError("CTR Tracker: the ctr_first room has no race_structure block "
                           "this build understands")
     # The Tracker may hand JSON arrays back as tuples; compare as lists.

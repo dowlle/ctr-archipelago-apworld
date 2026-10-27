@@ -288,6 +288,9 @@ class TestRestoredBlock(TestCtrFirst):
                 self.world, {"race_structure": dict(block, version=2)})
         with self.assertRaises(OptionError):
             race_structure.raise_if_restored_block_differs(
+                self.world, {"race_structure": dict(block, version=True)})
+        with self.assertRaises(OptionError):
+            race_structure.raise_if_restored_block_differs(
                 self.world, {"race_structure": dict(block, stage1_awards=block["stage1_awards"][1:])})
 
 
