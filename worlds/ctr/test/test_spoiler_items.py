@@ -143,6 +143,19 @@ class TestContentPlan(unittest.TestCase):
 
 
 class TestTrackerRestore(unittest.TestCase):
+    def test_pink_box_seed_restores_without_box_colours(self):
+        """CI check-ut-custom-tracks seed 531: boxes on, colours off. The
+        Tracker world defaults colours on and must not add AP Box Colours."""
+        for colours in (False, True):
+            with self.subTest(colours=colours):
+                options = {"box_locations": True, "color_boxes_by_item": colours, "spoiler_items": True}
+                world = make_world(options, seed=459)
+                wire = json.loads(json.dumps(world.fill_slot_data()))
+                restored = make_world({"box_locations": True}, seed=999, passthrough=wire)
+                self.assertEqual(bool(restored.options.color_boxes_by_item.value), colours)
+                self.assertEqual(reveal_items(restored), reveal_items(world))
+                self.assertEqual(len(restored.multiworld.itempool), len(world.multiworld.itempool))
+
     def test_on_off_and_absent(self):
         for profile in ({"box_locations": True}, profile_options()):
             for enabled in (False, True):

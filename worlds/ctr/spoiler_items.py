@@ -99,5 +99,13 @@ def fill_slot_data(world) -> dict:
 
 
 def restore_slot_data(options, ctr_options) -> None:
-    """Universal Tracker restore: an absent key is a pre-#459 seed, off."""
+    """Universal Tracker restore: an absent key is a pre-#459 seed, off.
+
+    AP Box Colours depends on `color_boxes_by_item` too, which the ordinary
+    restore deliberately leaves alone (display only, pinned by
+    test_color_boxes_by_item). On a Spoiler Items room it decides the pool, so
+    restore it there from the always-emitted key; otherwise the Tracker's
+    default (on) would add an AP Box Colours the seed never created."""
     options.spoiler_items.value = int(bool(ctr_options.get("spoiler_items", 0)))
+    if options.spoiler_items.value and "color_boxes_by_item" in ctr_options:
+        options.color_boxes_by_item.value = int(bool(ctr_options["color_boxes_by_item"]))
