@@ -73,36 +73,31 @@ class TestCtrFirst(CTRTestBase):
         self.assertEqual(enc_refs, [])
 
     def test_ctr_reachable_with_stage1_only(self):
-        """A destination whose physical pad has a stage-2 requirement: with
-        everything except that requirement's item, the CTR Challenge, its
+        """Destinations whose physical pad has a plain-item stage 2: with
+        every progression item except that one, the CTR Challenge, its
         letters and the Trophy Race are in logic, its relic checks are not."""
         stage2 = self.world.warp_pad_unlock_stage2_concrete
-        picked = None
-        for track, (item, count) in sorted(stage2.items()):
-            if item in self.world.item_name_to_id and f"{track}: CTR Token Challenge" in {
-                    loc.name for loc in self.multiworld.get_locations(self.player)}:
-                picked = (track, item)
-                break
-        if picked is None:
-            self.skipTest("no plain-item stage 2 in this seed")
-        track, item = picked
-        state = CollectionState(self.multiworld)
-        for it in self.multiworld.itempool:
-            if it.player == self.player and it.advancement and it.name != item:
-                state.collect(it, True)
-        state.sweep_for_advancements()
-        if not _loc(self.world, f"{track}: Trophy Race").parent_region.can_reach(state):
-            self.skipTest("stage 1 of this pad also needs the stage-2 item")
-        ctr = _loc(self.world, f"{track}: CTR Token Challenge")
-        self.assertEqual(ctr.can_reach(state),
-                         _loc(self.world, f"{track}: Trophy Race").can_reach(state))
-        letters = [loc for loc in self.multiworld.get_locations(self.player)
-                   if loc.name.startswith(f"{track}: Letter ")]
-        for letter in letters:
-            self.assertTrue(letter.can_reach(state), letter.name)
-        for loc in self.multiworld.get_locations(self.player):
-            if loc.name.startswith(f"{track}: ") and loc.name.endswith(" Time Trial"):
-                self.assertFalse(loc.can_reach(state), loc.name)
+        names = {loc.name for loc in self.multiworld.get_locations(self.player)}
+        tested = 0
+        for track, (item, _count) in sorted(stage2.items()):
+            if item not in self.world.item_name_to_id or f"{track}: CTR Token Challenge" not in names:
+                continue
+            state = CollectionState(self.multiworld)
+            for it in self.multiworld.itempool:
+                if it.player == self.player and it.advancement and it.name != item:
+                    state.collect(it, True)
+            state.sweep_for_advancements()
+            if not _loc(self.world, f"{track}: Trophy Race").parent_region.can_reach(state):
+                continue  # this pad's stage 1 also needs the item
+            self.assertTrue(_loc(self.world, f"{track}: CTR Token Challenge").can_reach(state), track)
+            self.assertTrue(_loc(self.world, f"{track}: Trophy Race").can_reach(state), track)
+            for loc in self.multiworld.get_locations(self.player):
+                if loc.name.startswith(f"{track}: Letter "):
+                    self.assertTrue(loc.can_reach(state), loc.name)
+                if loc.name.startswith(f"{track}: ") and loc.name.endswith(" Time Trial"):
+                    self.assertFalse(loc.can_reach(state), loc.name)
+            tested += 1
+        self.assertGreater(tested, 0, "no destination with a plain-item stage 2 to test")
 
     def test_relics_still_reference_the_trophy(self):
         refs = []
@@ -269,6 +264,25 @@ class TestRefusals(unittest.TestCase):
 
     def test_classic_trial_trophy_only_allowed(self):
         self._gen(slide_coliseum_races="trophy_race")
+
+
+class TestRestoredBlock(TestCtrFirst):
+    """Universal Tracker compares the room's block with the rebuilt one."""
+
+    def test_matching_block_passes(self):
+        block = race_structure.race_structure_block(self.world)
+        race_structure.raise_if_restored_block_differs(self.world, {"race_structure": block})
+
+    def test_missing_or_mismatched_block_refused(self):
+        block = race_structure.race_structure_block(self.world)
+        with self.assertRaises(OptionError):
+            race_structure.raise_if_restored_block_differs(self.world, {})
+        with self.assertRaises(OptionError):
+            race_structure.raise_if_restored_block_differs(
+                self.world, {"race_structure": dict(block, version=2)})
+        with self.assertRaises(OptionError):
+            race_structure.raise_if_restored_block_differs(
+                self.world, {"race_structure": dict(block, stage1_awards=block["stage1_awards"][1:])})
 
 
 class TestRestore(unittest.TestCase):

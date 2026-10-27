@@ -98,10 +98,13 @@ def raise_if_unservable(world) -> None:
 
     Trial tracks set to `trophy_race` and custom tracks whose package has no
     admitted CTR Challenge are the cases that reach this. A Tracker
-    regeneration skips it: the connected room already generated."""
-    if not ctr_first(world):
+    regeneration instead checks the room's saved block against the rebuilt
+    one (`raise_if_restored_block_differs`)."""
+    passthrough = getattr(world.multiworld, "re_gen_passthrough", {}).get(world.game)
+    if passthrough:
+        raise_if_restored_block_differs(world, passthrough)
         return
-    if getattr(world.multiworld, "re_gen_passthrough", {}).get(world.game):
+    if not ctr_first(world):
         return
     names = {loc.name for loc in world.multiworld.get_locations(world.player)}
     missing = sorted(name[:-len(TROPHY_SUFFIX)] for name in names
@@ -167,6 +170,28 @@ def race_structure_block(world):
                            mw.get_location(trophy, world.player).address]
                           for trophy, ctr in stage1_pairs(world)],
     }
+
+
+def raise_if_restored_block_differs(world, passthrough) -> None:
+    """Universal Tracker: the room's `race_structure` block must be exactly
+    what this build emits for the restored seed. Native refuses a ctr_first
+    room without a valid block, so a Tracker that tracked it anyway would
+    show checks the client never lets the player race. Refuse instead."""
+    saved = passthrough.get("race_structure")
+    rebuilt = race_structure_block(world)
+    if saved is None and rebuilt is None:
+        return
+    if rebuilt is None:
+        raise OptionError("CTR Tracker: the room has a race_structure block but is not ctr_first")
+    if not isinstance(saved, dict) or saved.get("version") != RACE_STRUCTURE_VERSION:
+        raise OptionError("CTR Tracker: the ctr_first room has no race_structure block "
+                          "this build understands")
+    pairs = saved.get("stage1_awards")
+    if (not isinstance(pairs, list)
+            or [list(p) if isinstance(p, (list, tuple)) else p for p in pairs]
+            != rebuilt["stage1_awards"]):
+        raise OptionError("CTR Tracker: the room's race_structure award pairs differ "
+                          "from the regenerated seed")
 
 
 def restore_slot_data(options, co) -> None:
