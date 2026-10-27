@@ -273,6 +273,12 @@ class TestRestoredBlock(TestCtrFirst):
         block = race_structure.race_structure_block(self.world)
         race_structure.raise_if_restored_block_differs(self.world, {"race_structure": block})
 
+    def test_tuple_block_passes(self):
+        """The Tracker hands JSON arrays back as tuples."""
+        block = race_structure.race_structure_block(self.world)
+        saved = dict(block, stage1_awards=tuple(tuple(p) for p in block["stage1_awards"]))
+        race_structure.raise_if_restored_block_differs(self.world, {"race_structure": saved})
+
     def test_missing_or_mismatched_block_refused(self):
         block = race_structure.race_structure_block(self.world)
         with self.assertRaises(OptionError):

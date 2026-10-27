@@ -186,8 +186,9 @@ def raise_if_restored_block_differs(world, passthrough) -> None:
     if not isinstance(saved, dict) or saved.get("version") != RACE_STRUCTURE_VERSION:
         raise OptionError("CTR Tracker: the ctr_first room has no race_structure block "
                           "this build understands")
+    # The Tracker may hand JSON arrays back as tuples; compare as lists.
     pairs = saved.get("stage1_awards")
-    if (not isinstance(pairs, list)
+    if (not isinstance(pairs, (list, tuple))
             or [list(p) if isinstance(p, (list, tuple)) else p for p in pairs]
             != rebuilt["stage1_awards"]):
         raise OptionError("CTR Tracker: the room's race_structure award pairs differ "
