@@ -6,6 +6,7 @@ from .logic_terms import (FALSE, TRUE, Families, Has, HasAny, HasEach, ItemSum,
                           Or, Ref, TextRule, all_of, and_term, boost_cap,
                           set_term, Cap)
 from .Options import OxideGoal
+from . import race_structure
 from .usf_finish import UsfFinishGate
 
 
@@ -163,6 +164,11 @@ def set_rules(world):
     add_item_box_rules(world, player)
     add_lettersanity_rules(world, player)
     add_custom_ctr_challenge_rules(world, player)
+    # adventure_structure ctr_first (#208): the CTR win and the Trophy Race
+    # check become one event with one rule. After every layer that ANDs onto
+    # either location, before the Hit Character capture below.
+    race_structure.raise_if_unservable(world)
+    race_structure.install_rules(world, player)
     # Hit Character encounter checks (tickets 07/08): install every target's
     # real rule LAST, so each guest's trigger capture sees every Trophy rule
     # (including the difficulty gates) already in place. A structurally
@@ -1221,6 +1227,15 @@ def add_time_trial_and_ctr_requirements(world, player):
             # the perfect crate term (2026-09-29 ruling) below still AND on,
             # exactly as they would with a Trophy Race (ruling 2026-09-29).
             rule = TRUE
+        elif (name.endswith("CTR Token Challenge")
+              and race_structure.ctr_entry_rule(world) is not None):
+            # adventure_structure ctr_first (#208): the CTR Challenge is the
+            # stage-1 race. Its entry is the destination region alone (the
+            # physical pad's stage-1 rule and racer lock sit on the
+            # entrances), with no Trophy reference and no stage 2; its
+            # letters share this entry below. race_structure.install_rules
+            # later makes it and the Trophy Race one event.
+            rule = race_structure.ctr_entry_rule(world)
         else:
             # Terms (logic_terms): the Trophy Race reference exports as a
             # `ref` to that check's `win_logic` entry, region included.

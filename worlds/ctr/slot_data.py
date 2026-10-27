@@ -10,7 +10,8 @@ import logging
 from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
-               progressive_capability, traps, version, wumpa_family, spoiler_items)
+               progressive_capability, traps, version, wumpa_family, spoiler_items,
+               race_structure)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
 from .custom_tracks import (custom_tracks_to_wire, resolved_custom_tracks)
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs_table
@@ -522,6 +523,11 @@ def fill_slot_data(world) -> Dict[str, object]:
             # arrives. Absent means off, today's previews. Display only: no
             # rule reads it or the two items.
             **spoiler_items.fill_slot_data(world),
+            # Adventure structure and race type menu (#208, schema 18):
+            # always emitted, as strings. Native READS both: absent means
+            # classic and the 0.3.0 `always` menu. ctr_first also emits the
+            # top-level `race_structure` block below.
+            **race_structure.fill_slot_data(world),
             "lettersanity": int(o.lettersanity.value),
             # #109 box scalars, same convention: both always emitted raw
             # (shortcut_knowledge even when box_locations is false, so
@@ -606,6 +612,11 @@ def fill_slot_data(world) -> Dict[str, object]:
         from .crystal_checks import wire_block
         slot_data["ctr_options"]["crystalsanity"] = True
         slot_data["crystal_checks"] = wire_block(world)
+    structure_block = race_structure.race_structure_block(world)
+    if structure_block is not None:
+        # #208 ctr_first: which CTR Challenge win also sends which Trophy
+        # Race check. Omitted in classic, so a classic room keeps its shape.
+        slot_data["race_structure"] = structure_block
     if o.itemsanity.value:
         # Additive under schema 7.  Omitted when off, so disabled seeds do
         # not gain a dormant 22-slot feature block.
