@@ -505,7 +505,6 @@ def draw_venues(world, record, custom=()):
     `custom` is [(venue, restart points)] of the plan's selected custom
     tracks and Cortex Vortex that may race a boss; without any the draw is
     exactly the retail one."""
-    import itertools
     o = world.options
     custom = [(name, points) for name, points in custom if points is not None]
     if not record["track_shuffle"] or not custom or o.boss_track_allowlist.value:
@@ -520,11 +519,12 @@ def draw_venues(world, record, custom=()):
     if record["repeats"]:
         picked = [world.random.choice(pool) for pool in pools]
     else:
-        assignments = [combo for combo in itertools.product(*pools) if len(set(combo)) == 4]
-        if not assignments:
+        # Same draw as choosing from every distinct four-way assignment, without
+        # listing them (0.3.0 review finding 2).
+        picked = boss_track_shuffle.choose_distinct_assignment(world.random, pools)
+        if picked is None:
             error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks "
                   "or set boss_encounter_repeats: allow.")
-        picked = list(world.random.choice(assignments))
     o._boss_track_venues = {_venue_key(g): picked[g] for g in range(4)}
     return dict(enumerate(picked))
 
