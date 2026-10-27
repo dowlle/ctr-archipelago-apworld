@@ -108,6 +108,26 @@ class TestLogic(unittest.TestCase):
         self.assertTrue(sources)
         self.assertTrue(sources <= set(ws.income_tracks(mw.worlds[PLAYER])))
 
+    def test_income_needs_boost_only_on_usf_tracks(self):
+        from ..usf_finish import ALL_USF_FINISH_TRACKS
+        mw = _build(23, progressive_boost="shared_global")
+        empty = CollectionState(mw)
+        region = mw.get_region(ws.WUMPA_INCOME_REGION, PLAYER)
+        seen_usf = seen_plain = False
+        for ent in region.entrances:
+            track = ent.parent_region.name
+            if track in ALL_USF_FINISH_TRACKS:
+                seen_usf = True
+                self.assertFalse(ent.access_rule(empty), track)
+            else:
+                seen_plain = True
+                self.assertTrue(ent.access_rule(empty), track)
+        self.assertTrue(seen_usf and seen_plain)
+        # Seed 23 with Progressive Boost: an ordinary race is open at the start,
+        # so income is reachable with no Boost at all.
+        self.assertTrue(mw.get_location(ws.WUMPA_INCOME, PLAYER).can_reach(
+            sphere0_guard._base_state(mw.worlds[PLAYER])))
+
     def test_shop_slots_never_count_as_starting_checks(self):
         mw = _build(1)
         world = mw.worlds[PLAYER]
@@ -149,6 +169,20 @@ class TestSupply(unittest.TestCase):
         self.assertEqual(ws.restricted_slot_count(O(10, 1)), 50)
         self.assertEqual(ws.restricted_slot_count(O(3, 0)), 5)
         self.assertEqual(ws.restricted_slot_count(O(0, 1)), 0)
+
+    def test_a_tight_allowed_seed_still_generates(self):
+        # Seed 1 of the probe: podium off and both capability packs fit once
+        # the default shop adds its slots.
+        generated = 0
+        for seed in range(1, 11):
+            try:
+                _filled(seed, podium_placement_checks=False, character_unlocks=False,
+                        progressive_boost="shared_global", progressive_stats="shared_global",
+                        accessibility="full", trap_fill_percentage=0)
+                generated += 1
+            except OptionError:
+                pass
+        self.assertGreater(generated, 0)
 
     def test_a_tight_excluded_seed_refuses_instead_of_failing_fill(self):
         # Measured 2026-10-27: before the rung sizer left restricted slots out
@@ -220,6 +254,17 @@ class TestWire(unittest.TestCase):
         self.assertEqual(ws.options_to_wire(other.options),
                          {k: sd["ctr_options"][k] for k in ws.options_to_wire(other.options)})
 
+    def test_ut_regeneration_rebuilds_the_same_shop(self):
+        original = _filled(4, wumpa_shop_slots=6, goal_wumpa=200)
+        wire = original.worlds[PLAYER].fill_slot_data()
+        tracker = setup_multiworld(ctrAPWorld, steps=(), seed=99, options={"wumpa_shop_slots": 2})
+        tracker.re_gen_passthrough = {ctrAPWorld.game: wire}
+        for step in ("generate_early", "create_regions", "create_items", "set_rules"):
+            call_all(tracker, step)
+        self.assertEqual(sorted(l.name for l in _shop_locations(tracker)),
+                         sorted(l.name for l in _shop_locations(original)))
+        self.assertIn(ws.WUMPA_INCOME, {l.name for l in tracker.get_locations(PLAYER)})
+
     def test_ut_without_keys_restores_off(self):
         other = _build(2).worlds[PLAYER]
         self.assertEqual(other.options.wumpa_shop_slots.value, 10)
@@ -260,6 +305,10 @@ class TestContentPlan(unittest.TestCase):
         def __init__(self, goal):
             class O:
                 pass
+            class M:
+                player_name = {1: "Tester"}
+            self.player = 1
+            self.multiworld = M()
             self.options = O()
             self.options.goal_wumpa = TestContentPlan._Opt(goal)
             self.options.wumpa_shop_slots = TestContentPlan._Opt(10)

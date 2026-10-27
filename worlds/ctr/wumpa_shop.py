@@ -13,8 +13,8 @@ and its DataStorage records.
 
 LOGIC. Fruit can be earned again by replaying a race, so logic models it as
 one code-free event, `Wumpa Income`, reached by finishing a race on any of
-the ordinary retail trophy tracks this seed keeps (`track_finish_t`, the same
-finish term every race check uses). Every retail track has fruit crates, so a
+the ordinary retail trophy tracks this seed keeps (the USF finish term on USF
+tracks, as the race checks use it). Every retail track has fruit crates, so a
 finish there always banks. Custom tracks, trial tracks and Cortex Vortex add
 no income route in logic (native still banks there): fewer routes only makes
 logic stricter. A shop slot needs its hub region and `Wumpa Income`; the
@@ -233,12 +233,16 @@ def create_locations(world, regions: list, region_lookup: dict) -> None:
 
 
 def install_rules(world, player: int) -> None:
-    """Income routes take the track's finish term; shop slots need income."""
+    """Income routes take the track's finish requirement, as its Finish (Any
+    Position) rung does: the USF finish term on the USF tracks, nothing more
+    elsewhere (the pad entrance already carries the unlock and racer lock).
+    Shop slots need income."""
     from .logic_terms import Has, and_term
-    from .usf_finish import track_finish_t
+    from .usf_finish import ALL_USF_FINISH_TRACKS, track_finish_t
     mw = world.multiworld
     for track, name in getattr(world, "ctr_wumpa_income_entrances", ()):
-        and_term(mw.get_entrance(name, player), track_finish_t(track, world))
+        if track in ALL_USF_FINISH_TRACKS:
+            and_term(mw.get_entrance(name, player), track_finish_t(track, world))
     for name in getattr(world, "ctr_wumpa_shop_base_prices", {}):
         and_term(mw.get_location(name, player), Has(WUMPA_INCOME, 1, player))
 
@@ -310,5 +314,10 @@ def disable_for_content_plan(world, refuse: bool) -> None:
         from Options import OptionError
         raise OptionError("CTR: goal_wumpa is not supported with a content_pool "
                           "yet; set goal_wumpa to 0.")
+    if refuse and shop_slots(o) > 0:
+        import logging
+        logging.getLogger(__name__).warning(
+            "CTR (%s): ignored option: Wumpa Shop Slots (content plans have no "
+            "Wumpa Shop yet)", world.multiworld.player_name[world.player])
     o.goal_wumpa.value = 0
     o.wumpa_shop_slots.value = 0
