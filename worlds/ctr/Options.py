@@ -481,6 +481,16 @@ class CupSweepChecks(Toggle):
     display_name = "Cup Sweep Checks"
 
 
+class LapCompletionChecks(Toggle):
+    """Completing the first lap of a race on a track sends one check for that track.
+
+    Any race with laps counts, Cup legs included, and finishing position does
+    not matter. Each track has one check, however often it appears in the seed.
+    Crystal Challenges have no laps and give no lap check.
+    """
+    display_name = "Lap Completion Checks"
+
+
 class Crystalsanity(Toggle):
     """Each authored crystal in an included Crystal Challenge is a check.
 
@@ -1497,6 +1507,7 @@ class ctrAPOptions(PerGameCommonOptions):
     include_battle_arenas: ShuffleWarpPadsBattleArenas
     crystalsanity: Crystalsanity
     cup_sweep_checks: CupSweepChecks
+    lap_completion_checks: LapCompletionChecks
     include_arcade_arenas: IncludeArcadeArenas
     warp_pad_shuffle_categories: WarpPadShuffleCategories
     warp_pad_shuffle_grouping: WarpPadShuffleGrouping
@@ -1556,6 +1567,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # The "how long is this seed" decisions, together, because they are read
     # against each other rather than one at a time.
     "Extra Checks": [BoxLocations, ShortcutKnowledge, Itemsanity, Crystalsanity, IncludeArcadeArenas, CupSweepChecks,
+                     LapCompletionChecks,
                      HitCharacter, RelicPerfectChecks,
                      Lettersanity, LettersPerTrack,
                      SlideColiseumRaces, TurboTrackRaces, CortexVortexTrack,
