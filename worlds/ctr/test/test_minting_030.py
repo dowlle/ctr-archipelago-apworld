@@ -27,7 +27,7 @@ REGISTRY_COMMIT = "e01959af45848777e11508e8bf357fd143f9f68b"
 REGISTRY_DIGEST = "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
-               "custom_item_boxes")
+               "custom_item_boxes", "wumpa_shop")
 
 
 class TestFixedFamilies(unittest.TestCase):
@@ -98,7 +98,11 @@ class TestReservedNotMinted(unittest.TestCase):
         (35027300, 35027399, "later cup names, Win All Legs"),
         (35028503, 35028519, "arcade completion expansion"),
         (35028580, 35028599, "arcade crystal expansion"),
-        (35028600, 35028799, "Wumpa Shop"),
+        (35028625, 35028639, "Wumpa Shop expansion, N. Sanity Beach"),
+        (35028665, 35028679, "Wumpa Shop expansion, Gem Stone Valley"),
+        (35028705, 35028719, "Wumpa Shop expansion, Lost Ruins"),
+        (35028745, 35028759, "Wumpa Shop expansion, Glacier Park"),
+        (35028785, 35028799, "Wumpa Shop expansion, Citadel City"),
     )
 
     def test_reserved_ranges_hold_no_id(self):
@@ -122,6 +126,34 @@ class TestReservedNotMinted(unittest.TestCase):
             self.assertEqual(L[arena+": Crystal Challenge"],35028500+a)
             self.assertEqual([L[f"{arena}: Crystal {n:02d}"] for n in range(1,21)],
                              list(range(35028520+20*a,35028540+20*a)))
+
+
+class TestSecondPassWumpaShop(unittest.TestCase):
+    """The 0.3.0 second id step (2026-10-27): the 125 Wumpa Shop slots of the
+    #249 design, `35028600 + 40 * hub + (n - 1)`. No item is minted."""
+
+    HUBS = ("N. Sanity Beach", "Gem Stone Valley", "Lost Ruins", "Glacier Park", "Citadel City")
+
+    def test_names_and_codes(self):
+        for h, hub in enumerate(self.HUBS):
+            with self.subTest(hub):
+                self.assertEqual([L[f"{hub} Shop: Slot {n}"] for n in range(1, 26)],
+                                 list(range(35028600 + 40 * h, 35028625 + 40 * h)))
+                self.assertNotIn(f"{hub} Shop: Slot 26", L)
+                self.assertNotIn(f"{hub} Shop: Slot 01", L)
+                self.assertEqual(ctrAPWorld.location_name_to_id[f"{hub} Shop: Slot 1"],
+                                 35028600 + 40 * h)
+
+    def test_whole_shop_reservation_holds_only_shop_names(self):
+        codes = {n: c for n, c in L.items() if 35028600 <= c <= 35028799}
+        self.assertEqual(len(codes), 125)
+        self.assertTrue(all(" Shop: Slot " in n for n in codes))
+        self.assertFalse({c for c in I.values() if 35028600 <= c <= 35028799})
+
+    def test_no_event_or_item_identity(self):
+        self.assertNotIn("Wumpa Income", L)
+        self.assertNotIn("Wumpa Income", I)
+        self.assertNotIn("Wumpa Tax", I)
 
 
 class TestNamedBatch(unittest.TestCase):
