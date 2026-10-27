@@ -86,6 +86,29 @@ their Trophy Race is in the seed. If Cortex Vortex Track takes the pad of a
 boss track, that track keeps its Wumpa check, paid from the boss race. The old
 `true` and `false` values still work and mean `global` and `off`.
 
+### Wumpa Shop and Wumpa Goal
+
+With the shop or a Wumpa goal on, every fruit you collect while already holding
+10 is banked, and so is the fruit you hold when you finish a race. Fruit you
+receive that would take you past 10 is banked too, even outside a race.
+Quitting or restarting a race banks nothing you hold, and neither does a race
+lost to a DeathLink. Banking needs Adventure mode. While racing, the banked
+total shows below your Wumpa count.
+
+Each hub's save screen has a WUMPA SHOP row. The shop lists that hub's slots
+with their item, its owner and the price. Buying spends banked fruit and sends
+the check. Later slots go on sale once enough fruit has been banked over the
+whole seed; spending never takes that back. A slot that the server checks for
+you, for example after a Collect, shows SOLD and costs nothing. Buying needs a
+connection to the server. In logic a shop slot needs its hub and one finished
+race on a trophy track; prices are not in logic.
+
+Wumpa Goal counts the fruit you banked over the whole seed. With N. Oxide in
+your goal, his garage also waits for that count, so beating him completes the
+goal.
+
+Prices and shelf unlocks are first values and may change after play testing.
+
 ### Boss Track Shuffle
 
 Each of the four boss garages races on a track drawn for your seed: any of
