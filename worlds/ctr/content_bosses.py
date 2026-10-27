@@ -186,6 +186,11 @@ def settings(world, raw):
     options, or None with bosses off. Takes no draw. The Final Challenge
     count is lowered to the base supply later (`resolve_relic_count`)."""
     o = world.options
+    # #169 tiers 2 and 3 are built for normal rooms only; a content plan's
+    # bosses record has no opponent or kit fields yet.
+    if o.boss_opponent_shuffle.value or o.boss_kit_shuffle.value:
+        error("boss_opponent_shuffle and boss_kit_shuffle are not available on content plans yet. Turn them "
+              "off for this profile. No content was changed.")
     enabled = raw.get("enabled")
     if type(enabled) is not bool:
         error("content_pool.bosses.enabled must be true or false. No content was changed.")

@@ -9,6 +9,7 @@ from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
 from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
+from .boss_encounters import OPPONENT_NAMES as BOSS_OPPONENT_NAMES, FAMILIES as BOSS_ATTACK_FAMILIES
 
 
 class OxideGoal(Choice):
@@ -198,10 +199,11 @@ class BossTrackBlocklist(OptionSet):
 
 
 class BossEncounterRepeats(Choice):
-    """Whether two boss garages may use the same drawn track.
+    """Whether two boss garages may use the same drawn track, racer or kit.
 
-    - **disallow** (default): the four bosses race on four different tracks.
-    - **allow**: each garage draws on its own, so tracks can repeat.
+    - **disallow** (default): the four bosses race on four different tracks,
+      against four different racers, with four different kits.
+    - **allow**: each garage draws on its own, so these can repeat.
 
     A track that is also an ordinary race or a Gem Cup leg never counts as a
     repeat."""
@@ -209,6 +211,109 @@ class BossEncounterRepeats(Choice):
     option_disallow = 0
     option_allow = 1
     default = 0
+
+
+class BossOpponentShuffle(Toggle):
+    """Race each of the four boss garages against a randomly drawn racer.
+
+    The garage keeps its Key, its door requirement, its check and its own
+    boss-grade driving. With Boss Track Shuffle off, the race stays on the
+    garage's own track; with both on, Boss Track Assignment decides the
+    track. Each garage gets a different racer unless Boss Encounter Repeats
+    allows repeats. N. Oxide is never drawn, and his own garage is not
+    affected."""
+    # #169 tier 2 (0.3.0). Wire: ctr_options.boss_opponent_shuffle plus the
+    # version 2 boss_encounters block. See boss_encounters.py.
+    display_name = "Boss Opponent Shuffle"
+
+
+class BossCharacterAllowlist(OptionSet):
+    """With Boss Opponent Shuffle on, draw boss opponents only from these
+    racers. Leave empty to allow every racer. Ignored when Boss Opponent
+    Shuffle is off."""
+    display_name = "Boss Character Allowlist"
+    valid_keys = sorted(BOSS_OPPONENT_NAMES)
+    default = frozenset()
+
+
+class BossCharacterBlocklist(OptionSet):
+    """With Boss Opponent Shuffle on, never draw these racers as a boss.
+    Applied after the allowlist. Ignored when Boss Opponent Shuffle is off."""
+    display_name = "Boss Character Blocklist"
+    valid_keys = sorted(BOSS_OPPONENT_NAMES)
+    default = frozenset()
+
+
+class BossTrackAssignment(Choice):
+    """With Boss Track Shuffle and Boss Opponent Shuffle both on, how the
+    track is chosen.
+
+    - **character_home_track** (default): the drawn racer races on their own
+      home track, for example Coco on Coco Park.
+    - **independent_track**: the track is drawn on its own.
+
+    Ignored unless both switches are on."""
+    display_name = "Boss Track Assignment"
+    option_character_home_track = 0
+    option_independent_track = 1
+    default = 0
+
+
+class BossKitShuffle(Toggle):
+    """Give each of the four boss garages a new attack kit.
+
+    Each boss gets a new set of weapons, used at set points of the lap. The
+    garage, its Key, its check and its racer stay the same unless the other
+    boss switches change them. N. Oxide keeps his own attacks."""
+    # #169 tier 3 (0.3.0). Wire: ctr_options.boss_kit_shuffle plus the
+    # version 2 boss_encounters block. See boss_encounters.py.
+    display_name = "Boss Kit Shuffle"
+
+
+class BossAttackAssignment(Choice):
+    """With Boss Kit Shuffle on, how a kit is made.
+
+    - **mixed_loadouts** (default): each boss uses two to four different
+      weapon types.
+    - **signature_profiles**: each boss gets one of the four retail boss
+      attack patterns as a whole (Ripper Roo's TNT, Papu Papu's potions,
+      Komodo Joe's thrown TNT, Pinstripe's bombs).
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Attack Assignment"
+    option_mixed_loadouts = 0
+    option_signature_profiles = 1
+    default = 0
+
+
+class BossAttackIntensity(Choice):
+    """With Boss Kit Shuffle on, how often a boss attacks. It changes the
+    wait between attacks only, never which weapons are used.
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Attack Intensity"
+    option_relaxed = 0
+    option_standard = 1
+    option_intense = 2
+    option_mayhem = 3
+    default = 1
+
+
+class BossLossEasing(DefaultOnToggle):
+    """With Boss Kit Shuffle on, each lost race against a garage's boss makes
+    that boss attack a little less often, as in the original game. Turn off
+    to keep the attacks the same on every try.
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Loss Easing"
+
+
+class BossPowerupBlocklist(OptionSet):
+    """With Boss Kit Shuffle on, weapon types a boss never uses. Ignored when
+    Boss Kit Shuffle is off."""
+    display_name = "Boss Powerup Blocklist"
+    valid_keys = sorted(BOSS_ATTACK_FAMILIES)
+    default = frozenset()
 
 
 class ShuffleGems(DefaultOnToggle):
@@ -1448,6 +1553,16 @@ class ctrAPOptions(PerGameCommonOptions):
     boss_track_allowlist: BossTrackAllowlist
     boss_track_blocklist: BossTrackBlocklist
     boss_encounter_repeats: BossEncounterRepeats
+    # boss encounters (#169 tiers 2 and 3: opponent and kit switches)
+    boss_opponent_shuffle: BossOpponentShuffle
+    boss_character_allowlist: BossCharacterAllowlist
+    boss_character_blocklist: BossCharacterBlocklist
+    boss_track_assignment: BossTrackAssignment
+    boss_kit_shuffle: BossKitShuffle
+    boss_attack_assignment: BossAttackAssignment
+    boss_attack_intensity: BossAttackIntensity
+    boss_loss_easing: BossLossEasing
+    boss_powerup_blocklist: BossPowerupBlocklist
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -1546,7 +1661,12 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
              FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
-                        BossTrackBlocklist, BossEncounterRepeats],
+                        BossTrackBlocklist, BossEncounterRepeats,
+                        BossOpponentShuffle, BossCharacterAllowlist,
+                        BossCharacterBlocklist, BossTrackAssignment,
+                        BossKitShuffle, BossAttackAssignment,
+                        BossAttackIntensity, BossLossEasing,
+                        BossPowerupBlocklist],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            WarpPadRules, BossGarageRequirements],

@@ -353,6 +353,10 @@ def fill_slot_data(world) -> Dict[str, object]:
             # #169 tier 1 (schema 18): always emitted; True exactly when
             # the top-level boss_encounters block below is present.
             "boss_track_shuffle": bool(o.boss_track_shuffle.value),
+            # #169 tiers 2 and 3 (schema 18): always emitted; either True
+            # makes boss_encounters a version 2 block.
+            "boss_opponent_shuffle": bool(o.boss_opponent_shuffle.value),
+            "boss_kit_shuffle": bool(o.boss_kit_shuffle.value),
             # Warp-pad item display (issue #59): 0 one_pile / 1
             # by_reward_type. ADDITIVE key, no schema bump -- the one_lap_cups
             # precedent: native json_int defaults the absent key to 0, which
@@ -676,9 +680,9 @@ def fill_slot_data(world) -> Dict[str, object]:
             "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
             world.player_name, error)
     slot_data["trap_identities"] = traps.trap_identities_block(world.item_name_to_id)
-    # #169 tier 1 (schema 18): the four resolved boss garage encounters,
-    # keyed by physical garage. Absent = retail encounters.
-    from .boss_track_shuffle import wire_block as boss_encounters_block
+    # #169 (schema 18): the four resolved boss garage encounters, keyed by
+    # physical garage. Absent = retail encounters.
+    from .boss_encounters import wire_block as boss_encounters_block
     boss_encounters = boss_encounters_block(o)
     if boss_encounters is not None:
         slot_data["boss_encounters"] = boss_encounters
