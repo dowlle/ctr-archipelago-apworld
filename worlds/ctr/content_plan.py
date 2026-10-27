@@ -1186,9 +1186,9 @@ def generate(world):
     selected.update(content_capability.item_counts(capability))
     # Itemsanity (#133 PR 4d): one row per weapon item.
     selected.update(content_global_checks.item_counts(global_checks))
-    def resolve_items(chosen):
+    def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
-            o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
+            o.item_pool.value, check_count, starts=starts,
             additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
             **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
                if chosen else {}))
@@ -1200,7 +1200,8 @@ def generate(world):
         reveal = [name for name in SPOILER_PACK_CODES if name in selected]
         if reveal:
             try:
-                resolve_items({k: v for k, v in selected.items() if k not in reveal})
+                resolve_items({k: v for k, v in selected.items() if k not in reveal},
+                              {k: v for k, v in o.start_inventory_from_pool.value.items() if k not in reveal})
             except OptionError:
                 raise exc
             error(f"Spoiler Items needs more checks for {' and '.join(reveal)}, which add no "

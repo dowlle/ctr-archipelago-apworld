@@ -192,6 +192,22 @@ class TestRefusalAttribution(unittest.TestCase):
         finally:
             content_item_pool.resolve = real
 
+    def test_content_plan_names_the_reveal_items_with_a_reveal_start(self):
+        from .. import content_item_pool
+        real = content_item_pool.resolve
+
+        def tight(raw, coded_checks, **kw):
+            if PREVIEW in (kw.get("selected_packs") or {}):
+                raise OptionError("CTR item_pool: short")
+            return real(raw, coded_checks, **kw)
+        content_item_pool.resolve = tight
+        try:
+            options = dict(profile_options(), spoiler_items=True, start_inventory_from_pool={PREVIEW: 1})
+            with self.assertRaisesRegex(OptionError, "Spoiler Items needs more checks for Warp Pad Preview"):
+                make_world(options, seed=459)
+        finally:
+            content_item_pool.resolve = real
+
     def test_older_content_plan_room_without_the_key(self):
         world = make_world(profile_options(), seed=459)
         wire = json.loads(json.dumps(world.fill_slot_data()))
