@@ -162,8 +162,8 @@ class TestRacerLocks(unittest.TestCase):
     def test_start_breadth_is_the_same_with_locks(self):
         from .. import sphere0_guard
         for seed in range(4):
-            off = make_world(racer_options(), seed=seed)
-            on = make_world(racer_options(locks=27), seed=seed)
+            off = make_world(racer_options(), seed=seed, stop_before="pre_fill")
+            on = make_world(racer_options(locks=27), seed=seed, stop_before="pre_fill")
             self.assertEqual(sphere0_guard.sphere0_breadth(on), sphere0_guard.sphere0_breadth(off))
 
     def test_a_locked_pad_needs_its_racer(self):

@@ -12,6 +12,7 @@ import unittest
 
 from BaseClasses import CollectionState
 from Options import OptionError
+from worlds.AutoWorld import call_all
 
 from .. import content_plan, named_tracks
 from .test_content_plan import make_world, profile_options
@@ -334,27 +335,28 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
     def test_seed_710_places_an_early_key_and_fills(self):
         from Fill import distribute_items_restrictive
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=710)
+        world = make_world(artifact_244_options(), seed=710, stop_before="pre_fill")
         mw = world.multiworld
         start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
         self.assertLess(len(start), sphere0_guard.NARROW_START_CHECKS)
         self.assertEqual(mw.local_early_items[1], {"Key": 1})
+        call_all(mw, "pre_fill")
         distribute_items_restrictive(mw)
         self.assertTrue(mw.can_beat_game())
         self.assertIn("Key", [loc.item.name for loc in start])
         self.assertEqual(len(mw.precollected_items[1]), 0)
 
     def test_wide_start_takes_no_early_item(self):
-        world = make_world(artifact_244_options(), seed=711)
+        world = make_world(artifact_244_options(), seed=711, stop_before="pre_fill")
         self.assertEqual(world.multiworld.local_early_items[1], {})
 
     def test_plan_without_second_stage_gates_takes_no_early_item(self):
-        world = make_world(artifact_244_options(stages="single"), seed=710)
+        world = make_world(artifact_244_options(stages="single"), seed=710, stop_before="pre_fill")
         self.assertEqual(world.multiworld.local_early_items[1], {})
 
     def test_without_a_key_opener_the_widest_opener_is_chosen(self):
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=710)
+        world = make_world(artifact_244_options(), seed=710, stop_before="pre_fill")
         mw = world.multiworld
         mw.itempool = [item for item in mw.itempool if item.name != "Key"]
         state = sphere0_guard._base_state(world)

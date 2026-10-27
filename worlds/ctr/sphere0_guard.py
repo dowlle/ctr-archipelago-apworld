@@ -303,3 +303,145 @@ def raise_if_narrow(world) -> None:
         f"{MIN_STARTING_CHECKS} needed): {_narrow_cause(world)}, so the item "
         f"fill can run out of early spots for the item that opens the next "
         f"check. {fix}{_manual_rules_note(world)}")
+
+
+# Start bootstrap for content plans (0.3.0 review finding 1, 2026-10-27).
+#
+# Root cause of the remaining content-plan FillErrors (CI fuzz 505 of the
+# content-plan-bosses arm; reproduced as seed 2601 of its YAML, and seeds 130,
+# 705, 2601, 3958, 4612, 4687 and 5632 of the same YAML with per-racer boost
+# pinned): AP's fill places items backwards. The last item it places must go
+# to a check reachable without it, and with Character Unlocks, racer locks and
+# Progressive Boost a content plan can start with two to five open checks that
+# widen by one to three checks per item. By the time the fill places the item
+# the start depends on, those few checks already hold items that open nothing,
+# and swapping cannot recover (seed 5632: 124 items placed, then a Red Gem with
+# only 6 reachable checks, all full). The early items above only reach the
+# checks open at the very start: two early items on a start of two fill it
+# completely, and when more items are marked than the start has checks, AP
+# drops one ("Could not fulfill rules of early items", the CI symptom), and a
+# start of five qualified for none of them (seed 5632).
+#
+# Fix: before the fill, place openers in the start one after another until at
+# least BOOTSTRAP_START_CHECKS checks are open and empty, or a quarter of the
+# slot's checks on a small plan (a 19-check plan opens 4, not most of itself).
+# The items the rulings above marked early go first, in the order they were
+# marked; then the item that opens the most further checks; when no single
+# item opens one (a pad needing two Red CTR Tokens, seed 4088), two to four
+# copies of one item, then two different items. Each item goes to a random
+# open check of this slot.
+# Nothing is precollected, no supply, gate or rule changes, and the fill is not
+# simulated: like the early items, this only measures what opens. A plan whose
+# start already has the open checks takes no draw and is unchanged.
+BOOTSTRAP_START_CHECKS = 12
+BOOTSTRAP_MAX_COPIES = 4
+
+
+def bootstrap_target(world) -> int:
+    """Open empty checks the start bootstrap aims for on this slot."""
+    checks = sum(1 for loc in world.multiworld.get_locations(world.player)
+                 if loc.address is not None)
+    return min(BOOTSTRAP_START_CHECKS, checks // 4)
+
+
+def _open_empty(world, state):
+    from BaseClasses import LocationProgressType
+    return [loc for loc in world.multiworld.get_unfilled_locations(world.player)
+            if loc.address is not None
+            and loc.progress_type != LocationProgressType.EXCLUDED
+            and loc.can_reach(state)]
+
+
+def _next_openers(world, state, start, pool):
+    """Names of the pool items to place next: one item that opens the most
+    further checks, else the fewest copies of one item, else two different
+    items, that open some. Empty when nothing opens a check."""
+    single = {}
+    for name, copies in pool.items():
+        probe = state.copy()
+        probe.collect(copies[0], True)
+        opened = len(_open_empty(world, probe))
+        if opened > start:
+            single[name] = opened
+    if single:
+        return [max(sorted(single), key=single.get)]
+    groups = {}
+    for name, copies in pool.items():
+        for count in range(2, min(len(copies), BOOTSTRAP_MAX_COPIES) + 1):
+            probe = state.copy()
+            for item in copies[:count]:
+                probe.collect(item, True)
+            opened = len(_open_empty(world, probe))
+            if opened > start:
+                groups[(name,) * count] = opened
+                break
+    if not groups:
+        import itertools
+        for first, second in itertools.combinations(sorted(pool), 2):
+            probe = state.copy()
+            probe.collect(pool[first][0], True)
+            probe.collect(pool[second][0], True)
+            opened = len(_open_empty(world, probe))
+            if opened > start:
+                groups[(first, second)] = opened
+    if not groups:
+        return []
+    return list(max(sorted(groups), key=lambda g: (groups[g] - start) / len(g)))
+
+
+def bootstrap_start(world) -> None:
+    """Content plans: place openers in this slot's start until at least
+    bootstrap_target checks are open and empty (see above). Runs in
+    pre_fill, after plando and item links. Draws only when it places."""
+    mw, player = world.multiworld, world.player
+    target = bootstrap_target(world)
+    state = _base_state(world)
+    if len(_open_empty(world, state)) >= target:
+        return
+    # A player's non_local_items stay out of their own start.
+    non_local = set(world.options.non_local_items.value)
+    marked = mw.local_early_items.setdefault(player, {})
+    queue = [name for name, count in list(marked.items()) for _ in range(count)]
+    placed = []
+    while True:
+        spots = _open_empty(world, state)
+        if len(spots) >= target or not spots:
+            break
+        pool = {}
+        for item in mw.itempool:
+            if (item.player == player and item.advancement and item.location is None
+                    and item.name not in non_local):
+                pool.setdefault(item.name, []).append(item)
+        names = []
+        while queue and not names:
+            name = queue.pop(0)
+            if name in pool:
+                names = [name]
+        if not names:
+            names = _next_openers(world, state, len(spots), pool)
+        if not names or len(names) > len(spots):
+            break
+        taken = {}
+        for name in names:
+            item = pool[name][taken.get(name, 0)]
+            taken[name] = taken.get(name, 0) + 1
+            fits = [loc for loc in sorted(_open_empty(world, state), key=lambda loc: loc.name)
+                    if loc.can_fill(state, item, True)]
+            if not fits:
+                break
+            location = world.random.choice(fits)
+            # Item equality is by name; remove this very copy.
+            del mw.itempool[next(i for i, pooled in enumerate(mw.itempool) if pooled is item)]
+            location.place_locked_item(item)
+            placed.append((name, location.name))
+            if marked.get(name):
+                marked[name] -= 1
+                if not marked[name]:
+                    del marked[name]
+        else:
+            state.sweep_for_advancements(
+                locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+            continue
+        break
+    if placed:
+        world._ctr_start_bootstrap = placed
