@@ -656,7 +656,8 @@ class WumpaShopProgression(Choice):
     - **allowed** (default): the slots on sale from the start may hold
       progression, at their hub's lowest price. Later slots hold useful items
       or filler.
-    - **excluded**: no shop slot holds progression or useful items."""
+    - **excluded**: no shop slot holds progression; useful items and filler
+      only."""
     display_name = "Wumpa Shop Progression"
     option_allowed = 0
     option_excluded = 1

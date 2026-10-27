@@ -130,14 +130,13 @@ class TestPlacement(unittest.TestCase):
                     if int(loc.name.rsplit(" ", 1)[1]) > first:
                         self.assertFalse(loc.item.advancement, loc.name)
 
-    def test_excluded_holds_no_progression_and_no_useful(self):
+    def test_excluded_holds_no_progression(self):
         for seed in (1, 2, 3):
             with self.subTest(seed=seed):
                 mw = _filled(seed, wumpa_shop_progression="excluded")
                 for loc in _shop_locations(mw):
-                    self.assertEqual(loc.progress_type, LocationProgressType.EXCLUDED)
+                    self.assertNotEqual(loc.progress_type, LocationProgressType.EXCLUDED)
                     self.assertFalse(loc.item.advancement, loc.name)
-                    self.assertFalse(loc.item.useful, loc.name)
 
 
 class TestSupply(unittest.TestCase):
@@ -153,7 +152,8 @@ class TestSupply(unittest.TestCase):
 
     def test_a_tight_excluded_seed_refuses_instead_of_failing_fill(self):
         # Measured 2026-10-27: before the rung sizer left restricted slots out
-        # of its supply, 8 of 30 such seeds raised FillError.
+        # of its supply, 8 of 30 such seeds raised FillError. Any FillError
+        # fails this test; a clean refusal or a generated seed passes.
         for seed in (1, 2, 3, 4, 5, 6):
             with self.subTest(seed=seed):
                 try:
