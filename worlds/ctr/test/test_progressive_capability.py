@@ -154,6 +154,9 @@ class TestCapabilityPoolOverflowRaises(CTRTestBase):
         "progressive_boost_blue_fire": True,
         "progressive_stats": "shared_global",
         "podium_placement_checks": False,
+        # Pool capacity from before the Wumpa Shop (#249), whose default 50
+        # slots would make room again.
+        "wumpa_shop_slots": 0,
     }
 
     def test_setup_raises_option_error(self):

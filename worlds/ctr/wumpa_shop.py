@@ -144,6 +144,16 @@ def price_band(hub: str, percent: int) -> Tuple[int, int]:
     return _scale(low, percent), _scale(high, percent)
 
 
+def restricted_slot_count(options) -> int:
+    """Shop slots that cannot hold progression: every slot with `excluded`,
+    else the later shelves. The rung sizer leaves them out of its supply,
+    because each takes only the filler its own location adds."""
+    slots = shop_slots(options)
+    per_hub = slots if _value(options, "wumpa_shop_progression", 0) == 1 \
+        else slots - initial_shelves(slots)
+    return len(SHOP_HUBS) * per_hub
+
+
 def unlock_banked(slot: int, slots: int, percent: int) -> int:
     """Lifetime banked fruit that puts `slot` on sale (0 = from the start)."""
     later = slot - initial_shelves(slots)

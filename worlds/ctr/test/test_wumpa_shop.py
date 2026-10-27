@@ -140,6 +140,31 @@ class TestPlacement(unittest.TestCase):
                     self.assertFalse(loc.item.useful, loc.name)
 
 
+class TestSupply(unittest.TestCase):
+    def test_restricted_slots(self):
+        class O:
+            def __init__(self, slots, prog):
+                self.wumpa_shop_slots = TestContentPlan._Opt(slots)
+                self.wumpa_shop_progression = TestContentPlan._Opt(prog)
+        self.assertEqual(ws.restricted_slot_count(O(10, 0)), 25)
+        self.assertEqual(ws.restricted_slot_count(O(10, 1)), 50)
+        self.assertEqual(ws.restricted_slot_count(O(3, 0)), 5)
+        self.assertEqual(ws.restricted_slot_count(O(0, 1)), 0)
+
+    def test_a_tight_excluded_seed_refuses_instead_of_failing_fill(self):
+        # Measured 2026-10-27: before the rung sizer left restricted slots out
+        # of its supply, 8 of 30 such seeds raised FillError.
+        for seed in (1, 2, 3, 4, 5, 6):
+            with self.subTest(seed=seed):
+                try:
+                    _filled(seed, podium_placement_checks=False, character_unlocks=False,
+                            progressive_boost="shared_global", progressive_stats="shared_global",
+                            wumpa_shop_progression="excluded", accessibility="full",
+                            trap_fill_percentage=0)
+                except OptionError:
+                    pass
+
+
 class TestPrices(unittest.TestCase):
     def test_prices_in_band_and_progression_at_the_bottom(self):
         for percent in (25, 100, 400):

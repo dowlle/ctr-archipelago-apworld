@@ -156,7 +156,11 @@ def _base_location_supply(world) -> int:
     # True-filler first Oxide consumes one real slot with its locked reward.
     locked_first = int(world.options.oxide_goal.value == 2 and
                        world.options.oxide_1_optional.value == 2)
-    return static_without_trials + relics + other_classes - locked_first
+    # Wumpa Shop slots that cannot hold progression (#249) take only the
+    # filler they add themselves, so they are no supply for the pool.
+    from .wumpa_shop import restricted_slot_count
+    return (static_without_trials + relics + other_classes - locked_first
+            - restricted_slot_count(world.options))
 
 
 def predicted_mandatory_pool(world) -> int:
