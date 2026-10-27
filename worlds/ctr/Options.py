@@ -825,6 +825,21 @@ class ColorBoxesByItem(DefaultOnToggle):
     display_name = "Item Box Colours"
 
 
+class SpoilerItems(Toggle):
+    """Hide reward previews until you find the items that show them.
+
+    Off (default): warp pads and AP item boxes show what they hold, as usual.
+
+    On: the floating rewards above warp pads stay hidden until you receive
+    Warp Pad Preview. With Item Box Locations and Item Box Colours both on,
+    AP item boxes also stay pink until you receive AP Box Colours.
+
+    Both are useful items that add no location, so each one takes a slot that
+    would otherwise hold filler. Pads still open, close and count their checks
+    as usual; only the previews wait for the items."""
+    display_name = "Spoiler Items"
+
+
 class WarpPadUnlockRequirements(Choice):
     """How warp pads unlock.
 
@@ -1506,6 +1521,8 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     # item boxes: colour by the item inside (ruling R11)
     color_boxes_by_item: ColorBoxesByItem
+    # reward previews held back behind two items (#459)
+    spoiler_items: SpoilerItems
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1576,7 +1593,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem],
+                        ColorBoxesByItem, SpoilerItems],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 

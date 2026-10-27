@@ -12,7 +12,7 @@ from typing import Dict
 from BaseClasses import ItemClassification
 from Options import OptionError
 
-from . import (characters, cortex_vortex_track, item_boxes, item_supply,
+from . import (characters, cortex_vortex_track, item_boxes, item_supply, spoiler_items,
                lettersanity, progressive_capability, tizi_helper, traps,
                turbo_grant, wumpa_family)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
@@ -443,6 +443,11 @@ def create_items(world):
     # the custom ones above. Empty with the option off.
     pool.extend(world.create_item(name) for name in
                 cortex_vortex_track.created_letter_item_names(world.options))
+    # Spoiler Items (#459): the one or two reveal items. Like Tizi Helper they
+    # add no location, so they go in before overflow shedding, which may then
+    # drop filler or the comfort pack to make room. Empty with the option off.
+    _spoiler_names = spoiler_items.created_item_names(world)
+    pool.extend(world.create_item(name) for name in _spoiler_names)
 
     # --- Character unlocks (issues #54 / #209, R4). ALWAYS ON: the
     # character phase is core 0.2.0 content, not a toggle, so every seed
@@ -530,6 +535,9 @@ def create_items(world):
     # It runs FIRST of the two capacity checks deliberately: when the
     # unlocks are what does not fit, its message says so specifically, which
     # is more useful than the general one below.
+    # Spoiler Items (#459) first: an enabled reveal item is never silently
+    # omitted, and when it alone tips the pool over, the message names it.
+    spoiler_items.raise_if_items_do_not_fit(len(pool), unfilled, _spoiler_names)
     characters.raise_if_unlocks_exceed_location_supply(
         world, available_supply=unfilled - (
             len(pool) - len(characters.created_unlock_names(world))))

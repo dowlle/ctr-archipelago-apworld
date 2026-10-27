@@ -6,7 +6,7 @@
 # arenas with Crystalsanity, boss garages with one or two boss cups and Boss
 # Track Shuffle, Character Unlocks with racer locks, Progressive Boost and
 # Stats, Item Box Locations, Itemsanity, Hit Character, Lettersanity, Wumpa,
-# Relic Race Perfects, traps, Reserve Top-Up, Turbo Grant, Tizi Helper,
+# Relic Race Perfects, traps, Reserve Top-Up, Spoiler Items (#459), Turbo Grant, Tizi Helper,
 # Progressive Starting Wumpa and every DeathLink send condition. Racer locks
 # are drawn (0, 8 or 21) because 21 locks with boost carry the parked
 # one-in-three-thousand fill residual (#133 PR 4c).
@@ -94,6 +94,7 @@ Crash Team Racing:
   hit_character: true
   trap_fill_percentage: 20
   reserve_top_up: true
+  spoiler_items: true
   turbo_grant: true
   tizi_helper: true
   progressive_starting_wumpa: {0: 1, 3: 1, 10: 1}

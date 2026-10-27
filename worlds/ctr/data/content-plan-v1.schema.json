@@ -1584,7 +1584,7 @@
       "additionalProperties": false
     },
     "ItemPacks": {
-      "description": "Pool-only packs (#133 PR 4a), present only when one is on: progressive_starting_wumpa copies of Progressive Starting Wumpa, one Turbo Grant, one Tizi Helper. Each takes an item ledger row and no location; content_plan.validate checks the rows and the key order.",
+      "description": "Pool-only packs (#133 PR 4a), present only when one is on: progressive_starting_wumpa copies of Progressive Starting Wumpa, one Turbo Grant, one Tizi Helper, and with Spoiler Items (#459) one Warp Pad Preview and, with coloured AP boxes, one AP Box Colours. Each takes an item ledger row and no location; content_plan.validate checks the rows and the key order.",
       "type": "object",
       "properties": {
         "progressive_starting_wumpa": {
@@ -1596,6 +1596,12 @@
           "const": true
         },
         "tizi_helper": {
+          "const": true
+        },
+        "warp_pad_preview": {
+          "const": true
+        },
+        "ap_box_colours": {
           "const": true
         }
       },

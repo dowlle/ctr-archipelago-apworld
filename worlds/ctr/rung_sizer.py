@@ -241,6 +241,10 @@ def predicted_mandatory_pool(world) -> int:
     # which is the same failure direction DeepSeek review F1 caught for #145.
     mandatory += len(characters.created_unlock_names(world))
     mandatory += mandatory_extra_wumpa
+    # Spoiler Items (#459): one or two useful reveal items with no location of
+    # their own, the same shape and failure direction as Tizi Helper above.
+    from .spoiler_items import created_item_names as created_spoiler_names
+    mandatory += len(created_spoiler_names(world))
     if mode in (2, 3):
         mandatory += len(_custom_ctr_slots(world)) * (
             3 if mode == 3 else int(world.options.letters_per_track.value))

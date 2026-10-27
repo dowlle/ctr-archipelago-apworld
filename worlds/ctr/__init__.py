@@ -23,6 +23,7 @@ from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITE
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
+from . import spoiler_items
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -494,6 +495,9 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
+        # Spoiler Items (#459): restored so the regenerated pool holds the same
+        # reveal items. Absent key is a pre-#459 seed and restores to off.
+        spoiler_items.restore_slot_data(o, co)
         # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
         # always-emitted scalar. Prefer the scalar; fall back to block presence
         # for a pre-widening seed, where a present block always meant the single

@@ -33,7 +33,7 @@ from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from . import (arena_content, content_bosses, content_capability, content_cups, content_global_checks,
-               content_item_boxes, custom_packages, tizi_helper, turbo_grant)
+               content_item_boxes, custom_packages, spoiler_items, tizi_helper, turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from .warp_pad_logic import HUB_STATIC
 
@@ -120,7 +120,15 @@ LOCATION_BY_CODE = {code: name for name, code in CTR_LOCATION_IDS.items()}
 PACK_FEATURE = "item_packs_v1"
 PACK_ITEMS = (("progressive_starting_wumpa", "Progressive Starting Wumpa"),
               ("turbo_grant", turbo_grant.TURBO_GRANT_ITEM),
-              ("tizi_helper", tizi_helper.TIZI_HELPER_ITEM))
+              ("tizi_helper", tizi_helper.TIZI_HELPER_ITEM),
+              # Spoiler Items (#459): the two reveal items, outside
+              # data/items.json like the letter items (SPOILER_PACK_CODES).
+              ("warp_pad_preview", spoiler_items.WARP_PAD_PREVIEW_ITEM),
+              ("ap_box_colours", spoiler_items.AP_BOX_COLOURS_ITEM))
+#: Item codes of the pack identities that live outside data/items.json.
+SPOILER_PACK_CODES = dict(spoiler_items.ITEM_CODES)
+#: Pack keys that are a single true grant.
+PACK_GRANTS = ("turbo_grant", "tizi_helper", "warp_pad_preview", "ap_box_colours")
 #: Highest Progressive Starting Wumpa count (Options.ProgressiveStartingWumpa).
 STARTING_WUMPA_MAX = 10
 #: Envelope keys a content plan carries only when the option is not at the
@@ -369,6 +377,11 @@ def pack_settings(options):
         out["turbo_grant"] = True
     if options.tizi_helper.value:
         out["tizi_helper"] = True
+    # Spoiler Items (#459): the same items the legacy creator pools.
+    if options.spoiler_items.value:
+        out["warp_pad_preview"] = True
+        if spoiler_items.box_colours_item_wanted(options):
+            out["ap_box_colours"] = True
     return out
 
 
@@ -376,14 +389,34 @@ def check_pack_settings(packs):
     """Shape and values of a plan's `item_packs` record. Key order is not a
     rule: JSON objects carry none, and native reads them sorted."""
     if not isinstance(packs, dict) or not packs or set(packs) - {key for key, _item in PACK_ITEMS}:
-        error("item_packs must be a nonempty mapping of progressive_starting_wumpa, turbo_grant and "
-              "tizi_helper.")
+        error("item_packs must be a nonempty mapping of progressive_starting_wumpa, turbo_grant, "
+              "tizi_helper, warp_pad_preview and ap_box_colours.")
     count = packs.get("progressive_starting_wumpa", 1)
     if type(count) is not int or not 1 <= count <= STARTING_WUMPA_MAX:
         error(f"item_packs.progressive_starting_wumpa must be 1 to {STARTING_WUMPA_MAX} when present.")
-    if any(packs[key] is not True for key in ("turbo_grant", "tizi_helper") if key in packs):
-        error("item_packs.turbo_grant and item_packs.tizi_helper must be true when present.")
+    if any(packs[key] is not True for key in PACK_GRANTS if key in packs):
+        error("item_packs grants must be true when present.")
+    if "ap_box_colours" in packs and "warp_pad_preview" not in packs:
+        error("item_packs.ap_box_colours needs item_packs.warp_pad_preview (both are Spoiler Items).")
     return packs
+
+
+def pack_code(name):
+    """The item code of one pack identity."""
+    return SPOILER_PACK_CODES.get(name) or content_item_pool.ITEMS[name]
+
+
+def check_spoiler_envelope(plan, co):
+    """Spoiler Items (#459): the envelope's `spoiler_items` agrees with the
+    plan's reveal items, and AP Box Colours exists exactly when the plan has
+    coloured AP boxes. An absent key is an older room, off."""
+    packs = plan.get("item_packs", {})
+    on = co.get("spoiler_items", False)
+    if type(on) is not bool or on != ("warp_pad_preview" in packs):
+        error("spoiler_items envelope disagrees with the plan's item_packs")
+    boxes = "item_boxes" in plan and co.get("color_boxes_by_item") is True
+    if ("ap_box_colours" in packs) != (on and boxes):
+        error("item_packs.ap_box_colours disagrees with the plan's coloured item boxes")
 
 
 def pack_counts(packs):
@@ -1156,7 +1189,8 @@ def generate(world):
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
-        **(dict(selected_packs=selected, pack_codes=letter_packs) if selected else {}))
+        **(dict(selected_packs=selected, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
+           if selected else {}))
     # Boss garages (#133 PR 6): the Oxide goal location holds filler only
     # (issue #27, excluded from progression), so the ledger keeps one filler
     # slot for it, as the legacy rung sizer reserves one.
@@ -1929,7 +1963,7 @@ def validate(plan):
     # Lettersanity modes 2 and 3 pool one copy of each letter item they use.
     letter_items = plan_letter_items(plan)
     # Pool-only packs (#133 PR 4a): one row per pack item, its count from item_packs.
-    pack_rows = {content_item_pool.ITEMS[name]: count for name, count in pack_counts(packs).items()}
+    pack_rows = {pack_code(name): count for name, count in pack_counts(packs).items()}
     # Character unlocks (#133 PR 4b): one row per unlock racer.
     pack_rows.update({content_item_pool.ITEMS[name]: 1 for name in (unlock_names(racers) if racers else ())})
     # Capability packs (#133 PR 4c): the boost and stat chains.
@@ -2034,10 +2068,12 @@ def restore(world, slot_data):
     check_envelope_options(co)
     check_racer_envelope(plan, co)
     check_box_envelope(plan, co)
+    check_spoiler_envelope(plan, co)
     capability = plan.get("capability", {})
     content_capability.check_envelope(capability, co)
     racers = plan.get("racers")
-    names = {**ITEM_BY_CODE, **plan_letter_items(plan)}
+    names = {**ITEM_BY_CODE, **plan_letter_items(plan),
+             **{code: name for name, code in SPOILER_PACK_CODES.items()}}
     rows = tuple(content_item_pool.ItemRow(name=names[r["item"]], **r) for r in plan["items"]["rows"])
     world.ctr_content_items = content_item_pool.ItemPlan(rows, **{k: v for k, v in plan["items"].items() if k != "rows"})
     world.ctr_content_plan = plan
@@ -2108,6 +2144,7 @@ def restore(world, slot_data):
     world.options.progressive_starting_wumpa.value = packs.get("progressive_starting_wumpa", 0)
     world.options.turbo_grant.value = int("turbo_grant" in packs)
     world.options.tizi_helper.value = int("tizi_helper" in packs)
+    world.options.spoiler_items.value = int("warp_pad_preview" in packs)
     world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
     world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
