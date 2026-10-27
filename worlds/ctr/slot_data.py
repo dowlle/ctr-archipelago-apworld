@@ -595,6 +595,10 @@ def fill_slot_data(world) -> Dict[str, object]:
         from .cup_sweeps import wire_block as cup_sweep_block
         slot_data["ctr_options"]["cup_sweep_checks"] = True
         slot_data["cup_sweep_checks"] = cup_sweep_block(world)
+    if o.lap_completion_checks.value:
+        from .lap_checks import wire_block as lap_block
+        slot_data["ctr_options"]["lap_completion_checks"] = True
+        slot_data["lap_checks"] = lap_block(world)
     if o.crystalsanity.value:
         from .crystal_checks import wire_block
         slot_data["ctr_options"]["crystalsanity"] = True

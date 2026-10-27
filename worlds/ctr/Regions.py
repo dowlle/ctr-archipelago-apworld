@@ -705,6 +705,10 @@ def create_regions(world: "ctrAPWorld"):
 
     from .cup_sweeps import create_locations as create_cup_sweeps
     create_cup_sweeps(world, region_lookup)
+    # #344: one lap check per raced track, in a dead-end region every race
+    # route enters (lap_checks.py). Nothing is created with the option off.
+    from .lap_checks import create_locations as create_lap_checks
+    create_lap_checks(world, region_lookup)
 
     # Crystals inherit precisely the arena region's physical entry gates. They
     # have no completion, weapon, boost or stat requirement of their own.

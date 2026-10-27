@@ -6,10 +6,10 @@
 # arenas with Crystalsanity, boss garages with one or two boss cups and Boss
 # Track Shuffle, Character Unlocks with racer locks, Progressive Boost and
 # Stats, Item Box Locations, Itemsanity, Hit Character, Lettersanity, Wumpa,
-# Relic Race Perfects, traps, Reserve Top-Up, Turbo Grant, Tizi Helper,
-# Progressive Starting Wumpa and every DeathLink send condition. Racer locks
-# are drawn (0, 8 or 21) because 21 locks with boost carry the parked
-# one-in-three-thousand fill residual (#133 PR 4c).
+# Relic Race Perfects, Lap Completion checks (#344), traps, Reserve Top-Up,
+# Turbo Grant, Tizi Helper, Progressive Starting Wumpa and every DeathLink
+# send condition. Racer locks are drawn (0, 8 or 21) because 21 locks with
+# boost carry the parked one-in-three-thousand fill residual (#133 PR 4c).
 Crash Team Racing:
   accessibility: full
   content_pool:
@@ -85,6 +85,7 @@ Crash Team Racing:
   include_arcade_arenas: {true: 1, false: 1}
   crystalsanity: true
   cup_sweep_checks: true
+  lap_completion_checks: true
   character_unlocks: true
   racer_locked_pads: {0: 1, 8: 1, 21: 1}
   progressive_boost_blue_fire: {true: 1, false: 1}

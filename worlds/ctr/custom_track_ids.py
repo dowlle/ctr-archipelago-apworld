@@ -163,6 +163,9 @@ def created_named_location_names(options) -> List[str]:
     if _wumpa_mode(options) == WUMPA_PER_TRACK:
         out.extend(wumpa_name(entry) for _role, _label, _region, entry
                    in eligible_custom_roles(options) if named_block(entry) is not None)
+    # #344: a named track's Complete One Lap, once create_regions made it.
+    from .lap_checks import named_location_names
+    out.extend(named_location_names(options))
     return out
 
 
