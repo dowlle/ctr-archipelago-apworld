@@ -12,6 +12,8 @@
 # one-in-three-thousand fill residual (#133 PR 4c).
 Crash Team Racing:
   accessibility: full
+  # #208: the content plan has no ctr_first mode yet and refuses it.
+  adventure_structure: classic
   content_pool:
     preset: mixed
     tracks:

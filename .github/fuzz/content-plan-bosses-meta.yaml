@@ -18,6 +18,8 @@
 # about one roll in forty.
 Crash Team Racing:
   accessibility: full
+  # #208: the content plan has no ctr_first mode yet and refuses it.
+  adventure_structure: classic
   content_pool:
     preset: mixed
     tracks:
