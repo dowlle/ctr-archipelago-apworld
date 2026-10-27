@@ -86,4 +86,8 @@ Crash Team Racing:
   wumpa_check: {"off": 1, global: 1, per_track: 6}
   relic_perfect_checks: {true: 7, false: 1}
   boss_track_shuffle: {true: 1, false: 1}
+  # #169 tiers 2 and 3 are not on content plans yet (the profile refuses
+  # them), so pin both switches off rather than let the fuzzer roll them.
+  boss_opponent_shuffle: false
+  boss_kit_shuffle: false
   warp_pad_rules: {}
