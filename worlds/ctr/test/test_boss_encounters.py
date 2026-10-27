@@ -116,9 +116,10 @@ class TestAllEightCombinations(unittest.TestCase):
                 if not co["boss_opponent_shuffle"]:
                     self.assertEqual(opps, be.GARAGE_BOSS)
 
-    def test_option_off_seed_draws_nothing_new(self):
-        # Same seed, same output whether the new options are absent or set
-        # to their defaults with subordinate lists filled (ignored).
+    def test_ignored_subordinate_lists_change_nothing(self):
+        # With both new switches off, filled subordinate lists change no
+        # output. Parity with the stacked base is checked outside pytest
+        # (the option-off identity run in the implementation note).
         base = _wire(_build(seed=77))
         other = _wire(_build(seed=77, boss_character_blocklist=["Crash Bandicoot"],
                              boss_powerup_blocklist=["tnt"]))
@@ -413,6 +414,7 @@ class TestParseWire(unittest.TestCase):
         # Every field allowed on its own, but not a certified row.
         self._bad(lambda b: b["garages"][g]["schedule"][1].__setitem__(slice(1, 6), [2, 2, 1, 15, 2]))
         self._bad(lambda b: [seg.__setitem__(2, 0x0F) for seg in b["garages"][g]["schedule"]])
+        self._bad(lambda b: b["garages"][g]["schedule"][1].__setitem__(0, b["garages"][g]["schedule"][1][0] + 1))
         # Opponent switch off but a swapped racer on the wire.
         self._bad(lambda b: None, opp=False)
         self._bad(lambda b: None, kit=False)

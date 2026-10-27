@@ -491,6 +491,10 @@ def _schedule_problem(garage: str, track: str, schedule) -> Optional[str]:
                 or not COOLDOWN_MIN <= cooldown <= COOLDOWN_MAX):
             return "schedule segment has a code this build cannot race"
         prev = cp
+    # The segments start where the garage's retail segments map to on this
+    # venue, as `_segments` composes them. Native checks the same.
+    if tuple(seg[0] for seg in schedule) != bts.translated_schedule(garage, track):
+        return "schedule checkpoints are not the garage's mapped segments"
     if all(seg[2] == 0x0F for seg in schedule):
         return "schedule never attacks"
     return None
