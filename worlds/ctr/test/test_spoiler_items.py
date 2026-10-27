@@ -183,7 +183,7 @@ class TestRefusalAttribution(unittest.TestCase):
         def tight(raw, coded_checks, **kw):
             packs = kw.get("selected_packs") or {}
             if PREVIEW in packs:
-                raise OptionError("CTR item_pool: short")
+                raise OptionError("CTR item_pool: 9 selected copies for 8 free checks.")
             return real(raw, coded_checks, **kw)
         content_item_pool.resolve = tight
         try:
@@ -198,7 +198,7 @@ class TestRefusalAttribution(unittest.TestCase):
 
         def tight(raw, coded_checks, **kw):
             if PREVIEW in (kw.get("selected_packs") or {}):
-                raise OptionError("CTR item_pool: short")
+                raise OptionError("CTR item_pool: 9 selected copies for 8 free checks.")
             return real(raw, coded_checks, **kw)
         content_item_pool.resolve = tight
         try:
@@ -207,6 +207,13 @@ class TestRefusalAttribution(unittest.TestCase):
                 make_world(options, seed=459)
         finally:
             content_item_pool.resolve = real
+
+    def test_other_ledger_errors_keep_their_message(self):
+        options = dict(profile_options(), spoiler_items=True, start_inventory_from_pool={PREVIEW: 2})
+        with self.assertRaises(OptionError) as caught:
+            make_world(options, seed=459)
+        self.assertNotIn("Spoiler Items needs more checks", str(caught.exception))
+        self.assertIn("Warp Pad Preview", str(caught.exception))
 
     def test_older_content_plan_room_without_the_key(self):
         world = make_world(profile_options(), seed=459)

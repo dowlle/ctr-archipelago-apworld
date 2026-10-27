@@ -1198,7 +1198,9 @@ def generate(world):
         # Spoiler Items (#459): when the reveal items alone overflow the
         # ledger, say so. resolve is pure, so the second call changes nothing.
         reveal = [name for name in SPOILER_PACK_CODES if name in selected]
-        if reveal:
+        # Only a capacity shortage is rephrased; other ledger errors (a bad
+        # start count, for example) keep their own message.
+        if reveal and "free checks" in str(exc):
             try:
                 resolve_items({k: v for k, v in selected.items() if k not in reveal},
                               {k: v for k, v in o.start_inventory_from_pool.value.items() if k not in reveal})
