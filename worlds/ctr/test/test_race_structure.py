@@ -134,11 +134,11 @@ class TestCtrFirst(CTRTestBase):
         from ..win_logic import wire_block
         block = wire_block(self.world)
         ids = self.world.location_name_to_id
-        checks = block["checks"] if "checks" in block else block
+        checks = block["checks"]
         trophy = checks.get(str(ids[f"{TRACK}: Trophy Race"]))
         ctr = checks.get(str(ids[f"{TRACK}: CTR Token Challenge"]))
-        if trophy is None or ctr is None:
-            self.skipTest("win_logic block keyed differently")
+        self.assertIsNotNone(trophy)
+        self.assertIsNotNone(ctr)
         self.assertEqual((trophy["kind"], ctr["kind"]), ("trophy", "ctr"))
         self.assertEqual({k: v for k, v in trophy.items() if k != "kind"},
                          {k: v for k, v in ctr.items() if k != "kind"})
@@ -168,6 +168,49 @@ class TestCtrFirstLettersanityItems(CTRTestBase):
         for name in letters:
             state.collect(self.world.create_item(name), True)
         self.assertTrue(_loc(self.world, f"{TRACK}: Trophy Race").can_reach(state))
+
+
+class TestCtrFirstUsfFinishRungs(CTRTestBase):
+    """A plain Trophy Race still crosses a USF track's finish line, so its
+    finish rungs need the USF finish, not the CTR win's letter items."""
+    options = {"adventure_structure": "ctr_first", "lettersanity": "items_only",
+               "progressive_boost": "shared_global"}
+
+    def test_finish_rung_does_not_wait_for_letters(self):
+        from .. import lettersanity
+        from ..podium import FINISH_RUNG_KEYS, location_name
+        from ..usf_finish import USF_FINISH_TRACKS
+        names = {loc.name for loc in self.multiworld.get_locations(self.player)}
+        tried = 0
+        for track in sorted(USF_FINISH_TRACKS):
+            rungs = [location_name(track, k) for k in sorted(FINISH_RUNG_KEYS)
+                     if location_name(track, k) in names]
+            if not rungs or f"{track}: Trophy Race" not in names:
+                continue
+            letters = {lettersanity.item_name(track, letter) for letter in lettersanity.LETTERS}
+            state = CollectionState(self.multiworld)
+            for it in self.multiworld.itempool:
+                if it.player == self.player and it.advancement and it.name not in letters:
+                    state.collect(it, True)
+            state.sweep_for_advancements()
+            self.assertFalse(_loc(self.world, f"{track}: Trophy Race").can_reach(state), track)
+            for rung in rungs:
+                self.assertTrue(_loc(self.world, rung).can_reach(state), rung)
+            tried += 1
+        self.assertGreater(tried, 0)
+
+
+class TestCtrFirstNarrowStartHint(TestCtrFirstLettersanityItems):
+    """The narrow-start guard names ctr_first with letter items as the cause.
+    A real seed with no free check is refused earlier by the item supply
+    check; this pins the message the guard gives when it is the one to stop."""
+
+    def test_message(self):
+        from unittest import mock
+        from .. import sphere0_guard
+        with mock.patch.object(sphere0_guard, "sphere0_breadth", return_value=0):
+            with self.assertRaisesRegex(OptionError, "ctr_first"):
+                sphere0_guard.raise_if_narrow(self.world)
 
 
 class TestCtrFirstTrialTracks(CTRTestBase):

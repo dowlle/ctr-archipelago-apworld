@@ -292,6 +292,13 @@ def raise_if_narrow(world) -> None:
     fix = ("Usual fix: turn on Item Box Locations, turn on Held-Position "
            "Rungs (or more Podium Rung categories), or set logic_difficulty "
            "to hard.")
+    if (int(world.options.adventure_structure.value) == 1
+            and int(world.options.lettersanity.value) in (2, 3)):
+        # #208: under ctr_first every first race is a CTR Challenge, so with
+        # letter items no Trophy Race check is free at the start.
+        fix += (" With adventure_structure ctr_first and Lettersanity letter "
+                "items, every track's first win also needs its letter items; "
+                "Lettersanity locations_only or off keeps those wins free.")
     if breadth == 0:
         raise OptionError(
             f"CTR: {name} has no check it can reach at the start: "

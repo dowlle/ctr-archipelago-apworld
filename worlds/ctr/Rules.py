@@ -1112,12 +1112,23 @@ def add_podium_placement_rules(world, player, usf_gate):
             if name not in all_names:
                 continue
             if gate_finish_rungs and rung_key in FINISH_RUNG_KEYS:
-                # The Location object, not its name: UT renames custom
-                # locations to their room title (#306 B+).
-                track_branch = (
-                    lambda state, t=mw.get_location(trophy_name, player):
-                    t.can_reach(state)
-                )
+                if race_structure.ctr_first(world):
+                    # #208 ctr_first: race_structure.install_rules later
+                    # gives the Trophy the CTR win's rule, but a plain
+                    # Trophy Race still crosses this line. Capture the
+                    # USF-gated Trophy rule as it is now.
+                    trophy_loc = mw.get_location(trophy_name, player)
+                    track_branch = (
+                        lambda state, r=trophy_loc.parent_region,
+                        b=trophy_loc.access_rule: r.can_reach(state) and b(state)
+                    )
+                else:
+                    # The Location object, not its name: UT renames custom
+                    # locations to their room title (#306 B+).
+                    track_branch = (
+                        lambda state, t=mw.get_location(trophy_name, player):
+                        t.can_reach(state)
+                    )
             else:
                 track_branch = raceable
             held_term = (usf_gate.held_first_term(track)

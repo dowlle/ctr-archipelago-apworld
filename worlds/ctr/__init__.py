@@ -553,6 +553,9 @@ class ctrAPWorld(World):
         if passthrough and "content_plan" in passthrough:
             from . import content_plan
             content_plan.restore(self, passthrough)
+            # #208: content-plan rooms carry neither structure key and are
+            # always classic; never keep the tracking player's own value.
+            race_structure.restore_slot_data(self.options, {})
             return
         if self.options.content_pool.value:
             from . import content_plan

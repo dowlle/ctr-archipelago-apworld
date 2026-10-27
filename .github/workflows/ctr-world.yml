@@ -289,6 +289,17 @@ jobs:
               exit 1
             fi
           fi
+          if [ "$CHECK_META" = "ctr-first" ]; then
+            # #208: the forced ctr_first arms randomize everything else, so
+            # about half the rolls are refused like the default arm's. Cap the
+            # share at four in five so an arm that stopped generating fails.
+            ignored="$(grep -oE '[0-9]+ ignored' fuzz.log | tail -1 | cut -d' ' -f1)"
+            echo "ctr-first ignored: ${ignored:-unknown} of ${CHECK_RUNS}"
+            if [ -z "$ignored" ] || [ "$ignored" -gt $((CHECK_RUNS * 4 / 5)) ]; then
+              echo "::error::ctr-first arm: too many ignored generations (${ignored:-unknown} of ${CHECK_RUNS})"
+              exit 1
+            fi
+          fi
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
