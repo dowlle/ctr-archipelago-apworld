@@ -621,6 +621,67 @@ class WumpaCheck(Choice):
         return super().from_any(data)
 
 
+class WumpaShopSlots(Range):
+    """How many Wumpa Shop slots each of the five hubs gets.
+
+    Every fruit you collect while already holding 10 is banked, and so is the
+    fruit you hold when you finish a race. Spend banked fruit at the save
+    screen of a hub: each slot is a check with a price. 10 (default) adds 50
+    checks, 25 adds 125. 0 turns the shop off.
+
+    Later slots of each shop go on sale once enough fruit has been banked over
+    the whole seed. Only the slots on sale from the start can hold progression.
+    Buying needs a connection to the server."""
+    display_name = "Wumpa Shop Slots"
+    range_start = 0
+    range_end = 25
+    default = 10
+
+
+class WumpaShopPrices(Range):
+    """Scales every Wumpa Shop price and every shelf unlock, in percent.
+
+    100 (default) keeps the normal prices: 10 to 30 fruit in N. Sanity Beach up
+    to 40 to 80 in Citadel City. A slot that holds progression always costs
+    the lowest price of its hub."""
+    display_name = "Wumpa Shop Prices"
+    range_start = 25
+    range_end = 400
+    default = 100
+
+
+class WumpaShopProgression(Choice):
+    """Whether Wumpa Shop slots may hold progression items.
+
+    - **allowed** (default): the slots on sale from the start may hold
+      progression, at their hub's lowest price. Later slots hold useful items
+      or filler.
+    - **excluded**: no shop slot holds progression or useful items."""
+    display_name = "Wumpa Shop Progression"
+    option_allowed = 0
+    option_excluded = 1
+    default = 0
+
+
+class WumpaShopHints(DefaultOnToggle):
+    """Opening a Wumpa Shop page hints the unsold items on it, so their owners
+    see where their items are."""
+    display_name = "Wumpa Shop Hints"
+
+
+class GoalWumpa(Range):
+    """Bank this many Wumpa Fruit over the whole seed for the goal.
+
+    0 (default) turns this condition off. Banked fruit is the fruit you collect
+    while already holding 10, plus the fruit you hold when you finish a race.
+    Spending fruit in the Wumpa Shop never lowers this count. Every goal
+    condition you set must be met. 1000 is a long goal of many races."""
+    display_name = "Wumpa Goal"
+    range_start = 0
+    range_end = 5000
+    default = 0
+
+
 class TurboGrant(Toggle):
     """Add one useful item that puts a Turbo into your weapon slot at the start
     of every race, once you have received it.
@@ -1440,6 +1501,7 @@ class ctrAPOptions(PerGameCommonOptions):
     oxide_1_optional: Oxide1Optional
     bosses_required_goal: BossesRequiredGoal
     gems_required_goal: GemsRequiredGoal
+    goal_wumpa: GoalWumpa
     oxide_final_challenge_unlock: FinalOxideUnlock
     oxide_final_challenge_relic_count: FinalOxideRelicCount
     oxide_final_track: OxideFinalTrack
@@ -1473,6 +1535,11 @@ class ctrAPOptions(PerGameCommonOptions):
     reserve_top_up: ReserveTopUp
     progressive_starting_wumpa: ProgressiveStartingWumpa
     wumpa_check: WumpaCheck
+    # the Wumpa Shop (#249)
+    wumpa_shop_slots: WumpaShopSlots
+    wumpa_shop_prices: WumpaShopPrices
+    wumpa_shop_progression: WumpaShopProgression
+    wumpa_shop_hints: WumpaShopHints
     # in-race Turbo hand-out (#224), the second ruled namespace amendment
     turbo_grant: TurboGrant
     lettersanity: Lettersanity
@@ -1544,7 +1611,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
     # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
-             FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
+             GoalWumpa, FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
                         BossTrackBlocklist, BossEncounterRepeats],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
@@ -1565,6 +1632,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TrapWeights,
                      TiziHelper, WumpaBundles, ReserveTopUp, ProgressiveStartingWumpa,
                      WumpaCheck, TurboGrant],
+    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression,
+                   WumpaShopHints],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can

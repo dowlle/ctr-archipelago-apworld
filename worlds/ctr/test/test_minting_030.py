@@ -25,9 +25,10 @@ L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
 REGISTRY_COMMIT = "e01959af45848777e11508e8bf357fd143f9f68b"
 REGISTRY_DIGEST = "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
+# `wumpa_shop` left this list when #249 built the shop: it is on by default.
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
-               "custom_item_boxes", "wumpa_shop")
+               "custom_item_boxes")
 
 
 class TestFixedFamilies(unittest.TestCase):

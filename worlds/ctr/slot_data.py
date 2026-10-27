@@ -599,6 +599,15 @@ def fill_slot_data(world) -> Dict[str, object]:
         from .crystal_checks import wire_block
         slot_data["ctr_options"]["crystalsanity"] = True
         slot_data["crystal_checks"] = wire_block(world)
+    from . import wumpa_shop
+    if wumpa_shop.banking_active(o):
+        # #249 (schema 18): the five option values ride ctr_options only when
+        # the shop or the Wumpa goal is on, so a seed with both off keeps its
+        # wire. Native reads goal_wumpa and wumpa_shop_hints; the block below
+        # carries every live slot with its price and shelf unlock.
+        slot_data["ctr_options"].update(wumpa_shop.options_to_wire(o))
+        if wumpa_shop.shop_slots(o):
+            slot_data["wumpa_shop"] = wumpa_shop.wire_block(world)
     if o.itemsanity.value:
         # Additive under schema 7.  Omitted when off, so disabled seeds do
         # not gain a dormant 22-slot feature block.

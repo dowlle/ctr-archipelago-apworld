@@ -585,8 +585,12 @@ class _CreatedMatchesGenerationMixin:
         self.assertEqual(predicted, actual)
 
     def test_active_set_matches_the_generated_world(self) -> None:
+        from ..wumpa_shop import WUMPA_SHOP_CLASS
         active = CTR_LOCATION_CLASSES.active(self.world.options)
         expected = (PODIUM_CLASS,) if self.expected_rungs else ()
+        # The Wumpa Shop (#249) is on by default: ten slots per hub.
+        if self.world.options.wumpa_shop_slots.value:
+            expected += (WUMPA_SHOP_CLASS,)
         self.assertEqual(active, expected)
 
     def test_slot_data_codes_come_from_the_class(self) -> None:

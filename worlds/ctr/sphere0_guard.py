@@ -38,8 +38,13 @@ from Options import OptionError
 
 
 def _reachable_empty(world, state) -> int:
+    """Empty coded locations reachable in `state`. Wumpa Shop slots never
+    count: a paid or delayed shelf must not disguise a narrow start (#249,
+    design review 2026-10-16: two non-shop starting checks)."""
+    from .wumpa_shop import LOCATION_TYPE as SHOP
     return sum(1 for loc in world.multiworld.get_locations(world.player)
                if loc.item is None and loc.address is not None
+               and getattr(loc, "type", None) != SHOP
                and loc.can_reach(state))
 
 

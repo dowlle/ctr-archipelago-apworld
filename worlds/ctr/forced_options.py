@@ -236,7 +236,8 @@ def raise_if_composed_goal_is_empty(world):
     from .Options import OxideGoal
     if not OxideGoal.oxide_is_goal(o.oxide_goal.value) \
             and o.bosses_required_goal.value == 0 \
-            and o.gems_required_goal.value == 0:
+            and o.gems_required_goal.value == 0 \
+            and o.goal_wumpa.value == 0:
         # Issue #320 acceptance 3: `disabled` reaches this the same way `none`
         # does, and needs the message to say so -- with both Oxide races gone
         # from the seed there is not even an optional race left to fall back
@@ -248,8 +249,8 @@ def raise_if_composed_goal_is_empty(world):
             f"'gems_required_goal' are all off ({o.oxide_goal.current_key}/0/0)"
             " -- the composed goal (issue #152) has no active condition, so "
             "the seed would be won the instant it connects. Set "
-            "'bosses_required_goal' or 'gems_required_goal' to a non-zero "
-            "value"
+            "'bosses_required_goal', 'gems_required_goal' or 'goal_wumpa' to "
+            "a non-zero value"
             + (", or choose an 'oxide_goal' that keeps Oxide in the seed."
                if disabled else
                ", or set 'oxide_goal' to 'any_percent' or '101_percent'."))
