@@ -268,6 +268,15 @@ class TestSubordinateOptions(unittest.TestCase):
                       "Boss Attack Intensity", "Boss Loss Easing"):
             self.assertTrue(any(i.startswith(label) for i in ignored), label)
 
+    def test_repeats_count_for_the_opponent_and_kit_draws(self):
+        from .. import notices
+        mw = _build(boss_kit_shuffle=True, boss_encounter_repeats="allow")
+        ignored = notices._state(mw.worlds[PLAYER]).get("ignored", [])
+        self.assertFalse(any(i.startswith("Boss Encounter Repeats") for i in ignored))
+        mw = _build(boss_encounter_repeats="allow")
+        ignored = notices._state(mw.worlds[PLAYER]).get("ignored", [])
+        self.assertTrue(any(i.startswith("Boss Encounter Repeats") for i in ignored))
+
     def test_content_plans_refuse_the_new_switches(self):
         from .. import content_bosses
         world = type("W", (), {})()

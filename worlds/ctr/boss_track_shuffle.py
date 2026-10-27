@@ -199,7 +199,11 @@ def validate_options(world) -> None:
                         ("boss_track_blocklist", "Boss Track Blocklist")):
         if getattr(o, name).value:
             note_ignored(world, f"{label} (Boss Track Shuffle off)")
-    if o.boss_encounter_repeats.value:
+    # #169 tiers 2 and 3: the opponent and kit draws use the repeat policy
+    # too, so it is ignored only when no boss switch is on.
+    others = (getattr(o, "boss_opponent_shuffle", None) and o.boss_opponent_shuffle.value) or \
+        (getattr(o, "boss_kit_shuffle", None) and o.boss_kit_shuffle.value)
+    if o.boss_encounter_repeats.value and not others:
         note_ignored(world, "Boss Encounter Repeats (no boss draw is on)")
 
 
