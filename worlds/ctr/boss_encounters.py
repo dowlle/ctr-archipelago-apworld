@@ -152,6 +152,13 @@ SIGNATURES: Dict[str, Tuple[Tuple[int, int, int, int, int], ...]] = {
                   (0x01, 3, 1, 0x0F, 0), (0x01, 3, 1, 0x0F, 0)),
 }
 
+#: Every (weapon, throw, path, juice) a composed segment may carry: the
+#: family variants and the signature rows. The cooldown is free within its
+#: range because intensity scales it. Native AP_BossKitRowCertified is the twin.
+CERTIFIED_ROWS = frozenset(
+    (w, t, p, j) for rows in tuple(FAMILY_VARIANTS.values()) + tuple(SIGNATURES.values())
+    for w, t, p, _c, j in rows)
+
 #: boss_attack_intensity -> cooldown factor (numerator, denominator).
 INTENSITY: Tuple[Tuple[str, int, int], ...] = (
     ("relaxed", 3, 2), ("standard", 1, 1), ("intense", 3, 4), ("mayhem", 1, 2))
@@ -480,10 +487,12 @@ def _schedule_problem(garage: str, track: str, schedule) -> Optional[str]:
         cp, throw, weapon, path, cooldown, juice = seg
         if not (prev < cp < points) or (prev < 0 and cp != 0):
             return "schedule checkpoints are not increasing from 0 inside the venue"
-        if (weapon not in WEAPON_CODES or throw not in THROW_CODES or path not in (0, 1)
-                or juice not in JUICE_CODES or not COOLDOWN_MIN <= cooldown <= COOLDOWN_MAX):
+        if ((weapon, throw, path, juice) not in CERTIFIED_ROWS
+                or not COOLDOWN_MIN <= cooldown <= COOLDOWN_MAX):
             return "schedule segment has a code this build cannot race"
         prev = cp
+    if all(seg[2] == 0x0F for seg in schedule):
+        return "schedule never attacks"
     return None
 
 
@@ -493,7 +502,8 @@ def parse_wire(block, opponent_flag: bool, kit_flag: bool) -> Tuple[
     scalars. Returns ({garage -> track}, {garage -> opponent name},
     {garage -> schedule}, kit record or None). Raises ValueError on anything
     this build would not emit."""
-    if not isinstance(block, Mapping) or block.get("version") != BLOCK_VERSION:
+    if (not isinstance(block, Mapping) or type(block.get("version")) is not int
+            or block["version"] != BLOCK_VERSION):
         raise ValueError("boss_encounters: version 2 block expected")
     if sorted(block) != sorted(("version", "garages") + (("kit",) if kit_flag else ())):
         raise ValueError("boss_encounters: unexpected top-level fields")
@@ -512,7 +522,8 @@ def parse_wire(block, opponent_flag: bool, kit_flag: bool) -> Tuple[
         opp = _OPPONENT_BY_KEY.get(row["opponent"]) if isinstance(row["opponent"], str) else None
         if track is None or opp is None:
             raise ValueError(f"boss_encounters.{key}: unknown track or opponent")
-        if (row["location"] != code or row["home_track"] != bts.VENUE_LEVEL_IDS[home]
+        if (type(row["location"]) is not int or type(row["home_track"]) is not int
+                or row["location"] != code or row["home_track"] != bts.VENUE_LEVEL_IDS[home]
                 or row["ai_profile"] != AI_PROFILE
                 or not isinstance(row["packages"], (list, tuple)) or len(row["packages"])
                 or not bts.inherited_attack_certified(key, track)

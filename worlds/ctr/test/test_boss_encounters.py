@@ -71,6 +71,7 @@ class TestTables(unittest.TestCase):
         self.assertEqual({n: [k, ROSTER_CHARACTER_ID[n]] for n, k in be.OPPONENT_KEY.items()},
                          doc["opponents"])
         self.assertEqual([list(x) for x in be.INTENSITY], doc["intensity"])
+        self.assertEqual(sorted(list(r) for r in be.CERTIFIED_ROWS), doc["certified_rows"])
 
     def test_every_composed_kit_fits_every_venue(self):
         for key in _keys():
@@ -295,6 +296,34 @@ class TestLogic(unittest.TestCase):
         for _k, region, _c, _h in bts.GARAGES:
             self.assertEqual(tracks[region], be.HOME_TRACK[be.opponents(o)[_k]])
 
+    def test_home_paired_venue_moves_the_finish_term(self):
+        # Pinstripe's home track Hot Air Skyway needs USF (two boosts); Coco
+        # Park, Polar Pass and Tiger Temple need only the floor.
+        from BaseClasses import CollectionState
+        mw = _build(seed=2, boss_opponent_shuffle=True, boss_track_shuffle=True,
+                    progressive_boost="shared_global",
+                    boss_character_allowlist=["Pinstripe", "Coco Bandicoot", "Polar", "Pura"])
+        o = mw.worlds[PLAYER].options
+
+        def state(boost):
+            st = CollectionState(mw)
+            for item in mw.worlds[PLAYER]._item_data_by_name:
+                if not item.startswith("Progressive Boost"):
+                    st.add_item(item, PLAYER, 99)
+            st.add_item("Progressive Boost", PLAYER, boost)
+            return st
+        one, two = state(1), state(2)
+        for key, region, _c, _h in bts.GARAGES:
+            loc = f"{region}: Boss Race"
+            venue = bts.venues(o)[key]
+            self.assertIn(region, {e.parent_region.name for e in
+                                   mw.get_region(f"{venue}: Wumpa", PLAYER).entrances})
+            if be.opponents(o)[key] == "Pinstripe":
+                self.assertFalse(one.can_reach(loc, "Location", PLAYER))
+                self.assertTrue(two.can_reach(loc, "Location", PLAYER))
+            else:
+                self.assertTrue(one.can_reach(loc, "Location", PLAYER))
+
     def test_boss_checks_keep_their_codes(self):
         mw = _build(boss_opponent_shuffle=True, boss_kit_shuffle=True)
         for _k, region, code, _h in bts.GARAGES:
@@ -379,6 +408,11 @@ class TestParseWire(unittest.TestCase):
         self._bad(lambda b: b["garages"][g]["schedule"][1].__setitem__(2, 0x09))
         self._bad(lambda b: b["garages"][g]["schedule"][1].__setitem__(4, 0))
         self._bad(lambda b: b["kit"].update(intensity="extreme"))
+        self._bad(lambda b: b.update(version=2.0))
+        self._bad(lambda b: b["garages"][g].update(location=35011101.0))
+        # Every field allowed on its own, but not a certified row.
+        self._bad(lambda b: b["garages"][g]["schedule"][1].__setitem__(slice(1, 6), [2, 2, 1, 15, 2]))
+        self._bad(lambda b: [seg.__setitem__(2, 0x0F) for seg in b["garages"][g]["schedule"]])
         # Opponent switch off but a swapped racer on the wire.
         self._bad(lambda b: None, opp=False)
         self._bad(lambda b: None, kit=False)
