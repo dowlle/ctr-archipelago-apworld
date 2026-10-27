@@ -1186,11 +1186,26 @@ def generate(world):
     selected.update(content_capability.item_counts(capability))
     # Itemsanity (#133 PR 4d): one row per weapon item.
     selected.update(content_global_checks.item_counts(global_checks))
-    world.ctr_content_items = content_item_pool.resolve(
-        o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
-        additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
-        **(dict(selected_packs=selected, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
-           if selected else {}))
+    def resolve_items(chosen):
+        return content_item_pool.resolve(
+            o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
+            additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
+            **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
+               if chosen else {}))
+    try:
+        world.ctr_content_items = resolve_items(selected)
+    except OptionError as exc:
+        # Spoiler Items (#459): when the reveal items alone overflow the
+        # ledger, say so. resolve is pure, so the second call changes nothing.
+        reveal = [name for name in SPOILER_PACK_CODES if name in selected]
+        if reveal:
+            try:
+                resolve_items({k: v for k, v in selected.items() if k not in reveal})
+            except OptionError:
+                raise exc
+            error(f"Spoiler Items needs more checks for {' and '.join(reveal)}, which add no "
+                  "check of their own. Add checks or turn off Spoiler Items.")
+        raise
     # Boss garages (#133 PR 6): the Oxide goal location holds filler only
     # (issue #27, excluded from progression), so the ledger keeps one filler
     # slot for it, as the legacy rung sizer reserves one.

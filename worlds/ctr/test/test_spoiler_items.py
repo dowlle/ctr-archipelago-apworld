@@ -162,3 +162,40 @@ class TestTrackerRestore(unittest.TestCase):
                         old = make_world(dict(profile, spoiler_items=True), seed=999, passthrough=wire)
                         self.assertFalse(old.options.spoiler_items.value)
                         self.assertEqual(reveal_items(old), [])
+
+
+class TestRefusalAttribution(unittest.TestCase):
+    def test_item_creation_names_the_reveal_items_first(self):
+        """The spoiler check runs before the Lettersanity items_only and
+        capability guards, against the final pool including capability packs."""
+        import inspect
+        from .. import item_creation
+        src = inspect.getsource(item_creation)
+        spoiler = src.index("spoiler_items.raise_if_items_do_not_fit(")
+        self.assertLess(spoiler, src.index("Lettersanity 'items_only' needs"))
+        self.assertLess(spoiler, src.index("raise_if_capability_items_exceed_location_supply(\n"))
+        self.assertLess(spoiler, src.index("characters.raise_if_unlocks_exceed_location_supply("))
+
+    def test_content_plan_names_the_reveal_items(self):
+        from .. import content_item_pool
+        real = content_item_pool.resolve
+
+        def tight(raw, coded_checks, **kw):
+            packs = kw.get("selected_packs") or {}
+            if PREVIEW in packs:
+                raise OptionError("CTR item_pool: short")
+            return real(raw, coded_checks, **kw)
+        content_item_pool.resolve = tight
+        try:
+            with self.assertRaisesRegex(OptionError, "Spoiler Items needs more checks for Warp Pad Preview"):
+                make_world(dict(profile_options(), spoiler_items=True), seed=459)
+        finally:
+            content_item_pool.resolve = real
+
+    def test_older_content_plan_room_without_the_key(self):
+        world = make_world(profile_options(), seed=459)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        wire["ctr_options"].pop("spoiler_items")
+        old = make_world(dict(profile_options(), spoiler_items=True), seed=999, passthrough=wire)
+        self.assertFalse(old.options.spoiler_items.value)
+        self.assertEqual(reveal_items(old), [])

@@ -498,6 +498,14 @@ def create_items(world):
         pool, shedding_supply, SURFACE_ITEM_NAMES,
         filler_floor=estimated_filler_reserve(world))
 
+    # Spoiler Items (#459) first: an enabled reveal item is never silently
+    # omitted, and when it alone tips the final pool over (the capability
+    # packs below included), the message names it rather than Lettersanity,
+    # the capability packs or the character unlocks.
+    spoiler_items.raise_if_items_do_not_fit(
+        len(pool) + sum(progressive_capability.created_item_counts(world).values()),
+        unfilled, _spoiler_names)
+
     if int(world.options.lettersanity.value) == 3 and len(pool) > unfilled:
         raise OptionError(
             f"CTR: Lettersanity 'items_only' needs 48 spare filler slots, but this "
@@ -535,9 +543,6 @@ def create_items(world):
     # It runs FIRST of the two capacity checks deliberately: when the
     # unlocks are what does not fit, its message says so specifically, which
     # is more useful than the general one below.
-    # Spoiler Items (#459) first: an enabled reveal item is never silently
-    # omitted, and when it alone tips the pool over, the message names it.
-    spoiler_items.raise_if_items_do_not_fit(len(pool), unfilled, _spoiler_names)
     characters.raise_if_unlocks_exceed_location_supply(
         world, available_supply=unfilled - (
             len(pool) - len(characters.created_unlock_names(world))))
