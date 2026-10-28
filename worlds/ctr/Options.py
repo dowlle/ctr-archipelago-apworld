@@ -653,9 +653,8 @@ class WumpaShopPrices(Range):
 class WumpaShopProgression(Choice):
     """Whether Wumpa Shop slots may hold progression items.
 
-    - **allowed** (default): the slots on sale from the start may hold
-      progression, at their hub's lowest price. Later slots hold useful items
-      or filler.
+    - **allowed** (default): any shop slot may hold progression, priced at
+      its hub's lowest price.
     - **excluded**: no shop slot holds progression; useful items and filler
       only."""
     display_name = "Wumpa Shop Progression"

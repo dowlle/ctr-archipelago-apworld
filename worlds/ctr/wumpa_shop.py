@@ -22,10 +22,11 @@ goal arm needs `Wumpa Income`. Prices and shelf unlocks cost time, not
 items, so they are not in logic (design 2026-10-13, "Generation and logic").
 
 PLACEMENT. The first `initial_shelves(n)` slots of each hub are on sale from
-the start; only they may hold progression, and a slot holding progression is
-priced at its hub's lowest band price after fill. Later slots open at a
-lifetime banked total and take useful items or filler. `excluded` keeps
-progression out of every slot. Shop slots never count as starting checks
+the start; later slots open at a lifetime banked total. With `allowed` any
+slot may hold any item, progression and traps included (ruled 2026-10-28,
+decisions 24 and 25); a slot holding progression is priced at its hub's
+lowest band price after fill. `excluded` keeps progression out of every slot
+(useful items and filler only). Shop slots never count as starting checks
 (`sphere0_guard`).
 
 DATAPACKAGE STABILITY. `35028600 + 40 * hub + (n - 1)`, hub order N. Sanity
@@ -144,14 +145,15 @@ def price_band(hub: str, percent: int) -> Tuple[int, int]:
     return _scale(low, percent), _scale(high, percent)
 
 
+def progression_excluded(options) -> bool:
+    return _value(options, "wumpa_shop_progression", 0) == 1
+
+
 def restricted_slot_count(options) -> int:
     """Shop slots that cannot hold progression: every slot with `excluded`,
-    else the later shelves. The rung sizer leaves them out of its supply for
-    the progression-bearing pool."""
-    slots = shop_slots(options)
-    per_hub = slots if _value(options, "wumpa_shop_progression", 0) == 1 \
-        else slots - initial_shelves(slots)
-    return len(SHOP_HUBS) * per_hub
+    none with `allowed`. The rung sizer counts them as room for useful items
+    and filler only."""
+    return len(SHOP_HUBS) * shop_slots(options) if progression_excluded(options) else 0
 
 
 def unlock_banked(slot: int, slots: int, percent: int) -> int:
@@ -211,8 +213,7 @@ def create_locations(world, regions: list, region_lookup: dict) -> None:
     if not slots:
         return
     rng = Random(world.random.getrandbits(64))
-    excluded = _value(o, "wumpa_shop_progression", 0) == 1
-    first = initial_shelves(slots)
+    excluded = progression_excluded(o)
     for hub in SHOP_HUBS:
         region = region_lookup[hub]
         low, high = PRICE_BANDS[hub]
@@ -221,11 +222,10 @@ def create_locations(world, regions: list, region_lookup: dict) -> None:
             loc = create_location(player, name, region)
             loc.type = LOCATION_TYPE
             loc.logic_text = "True"
-            # `excluded` keeps progression out of every slot, the later
-            # shelves always. Useful items and filler may go anywhere
-            # (design: "only filler and useful items land there"), so the
-            # slots need no filler reserve of their own.
-            if excluded or n > first:
+            # `excluded` keeps progression out of every slot; useful items
+            # and filler may still go there (design: "only filler and useful
+            # items land there"), so it is an item rule, not AP EXCLUDED.
+            if excluded:
                 loc.item_rule = lambda item: not item.advancement
             region.locations.append(loc)
             mw.regions.location_cache[player][name] = loc

@@ -37,6 +37,8 @@ from . import wumpa_family
 from . import characters
 from . import progressive_capability
 from . import lettersanity
+from . import item_boxes
+from .item_boxes import ITEM_BOX_CLASS
 
 
 def _custom_ctr_slots(world):
@@ -156,11 +158,44 @@ def _base_location_supply(world) -> int:
     # True-filler first Oxide consumes one real slot with its locked reward.
     locked_first = int(world.options.oxide_goal.value == 2 and
                        world.options.oxide_1_optional.value == 2)
-    # Wumpa Shop slots that cannot hold progression (#249) take only the
-    # filler they add themselves, so they are no supply for the pool.
+    # Wumpa Shop slots that cannot hold progression (`excluded`, #249) are
+    # room for the pool's non-progression items and for filler. Filler is no
+    # demand here, so they count as supply only up to the mandatory items
+    # known to stay non-progression; the rest of the pool still needs other
+    # locations (decision 24, 2026-10-28).
     from .wumpa_shop import restricted_slot_count
+    restricted = restricted_slot_count(world.options)
+    shop_credit = min(restricted, predicted_mandatory_non_progression(world)) \
+        if restricted else 0
     return (static_without_trials + relics + other_classes - locked_first
-            - restricted_slot_count(world.options))
+            - restricted + shop_credit)
+
+
+def predicted_mandatory_non_progression(world) -> int:
+    """Mandatory pool items this seed is sure to create as non-progression.
+
+    Only the Wumpa Shop sizing reads it. It counts the items whose class does
+    not depend on the resolved seed: the starting-wumpa ladder, Tizi Helper,
+    Turbo Grant, and the stat chains unless the hard box tier makes them
+    progression (``item_creation.create_item``). Character unlocks and relic
+    tiers can be either, so they count as progression: an undercount only
+    refuses a seed that might have filled, never the reverse.
+    """
+    o = world.options
+    total = wumpa_family.created_item_total(world)
+    total += tizi_helper.created_item_count(world)
+    total += turbo_grant.created_item_count(world)
+    stats_progression = (ITEM_BOX_CLASS.is_enabled(o) and
+                         int(o.shortcut_knowledge.value) == item_boxes.SK_HARD)
+    if not stats_progression:
+        stat_names = set(progressive_capability.STAT_CHAINS) | {
+            progressive_capability.stat_item_name(chain, character)
+            for character in progressive_capability.ROSTER
+            for chain in progressive_capability.STAT_CHAINS}
+        total += sum(count for name, count in
+                     progressive_capability.created_item_counts(world).items()
+                     if name in stat_names)
+    return total
 
 
 def predicted_mandatory_pool(world) -> int:

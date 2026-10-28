@@ -141,14 +141,18 @@ class TestLogic(unittest.TestCase):
 
 
 class TestPlacement(unittest.TestCase):
-    def test_later_shelves_hold_no_progression(self):
+    def test_allowed_puts_progression_on_any_shelf(self):
+        # Decision 24 (2026-10-28): no later-shelf item rule with `allowed`.
+        first = ws.initial_shelves(10)
+        later_progression = 0
         for seed in (1, 2, 3, 4, 5):
             with self.subTest(seed=seed):
                 mw = _filled(seed, wumpa_shop_slots=10)
-                first = ws.initial_shelves(10)
                 for loc in _shop_locations(mw):
-                    if int(loc.name.rsplit(" ", 1)[1]) > first:
-                        self.assertFalse(loc.item.advancement, loc.name)
+                    self.assertTrue(loc.item_rule(loc.item), loc.name)
+                    if int(loc.name.rsplit(" ", 1)[1]) > first and loc.item.advancement:
+                        later_progression += 1
+        self.assertGreater(later_progression, 0)
 
     def test_excluded_holds_no_progression(self):
         for seed in (1, 2, 3):
@@ -165,10 +169,23 @@ class TestSupply(unittest.TestCase):
             def __init__(self, slots, prog):
                 self.wumpa_shop_slots = TestContentPlan._Opt(slots)
                 self.wumpa_shop_progression = TestContentPlan._Opt(prog)
-        self.assertEqual(ws.restricted_slot_count(O(10, 0)), 25)
+        self.assertEqual(ws.restricted_slot_count(O(10, 0)), 0)
         self.assertEqual(ws.restricted_slot_count(O(10, 1)), 50)
-        self.assertEqual(ws.restricted_slot_count(O(3, 0)), 5)
+        self.assertEqual(ws.restricted_slot_count(O(3, 0)), 0)
         self.assertEqual(ws.restricted_slot_count(O(0, 1)), 0)
+
+    def test_excluded_slots_are_room_for_non_progression(self):
+        # Decision 24: `excluded` slots count as supply up to the mandatory
+        # items that stay non-progression (here the 12 shared stat items).
+        from .. import rung_sizer
+        opts = dict(podium_placement_checks=False, character_unlocks=False,
+                    progressive_stats="shared_global")
+        allowed = _build(1, **opts).worlds[PLAYER]
+        excluded = _build(1, wumpa_shop_progression="excluded", **opts).worlds[PLAYER]
+        credit = rung_sizer.predicted_mandatory_non_progression(excluded)
+        self.assertGreater(credit, 0)
+        self.assertEqual(rung_sizer._base_location_supply(excluded),
+                         rung_sizer._base_location_supply(allowed) - 50 + min(50, credit))
 
     def test_a_tight_allowed_seed_still_generates(self):
         # Seed 1 of the probe: podium off and both capability packs fit once
@@ -185,9 +202,10 @@ class TestSupply(unittest.TestCase):
         self.assertGreater(generated, 0)
 
     def test_a_tight_excluded_seed_refuses_instead_of_failing_fill(self):
-        # Measured 2026-10-27: before the rung sizer left restricted slots out
-        # of its supply, 8 of 30 such seeds raised FillError. Any FillError
-        # fails this test; a clean refusal or a generated seed passes.
+        # Measured 2026-10-27: when the rung sizer counted every restricted
+        # slot as supply, 8 of 30 such seeds raised FillError. It now counts
+        # them only up to the non-progression demand. Any FillError fails
+        # this test; a clean refusal or a generated seed passes.
         for seed in (1, 2, 3, 4, 5, 6):
             with self.subTest(seed=seed):
                 try:

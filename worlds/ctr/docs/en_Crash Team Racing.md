@@ -92,16 +92,22 @@ With the shop or a Wumpa goal on, every fruit you collect while already holding
 10 is banked, and so is the fruit you hold when you finish a race. Fruit you
 receive that would take you past 10 is banked too, even outside a race.
 Quitting or restarting a race banks nothing you hold, and neither does a race
-lost to a DeathLink. Banking needs Adventure mode. While racing, the banked
-total shows below your Wumpa count.
+lost to a DeathLink. Race fruit banks only in Adventure races; Arcade, Time
+Trial and Battle bank nothing. While racing, the HUD shows only this race's
+fruit. In a hub, a line below the relic, key and trophy counters shows your
+spendable fruit and the total banked over the whole seed, and the tracker's
+hub map shows how many shop slots that hub has left, how many are on sale and
+how many you can afford.
 
 Each hub's save screen has a WUMPA SHOP row. The shop lists that hub's slots
 with their item, its owner and the price. Buying spends banked fruit and sends
 the check. Later slots go on sale once enough fruit has been banked over the
 whole seed; spending never takes that back. A slot that the server checks for
 you, for example after a Collect, shows SOLD and costs nothing. Buying needs a
-connection to the server. In logic a shop slot needs its hub and one finished
-race on a trophy track; prices are not in logic.
+connection to the server. Any slot may hold any item, unless
+`wumpa_shop_progression` is `excluded`: then the shop holds no progression
+items. In logic a shop slot needs its hub and one finished race on a trophy
+track; prices and shelf unlocks are not in logic.
 
 Wumpa Goal counts the fruit you banked over the whole seed. With N. Oxide in
 your goal, his garage also waits for that count, so beating him completes the
