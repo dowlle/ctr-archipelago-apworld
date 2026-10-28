@@ -355,7 +355,8 @@ def _open_empty(world, state):
 def _next_openers(world, state, start, pool):
     """Names of the pool items to place next: one item that opens the most
     further checks, else the fewest copies of one item, else two different
-    items, that open some. Empty when nothing opens a check."""
+    items, that open some. Only groups that fit in the open checks count.
+    Empty when nothing opens a check."""
     single = {}
     for name, copies in pool.items():
         probe = state.copy()
@@ -367,7 +368,7 @@ def _next_openers(world, state, start, pool):
         return [max(sorted(single), key=single.get)]
     groups = {}
     for name, copies in pool.items():
-        for count in range(2, min(len(copies), BOOTSTRAP_MAX_COPIES) + 1):
+        for count in range(2, min(len(copies), BOOTSTRAP_MAX_COPIES, start) + 1):
             probe = state.copy()
             for item in copies[:count]:
                 probe.collect(item, True)
@@ -375,7 +376,7 @@ def _next_openers(world, state, start, pool):
             if opened > start:
                 groups[(name,) * count] = opened
                 break
-    if not groups:
+    if not groups and start >= 2:
         import itertools
         for first, second in itertools.combinations(sorted(pool), 2):
             probe = state.copy()

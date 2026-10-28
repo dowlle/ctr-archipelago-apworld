@@ -415,6 +415,33 @@ class TestStartBootstrap(unittest.TestCase):
         self.assertEqual(names[2:4], ["Red CTR Token", "Red CTR Token"])
         self.fills(world)
 
+    def test_openers_must_fit_in_the_open_checks(self):
+        """Codex review round 1: with two open checks, three copies of A open
+        checks but do not fit; the pair B + C does and must be chosen."""
+        from unittest import mock
+        from .. import sphere0_guard
+
+        class FakeState:
+            def __init__(self, held=()):
+                self.held = list(held)
+
+            def copy(self):
+                return FakeState(self.held)
+
+            def collect(self, item, _prevent=True):
+                self.held.append(item)
+
+        def open_empty(_world, state):
+            held = state.held
+            opens = held.count("A") >= 3 or ("B" in held and "C" in held)
+            return [object()] * (2 + (3 if opens else 0))
+
+        pool = {"A": ["A"] * 4, "B": ["B"], "C": ["C"]}
+        with mock.patch.object(sphere0_guard, "_open_empty", open_empty):
+            self.assertEqual(sphere0_guard._next_openers(None, FakeState(), 2, pool), ["B", "C"])
+            # With room for three, the single-item group is still preferred.
+            self.assertEqual(sphere0_guard._next_openers(None, FakeState(), 3, pool), ["A"] * 3)
+
     def test_non_local_items_stay_out_of_the_start(self):
         options = self.fixture("content_plan_boost_pair_opener_4088.yaml")
         options["non_local_items"] = ["Red CTR Token", "Key"]
