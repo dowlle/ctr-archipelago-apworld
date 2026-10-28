@@ -300,7 +300,7 @@ def raise_if_narrow(world) -> None:
         fix += (" With adventure_structure ctr_first and Lettersanity letter "
                 "items, the first win on every track with a CTR Challenge also "
                 "needs its letter items; Lettersanity locations_only or off "
-                "keeps those wins free.")
+                "removes that letter-item requirement.")
     if breadth == 0:
         raise OptionError(
             f"CTR: {name} has no check it can reach at the start: "
