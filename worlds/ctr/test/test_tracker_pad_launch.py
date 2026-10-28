@@ -69,7 +69,7 @@ class TestNoLogic(unittest.TestCase):
                 off = make_world(dict(profile, tracker_pad_launch=False), seed=7)
                 items = sorted((i for i in off.multiworld.itempool if i.advancement), key=lambda i: i.name)
                 state_on, state_off = CollectionState(on.multiworld), CollectionState(off.multiworld)
-                step = max(1, len(items) // 12)
+                step = 1
                 for count in range(0, len(items) + step, step):
                     for item in items[count - step if count else 0:count]:
                         state_on.collect(on.create_item(item.name), True)
