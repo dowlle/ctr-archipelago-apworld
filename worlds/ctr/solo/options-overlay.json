@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "groups": [
+    {"id": "goal", "label": "Goal", "options": ["oxide_goal", "bosses_required_goal", "gems_required_goal", "oxide_final_challenge_unlock"]},
+    {"id": "progression", "label": "Progression", "options": ["shuffle_keys", "shuffle_gems", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "character_unlocks", "progressive_boost", "progressive_stats", "logic_difficulty"]},
+    {"id": "extras", "label": "Extras", "options": ["itemsanity", "lettersanity", "box_locations", "podium_placement_checks", "trap_fill_percentage", "one_lap_cups", "death_link"]}
+  ],
+  "rules": [
+    {"option": "death_link", "forced": "off", "reason": "No other players in solo"},
+    {"option": "oxide_final_challenge_unlock", "visible_when": {"oxide_goal": ["101_percent"]}},
+    {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"}
+  ]
+}

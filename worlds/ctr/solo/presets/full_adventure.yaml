@@ -1,0 +1,11 @@
+# Full Adventure: everything on, Oxide's Final Challenge as the goal, and
+# every location reachable.
+name: Player
+game: Crash Team Racing
+Crash Team Racing:
+  accessibility: full
+  oxide_goal: 101_percent
+  itemsanity: true
+  lettersanity: locations_and_items
+  box_locations: true
+  death_link: "off"
