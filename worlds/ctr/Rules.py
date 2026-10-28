@@ -167,7 +167,7 @@ def set_rules(world):
     # adventure_structure ctr_first (#208): the CTR win and the Trophy Race
     # check become one event with one rule. After every layer that ANDs onto
     # either location, before the Hit Character capture below.
-    race_structure.raise_if_unservable(world)
+    race_structure.check_tracker_block(world)
     race_structure.install_rules(world, player)
     # Hit Character encounter checks (tickets 07/08): install every target's
     # real rule LAST, so each guest's trigger capture sees every Trophy rule
@@ -1114,9 +1114,11 @@ def add_podium_placement_rules(world, player, usf_gate):
             if gate_finish_rungs and rung_key in FINISH_RUNG_KEYS:
                 if race_structure.ctr_first(world):
                     # #208 ctr_first: race_structure.install_rules later
-                    # gives the Trophy the CTR win's rule, but a plain
-                    # Trophy Race still crosses this line. Capture the
-                    # USF-gated Trophy rule as it is now.
+                    # gives the Trophy the CTR win's rule, but the rungs
+                    # come from the CTR Challenge's finishing place, letters
+                    # or not (decision 14): the same track, field and
+                    # stage-1 entry. Capture the USF-gated Trophy rule as
+                    # it is now.
                     trophy_loc = mw.get_location(trophy_name, player)
                     track_branch = (
                         lambda state, r=trophy_loc.parent_region,
