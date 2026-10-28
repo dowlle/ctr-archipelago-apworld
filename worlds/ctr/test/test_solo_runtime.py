@@ -136,6 +136,16 @@ class TestDescribe(SoloTestCase):
         self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure"])
         deathlink = next(r for r in overlay["rules"] if r["option"] == "death_link")
         self.assertEqual(deathlink["forced"], "off")
+        self.assertEqual(set(result["values"]), set(overlay_names))
+
+    def test_describe_reports_preset_values(self):
+        events, code = self.call("describe", "--yaml", self.preset("quick.yaml"))
+        self.assertEqual(code, 0, events)
+        values = last(events)["values"]
+        self.assertEqual(values["warppad_unlock_requirements"], "vanilla")
+        self.assertEqual(values["two_stage_density"], "off")
+        self.assertEqual(values["racer_locked_pads"], 0)
+        self.assertIs(values["shuffle_keys"], True)
 
 
 class TestPresets(SoloTestCase):

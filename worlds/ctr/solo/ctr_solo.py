@@ -297,12 +297,53 @@ def describe_option(name: str, option) -> dict:
     return entry
 
 
-def describe(paths: Paths) -> dict:
+def _canonical(option, raw):
+    """The value the options screen shows: choice name, bool or int."""
+    import Options
+    value = option.from_any(raw)
+    if isinstance(value, Options.Choice):
+        return value.current_key
+    if isinstance(value, Options.Toggle):
+        return bool(value.value)
+    if isinstance(value, Options.Range):
+        return int(value.value)
+    return None
+
+
+def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
+    """Values of the overlay's options in a YAML (or the defaults). A weighted
+    or random value cannot be shown on the screen and falls back to the default."""
+    hints = world_class().options_dataclass.type_hints
+    section = {}
+    if yaml_path:
+        doc = read_player_yaml(yaml_path)
+        section = doc.get(GAME) or {}
+        if not isinstance(section, dict):
+            section = {}
+    values = {}
+    for group in overlay.get("groups", []):
+        for name in group.get("options", []):
+            option = hints.get(name)
+            if option is None:
+                continue
+            raw = section.get(name, option.default)
+            if isinstance(raw, dict) or (isinstance(raw, str) and raw.startswith("random")):
+                raw = option.default
+            try:
+                values[name] = _canonical(option, raw)
+            except Exception:
+                values[name] = _canonical(option, option.default)
+    return values
+
+
+def describe(paths: Paths, yaml_path: str | None = None) -> dict:
     cls = world_class()
     options = [describe_option(name, option)
                for name, option in cls.options_dataclass.type_hints.items()]
+    overlay = load_overlay(paths)
     return {"game": GAME, "world_version": world_version(), "ap_version": ap_version(),
-            "options": options, "overlay": load_overlay(paths), "presets": list_presets(paths)}
+            "options": options, "overlay": overlay, "presets": list_presets(paths),
+            "values": overlay_values(yaml_path, overlay)}
 
 
 def load_overlay(paths: Paths) -> dict:
@@ -930,7 +971,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--apworld-sha256", default=None, help="expected ctr.apworld SHA-256")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list")
-    sub.add_parser("describe")
+    cmd = sub.add_parser("describe")
+    cmd.add_argument("--yaml", default=None, help="report the overlay options' values in this YAML")
     for name in ("validate", "generate"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--yaml", required=True)
@@ -974,7 +1016,7 @@ def main(argv: list[str] | None = None) -> int:
         emit("progress", phase="Starting runtime")
         bootstrap_core(paths, load_worlds=True)
         if args.command == "describe":
-            emit("result", **describe(paths))
+            emit("result", **describe(paths, args.yaml))
         elif args.command == "validate":
             emit("result", **validate(paths, args.yaml, args.name, args.set, args.stamp_requires))
         elif args.command == "generate":
