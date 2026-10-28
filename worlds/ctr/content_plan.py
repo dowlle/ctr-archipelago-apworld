@@ -2057,6 +2057,9 @@ def restore(world, slot_data):
     if "death_link_send" in co:
         world.options.death_link_send.value = {key for key, bit in DL_SEND_BITS.items()
                                                if co["death_link_send"] & bit}
+    else:
+        # The tracking player's own YAML must not leak into a seed that omitted it.
+        world.options.death_link_send.value = {"follow_death_link"}
     world.options.deathlink_amnesty.value = co.get("deathlink_amnesty", 1)
     # Optional legacy classifiers must not read the tracking player's unrelated YAML.
     # Character packs (#133 PR 4b) come from the plan and the envelope.
