@@ -840,6 +840,21 @@ class SpoilerItems(Toggle):
     display_name = "Spoiler Items"
 
 
+class TrackerPadLaunch(DefaultOnToggle):
+    """Start warp pad and boss garage activities from the in-game tracker.
+
+    On (default): in a hub, pause and open the tracker, pick a pad or boss
+    garage and press Cross to see what it offers. Modes you can start now are
+    listed first; modes you cannot start yet stay in the list, grey, with the
+    reason (hub Keys, the pad's requirement, a racer, the second requirement).
+    Starting one takes you to that pad's hub and enters the pad exactly as if
+    you had driven onto it, with the same requirements.
+
+    Off: the tracker only shows information. A race or sync host can turn
+    this off for everyone. This never changes what is in logic."""
+    display_name = "Tracker Pad Launch"
+
+
 class AdventureStructure(Choice):
     """Which race on a track earns its Trophy Race check.
 
@@ -1566,6 +1581,8 @@ class ctrAPOptions(PerGameCommonOptions):
     # race structure and the pad race type menu (#208)
     adventure_structure: AdventureStructure
     race_type_selector: RaceTypeSelector
+    # start pad activities from the in-game tracker (#375)
+    tracker_pad_launch: TrackerPadLaunch
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1636,7 +1653,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem, SpoilerItems, RaceTypeSelector],
+                        ColorBoxesByItem, SpoilerItems, RaceTypeSelector,
+                        TrackerPadLaunch],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 

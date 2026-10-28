@@ -25,6 +25,7 @@ from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
 from . import wumpa_family
 from . import spoiler_items
 from . import race_structure
+from . import tracker_pad_launch
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -502,6 +503,8 @@ class ctrAPWorld(World):
         # Adventure structure and race type menu (#208). Absent keys are a
         # pre-#208 room and restore to classic and the 0.3.0 menu default.
         race_structure.restore_slot_data(o, co)
+        # Tracker pad launch (#375): absent is a pre-#375 room, off.
+        tracker_pad_launch.restore_slot_data(o, co)
         # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
         # always-emitted scalar. Prefer the scalar; fall back to block presence
         # for a pre-widening seed, where a present block always meant the single
@@ -556,6 +559,8 @@ class ctrAPWorld(World):
             # #208: content-plan rooms carry neither structure key and are
             # always classic; never keep the tracking player's own value.
             race_structure.restore_slot_data(self.options, {})
+            # #375: the envelope carries it as an additive Boolean.
+            tracker_pad_launch.restore_slot_data(self.options, passthrough.get("ctr_options", {}))
             return
         if self.options.content_pool.value:
             from . import content_plan

@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
                progressive_capability, traps, version, wumpa_family, spoiler_items,
-               race_structure)
+               race_structure, tracker_pad_launch)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
 from .custom_tracks import (custom_tracks_to_wire, resolved_custom_tracks)
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs_table
@@ -228,6 +228,8 @@ def fill_slot_data(world) -> Dict[str, object]:
         wire = content_plan.wire(world)
         wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
         wire["ctr_options"].update(spoiler_items.fill_slot_data(world))
+        # #375: an additive envelope Boolean, like the two above.
+        wire["ctr_options"].update(tracker_pad_launch.fill_slot_data(world))
         return wire
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -528,6 +530,10 @@ def fill_slot_data(world) -> Dict[str, object]:
             # classic and the 0.3.0 `always` menu. ctr_first also emits the
             # top-level `race_structure` block below.
             **race_structure.fill_slot_data(world),
+            # Tracker pad launch (#375, schema 18): always emitted, a
+            # Boolean. Native reads absent or non-Boolean as off. Display
+            # and input only: no rule reads it.
+            **tracker_pad_launch.fill_slot_data(world),
             "lettersanity": int(o.lettersanity.value),
             # #109 box scalars, same convention: both always emitted raw
             # (shortcut_knowledge even when box_locations is false, so
