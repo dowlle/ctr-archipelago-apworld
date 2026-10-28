@@ -43,6 +43,9 @@ import threading
 import time
 import zipfile
 
+# The runtime folder is read-only to the runtime: never write .pyc files.
+sys.dont_write_bytecode = True
+
 GAME = "Crash Team Racing"
 PROTOCOL = 1
 PORT_FIRST = 38301
