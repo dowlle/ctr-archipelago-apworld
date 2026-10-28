@@ -42,6 +42,13 @@ Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`)
                   bytes (LEV at most 16 MiB, VRM at most 4 MiB), format
                   ctr-lev / ctr-vrm, format_version 1
     evidence      0 to 16 informational rows; every hash must be one of the pins
+    locator       optional; where an imported track comes from, so the client
+                  can name the patch to import ([[xdelta track importer
+                  design]]): kind "xdelta", patch_sha256 (64 lowercase hex),
+                  bigfile_index 0 to 4095, and optionally patch_name (1 to 64
+                  printable ASCII bytes, the file name to show) and source_url
+                  (an https:// link, at most 256 bytes). Informational: it
+                  never changes logic, ids or admission
 
 Native (`ap/ap_content_plan_impl.hpp`) applies the same rules; the parity tool
 `tools/test-content-plan-parity.py` compares the two on forged descriptors.
@@ -71,7 +78,10 @@ WEAPON_CRATES_MAX = 65536
 RELIC_TIERS = ("sapphire", "gold", "platinum")
 REQUIRED = ("id", "content_id", "uuid", "revision", "display_name", "author", "laps",
             "capabilities", "files", "evidence")
-OPTIONAL = ("relic_targets",)
+OPTIONAL = ("relic_targets", "locator")
+LOCATOR_REQUIRED = ("kind", "patch_sha256", "bigfile_index")
+LOCATOR_OPTIONAL = ("patch_name", "source_url")
+BIGFILE_INDEX_MAX = 4095
 #: The most descriptors one content plan may list; also the generic slot count.
 MAX_PACKAGES = 32
 MAX_LAPS = 7  # GameTracker.lapTime has seven entries
@@ -87,6 +97,8 @@ REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 HEX64 = re.compile(r"[0-9a-f]{64}")
 KEY = re.compile(r"[A-Za-z0-9_.:/+\-]+")
+PATCH_NAME = re.compile(r"[\x20-\x7e]+")
+SOURCE_URL = re.compile(r"https://[\x21-\x7e]+")
 FILES = (("lev", "ctr-lev", LEV_MAX_BYTES), ("vrm", "ctr-vrm", VRM_MAX_BYTES))
 
 
@@ -182,6 +194,21 @@ def admit(descriptor, where="package"):
         if not ticks[0] > ticks[1] > ticks[2]:
             _fail(where + ".relic_targets", "sapphire must be slower than gold, and gold slower than platinum")
         out["relic_targets"] = dict(zip(RELIC_TIERS, ticks))
+    if "locator" in d:
+        loc = d["locator"]
+        at = where + ".locator"
+        _closed(loc, LOCATOR_REQUIRED, LOCATOR_OPTIONAL, at)
+        if loc["kind"] != "xdelta" or type(loc["kind"]) is not str:
+            _fail(at + ".kind", "must be 'xdelta'")
+        located = dict(kind="xdelta",
+                       patch_sha256=_string(loc["patch_sha256"], HEX64, 64, at + ".patch_sha256",
+                                            "64 lowercase hexadecimal characters"),
+                       bigfile_index=_integer(loc["bigfile_index"], 0, BIGFILE_INDEX_MAX, at + ".bigfile_index"))
+        if "patch_name" in loc:
+            located["patch_name"] = _string(loc["patch_name"], PATCH_NAME, 64, at + ".patch_name", "printable ASCII")
+        if "source_url" in loc:
+            located["source_url"] = _string(loc["source_url"], SOURCE_URL, 256, at + ".source_url", "an https:// link")
+        out["locator"] = located
     files = d["files"]
     if type(files) is not list or len(files) != 2:
         _fail(where + ".files", "must list exactly two files, the LEV then the VRM")
