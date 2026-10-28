@@ -864,29 +864,38 @@ def _world_module(name: str):
     return importlib.import_module(f"{module.__package__ or module.__name__}.{name}")
 
 
+#: A room.json is small (room facts and at most 32 descriptors).
+ROOM_META_MAX_BYTES = 4 * 1024 * 1024
+
+
+def _small_json(path: str, limit: int, inside: str):
+    """A plain JSON file inside `inside`, at most `limit` bytes, or None. The
+    files are player-writable: a link, a huge file or bad bytes is skipped."""
+    try:
+        if (os.path.islink(path) or os.path.islink(os.path.dirname(path)) or not os.path.isfile(path)
+                or os.path.commonpath([os.path.realpath(inside), os.path.realpath(path)]) != os.path.realpath(inside)
+                or os.path.getsize(path) > limit):
+            return None
+        return read_json(path)
+    except (OSError, ValueError):  # UnicodeDecodeError is a ValueError
+        return None
+
+
 def _descriptor_sources(paths: Paths) -> list:
     """(descriptor, source) pairs, unchecked: the world's own packages, the
     descriptor files in solo/tracks, and the tracks of the solo rooms."""
     found = [(d, "built-in") for d in _world_module("content_plan").PACKAGES]
     if os.path.isdir(paths.tracks):
         for name in sorted(os.listdir(paths.tracks)):
-            full = os.path.join(paths.tracks, name)
-            if not name.lower().endswith(".json") or not os.path.isfile(full) or os.path.islink(full):
-                continue
-            try:
-                if os.path.getsize(full) > DESCRIPTOR_MAX_BYTES:
-                    continue
-                found.append((read_json(full), "file"))
-            except (OSError, ValueError):
-                continue
+            if name.lower().endswith(".json"):
+                descriptor = _small_json(os.path.join(paths.tracks, name), DESCRIPTOR_MAX_BYTES, paths.tracks)
+                if descriptor is not None:
+                    found.append((descriptor, "file"))
     if os.path.isdir(paths.rooms):
         for room_id in sorted(os.listdir(paths.rooms)):
-            meta_path = os.path.join(paths.rooms, room_id, "room.json")
-            try:
-                meta = read_json(meta_path) if os.path.isfile(meta_path) else {}
-            except (OSError, ValueError):
-                continue
-            for descriptor in meta.get("custom_tracks") or []:
+            meta = _small_json(os.path.join(paths.rooms, room_id, "room.json"), ROOM_META_MAX_BYTES, paths.rooms)
+            tracks = meta.get("custom_tracks") if isinstance(meta, dict) else None
+            for descriptor in tracks if isinstance(tracks, list) else []:
                 found.append((descriptor, "room"))
     return found
 
@@ -977,13 +986,17 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         section["content_pool"] = {}
         _merge_missing(section, profile)
     pool = section["content_pool"]
-    pool.setdefault("tracks", {})
-    custom = pool["tracks"].setdefault("custom", [])
-    have = {d.get("id") for d in custom if isinstance(d, dict)}
+    tracks = pool.setdefault("tracks", {}) if isinstance(pool, dict) else None
+    custom = tracks.setdefault("custom", []) if isinstance(tracks, dict) else None
+    required = pool.setdefault("required_entries", []) if isinstance(pool, dict) else None
+    if not isinstance(custom, list) or not isinstance(required, list):
+        raise SoloError("option", "This YAML's content_pool cannot take picked tracks: content_pool, its tracks and "
+                        "tracks.custom must be mappings and lists as the option describes.", option="content_pool")
+    # The installed descriptor is the one whose files are here: it replaces an
+    # entry of the same package id the YAML already has.
     for track_id in picked:
-        if track_id not in have:
-            custom.append(by_id[track_id]["descriptor"])
-    required = pool.setdefault("required_entries", [])
+        custom[:] = [d for d in custom if not (isinstance(d, dict) and d.get("id") == track_id)]
+        custom.append(by_id[track_id]["descriptor"])
     for track_id in guaranteed:
         entry = by_id[track_id]["track_id"]
         if entry not in required:
