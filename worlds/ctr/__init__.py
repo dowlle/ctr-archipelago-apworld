@@ -1466,6 +1466,7 @@ class ctrAPWorld(World):
             spoiler_handle.write(f"CTR boss encounters ({_player_name}):\n"
                                  if boss_encounters.opponent_on(self.options)
                                  or boss_encounters.kit_on(self.options)
+                                 or boss_encounters.final_on(self.options)
                                  else f"CTR boss tracks ({_player_name}):\n")
             for _line in _boss_venues:
                 spoiler_handle.write(f"  {_line}\n")

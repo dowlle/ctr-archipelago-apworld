@@ -318,7 +318,8 @@ def install(world, check, location, route_tests):
         names = hit_character._location_name_by_code(world)
         present = {c["location"] for c in plan["checks"]}
         triggers = tuple(world.multiworld.get_location(names[code], player)
-                         for code in hit_character.UNLOCK_TRIGGERS[target][0] if code in present)
+                         for code in hit_character.unlock_triggers_for(
+                             world.ctr_hit_character_encounters["bosses"])[target][0] if code in present)
     weapons = bool(plan.get("global_checks", {}).get("itemsanity"))
     unlocks = characters.unlocks_enabled(world)
 

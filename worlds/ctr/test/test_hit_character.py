@@ -338,15 +338,15 @@ class TestUTRestore(unittest.TestCase):
         self.assertIs(world.ctr_hit_character_encounters, block)
         self.assertIs(slot_data(world), block)
 
-    def test_boss_identity_substitution_is_allowed(self):
-        """The boss values are resolved identities, not a frozen literal: a
-        fixture may substitute any valid engine id 0..15."""
+    def test_boss_identity_must_match_the_boss_record(self):
+        """The boss values are resolved identities (decision 9, 2026-10-28):
+        a normal room's table must name the racer each restored boss race
+        seats, so a substitution the boss record does not make is refused."""
         block = build_encounters(1)
         block["bosses"]["35011100"] = 3
         world = self._world()
-        self._restore_block(world, block)
-        self.assertEqual(
-            world.ctr_hit_character_encounters["bosses"]["35011100"], 3)
+        with self.assertRaises(OptionError):
+            self._restore_block(world, block)
 
     def test_scalar_must_be_an_actual_bool(self):
         for bad in (1, 0, "true", None):

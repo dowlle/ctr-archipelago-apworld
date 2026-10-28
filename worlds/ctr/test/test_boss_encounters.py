@@ -68,8 +68,11 @@ class TestTables(unittest.TestCase):
         self.assertEqual({k: [list(r) for r in rows] for k, rows in be.FAMILY_VARIANTS.items()},
                          doc["families"])
         from ..characters import ROSTER_CHARACTER_ID
-        self.assertEqual({n: [k, ROSTER_CHARACTER_ID[n]] for n, k in be.OPPONENT_KEY.items()},
+        self.assertEqual({n: [be.OPPONENT_KEY[n], ROSTER_CHARACTER_ID[n]] for n in be.OPPONENT_NAMES},
                          doc["opponents"])
+        self.assertEqual([be.OXIDE_KEY, ROSTER_CHARACTER_ID[be.OXIDE_NAME]], doc["oxide"])
+        self.assertEqual(list(be.OXIDE_CHECKPOINTS), doc["oxide_checkpoints"])
+        self.assertEqual(list(be.FINAL_LOCATIONS), doc["final_locations"])
         self.assertEqual([list(x) for x in be.INTENSITY], doc["intensity"])
         self.assertEqual(sorted(list(r) for r in be.CERTIFIED_ROWS), doc["certified_rows"])
 
@@ -103,7 +106,7 @@ class TestAllEightCombinations(unittest.TestCase):
                 self.assertEqual(block["version"], 1 if mask == 4 else 2)
                 if mask == 4:
                     continue
-                tracks, opps, scheds, kit = be.parse_wire(
+                tracks, opps, scheds, kit, _fo, _fs = be.parse_wire(
                     block, co["boss_opponent_shuffle"], co["boss_kit_shuffle"])
                 self.assertEqual(tracks, bts.venues(o))
                 self.assertEqual(opps, be.opponents(o))
@@ -168,10 +171,11 @@ class TestOpponentDraw(unittest.TestCase):
                    boss_character_allowlist=["Crash Bandicoot", "Coco Bandicoot", "Polar", "Pura"],
                    boss_character_blocklist=["Pura"])
 
-    def test_repeats_allowed_may_repeat(self):
-        o = _build(boss_opponent_shuffle=True, boss_encounter_repeats="allow",
-                   boss_character_allowlist=["Crash Bandicoot"]).worlds[PLAYER].options
-        self.assertEqual(set(be.opponents(o).values()), {"Crash Bandicoot"})
+    def test_bosses_never_repeat(self):
+        # Decision 7 (2026-10-28): the repeats-allowed option is gone.
+        self.assertFalse(hasattr(_build().worlds[PLAYER].options, "boss_encounter_repeats"))
+        with self.assertRaises(OptionError):
+            _build(boss_opponent_shuffle=True, boss_character_allowlist=["Crash Bandicoot"])
 
     def test_home_pairing_respects_the_track_filters(self):
         # Four racers allowed, but one's home track is blocked: no matching.
@@ -231,17 +235,19 @@ class TestKitDraw(unittest.TestCase):
         self.assertEqual(sorted(used), sorted(_keys()))
 
     def test_powerup_blocklist(self):
+        advanced = ["turbo", "shield", "mask", "clock", "warp_orb", "invisibility"]
         o = _build(seed=2, boss_kit_shuffle=True,
-                   boss_powerup_blocklist=["tnt", "missile"]).worlds[PLAYER].options
+                   boss_powerup_blocklist=["tnt", "missile"] + advanced).worlds[PLAYER].options
         for sched in be.kits(o).values():
             self.assertEqual({be.family_of(s[2]) for s in sched}, {"bomb", "potion"})
         with self.assertRaises(OptionError):
-            _build(boss_kit_shuffle=True, boss_powerup_blocklist=["tnt", "missile", "bomb"])
+            _build(boss_kit_shuffle=True, boss_powerup_blocklist=["tnt", "missile", "bomb"] + advanced)
+        # The Super Engine is N. Oxide's only (decision 6): not a garage key.
+        self.assertNotIn("super_engine", be.GARAGE_FAMILIES)
         with self.assertRaises(OptionError):
             _build(boss_kit_shuffle=True, boss_attack_assignment="signature_profiles",
                    boss_powerup_blocklist=["tnt"])
-        o = _build(boss_kit_shuffle=True, boss_attack_assignment="signature_profiles",
-                   boss_powerup_blocklist=["tnt"], boss_encounter_repeats="allow").worlds[PLAYER].options
+        o = _build(boss_kit_shuffle=True, boss_powerup_blocklist=["tnt"]).worlds[PLAYER].options
         self.assertTrue(all(be.family_of(s[2]) != "tnt" for k in be.kits(o).values() for s in k))
 
     def test_intensity_changes_cooldowns_not_families(self):
@@ -270,14 +276,13 @@ class TestSubordinateOptions(unittest.TestCase):
                       "Boss Attack Intensity", "Boss Loss Easing"):
             self.assertTrue(any(i.startswith(label) for i in ignored), label)
 
-    def test_repeats_count_for_the_opponent_and_kit_draws(self):
+    def test_oxide_controls_ignored_without_their_switch(self):
         from .. import notices
-        mw = _build(boss_kit_shuffle=True, boss_encounter_repeats="allow")
+        mw = _build(boss_oxide_in_pool=True, oxide_powerup_blocklist=["clock"])
         ignored = notices._state(mw.worlds[PLAYER]).get("ignored", [])
-        self.assertFalse(any(i.startswith("Boss Encounter Repeats") for i in ignored))
-        mw = _build(boss_encounter_repeats="allow")
-        ignored = notices._state(mw.worlds[PLAYER]).get("ignored", [])
-        self.assertTrue(any(i.startswith("Boss Encounter Repeats") for i in ignored))
+        for label in ("Boss Pool Includes N. Oxide", "N. Oxide Powerup Blocklist"):
+            self.assertTrue(any(i.startswith(label) for i in ignored), label)
+        self.assertIsNone(_wire(mw).get("boss_encounters"))
 
     def test_content_plans_refuse_the_new_switches(self):
         from .. import content_bosses
@@ -400,7 +405,7 @@ class TestParseWire(unittest.TestCase):
         self._bad(lambda b: b.pop("kit"))
         self._bad(lambda b: b["garages"].pop(g))
         self._bad(lambda b: b["garages"][g].update(location=35011100))
-        self._bad(lambda b: b["garages"][g].update(opponent="nitros_oxide"))
+        self._bad(lambda b: b["garages"][g].update(opponent="nitros_oxide"))  # no boss_oxide_in_pool
         self._bad(lambda b: b["garages"][g].update(ai_profile="mayhem"))
         self._bad(lambda b: b["garages"][g].update(attack="inherited"))
         self._bad(lambda b: b["garages"][g].update(packages=["x"]))

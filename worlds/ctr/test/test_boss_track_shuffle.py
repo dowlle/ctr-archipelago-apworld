@@ -201,14 +201,13 @@ class TestDraw(unittest.TestCase):
     def test_empty_pool_names_the_garage(self):
         with self.assertRaises(OptionError) as caught:
             _build(boss_track_shuffle=True, boss_track_allowlist=["Crash Cove"],
-                   boss_track_blocklist=["Crash Cove"], boss_encounter_repeats="allow")
+                   boss_track_blocklist=["Crash Cove"])
         self.assertIn("Ripper Roo Garage", str(caught.exception))
 
-    def test_repeats_allowed_may_repeat(self):
-        mw = _build(boss_track_shuffle=True, boss_track_allowlist=["Crash Cove"],
-                    boss_encounter_repeats="allow")
-        self.assertEqual(set(mw.worlds[PLAYER].options._boss_track_venues.values()),
-                         {"Crash Cove"})
+    def test_venues_never_repeat(self):
+        # Decision 7 (2026-10-28): the repeats-allowed option is gone.
+        with self.assertRaises(OptionError):
+            _build(boss_track_shuffle=True, boss_track_allowlist=["Crash Cove"])
 
     def test_ordinary_pad_use_never_counts_as_a_repeat(self):
         # Crash Cove keeps its own pad and Trophy Race while Roo races there.

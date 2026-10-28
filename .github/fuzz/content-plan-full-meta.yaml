@@ -63,7 +63,6 @@ Crash Team Racing:
   oxide_final_track: {cortex_vortex: 1, oxide_station: 1}
   oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, platinum_relics: 1, any_relic_type: 1, total_relics: 1}
   oxide_final_challenge_relic_count: {1: 1, 4: 1, 12: 1, 18: 1, 30: 1}
-  boss_encounter_repeats: {disallow: 1, allow: 1}
   boss_track_allowlist: []
   boss_track_blocklist: []
   custom_tracks: {}
@@ -84,6 +83,9 @@ Crash Team Racing:
   # them), so pin both switches off rather than let the fuzzer roll them.
   boss_opponent_shuffle: false
   boss_kit_shuffle: false
+  boss_oxide_in_pool: false
+  purple_cup_boss_gauntlet: false
+  oxide_attack_profile: retail
   warp_pad_rules: {}
   include_battle_arenas: true
   include_arcade_arenas: {true: 1, false: 1}

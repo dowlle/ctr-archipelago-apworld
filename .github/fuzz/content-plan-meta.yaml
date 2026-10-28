@@ -107,4 +107,7 @@ Crash Team Racing:
   # them), so pin both switches off rather than let the fuzzer roll them.
   boss_opponent_shuffle: false
   boss_kit_shuffle: false
+  boss_oxide_in_pool: false
+  purple_cup_boss_gauntlet: false
+  oxide_attack_profile: retail
   warp_pad_rules: {}

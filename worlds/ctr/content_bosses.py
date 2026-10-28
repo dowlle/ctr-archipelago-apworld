@@ -12,7 +12,7 @@ ENCOUNTERS. One record per encounter (implementation packet, `Encounter`):
     own boss as the opponent, on its home track, or with `boss_track_shuffle`
     on, on the track the #169 tier 1 draw gives that garage
     (boss_track_shuffle.draw, the certified venue table, its allow and block
-    lists and `boss_encounter_repeats`). Since #133 PR 6b the draw also
+    lists; never a repeated venue, decision 7 of 2026-10-28). Since #133 PR 6b the draw also
     takes the plan's selected custom tracks and Cortex Vortex (ruling
     2026-10-15: custom tracks join the Boss Track Shuffle pool): a package
     joins when it states `ai_nav: true` and a `checkpoints` count that
@@ -186,10 +186,14 @@ def settings(world, raw):
     options, or None with bosses off. Takes no draw. The Final Challenge
     count is lowered to the base supply later (`resolve_relic_count`)."""
     o = world.options
-    # #169 tiers 2 and 3 are built for normal rooms only; a content plan's
-    # bosses record has no opponent or kit fields yet.
-    if o.boss_opponent_shuffle.value or o.boss_kit_shuffle.value:
-        error("boss_opponent_shuffle and boss_kit_shuffle are not available on content plans yet. Turn them "
+    # #169 tiers 2 and 3 and the 2026-10-28 additions (N. Oxide in the pool,
+    # the Purple Gem Cup gauntlet, N. Oxide's all_compatible profile) are
+    # built for normal rooms only; a content plan's bosses record has no
+    # opponent, kit or final fields yet (decision 3: content plans, job J11).
+    if (o.boss_opponent_shuffle.value or o.boss_kit_shuffle.value or o.boss_oxide_in_pool.value
+            or o.purple_cup_boss_gauntlet.value or int(o.oxide_attack_profile.value) != 0):
+        error("boss_opponent_shuffle, boss_kit_shuffle, boss_oxide_in_pool, purple_cup_boss_gauntlet and "
+              "oxide_attack_profile: all_compatible are not available on content plans yet. Turn them "
               "off for this profile. No content was changed.")
     enabled = raw.get("enabled")
     if type(enabled) is not bool:
@@ -224,7 +228,7 @@ def settings(world, raw):
                 oxide_1_optional=goal == GOAL_FINAL and optional == 1,
                 oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
                 oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
-                track_shuffle=shuffle, repeats=shuffle and bool(o.boss_encounter_repeats.value))
+                track_shuffle=shuffle, repeats=False)
 
 
 def check_settings(record):
@@ -242,8 +246,10 @@ def check_settings(record):
             error(f"bosses.{key} must be true or false.")
     if record["oxide_1_optional"] and goal != GOAL_FINAL:
         error("bosses.oxide_1_optional belongs to oxide_goal 101_percent only.")
-    if record["repeats"] and not record["track_shuffle"]:
-        error("bosses.repeats belongs to track_shuffle only.")
+    if record["repeats"]:
+        # Decision 7 (2026-10-28): boss encounters never repeat. The field
+        # stays on the wire, always false.
+        error("bosses.repeats must be false: boss encounters never repeat.")
     if type(unlock) is not int or not 0 <= unlock <= UNLOCK_TOTAL:
         error("bosses.oxide_final_unlock must be 0 to 4.")
     if type(count) is not int or not 1 <= count <= (54 if unlock == UNLOCK_TOTAL else SINGLE_TIER_MAX):
@@ -522,14 +528,10 @@ def draw_venues(world, record, custom=()):
     pools = [retail[_venue_key(g)] + [name for name, points in custom
                                       if boss_track_shuffle.schedule_fits(_venue_key(g), points)]
              for g in range(4)]
-    if record["repeats"]:
-        picked = [world.random.choice(pool) for pool in pools]
-    else:
-        assignments = [combo for combo in itertools.product(*pools) if len(set(combo)) == 4]
-        if not assignments:
-            error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks "
-                  "or set boss_encounter_repeats: allow.")
-        picked = list(world.random.choice(assignments))
+    assignments = [combo for combo in itertools.product(*pools) if len(set(combo)) == 4]
+    if not assignments:
+        error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks.")
+    picked = list(world.random.choice(assignments))
     o._boss_track_venues = {_venue_key(g): picked[g] for g in range(4)}
     return dict(enumerate(picked))
 
@@ -791,7 +793,6 @@ def restore_options(world, plan):
     o.oxide_final_challenge_unlock.value = record["oxide_final_unlock"]
     o.oxide_final_challenge_relic_count.value = record["oxide_final_count"]
     o.boss_track_shuffle.value = int(record["track_shuffle"])
-    o.boss_encounter_repeats.value = int(record["repeats"])
     o.boss_track_allowlist.value = set()
     o.boss_track_blocklist.value = set()
     venues, final, _cups = plan_venues(plan)

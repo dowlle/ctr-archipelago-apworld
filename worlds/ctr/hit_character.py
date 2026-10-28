@@ -164,6 +164,47 @@ BOSS_WIN_OPPONENTS: Dict[int, int] = {
     35011105: 15,  # N. Oxide Garage: N. Oxide's Final Challenge
 }
 
+#: Retail track wins of the three track-kind guests, in wire order.
+RETAIL_TRACK_WINS: Dict[int, Tuple[int, ...]] = {
+    guest: codes for guest, (codes, kind) in UNLOCK_TRIGGERS.items() if kind == "track"}
+
+
+def unlock_triggers_for(bosses) -> Dict[int, Tuple[Tuple[int, ...], str]]:
+    """The guest unlock triggers for a `bosses` identity table {win code ->
+    engine id} (decision 9 of 2026-10-28). A guest unlocks through its retail
+    track wins (N. Tropy, Penta Penguin, Fake Crash) and through every boss
+    race whose raced opponent it is: beating a garage unlocks the racer drawn
+    there as an opponent in other races, not the garage's retail boss. The
+    retail table gives the retail `UNLOCK_TRIGGERS` exactly. A boss guest
+    raced nowhere gets an empty set (and so the Key fallback)."""
+    table = {int(code): int(cid) for code, cid in dict(bosses).items()}
+    out: Dict[int, Tuple[Tuple[int, ...], str]] = {}
+    for guest in GUEST_RACER_IDS:
+        track = RETAIL_TRACK_WINS.get(guest, ())
+        boss = tuple(sorted(code for code, cid in table.items() if cid == guest))
+        kind = "boss" if boss else ("track" if track else UNLOCK_TRIGGERS[guest][1])
+        out[guest] = (track + boss, kind)
+    return out
+
+
+def identity_shuffled(bosses) -> bool:
+    """Does a `bosses` table differ from the retail encounters? Then the Key
+    fallback uses `CONTENT_PLAN_FALLBACK_KEYS`, which gives every guest a
+    count, because a retail boss may be raced nowhere."""
+    return {int(code): int(cid) for code, cid in dict(bosses).items()} != BOSS_WIN_OPPONENTS
+
+
+def fallback_table_for(bosses) -> Dict[int, int]:
+    return CONTENT_PLAN_FALLBACK_KEYS if identity_shuffled(bosses) else FALLBACK_KEYS
+
+
+def world_boss_identity(world) -> Dict[int, int]:
+    """The normal room's {boss win code -> raced engine id}: the resolved
+    boss encounters (`boss_encounters.boss_identity`)."""
+    from . import boss_encounters
+    return boss_encounters.boss_identity(world.options)
+
+
 #: `policy` block, verbatim.
 POLICY_SELF_CHARACTER = "never_seat_player"
 
@@ -230,7 +271,7 @@ def destination_order(seed: int, destination: int) -> List[int]:
     return order
 
 
-def build_encounters(seed: int, fallback=None, content_cups=()) -> Dict[str, object]:
+def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None) -> Dict[str, object]:
     """Build the `hit_character_encounters` block (schema 3) for a uint32 seed.
 
     `fallback` is the optional `{guest engine id: Key count}` mapping produced
@@ -240,7 +281,12 @@ def build_encounters(seed: int, fallback=None, content_cups=()) -> Dict[str, obj
 
     `content_cups` is the name indices of a content plan's cups (#133 PR 5b);
     when nonempty the block gains `content_cups` with one order per cup.
+
+    `bosses` is the {boss win code -> raced engine id} table (decision 9);
+    None is the retail table. The unlock triggers derive from it.
     """
+    identity = dict(BOSS_WIN_OPPONENTS if bosses is None else bosses)
+    derived = unlock_triggers_for(identity)
     locations = {
         str(cid): HIT_CHARACTER_CODE_BASE + cid
         for cid in sorted(characters.CHARACTER_ID_TO_NAME)
@@ -252,13 +298,13 @@ def build_encounters(seed: int, fallback=None, content_cups=()) -> Dict[str, obj
     fallback = dict(fallback or {})
     triggers: Dict[str, Dict[str, object]] = {}
     for guest in GUEST_RACER_IDS:
-        codes, kind = UNLOCK_TRIGGERS[guest]
+        codes, kind = derived[guest]
         entry: Dict[str, object] = {"kind": kind, "any_of": list(codes)}
         if guest in fallback:
             entry["fallback_keys"] = int(fallback[guest])
         triggers[str(guest)] = entry
-    bosses = {str(code): opponent
-              for code, opponent in sorted(BOSS_WIN_OPPONENTS.items())}
+    bosses = {str(code): int(opponent)
+              for code, opponent in sorted(identity.items())}
     block = {
         "schema": HIT_CHARACTER_SCHEMA,
         "locations": locations,
@@ -382,8 +428,9 @@ def resolve_for_generation(world) -> Dict[str, object] | None:
         return cached
     seed = int(world.random.getrandbits(32))
     world.ctr_hit_character_seed = seed
-    block = build_encounters(seed)
-    _validate_block(block)
+    identity = world_boss_identity(world)
+    block = build_encounters(seed, bosses=identity)
+    _validate_block(block, fallback_table_for(identity), bosses=identity)
     world.ctr_hit_character_encounters = block
     return block
 
@@ -421,24 +468,26 @@ def slot_data(world) -> Dict[str, object] | None:
 # any of the functions below, so the existing RNG consumption order is
 # untouched and generation stays deterministic.
 
-def fallback_guests(created_codes, table=None) -> Dict[int, int]:
+def fallback_guests(created_codes, table=None, triggers=None) -> Dict[int, int]:
     """`{guest engine id: Key count}` for the guests with no unlock win here.
 
     Pure function of the seed's created AP location codes, so it is directly
     testable without a world. A guest qualifies only when it has a
     `FALLBACK_KEYS` entry (the four bosses never do) and none of its
     authoritative `UNLOCK_TRIGGERS` codes is in `created_codes`. A content
-    plan passes `CONTENT_PLAN_FALLBACK_KEYS` as `table`.
+    plan passes `CONTENT_PLAN_FALLBACK_KEYS` as `table`. `triggers` is the
+    seed's derived trigger table (`unlock_triggers_for`), retail when None.
     """
     created = {int(code) for code in created_codes}
+    triggers = UNLOCK_TRIGGERS if triggers is None else triggers
     return {
         guest: keys
         for guest, keys in sorted((FALLBACK_KEYS if table is None else table).items())
-        if not created.intersection(UNLOCK_TRIGGERS[guest][0])
+        if not created.intersection(triggers[guest][0])
     }
 
 
-def created_trigger_codes(world, player: int) -> set:
+def created_trigger_codes(world, player: int, triggers=None) -> set:
     """The authoritative unlock-win codes that exist as locations in this seed.
 
     Reads the same `location_cache` `trigger_proofs` reads, so the fallback
@@ -448,7 +497,7 @@ def created_trigger_codes(world, player: int) -> set:
     names = _location_name_by_code(world)
     cache = world.multiworld.regions.location_cache[player]
     created = set()
-    for codes, _kind in UNLOCK_TRIGGERS.values():
+    for codes, _kind in (UNLOCK_TRIGGERS if triggers is None else triggers).values():
         for code in codes:
             name = names.get(int(code))
             if name is not None and cache.get(name) is not None:
@@ -491,9 +540,12 @@ def resolve_fallback(world, player: int) -> Dict[int, int]:
             if "fallback_keys" in entry
         }
     else:
-        fallback = fallback_guests(created_trigger_codes(world, player))
+        identity = {int(code): int(cid) for code, cid in block["bosses"].items()}
+        triggers = unlock_triggers_for(identity)
+        table = fallback_table_for(identity)
+        fallback = fallback_guests(created_trigger_codes(world, player, triggers), table, triggers)
         apply_fallback(block, fallback)
-        _validate_block(block)
+        _validate_block(block, table, bosses=identity)
     world.ctr_hit_character_fallback = fallback
     return fallback
 
@@ -553,7 +605,7 @@ def _validate_order(entry, label: str) -> None:
                           expected_set=ALL_RACER_IDS, exact_length=16)
 
 
-def _validate_block(block, table=None, content_cups=()) -> None:
+def _validate_block(block, table=None, content_cups=(), bosses=None) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
     Every structural commitment of the schema-3 contract is enforced exactly:
@@ -574,7 +626,13 @@ def _validate_block(block, table=None, content_cups=()) -> None:
     the block carries `content_cups` exactly when it is nonempty, with exactly
     those keys, each one order. A normal room passes nothing and is refused
     the key.
+
+    `bosses` is the room's {boss win code -> raced engine id} table
+    (decision 9); when given, the block's `bosses` must equal it exactly and
+    the triggers must be `unlock_triggers_for` it. None keeps the retail
+    trigger sets and only range-checks `bosses` (content plans).
     """
+    expected_triggers = UNLOCK_TRIGGERS if bosses is None else unlock_triggers_for(bosses)
     fallback_table = FALLBACK_KEYS if table is None else table
     expected_cups = {str(int(i)) for i in content_cups}
     if not isinstance(block, dict):
@@ -669,11 +727,11 @@ def _validate_block(block, table=None, content_cups=()) -> None:
             if count != fallback_table[cid]:
                 _fail(f"unlock_triggers[{cid!r}].fallback_keys must be the "
                       f"table value {fallback_table[cid]}, got {count}")
-        expected_codes, expected_kind = UNLOCK_TRIGGERS[cid]
+        expected_codes, expected_kind = expected_triggers[cid]
         if entry.get("kind") != expected_kind:
             _fail(f"unlock_triggers[{cid!r}].kind must be {expected_kind!r}")
         any_of = entry.get("any_of")
-        if not isinstance(any_of, list) or not any_of:
+        if not isinstance(any_of, list) or (expected_codes and not any_of):
             _fail(f"unlock_triggers[{cid!r}].any_of must be a non-empty list")
         if any(not _is_positive_code(code) for code in any_of):
             _fail(f"unlock_triggers[{cid!r}].any_of must hold positive "
@@ -684,14 +742,18 @@ def _validate_block(block, table=None, content_cups=()) -> None:
             _fail(f"unlock_triggers[{cid!r}].any_of must be exactly "
                   f"{sorted(expected_codes)}")
 
-    bosses = block.get("bosses")
+    wire_bosses = block.get("bosses")
     canonical_boss_keys = {str(code) for code in BOSS_WIN_OPPONENTS}
-    if not isinstance(bosses, dict) or set(bosses) != canonical_boss_keys:
+    if not isinstance(wire_bosses, dict) or set(wire_bosses) != canonical_boss_keys:
         _fail("bosses must map exactly the six canonical boss-win AP codes "
               f"{sorted(canonical_boss_keys)}")
-    for code, opponent in bosses.items():
+    for code, opponent in block["bosses"].items():
         if type(opponent) is not int or not 0 <= opponent <= 15:
             _fail(f"bosses[{code!r}] must be an engine id 0..15")
+    if bosses is not None and {int(c): o for c, o in block["bosses"].items()} != {
+            int(c): int(o) for c, o in dict(bosses).items()}:
+        _fail("bosses must name the racer each boss race actually seats "
+              f"{ {int(c): int(o) for c, o in dict(bosses).items()} }")
 
 
 # ---------------------------------------------------------------------------
@@ -787,7 +849,13 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    _validate_block(block, table, content_cups)
+    identity = None
+    if table is None:
+        # A normal room: the boss encounters were restored first (decision
+        # 9), so the block must name the racers those boss races seat.
+        identity = world_boss_identity(world)
+        table = fallback_table_for(identity)
+    _validate_block(block, table, content_cups, bosses=identity)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
     # The fallback determination is part of the restored data, not something a
@@ -868,10 +936,14 @@ def _tuples_to_lists(value):
 # reachable whenever the Hit check must be; under `accessibility: minimal` the
 # check may be left unreachable like any other non-goal check.
 #
-# BOSS ROUTES. A boss-kind guest can be hit during its boss race whether or not
-# the boss is cleared. The route comes from the emitted `bosses` identity table
-# (the shared resolved-identity source), so a resolved identity substitution
-# moves the route with the table. A boss race removed by options (for example
+# BOSS ROUTES. A racer can be hit during a boss race that seats it whether or
+# not the boss is cleared. The route comes from the emitted `bosses` identity
+# table (the shared resolved-identity source), so a resolved identity
+# substitution moves the route with the table: with boss opponent shuffle
+# (decision 9 of 2026-10-28) the route follows the racer drawn for that
+# garage, the garage's retail boss loses it, and a default racer drawn as a
+# boss gains one. The guest unlock triggers derive from the same table
+# (`unlock_triggers_for`). A boss race removed by options (for example
 # `oxide_goal: disabled`) simply produces no boss route.
 #
 # SELF. `never_seat_player`: the target is never the player's own racer, so a
@@ -1203,7 +1275,9 @@ def _install_target(world, player: int, target_id: int, block,
     if target_id in DEFAULT_RACER_IDS:
         ordinary = (_build_ordinary_routes(world, player, target_id, block)
                     + _build_custom_routes(world, player, target_id))
-        boss: List[HitRoute] = []
+        # A default racer drawn as a boss opponent can also be hit in that
+        # boss race (decision 9 of 2026-10-28).
+        boss = _build_boss_routes(world, player, target_id, block)
         if not ordinary:
             _fail(f"default racer {target_name!r} has no structurally "
                   "reachable ordinary appearance on any created retail track "

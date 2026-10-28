@@ -9,7 +9,8 @@ from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
 from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
-from .boss_encounters import OPPONENT_NAMES as BOSS_OPPONENT_NAMES, FAMILIES as BOSS_ATTACK_FAMILIES
+from .boss_encounters import (POOL_NAMES as BOSS_OPPONENT_NAMES, GARAGE_FAMILIES as BOSS_ATTACK_FAMILIES,
+                              FAMILIES as OXIDE_ATTACK_FAMILIES)
 
 
 class OxideGoal(Choice):
@@ -157,8 +158,8 @@ class FinalOxideRelicCount(NamedRange):
 
 
 class OxideFinalTrack(Choice):
-    """Venue for N. Oxide's Final Challenge. The opponent remains Nitros
-    Oxide for both choices."""
+    """Venue for N. Oxide's Final Challenge. The opponent is N. Oxide for
+    both choices, unless Boss Pool Includes N. Oxide draws another racer."""
     # The AP location backing this challenge is 35011105 for both venue
     # choices -- an implementation detail, not something a player needs to
     # know to pick a venue (issue #355).
@@ -173,9 +174,8 @@ class BossTrackShuffle(Toggle):
 
     Ripper Roo, Papu Papu, Komodo Joe and Pinstripe keep their garage, their
     Key, their door requirement and their own attacks; only the track they
-    race on changes. Each boss gets a different track unless Boss Encounter
-    Repeats allows repeats. N. Oxide is not affected, and the Purple Gem Cup
-    keeps its own tracks."""
+    race on changes. Each boss gets a different track. N. Oxide is not
+    affected, and the Purple Gem Cup keeps its own tracks."""
     # #169 tier 1 (0.3.0). Wire: ctr_options.boss_track_shuffle plus the
     # boss_encounters block (schema 18). See boss_track_shuffle.py.
     display_name = "Boss Track Shuffle"
@@ -198,33 +198,28 @@ class BossTrackBlocklist(OptionSet):
     default = frozenset()
 
 
-class BossEncounterRepeats(Choice):
-    """Whether two boss garages may use the same drawn track, racer or kit.
-
-    - **disallow** (default): the four bosses race on four different tracks,
-      against four different racers, with four different kits.
-    - **allow**: each garage draws on its own, so these can repeat.
-
-    A track that is also an ordinary race or a Gem Cup leg never counts as a
-    repeat."""
-    display_name = "Boss Encounter Repeats"
-    option_disallow = 0
-    option_allow = 1
-    default = 0
-
-
 class BossOpponentShuffle(Toggle):
     """Race each of the four boss garages against a randomly drawn racer.
 
     The garage keeps its Key, its door requirement, its check and its own
     boss-grade driving. With Boss Track Shuffle off, the race stays on the
     garage's own track; with both on, Boss Track Assignment decides the
-    track. Each garage gets a different racer unless Boss Encounter Repeats
-    allows repeats. N. Oxide is never drawn, and his own garage is not
-    affected."""
+    track. Each garage gets a different racer. N. Oxide is drawn only with
+    Boss Pool Includes N. Oxide on."""
     # #169 tier 2 (0.3.0). Wire: ctr_options.boss_opponent_shuffle plus the
     # version 2 boss_encounters block. See boss_encounters.py.
     display_name = "Boss Opponent Shuffle"
+
+
+class BossOxideInPool(Toggle):
+    """With Boss Opponent Shuffle on, N. Oxide can be drawn as the racer of
+    one of the four boss garages, and N. Oxide's own garage then races a
+    randomly drawn racer instead of N. Oxide (both of its races). All five
+    bosses are different racers. N. Oxide's garage keeps its door, its
+    checks and the goal. Ignored when Boss Opponent Shuffle is off."""
+    # Decision 7 of 2026-10-28. Wire: ctr_options.boss_oxide_in_pool and the
+    # boss_encounters `final` record. See boss_encounters.py.
+    display_name = "Boss Pool Includes N. Oxide"
 
 
 class BossCharacterAllowlist(OptionSet):
@@ -313,6 +308,44 @@ class BossPowerupBlocklist(OptionSet):
     Boss Kit Shuffle is off."""
     display_name = "Boss Powerup Blocklist"
     valid_keys = sorted(BOSS_ATTACK_FAMILIES)
+    default = frozenset()
+
+
+class PurpleCupBossGauntlet(Toggle):
+    """In each Purple Gem Cup race, one racer attacks you like a boss, with a
+    kit made the same way as the boss garage kits. The cup's tracks, racers
+    and checks do not change, but the podium places get harder.
+
+    Needs Boss Kit Shuffle on; a YAML with this on and Boss Kit Shuffle off
+    is refused."""
+    # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire:
+    # ctr_options.purple_cup_boss_gauntlet and the boss_encounters `gauntlet`
+    # record. See boss_encounters.py.
+    display_name = "Purple Gem Cup Boss Gauntlet"
+
+
+class OxideAttackProfile(Choice):
+    """How N. Oxide's garage races attack you.
+
+    - **retail** (default): N. Oxide's own attacks from the original game.
+    - **all_compatible**: a new attack kit drawn from every weapon a boss can
+      use, including the Super Engine, which only N. Oxide's garage uses.
+
+    The kit belongs to N. Oxide's garage, so it also applies when Boss Pool
+    Includes N. Oxide puts another racer there."""
+    # Wayfinder D2a (ruled 2026-09-02) and decision 5 (2026-10-28).
+    display_name = "N. Oxide Attack Profile"
+    option_retail = 0
+    option_all_compatible = 1
+    default = 0
+
+
+class OxidePowerupBlocklist(OptionSet):
+    """With N. Oxide Attack Profile all_compatible, weapon types N. Oxide's
+    garage never uses. Separate from Boss Powerup Blocklist. Ignored with
+    the retail profile."""
+    display_name = "N. Oxide Powerup Blocklist"
+    valid_keys = sorted(OXIDE_ATTACK_FAMILIES)
     default = frozenset()
 
 
@@ -1552,7 +1585,6 @@ class ctrAPOptions(PerGameCommonOptions):
     boss_track_shuffle: BossTrackShuffle
     boss_track_allowlist: BossTrackAllowlist
     boss_track_blocklist: BossTrackBlocklist
-    boss_encounter_repeats: BossEncounterRepeats
     # boss encounters (#169 tiers 2 and 3: opponent and kit switches)
     boss_opponent_shuffle: BossOpponentShuffle
     boss_character_allowlist: BossCharacterAllowlist
@@ -1563,6 +1595,11 @@ class ctrAPOptions(PerGameCommonOptions):
     boss_attack_intensity: BossAttackIntensity
     boss_loss_easing: BossLossEasing
     boss_powerup_blocklist: BossPowerupBlocklist
+    # boss encounters (decisions 5 to 7 of 2026-10-28)
+    boss_oxide_in_pool: BossOxideInPool
+    purple_cup_boss_gauntlet: PurpleCupBossGauntlet
+    oxide_attack_profile: OxideAttackProfile
+    oxide_powerup_blocklist: OxidePowerupBlocklist
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -1661,12 +1698,13 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
              FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
-                        BossTrackBlocklist, BossEncounterRepeats,
-                        BossOpponentShuffle, BossCharacterAllowlist,
+                        BossTrackBlocklist,
+                        BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlist,
                         BossCharacterBlocklist, BossTrackAssignment,
                         BossKitShuffle, BossAttackAssignment,
                         BossAttackIntensity, BossLossEasing,
-                        BossPowerupBlocklist],
+                        BossPowerupBlocklist, PurpleCupBossGauntlet,
+                        OxideAttackProfile, OxidePowerupBlocklist],
     "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            WarpPadRules, BossGarageRequirements],
