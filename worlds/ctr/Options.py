@@ -872,7 +872,8 @@ class RaceTypeSelector(Choice):
 
     - **always** (default): every race pad you can enter opens the race
       type menu, with Trophy Race, CTR Challenge and Relic Race where the
-      track has them and the pad allows them.
+      track has them and the pad allows them. Under adventure_structure
+      ctr_first a track with a CTR Challenge has no Trophy Race row.
     - **productive**: the menu opens only when more than one race type still
       has a check, or when none has; with exactly one, the pad loads it.
 

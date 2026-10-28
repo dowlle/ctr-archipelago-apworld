@@ -254,6 +254,30 @@ class TestCtrFirstTrialFallback(CTRTestBase):
         self.assertTrue(_loc(self.world, "Slide Coliseum: Trophy Race").can_reach(state))
 
 
+class TestRestoredBlockFallback(TestCtrFirstTrialFallback):
+    """Universal Tracker on a seed with a classic fallback track: the room's
+    block must leave that track out, as the rebuilt one does."""
+
+    def _passthrough(self, saved):
+        self.multiworld.re_gen_passthrough = {self.world.game: {"race_structure": saved}}
+        try:
+            race_structure.check_tracker_block(self.world)
+        finally:
+            del self.multiworld.re_gen_passthrough
+
+    def test_matching_block_passes(self):
+        self._passthrough(race_structure.race_structure_block(self.world))
+
+    def test_block_pairing_the_fallback_track_refused(self):
+        """A room generated with Slide Coliseum on trophy_and_ctr_challenge
+        pairs it; tracking it with a trophy_race YAML must refuse."""
+        block = race_structure.race_structure_block(self.world)
+        sc = _loc(self.world, "Slide Coliseum: Trophy Race").address
+        saved = dict(block, stage1_awards=block["stage1_awards"] + [[sc + 100000, sc]])
+        with self.assertRaises(OptionError):
+            self._passthrough(saved)
+
+
 class TestRefusals(unittest.TestCase):
     def _gen(self, **options):
         from worlds import AutoWorld
