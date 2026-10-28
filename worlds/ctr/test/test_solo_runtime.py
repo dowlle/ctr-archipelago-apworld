@@ -319,14 +319,16 @@ class TestCustomTracks(SoloTestCase):
         with open(os.path.join(SOLO, "options-overlay.json"), encoding="utf-8") as handle:
             section = json.load(handle)["custom_tracks"]["profile"]
         section["content_pool"]["tracks"]["custom"] = [stale]
+        section["content_pool"]["required_entries"] = ["custom/fixture-loop/2.0"]
         section["death_link"] = "off"
         source = write_yaml(self.work, "stale.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: section}))
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
         self.assertEqual(code, 0, events)
         with open(os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml"),
                   encoding="utf-8") as handle:
-            custom = yaml.safe_load(handle)[GAME]["content_pool"]["tracks"]["custom"]
-        self.assertEqual(custom, [loop])
+            pool = yaml.safe_load(handle)[GAME]["content_pool"]
+        self.assertEqual(pool["tracks"]["custom"], [loop])
+        self.assertEqual(pool["required_entries"], ["custom/fixture-loop/2.1"])
         for pool in ({"tracks": {"custom": {}}}, [], False):
             with self.subTest(pool=pool):
                 broken = write_yaml(self.work, "broken.yaml", yaml.safe_dump(

@@ -912,9 +912,11 @@ def _pinned_file(folders: list, pin: dict) -> str | None:
     whatever its name (the client's own rule, LocateContentFiles)."""
     suffix = TRACK_FILE_SUFFIX[pin["role"]]
     for folder in folders:
-        if not os.path.isdir(folder):
+        try:
+            names = sorted(os.listdir(folder))
+        except OSError:  # missing or gone meanwhile
             continue
-        for name in sorted(os.listdir(folder)):
+        for name in names:
             full = os.path.join(folder, name)
             try:
                 if (name.lower().endswith(suffix) and os.path.isfile(full)
@@ -1004,11 +1006,22 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                         "tracks.custom must be mappings and lists as the option describes.", option="content_pool")
     # The installed descriptor is the one whose files are here: it replaces an
     # entry of the same track (any revision) the YAML already has.
+    # Its required entry and per-track override follow it to the new revision.
+    overrides = tracks.get("overrides")
     for track_id in picked:
-        key = by_id[track_id]["content_id"]
+        key, entry = by_id[track_id]["content_id"], by_id[track_id]["track_id"]
+        old = {f"custom/{key}/{d.get('revision')}" for d in custom
+               if isinstance(d, dict) and (d.get("id") == track_id or d.get("content_id") == key)}
         custom[:] = [d for d in custom
                      if not (isinstance(d, dict) and (d.get("id") == track_id or d.get("content_id") == key))]
         custom.append(by_id[track_id]["descriptor"])
+        required[:] = [entry if r in old else r for r in required]
+        required[:] = [r for i, r in enumerate(required) if r not in required[:i]]
+        if isinstance(overrides, dict):
+            for stale in old - {entry}:
+                if stale in overrides:
+                    overrides.setdefault(entry, overrides[stale])
+                    del overrides[stale]
     for track_id in guaranteed:
         entry = by_id[track_id]["track_id"]
         if entry not in required:
