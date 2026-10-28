@@ -172,8 +172,11 @@ def bootstrap_core(paths: Paths, load_worlds: bool) -> None:
     global _archipelago_ready
     if not _archipelago_ready:
         os.environ["SKIP_REQUIREMENTS_UPDATE"] = "1"
-        if paths.core not in sys.path:
-            sys.path.insert(0, paths.core)
+        # The bundled dependencies, then the core, ahead of anything else.
+        site = os.path.join(paths.runtime, "site-packages")
+        for folder in (site, paths.core):
+            if os.path.isdir(folder) and folder not in sys.path:
+                sys.path.insert(0, folder)
         _redirect_stdout()
         # NetUtils compiles _speedups through pyximport when Cython is around,
         # into the user's home. The runtime never compiles: use the pure
