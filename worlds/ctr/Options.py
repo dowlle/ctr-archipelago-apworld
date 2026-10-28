@@ -831,8 +831,11 @@ class SpoilerItems(Toggle):
     Off (default): warp pads and AP item boxes show what they hold, as usual.
 
     On: the floating rewards above warp pads stay hidden until you receive
-    Warp Pad Preview. With Item Box Locations and Item Box Colours both on,
-    AP item boxes also stay pink until you receive AP Box Colours.
+    Warp Pad Preview. Until then, a pad with any open location shows one
+    plain Archipelago marker, and a finished pad shows nothing. With Item Box
+    Locations and Item Box Colours both on, AP item boxes also stay pink until
+    you receive AP Box Colours. You can switch the in-game Item Box Colours
+    row to OFF before that, and the boxes then stay pink after it arrives.
 
     Both are useful items that add no location, so each one takes a slot that
     would otherwise hold filler. Pads still open, close and count their checks
