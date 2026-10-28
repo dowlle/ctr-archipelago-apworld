@@ -61,14 +61,23 @@ class TestNoLogic(unittest.TestCase):
                     self.assertEqual(wire_on, wire_off)
 
     def test_no_rule_reads_it(self):
-        world = make_world(dict(ORDINARY, tracker_pad_launch=False), seed=7)
-        state = CollectionState(world.multiworld)
-        for item in world.multiworld.itempool:
-            if item.advancement:
-                state.collect(item, True)
-        state.sweep_for_advancements()
-        for location in world.multiworld.get_locations(1):
-            self.assertTrue(location.can_reach(state), location.name)
+        """The same locations are reachable with it on and off at every
+        inventory size, from nothing to everything."""
+        for profile in (ORDINARY, profile_options()):
+            with self.subTest(content_plan="content_pool" in profile):
+                on = make_world(dict(profile, tracker_pad_launch=True), seed=7)
+                off = make_world(dict(profile, tracker_pad_launch=False), seed=7)
+                items = sorted((i for i in off.multiworld.itempool if i.advancement), key=lambda i: i.name)
+                state_on, state_off = CollectionState(on.multiworld), CollectionState(off.multiworld)
+                step = max(1, len(items) // 12)
+                for count in range(0, len(items) + step, step):
+                    for item in items[count - step if count else 0:count]:
+                        state_on.collect(on.create_item(item.name), True)
+                        state_off.collect(off.create_item(item.name), True)
+                    reach_on = {l.name for l in on.multiworld.get_locations(1) if l.can_reach(state_on)}
+                    reach_off = {l.name for l in off.multiworld.get_locations(1) if l.can_reach(state_off)}
+                    self.assertEqual(reach_on, reach_off, count)
+                self.assertEqual(reach_off, {l.name for l in off.multiworld.get_locations(1)})
 
 
 class TestTrackerRestore(unittest.TestCase):
@@ -84,18 +93,19 @@ class TestTrackerRestore(unittest.TestCase):
                     self.assertIs(restored.fill_slot_data()["ctr_options"][KEY], enabled)
                     self.assertEqual(sorted(l.address for l in restored.multiworld.get_locations(1) if l.address),
                                      sorted(l.address for l in world.multiworld.get_locations(1) if l.address))
-        world = make_world(ORDINARY, seed=375)
-        wire = json.loads(json.dumps(world.fill_slot_data()))
-        for value in ("absent", 1, "true"):
-            with self.subTest(value=value):
-                bad = copy.deepcopy(wire)
-                if value == "absent":
-                    bad["ctr_options"].pop(KEY)
-                else:
-                    bad["ctr_options"][KEY] = value
-                restored = make_world(dict(ORDINARY, tracker_pad_launch=True), seed=999, passthrough=bad)
-                self.assertFalse(restored.options.tracker_pad_launch.value)
-
+        for profile in (ORDINARY, profile_options()):
+            world = make_world(profile, seed=375)
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            for value in ("absent", 1, "true"):
+                with self.subTest(content_plan="content_pool" in profile, value=value):
+                    bad = copy.deepcopy(wire)
+                    if value == "absent":
+                        bad["ctr_options"].pop(KEY)
+                    else:
+                        bad["ctr_options"][KEY] = value
+                    restored = make_world(dict(profile, tracker_pad_launch=True), seed=999, passthrough=bad)
+                    self.assertFalse(restored.options.tracker_pad_launch.value)
+                    self.assertIs(restored.fill_slot_data()["ctr_options"][KEY], False)
 
 if __name__ == "__main__":
     unittest.main()
