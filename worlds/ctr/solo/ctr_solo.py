@@ -523,6 +523,21 @@ def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after
     return os.path.join(out_dir, rooms[0])
 
 
+def clear_tmp(paths: Paths) -> None:
+    """A cancelled generation (the client ends the process) leaves its work
+    folder behind. The client runs one job at a time and serve never uses
+    tmp, so a new job starts from an empty tmp."""
+    for entry in os.listdir(paths.tmp):
+        full = os.path.join(paths.tmp, entry)
+        if os.path.isdir(full):
+            shutil.rmtree(full, ignore_errors=True)
+        else:
+            try:
+                os.remove(full)
+            except OSError:
+                pass
+
+
 def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str],
                  stamp: bool) -> tuple[dict, str]:
     """Read and override a YAML, write the exact input to a temp file."""
@@ -806,6 +821,10 @@ def port_free(port: int) -> bool:
     try:
         if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
             test.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        elif os.name != "nt":
+            # Like the server's own bind: a port in TIME_WAIT from our last
+            # session is free; a port with a listener still is not.
+            test.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         test.bind((HOST, port))
         return True
     except OSError:
@@ -1014,6 +1033,8 @@ def main(argv: list[str] | None = None) -> int:
             bootstrap_core(paths, load_worlds=True)
             return serve(paths, args.room, args.game_pid, (args.port_first, args.port_last), args.password)
         emit("progress", phase="Starting runtime")
+        if args.command in ("validate", "generate", "import-yaml", "import-room"):
+            clear_tmp(paths)
         bootstrap_core(paths, load_worlds=True)
         if args.command == "describe":
             emit("result", **describe(paths, args.yaml))

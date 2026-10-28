@@ -386,6 +386,18 @@ class TestServe(SoloTestCase):
         self.assertEqual(last(events)["kind"], "exists")
 
 
+class TestTmp(SoloTestCase):
+    def test_a_new_job_clears_a_cancelled_generation(self):
+        stale = os.path.join(self.solo, "tmp", "generate-stale")
+        os.makedirs(stale)
+        with open(os.path.join(stale, "AP_x.zip"), "wb") as handle:
+            handle.write(b"half")
+        events, code = self.call("validate", "--yaml", self.preset("standard.yaml"))
+        self.assertEqual(code, 0, events)
+        self.assertEqual(os.listdir(os.path.join(self.solo, "tmp")), [])
+        self.assertEqual(os.listdir(os.path.join(self.solo, "rooms")), [])
+
+
 class TestImportYaml(SoloTestCase):
     def test_import_and_inbox_listing(self):
         os.makedirs(os.path.join(self.solo, "inbox"))
