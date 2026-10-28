@@ -10,13 +10,16 @@ Layout inside a client folder (see RUNTIME.txt for the pinned parts):
 
     <client>/ctr.apworld            the release world, the only one loaded
     <client>/solo-runtime/          this script, presets, overlay, the core
-    <client>/solo/                  rooms, YAMLs, inbox and ap-home (writable)
+    <client>/solo/                  rooms, YAMLs, inbox, tracks and ap-home (writable)
 
 Commands:
     list                      rooms, saved YAMLs, inbox YAMLs and presets
+    tracks                    installed custom tracks a new seed can include
     describe                  options of the loaded world plus the overlay
     validate  --yaml F        roll the settings and run the option checks
     generate  --yaml F        generate a room into solo/rooms/<room id>/
+                              (--track ID adds an installed custom track,
+                              --guarantee ID gives it an Adventure pad)
     import-yaml   F           validate and keep a copy in solo/yamls/
     import-room   F           accept a one-player CTR room as a solo room
     serve --room ID           host one room on 127.0.0.1 until told to stop
@@ -95,6 +98,7 @@ class Paths:
         self.yamls = os.path.join(self.solo, "yamls")
         self.inbox = os.path.join(self.solo, "inbox")
         self.tmp = os.path.join(self.solo, "tmp")
+        self.tracks = os.path.join(self.solo, "tracks")
         self.presets = os.path.join(self.runtime, "presets")
         self.overlay = os.path.join(self.runtime, "options-overlay.json")
 
@@ -106,7 +110,7 @@ class Paths:
             raise SoloError("runtime", f"The solo folder is a link: {self.solo}")
         os.makedirs(self.solo, exist_ok=True)
         for path in (self.ap_home, os.path.join(self.ap_home, "worlds"), self.rooms, self.yamls, self.inbox,
-                     self.tmp):
+                     self.tmp, self.tracks):
             self.check_one(path)
             os.makedirs(path, exist_ok=True)
         self.check_inside()
@@ -122,7 +126,7 @@ class Paths:
         elsewhere (for example to a global Archipelago worlds folder) is
         refused before anything is touched."""
         root = os.path.realpath(self.solo)
-        for path in (self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp,
+        for path in (self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp, self.tracks,
                      os.path.join(self.ap_home, "worlds")):
             real = os.path.realpath(path)
             if os.path.islink(path) or os.path.commonpath([root, real]) != root:
@@ -604,10 +608,13 @@ def clear_tmp(paths: Paths) -> None:
 
 
 def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str],
-                 stamp: bool) -> tuple[dict, str]:
-    """Read and override a YAML, write the exact input to a temp file."""
+                 stamp: bool, tracks: dict | None = None) -> tuple[dict, str]:
+    """Read and override a YAML, add picked custom tracks, write the exact
+    input to a temp file."""
     doc = read_player_yaml(source)
     doc = apply_overrides(doc, name, settings)
+    if tracks:
+        doc = apply_tracks(paths, doc, tracks["assets"], tracks["picked"], tracks["guaranteed"])
     presets = os.path.realpath(paths.presets)
     if stamp or os.path.commonpath([presets, os.path.realpath(source)]) == presets:
         doc = stamp_requires(doc)  # a bundled preset is always this client's own YAML
@@ -617,8 +624,9 @@ def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str
     return doc, tmp
 
 
-def validate(paths: Paths, source: str, name: str | None, settings: list[str], stamp: bool) -> dict:
-    _, tmp = prepare_yaml(paths, source, name, settings, stamp)
+def validate(paths: Paths, source: str, name: str | None, settings: list[str], stamp: bool,
+             tracks: dict | None = None) -> dict:
+    _, tmp = prepare_yaml(paths, source, name, settings, stamp, tracks)
     work = tempfile.mkdtemp(prefix="validate-", dir=paths.tmp)
     try:
         # The whole generation except writing the room: the world raises some
@@ -720,8 +728,8 @@ def install_room(paths: Paths, room_file: str, origin: str, apworld_sha: str, pl
 
 
 def generate(paths: Paths, source: str, name: str | None, settings: list[str], stamp: bool,
-             seed: int | None, preset: str | None, apworld_sha: str) -> dict:
-    doc, tmp = prepare_yaml(paths, source, name, settings, stamp)
+             seed: int | None, preset: str | None, apworld_sha: str, tracks: dict | None = None) -> dict:
+    doc, tmp = prepare_yaml(paths, source, name, settings, stamp, tracks)
     work = tempfile.mkdtemp(prefix="generate-", dir=paths.tmp)
     try:
         room = _run_generation(tmp, work, seed, stop_after_options=False, spoiler=2)
@@ -837,6 +845,150 @@ def list_all(paths: Paths) -> dict:
     return {"rooms": rooms, "yamls": _yaml_entries(paths.yamls, "saved"),
             "inbox": _yaml_entries(paths.inbox, "inbox"), "presets": list_presets(paths),
             "inbox_path": paths.inbox}
+
+
+# ---------------------------------------------------------------------------
+# custom tracks (decision 32): installed tracks a preset can include
+
+#: Descriptor files: solo/tracks/<content_id>__<revision>.json. The client
+#: writes one for every content-plan package it has verified on disk; a player
+#: may drop one in too (for example a descriptor exported from AP-Pie).
+DESCRIPTOR_MAX_BYTES = 64 * 1024
+TRACK_FILE_SUFFIX = {"lev": ".lev", "vrm": ".vrm"}
+
+
+def _world_module(name: str):
+    """A module of the loaded CTR world (worlds.ctr.<name>)."""
+    import importlib
+    module = sys.modules[world_class().__module__]
+    return importlib.import_module(f"{module.__package__ or module.__name__}.{name}")
+
+
+def _descriptor_sources(paths: Paths) -> list:
+    """(descriptor, source) pairs, unchecked: the world's own packages, the
+    descriptor files in solo/tracks, and the tracks of the solo rooms."""
+    found = [(d, "built-in") for d in _world_module("content_plan").PACKAGES]
+    if os.path.isdir(paths.tracks):
+        for name in sorted(os.listdir(paths.tracks)):
+            full = os.path.join(paths.tracks, name)
+            if not name.lower().endswith(".json") or not os.path.isfile(full) or os.path.islink(full):
+                continue
+            try:
+                if os.path.getsize(full) > DESCRIPTOR_MAX_BYTES:
+                    continue
+                found.append((read_json(full), "file"))
+            except (OSError, ValueError):
+                continue
+    if os.path.isdir(paths.rooms):
+        for room_id in sorted(os.listdir(paths.rooms)):
+            meta_path = os.path.join(paths.rooms, room_id, "room.json")
+            try:
+                meta = read_json(meta_path) if os.path.isfile(meta_path) else {}
+            except (OSError, ValueError):
+                continue
+            for descriptor in meta.get("custom_tracks") or []:
+                found.append((descriptor, "room"))
+    return found
+
+
+def _pinned_file(folders: list, pin: dict) -> str | None:
+    """A file in one of the folders with the pin's suffix, size and SHA-256,
+    whatever its name (the client's own rule, LocateContentFiles)."""
+    suffix = TRACK_FILE_SUFFIX[pin["role"]]
+    for folder in folders:
+        if not os.path.isdir(folder):
+            continue
+        for name in sorted(os.listdir(folder)):
+            full = os.path.join(folder, name)
+            if (name.lower().endswith(suffix) and os.path.isfile(full)
+                    and os.path.getsize(full) == pin["bytes"] and sha256_file(full) == pin["sha256"]):
+                return full
+    return None
+
+
+def installed_tracks(paths: Paths, assets: str) -> list:
+    """Admitted descriptors whose LEV and VRM are in assets/tracks/<track key>/original
+    (or the folder the client keeps a built-in package in), one per package id."""
+    admit = _world_module("custom_packages").admit
+    supported = _world_module("content_plan").supported_modes
+    tracks_root = os.path.join(assets, "tracks")
+    seen, result = set(), []
+    for raw, source in _descriptor_sources(paths):
+        try:
+            descriptor = admit(json.loads(json.dumps(raw)))
+        except Exception:
+            continue
+        if descriptor["id"] in seen:
+            continue
+        key, revision = descriptor["content_id"], descriptor["revision"]
+        folders = [os.path.join(tracks_root, key, "original"),
+                   os.path.join(tracks_root, f"{key}-{revision}", "original")]
+        if not all(_pinned_file(folders, pin) for pin in descriptor["files"]):
+            continue
+        seen.add(descriptor["id"])
+        result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
+                       "revision": revision, "display_name": descriptor["display_name"],
+                       "author": descriptor["author"], "laps": descriptor["laps"],
+                       "modes": supported("custom", descriptor), "source": source, "descriptor": descriptor})
+    result.sort(key=lambda t: (t["display_name"].lower(), t["revision"]))
+    return result
+
+
+def list_tracks(paths: Paths, assets: str) -> dict:
+    tracks = installed_tracks(paths, assets)
+    return {"tracks": [{k: v for k, v in t.items() if k != "descriptor"} for t in tracks],
+            "tracks_path": paths.tracks}
+
+
+def _merge_missing(target: dict, defaults: dict) -> None:
+    for key, value in defaults.items():
+        if key not in target:
+            target[key] = json.loads(json.dumps(value))
+        elif isinstance(target[key], dict) and isinstance(value, dict):
+            _merge_missing(target[key], value)
+
+
+def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaranteed: list[str]) -> dict:
+    """Put the picked installed tracks into content_pool.tracks.custom and the
+    guaranteed ones into content_pool.required_entries. A YAML without a
+    content plan gets the overlay's content profile where it sets nothing."""
+    if not picked and not guaranteed:
+        return doc
+    if set(guaranteed) - set(picked):
+        raise SoloError("track", "A guaranteed track must also be picked.")
+    by_id = {t["id"]: t for t in installed_tracks(paths, assets)}
+    missing = [p for p in picked if p not in by_id]
+    if missing:
+        raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
+    keys = [by_id[p]["content_id"] for p in picked]
+    twice = next((p for p in picked if keys.count(by_id[p]["content_id"]) > 1), None)
+    if twice:
+        raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
+    doc = json.loads(json.dumps(doc))
+    section = doc.setdefault(GAME, {})
+    for legacy in ("custom_tracks", "cortex_vortex_track"):
+        if section.get(legacy):
+            raise SoloError("option", f"This YAML uses {legacy}, which cannot be mixed with picked tracks.",
+                            option=legacy)
+    if not section.get("content_pool"):
+        profile = load_overlay(paths).get("custom_tracks", {}).get("profile")
+        if not isinstance(profile, dict) or not isinstance(profile.get("content_pool"), dict):
+            raise SoloError("runtime", "The options overlay has no custom-track profile.")
+        section["content_pool"] = {}
+        _merge_missing(section, profile)
+    pool = section["content_pool"]
+    pool.setdefault("tracks", {})
+    custom = pool["tracks"].setdefault("custom", [])
+    have = {d.get("id") for d in custom if isinstance(d, dict)}
+    for track_id in picked:
+        if track_id not in have:
+            custom.append(by_id[track_id]["descriptor"])
+    required = pool.setdefault("required_entries", [])
+    for track_id in guaranteed:
+        entry = by_id[track_id]["track_id"]
+        if entry not in required:
+            required.append(entry)
+    return doc
 
 
 # ---------------------------------------------------------------------------
@@ -1259,6 +1411,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--apworld-sha256", default=None, help="expected ctr.apworld SHA-256")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list")
+    cmd = sub.add_parser("tracks")
+    cmd.add_argument("--assets", default=None, help="the client's assets folder (default <client>/assets)")
     cmd = sub.add_parser("describe")
     cmd.add_argument("--yaml", default=None, help="report the overlay options' values in this YAML")
     for name in ("validate", "generate"):
@@ -1268,6 +1422,11 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--set", action="append", default=[], metavar="OPTION=VALUE")
         cmd.add_argument("--stamp-requires", action="store_true",
                          help="add requires: for a YAML this client wrote (presets, options screen)")
+        cmd.add_argument("--assets", default=None, help="the client's assets folder (default <client>/assets)")
+        cmd.add_argument("--track", action="append", default=[], metavar="PACKAGE_ID",
+                         help="include this installed custom track (repeatable)")
+        cmd.add_argument("--guarantee", action="append", default=[], metavar="PACKAGE_ID",
+                         help="give this picked track an Adventure pad (repeatable)")
         if name == "generate":
             cmd.add_argument("--seed", type=int, default=None)
             cmd.add_argument("--preset", default=None)
@@ -1305,13 +1464,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in ("validate", "generate", "import-yaml", "import-room"):
             clear_tmp(paths)
         bootstrap_core(paths, load_worlds=True)
+        assets = os.path.abspath(getattr(args, "assets", None) or os.path.join(client, "assets"))
+        tracks = ({"assets": assets, "picked": args.track, "guaranteed": args.guarantee}
+                  if args.command in ("validate", "generate") else None)
         if args.command == "describe":
             emit("result", **describe(paths, args.yaml))
+        elif args.command == "tracks":
+            emit("result", **list_tracks(paths, assets))
         elif args.command == "validate":
-            emit("result", **validate(paths, args.yaml, args.name, args.set, args.stamp_requires))
+            emit("result", **validate(paths, args.yaml, args.name, args.set, args.stamp_requires, tracks))
         elif args.command == "generate":
             emit("result", **generate(paths, args.yaml, args.name, args.set, args.stamp_requires,
-                                      args.seed, args.preset, apworld_sha))
+                                      args.seed, args.preset, apworld_sha, tracks))
         elif args.command == "import-yaml":
             emit("result", **import_yaml(paths, args.file))
         elif args.command == "import-room":

@@ -227,6 +227,138 @@ class TestPresets(SoloTestCase):
         self.assertEqual(last(events)["kind"], "option")
 
 
+class TestCustomTracks(SoloTestCase):
+    """The custom-track step (decision 32): installed tracks, picked into a preset."""
+
+    def setUp(self):
+        super().setUp()
+        self.assets = os.path.join(self.work, "assets")
+        self.descriptors = os.path.join(self.solo, "tracks")
+        os.makedirs(self.descriptors)
+
+    def install(self, key: str, revision: str, title: str, folder: str | None = None, lev_name: str = "a.LEV",
+                write_descriptor: bool = True) -> dict:
+        """Made-up LEV and VRM bytes in assets/tracks/<folder>/original and a
+        descriptor pinning them. Test data only: the bytes are no track."""
+        original = os.path.join(self.assets, "tracks", folder or key, "original")
+        os.makedirs(original, exist_ok=True)
+        lev, vrm = os.urandom(3000), os.urandom(2000)
+        for name, data in ((lev_name.replace("a.", f"a-{revision}."), lev), (f"b-{revision}.vrm", vrm)):
+            with open(os.path.join(original, name), "wb") as handle:
+                handle.write(data)
+        descriptor = dict(
+            id=f"package/{key}/{revision}", content_id=key,
+            uuid="0f0e0d0c-0b0a-4908-8706-%012x" % int(hashlib.sha256(key.encode()).hexdigest()[:12], 16),
+            revision=revision, display_name=title, author="Fixture Author", laps=3,
+            capabilities=dict(time_trial=True, arcade=True, relic=True, ctr_tokens=False, wumpa=False),
+            relic_targets=dict(sapphire=96000, gold=86400, platinum=76800),
+            files=[dict(role="lev", sha256=hashlib.sha256(lev).hexdigest(), bytes=len(lev), format="ctr-lev",
+                        format_version=1),
+                   dict(role="vrm", sha256=hashlib.sha256(vrm).hexdigest(), bytes=len(vrm), format="ctr-vrm",
+                        format_version=1)],
+            evidence=[])
+        if write_descriptor:
+            with open(os.path.join(self.descriptors, f"{key}__{revision}.json"), "w", encoding="utf-8") as handle:
+                json.dump(descriptor, handle)
+        return descriptor
+
+    def tracks(self) -> list:
+        events, code = self.call("tracks", "--assets", self.assets)
+        self.assertEqual(code, 0, events)
+        return last(events)["tracks"]
+
+    def test_lists_only_tracks_whose_files_are_installed(self):
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        self.install("fixture-hill", "1.0", "Fixture Hill")
+        # A descriptor without files, and files that do not match their pins.
+        broken = self.install("fixture-gone", "1.0", "Fixture Gone")
+        shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-gone"))
+        changed = self.install("fixture-changed", "1.0", "Fixture Changed")
+        with open(os.path.join(self.assets, "tracks", "fixture-changed", "original", "b-1.0.vrm"), "r+b") as handle:
+            handle.write(b"x")
+        with open(os.path.join(self.descriptors, "junk.json"), "w", encoding="utf-8") as handle:
+            handle.write("{not json")
+        with open(os.path.join(self.descriptors, "foreign.json"), "w", encoding="utf-8") as handle:
+            json.dump({"id": "package/x/1"}, handle)
+        tracks = self.tracks()
+        self.assertEqual([t["display_name"] for t in tracks], ["Fixture Hill", "Fixture Loop"])
+        entry = next(t for t in tracks if t["id"] == loop["id"])
+        self.assertEqual(entry["track_id"], "custom/fixture-loop/2.1")
+        self.assertEqual(entry["modes"], ["trophy", "relic"])
+        self.assertNotIn(broken["id"], [t["id"] for t in tracks])
+        self.assertNotIn(changed["id"], [t["id"] for t in tracks])
+
+    def test_files_may_sit_in_the_revision_folder(self):
+        # The client keeps Baby T Park 1.0.2 in tracks/baby-t-park-1.0.2.
+        self.install("fixture-loop", "2.1", "Fixture Loop", folder="fixture-loop-2.1", lev_name="track.lev")
+        self.assertEqual([t["id"] for t in self.tracks()], ["package/fixture-loop/2.1"])
+
+    def test_picked_tracks_go_into_the_content_plan(self):
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        hill = self.install("fixture-hill", "1.0", "Fixture Hill")
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--name", "Solo",
+                                 "--preset", "standard", "--assets", self.assets, "--track", loop["id"],
+                                 "--track", hill["id"], "--guarantee", hill["id"], "--seed", "7")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        self.assertEqual([d["id"] for d in result["custom_tracks"]], [loop["id"], hill["id"]])
+        with open(os.path.join(self.solo, "rooms", result["room_id"], "player.yaml"), encoding="utf-8") as handle:
+            section = yaml.safe_load(handle)[GAME]
+        pool = section["content_pool"]
+        self.assertEqual(pool["tracks"]["custom"], [loop, hill])
+        self.assertEqual(pool["required_entries"], ["custom/fixture-hill/1.0"])
+        with open(os.path.join(SOLO, "options-overlay.json"), encoding="utf-8") as handle:
+            profile = json.load(handle)["custom_tracks"]["profile"]
+        self.assertEqual(section["pad_layout"], profile["pad_layout"])
+        self.assertEqual(section["item_pool"], profile["item_pool"])
+        self.assertEqual(pool["bosses"], profile["content_pool"]["bosses"])
+        self.assertEqual(section["death_link"], "off")
+        # The room is a content-plan room: its tracks are listed afterwards
+        # even without the descriptor files.
+        shutil.rmtree(self.descriptors)
+        self.assertEqual(sorted(t["source"] for t in self.tracks()), ["room", "room"])
+
+    def test_every_preset_takes_a_track(self):
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        for preset in ("quick.yaml", "standard.yaml", "full_adventure.yaml"):
+            with self.subTest(preset=preset):
+                events, code = self.call("validate", "--yaml", self.preset(preset), "--assets", self.assets,
+                                         "--track", loop["id"], "--guarantee", loop["id"])
+                self.assertEqual(code, 0, events)
+
+    def test_refusals(self):
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        older = self.install("fixture-loop", "2.0", "Fixture Loop")
+        events, code = self.call("validate", "--yaml", self.preset("quick.yaml"), "--assets", self.assets,
+                                 "--track", loop["id"], "--track", older["id"])
+        self.assertNotEqual(code, 0)
+        self.assertEqual(last(events)["kind"], "track")
+        self.assertIn("one version", last(events)["message"])
+        events, code = self.call("validate", "--yaml", self.preset("quick.yaml"), "--assets", self.assets,
+                                 "--track", "package/not-here/1.0")
+        self.assertNotEqual(code, 0)
+        self.assertEqual(last(events)["kind"], "track")
+        events, code = self.call("validate", "--yaml", self.preset("quick.yaml"), "--assets", self.assets,
+                                 "--guarantee", loop["id"])
+        self.assertNotEqual(code, 0)
+        self.assertEqual(last(events)["kind"], "track")
+        legacy = write_yaml(self.work, "legacy.yaml",
+                            f"name: Solo\ngame: {GAME}\n{GAME}:\n  cortex_vortex_track: true\n")
+        events, code = self.call("validate", "--yaml", legacy, "--assets", self.assets, "--track", loop["id"])
+        self.assertNotEqual(code, 0)
+        self.assertEqual(last(events)["option"], "cortex_vortex_track")
+
+    def test_no_track_leaves_the_preset_alone(self):
+        import yaml
+        events, code = self.call("generate", "--yaml", self.preset("quick.yaml"), "--name", "Solo",
+                                 "--assets", self.assets)
+        self.assertEqual(code, 0, events)
+        with open(os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml"),
+                  encoding="utf-8") as handle:
+            self.assertNotIn("content_pool", yaml.safe_load(handle)[GAME])
+
+
 class TestRefusals(SoloTestCase):
     def check(self, text: str, kind: str, **expect):
         path = write_yaml(self.work, "in.yaml", text)

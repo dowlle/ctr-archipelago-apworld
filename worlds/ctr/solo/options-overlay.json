@@ -9,5 +9,13 @@
     {"option": "death_link", "forced": "off", "reason": "No other players in solo"},
     {"option": "oxide_final_challenge_unlock", "visible_when": {"oxide_goal": ["101_percent"]}},
     {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"}
-  ]
+  ],
+  "custom_tracks": {
+    "comment": "Solo custom-track step (#89, decision 32). Picked tracks turn a preset into a content-plan seed: these settings are added where the preset does not set them. Probed on all three presets with one and two tracks.",
+    "profile": {
+      "content_pool": {"preset": "mixed", "tracks": {"retail": "all", "cortex_vortex": false, "modes": ["trophy", "ctr", "relic"]}, "cups": {"count": 4}, "crystals": {"count": 4}, "bosses": {"enabled": true}},
+      "pad_layout": {"placement": "shuffle", "stages": "two", "mode_order": "fixed", "merge_trophy_ctr": false},
+      "item_pool": {"base": {"trophies": 16, "relics": {"sapphire": 6, "gold": 4, "platinum": 2}, "tokens": {"red": 2, "green": 2, "blue": 2, "yellow": 0, "purple": 0}, "gems": ["red", "green", "blue", "yellow", "purple"], "keys": 4}}
+    }
+  }
 }
