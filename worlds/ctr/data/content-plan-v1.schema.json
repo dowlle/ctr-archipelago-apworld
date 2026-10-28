@@ -361,6 +361,47 @@
           "maxItems": 16,
           "minItems": 0,
           "description": "Informational. Every hash must be one of this package's file pins."
+        },
+        "locator": {
+          "description": "Optional (xdelta importer, 0.3.0): which xdelta patch and BIGFILE slot an imported track comes from, so the client can name the patch to import. Informational only: no logic, ids or admission depend on it.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "xdelta"
+              ]
+            },
+            "patch_sha256": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bigfile_index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4095
+            },
+            "patch_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[\\x20-\\x7e]+$"
+            },
+            "source_url": {
+              "type": "string",
+              "minLength": 9,
+              "maxLength": 128,
+              "pattern": "^https://[\\x21-\\x7e]+$"
+            }
+          },
+          "required": [
+            "kind",
+            "patch_sha256",
+            "bigfile_index"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
