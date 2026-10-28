@@ -176,13 +176,19 @@ def predicted_mandatory_non_progression(world) -> int:
 
     Only the Wumpa Shop sizing reads it. It counts the items whose class does
     not depend on the resolved seed: the starting-wumpa ladder, Tizi Helper,
-    Turbo Grant, and the stat chains unless the hard box tier makes them
-    progression (``item_creation.create_item``). Character unlocks and relic
-    tiers can be either, so they count as progression: an undercount only
+    Turbo Grant, the stat chains unless the hard box tier makes them
+    progression, and the relic tiers ``item_creation.relic_progression_map``
+    downgrades (a pure function of options and the relic counts, both final
+    once this runs at the end of ``generate_early``). Character unlocks depend
+    on the resolved pad map, so they count as progression: an undercount only
     refuses a seed that might have filled, never the reverse.
     """
+    from .item_creation import relic_progression_map
     o = world.options
     total = wumpa_family.created_item_total(world)
+    total += sum(world._ctr_relic_created.get(tier, 0)
+                 for tier, progression in relic_progression_map(world).items()
+                 if not progression)
     total += tizi_helper.created_item_count(world)
     total += turbo_grant.created_item_count(world)
     stats_progression = (ITEM_BOX_CLASS.is_enabled(o) and

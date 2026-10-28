@@ -201,6 +201,25 @@ class TestSupply(unittest.TestCase):
                 pass
         self.assertGreater(generated, 0)
 
+    def test_a_tight_excluded_seed_generates(self):
+        # Decision 24: podium off and shared stats with an `excluded` shop.
+        # Before the shop slots counted as room for the 12 stat items (and
+        # the relic tiers that stay useful) these seeds refused by about ten
+        # locations; now they fill.
+        from .. import rung_sizer
+        opts = dict(podium_placement_checks=False, character_unlocks=False,
+                    progressive_stats="shared_global", wumpa_shop_progression="excluded",
+                    accessibility="full", trap_fill_percentage=0)
+        for seed in (3, 4):
+            with self.subTest(seed=seed):
+                world = _build(seed, **opts).worlds[PLAYER]
+                credit = rung_sizer.predicted_mandatory_non_progression(world)
+                self.assertGreater(rung_sizer._demand(world),
+                                   rung_sizer.location_supply(world, 0) - credit,
+                                   "precondition: refused without the shop credit")
+                mw = _filled(seed, **opts)
+                self.assertTrue(mw.can_beat_game(CollectionState(mw)))
+
     def test_a_tight_excluded_seed_refuses_instead_of_failing_fill(self):
         # Measured 2026-10-27: when the rung sizer counted every restricted
         # slot as supply, 8 of 30 such seeds raised FillError. It now counts
