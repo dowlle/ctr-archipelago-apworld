@@ -47,7 +47,8 @@ Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`)
                   design]]): kind "xdelta", patch_sha256 (64 lowercase hex),
                   bigfile_index 0 to 4095, and optionally patch_name (1 to 64
                   printable ASCII bytes, the file name to show) and source_url
-                  (an https:// link, at most 256 bytes). Informational: it
+                  (an https:// link, at most 128 bytes, the wire
+                  string budget). Informational: it
                   never changes logic, ids or admission
 
 Native (`ap/ap_content_plan_impl.hpp`) applies the same rules; the parity tool
@@ -207,7 +208,7 @@ def admit(descriptor, where="package"):
         if "patch_name" in loc:
             located["patch_name"] = _string(loc["patch_name"], PATCH_NAME, 64, at + ".patch_name", "printable ASCII")
         if "source_url" in loc:
-            located["source_url"] = _string(loc["source_url"], SOURCE_URL, 256, at + ".source_url", "an https:// link")
+            located["source_url"] = _string(loc["source_url"], SOURCE_URL, 128, at + ".source_url", "an https:// link")
         out["locator"] = located
     files = d["files"]
     if type(files) is not list or len(files) != 2:

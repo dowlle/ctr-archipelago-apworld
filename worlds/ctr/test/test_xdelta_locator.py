@@ -28,6 +28,8 @@ class TestLocator(unittest.TestCase):
         minimal = located()
         del minimal["locator"]["patch_name"], minimal["locator"]["source_url"]
         self.assertEqual(custom_packages.admit(copy.deepcopy(minimal)), minimal)
+        longest = located(source_url="https://" + "x" * 120)  # 128 bytes, the wire string budget
+        self.assertEqual(custom_packages.admit(copy.deepcopy(longest)), longest)
 
     def refused(self, descriptor, field):
         with self.assertRaises(custom_packages.PackageError) as caught:
@@ -45,6 +47,7 @@ class TestLocator(unittest.TestCase):
         self.refused(located(patch_name="café.xdelta"), "locator.patch_name")
         self.refused(located(source_url="http://example.invalid/pack"), "locator.source_url")
         self.refused(located(source_url="https://example.invalid/a b"), "locator.source_url")
+        self.refused(located(source_url="https://" + "x" * 121), "locator.source_url")  # 129 bytes
         self.refused(located(extra=1), "unknown field extra")
         d = located()
         del d["locator"]["bigfile_index"]
@@ -55,6 +58,8 @@ class TestLocator(unittest.TestCase):
         with_locator = make_world(options_with([located()])).ctr_content_plan
         self.assertEqual(with_locator["packages"], [located()])
         self.assertTrue(content_plan.validate(with_locator))
+        longest = make_world(options_with([located(source_url="https://" + "x" * 120)])).ctr_content_plan
+        self.assertTrue(content_plan.validate(longest))
         stripped = copy.deepcopy(with_locator)
         del stripped["packages"][0]["locator"]
         self.assertEqual(stripped, plain, "the locator must not change tracks, checks or ids")
