@@ -192,6 +192,11 @@ def bootstrap_core(paths: Paths, load_worlds: bool) -> None:
         Utils.user_path.cached_path = paths.ap_home
         Utils.home_path.cached_path = paths.ap_home
         Utils.cache_path.cached_path = os.path.join(paths.ap_home, "cache")
+        # Archipelago reads options.yaml / host.yaml from the working folder
+        # first, and its output stage uses the system temp folder. Keep both
+        # inside solo/.
+        os.chdir(paths.ap_home)
+        tempfile.tempdir = paths.tmp
         _archipelago_ready = True
     if load_worlds and "worlds" not in sys.modules:
         _stage_world(paths)
@@ -361,8 +366,10 @@ def _load_yaml_documents(path: str) -> list:
     try:
         with open(path, "rb") as handle:
             text = handle.read().decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise SoloError("yaml", "The YAML is not UTF-8 text.", file=os.path.basename(path))
+    except UnicodeDecodeError as error:
+        with open(path, "rb") as handle:
+            line = handle.read()[:error.start].count(b"\n") + 1
+        raise SoloError("yaml", "The YAML is not UTF-8 text.", file=os.path.basename(path), line=line)
     except OSError as error:
         raise SoloError("yaml", f"Could not read the YAML: {error}", file=os.path.basename(path))
     try:
@@ -415,6 +422,10 @@ def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
 
 
 def stamp_requires(doc: dict) -> dict:
+    """Only for YAMLs this client writes (presets). A YAML that already says
+    what it requires keeps it, so Archipelago can refuse a mismatch."""
+    if "requires" in doc:
+        return doc
     doc = dict(doc)
     doc["requires"] = {"version": ap_version(), "game": {GAME: world_version()}}
     return doc
@@ -452,9 +463,13 @@ def _option_error(error: Exception) -> SoloError:
     import Options
     text = str(error) or error.__class__.__name__
     hints = world_class().options_dataclass.type_hints
-    named = [name for name, option in hints.items()
-             if re.search(r"\b%s\b" % re.escape(name), text)
-             or re.search(r"\b%s\b" % re.escape(getattr(option, "display_name", name)), text)]
+    found = []
+    for name, option in hints.items():
+        spots = [m.start() for pattern in (name, getattr(option, "display_name", name))
+                 for m in [re.search(r"\b%s\b" % re.escape(pattern), text)] if m]
+        if spots:
+            found.append((min(spots), name))
+    named = [name for _, name in sorted(found)]  # the option the message names first
     fill = error.__class__.__name__ in ("FillError",)
     if fill:
         return SoloError("fill", "This combination could not be generated. Try again or change options.",
@@ -523,12 +538,20 @@ def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after
     return os.path.join(out_dir, rooms[0])
 
 
+TMP_ABANDONED_SECONDS = 600  # well past the client's 120 s generation limit
+
+
 def clear_tmp(paths: Paths) -> None:
     """A cancelled generation (the client ends the process) leaves its work
-    folder behind. The client runs one job at a time and serve never uses
-    tmp, so a new job starts from an empty tmp."""
+    folder behind. Remove work older than any live job can be."""
+    now = time.time()
     for entry in os.listdir(paths.tmp):
         full = os.path.join(paths.tmp, entry)
+        try:
+            if now - os.path.getmtime(full) < TMP_ABANDONED_SECONDS:
+                continue
+        except OSError:
+            continue
         if os.path.isdir(full):
             shutil.rmtree(full, ignore_errors=True)
         else:
@@ -801,9 +824,18 @@ def live_lock(room: str) -> dict | None:
     path = os.path.join(room, "session.lock")
     try:
         lock = read_json(path)
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return None
-    if pid_alive(int(lock.get("pid", 0))):
+    except (OSError, ValueError):
+        # Being written right now by a starting server (acquire_lock creates
+        # it, then fills it): a young unreadable lock counts as live.
+        try:
+            if time.time() - os.path.getmtime(path) < 5:
+                return {"pid": None, "port": None}
+        except OSError:
+            pass
+        return None
+    if pid_alive(int(lock.get("pid") or 0)):
         return lock
     return None
 
@@ -833,44 +865,145 @@ def port_free(port: int) -> bool:
         test.close()
 
 
+_SAVE_LOCK = threading.Lock()
+
+
 def _atomic_save(ctx) -> bool:
+    """Write the save to a unique temp file, fsync, then replace. Serialized:
+    the periodic saver thread and the check handler both call it. A failed
+    save leaves the save dirty so the periodic saver retries; the client's
+    check journal resends the checks on the next connect as well."""
     import pickle
     import zlib
+    with _SAVE_LOCK:
+        tmp = None
+        try:
+            encoded = zlib.compress(pickle.dumps(ctx.get_save()))
+            folder = os.path.dirname(os.path.abspath(ctx.save_filename))
+            fd, tmp = tempfile.mkstemp(prefix=".apsave-", suffix=".tmp", dir=folder)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, ctx.save_filename)
+            tmp = None
+        except Exception as error:
+            ctx.logger.exception(error)
+            ctx.save_dirty = True
+            return False
+        finally:
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+        ctx.save_dirty = False
+        return True
+
+
+def _save_loads(path: str) -> bool:
+    import zlib
+    from Utils import restricted_loads
     try:
-        encoded = zlib.compress(pickle.dumps(ctx.get_save()))
-        tmp = ctx.save_filename + ".tmp"
-        with open(tmp, "wb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp, ctx.save_filename)
-    except Exception as error:  # a failed save is logged; the client resends on reconnect
-        ctx.logger.exception(error)
+        with open(path, "rb") as handle:
+            data = restricted_loads(zlib.decompress(handle.read()))
+        return isinstance(data, dict) and "location_checks" in data
+    except Exception:
         return False
-    return True
+
+
+def prepare_save(save_file: str) -> str:
+    """Before a start: keep a good save as .bak; restore a good .bak over a
+    damaged save; refuse when both are damaged. Returns what happened."""
+    bak = save_file + ".bak"
+    if not os.path.isfile(save_file):
+        if os.path.isfile(bak) and _save_loads(bak):
+            shutil.copyfile(bak, save_file)
+            return "restored"
+        return "new"
+    if _save_loads(save_file):
+        shutil.copyfile(save_file, bak + ".tmp")
+        os.replace(bak + ".tmp", bak)
+        return "ok"
+    damaged = save_file + ".damaged-" + time.strftime("%Y%m%d%H%M%S")
+    os.replace(save_file, damaged)
+    if os.path.isfile(bak) and _save_loads(bak):
+        shutil.copyfile(bak, save_file)
+        return "restored"
+    raise SoloError("save", "The save of this solo seed is damaged and has no good backup.",
+                    damaged=os.path.basename(damaged))
+
+
+def acquire_lock(room: str) -> str:
+    """Create session.lock atomically before the save is loaded. A lock whose
+    process is gone is stale and is replaced. Returns this server's token."""
+    path = os.path.join(room, "session.lock")
+    token = secrets.token_hex(8)
+    for _ in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            lock = live_lock(room)
+            if lock is not None:
+                raise SoloError("running", "This room already has a running server.",
+                                port=lock.get("port"), pid=lock.get("pid"))
+            try:
+                os.remove(path)  # stale: its process is gone
+            except FileNotFoundError:
+                pass
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump({"pid": os.getpid(), "token": token, "port": None}, handle)
+        return token
+    raise SoloError("running", "This room's lock could not be taken.")
+
+
+def release_lock(room: str, token: str) -> None:
+    path = os.path.join(room, "session.lock")
+    try:
+        if read_json(path).get("token") == token:
+            os.remove(path)
+    except (OSError, ValueError):
+        pass
+
+
+def check_ports(ports: tuple[int, int]) -> tuple[int, int]:
+    """The solo range is 38301 to 38320. Tests may pick another range with
+    CTR_SOLO_TEST_PORTS=1 (parallel test runs); the client never sets it."""
+    first, last = ports
+    if (first, last) != (PORT_FIRST, PORT_LAST) and os.environ.get("CTR_SOLO_TEST_PORTS") != "1":
+        raise SoloError("ports", f"The solo port range is {PORT_FIRST} to {PORT_LAST}.")
+    if not (1024 <= first <= last <= 65535):
+        raise SoloError("ports", "Invalid port range.")
+    return first, last
 
 
 def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, int],
           password: str | None) -> int:
+    ports = check_ports(ports)
+    room = paths.room_dir(room_id)
+    meta_path = os.path.join(room, "room.json")
+    if not os.path.isfile(meta_path):
+        raise SoloError("bad_room", "That solo room does not exist.", room_id=room_id)
+    meta = read_json(meta_path)
+    token = acquire_lock(room)
+    try:
+        return _serve_locked(paths, room, room_id, meta, game_pid, ports, password, token)
+    finally:
+        release_lock(room, token)
+
+
+def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: int | None,
+                  ports: tuple[int, int], password: str | None, token: str) -> int:
     import asyncio
     import functools
     import logging
     import MultiServer
     import websockets
 
-    room = paths.room_dir(room_id)
-    meta_path = os.path.join(room, "room.json")
-    if not os.path.isfile(meta_path):
-        raise SoloError("bad_room", "That solo room does not exist.", room_id=room_id)
-    meta = read_json(meta_path)
-    lock = live_lock(room)
-    if lock is not None:
-        raise SoloError("running", "This room already has a running server.",
-                        port=lock.get("port"), pid=lock.get("pid"))
     room_file = os.path.join(room, meta["room_file"])
     save_file = os.path.splitext(room_file)[0] + ".apsave"
-    if os.path.isfile(save_file):
-        shutil.copyfile(save_file, save_file + ".bak")
+    save_state = prepare_save(save_file)
     password = password or secrets.token_hex(12)
 
     log = logging.getLogger()
@@ -878,6 +1011,7 @@ def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, in
     handler = logging.FileHandler(os.path.join(room, "server.log"), encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     log.addHandler(handler)
+    log.info("solo serve: room %s, save %s", room_id, save_state)
 
     ctx = MultiServer.Context(HOST, 0, None, password, location_check_points=1, hint_cost=10,
                               item_cheat=False, release_mode="auto", collect_mode="auto",
@@ -887,12 +1021,16 @@ def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, in
     ctx.save_filename = save_file
     ctx._save = lambda exit_save=False: _atomic_save(ctx)  # noqa: E731
     ctx.init_save(True)
+    # The room's embedded server options and a loaded save both set the
+    # passwords. A solo server always uses this session's password and has
+    # no admin password.
+    ctx.password = password
+    ctx.server_password = None
     # Save on every check batch, so a crash cannot lose a check.
     original_checks = MultiServer.register_location_checks
 
     def register_location_checks(c, team, slot, locations, *args, **kwargs):
         result = original_checks(c, team, slot, locations, *args, **kwargs)
-        c.save_dirty = False
         _atomic_save(c)
         return result
 
@@ -919,7 +1057,7 @@ def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, in
         ctx.port = port
         ctx.server = server
         write_json_atomic(os.path.join(room, "session.lock"),
-                          {"pid": os.getpid(), "port": port, "password": password, "seed_name": ctx.seed_name,
+                          {"pid": os.getpid(), "token": token, "port": port, "seed_name": ctx.seed_name,
                            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
         emit("ready", port=port, password=password, seed_name=ctx.seed_name, slot=meta.get("slot"),
              room_id=room_id)
@@ -965,15 +1103,7 @@ def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, in
         emit("stopped", reason=reason)
         return 0
 
-    try:
-        return asyncio.run(run())
-    finally:
-        try:
-            lock_path = os.path.join(room, "session.lock")
-            if os.path.isfile(lock_path) and read_json(lock_path).get("pid") == os.getpid():
-                os.remove(lock_path)
-        except (OSError, ValueError):
-            pass
+    return asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------

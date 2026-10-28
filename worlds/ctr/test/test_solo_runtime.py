@@ -10,11 +10,11 @@ import hashlib
 import json
 import os
 import shutil
-import signal
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 import zlib
@@ -53,6 +53,7 @@ def build_client() -> str:
 def env(home: str | None = None) -> dict:
     result = dict(os.environ)
     result["PYTHONDONTWRITEBYTECODE"] = "1"
+    result["CTR_SOLO_TEST_PORTS"] = "1"  # parallel test runs use their own port ranges
     result.pop("PYTHONPATH", None)
     if home:
         result["HOME"] = home
@@ -282,8 +283,30 @@ class TestServe(SoloTestCase):
                                  "--port-last", str(last_port)],
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, env=env(self.home))
-        ready = json.loads(proc.stdout.readline())
-        return proc, ready
+        line = []
+        reader = threading.Thread(target=lambda: line.append(proc.stdout.readline()), daemon=True)
+        reader.start()
+        reader.join(60)
+        if not line:
+            proc.kill()
+            self.fail("the server did not answer within 60 seconds")
+        return proc, json.loads(line[0])
+
+    def try_connect(self, ready: dict, password: str) -> str:
+        """The first reply command to a Connect with this password."""
+        import asyncio
+        import websockets
+
+        async def go():
+            async with websockets.connect(f"ws://127.0.0.1:{ready['port']}") as ws:
+                json.loads(await ws.recv())
+                await ws.send(json.dumps([{"cmd": "Connect", "game": GAME, "name": ready["slot"],
+                                           "password": password, "uuid": "test",
+                                           "version": {"major": 0, "minor": 6, "build": 7, "class": "Version"},
+                                           "items_handling": 7, "tags": [], "slot_data": False}]))
+                return json.loads(await ws.recv())[0]["cmd"]
+
+        return asyncio.run(go())
 
     def check_location(self, ready: dict) -> int:
         import asyncio
@@ -330,7 +353,7 @@ class TestServe(SoloTestCase):
                 self.assertTrue(os.path.isfile(lock))
                 location = self.check_location(ready)
                 # The check must already be on disk: kill without a chance to save.
-                proc.send_signal(signal.SIGKILL)
+                proc.kill()
                 proc.wait(10)
             finally:
                 if proc.poll() is None:
@@ -359,6 +382,83 @@ class TestServe(SoloTestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.solo, "rooms", room["room_id"],
                                                     os.path.splitext(room["room_file"])[0] + ".apsave.bak")))
         self.assertFalse(os.path.exists(os.path.join(self.solo, "rooms", room["room_id"], "session.lock")))
+
+    def test_password_is_required_even_after_a_save(self):
+        room = self.generate_room()
+        base = 38800 + (os.getpid() % 60) * 3
+        for _ in range(2):  # the second start loads the save written by the first
+            proc, ready = self.start(room["room_id"], base, base + 2)
+            try:
+                self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(self.try_connect(ready, ""), "ConnectionRefused")
+                self.assertEqual(self.try_connect(ready, "wrong"), "ConnectionRefused")
+                self.assertEqual(self.try_connect(ready, ready["password"]), "Connected")
+                proc.stdin.write("/exit\n")
+                proc.stdin.flush()
+                self.assertEqual(proc.wait(15), 0)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+
+    def test_damaged_save_is_restored_from_the_backup_or_refused(self):
+        room = self.generate_room()
+        base = 38600 + (os.getpid() % 60) * 3
+        folder = os.path.join(self.solo, "rooms", room["room_id"])
+        save = os.path.join(folder, os.path.splitext(room["room_file"])[0] + ".apsave")
+        proc, ready = self.start(room["room_id"], base, base + 2)
+        try:
+            self.check_location(ready)
+            proc.stdin.write("/exit\n")
+            proc.stdin.flush()
+            proc.wait(15)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+        # Second start makes the .bak from the good save; then damage the save.
+        proc, ready = self.start(room["room_id"], base, base + 2)
+        proc.stdin.write("/exit\n")
+        proc.stdin.flush()
+        proc.wait(15)
+        with open(save, "wb") as handle:
+            handle.write(b"not a save")
+        proc, ready = self.start(room["room_id"], base, base + 2)
+        try:
+            self.assertEqual(ready["event"], "ready", ready)
+            proc.stdin.write("/exit\n")
+            proc.stdin.flush()
+            proc.wait(15)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+        self.assertEqual(len(self.read_save(room)["location_checks"][(0, 1)]), 1)
+        self.assertTrue(any(n.startswith(os.path.basename(save) + ".damaged-") for n in os.listdir(folder)))
+        # Both damaged: refused, nothing overwritten.
+        for path in (save, save + ".bak"):
+            with open(path, "wb") as handle:
+                handle.write(b"broken")
+        events, code = self.call("serve", "--room", room["room_id"], "--port-first", str(base),
+                                 "--port-last", str(base + 2))
+        self.assertEqual(last(events)["kind"], "save")
+
+    def test_one_server_per_room_and_production_port_range(self):
+        room = self.generate_room()
+        base = 38400 + (os.getpid() % 60) * 3
+        proc, ready = self.start(room["room_id"], base, base + 2)
+        try:
+            self.assertEqual(ready["event"], "ready", ready)
+            events, code = self.call("serve", "--room", room["room_id"], "--port-first", str(base),
+                                     "--port-last", str(base + 2))
+            self.assertEqual(last(events)["kind"], "running")
+        finally:
+            proc.kill()
+            proc.wait(10)
+        script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        no_hook = env(self.home)
+        no_hook.pop("CTR_SOLO_TEST_PORTS")
+        out = subprocess.run([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room["room_id"],
+                              "--port-first", "39000", "--port-last", "39000"],
+                             capture_output=True, text=True, timeout=120, env=no_hook)
+        self.assertEqual(json.loads(out.stdout.splitlines()[-1])["kind"], "ports")
 
     def test_closed_stdin_stops_the_server(self):
         room = self.generate_room()
@@ -389,12 +489,17 @@ class TestServe(SoloTestCase):
 class TestTmp(SoloTestCase):
     def test_a_new_job_clears_a_cancelled_generation(self):
         stale = os.path.join(self.solo, "tmp", "generate-stale")
+        fresh = os.path.join(self.solo, "tmp", "generate-running")
         os.makedirs(stale)
+        os.makedirs(fresh)
         with open(os.path.join(stale, "AP_x.zip"), "wb") as handle:
             handle.write(b"half")
+        old = time.time() - 3600
+        os.utime(stale, (old, old))
         events, code = self.call("validate", "--yaml", self.preset("standard.yaml"))
         self.assertEqual(code, 0, events)
-        self.assertEqual(os.listdir(os.path.join(self.solo, "tmp")), [])
+        # Abandoned work goes; work young enough to belong to a live job stays.
+        self.assertEqual(os.listdir(os.path.join(self.solo, "tmp")), ["generate-running"])
         self.assertEqual(os.listdir(os.path.join(self.solo, "rooms")), [])
 
 
