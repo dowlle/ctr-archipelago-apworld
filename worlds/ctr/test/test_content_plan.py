@@ -60,8 +60,11 @@ class TestContentPlan(CTRTestBase):
         # baby-t-park has a named block since the 0.3.0 id step (#306).
         self.assertIn("Baby T Park: Trophy Race", [loc.name for loc in self.multiworld.get_locations(1)])
         self.assertEqual(plan["packages"], [content_plan.PACKAGES[1]])
-        self.assertEqual(sum(item.name == "Key" for item in self.multiworld.itempool), 4)
-        self.assertEqual(sum(item.name.endswith(" Gem") for item in self.multiworld.itempool), 5)
+        # Count the start openers too: bootstrap_start may have placed a Key or a Gem.
+        names = [item.name for item in self.multiworld.itempool]
+        names += [name for name, _ in getattr(self.world, "_ctr_start_bootstrap", ())]
+        self.assertEqual(sum(name == "Key" for name in names), 4)
+        self.assertEqual(sum(name.endswith(" Gem") for name in names), 5)
         self.assertEqual(len(self.multiworld.precollected_items[1]), 0)
         self.assertFalse(hasattr(self.world, "_ctr_backstop_fired"))
 
