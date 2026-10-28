@@ -86,8 +86,13 @@ def last(events: list[dict]) -> dict:
 def free_ports(count: int) -> int:
     """First of `count` consecutive ports that nothing listens on right now."""
     import random
+    # Each xdist worker draws from its own band, so two workers never race
+    # for the same range between this probe and the child's bind.
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+    band = int(worker[2:]) if worker[2:].isdigit() else 0
+    low = 40000 + (band % 10) * 2000
     for _ in range(200):
-        base = random.randint(40000, 60000)
+        base = random.randint(low, low + 1990)
         socks = []
         try:
             for port in range(base, base + count):
@@ -198,6 +203,14 @@ class TestPresets(SoloTestCase):
         with open(self.preset("full_adventure.yaml"), encoding="utf-8") as handle:
             self.assertIn("accessibility: full", handle.read())
 
+    def test_a_bundled_preset_is_always_stamped(self):
+        events, code = self.call("generate", "--yaml", self.preset("quick.yaml"), "--preset", "quick")
+        self.assertEqual(code, 0, events)
+        import yaml
+        room = os.path.join(self.solo, "rooms", last(events)["room_id"])
+        with open(os.path.join(room, "player.yaml"), encoding="utf-8") as handle:
+            self.assertIn("requires", yaml.safe_load(handle))
+
     def test_overrides_and_option_error_names_the_option(self):
         events, code = self.call("validate", "--yaml", self.preset("standard.yaml"),
                                  "--set", "oxide_goal=none", "--set", "bosses_required_goal=0",
@@ -231,6 +244,15 @@ class TestRefusals(SoloTestCase):
 
     def test_two_players(self):
         self.check("name: A\ngame: Crash Team Racing\n---\nname: B\ngame: Crash Team Racing\n", "players")
+
+    def test_an_empty_extra_document(self):
+        self.check("name: A\ngame: Crash Team Racing\n---\n", "players")
+
+    def test_weighted_game_with_zero_weight_for_another(self):
+        path = write_yaml(self.work, "in.yaml",
+                          "name: A\ngame:\n  Crash Team Racing: 1\n  Other Game: '0'\nCrash Team Racing: {}\n")
+        events, code = self.call("validate", "--yaml", path)
+        self.assertEqual(code, 0, events)
 
     def test_broken_syntax_has_a_line(self):
         result = self.check("name: A\ngame: Crash Team Racing\nCrash Team Racing:\n  oxide_goal: [\n", "yaml")
@@ -551,6 +573,15 @@ class TestServe(SoloTestCase):
 
 
 class TestLinks(SoloTestCase):
+    def test_a_linked_ap_home_gets_nothing_created(self):
+        outside = os.path.join(self.work, "outside-home")
+        os.makedirs(outside)
+        os.makedirs(self.solo)
+        os.symlink(outside, os.path.join(self.solo, "ap-home"))
+        events, code = self.call("describe")
+        self.assertEqual(last(events)["kind"], "runtime")
+        self.assertEqual(os.listdir(outside), [])
+
     def test_a_linked_worlds_folder_is_refused(self):
         outside = os.path.join(self.work, "global-worlds")
         os.makedirs(outside)

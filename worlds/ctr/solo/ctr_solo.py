@@ -99,10 +99,20 @@ class Paths:
         self.overlay = os.path.join(self.runtime, "options-overlay.json")
 
     def ensure(self) -> None:
-        for path in (self.solo, self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp,
-                     os.path.join(self.ap_home, "worlds")):
+        # Parents before children, each checked before anything is created
+        # inside it, so a link can never receive a new folder.
+        os.makedirs(self.solo, exist_ok=True)
+        for path in (self.ap_home, os.path.join(self.ap_home, "worlds"), self.rooms, self.yamls, self.inbox,
+                     self.tmp):
+            self.check_one(path)
             os.makedirs(path, exist_ok=True)
         self.check_inside()
+
+    def check_one(self, path: str) -> None:
+        root = os.path.realpath(self.solo)
+        if os.path.islink(path) or (os.path.exists(path) and
+                                    os.path.commonpath([root, os.path.realpath(path)]) != root):
+            raise SoloError("runtime", f"A solo folder leads outside the solo folder: {path}")
 
     def check_inside(self) -> None:
         """The wrapper deletes and writes in these folders. A link that leads
@@ -389,7 +399,7 @@ def _load_yaml_documents(path: str) -> list:
     except OSError as error:
         raise SoloError("yaml", f"Could not read the YAML: {error}", file=os.path.basename(path))
     try:
-        docs = [doc for doc in parse_yamls(text) if doc is not None]
+        docs = list(parse_yamls(text))
     except Exception as error:  # yaml.MarkedYAMLError carries the line number
         mark = getattr(error, "problem_mark", None)
         line = mark.line + 1 if mark is not None else None
@@ -398,10 +408,18 @@ def _load_yaml_documents(path: str) -> list:
     return docs
 
 
+def _weight(value) -> int:
+    """A weight as Archipelago reads it (int of the value); unreadable is 0."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def read_player_yaml(path: str) -> dict:
     """One document, one CTR player. Returns the document."""
     docs = _load_yaml_documents(path)
-    if not docs:
+    if not docs or all(doc is None for doc in docs):
         raise SoloError("yaml", "The YAML is empty.", file=os.path.basename(path))
     if len(docs) > 1:
         raise SoloError("players", "Solo seeds have one player. This YAML has more than one document.",
@@ -410,7 +428,7 @@ def read_player_yaml(path: str) -> dict:
     if not isinstance(doc, dict):
         raise SoloError("yaml", "The YAML is not a player settings file.", file=os.path.basename(path))
     game = doc.get("game")
-    games = [k for k, v in game.items() if v] if isinstance(game, dict) else [game]
+    games = [k for k, v in game.items() if _weight(v) > 0] if isinstance(game, dict) else [game]
     if games != [GAME]:
         raise SoloError("game", f"This YAML is for {', '.join(map(str, games)) or 'no game'}, not {GAME}.",
                         file=os.path.basename(path))
@@ -587,8 +605,9 @@ def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str
     """Read and override a YAML, write the exact input to a temp file."""
     doc = read_player_yaml(source)
     doc = apply_overrides(doc, name, settings)
-    if stamp:
-        doc = stamp_requires(doc)
+    presets = os.path.realpath(paths.presets)
+    if stamp or os.path.commonpath([presets, os.path.realpath(source)]) == presets:
+        doc = stamp_requires(doc)  # a bundled preset is always this client's own YAML
     fd, tmp = tempfile.mkstemp(prefix="player-", suffix=".yaml", dir=paths.tmp)
     os.close(fd)
     dump_yaml(doc, tmp)
@@ -1006,9 +1025,16 @@ def _save_matches_room(path: str, ctx) -> bool:
     except Exception:
         return False
     needed = ("version", "connect_names", "received_items", "location_checks", "hints_used", "hints",
-              "name_aliases", "client_game_state", "client_connection_timers", "client_activity_timers")
-    return (isinstance(data, dict) and all(key in data for key in needed)
-            and data["connect_names"] == ctx.connect_names and data["version"] <= ctx.save_version)
+              "name_aliases", "client_game_state", "client_connection_timers", "client_activity_timers",
+              "random_state")
+    option_keys = ("hint_cost", "location_check_points", "server_password", "password", "release_mode",
+                   "remaining_mode", "collect_mode", "item_cheat", "compatibility")
+    if not (isinstance(data, dict) and all(key in data for key in needed)):
+        return False
+    options = data.get("game_options")
+    if options is not None and not (isinstance(options, dict) and all(k in options for k in option_keys)):
+        return False
+    return data["connect_names"] == ctx.connect_names and data["version"] <= ctx.save_version
 
 
 def prepare_save(save_file: str, ctx) -> str:
@@ -1021,9 +1047,7 @@ def prepare_save(save_file: str, ctx) -> str:
             return "restored"
         return "new"
     if _save_matches_room(save_file, ctx):
-        shutil.copyfile(save_file, bak + ".tmp")
-        os.replace(bak + ".tmp", bak)
-        return "ok"
+        return "ok"  # .bak is refreshed once the save has been applied (load_save)
     damaged = save_file + ".damaged-" + time.strftime("%Y%m%d%H%M%S")
     os.replace(save_file, damaged)
     if os.path.isfile(bak) and _save_matches_room(bak, ctx):
@@ -1036,7 +1060,8 @@ def prepare_save(save_file: str, ctx) -> str:
 def load_save(ctx, save_file: str) -> None:
     """MultiServer's init_save logs a save it cannot apply and starts a new
     game, which the next check would then write over. Here a save that
-    cannot be applied stops the start instead."""
+    cannot be applied stops the start instead, and only a save that applied
+    becomes the new .bak."""
     ctx.save_filename = save_file
     ctx.saving = True
     if os.path.isfile(save_file):
@@ -1044,6 +1069,9 @@ def load_save(ctx, save_file: str) -> None:
             ctx.set_save(_read_save(save_file))
         except Exception as error:
             raise SoloError("save", f"The save of this solo seed could not be loaded: {error}")
+        bak = save_file + ".bak"
+        shutil.copyfile(save_file, bak + ".tmp")
+        os.replace(bak + ".tmp", bak)
     _start_saver(ctx)
 
 
