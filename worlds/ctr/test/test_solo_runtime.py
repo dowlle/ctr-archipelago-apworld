@@ -546,6 +546,19 @@ class TestServe(SoloTestCase):
                 proc.kill()
         self.assertIn(location, self.read_save(room)["location_checks"][(0, 1)])
 
+    def test_room_json_cannot_point_outside_the_room(self):
+        room = self.generate_room()
+        meta_path = os.path.join(self.solo, "rooms", room["room_id"], "room.json")
+        with open(meta_path, encoding="utf-8") as handle:
+            meta = json.load(handle)
+        meta["room_file"] = "../../" + meta["room_file"]
+        with open(meta_path, "w", encoding="utf-8") as handle:
+            json.dump(meta, handle)
+        base = free_ports(3)
+        events, code = self.call("serve", "--room", room["room_id"], "--port-first", str(base),
+                                 "--port-last", str(base + 2))
+        self.assertEqual(last(events)["kind"], "room")
+
     def test_closed_stdin_stops_the_server(self):
         room = self.generate_room()
         base = free_ports(3)
@@ -573,6 +586,14 @@ class TestServe(SoloTestCase):
 
 
 class TestLinks(SoloTestCase):
+    def test_a_linked_solo_folder_is_refused(self):
+        outside = os.path.join(self.work, "outside-solo")
+        os.makedirs(outside)
+        os.symlink(outside, self.solo)
+        events, code = self.call("describe")
+        self.assertEqual(last(events)["kind"], "runtime")
+        self.assertEqual(os.listdir(outside), [])
+
     def test_a_linked_ap_home_gets_nothing_created(self):
         outside = os.path.join(self.work, "outside-home")
         os.makedirs(outside)

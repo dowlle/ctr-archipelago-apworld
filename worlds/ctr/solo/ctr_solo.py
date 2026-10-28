@@ -100,7 +100,10 @@ class Paths:
 
     def ensure(self) -> None:
         # Parents before children, each checked before anything is created
-        # inside it, so a link can never receive a new folder.
+        # inside it, so a link can never receive a new folder. The solo
+        # folder itself must be a real folder in the client folder.
+        if os.path.islink(self.solo):
+            raise SoloError("runtime", f"The solo folder is a link: {self.solo}")
         os.makedirs(self.solo, exist_ok=True)
         for path in (self.ap_home, os.path.join(self.ap_home, "worlds"), self.rooms, self.yamls, self.inbox,
                      self.tmp):
@@ -799,7 +802,10 @@ def _yaml_entries(folder: str, source: str) -> list:
 
 
 def checks_done(room: str, meta: dict) -> int | None:
-    save = os.path.join(room, os.path.splitext(meta.get("room_file", ""))[0] + ".apsave")
+    name = meta.get("room_file", "")
+    if not isinstance(name, str) or os.path.basename(name) != name:
+        return None
+    save = os.path.join(room, os.path.splitext(name)[0] + ".apsave")
     if not os.path.isfile(save):
         return 0
     try:
@@ -1075,6 +1081,21 @@ def load_save(ctx, save_file: str) -> None:
     _start_saver(ctx)
 
 
+def room_file_path(room: str, meta: dict) -> str:
+    """room.json names the room file. It must be a plain file in the room
+    folder with the recorded SHA-256, so an edited room.json cannot point the
+    server (and its save) somewhere else."""
+    name = meta.get("room_file")
+    if not isinstance(name, str) or not name or os.path.basename(name) != name or name in (".", ".."):
+        raise SoloError("room", "room.json does not name a room file in its folder.")
+    path = os.path.join(room, name)
+    if os.path.islink(path) or not os.path.isfile(path):
+        raise SoloError("room", "The room file is missing.")
+    if meta.get("room_sha256") and sha256_file(path) != meta["room_sha256"]:
+        raise SoloError("room", "The room file does not match room.json.")
+    return path
+
+
 def check_ports(ports: tuple[int, int]) -> tuple[int, int]:
     """The solo range is 38301 to 38320. Tests may pick another range with
     CTR_SOLO_TEST_PORTS=1 (parallel test runs); the client never sets it."""
@@ -1117,7 +1138,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
     import MultiServer
     import websockets
 
-    room_file = os.path.join(room, meta["room_file"])
+    room_file = room_file_path(room, meta)
     save_file = os.path.splitext(room_file)[0] + ".apsave"
     password = password or secrets.token_hex(12)
 
