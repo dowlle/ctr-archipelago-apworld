@@ -99,13 +99,29 @@ class Paths:
         self.overlay = os.path.join(self.runtime, "options-overlay.json")
 
     def ensure(self) -> None:
-        for path in (self.solo, self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp):
+        for path in (self.solo, self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp,
+                     os.path.join(self.ap_home, "worlds")):
             os.makedirs(path, exist_ok=True)
+        self.check_inside()
+
+    def check_inside(self) -> None:
+        """The wrapper deletes and writes in these folders. A link that leads
+        elsewhere (for example to a global Archipelago worlds folder) is
+        refused before anything is touched."""
+        root = os.path.realpath(self.solo)
+        for path in (self.ap_home, self.rooms, self.yamls, self.inbox, self.tmp,
+                     os.path.join(self.ap_home, "worlds")):
+            real = os.path.realpath(path)
+            if os.path.islink(path) or os.path.commonpath([root, real]) != root:
+                raise SoloError("runtime", f"A solo folder leads outside the solo folder: {path}")
 
     def room_dir(self, room_id: str) -> str:
         if not re.fullmatch(r"[0-9a-f]{%d}" % ROOM_ID_HEX, room_id or ""):
             raise SoloError("bad_room", f"Not a room id: {room_id!r}")
-        return os.path.join(self.rooms, room_id)
+        path = os.path.join(self.rooms, room_id)
+        if os.path.islink(path):
+            raise SoloError("bad_room", "That solo room is a link, not a folder.", room_id=room_id)
+        return path
 
 
 def sha256_file(path: str) -> str:
@@ -332,7 +348,7 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
             if option is None:
                 continue
             raw = section.get(name, option.default)
-            if isinstance(raw, dict) or (isinstance(raw, str) and raw.startswith("random")):
+            if isinstance(raw, dict) or (isinstance(raw, str) and raw.strip().lower().startswith("random")):
                 raw = option.default
             try:
                 values[name] = _canonical(option, raw)
@@ -480,8 +496,9 @@ def _option_error(error: Exception) -> SoloError:
 
 
 def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after_options: bool,
-                    spoiler: int) -> str | None:
-    """Run Generate and Main in process. Returns the room zip path."""
+                    spoiler: int, skip_output: bool = False) -> str | None:
+    """Run Generate and Main in process. Returns the room zip path (None for
+    skip_output: everything up to and including fill, no room file)."""
     import Generate
     import Main
     from worlds import AutoWorld
@@ -494,6 +511,8 @@ def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after
             "--meta_file_path", os.path.join(players, "_none_meta.yaml")]
     if seed is not None:
         argv += ["--seed", str(seed)]
+    if skip_output:
+        argv += ["--skip_output"]
     args = Generate.mystery_argparse(argv)
     emit("progress", phase="Checking options")
     try:
@@ -532,6 +551,8 @@ def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after
     finally:
         AutoWorld.call_all = original_call_all
         Main.AutoWorld.call_all = original_call_all
+    if skip_output:
+        return None
     rooms = [name for name in os.listdir(out_dir) if name.startswith("AP_") and name.endswith(".zip")]
     if len(rooms) != 1:
         raise SoloError("generate", "Generation finished without exactly one room file.")
@@ -578,7 +599,11 @@ def validate(paths: Paths, source: str, name: str | None, settings: list[str], s
     _, tmp = prepare_yaml(paths, source, name, settings, stamp)
     work = tempfile.mkdtemp(prefix="validate-", dir=paths.tmp)
     try:
-        _run_generation(tmp, work, None, stop_after_options=True, spoiler=0)
+        # The whole generation except writing the room: the world raises some
+        # option errors only at fill time (for example the warp pad check in
+        # pre_fill), so stopping after generate_early would pass YAMLs that
+        # cannot generate.
+        _run_generation(tmp, work, None, stop_after_options=False, spoiler=0, skip_output=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
         os.remove(tmp)
@@ -781,7 +806,7 @@ def list_all(paths: Paths) -> dict:
         except (OSError, ValueError):
             continue
         meta["checks_done"] = checks_done(folder, meta)
-        meta["running"] = live_lock(folder) is not None
+        meta["running"] = room_running(folder)
         rooms.append(meta)
     rooms.sort(key=lambda m: m.get("created", ""), reverse=True)
     return {"rooms": rooms, "yamls": _yaml_entries(paths.yamls, "saved"),
@@ -794,6 +819,8 @@ def list_all(paths: Paths) -> dict:
 
 
 def pid_alive(pid: int) -> bool:
+    """False only when the process is known to be gone. A process we may not
+    query (access denied) counts as alive."""
     if pid <= 0:
         return False
     if os.name == "nt":
@@ -803,11 +830,11 @@ def pid_alive(pid: int) -> bool:
         kernel32.OpenProcess.restype = wintypes.HANDLE
         handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
-            return False
+            return ctypes.get_last_error() == 5  # ERROR_ACCESS_DENIED: exists, not ours to query
         try:
             code = wintypes.DWORD()
             if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return False
+                return True
             return code.value == 259  # STILL_ACTIVE
         finally:
             kernel32.CloseHandle(handle)
@@ -820,49 +847,98 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
-def live_lock(room: str) -> dict | None:
-    path = os.path.join(room, "session.lock")
-    try:
-        lock = read_json(path)
-    except FileNotFoundError:
-        return None
-    except (OSError, ValueError):
-        # Being written right now by a starting server (acquire_lock creates
-        # it, then fills it): a young unreadable lock counts as live.
+class RoomLock:
+    """One server per room: an OS file lock on rooms/<id>/serve.lock, held for
+    the whole session and released by the OS when the process ends, so a
+    crashed server never leaves a stale lock. session.lock beside it only
+    tells the client which port the live server uses."""
+
+    def __init__(self, room: str):
+        self.path = os.path.join(room, "serve.lock")
+        self.handle = None
+
+    def try_acquire(self) -> bool:
+        handle = open(self.path, "a+b")
         try:
-            if time.time() - os.path.getmtime(path) < 5:
-                return {"pid": None, "port": None}
+            if os.name == "nt":
+                import msvcrt
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            handle.close()
+            return False
+        self.handle = handle
+        return True
+
+    def release(self) -> None:
+        if self.handle is None:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+                self.handle.seek(0)
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
         except OSError:
             pass
+        self.handle.close()
+        self.handle = None
+
+
+def room_running(room: str) -> bool:
+    """True while a server holds the room lock (probe and let go at once)."""
+    if not os.path.isfile(os.path.join(room, "serve.lock")):
+        return False
+    probe = RoomLock(room)
+    if probe.try_acquire():
+        probe.release()
+        return False
+    return True
+
+
+def live_lock(room: str) -> dict | None:
+    """The running server's session facts, or None when no server runs."""
+    if not room_running(room):
         return None
-    if pid_alive(int(lock.get("pid") or 0)):
-        return lock
-    return None
+    try:
+        return read_json(os.path.join(room, "session.lock"))
+    except (OSError, ValueError):
+        return {"pid": None, "port": None}  # starting: not written yet
 
 
-def port_free(port: int) -> bool:
+def _listen_socket(port: int):
+    """The server's own listening socket. Windows: exclusive use, so no other
+    program can bind the port while we hold it. POSIX: SO_REUSEADDR, so a
+    port in TIME_WAIT from our last session is usable (a port with a live
+    listener never is)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        elif os.name != "nt":
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((HOST, port))
+        sock.listen(16)
+        sock.setblocking(False)
+        return sock
+    except OSError:
+        sock.close()
+        return None
+
+
+def port_answers(port: int) -> bool:
     """Something already answering on the port is never ours to reuse."""
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     probe.settimeout(0.2)
     try:
-        if probe.connect_ex((HOST, port)) == 0:
-            return False
+        return probe.connect_ex((HOST, port)) == 0
     finally:
         probe.close()
-    test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
-            test.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-        elif os.name != "nt":
-            # Like the server's own bind: a port in TIME_WAIT from our last
-            # session is free; a port with a listener still is not.
-            test.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        test.bind((HOST, port))
-        return True
-    except OSError:
-        return False
-    finally:
-        test.close()
 
 
 _SAVE_LOCK = threading.Lock()
@@ -870,9 +946,9 @@ _SAVE_LOCK = threading.Lock()
 
 def _atomic_save(ctx) -> bool:
     """Write the save to a unique temp file, fsync, then replace. Serialized:
-    the periodic saver thread and the check handler both call it. A failed
-    save leaves the save dirty so the periodic saver retries; the client's
-    check journal resends the checks on the next connect as well."""
+    the saver thread and the check handler both call it. A failed save
+    leaves the save dirty, so the saver thread retries until one succeeds;
+    the client's check journal also resends checks on the next connect."""
     import pickle
     import zlib
     with _SAVE_LOCK:
@@ -901,70 +977,74 @@ def _atomic_save(ctx) -> bool:
         return True
 
 
-def _save_loads(path: str) -> bool:
+SAVE_RETRY_SECONDS = 2.0
+
+
+def _start_saver(ctx) -> None:
+    """Replaces MultiServer's saver thread, which clears save_dirty even
+    after a failed save. This one clears it only on success (_atomic_save)."""
+    def loop():
+        while not ctx.exit_event.is_set():
+            time.sleep(SAVE_RETRY_SECONDS)
+            if ctx.save_dirty:
+                _atomic_save(ctx)
+    threading.Thread(target=loop, daemon=True).start()
+
+
+def _read_save(path: str):
     import zlib
     from Utils import restricted_loads
+    with open(path, "rb") as handle:
+        return restricted_loads(zlib.decompress(handle.read()))
+
+
+def _save_matches_room(path: str, ctx) -> bool:
+    """The save loads and passes the checks MultiServer's set_save makes
+    (same players, not newer than the server), with the keys it reads."""
     try:
-        with open(path, "rb") as handle:
-            data = restricted_loads(zlib.decompress(handle.read()))
-        return isinstance(data, dict) and "location_checks" in data
+        data = _read_save(path)
     except Exception:
         return False
+    needed = ("version", "connect_names", "received_items", "location_checks", "hints_used", "hints",
+              "name_aliases", "client_game_state", "client_connection_timers", "client_activity_timers")
+    return (isinstance(data, dict) and all(key in data for key in needed)
+            and data["connect_names"] == ctx.connect_names and data["version"] <= ctx.save_version)
 
 
-def prepare_save(save_file: str) -> str:
+def prepare_save(save_file: str, ctx) -> str:
     """Before a start: keep a good save as .bak; restore a good .bak over a
-    damaged save; refuse when both are damaged. Returns what happened."""
+    damaged or foreign save; refuse when there is no good one."""
     bak = save_file + ".bak"
     if not os.path.isfile(save_file):
-        if os.path.isfile(bak) and _save_loads(bak):
+        if os.path.isfile(bak) and _save_matches_room(bak, ctx):
             shutil.copyfile(bak, save_file)
             return "restored"
         return "new"
-    if _save_loads(save_file):
+    if _save_matches_room(save_file, ctx):
         shutil.copyfile(save_file, bak + ".tmp")
         os.replace(bak + ".tmp", bak)
         return "ok"
     damaged = save_file + ".damaged-" + time.strftime("%Y%m%d%H%M%S")
     os.replace(save_file, damaged)
-    if os.path.isfile(bak) and _save_loads(bak):
+    if os.path.isfile(bak) and _save_matches_room(bak, ctx):
         shutil.copyfile(bak, save_file)
         return "restored"
     raise SoloError("save", "The save of this solo seed is damaged and has no good backup.",
                     damaged=os.path.basename(damaged))
 
 
-def acquire_lock(room: str) -> str:
-    """Create session.lock atomically before the save is loaded. A lock whose
-    process is gone is stale and is replaced. Returns this server's token."""
-    path = os.path.join(room, "session.lock")
-    token = secrets.token_hex(8)
-    for _ in range(2):
+def load_save(ctx, save_file: str) -> None:
+    """MultiServer's init_save logs a save it cannot apply and starts a new
+    game, which the next check would then write over. Here a save that
+    cannot be applied stops the start instead."""
+    ctx.save_filename = save_file
+    ctx.saving = True
+    if os.path.isfile(save_file):
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
-            lock = live_lock(room)
-            if lock is not None:
-                raise SoloError("running", "This room already has a running server.",
-                                port=lock.get("port"), pid=lock.get("pid"))
-            try:
-                os.remove(path)  # stale: its process is gone
-            except FileNotFoundError:
-                pass
-            continue
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump({"pid": os.getpid(), "token": token, "port": None}, handle)
-        return token
-    raise SoloError("running", "This room's lock could not be taken.")
-
-
-def release_lock(room: str, token: str) -> None:
-    path = os.path.join(room, "session.lock")
-    try:
-        if read_json(path).get("token") == token:
-            os.remove(path)
-    except (OSError, ValueError):
-        pass
+            ctx.set_save(_read_save(save_file))
+        except Exception as error:
+            raise SoloError("save", f"The save of this solo seed could not be loaded: {error}")
+    _start_saver(ctx)
 
 
 def check_ports(ports: tuple[int, int]) -> tuple[int, int]:
@@ -986,15 +1066,23 @@ def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, in
     if not os.path.isfile(meta_path):
         raise SoloError("bad_room", "That solo room does not exist.", room_id=room_id)
     meta = read_json(meta_path)
-    token = acquire_lock(room)
+    lock = RoomLock(room)
+    if not lock.try_acquire():
+        info = live_lock(room) or {}
+        raise SoloError("running", "This room already has a running server.",
+                        port=info.get("port"), pid=info.get("pid"))
     try:
-        return _serve_locked(paths, room, room_id, meta, game_pid, ports, password, token)
+        return _serve_locked(paths, room, room_id, meta, game_pid, ports, password)
     finally:
-        release_lock(room, token)
+        try:
+            os.remove(os.path.join(room, "session.lock"))
+        except OSError:
+            pass
+        lock.release()
 
 
 def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: int | None,
-                  ports: tuple[int, int], password: str | None, token: str) -> int:
+                  ports: tuple[int, int], password: str | None) -> int:
     import asyncio
     import functools
     import logging
@@ -1003,7 +1091,6 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
 
     room_file = os.path.join(room, meta["room_file"])
     save_file = os.path.splitext(room_file)[0] + ".apsave"
-    save_state = prepare_save(save_file)
     password = password or secrets.token_hex(12)
 
     log = logging.getLogger()
@@ -1011,16 +1098,16 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
     handler = logging.FileHandler(os.path.join(room, "server.log"), encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     log.addHandler(handler)
-    log.info("solo serve: room %s, save %s", room_id, save_state)
 
     ctx = MultiServer.Context(HOST, 0, None, password, location_check_points=1, hint_cost=10,
                               item_cheat=False, release_mode="auto", collect_mode="auto",
                               countdown_mode="auto", remaining_mode="goal", auto_shutdown=0,
                               compatibility=2, log_network=False)
     ctx.load(room_file, True)
-    ctx.save_filename = save_file
     ctx._save = lambda exit_save=False: _atomic_save(ctx)  # noqa: E731
-    ctx.init_save(True)
+    save_state = prepare_save(save_file, ctx)
+    log.info("solo serve: room %s, save %s", room_id, save_state)
+    load_save(ctx, save_file)
     # The room's embedded server options and a loaded save both set the
     # passwords. A solo server always uses this session's password and has
     # no admin password.
@@ -1042,13 +1129,16 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
         server = None
         port = None
         for candidate in range(ports[0], ports[1] + 1):
-            if not port_free(candidate):
+            if port_answers(candidate):
+                continue
+            sock = _listen_socket(candidate)
+            if sock is None:
                 continue
             try:
-                server = await websockets.serve(functools.partial(MultiServer.server, ctx=ctx), host=HOST,
-                                                port=candidate,
+                server = await websockets.serve(functools.partial(MultiServer.server, ctx=ctx), sock=sock,
                                                 extensions=[MultiServer.server_per_message_deflate_factory])
             except OSError:
+                sock.close()
                 continue
             port = candidate
             break
@@ -1057,7 +1147,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
         ctx.port = port
         ctx.server = server
         write_json_atomic(os.path.join(room, "session.lock"),
-                          {"pid": os.getpid(), "token": token, "port": port, "seed_name": ctx.seed_name,
+                          {"pid": os.getpid(), "port": port, "seed_name": ctx.seed_name,
                            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
         emit("ready", port=port, password=password, seed_name=ctx.seed_name, slot=meta.get("slot"),
              room_id=room_id)

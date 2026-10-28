@@ -83,6 +83,26 @@ def last(events: list[dict]) -> dict:
     return events[-1]
 
 
+def free_ports(count: int) -> int:
+    """First of `count` consecutive ports that nothing listens on right now."""
+    import random
+    for _ in range(200):
+        base = random.randint(40000, 60000)
+        socks = []
+        try:
+            for port in range(base, base + count):
+                sock = socket.socket()
+                socks.append(sock)
+                sock.bind(("127.0.0.1", port))
+            return base
+        except OSError:
+            continue
+        finally:
+            for sock in socks:
+                sock.close()
+    raise RuntimeError("no free port range")
+
+
 def write_yaml(folder: str, name: str, text: str) -> str:
     path = os.path.join(folder, name)
     with open(path, "w", encoding="utf-8") as handle:
@@ -340,7 +360,7 @@ class TestServe(SoloTestCase):
 
     def test_check_survives_a_killed_server_and_occupied_port_is_skipped(self):
         room = self.generate_room()
-        base = 39400 + (os.getpid() % 200) * 3
+        base = free_ports(3)
         blocker = socket.socket()
         blocker.bind(("127.0.0.1", base))
         blocker.listen(1)
@@ -385,7 +405,7 @@ class TestServe(SoloTestCase):
 
     def test_password_is_required_even_after_a_save(self):
         room = self.generate_room()
-        base = 38800 + (os.getpid() % 60) * 3
+        base = free_ports(3)
         for _ in range(2):  # the second start loads the save written by the first
             proc, ready = self.start(room["room_id"], base, base + 2)
             try:
@@ -402,7 +422,7 @@ class TestServe(SoloTestCase):
 
     def test_damaged_save_is_restored_from_the_backup_or_refused(self):
         room = self.generate_room()
-        base = 38600 + (os.getpid() % 60) * 3
+        base = free_ports(3)
         folder = os.path.join(self.solo, "rooms", room["room_id"])
         save = os.path.join(folder, os.path.splitext(room["room_file"])[0] + ".apsave")
         proc, ready = self.start(room["room_id"], base, base + 2)
@@ -442,7 +462,7 @@ class TestServe(SoloTestCase):
 
     def test_one_server_per_room_and_production_port_range(self):
         room = self.generate_room()
-        base = 38400 + (os.getpid() % 60) * 3
+        base = free_ports(3)
         proc, ready = self.start(room["room_id"], base, base + 2)
         try:
             self.assertEqual(ready["event"], "ready", ready)
@@ -460,9 +480,53 @@ class TestServe(SoloTestCase):
                              capture_output=True, text=True, timeout=120, env=no_hook)
         self.assertEqual(json.loads(out.stdout.splitlines()[-1])["kind"], "ports")
 
+    def test_simultaneous_starts_serve_once(self):
+        room = self.generate_room()
+        base = free_ports(6)
+        script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        procs = [subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room",
+                                   room["room_id"], "--port-first", str(base), "--port-last", str(base + 5)],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                  text=True, env=env(self.home)) for _ in range(4)]
+        try:
+            firsts = [json.loads(p.stdout.readline()) for p in procs]
+            kinds = sorted(e.get("kind", e["event"]) for e in firsts)
+            self.assertEqual(kinds, ["ready", "running", "running", "running"], firsts)
+        finally:
+            for p in procs:
+                p.kill()
+                p.wait(10)
+
+    def test_a_failed_save_is_retried(self):
+        if os.name == "nt" or os.geteuid() == 0:
+            self.skipTest("needs a POSIX folder the test can make read-only")
+        room = self.generate_room()
+        base = free_ports(3)
+        folder = os.path.join(self.solo, "rooms", room["room_id"])
+        proc, ready = self.start(room["room_id"], base, base + 2)
+        try:
+            os.chmod(folder, 0o555)  # the check's save fails
+            location = self.check_location(ready)
+            os.chmod(folder, 0o755)  # storage recovers; the saver retries
+            deadline = time.time() + 15
+            while time.time() < deadline:
+                try:
+                    if location in self.read_save(room)["location_checks"].get((0, 1), ()):
+                        break
+                except OSError:
+                    pass
+                time.sleep(0.5)
+            proc.kill()  # no exit save: the retry alone must have written it
+            proc.wait(10)
+        finally:
+            os.chmod(folder, 0o755)
+            if proc.poll() is None:
+                proc.kill()
+        self.assertIn(location, self.read_save(room)["location_checks"][(0, 1)])
+
     def test_closed_stdin_stops_the_server(self):
         room = self.generate_room()
-        base = 39000 + (os.getpid() % 100) * 3
+        base = free_ports(3)
         proc, ready = self.start(room["room_id"], base, base + 2)
         try:
             self.assertEqual(ready["event"], "ready", ready)
@@ -484,6 +548,20 @@ class TestServe(SoloTestCase):
         self.assertEqual(last(events)["room_id"], room["room_id"])
         events, code = run(self.client, "import-room", copy, solo=other, home=self.home)
         self.assertEqual(last(events)["kind"], "exists")
+
+
+class TestLinks(SoloTestCase):
+    def test_a_linked_worlds_folder_is_refused(self):
+        outside = os.path.join(self.work, "global-worlds")
+        os.makedirs(outside)
+        keep = os.path.join(outside, "other.apworld")
+        with open(keep, "wb") as handle:
+            handle.write(b"someone else's world")
+        os.makedirs(os.path.join(self.solo, "ap-home"))
+        os.symlink(outside, os.path.join(self.solo, "ap-home", "worlds"))
+        events, code = self.call("describe")
+        self.assertEqual(last(events)["kind"], "runtime")
+        self.assertTrue(os.path.isfile(keep))
 
 
 class TestTmp(SoloTestCase):
