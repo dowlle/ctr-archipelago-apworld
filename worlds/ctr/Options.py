@@ -624,14 +624,14 @@ class WumpaCheck(Choice):
 class WumpaShopSlots(Range):
     """How many Wumpa Shop slots each of the five hubs gets.
 
-    Every fruit you collect while already holding 10 is banked, and so is the
-    fruit you hold when you finish a race. Spend banked fruit at the save
-    screen of a hub: each slot is a check with a price. 10 (default) adds 50
-    checks, 25 adds 125. 0 turns the shop off.
+    In Adventure races, every fruit you collect while already holding 10 is
+    banked, and so is the fruit you hold when you finish a race. Spend banked
+    fruit at the save screen of a hub: each slot is a check with a price. 10
+    (default) adds 50 checks, 25 adds 125. 0 turns the shop off.
 
     Later slots of each shop go on sale once enough fruit has been banked over
-    the whole seed. Only the slots on sale from the start can hold progression.
-    Buying needs a connection to the server."""
+    the whole seed. Any slot may hold any item unless Wumpa Shop Progression
+    is excluded. Buying needs a connection to the server."""
     display_name = "Wumpa Shop Slots"
     range_start = 0
     range_end = 25

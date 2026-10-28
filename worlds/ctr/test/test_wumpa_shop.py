@@ -154,6 +154,16 @@ class TestPlacement(unittest.TestCase):
                         later_progression += 1
         self.assertGreater(later_progression, 0)
 
+    def test_traps_may_sit_on_any_shelf(self):
+        # Decision 25 (2026-10-28): traps are allowed on every shelf, in both
+        # modes; no shop item rule refuses a trap.
+        for mode in ("allowed", "excluded"):
+            with self.subTest(mode=mode):
+                mw = _build(1, wumpa_shop_progression=mode)
+                trap = next(i for i in mw.itempool if i.player == PLAYER and i.trap)
+                for loc in _shop_locations(mw):
+                    self.assertTrue(loc.item_rule(trap), loc.name)
+
     def test_excluded_holds_no_progression(self):
         for seed in (1, 2, 3):
             with self.subTest(seed=seed):
