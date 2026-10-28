@@ -873,11 +873,18 @@ def _small_json(path: str, limit: int, inside: str):
     files are player-writable: a link, a huge file or bad bytes is skipped."""
     try:
         if (os.path.islink(path) or os.path.islink(os.path.dirname(path)) or not os.path.isfile(path)
-                or os.path.commonpath([os.path.realpath(inside), os.path.realpath(path)]) != os.path.realpath(inside)
-                or os.path.getsize(path) > limit):
+                or os.path.commonpath([os.path.realpath(inside), os.path.realpath(path)]) != os.path.realpath(inside)):
             return None
-        return read_json(path)
-    except (OSError, ValueError):  # UnicodeDecodeError is a ValueError
+        # Read at most limit + 1 bytes through a descriptor opened without
+        # following a link, so a file swapped or grown after the checks
+        # above is still refused.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+        with os.fdopen(fd, "rb") as handle:
+            data = handle.read(limit + 1)
+        if len(data) > limit:
+            return None
+        return json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, RecursionError):  # UnicodeDecodeError is a ValueError
         return None
 
 
@@ -909,9 +916,12 @@ def _pinned_file(folders: list, pin: dict) -> str | None:
             continue
         for name in sorted(os.listdir(folder)):
             full = os.path.join(folder, name)
-            if (name.lower().endswith(suffix) and os.path.isfile(full)
-                    and os.path.getsize(full) == pin["bytes"] and sha256_file(full) == pin["sha256"]):
-                return full
+            try:
+                if (name.lower().endswith(suffix) and os.path.isfile(full)
+                        and os.path.getsize(full) == pin["bytes"] and sha256_file(full) == pin["sha256"]):
+                    return full
+            except OSError:  # gone or unreadable meanwhile: not this file
+                continue
     return None
 
 
@@ -979,7 +989,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         if section.get(legacy):
             raise SoloError("option", f"This YAML uses {legacy}, which cannot be mixed with picked tracks.",
                             option=legacy)
-    if not section.get("content_pool"):
+    if section.get("content_pool") in (None, {}):
         profile = load_overlay(paths).get("custom_tracks", {}).get("profile")
         if not isinstance(profile, dict) or not isinstance(profile.get("content_pool"), dict):
             raise SoloError("runtime", "The options overlay has no custom-track profile.")
@@ -993,9 +1003,11 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         raise SoloError("option", "This YAML's content_pool cannot take picked tracks: content_pool, its tracks and "
                         "tracks.custom must be mappings and lists as the option describes.", option="content_pool")
     # The installed descriptor is the one whose files are here: it replaces an
-    # entry of the same package id the YAML already has.
+    # entry of the same track (any revision) the YAML already has.
     for track_id in picked:
-        custom[:] = [d for d in custom if not (isinstance(d, dict) and d.get("id") == track_id)]
+        key = by_id[track_id]["content_id"]
+        custom[:] = [d for d in custom
+                     if not (isinstance(d, dict) and (d.get("id") == track_id or d.get("content_id") == key))]
         custom.append(by_id[track_id]["descriptor"])
     for track_id in guaranteed:
         entry = by_id[track_id]["track_id"]

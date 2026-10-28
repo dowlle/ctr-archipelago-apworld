@@ -292,6 +292,8 @@ class TestCustomTracks(SoloTestCase):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         with open(os.path.join(self.descriptors, "bytes.json"), "wb") as handle:
             handle.write(b"\xff\xfe{")
+        with open(os.path.join(self.descriptors, "deep.json"), "w", encoding="utf-8") as handle:
+            handle.write("[" * 10000 + "]" * 10000)
         with open(os.path.join(self.descriptors, "big.json"), "w", encoding="utf-8") as handle:
             handle.write(" " * (64 * 1024 + 1) + "{}")
         rooms = os.path.join(self.solo, "rooms")
@@ -313,6 +315,7 @@ class TestCustomTracks(SoloTestCase):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         stale = json.loads(json.dumps(loop))
         stale["files"][0]["sha256"] = "a1" * 32
+        stale.update(id="package/fixture-loop/2.0", revision="2.0")  # an older revision of the same track
         with open(os.path.join(SOLO, "options-overlay.json"), encoding="utf-8") as handle:
             section = json.load(handle)["custom_tracks"]["profile"]
         section["content_pool"]["tracks"]["custom"] = [stale]
@@ -324,12 +327,14 @@ class TestCustomTracks(SoloTestCase):
                   encoding="utf-8") as handle:
             custom = yaml.safe_load(handle)[GAME]["content_pool"]["tracks"]["custom"]
         self.assertEqual(custom, [loop])
-        broken = write_yaml(self.work, "broken.yaml", yaml.safe_dump(
-            {"name": "Solo", "game": GAME, GAME: {"content_pool": {"tracks": {"custom": {}}}}}))
-        events, code = self.call("validate", "--yaml", broken, "--assets", self.assets, "--track", loop["id"])
-        self.assertNotEqual(code, 0)
-        self.assertEqual(last(events)["kind"], "option")
-        self.assertEqual(last(events)["option"], "content_pool")
+        for pool in ({"tracks": {"custom": {}}}, [], False):
+            with self.subTest(pool=pool):
+                broken = write_yaml(self.work, "broken.yaml", yaml.safe_dump(
+                    {"name": "Solo", "game": GAME, GAME: {"content_pool": pool}}))
+                events, code = self.call("validate", "--yaml", broken, "--assets", self.assets, "--track", loop["id"])
+                self.assertNotEqual(code, 0)
+                self.assertEqual(last(events)["kind"], "option")
+                self.assertEqual(last(events)["option"], "content_pool")
 
     def test_files_may_sit_in_the_revision_folder(self):
         # The client keeps Baby T Park 1.0.2 in tracks/baby-t-park-1.0.2.
