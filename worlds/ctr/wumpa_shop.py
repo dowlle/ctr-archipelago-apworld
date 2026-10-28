@@ -26,7 +26,7 @@ the start; later slots open at a lifetime banked total. With `allowed` any
 slot may hold any item, progression and traps included (ruled 2026-10-28,
 decisions 24 and 25); a slot holding progression is priced at its hub's
 lowest band price after fill. `excluded` keeps progression out of every slot
-(useful items and filler only). Shop slots never count as starting checks
+(useful items, filler and traps only). Shop slots never count as starting checks
 (`sphere0_guard`).
 
 DATAPACKAGE STABILITY. `35028600 + 40 * hub + (n - 1)`, hub order N. Sanity
