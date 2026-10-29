@@ -13,3 +13,7 @@ Crash Team Racing:
   adventure_structure: ctr_first
   slide_coliseum_races: trophy_and_ctr_challenge
   turbo_track_races: trophy_and_ctr_challenge
+  # #169 (merged into this stack): a random roll that turns the Purple Gem Cup
+  # gauntlet on without boss_kit_shuffle is refused as ruled, which pushed the
+  # Tracker arm past its ignored cap. The gauntlet does not touch ctr_first.
+  purple_cup_boss_gauntlet: false
