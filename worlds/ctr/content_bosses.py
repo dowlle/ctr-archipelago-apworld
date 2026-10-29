@@ -1143,6 +1143,28 @@ def _check_schedule(schedule, checkpoints, intensity, garage_row, label):
     return tuple(out)
 
 
+def _check_kit_shape(schedule, intensity, assignment, label, oxide=False):
+    """The kit rules native also enforces (J11 parity): a signature_profiles
+    garage kit is one retail garage profile at the kit intensity; a
+    mixed_loadouts garage kit uses two to four weapon families; N. Oxide's
+    composed profile one to six. Every row of a mixed kit or of N. Oxide's
+    profile belongs to a weapon family (no empty segment)."""
+    be = _be()
+    if not oxide and assignment == "signature_profiles":
+        rows = tuple((w, t, p, c, j) for _cp, t, w, p, c, j in schedule)
+        if not any(rows == tuple((w, t, p, be.scale_cooldown(c, intensity), j) for w, t, p, c, j in profile)
+                   for profile in be.SIGNATURES.values()):
+            error(f"{label}: a signature_profiles boss kit is not a retail garage profile at its intensity")
+        return
+    families = {be.family_of(seg[2]) for seg in schedule}
+    if None in families:
+        error(f"{label}: a boss kit row is not a weapon family row")
+    low, high = (1, 6) if oxide else (be.MIX_MIN, be.MIX_MAX)
+    if not low <= len(families) <= high:
+        error(f"{label}: " + ("N. Oxide's composed profile uses one to six weapon families" if oxide
+                              else "a mixed_loadouts boss kit uses two to four weapon families"))
+
+
 def check_opponents(record, venues, points, opponents, cups=None):
     """Check a plan's boss opponents against its record and return them as
     build() takes them, or None for a record without drawn encounters (build
@@ -1175,6 +1197,7 @@ def check_opponents(record, venues, points, opponents, cups=None):
             schedule = _check_schedule(opponent.get("schedule"),
                                        mapped_checkpoints(g, venue_points(venues[g], points)),
                                        intensity, True, f"garage {g}")
+            _check_kit_shape(schedule, intensity, record["kit"]["assignment"], f"garage {g}")
         out[g] = (cid, schedule)
     if len({out[g][0] for g in range(4)}) != 4:
         error("two garages race the same racer: bosses never repeat")
@@ -1196,6 +1219,7 @@ def check_opponents(record, venues, points, opponents, cups=None):
         if record["oxide_attack_profile"] == PROFILES[1]:
             schedule = _check_schedule(finals[0].get("schedule"), be.OXIDE_CHECKPOINTS, intensity, False,
                                        "N. Oxide's garage")
+            _check_kit_shape(schedule, intensity, None, "N. Oxide's garage", oxide=True)
         out[OXIDE_GARAGE] = (cid, schedule)
     return out
 
