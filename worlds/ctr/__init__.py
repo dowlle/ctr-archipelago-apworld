@@ -25,6 +25,8 @@ from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
 from . import wumpa_shop
+from . import spoiler_items
+from . import race_structure
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -497,6 +499,12 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
+        # Spoiler Items (#459): restored so the regenerated pool holds the same
+        # reveal items. Absent key is a pre-#459 seed and restores to off.
+        spoiler_items.restore_slot_data(o, co)
+        # Adventure structure and race type menu (#208). Absent keys are a
+        # pre-#208 room and restore to classic and the 0.3.0 menu default.
+        race_structure.restore_slot_data(o, co)
         # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
         # always-emitted scalar. Prefer the scalar; fall back to block presence
         # for a pre-widening seed, where a present block always meant the single
@@ -552,10 +560,14 @@ class ctrAPWorld(World):
             from . import content_plan
             wumpa_shop.disable_for_content_plan(self, refuse=False)
             content_plan.restore(self, passthrough)
+            # #208: content-plan rooms carry neither structure key and are
+            # always classic; never keep the tracking player's own value.
+            race_structure.restore_slot_data(self.options, {})
             return
         if self.options.content_pool.value:
             from . import content_plan
             wumpa_shop.disable_for_content_plan(self, refuse=True)
+            race_structure.raise_if_content_plan(self.options)
             content_plan.generate(self)
             return
         if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:

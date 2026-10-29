@@ -11,6 +11,8 @@ Crash Team Racing:
   accessibility: full
   # Content plans refuse a Wumpa goal until they have a record for it (#249).
   goal_wumpa: 0
+  # #208: the content plan has no ctr_first mode yet and refuses it.
+  adventure_structure: classic
   content_pool:
     preset: mixed
     tracks:

@@ -1024,6 +1024,68 @@ class ColorBoxesByItem(DefaultOnToggle):
     display_name = "Item Box Colours"
 
 
+class SpoilerItems(Toggle):
+    """Hide reward previews until you find the items that show them.
+
+    Off (default): warp pads and AP item boxes show what they hold, as usual.
+
+    On: the floating rewards above warp pads stay hidden until you receive
+    Warp Pad Preview. Until then, a pad with any open location shows one
+    plain Archipelago marker, and a finished pad shows nothing. With Item Box
+    Locations and Item Box Colours both on, AP item boxes also stay pink until
+    you receive AP Box Colours. You can switch the in-game Item Box Colours
+    row to OFF before that, and the boxes then stay pink after it arrives.
+
+    Both are useful items that add no location, so each one takes a slot that
+    would otherwise hold filler. Pads still open, close and count their checks
+    as usual; only the previews wait for the items."""
+    display_name = "Spoiler Items"
+
+
+class AdventureStructure(Choice):
+    """Which race on a track earns its Trophy Race check.
+
+    - **classic** (default): as in the retail game. Win the Trophy Race
+      first; the CTR Challenge and the Relic Race open after it.
+    - **ctr_first**: the first race on each track is its CTR Challenge.
+      Winning it with the letters sends both that track's CTR Token
+      Challenge check and its Trophy Race check. The track has no plain
+      Trophy Race: item boxes, Wumpa and placement checks come from the CTR
+      Challenge race, and placement counts even without all the letters.
+      The Relic Race still opens after that, behind the warp pad's second
+      requirement.
+
+    The checks keep their names: "Trophy Race" stays the track's first
+    check even though a CTR Challenge win earns it. A track without a CTR
+    Challenge (a trial track set to trophy_race, a custom track without
+    one) keeps the classic order. Not available with the experimental
+    content plan."""
+    display_name = "Adventure Structure"
+    option_classic = 0
+    option_ctr_first = 1
+    default = 0
+
+
+class RaceTypeSelector(Choice):
+    """When a warp pad asks which race to run.
+
+    - **always** (default): every race pad you can enter opens the race
+      type menu, with Trophy Race, CTR Challenge and Relic Race where the
+      track has them and the pad allows them. Under adventure_structure
+      ctr_first a track with a CTR Challenge has no Trophy Race row.
+    - **productive**: the menu opens only when more than one race type still
+      has a check, or when none has; with exactly one, the pad loads it.
+
+    Race types with nothing left to check are grey but you can still pick
+    them to race again. This is the starting value: the client's Options
+    menu can change it at any time. It only changes the menu, never what is
+    in logic."""
+    display_name = "Race Type Selector"
+    option_productive = 0
+    option_always = 1
+    default = 1
+
+
 class WarpPadUnlockRequirements(Choice):
     """How warp pads unlock.
 
@@ -1725,6 +1787,11 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     # item boxes: colour by the item inside (ruling R11)
     color_boxes_by_item: ColorBoxesByItem
+    # reward previews held back behind two items (#459)
+    spoiler_items: SpoilerItems
+    # race structure and the pad race type menu (#208)
+    adventure_structure: AdventureStructure
+    race_type_selector: RaceTypeSelector
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1772,7 +1839,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                         BossAttackIntensity, BossLossEasing,
                         BossPowerupBlocklist, PurpleCupBossGauntlet,
                         OxideAttackProfile, OxidePowerupBlocklist],
-    "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
+    "Warp Pad Unlocking": [AdventureStructure, WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            WarpPadRules, BossGarageRequirements],
     "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
@@ -1803,7 +1870,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem],
+                        ColorBoxesByItem, SpoilerItems, RaceTypeSelector],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 

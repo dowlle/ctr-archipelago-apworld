@@ -10,7 +10,8 @@ import logging
 from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
-               progressive_capability, traps, version, wumpa_family)
+               progressive_capability, traps, version, wumpa_family, spoiler_items,
+               race_structure)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
 from .custom_tracks import (custom_tracks_to_wire, resolved_custom_tracks)
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs_table
@@ -236,6 +237,7 @@ def fill_slot_data(world) -> Dict[str, object]:
         from . import content_plan
         wire = content_plan.wire(world)
         wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
+        wire["ctr_options"].update(spoiler_items.fill_slot_data(world))
         return wire
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -536,6 +538,17 @@ def fill_slot_data(world) -> Dict[str, object]:
             # location membership. Reading a config flag as well would add a
             # second source of truth for one boolean.
             "turbo_grant": bool(o.turbo_grant.value),
+            # Spoiler Items (#459, schema 18): always emitted. Native READS
+            # this key: on, it hides the pad reward previews until Warp Pad
+            # Preview arrives and keeps AP boxes pink until AP Box Colours
+            # arrives. Absent means off, today's previews. Display only: no
+            # rule reads it or the two items.
+            **spoiler_items.fill_slot_data(world),
+            # Adventure structure and race type menu (#208, schema 18):
+            # always emitted, as strings. Native READS both: absent means
+            # classic and the 0.3.0 `always` menu. ctr_first also emits the
+            # top-level `race_structure` block below.
+            **race_structure.fill_slot_data(world),
             "lettersanity": int(o.lettersanity.value),
             # #109 box scalars, same convention: both always emitted raw
             # (shortcut_knowledge even when box_locations is false, so
@@ -629,6 +642,11 @@ def fill_slot_data(world) -> Dict[str, object]:
         slot_data["ctr_options"].update(wumpa_shop.options_to_wire(o))
         if wumpa_shop.shop_slots(o):
             slot_data["wumpa_shop"] = wumpa_shop.wire_block(world)
+    structure_block = race_structure.race_structure_block(world)
+    if structure_block is not None:
+        # #208 ctr_first: which CTR Challenge win also sends which Trophy
+        # Race check. Omitted in classic, so a classic room keeps its shape.
+        slot_data["race_structure"] = structure_block
     if o.itemsanity.value:
         # Additive under schema 7.  Omitted when off, so disabled seeds do
         # not gain a dormant 22-slot feature block.
