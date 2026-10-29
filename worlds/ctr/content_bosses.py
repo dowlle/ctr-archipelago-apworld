@@ -1230,8 +1230,10 @@ def spoiler_lines(plan):
         entry = entries[enc["entry_id"]]
         g = int(enc["pad_id"].removeprefix("garage:"))
         opponent = entry["opponent"]
-        venue = tracks[entry["track_id"]]
-        parts = [venue.get("room_title", venue["display_name"]), f"vs {by_id[opponent['character_id']]}"]
+        venues = [tracks[leg["track_id"]] for leg in entry["legs"]] if entry["kind"] == CUP_KIND \
+            else [tracks[entry["track_id"]]]
+        parts = [" / ".join(t.get("room_title", t["display_name"]) for t in venues),
+                 f"vs {by_id[opponent['character_id']]}"]
         if opponent.get("schedule"):
             parts.append(f"kit: {be.kit_label(opponent['schedule'])}")
         label = regions[g] + (f" ({'Final Challenge' if enc['index'] else 'Challenge'})" if g == OXIDE_GARAGE else "")
