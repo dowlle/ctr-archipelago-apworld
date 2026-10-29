@@ -160,6 +160,11 @@ jobs:
           # .github/fuzz/content-plan-full-meta.yaml, under the same cap.
           - {check_name: content-plan-full,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-full'}
           - {check_name: content-plan-full-ut,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-full'}
+          # Job J11 on the forced content plan: ctr_first, the Wumpa Shop and
+          # goal, and Boss Opponent and Kit Shuffle all forced on, from
+          # .github/fuzz/content-plan-030-meta.yaml, under the same cap.
+          - {check_name: content-plan-030,            check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-030'}
+          - {check_name: content-plan-030-ut,         check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-030'}
           # Forced ctr_first (#208): every seed runs the Trophy Race-free
           # structure from .github/fuzz/ctr-first-meta.yaml, with the rest
           # randomized; the tracker arm checks its restore.
@@ -172,7 +177,7 @@ jobs:
           repository: dowlle/Archipelago-index
           path: index-repo
       - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
-        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || matrix.check_meta == 'ctr-first' || matrix.check_tracker == 'yes'
+        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || matrix.check_meta == 'content-plan-030' || matrix.check_meta == 'ctr-first' || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -273,12 +278,16 @@ jobs:
             cp ../world-src/.github/fuzz/content-plan-full-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [ "$CHECK_META" = "content-plan-030" ]; then
+            cp ../world-src/.github/fuzz/content-plan-030-meta.yaml ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           if [ "$CHECK_META" = "ctr-first" ]; then
             cp ../world-src/.github/fuzz/ctr-first-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
           uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
-          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ]; then
+          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ] || [ "$CHECK_META" = "content-plan-030" ]; then
             # A refused option set is "ignored", not a failure. If the meta file
             # stopped matching the profile, every seed would be ignored and the
             # arm would pass without testing anything, so cap the ignored share.

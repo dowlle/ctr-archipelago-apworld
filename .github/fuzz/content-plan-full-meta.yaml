@@ -12,10 +12,13 @@
 # one-in-three-thousand fill residual (#133 PR 4c).
 Crash Team Racing:
   accessibility: full
-  # Content plans refuse a Wumpa goal until they have a record for it (#249).
-  goal_wumpa: 0
-  # #208: the content plan has no ctr_first mode yet and refuses it.
-  adventure_structure: classic
+  # Job J11: content plans take the Wumpa Shop, the Wumpa goal and ctr_first.
+  # Weighted so most seeds carry the shop and the goal, and one in four runs
+  # ctr_first; a large `excluded` shop or a ctr_first start behind letter
+  # items can refuse, so the weights keep the ignored share under the cap.
+  goal_wumpa: {0: 2, 300: 1, 2500: 1}
+  wumpa_shop_slots: {0: 1, 2: 1, 5: 1, 10: 1}
+  adventure_structure: {classic: 3, ctr_first: 1}
   content_pool:
     preset: mixed
     tracks:
@@ -83,13 +86,17 @@ Crash Team Racing:
   wumpa_check: {global: 1, per_track: 1}
   relic_perfect_checks: true
   boss_track_shuffle: true
-  # #169 tiers 2 and 3 are not on content plans yet (the profile refuses
-  # them), so pin both switches off rather than let the fuzzer roll them.
+  # Job J11: boss cups do not take a drawn opponent or kit yet and this arm
+  # draws boss cups, so the opponent and kit switches stay off here
+  # (content-plan-030-meta.yaml forces them). N. Oxide's all_compatible
+  # profile composes with boss cups and is drawn; the Purple Gem Cup
+  # gauntlet is ignored with a notice on content plans.
   boss_opponent_shuffle: false
   boss_kit_shuffle: false
   boss_oxide_in_pool: false
-  purple_cup_boss_gauntlet: false
-  oxide_attack_profile: retail
+  purple_cup_boss_gauntlet: {false: 3, true: 1}
+  oxide_attack_profile: {retail: 1, all_compatible: 1}
+  oxide_powerup_blocklist: []
   warp_pad_rules: {}
   include_battle_arenas: true
   include_arcade_arenas: {true: 1, false: 1}
