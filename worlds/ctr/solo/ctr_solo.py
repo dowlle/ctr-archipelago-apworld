@@ -1004,24 +1004,23 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     if not isinstance(custom, list) or not isinstance(required, list):
         raise SoloError("option", "This YAML's content_pool cannot take picked tracks: content_pool, its tracks and "
                         "tracks.custom must be mappings and lists as the option describes.", option="content_pool")
-    # The installed descriptor is the one whose files are here: it replaces an
-    # entry of the same track (any revision) the YAML already has.
-    # Its required entry and per-track override follow it to the new revision.
-    overrides = tracks.get("overrides")
+    # A YAML that already lists a picked track must list exactly the installed
+    # one: another version or other file pins is a conflict, refused rather
+    # than guessed at (round 2 decision 5). The same descriptor is not added
+    # twice, and a guarantee the YAML already has is not repeated.
     for track_id in picked:
-        key, entry = by_id[track_id]["content_id"], by_id[track_id]["track_id"]
-        old = {f"custom/{key}/{d.get('revision')}" for d in custom
-               if isinstance(d, dict) and (d.get("id") == track_id or d.get("content_id") == key)}
-        custom[:] = [d for d in custom
-                     if not (isinstance(d, dict) and (d.get("id") == track_id or d.get("content_id") == key))]
-        custom.append(by_id[track_id]["descriptor"])
-        required[:] = [entry if r in old else r for r in required]
-        required[:] = [r for i, r in enumerate(required) if r not in required[:i]]
-        if isinstance(overrides, dict):
-            for stale in old - {entry}:
-                if stale in overrides:
-                    overrides.setdefault(entry, overrides[stale])
-                    del overrides[stale]
+        key = by_id[track_id]["content_id"]
+        other = next((d for d in custom if isinstance(d, dict) and d.get("content_id") == key
+                      and d != by_id[track_id]["descriptor"]), None)
+        if other is not None:
+            raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
+                            f"(version {other.get('revision', '?')}) differently from the installed version "
+                            f"{by_id[track_id]['revision']}. Remove it from the YAML or leave the track off.",
+                            track=track_id)
+    for track_id in picked:
+        descriptor = by_id[track_id]["descriptor"]
+        if descriptor not in custom:
+            custom.append(descriptor)
     for track_id in guaranteed:
         entry = by_id[track_id]["track_id"]
         if entry not in required:

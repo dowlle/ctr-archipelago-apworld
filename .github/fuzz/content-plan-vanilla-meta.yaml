@@ -1,0 +1,82 @@
+# Content-plan vanilla-shape arm (#89 solo custom-track profile, round 2
+# decision 4), used by .github/workflows/ctr-world.yml. The shape the Play Solo
+# client gives a seed with custom tracks (worlds/ctr/solo/options-overlay.json,
+# custom_tracks.profile): 18 race pads, 5 Gem Cups, 4 Crystal Challenges on the
+# retail arenas, boss garages on, the retail item quantities and no Cortex
+# Vortex track. Retail tracks and the two custom tracks form one pool, so a
+# custom track on a pad displaces a retail track and every cup leg draws from
+# the same pool. Baby T Park is guaranteed a pad (Own pad); the fixture loop is
+# only in the pool (In pool). The goal and boss options and the packs are
+# drawn as in the bosses meta (content-plan-meta.yaml explains every pinned
+# option), with accessibility: full.
+Crash Team Racing:
+  accessibility: full
+  content_pool:
+    preset: mixed
+    tracks:
+      retail: all
+      cortex_vortex: false
+      modes: [trophy, ctr, relic]
+      custom:
+        - id: package/baby-t-park/1.0.2
+          content_id: baby-t-park
+          uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+          revision: "1.0.2"
+          display_name: Baby T Park
+          author: Lockheart
+          laps: 7
+          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8, checkpoints: 35, ai_nav: true}
+          files:
+            - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
+            - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
+          evidence: []
+        - id: package/fuzz-fixture-loop/1.0
+          content_id: fuzz-fixture-loop
+          uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+          revision: "1.0"
+          display_name: Fuzz Fixture Loop
+          author: Fixture Author
+          laps: 3
+          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 12}
+          relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
+          files:
+            - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
+            - {role: vrm, sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2, bytes: 458808, format: ctr-vrm, format_version: 1}
+          evidence: []
+    cups: {count: 5}
+    crystals: {count: 4, pool: [21, 19, 23, 18]}
+    bosses: {enabled: true}
+    required_entries: [custom/baby-t-park/1.0.2]
+  pad_layout: {placement: shuffle, stages: two, mode_order: fixed, merge_trophy_ctr: false}
+  item_pool:
+    base:
+      trophies: 16
+      relics: {sapphire: 18, gold: 18, platinum: 18}
+      tokens: {red: 4, green: 4, blue: 4, yellow: 4, purple: 4}
+      gems: [red, green, blue, yellow, purple]
+      keys: 4
+  oxide_goal: {any_percent: 3, 101_percent: 3, none: 1, disabled: 1}
+  bosses_required_goal: {0: 2, 1: 1, 2: 1, 3: 1, 4: 1}
+  gems_required_goal: {0: 1, 1: 1, 3: 1, 5: 1}
+  oxide_1_optional: {mandatory: 1, optional: 1}
+  oxide_final_track: {cortex_vortex: 1, oxide_station: 1}
+  oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, platinum_relics: 1, any_relic_type: 1, total_relics: 1}
+  oxide_final_challenge_relic_count: {1: 1, 4: 1, 12: 1, 18: 1, 30: 1}
+  boss_encounter_repeats: {disallow: 1, allow: 1}
+  boss_track_allowlist: []
+  boss_track_blocklist: []
+  custom_tracks: {}
+  cortex_vortex_track: false
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_stats: {"off": 1, shared_global: 1}
+  lettersanity: {"off": 1, locations_only: 2, locations_and_items: 2, items_only: 1}
+  letters_per_track: {1: 1, 2: 1, 3: 1}
+  podium_placement_checks: {true: 7, false: 1}
+  podium_held_rungs: {true: 3, false: 1}
+  podium_held_fifth_rung: {true: 1, false: 1}
+  podium_finish_rungs: {true: 1, false: 1}
+  podium_any_position_rung: {true: 1, false: 1}
+  wumpa_check: {"off": 1, global: 1, per_track: 6}
+  relic_perfect_checks: {true: 7, false: 1}
+  boss_track_shuffle: {true: 1, false: 1}
+  warp_pad_rules: {}
