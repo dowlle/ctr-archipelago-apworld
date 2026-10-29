@@ -284,13 +284,17 @@ class TestSubordinateOptions(unittest.TestCase):
             self.assertTrue(any(i.startswith(label) for i in ignored), label)
         self.assertIsNone(_wire(mw).get("boss_encounters"))
 
-    def test_content_plans_refuse_the_new_switches(self):
+    def test_content_plans_refuse_the_new_switches_without_garages(self):
+        """Job J11: content plans take the switches with bosses on
+        (test_content_boss_shuffle); with the garages empty they refuse."""
         from .. import content_bosses
         world = type("W", (), {})()
         world.options = _build().worlds[PLAYER].options
         world.options.boss_kit_shuffle.value = 1
+        world.options.oxide_goal.value = 3
+        world.options.gems_required_goal.value = 2
         with self.assertRaises(OptionError):
-            content_bosses.settings(world, {"enabled": True})
+            content_bosses.settings(world, {"enabled": False})
 
 
 class TestLogic(unittest.TestCase):

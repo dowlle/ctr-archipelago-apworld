@@ -173,12 +173,17 @@ class TestPlacement(unittest.TestCase):
                     self.assertFalse(loc.item.advancement, loc.name)
 
 
+class _Opt:
+    def __init__(self, value):
+        self.value = value
+
+
 class TestSupply(unittest.TestCase):
     def test_restricted_slots(self):
         class O:
             def __init__(self, slots, prog):
-                self.wumpa_shop_slots = TestContentPlan._Opt(slots)
-                self.wumpa_shop_progression = TestContentPlan._Opt(prog)
+                self.wumpa_shop_slots = _Opt(slots)
+                self.wumpa_shop_progression = _Opt(prog)
         self.assertEqual(ws.restricted_slot_count(O(10, 0)), 0)
         self.assertEqual(ws.restricted_slot_count(O(10, 1)), 50)
         self.assertEqual(ws.restricted_slot_count(O(3, 0)), 0)
@@ -341,33 +346,6 @@ class TestGoal(unittest.TestCase):
         self.assertFalse(mw.completion_condition[PLAYER](state))
         state.collect(mw.get_location(ws.WUMPA_INCOME, PLAYER).item, True)
         self.assertTrue(mw.completion_condition[PLAYER](state))
-
-
-class TestContentPlan(unittest.TestCase):
-    class _Opt:
-        def __init__(self, value):
-            self.value = value
-
-    class _World:
-        def __init__(self, goal):
-            class O:
-                pass
-            class M:
-                player_name = {1: "Tester"}
-            self.player = 1
-            self.multiworld = M()
-            self.options = O()
-            self.options.goal_wumpa = TestContentPlan._Opt(goal)
-            self.options.wumpa_shop_slots = TestContentPlan._Opt(10)
-
-    def test_content_plan_turns_the_shop_off(self):
-        world = self._World(0)
-        ws.disable_for_content_plan(world, refuse=True)
-        self.assertEqual(world.options.wumpa_shop_slots.value, 0)
-
-    def test_content_plan_refuses_a_wumpa_goal(self):
-        with self.assertRaises(OptionError):
-            ws.disable_for_content_plan(self._World(100), refuse=True)
 
 
 if __name__ == "__main__":

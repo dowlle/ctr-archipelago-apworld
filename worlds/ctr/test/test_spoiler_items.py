@@ -167,7 +167,10 @@ class TestTrackerRestore(unittest.TestCase):
                     self.assertEqual(bool(restored.options.spoiler_items.value), enabled)
                     self.assertEqual(reveal_items(restored), reveal_items(world))
                     self.assertEqual(restored.fill_slot_data()["ctr_options"]["spoiler_items"], enabled)
-                    self.assertEqual(len(restored.multiworld.itempool), len(world.multiworld.itempool))
+                    # pre_fill may seat start openers from the pool on a content
+                    # plan (sphere0_guard.bootstrap_start); the Tracker skips it.
+                    placed = len(getattr(world, "_ctr_start_bootstrap", ()))
+                    self.assertEqual(len(restored.multiworld.itempool), len(world.multiworld.itempool) + placed)
                     self.assertEqual(sorted(l.address for l in restored.multiworld.get_locations(1) if l.address),
                                      sorted(l.address for l in world.multiworld.get_locations(1) if l.address))
                     if "content_pool" not in profile:

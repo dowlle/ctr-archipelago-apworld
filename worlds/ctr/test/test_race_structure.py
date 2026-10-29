@@ -308,15 +308,10 @@ class TestRefusals(unittest.TestCase):
         world = mw.worlds[1]
         self.assertIn("Slide Coliseum", race_structure.classic_fallbacks(world))
 
-    def test_content_plan_refused(self):
-        class O:
-            class adventure_structure:
-                value = race_structure.CTR_FIRST
-
-            class content_pool:
-                value = {"tracks": []}
-        with self.assertRaisesRegex(OptionError, "content_pool"):
-            race_structure.raise_if_content_plan(O)
+    def test_content_plans_take_ctr_first(self):
+        """Job J11: content plans carry ctr_first in the plan
+        (test_content_ctr_first); the old refusal is gone."""
+        self.assertFalse(hasattr(race_structure, "raise_if_content_plan"))
 
     def test_classic_trial_trophy_only_allowed(self):
         self._gen(slide_coliseum_races="trophy_race")
