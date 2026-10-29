@@ -743,6 +743,10 @@ class ctrAPWorld(World):
             # copies and pay for explicit plando items with this world's filler.
             from . import content_item_pool
             self.ctr_framework_accounting = content_item_pool.settle_after_plando(self)
+            # Narrow starts (0.3.0 review finding 1): open the start before
+            # the fill, see sphere0_guard.bootstrap_start.
+            from . import sphere0_guard
+            sphere0_guard.bootstrap_start(self)
             # Independent supply never uses automatic progression starts. Manual
             # pad rules still get the solo fill check, so a dead end names them.
             if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:

@@ -53,7 +53,6 @@ venue's own pad, as ruled 2026-09-12.
 """
 from __future__ import annotations
 
-import itertools
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 from Options import OptionError
@@ -246,16 +245,16 @@ def draw(world) -> None:
                 "boss_track_blocklist.")
     keys = [key for key, _r, _c, _h in GARAGES]
     # Boss encounters never repeat (decision 7, 2026-10-28; the former
-    # boss_encounter_repeats: allow is gone).
-    assignments = [combo for combo in
-                   itertools.product(*(candidates[key] for key in keys))
-                   if len(set(combo)) == len(combo)]
-    if not assignments:
+    # boss_encounter_repeats: allow is gone). Same draw as choosing from every
+    # distinct four-way assignment, without listing them (0.3.0 review
+    # finding 2).
+    picked = choose_distinct_assignment(
+        world.random, [candidates[key] for key in keys])
+    if picked is None:
         raise OptionError(
             f"CTR ({_who(world)}): boss_track_shuffle cannot give the four "
             "boss garages four different tracks from the allowed pool ("
             + ", ".join(venue_pool(o)) + "). Allow more tracks.")
-    picked = list(world.random.choice(assignments))
     drawn = {key: track for key, track in zip(keys, picked)}
     if existing is None:
         o._boss_track_venues = drawn
@@ -265,6 +264,73 @@ def draw(world) -> None:
             or len(set(existing.values())) != len(keys)):
         raise ValueError(f"CTR: preset boss venues {existing} are not a valid "
                          "draw for this option set")
+
+
+def _set_partitions(items):
+    """Every set partition of `items` (a list), as lists of blocks."""
+    if not items:
+        yield []
+        return
+    first, rest = items[0], items[1:]
+    for partition in _set_partitions(rest):
+        yield [[first]] + partition
+        for i in range(len(partition)):
+            yield partition[:i] + [[first] + partition[i]] + partition[i + 1:]
+
+
+def count_distinct_assignments(pools) -> int:
+    """How many tuples of `itertools.product(*pools)` hold pairwise different
+    values, without listing them. Inclusion-exclusion over the set partitions
+    of the positions (Mobius function of the partition lattice): a block of
+    size b contributes (-1)^(b-1) (b-1)! times the number of ways its positions
+    take one common value. A value listed twice in one pool counts twice, as
+    the product does. Four pools have 15 partitions."""
+    from collections import Counter
+    from math import factorial, prod
+    counters = [Counter(pool) for pool in pools]
+    total = 0
+    for partition in _set_partitions(list(range(len(pools)))):
+        term = 1
+        for block in partition:
+            if len(block) == 1:
+                ways = len(pools[block[0]])
+            else:
+                ways = sum(prod(counters[i][value] for i in block)
+                           for value in counters[block[0]])
+            term *= (-1) ** (len(block) - 1) * factorial(len(block) - 1) * ways
+            if not term:
+                break
+        total += term
+    return total
+
+
+def choose_distinct_assignment(rng, pools) -> Optional[List[str]]:
+    """Exactly `rng.choice([c for c in itertools.product(*pools) if all
+    different])`, without building that list (0.3.0 review finding 2: with
+    custom venues the list could reach millions of tuples). The draw is the
+    same single `randrange(n)` that `choice` makes over a list of n entries,
+    and the entry is found by counting completions position by position in
+    product order, so every seed keeps its venues. None, with no draw, when no
+    assignment exists."""
+    pools = [list(pool) for pool in pools]
+    total = count_distinct_assignments(pools)
+    if total == 0:
+        return None
+    index = rng.randrange(total)
+    picked: List[str] = []
+    for position, pool in enumerate(pools):
+        rest = pools[position + 1:]
+        for value in pool:
+            if value in picked:
+                continue
+            used = set(picked) | {value}
+            completions = count_distinct_assignments(
+                [[v for v in later if v not in used] for later in rest])
+            if index < completions:
+                picked.append(value)
+                break
+            index -= completions
+    return picked
 
 
 def retail_venues() -> Dict[str, str]:

@@ -1,0 +1,243 @@
+# Fill regression for the 0.3.0 review finding 1 (start bootstrap, 2026-10-27).
+# Options drawn for seed 2601 from the YAML of CI fuzz failure 505 on the
+# content-plan-bosses arm: per-racer boost, Character Unlocks, 17 racer locks,
+# starting racer Pura, logic easy. A start of 2 checks; both early items were
+# Pura boosts and filled it, and the fill dead-ended. Generated with seed 2601.
+Crash Team Racing:
+  progression_balancing: 37
+  accessibility: full
+  local_items: []
+  non_local_items: []
+  start_inventory: {}
+  start_hints: []
+  start_location_hints: []
+  exclude_locations: []
+  priority_locations: []
+  item_links: []
+  plando_items: []
+  content_pool:
+    preset: mixed
+    tracks:
+      retail: all
+      cortex_vortex: true
+      modes:
+      - trophy
+      - ctr
+      - relic
+      custom:
+      - id: package/baby-t-park/1.0.2
+        content_id: baby-t-park
+        uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+        revision: 1.0.2
+        display_name: Baby T Park
+        author: Lockheart
+        laps: 7
+        capabilities:
+          time_trial: true
+          arcade: true
+          relic: false
+          ctr_tokens: true
+          wumpa: true
+          super_turbo_pads: true
+          weapon_crates: 8
+          checkpoints: 35
+          ai_nav: true
+        files:
+        - role: lev
+          sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+          bytes: 2558168
+          format: ctr-lev
+          format_version: 1
+        - role: vrm
+          sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+          bytes: 458808
+          format: ctr-vrm
+          format_version: 1
+        evidence: []
+      - id: package/fuzz-fixture-loop/1.0
+        content_id: fuzz-fixture-loop
+        uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+        revision: '1.0'
+        display_name: Fuzz Fixture Loop
+        author: Fixture Author
+        laps: 3
+        capabilities:
+          time_trial: true
+          arcade: true
+          relic: true
+          ctr_tokens: false
+          wumpa: false
+          super_turbo_pads: true
+          weapon_crates: 12
+        relic_targets:
+          sapphire: 96000
+          gold: 86400
+          platinum: 76800
+        files:
+        - role: lev
+          sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
+          bytes: 1234567
+          format: ctr-lev
+          format_version: 1
+        - role: vrm
+          sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+          bytes: 458808
+          format: ctr-vrm
+          format_version: 1
+        evidence: []
+    cups:
+      count:
+        min: 0
+        max: 4
+    crystals:
+      count:
+        min: 0
+        max: 4
+    bosses:
+      enabled: true
+      cups:
+        min: 0
+        max: 2
+    required_entries:
+    - custom/baby-t-park/1.0.2
+    - custom/fuzz-fixture-loop/1.0
+  pad_layout:
+    placement: shuffle
+    stages: two
+    mode_order: per_pad
+    merge_trophy_ctr: false
+  item_pool:
+    base:
+      trophies: 16
+      relics:
+        sapphire: 6
+        gold: 4
+        platinum: 2
+      tokens:
+        red: 2
+        green: 2
+        blue: 2
+        yellow: 0
+        purple: 0
+      gems:
+      - red
+      - green
+      - blue
+      - yellow
+      - purple
+      keys: 4
+  start_inventory_from_pool: {}
+  oxide_goal: disabled
+  oxide_1_optional: mandatory
+  bosses_required_goal: 4
+  gems_required_goal: 5
+  oxide_final_challenge_unlock: gold_relics
+  oxide_final_challenge_relic_count: 18
+  oxide_final_track: oxide_station
+  boss_track_shuffle: 'true'
+  boss_track_allowlist: []
+  boss_track_blocklist: []
+  boss_encounter_repeats: disallow
+  shuffle_gems: 'false'
+  include_gem_cups: 'true'
+  randomize_gem_cup_tracks: 'false'
+  custom_tracks: {}
+  slide_coliseum_races: 'off'
+  turbo_track_races: trophy_race
+  cortex_vortex_track: 'false'
+  shuffle_keys: 'false'
+  trap_fill_percentage: 20
+  trap_weights:
+    icy_road: 5
+    low_gravity: 5
+    forced_usf: 2
+    forced_boost: 4
+    first_person: 3
+    wumpa_wipeout: 4
+    flatten: 6
+    item_reroll: 5
+    forced_use: 4
+    empty_crates: 3
+    weakened_kart: 3
+    boost_blocker: 3
+    wireframe: 2
+    nitro: 5
+    reverse_steering: 4
+    red_potion: 3
+    upside_down: 0
+    mirror_mode: 3
+    warpball_ambush: 3
+    demo_camera: 3
+    clocked_out: 3
+    reverse_camera: 2
+  itemsanity: 'false'
+  hit_character: 'false'
+  relic_perfect_checks: 'true'
+  tizi_helper: 'false'
+  wumpa_bundles: 'false'
+  reserve_top_up: 'false'
+  progressive_starting_wumpa: 6
+  wumpa_check: global
+  turbo_grant: 'false'
+  lettersanity: locations_and_items
+  letters_per_track: 3
+  box_locations: 'false'
+  shortcut_knowledge: hard
+  progressive_boost: per_character
+  progressive_boost_blue_fire: 'true'
+  progressive_stats: shared_global
+  logic_difficulty: easy
+  starting_character: pura
+  starting_stat_class: balanced
+  character_unlocks: 'true'
+  remove_playable_oxide: 'true'
+  racer_locked_pads: 17
+  penta_stats: ntsc
+  editable_stats: per_character
+  include_battle_arenas: 'false'
+  crystalsanity: 'true'
+  cup_sweep_checks: 'false'
+  include_arcade_arenas: 'true'
+  warp_pad_shuffle_categories:
+  - crystals
+  - cups
+  - tracks
+  warp_pad_shuffle_grouping: merged
+  warp_pad_item_display: by_reward_type
+  ap_item_type_colors: 'false'
+  color_boxes_by_item: 'false'
+  warppad_unlock_requirements: randomized
+  two_stage_density: 'off'
+  requirement_variety: custom
+  requirement_weights:
+    Trophy: 90
+    Key: 20
+    Red CTR Token: 16
+    Green CTR Token: 16
+    Blue CTR Token: 16
+    Yellow CTR Token: 16
+    Purple CTR Token: 12
+    Sapphire Relic: 18
+    Gold Relic: 18
+    Platinum Relic: 18
+    Red Gem: 4
+    Green Gem: 4
+    Blue Gem: 4
+    Yellow Gem: 4
+    Purple Gem: 4
+  warp_pad_rules: {}
+  podium_placement_checks: 'true'
+  podium_finish_rungs: 'false'
+  podium_any_position_rung: 'true'
+  podium_held_rungs: 'false'
+  podium_held_fifth_rung: 'true'
+  one_lap_cups: 'true'
+  death_link: any_hit
+  death_link_send:
+  - race_loss
+  - weapon_hit
+  deathlink_amnesty: 28
+  sapphire_relic_count: 4
+  gold_relic_count: 11
+  platinum_relic_count: 3
+  bossgarage_unlock_requirements: trophies

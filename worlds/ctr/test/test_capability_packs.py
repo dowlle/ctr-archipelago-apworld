@@ -15,6 +15,7 @@ import unittest
 
 from BaseClasses import CollectionState
 from Options import OptionError
+from worlds.AutoWorld import call_all
 
 from .. import content_capability, content_item_pool, content_plan, custom_packages, progressive_capability
 from .test_content_plan import make_world
@@ -290,7 +291,7 @@ class TestEarlyBoost(unittest.TestCase):
         out = []
         for seed in range(40):
             try:
-                world = make_world(cap_options(**extra), seed=seed)
+                world = make_world(cap_options(**extra), seed=seed, stop_before="pre_fill")
             except OptionError:
                 continue
             out.append((world, sphere0_guard.sphere0_breadth(world)))
@@ -346,21 +347,175 @@ class TestEarlyBoost(unittest.TestCase):
         is a second Tiny Tiger boost rank, and the seed fills."""
         import yaml
         from pathlib import Path
-        from Fill import distribute_early_items, distribute_items_restrictive
+        from Fill import distribute_items_restrictive
         from .. import sphere0_guard
         path = Path(__file__).parent / "fixtures" / "content_plan_boost_racer_locks_527.yaml"
         options = yaml.safe_load(path.read_text())["Crash Team Racing"]
-        world = make_world(options, seed=527)
+        world = make_world(options, seed=527, stop_before="pre_fill")
         mw = world.multiworld
         self.assertEqual(sphere0_guard.sphere0_breadth(world), 2)
         self.assertEqual(len(world.ctr_racer_locks), 19)
         self.assertEqual(mw.local_early_items[1], {"Progressive Boost (Tiny Tiger)": 2})
         self.assertEqual(world._ctr_early_second, "Progressive Boost (Tiny Tiger)")
         self.assertFalse(mw.precollected_items[1])
-        _, mw.itempool = distribute_early_items(mw, mw.get_unfilled_locations(), mw.itempool)
+        # pre_fill places both early copies in the start (bootstrap_start).
+        call_all(mw, "pre_fill")
+        self.assertEqual(mw.local_early_items[1], {})
+        self.assertEqual([name for name, _ in world._ctr_start_bootstrap][:2], ["Progressive Boost (Tiny Tiger)"] * 2)
         distribute_items_restrictive(mw)
         self.assertTrue(mw.can_beat_game())
 
+
+
+class TestStartBootstrap(unittest.TestCase):
+    """0.3.0 review finding 1: pre_fill places openers in a narrow content-plan
+    start until sphere0_guard.BOOTSTRAP_START_CHECKS checks are open, so the
+    fill no longer dead-ends on the few starting checks. Nothing is
+    precollected."""
+
+    @staticmethod
+    def fixture(name):
+        import yaml
+        from pathlib import Path
+        path = Path(__file__).parent / "fixtures" / name
+        return yaml.safe_load(path.read_text())["Crash Team Racing"]
+
+    def fills(self, world):
+        from Fill import distribute_items_restrictive
+        mw = world.multiworld
+        self.assertFalse(mw.precollected_items[1])
+        distribute_items_restrictive(mw)
+        self.assertTrue(mw.can_beat_game())
+        state = CollectionState(mw)
+        state.sweep_for_advancements()
+        self.assertTrue(all(loc.can_reach(state) for loc in mw.get_locations(1)))
+
+    def test_ci_fuzz_505_seed_2601_fills(self):
+        """Dead-ended before: two early Pura boosts filled a start of 2."""
+        from .. import sphere0_guard
+        world = make_world(self.fixture("content_plan_bosses_fuzz505_2601.yaml"), seed=2601)
+        placed = world._ctr_start_bootstrap
+        self.assertEqual([name for name, _ in placed[:2]], ["Progressive Boost (Pura)"] * 2)
+        self.assertEqual(world.multiworld.local_early_items[1], {})
+        self.assertEqual(sphere0_guard.bootstrap_target(world), sphere0_guard.BOOTSTRAP_START_CHECKS)
+        self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world), sphere0_guard.BOOTSTRAP_START_CHECKS)
+        self.fills(world)
+
+    def test_start_of_five_seed_5632_fills(self):
+        """Dead-ended before: a start of 5 took no early item."""
+        world = make_world(self.fixture("content_plan_boost_start5_5632.yaml"), seed=5632)
+        self.assertTrue(world._ctr_start_bootstrap)
+        self.fills(world)
+
+    def test_two_copies_open_when_one_does_not(self):
+        """Seed 4088: after two Pura boosts no single item opens a check, two
+        Red CTR Tokens do."""
+        world = make_world(self.fixture("content_plan_boost_pair_opener_4088.yaml"), seed=4088)
+        names = [name for name, _ in world._ctr_start_bootstrap]
+        self.assertEqual(names[2:4], ["Red CTR Token", "Red CTR Token"])
+        self.fills(world)
+
+    def test_openers_must_fit_in_the_open_checks(self):
+        """Codex review round 1: with two open checks, three copies of A open
+        checks but do not fit; the pair B + C does and must be chosen."""
+        from unittest import mock
+        from .. import sphere0_guard
+
+        class FakeState:
+            def __init__(self, held=()):
+                self.held = list(held)
+
+            def copy(self):
+                return FakeState(self.held)
+
+            def collect(self, item, _prevent=True):
+                self.held.append(item)
+
+        def open_empty(_world, state):
+            held = state.held
+            opens = held.count("A") >= 3 or ("B" in held and "C" in held)
+            return [object()] * (2 + (3 if opens else 0))
+
+        pool = {"A": ["A"] * 4, "B": ["B"], "C": ["C"]}
+        with mock.patch.object(sphere0_guard, "_open_empty", open_empty):
+            self.assertEqual(sphere0_guard._next_openers(None, FakeState(), 2, pool), ["B", "C"])
+            # With room for three, the single-item group is still preferred.
+            self.assertEqual(sphere0_guard._next_openers(None, FakeState(), 3, pool), ["A"] * 3)
+
+    def test_non_local_items_stay_out_of_the_start(self):
+        options = self.fixture("content_plan_boost_pair_opener_4088.yaml")
+        options["non_local_items"] = ["Red CTR Token", "Key"]
+        world = make_world(options, seed=4088)
+        names = {name for name, _ in getattr(world, "_ctr_start_bootstrap", ())}
+        self.assertFalse(names & {"Red CTR Token", "Key"})
+
+    def test_placed_items_sit_in_starting_checks_of_the_slot(self):
+        world = make_world(self.fixture("content_plan_bosses_fuzz505_2601.yaml"), seed=2601)
+        mw = world.multiworld
+        state = CollectionState(mw)
+        for name, location in world._ctr_start_bootstrap:
+            loc = mw.get_location(location, 1)
+            self.assertEqual(loc.item.name, name)
+            self.assertTrue(loc.locked)
+            self.assertTrue(loc.can_reach(state), location)
+            state.sweep_for_advancements(locations=[loc])
+            self.assertFalse(any(item is loc.item for item in mw.itempool))
+
+    def test_the_bootstrap_leaves_room_for_the_early_weapon(self):
+        # Review round 1: Itemsanity marks its weapon in early_items; the
+        # bootstrap must not fill the start before AP's early pass seats it.
+        from Fill import distribute_items_restrictive
+        from worlds.AutoWorld import call_single
+        from .test_content_bosses import varied
+        world = make_world(varied(3), seed=14, stop_before="pre_fill")
+        mw = world.multiworld
+        weapon = next(iter(mw.early_items[1]))
+        call_single(mw, "pre_fill", 1)
+        distribute_items_restrictive(mw)
+        location = next(loc for loc in mw.get_locations(1)
+                        if loc.item is not None and loc.item.name == weapon)
+        # Seated by the early pass: reachable with nothing collected.
+        self.assertTrue(location.can_reach(CollectionState(mw)), location.name)
+
+    def test_the_early_weapon_is_not_taken_by_the_bootstrap(self):
+        # Review round 2: an item named in early_items stays out of the bootstrap
+        # pool, and the early pass still seats it in the initial sphere.
+        from Fill import distribute_items_restrictive
+        from worlds.AutoWorld import call_single
+        options = self.fixture("content_plan_boost_pair_opener_4088.yaml")
+        options["itemsanity"] = True
+        for seed in (4088, 4089, 4090):
+            world = make_world(options, seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            weapons = set(mw.early_items.get(1, {}))
+            if not weapons:
+                continue
+            call_single(mw, "pre_fill", 1)
+            self.assertFalse(weapons & {n for n, _ in getattr(world, "_ctr_start_bootstrap", ())})
+            distribute_items_restrictive(mw)
+            for loc in mw.get_locations(1):
+                if loc.item is not None and loc.item.name in weapons:
+                    self.assertTrue(loc.can_reach(CollectionState(mw)), (seed, loc.name))
+
+    def test_a_wide_start_is_unchanged(self):
+        from .. import sphere0_guard
+        seen = 0
+        for seed in range(12):
+            try:
+                before = make_world(cap_options(boost="off", stats="shared_global"), seed=seed,
+                                    stop_before="pre_fill")
+            except OptionError:
+                continue
+            if sphere0_guard.sphere0_breadth(before) < sphere0_guard.bootstrap_target(before):
+                continue
+            seen += 1
+            state = before.multiworld.random.getstate()
+            pool = list(before.multiworld.itempool)
+            call_all(before.multiworld, "pre_fill")
+            self.assertIsNone(getattr(before, "_ctr_start_bootstrap", None))
+            self.assertEqual(before.multiworld.itempool, pool)
+            self.assertEqual(before.multiworld.random.getstate(), state)
+        self.assertTrue(seen)
 
 class TestForgedPlans(unittest.TestCase):
     @classmethod

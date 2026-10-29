@@ -8,7 +8,7 @@ import unittest
 from BaseClasses import CollectionState, LocationProgressType
 from Options import OptionError
 
-from .. import boss_track_shuffle, content_bosses, content_plan, hit_character
+from .. import boss_track_shuffle, content_bosses, content_plan, destinations, hit_character
 from .test_content_plan import make_world, profile_options
 
 BOSS_NAMES = ["Ripper Roo Garage: Boss Race", "Papu Papu Garage: Boss Race", "Komodo Joe Garage: Boss Race",
@@ -555,6 +555,75 @@ class TestBossCups(unittest.TestCase):
         options["content_pool"]["bosses"]["cups"] = 5
         with self.assertRaisesRegex(OptionError, "bosses.cups"):
             make_world(options)
+
+
+class TestBoundedVenueDraw(unittest.TestCase):
+    """The disallow-repeats venue draw counts the distinct four-way assignments
+    instead of listing them (0.3.0 review finding 2), and still picks exactly
+    the assignment `random.choice` picked from the full list."""
+
+    @staticmethod
+    def listed_choice(rng, pools):
+        """The draw before the fix: every distinct assignment, then choice."""
+        import itertools
+        assignments = [c for c in itertools.product(*pools) if len(set(c)) == len(c)]
+        return list(rng.choice(assignments)) if assignments else None
+
+    def test_same_pick_and_same_random_stream_as_the_listed_draw(self):
+        import random
+        rng = random.Random(133)
+        for _ in range(1500):
+            universe = [f"t{i}" for i in range(rng.randint(1, 9))]
+            pools = [[rng.choice(universe) for _ in range(rng.randint(0, 6))] for _ in range(rng.randint(1, 4))]
+            seed = rng.random()
+            new, old = random.Random(seed), random.Random(seed)
+            with self.subTest(pools=pools):
+                self.assertEqual(boss_track_shuffle.choose_distinct_assignment(new, pools),
+                                 self.listed_choice(old, pools))
+                self.assertEqual(new.random(), old.random())
+
+    def test_retail_pools_draw_as_before(self):
+        import random
+        options = boss_options(boss_track_shuffle=True)
+        world = make_world(copy.deepcopy(options), seed=7)
+        candidates = boss_track_shuffle.garage_candidates(world.options)
+        pools = [candidates[key] for key, *_ in boss_track_shuffle.GARAGES]
+        for seed in range(25):
+            self.assertEqual(boss_track_shuffle.choose_distinct_assignment(random.Random(seed), pools),
+                             self.listed_choice(random.Random(seed), pools))
+
+    def test_none_without_a_distinct_assignment(self):
+        import random
+        rng = random.Random(1)
+        state = rng.getstate()
+        self.assertIsNone(boss_track_shuffle.choose_distinct_assignment(rng, [["a"], ["a"], ["a", "b"], ["b"]]))
+        self.assertEqual(rng.getstate(), state)
+
+    def test_largest_custom_pool_is_fast_and_small(self):
+        """27 custom venues (every normal pad) plus Cortex Vortex join each
+        garage's retail pool: about 4 million distinct assignments, which the
+        listed draw held in memory."""
+        import time
+        import tracemalloc
+        world = make_world(boss_options(boss_track_shuffle=True), seed=11)
+        custom = [(f"custom/fixture-{i}/1.0", 35) for i in range(27)]
+        custom.append((destinations.CORTEX_VORTEX, content_bosses.CORTEX_RESTART_POINTS))
+        retail = boss_track_shuffle.garage_candidates(world.options)
+        pools = [retail[key] + [name for name, _ in custom] for key, *_ in boss_track_shuffle.GARAGES]
+        self.assertGreater(boss_track_shuffle.count_distinct_assignments(pools), 3_000_000)
+        record = dict(track_shuffle=True, repeats=False)
+        tracemalloc.start()
+        started = time.perf_counter()
+        venues = content_bosses.draw_venues(world, record, custom)
+        elapsed = time.perf_counter() - started
+        peak = tracemalloc.get_traced_memory()[1]
+        tracemalloc.stop()
+        self.assertEqual(len(set(venues.values())), 4)
+        for garage, venue in venues.items():
+            self.assertIn(venue, pools[garage])
+        self.assertLess(elapsed, 2.0)
+        self.assertLess(peak, 2_000_000)
+
 
 if __name__ == "__main__":
     unittest.main()
