@@ -831,8 +831,11 @@ class SpoilerItems(Toggle):
     Off (default): warp pads and AP item boxes show what they hold, as usual.
 
     On: the floating rewards above warp pads stay hidden until you receive
-    Warp Pad Preview. With Item Box Locations and Item Box Colours both on,
-    AP item boxes also stay pink until you receive AP Box Colours.
+    Warp Pad Preview. Until then, a pad with any open location shows one
+    plain Archipelago marker, and a finished pad shows nothing. With Item Box
+    Locations and Item Box Colours both on, AP item boxes also stay pink until
+    you receive AP Box Colours. You can switch the in-game Item Box Colours
+    row to OFF before that, and the boxes then stay pink after it arrives.
 
     Both are useful items that add no location, so each one takes a slot that
     would otherwise hold filler. Pads still open, close and count their checks
@@ -862,16 +865,17 @@ class AdventureStructure(Choice):
       first; the CTR Challenge and the Relic Race open after it.
     - **ctr_first**: the first race on each track is its CTR Challenge.
       Winning it with the letters sends both that track's CTR Token
-      Challenge check and its Trophy Race check. The Relic Race still opens
-      after that, behind the warp pad's second requirement. Winning a plain
-      Trophy Race sends neither check; you can still race it for boxes,
-      Wumpa and placement checks.
+      Challenge check and its Trophy Race check. The track has no plain
+      Trophy Race: item boxes, Wumpa and placement checks come from the CTR
+      Challenge race, and placement counts even without all the letters.
+      The Relic Race still opens after that, behind the warp pad's second
+      requirement.
 
     The checks keep their names: "Trophy Race" stays the track's first
-    check even though a CTR Challenge win earns it. Every track with a
-    Trophy Race check needs a CTR Challenge check too, so ctr_first refuses
-    a trial track set to trophy_race, a custom track without a CTR
-    Challenge, and the experimental content plan."""
+    check even though a CTR Challenge win earns it. A track without a CTR
+    Challenge (a trial track set to trophy_race, a custom track without
+    one) keeps the classic order. Not available with the experimental
+    content plan."""
     display_name = "Adventure Structure"
     option_classic = 0
     option_ctr_first = 1
@@ -883,12 +887,15 @@ class RaceTypeSelector(Choice):
 
     - **always** (default): every race pad you can enter opens the race
       type menu, with Trophy Race, CTR Challenge and Relic Race where the
-      track has them and the pad allows them.
+      track has them and the pad allows them. Under adventure_structure
+      ctr_first a track with a CTR Challenge has no Trophy Race row.
     - **productive**: the menu opens only when more than one race type still
       has a check, or when none has; with exactly one, the pad loads it.
 
     Race types with nothing left to check are grey but you can still pick
-    them to race again. This only changes the menu, never what is in logic."""
+    them to race again. This is the starting value: the client's Options
+    menu can change it at any time. It only changes the menu, never what is
+    in logic."""
     display_name = "Race Type Selector"
     option_productive = 0
     option_always = 1

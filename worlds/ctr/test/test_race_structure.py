@@ -166,8 +166,9 @@ class TestCtrFirstLettersanityItems(CTRTestBase):
 
 
 class TestCtrFirstUsfFinishRungs(CTRTestBase):
-    """A plain Trophy Race still crosses a USF track's finish line, so its
-    finish rungs need the USF finish, not the CTR win's letter items."""
+    """The CTR Challenge's finishing place earns the rungs, letters or not
+    (decision 14), so a USF track's finish rungs need the USF finish, not
+    the CTR win's letter items."""
     options = {"adventure_structure": "ctr_first", "lettersanity": "items_only",
                "progressive_boost": "shared_global"}
 
@@ -225,6 +226,58 @@ class TestCtrFirstCortexVortex(CTRTestBase):
         self.assertIn("Cortex Vortex: Trophy Race", names)
 
 
+class TestCtrFirstTrialFallback(CTRTestBase):
+    """Decision 4: a trial track on trophy_race in a ctr_first seed is a
+    classic track. Its Trophy Race keeps its own rule, it is in no award
+    pair, and the retail tracks still pair."""
+    options = {"adventure_structure": "ctr_first",
+               "slide_coliseum_races": "trophy_race",
+               "turbo_track_races": "trophy_and_ctr_challenge"}
+
+    def test_fallback_and_pairs(self):
+        self.assertEqual(race_structure.classic_fallbacks(self.world), ["Slide Coliseum"])
+        pairs = race_structure.stage1_pairs(self.world)
+        self.assertEqual(len(pairs), 17)
+        self.assertNotIn("Slide Coliseum: Trophy Race", [t for t, _c in pairs])
+        block = race_structure.race_structure_block(self.world)
+        sc = _loc(self.world, "Slide Coliseum: Trophy Race").address
+        self.assertNotIn(sc, [t for _c, t in block["stage1_awards"]])
+
+    def test_fallback_trophy_needs_no_ctr_terms(self):
+        """The classic Trophy is reachable with the items that reach any
+        retail Trophy; nothing ties it to a CTR win."""
+        state = CollectionState(self.multiworld)
+        for it in self.multiworld.itempool:
+            if it.player == self.player and it.advancement:
+                state.collect(it, True)
+        state.sweep_for_advancements()
+        self.assertTrue(_loc(self.world, "Slide Coliseum: Trophy Race").can_reach(state))
+
+
+class TestRestoredBlockFallback(TestCtrFirstTrialFallback):
+    """Universal Tracker on a seed with a classic fallback track: the room's
+    block must leave that track out, as the rebuilt one does."""
+
+    def _passthrough(self, saved):
+        self.multiworld.re_gen_passthrough = {self.world.game: {"race_structure": saved}}
+        try:
+            race_structure.check_tracker_block(self.world)
+        finally:
+            del self.multiworld.re_gen_passthrough
+
+    def test_matching_block_passes(self):
+        self._passthrough(race_structure.race_structure_block(self.world))
+
+    def test_block_pairing_the_fallback_track_refused(self):
+        """A room generated with Slide Coliseum on trophy_and_ctr_challenge
+        pairs it; tracking it with a trophy_race YAML must refuse."""
+        block = race_structure.race_structure_block(self.world)
+        sc = _loc(self.world, "Slide Coliseum: Trophy Race").address
+        saved = dict(block, stage1_awards=block["stage1_awards"] + [[sc + 100000, sc]])
+        with self.assertRaises(OptionError):
+            self._passthrough(saved)
+
+
 class TestRefusals(unittest.TestCase):
     def _gen(self, **options):
         from worlds import AutoWorld
@@ -248,9 +301,12 @@ class TestRefusals(unittest.TestCase):
             call_all(mw, step)
         return mw
 
-    def test_trial_trophy_only_refused(self):
-        with self.assertRaisesRegex(OptionError, "Slide Coliseum"):
-            self._gen(adventure_structure="ctr_first", slide_coliseum_races="trophy_race")
+    def test_trial_trophy_only_falls_back(self):
+        """Decision 4 (2026-10-28): a track without a CTR Challenge keeps
+        the classic order inside a ctr_first seed instead of refusing."""
+        mw = self._gen(adventure_structure="ctr_first", slide_coliseum_races="trophy_race")
+        world = mw.worlds[1]
+        self.assertIn("Slide Coliseum", race_structure.classic_fallbacks(world))
 
     def test_content_plan_refused(self):
         class O:
