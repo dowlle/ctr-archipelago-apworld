@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "groups": [
+    {"id": "goal", "label": "Goal", "options": ["oxide_goal", "bosses_required_goal", "gems_required_goal", "oxide_final_challenge_unlock"]},
+    {"id": "progression", "label": "Progression", "options": ["shuffle_keys", "shuffle_gems", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "character_unlocks", "progressive_boost", "progressive_stats", "logic_difficulty"]},
+    {"id": "extras", "label": "Extras", "options": ["itemsanity", "lettersanity", "box_locations", "podium_placement_checks", "trap_fill_percentage", "one_lap_cups", "death_link"]}
+  ],
+  "rules": [
+    {"option": "death_link", "forced": "off", "reason": "No other players in solo"},
+    {"option": "oxide_final_challenge_unlock", "visible_when": {"oxide_goal": ["101_percent"]}},
+    {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"}
+  ],
+  "custom_tracks": {
+    "comment": "Solo custom-track step (#89, decisions 32, 4 and 5 of the round 2 notes). The vanilla-shape profile: 18 race pads, 5 Gem Cups, 4 Crystal Challenges (the retail arenas), 4 boss garages plus Oxide, and the retail item quantities. Retail and picked custom tracks form one pool for the pads and every cup leg; the pads stay 18, so a custom track on a pad displaces a retail track. A YAML without a content plan gets these settings where it sets nothing; a YAML with a content plan keeps its own counts.",
+    "profile": {
+      "content_pool": {"preset": "mixed", "tracks": {"retail": "all", "cortex_vortex": false, "modes": ["trophy", "ctr", "relic"]}, "cups": {"count": 5}, "crystals": {"count": 4, "pool": [21, 19, 23, 18]}, "bosses": {"enabled": true}},
+      "pad_layout": {"placement": "shuffle", "stages": "two", "mode_order": "fixed", "merge_trophy_ctr": false},
+      "item_pool": {"base": {"trophies": 16, "relics": {"sapphire": 18, "gold": 18, "platinum": 18}, "tokens": {"red": 4, "green": 4, "blue": 4, "yellow": 4, "purple": 4}, "gems": ["red", "green", "blue", "yellow", "purple"], "keys": 4}}
+    }
+  }
+}

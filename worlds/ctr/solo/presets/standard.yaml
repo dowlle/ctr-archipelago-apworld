@@ -1,0 +1,6 @@
+# Standard: the release defaults. DeathLink is off because a solo room has no
+# other players.
+name: Player
+game: Crash Team Racing
+Crash Team Racing:
+  death_link: "off"
