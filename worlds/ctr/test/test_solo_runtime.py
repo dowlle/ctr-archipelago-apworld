@@ -352,6 +352,14 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(last(events)["kind"], "track")
         self.assertIn("already lists Fixture Loop", last(events)["message"])
         self.assertIn("2.0", last(events)["message"])
+        # The same revision with other file pins is a conflict too.
+        pinned = json.loads(json.dumps(loop))
+        pinned["files"][0]["sha256"] = "a1" * 32
+        source = self.yaml_with_plan("pinned.yaml", tracks=dict(retail="all", modes=["trophy", "relic"],
+                                                                custom=[pinned]))
+        events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
+        self.assertNotEqual(code, 0)
+        self.assertEqual(last(events)["kind"], "track")
         for pool in ({"tracks": {"custom": {}}}, [], False):
             with self.subTest(pool=pool):
                 import yaml

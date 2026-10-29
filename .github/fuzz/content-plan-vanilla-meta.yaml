@@ -65,6 +65,8 @@ Crash Team Racing:
   boss_encounter_repeats: {disallow: 1, allow: 1}
   boss_track_allowlist: []
   boss_track_blocklist: []
+  include_battle_arenas: true
+  include_arcade_arenas: false
   custom_tracks: {}
   cortex_vortex_track: false
   progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
