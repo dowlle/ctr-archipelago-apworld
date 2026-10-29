@@ -477,6 +477,26 @@ class TestStartBootstrap(unittest.TestCase):
         # Seated by the early pass: reachable with nothing collected.
         self.assertTrue(location.can_reach(CollectionState(mw)), location.name)
 
+    def test_the_early_weapon_is_not_taken_by_the_bootstrap(self):
+        # Review round 2: an item named in early_items stays out of the bootstrap
+        # pool, and the early pass still seats it in the initial sphere.
+        from Fill import distribute_items_restrictive
+        from worlds.AutoWorld import call_single
+        options = self.fixture("content_plan_boost_pair_opener_4088.yaml")
+        options["itemsanity"] = True
+        for seed in (4088, 4089, 4090):
+            world = make_world(options, seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            weapons = set(mw.early_items.get(1, {}))
+            if not weapons:
+                continue
+            call_single(mw, "pre_fill", 1)
+            self.assertFalse(weapons & {n for n, _ in getattr(world, "_ctr_start_bootstrap", ())})
+            distribute_items_restrictive(mw)
+            for loc in mw.get_locations(1):
+                if loc.item is not None and loc.item.name in weapons:
+                    self.assertTrue(loc.can_reach(CollectionState(mw)), (seed, loc.name))
+
     def test_a_wide_start_is_unchanged(self):
         from .. import sphere0_guard
         seen = 0

@@ -394,10 +394,16 @@ def bootstrap_start(world) -> None:
     """Content plans: place openers in this slot's start until at least
     bootstrap_target checks are open and empty (see above). Runs in
     pre_fill, after plando and item links. Draws only when it places."""
+    from BaseClasses import CollectionState
     mw, player = world.multiworld, world.player
     target = bootstrap_target(world)
     state = _base_state(world)
-    base = _base_state(world)  # never swept: the start as the early pass sees it
+    # The start as AP's early pass sees it: only event items (no address) are
+    # swept, placed items never are.
+    base = CollectionState(mw)
+    base.sweep_for_advancements(
+        locations=[loc for loc in mw.get_locations(player)
+                   if loc.item is not None and loc.address is None])
     if len(_open_empty(world, state)) >= target:
         return
     # A player's non_local_items stay out of their own start.
@@ -412,7 +418,8 @@ def bootstrap_start(world) -> None:
         pool = {}
         for item in mw.itempool:
             if (item.player == player and item.advancement and item.location is None
-                    and item.name not in non_local):
+                    and item.name not in non_local
+                    and item.name not in mw.early_items.get(player, {})):
                 pool.setdefault(item.name, []).append(item)
         names = []
         while queue and not names:
