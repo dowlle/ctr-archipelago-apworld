@@ -706,6 +706,10 @@ def create_regions(world: "ctrAPWorld"):
     from .cup_sweeps import create_locations as create_cup_sweeps
     create_cup_sweeps(world, region_lookup)
 
+    # The Wumpa Shop (#249): the `Wumpa Income` event and the hub shop slots.
+    from .wumpa_shop import create_locations as create_wumpa_shop
+    create_wumpa_shop(world, regions, region_lookup)
+
     # Crystals inherit precisely the arena region's physical entry gates. They
     # have no completion, weapon, boost or stat requirement of their own.
     from .crystal_checks import CRYSTAL_CLASS

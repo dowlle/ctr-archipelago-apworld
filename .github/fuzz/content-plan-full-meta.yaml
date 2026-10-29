@@ -12,6 +12,8 @@
 # one-in-three-thousand fill residual (#133 PR 4c).
 Crash Team Racing:
   accessibility: full
+  # Content plans refuse a Wumpa goal until they have a record for it (#249).
+  goal_wumpa: 0
   content_pool:
     preset: mixed
     tracks:

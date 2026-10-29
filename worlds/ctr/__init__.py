@@ -24,6 +24,7 @@ from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITE
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
+from . import wumpa_shop
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -527,6 +528,9 @@ class ctrAPWorld(World):
         # options emit (Cortex Vortex's dropped destination was restored
         # above), otherwise the restore refuses. See relic_perfect.
         relic_perfect.restore_from_wire(o, passthrough)
+        # #249: the shop and goal values; absent keys are a seed with banking
+        # off, whatever the tracking player's own YAML default says.
+        wumpa_shop.restore_options(o, passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -546,10 +550,12 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough and "content_plan" in passthrough:
             from . import content_plan
+            wumpa_shop.disable_for_content_plan(self, refuse=False)
             content_plan.restore(self, passthrough)
             return
         if self.options.content_pool.value:
             from . import content_plan
+            wumpa_shop.disable_for_content_plan(self, refuse=True)
             content_plan.generate(self)
             return
         if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
@@ -1072,6 +1078,8 @@ class ctrAPWorld(World):
         schema>=7-aware native never reads this for evaluation. -1 when the
         composed goal has no single-condition legacy analogue."""
         o = self.options
+        if o.goal_wumpa.value > 0:
+            return -1  # no single-condition legacy goal banks fruit
         oxide = o.oxide_goal.value
         bosses = o.bosses_required_goal.value
         gems = o.gems_required_goal.value
@@ -1219,6 +1227,12 @@ class ctrAPWorld(World):
         if o.gems_required_goal.value > 0:
             self._ctr_gems_predicate = self.gemgoal(
                 player, o.gems_required_goal.value, predicates)
+
+        # #249: bank N fruit over the seed. Logic needs only that fruit can be
+        # banked (`Wumpa Income`); the amount costs time, not items. Native
+        # counts its own persisted banking, never checked or Collected slots.
+        if o.goal_wumpa.value > 0:
+            predicates.append(wumpa_shop.goal_term(self).compile())
 
         # generate_early's raise_if_composed_goal_is_empty already rejects the
         # all-off combination, so this can never be empty here; the assert is

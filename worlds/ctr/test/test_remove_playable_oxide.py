@@ -43,6 +43,9 @@ TRIAL = {"slide_coliseum_races": "trophy_race",
 
 
 def _build(seed=1, steps=THROUGH_ITEMS, **options):
+    # Pool-capacity fixture from before the Wumpa Shop (#249): its default of
+    # ten slots per hub adds 50 locations, so pin it off.
+    options.setdefault("wumpa_shop_slots", 0)
     return setup_multiworld(ctrAPWorld, steps, seed=seed, options=options)
 
 
