@@ -353,16 +353,21 @@ BOOTSTRAP_MAX_COPIES = 4
 
 def bootstrap_target(world) -> int:
     """Open empty checks the start bootstrap aims for on this slot."""
+    from .wumpa_shop import LOCATION_TYPE as SHOP
     checks = sum(1 for loc in world.multiworld.get_locations(world.player)
-                 if loc.address is not None)
+                 if loc.address is not None and getattr(loc, "type", None) != SHOP)
     return min(BOOTSTRAP_START_CHECKS, checks // 4)
 
 
 def _open_empty(world, state):
+    """Open empty checks the bootstrap may seat an opener on. Wumpa Shop
+    slots never count as starting checks (content plans, job J11)."""
     from BaseClasses import LocationProgressType
+    from .wumpa_shop import LOCATION_TYPE as SHOP
     return [loc for loc in world.multiworld.get_unfilled_locations(world.player)
             if loc.address is not None
             and loc.progress_type != LocationProgressType.EXCLUDED
+            and getattr(loc, "type", None) != SHOP
             and loc.can_reach(state)]
 
 

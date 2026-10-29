@@ -303,21 +303,3 @@ def restore_options(options, wire: Dict[str, object]) -> None:
         value = co.get(key, fallback)
         option = getattr(options, key)
         option.value = int(value) if type(value) in (int, bool) else fallback
-
-
-def disable_for_content_plan(world, refuse: bool) -> None:
-    """Content plans own their checks and goal, and have no shop or Wumpa
-    goal record yet. A Wumpa goal there is refused; the shop count, which
-    defaults on, is set to 0 so the plan path is unchanged."""
-    o = world.options
-    if refuse and goal_wumpa(o) > 0:
-        from Options import OptionError
-        raise OptionError("CTR: goal_wumpa is not supported with a content_pool "
-                          "yet; set goal_wumpa to 0.")
-    if refuse and shop_slots(o) > 0:
-        import logging
-        logging.getLogger(__name__).warning(
-            "CTR (%s): ignored option: Wumpa Shop Slots (content plans have no "
-            "Wumpa Shop yet)", world.multiworld.player_name[world.player])
-    o.goal_wumpa.value = 0
-    o.wumpa_shop_slots.value = 0
