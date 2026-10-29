@@ -461,6 +461,22 @@ class TestStartBootstrap(unittest.TestCase):
             state.sweep_for_advancements(locations=[loc])
             self.assertFalse(any(item is loc.item for item in mw.itempool))
 
+    def test_the_bootstrap_leaves_room_for_the_early_weapon(self):
+        # Review round 1: Itemsanity marks its weapon in early_items; the
+        # bootstrap must not fill the start before AP's early pass seats it.
+        from Fill import distribute_items_restrictive
+        from worlds.AutoWorld import call_single
+        from .test_content_bosses import varied
+        world = make_world(varied(3), seed=14, stop_before="pre_fill")
+        mw = world.multiworld
+        weapon = next(iter(mw.early_items[1]))
+        call_single(mw, "pre_fill", 1)
+        distribute_items_restrictive(mw)
+        location = next(loc for loc in mw.get_locations(1)
+                        if loc.item is not None and loc.item.name == weapon)
+        # Seated by the early pass: reachable with nothing collected.
+        self.assertTrue(location.can_reach(CollectionState(mw)), location.name)
+
     def test_a_wide_start_is_unchanged(self):
         from .. import sphere0_guard
         seen = 0

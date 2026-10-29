@@ -397,6 +397,7 @@ def bootstrap_start(world) -> None:
     mw, player = world.multiworld, world.player
     target = bootstrap_target(world)
     state = _base_state(world)
+    base = _base_state(world)  # never swept: the start as the early pass sees it
     if len(_open_empty(world, state)) >= target:
         return
     # A player's non_local_items stay out of their own start.
@@ -422,12 +423,19 @@ def bootstrap_start(world) -> None:
             names = _next_openers(world, state, len(spots), pool)
         if not names or len(names) > len(spots):
             break
+        # Items AP's own early pass still has to seat (Itemsanity's weapon) need
+        # a check open from the very start: keep that many of those free.
+        owed = sum(n for name, n in mw.early_items.get(player, {}).items()
+                   if name not in non_local)
         taken = {}
         for name in names:
             item = pool[name][taken.get(name, 0)]
             taken[name] = taken.get(name, 0) + 1
             fits = [loc for loc in sorted(_open_empty(world, state), key=lambda loc: loc.name)
                     if loc.can_fill(state, item, True)]
+            base_open = {loc.name for loc in _open_empty(world, base)}
+            if len(base_open) <= owed:
+                fits = [loc for loc in fits if loc.name not in base_open]
             if not fits:
                 break
             location = world.random.choice(fits)
