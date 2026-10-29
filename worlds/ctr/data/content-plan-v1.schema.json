@@ -86,10 +86,14 @@
           "global_checks_v1",
           "item_boxes_v1",
           "cup_entries_v1",
-          "boss_encounters_v1"
+          "boss_encounters_v1",
+          "ctr_first_v1",
+          "boss_opponents_v1",
+          "wumpa_shop_v1",
+          "wumpa_goal_v1"
         ]
       },
-      "maxItems": 17,
+      "maxItems": 21,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -113,6 +117,13 @@
     },
     "bosses": {
       "$ref": "#/$defs/Bosses"
+    },
+    "adventure_structure": {
+      "description": "adventure_structure: ctr_first (job J11), present only then. A track entry whose track lists trophy and ctr runs the CTR Challenge first and has no Trophy Race (decisions 4 and 14).",
+      "const": "ctr_first"
+    },
+    "wumpa_shop": {
+      "$ref": "#/$defs/WumpaShop"
     }
   },
   "required": [
@@ -698,6 +709,22 @@
           "minLength": 1,
           "maxLength": 64,
           "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "schedule": {
+          "description": "Boss kit shuffle and N. Oxide's all_compatible profile (job J11), present only with attack_profile composed: rows [checkpoint, throw, weapon, path, cooldown, juice].",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 13,
+          "items": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
         }
       },
       "required": [
@@ -1284,6 +1311,25 @@
             "terms"
           ],
           "additionalProperties": false
+        },
+        {
+          "description": "The Wumpa goal arm (job J11), valid only in the plan goal: lifetime banked fruit.",
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "wumpa_banked"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            }
+          },
+          "required": [
+            "op",
+            "count"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1415,7 +1461,7 @@
             "$ref": "#/$defs/Route"
           },
           "maxItems": 132,
-          "minItems": 1,
+          "minItems": 0,
           "uniqueItems": true
         },
         "boost": {
@@ -1427,6 +1473,18 @@
         "stats": {
           "description": "Item Box Locations (#133 PR 4e): true when the check needs one copy of each stat chain (the hard-tier box rule), present only when the plan's capability record has Progressive Stats on. Bound to the pad's racer lock with the check's boost rank. content_item_boxes decides it; content_plan.validate recomputes it.",
           "const": true
+        },
+        "price": {
+          "description": "Wumpa Shop slot (job J11): the final price, written when slot_data is built.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "unlock_banked": {
+          "description": "Wumpa Shop slot (job J11): lifetime banked fruit that puts the slot on sale, 0 from the start.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
         }
       },
       "required": [
@@ -1751,6 +1809,63 @@
           },
           "maxItems": 4,
           "uniqueItems": true
+        },
+        "opponent_shuffle": {
+          "description": "Job J11: the encounter fields, present together only when an opponent, kit or N. Oxide profile is drawn.",
+          "type": "boolean"
+        },
+        "oxide_in_pool": {
+          "type": "boolean"
+        },
+        "kit_shuffle": {
+          "type": "boolean"
+        },
+        "kit": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "assignment": {
+                  "enum": [
+                    "mixed_loadouts",
+                    "signature_profiles"
+                  ]
+                },
+                "intensity": {
+                  "enum": [
+                    "relaxed",
+                    "standard",
+                    "intense",
+                    "mayhem"
+                  ]
+                },
+                "loss_easing": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "assignment",
+                "intensity",
+                "loss_easing"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "oxide_attack_profile": {
+          "enum": [
+            "retail",
+            "all_compatible"
+          ]
+        },
+        "track_assignment": {
+          "enum": [
+            "character_home_track",
+            "independent_track"
+          ]
         }
       },
       "required": [
@@ -1763,6 +1878,38 @@
         "repeats",
         "requirement_level",
         "cups"
+      ],
+      "additionalProperties": false
+    },
+    "WumpaShop": {
+      "description": "The Wumpa Shop (job J11), present only with wumpa_shop_slots above 0: slots per hub, the price percentage, whether progression may sit in a slot, and shop hints. content_wumpa decides the shop checks; content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "slots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25
+        },
+        "prices": {
+          "type": "integer",
+          "minimum": 25,
+          "maximum": 400
+        },
+        "progression": {
+          "enum": [
+            "allowed",
+            "excluded"
+          ]
+        },
+        "hints": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "slots",
+        "prices",
+        "progression",
+        "hints"
       ],
       "additionalProperties": false
     }

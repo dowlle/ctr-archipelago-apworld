@@ -558,16 +558,14 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough and "content_plan" in passthrough:
             from . import content_plan
-            wumpa_shop.disable_for_content_plan(self, refuse=False)
-            content_plan.restore(self, passthrough)
-            # #208: content-plan rooms carry neither structure key and are
-            # always classic; never keep the tracking player's own value.
+            # #208: content-plan rooms carry no `ctr_options` structure key;
+            # the plan's `adventure_structure` (job J11) is restored by
+            # content_plan.restore, after the menu default here.
             race_structure.restore_slot_data(self.options, {})
+            content_plan.restore(self, passthrough)
             return
         if self.options.content_pool.value:
             from . import content_plan
-            wumpa_shop.disable_for_content_plan(self, refuse=True)
-            race_structure.raise_if_content_plan(self.options)
             content_plan.generate(self)
             return
         if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
@@ -1482,6 +1480,14 @@ class ctrAPWorld(World):
                     f"CTR Hit Character ({self.multiworld.player_name[self.player]}): "
                     f"{characters.CHARACTER_ID_TO_NAME[int(_guest)]} has no unlock race in this seed and "
                     f"joins races at {_keys} {'Key' if _keys == 1 else 'Keys'}.\n")
+            # Boss opponent and kit shuffle on content plans (job J11): the
+            # same lines as a normal seed's; nothing when nothing is drawn.
+            from . import content_bosses
+            _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
+            if _lines:
+                spoiler_handle.write(f"CTR boss encounters ({self.multiworld.player_name[self.player]}):\n")
+                for _line in _lines:
+                    spoiler_handle.write(f"  {_line}\n")
             return
         # Character phase (#54/#209): which racer this seed starts you as, and
         # which pads demand a specific racer. Both are per-seed DRAWS rather

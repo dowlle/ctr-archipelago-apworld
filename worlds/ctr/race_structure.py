@@ -46,17 +46,17 @@ LOGIC UNDER `ctr_first` (`install_rules`), per destination with both checks:
 A destination with a Trophy Race check but no CTR Challenge check keeps its
 classic rules: `stage1_pairs` leaves it out, so `install_rules` does not
 touch it and native, seeing its Trophy code in no pair, runs it in the
-classic order (decision 4). The content plan is refused outright: its
-executable profile is Trophy-only and its schema, validator and native
-verifier have no `ctr_first` mode yet.
+classic order (decision 4). Content plans carry `ctr_first` in the plan
+itself (`content_plan.CTR_FIRST`, job J11) with the same rules per entry.
 
 WIRE (schema 18 running section). `ctr_options.adventure_structure` and
 `ctr_options.race_type_selector` are always emitted on an ordinary room as
 strings. The `race_structure` block exists only under `ctr_first`: its
 `stage1_awards` pairs list every CTR Challenge code whose qualifying win also
 sends a Trophy Race code. Native uses that list as the authority and refuses
-an unknown version; a Trophy code in no pair is a classic track. Content-plan rooms carry neither key (the plan is refused
-under `ctr_first`, and the closed envelope stays as it is).
+an unknown version; a Trophy code in no pair is a classic track. Content-plan rooms carry neither key: their plan's
+`adventure_structure` and its routes say it (job J11), and the closed
+envelope stays as it is.
 """
 from typing import Dict, List, Tuple
 
@@ -78,16 +78,6 @@ CTR_SUFFIX = ": CTR Token Challenge"
 
 def ctr_first(world) -> bool:
     return int(world.options.adventure_structure.value) == CTR_FIRST
-
-
-def raise_if_content_plan(options) -> None:
-    """The content plan has no `ctr_first` mode yet (design, "Generation and
-    logic": schema, validator and native verifier grow together first)."""
-    if int(options.adventure_structure.value) == CTR_FIRST and options.content_pool.value:
-        raise OptionError(
-            "adventure_structure: ctr_first is not available with a content_pool "
-            "yet. The content plan's tracks have no CTR Challenge stage 1. Use "
-            "adventure_structure: classic with a content plan.")
 
 
 def stage1_pairs(world) -> List[Tuple[str, str]]:
