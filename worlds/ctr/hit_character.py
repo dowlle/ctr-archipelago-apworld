@@ -761,7 +761,7 @@ def _validate_block(block, table=None, content_cups=(), bosses=None) -> None:
 # ---------------------------------------------------------------------------
 
 def restore_from_wire(world, passthrough: Dict[str, object], table=None,
-                      content_cups=()) -> None:
+                      content_cups=(), bosses=None) -> None:
     """Pin the connected seed's Hit Character block instead of re-drawing.
 
     The scalar, the global schema and the block must agree, and every malformed
@@ -794,7 +794,8 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     redrawn. Any previously cached block is cleared before validation so a
     refused restore never leaves a stale valid seed active. A content plan
     passes `CONTENT_PLAN_FALLBACK_KEYS` as `table` and its cups' name indices
-    as `content_cups` (#133 PR 5b).
+    as `content_cups` (#133 PR 5b), and the {boss win code -> raced engine
+    id} table its plan's encounters seat as `bosses` (job J11, decision 9).
     """
     world.ctr_hit_character_encounters = None
     world.ctr_hit_character_seed = None
@@ -849,7 +850,7 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    identity = None
+    identity = bosses
     if table is None:
         # A normal room: the boss encounters were restored first (decision
         # 9), so the block must name the racers those boss races seat.

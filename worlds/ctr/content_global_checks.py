@@ -205,8 +205,11 @@ def plan_codes(plan):
 
 
 def fallback(plan):
-    """{guest engine id: Key count} for the guests with no unlock win in the plan."""
-    return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+    """{guest engine id: Key count} for the guests with no unlock win in the
+    plan. The unlock wins follow the racers the plan's boss races seat (job
+    J11, decision 9): a retail boss raced nowhere falls back to Keys too."""
+    triggers = hit_character.unlock_triggers_for(content_bosses.identity(plan))
+    return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS, triggers)
 
 
 def cup_indices(plan):
@@ -220,8 +223,9 @@ def encounter_block(world, plan):
     with the plan's fallback and one order per cup. The block's only draw,
     taken only with Hit Character on; the cup orders derive from the seed."""
     seed = int(world.random.getrandbits(32))
-    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan))
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
+    bosses = content_bosses.identity(plan)
+    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan), bosses)
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan), bosses)
     world.ctr_hit_character_seed = seed
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_fallback = fallback(plan)
@@ -241,7 +245,8 @@ def check_encounter_block(plan, slot_data):
         return
     block = slot_data.get("hit_character_encounters")
     block = hit_character._tuples_to_lists(block) if hit_character._has_tuple(block) else block
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan),
+                                  content_bosses.identity(plan))
     got = {int(g): e["fallback_keys"] for g, e in block["unlock_triggers"].items() if "fallback_keys" in e}
     if got != fallback(plan):
         error("hit_character_encounters fallback disagrees with the plan's unlock wins")
