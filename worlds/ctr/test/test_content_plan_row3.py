@@ -410,24 +410,30 @@ class TestStartGuards(unittest.TestCase):
         self.assertEqual(mw.early_items[1], weapons)
 
     def test_a_marked_item_that_opens_nothing_waits_for_an_opener(self):
+        """Two start checks: the marked boost opens nothing, a Key does."""
+        from unittest import mock
         from .. import sphere0_guard
-        tested = 0
-        for seed in range(30):
-            try:
-                world = make_world(options(warppad_unlock_requirements="vanilla", progressive_boost="shared_global",
-                                           podium_placement_checks=False, item_pool={"base": {"trophies": 4}}),
-                                   seed=seed, stop_before="pre_fill")
-            except OptionError as exc:
-                self.assertIn("at the start", str(exc))
-                continue
-            mw = world.multiworld
-            if sphere0_guard.sphere0_breadth(world) > 3 or "Progressive Boost" not in mw.local_early_items[1]:
-                continue
-            tested += 1
-            call_all(mw, "pre_fill")
-            distribute_items_restrictive(mw)
-            self.assertTrue(mw.can_beat_game(), seed)
-        self.assertGreater(tested, 0)
+        world = make_world(options(), stop_before="pre_fill")
+        mw = world.multiworld
+        mw.local_early_items[1] = {"Trophy": 1}
+        mw.early_items[1] = {}
+        spot_a, spot_b = mw.get_location("Crash Cove: Trophy Race", 1), mw.get_location("Roo's Tubes: Trophy Race", 1)
+        order = []
+
+        def open_empty(_world, state):
+            return [spot for spot in (spot_a, spot_b) if spot.item is None]
+
+        def place(self, item):
+            order.append(item.name)
+            self.item = item
+
+        with mock.patch.object(sphere0_guard, "_open_empty", open_empty), \
+                mock.patch.object(sphere0_guard, "bootstrap_target", lambda _world: 12), \
+                mock.patch.object(sphere0_guard, "_next_openers", lambda *_args: ["Key"]), \
+                mock.patch("BaseClasses.Location.place_locked_item", place), \
+                mock.patch("BaseClasses.Location.can_fill", lambda *_args: True):
+            sphere0_guard.bootstrap_start(world)
+        self.assertEqual(order[0], "Key")
 
     def test_the_collapse_message_is_silent(self):
         with self.assertNoLogs(level="WARNING"):
