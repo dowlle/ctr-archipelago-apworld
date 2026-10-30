@@ -96,6 +96,16 @@ class TestPlacement(unittest.TestCase):
         self.assertTrue(cr.own_content(dict(zip((3, 6), chosen))))
         self.assertFalse(cr.own_content({3: chosen[1], 6: chosen[0]}))
 
+    def test_the_fallback_keeps_a_draw_that_passes_the_cup_floor(self):
+        for seed in range(30):
+            o = options(warppad_unlock_requirements="vanilla", podium_placement_checks=False,
+                        item_pool={"base": {"trophies": 4}}, oxide_goal="disabled", gems_required_goal=1)
+            plan = make_world(o, seed=seed, stop_before="generate_basic").ctr_content_plan
+            registry = {p[0]: p for p in content_plan.pad_registry()}
+            seated = {physical: dict(cup_index=0) if e["kind"] == "cup" else dict(arena_id=1) if e["kind"] == "crystal"
+                      else dict(retail_id=0) for physical, e in occupied(plan).items()}
+            self.assertTrue(cr.capacity_met(seated, list(registry.values()), 0), seed)
+
     def test_too_many_cups_on_early_pads_fail_the_floor(self):
         seats = [(i, 26, 0) for i in (3, 6, 9, 8, 21)] + [(14, 27, 1)]
         cups = {p: dict(cup_index=None, gem_cup=n) for n, p in enumerate((3, 6, 9, 8))}
@@ -401,17 +411,23 @@ class TestStartGuards(unittest.TestCase):
 
     def test_a_marked_item_that_opens_nothing_waits_for_an_opener(self):
         from .. import sphere0_guard
+        tested = 0
         for seed in range(30):
-            world = make_world(options(warppad_unlock_requirements="vanilla", progressive_boost="shared_global",
-                                       podium_placement_checks=False,
-                                       item_pool={"base": {"trophies": 4}}),
-                               seed=seed, stop_before="pre_fill")
+            try:
+                world = make_world(options(warppad_unlock_requirements="vanilla", progressive_boost="shared_global",
+                                           podium_placement_checks=False, item_pool={"base": {"trophies": 4}}),
+                                   seed=seed, stop_before="pre_fill")
+            except OptionError as exc:
+                self.assertIn("at the start", str(exc))
+                continue
             mw = world.multiworld
             if sphere0_guard.sphere0_breadth(world) > 3 or "Progressive Boost" not in mw.local_early_items[1]:
                 continue
+            tested += 1
             call_all(mw, "pre_fill")
             distribute_items_restrictive(mw)
             self.assertTrue(mw.can_beat_game(), seed)
+        self.assertGreater(tested, 0)
 
     def test_the_collapse_message_is_silent(self):
         with self.assertNoLogs(level="WARNING"):

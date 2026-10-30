@@ -183,24 +183,38 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
     start, 1 for one just behind it, else 0; `start_checks(content)` counts the
     checks it then opens with no items, aimed at the start the guards call
     wide. The start counts because arenas, cups or boost terms can leave little
-    on the two open pads of vanilla requirements. If none fits, the draw with
-    the best early pads stands. Vanilla placement never redraws."""
+    on the two open pads of vanilla requirements. If none fits, the best draw
+    stands: one that passes the first two tests, then the best early pads, and
+    `shuffle` then trades content onto the open pads. Vanilla placement never
+    redraws."""
     seats = list(seats)
     weight = {seat[0]: reach(seat) for seat in seats}
     need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen))
-    best, best_score = None, -1
+    best, best_score = None, (False, -1)
     for _ in range(PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
         seated = _seat(world, chosen, seats, placement, manual)
         start = sum(start_checks(item) for physical, item in seated.items() if weight[physical] == 2)
-        if placement == "vanilla" or (not own_content(seated) and capacity_met(seated, seats, rungs) and start >= need):
+        fits = not own_content(seated) and capacity_met(seated, seats, rungs)
+        if placement == "vanilla" or (fits and start >= need):
             best = None
             break
-        score = sum(weight[physical] * start_checks(item) for physical, item in seated.items())
+        score = (fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))
         if score > best_score:
             best, best_score = (list(seats), seated), score
     if best:
         seats, seated = best
+    if placement == "shuffle":
+        # Still short: content that opens nothing at the start trades places
+        # with content that does, as the open empty pad swap does for a gap.
+        for physical in [p for p in seated if weight[p] == 2]:
+            if sum(start_checks(seated[p]) for p in seated if weight[p] == 2) >= need:
+                break
+            donors = sorted((p for p in seated if weight[p] < 2 and p not in manual
+                             and start_checks(seated[p]) > start_checks(seated[physical])),
+                            key=lambda p: (-start_checks(seated[p]), p))
+            if donors and physical not in manual:
+                seated[physical], seated[donors[0]] = seated[donors[0]], seated[physical]
     ordered = sorted(seated, key=[seat[0] for seat in seats].index)
     by_physical = {seat[0]: seat for seat in seats}
     return [seated[p] for p in ordered], [by_physical[p] for p in ordered] + [s for s in seats if s[0] not in seated]
