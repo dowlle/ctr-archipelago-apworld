@@ -83,6 +83,8 @@ EXPECTED_CLASSES = [
     ("custom_wumpa", 132, (35016000,)),
     ("custom_item_boxes", 1980, (35017000, 35018000)),
     ("arcade_arena", 63, (35028500,35028520)),
+    # 0.3.0 second id step: Wumpa Shop slots (#249), 5 hubs x 25.
+    ("wumpa_shop", 125, (35028600,)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -154,7 +156,7 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + 13 Cortex Vortex pad-track names (2026-09-13 unfreeze).
         # + the 16 Hit Character encounter names (0.2.1 candidate).
         # + the 0.3.0 id step: 3,682 fixed-family names and 82 x 32 named.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 82 * 32 + 63)
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 82 * 32 + 63 + 125)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
