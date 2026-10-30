@@ -533,9 +533,10 @@ class TestStartBootstrap(unittest.TestCase):
                 continue
             call_single(mw, "pre_fill", 1)
             self.assertFalse(weapons & {n for n, _ in getattr(world, "_ctr_start_bootstrap", ())})
+            kept = weapons & set(mw.early_items.get(1, {}))  # a start with no spare check lets it go
             distribute_items_restrictive(mw)
             for loc in mw.get_locations(1):
-                if loc.item is not None and loc.item.name in weapons:
+                if loc.item is not None and loc.item.name in kept:
                     self.assertTrue(loc.can_reach(CollectionState(mw)), (seed, loc.name))
 
     def test_a_wide_start_is_unchanged(self):

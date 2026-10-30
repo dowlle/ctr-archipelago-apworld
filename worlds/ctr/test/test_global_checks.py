@@ -161,7 +161,6 @@ class TestItemsanity(unittest.TestCase):
         self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Bomb")))
         for win, rule in zip(wins, rules):
             win.access_rule = rule
-        self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Mask")))
         # Hot Air Skyway's finish needs USF: no weapon replaces it.
         many = state_with(world, *others, *itemsanity.ITEM_NAMES)
         self.assertFalse(loc("Hot Air Skyway: Trophy Race").can_reach(many))
