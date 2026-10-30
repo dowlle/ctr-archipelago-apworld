@@ -3,7 +3,7 @@ import copy
 import json
 import unittest
 
-from BaseClasses import CollectionState
+from BaseClasses import CollectionState, ItemClassification
 from Fill import distribute_items_restrictive
 from Options import OptionError
 from worlds.AutoWorld import call_all
@@ -467,3 +467,63 @@ class TestTracker(unittest.TestCase):
     def test_the_feature_is_declared(self):
         plan = make_world(options()).ctr_content_plan
         self.assertIn(cr.FEATURE, plan["required_features"])
+
+
+class TestRelicProgression(unittest.TestCase):
+    def test_vanilla_plan_classifies_its_relic_gates(self):
+        o = options(warppad_unlock_requirements="vanilla", accessibility="minimal",
+                    oxide_goal="disabled", gems_required_goal=1)
+        world = make_world(o, stop_before="pre_fill")
+        expected = {"Sapphire Relic": True, "Gold Relic": False, "Platinum Relic": False}
+        self.assertEqual(world._ctr_relic_prog, expected)
+        self.assertEqual(world.fill_slot_data()["ctr_options"]["relic_progression"], expected)
+        for item in world.ctr_created_items:
+            if item.name in expected:
+                self.assertEqual(item.classification, ItemClassification.progression if expected[item.name]
+                                 else ItemClassification.useful)
+
+    def test_capped_slide_gate_and_final_challenge_tiers(self):
+        o = options(warppad_unlock_requirements="vanilla", accessibility="minimal",
+                    oxide_goal="disabled", gems_required_goal=1,
+                    item_pool={"base": {"relics": {"sapphire": 4}}})
+        world = make_world(o, stop_before="pre_fill")
+        self.assertEqual(records(world.ctr_content_plan, "stage1:")[16]["count"], 4)
+        self.assertTrue(world._ctr_relic_prog["Sapphire Relic"])
+        for access, goal in (("full", "none"), ("minimal", "101_percent")):
+            o = options(warppad_unlock_requirements="vanilla", accessibility=access, oxide_goal=goal,
+                        oxide_final_challenge_unlock="gold_relics", gems_required_goal=1)
+            world = make_world(o, stop_before="pre_fill")
+            self.assertTrue(world._ctr_relic_prog["Gold Relic"])
+            if goal == "101_percent":
+                self.assertTrue(world._ctr_relic_prog["Sapphire Relic"])
+
+    def test_randomized_plan_keeps_every_tier_progression_and_omits_hint(self):
+        for mode in ("randomized", "random_without_4_keys"):
+            world = make_world(options(warppad_unlock_requirements=mode), stop_before="pre_fill")
+            self.assertTrue(all(world._ctr_relic_prog.values()))
+            self.assertNotIn("relic_progression", world.fill_slot_data()["ctr_options"])
+        manual = make_world(options(warp_pad_rules={"Crash Cove": dict(item="Gold Relic", count=2)}),
+                            stop_before="pre_fill")
+        self.assertTrue(all(manual._ctr_relic_prog.values()))
+        self.assertNotIn("relic_progression", manual.fill_slot_data()["ctr_options"])
+
+    def test_tracker_restores_classification_and_rejects_bad_shape(self):
+        world = make_world(options(warppad_unlock_requirements="vanilla", accessibility="minimal",
+                                   oxide_goal="disabled", gems_required_goal=1), stop_before="pre_fill")
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        restored = make_world({}, passthrough=wire)
+        self.assertEqual(restored._ctr_relic_prog, world._ctr_relic_prog)
+        gold = next(item for item in restored.ctr_created_items if item.name == "Gold Relic")
+        self.assertEqual(gold.classification, ItemClassification.useful)
+        old = copy.deepcopy(wire)
+        old["ctr_options"].pop("relic_progression")
+        self.assertTrue(all(make_world({}, passthrough=old)._ctr_relic_prog.values()))
+        for bad in ({"Sapphire Relic": True},
+                    {"Sapphire Relic": True, "Gold Relic": False, "Platinum Relic": False,
+                     "Ruby Relic": True},
+                    {"Sapphire Relic": True, "Gold Relic": 0, "Platinum Relic": False},
+                    []):
+            forged = copy.deepcopy(wire)
+            forged["ctr_options"]["relic_progression"] = bad
+            with self.assertRaisesRegex(OptionError, "relic_progression"):
+                make_world({}, passthrough=forged)

@@ -466,6 +466,15 @@ def check_envelope_options(co):
               "(2, 1 or 2, true) or Progressive Stats (1, 1 or 2, false) together when present.")
 
 
+def check_relic_progression(co):
+    if "relic_progression" not in co:
+        return
+    value = co["relic_progression"]
+    if (type(value) is not dict or set(value) != {"Sapphire Relic", "Gold Relic", "Platinum Relic"}
+            or any(type(flag) is not bool for flag in value.values())):
+        error("ctr_options.relic_progression must name exactly the three relic tiers with boolean values.")
+
+
 def box_envelope(world):
     """Item Box Locations (#133 PR 4e): `box_locations` and the seed's
     `color_boxes_by_item`, present exactly when the plan has its `item_boxes`
@@ -1725,6 +1734,7 @@ def create_regions(world):
 
 def create_items(world):
     plan = world.ctr_content_items
+    world._ctr_relic_prog = relic_progression_map(world)
     names = plan.selected_names()
     names += traps.draw_trap_names(world, plan.trap_count)
     names += [wumpa_family.draw_filler_name(world) for _ in range(plan.filler_count - plan.trap_count)]
@@ -1735,6 +1745,42 @@ def create_items(world):
     # Main.py has granted these starts. Consume only this world's local removal
     # request; retain the original configuration for spoiler/Tracker diagnostics.
     world.options.start_inventory_from_pool.value = {}
+
+
+def relic_progression_map(world):
+    """Classify relic tiers from the plan's gates and required access."""
+    tiers = {name: True for name in ("Sapphire Relic", "Gold Relic", "Platinum Relic")}
+    passthrough = getattr(world.multiworld, "re_gen_passthrough", {}).get(world.game)
+    if passthrough:
+        wire = (passthrough.get("ctr_options") or {}).get("relic_progression")
+        return dict(wire) if wire is not None else tiers
+    plan = world.ctr_content_plan
+    if plan.get("pad_requirements", {}).get("mode") != "vanilla":
+        return tiers
+
+    codes = {content_item_pool.ITEMS[name]: name for name in tiers}
+    needed = set()
+
+    def read(node):
+        if node["op"] == "count":
+            if node["item"] in codes:
+                needed.add(codes[node["item"]])
+        elif node["op"] in ("sum", "distinct"):
+            needed.update(codes[code] for code in node["items"] if code in codes)
+        elif node["op"] in ("all", "any"):
+            for term in node["terms"]:
+                read(term)
+
+    final_goal = plan.get("bosses", {}).get("oxide_goal") == content_bosses.GOAL_FINAL
+    access_full = world.options.accessibility.value == 0
+    final_required = access_full or final_goal
+    for row in plan["requirements"]:
+        if row["id"] != "oxide:final" or final_required:
+            read(row["predicate"])
+    read(plan["goal"])
+    if final_required:
+        needed.add("Sapphire Relic")
+    return {name: name in needed for name in tiers}
 
 
 def set_rules(world):
@@ -1789,6 +1835,10 @@ def wire(world):
     # plan's fallback, and the envelope flag that admits it.
     hit = dict(hit_character_encounters=copy.deepcopy(world.ctr_hit_character_encounters)) \
         if plan.get("global_checks", {}).get("hit_character") else {}
+    relic_progression = getattr(world, "_ctr_relic_prog", None) or relic_progression_map(world)
+    relic_option = ({"relic_progression": relic_progression}
+                    if plan.get("pad_requirements", {}).get("mode") == "vanilla"
+                    and not all(relic_progression.values()) else {})
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version=world.world_version.as_simple_string(), content_plan=True,
                                  goal=-1, **goal_envelope(plan),
@@ -1800,7 +1850,7 @@ def wire(world):
                                  progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
                                  hit_character=bool(plan.get("global_checks", {}).get("hit_character")),
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
-                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world)),
+                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world), **relic_option),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
 
 
@@ -2222,6 +2272,7 @@ def restore(world, slot_data):
                                    for key, value in goal_envelope(plan).items()):
         error("goal envelope disagrees with the plan")
     check_envelope_options(co)
+    check_relic_progression(co)
     check_racer_envelope(plan, co)
     check_box_envelope(plan, co)
     capability = plan.get("capability", {})
