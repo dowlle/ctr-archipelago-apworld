@@ -404,7 +404,7 @@ class TestStartGuards(unittest.TestCase):
         for seed in range(30):
             world = make_world(options(warppad_unlock_requirements="vanilla", progressive_boost="shared_global",
                                        podium_placement_checks=False,
-                                       item_pool={"base": {"relics": {"sapphire": 3, "gold": 3}}}),
+                                       item_pool={"base": {"trophies": 4}}),
                                seed=seed, stop_before="pre_fill")
             mw = world.multiworld
             if sphere0_guard.sphere0_breadth(world) > 3 or "Progressive Boost" not in mw.local_early_items[1]:
