@@ -84,7 +84,10 @@ class TestTrackerAndContentPlan(unittest.TestCase):
                     self.assertEqual(sorted(l.address for l in restored.multiworld.get_locations(1) if l.address),
                                      sorted(l.address for l in world.multiworld.get_locations(1) if l.address))
                     self.assertEqual(bool(restored.options.reserve_top_up.value), enabled)
-                    self.assertEqual(len(restored.multiworld.itempool), len(world.multiworld.itempool))
+                    # The real generation's pre_fill may place start openers
+                    # (sphere0_guard.bootstrap_start); the tracker skips pre_fill.
+                    placed = len(getattr(world, "_ctr_start_bootstrap", ()))
+                    self.assertEqual(len(restored.multiworld.itempool), len(world.multiworld.itempool) + placed)
                     if not enabled:
                         self.assertNotIn("Reserve Top-Up", {i.name for i in restored.multiworld.itempool})
                     wire["ctr_options"].pop("reserve_top_up")
