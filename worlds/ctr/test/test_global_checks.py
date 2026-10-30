@@ -150,7 +150,12 @@ class TestItemsanity(unittest.TestCase):
         self.assertFalse(loc("Crash Cove: Held 1st").can_reach(bare))
         self.assertTrue(loc("Crash Cove: Held 1st").can_reach(state_with(world, *others, "Missile x3")))
         self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(bare))
+        # Letters are a later race: past the first race, the arm alone decides.
+        trophy, loc("Papu's Pyramid: Trophy Race").access_rule = loc("Papu's Pyramid: Trophy Race").access_rule, lambda _s: True
         self.assertTrue(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Mask")))
+        self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Bomb")))
+        loc("Papu's Pyramid: Trophy Race").access_rule = trophy
+        self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Mask")))
         # Hot Air Skyway's finish needs USF: no weapon replaces it.
         many = state_with(world, *others, *itemsanity.ITEM_NAMES)
         self.assertFalse(loc("Hot Air Skyway: Trophy Race").can_reach(many))

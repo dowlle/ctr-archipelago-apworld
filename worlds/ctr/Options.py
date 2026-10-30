@@ -1415,9 +1415,13 @@ class ContentPadLayout(OptionDict):
     """Physical pad placement and mode stages for content_pool.
 
     `stages`: two (default) or single. With two, a pad's first mode opens with
-    the pad and its other modes share one second requirement; with single,
-    every mode opens with the pad. `mode_order`: fixed (Trophy, CTR, Relic),
-    per_seed (one random order for the seed) or per_pad. `placement` is shuffle;
+    the pad and its other modes share one second requirement, as
+    two_stage_density sets; single is two_stage_density off. Later modes count
+    once the pad's first race is won. `mode_order`: fixed (Trophy, CTR, Relic),
+    per_seed (one random order for the seed) or per_pad. `placement`: shuffle
+    (default, any content on any pad), shuffle_within_kind (tracks on track
+    pads, cups on cup pads, arenas on arena pads) or vanilla (original content
+    on its original pad). Content that does not fit takes any free pad.
     `merge_trophy_ctr` must stay false for now.
     """
     display_name = "Content Pad Layout (Experimental)"

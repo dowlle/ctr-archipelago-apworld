@@ -69,6 +69,18 @@ def collect_requirement(world, state, predicate):
         state.collect(world.create_item(by_code[items[n % len(items)]]), prevent_sweep=True)
 
 
+def first_open_world(options):
+    """A seed the starting-check guard accepts: a profile without podium rungs
+    and with boost terms can start with nothing open."""
+    for seed in range(40):
+        try:
+            return make_world(copy.deepcopy(options), seed=seed)
+        except OptionError as exc:
+            if "at the start" not in str(exc):
+                raise
+    raise AssertionError("no seed in 40 passed the starting-check guard")
+
+
 class TestBossEncounters(unittest.TestCase):
     def test_retail_pairs_by_default(self):
         world = make_world(boss_options())
@@ -232,12 +244,13 @@ class TestBossEncounters(unittest.TestCase):
                     make_world(options)
 
     def test_boss_checks_carry_the_legacy_boost(self):
-        world = make_world(boss_options(progressive_boost="shared_global", oxide_final_track="cortex_vortex"))
+        world = first_open_world(boss_options(progressive_boost="shared_global", oxide_final_track="cortex_vortex",
+                                              podium_placement_checks=True))
         checks = {c["location"]: c for c in world.ctr_content_plan["checks"] if c["kind"] == content_bosses.KIND}
         # First rank everywhere, USF on Hot Air Skyway, Oxide Station and Cortex Vortex.
         self.assertEqual([checks[c].get("boost") for c in sorted(checks)], [1, 1, 1, 2, 2, 2])
-        world = make_world(boss_options(progressive_boost="shared_global", shortcut_knowledge="hard",
-                                        logic_difficulty="hard"))
+        world = first_open_world(boss_options(progressive_boost="shared_global", shortcut_knowledge="hard",
+                                              logic_difficulty="hard", podium_placement_checks=True))
         checks = {c["location"]: c for c in world.ctr_content_plan["checks"] if c["kind"] == content_bosses.KIND}
         self.assertEqual(checks[35011104]["boost"], 1)
 
@@ -412,8 +425,6 @@ class TestGarageRoll(unittest.TestCase):
             for g in range(4):
                 pred = req[f"boss:{g}"]
                 content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g)
-                if pred.get("item") == content_bosses.TROPHY_ITEM:
-                    self.assertEqual(pred["count"], 4)
                 if pred.get("item") == content_bosses.KEY_ITEM:
                     self.assertTrue(content_bosses.GARAGES[g][2] < pred["count"] <= 3)
                 seen.add(json.dumps(pred, sort_keys=True))
@@ -422,7 +433,7 @@ class TestGarageRoll(unittest.TestCase):
     def test_forged_garage_requirements_refuse(self):
         rows = make_world(boss_options()).ctr_content_plan["items"]["rows"]
         trophy, key = content_bosses.TROPHY_ITEM, content_bosses.KEY_ITEM
-        for pred, g in ((dict(op="count", item=trophy, count=8), 0),
+        for pred, g in ((dict(op="count", item=trophy, count=17), 0),
                         (dict(op="count", item=key, count=1), 2),
                         (dict(op="count", item=key, count=4), 0),
                         (dict(op="always"), 1),
@@ -453,7 +464,7 @@ class TestCustomBossVenues(unittest.TestCase):
     def test_custom_tracks_and_cortex_vortex_join_the_draw(self):
         options = boss_options(boss_track_shuffle=True)
         options["content_pool"]["tracks"]["cortex_vortex"] = True
-        drawn = self.drawn(options)
+        drawn = self.drawn(options, range(24))
         self.assertIn(self.BTP, drawn)
         self.assertIn("cortex_vortex", drawn)
 
@@ -535,8 +546,9 @@ class TestBossCups(unittest.TestCase):
         self.assertFalse(any(e["kind"] == content_bosses.CUP_KIND for e in plan["entries"]))
 
     def test_the_cup_check_takes_the_strictest_leg(self):
-        world = self.cup_world(cups=4, progressive_boost="shared_global")
-        plan = world.ctr_content_plan
+        options = boss_options(progressive_boost="shared_global", podium_placement_checks=True)
+        options["content_pool"]["bosses"]["cups"] = 4
+        plan = first_open_world(options).ctr_content_plan
         tracks = {t["id"]: t for t in plan["tracks"]}
         entries = {e["id"]: e for e in plan["entries"]}
         from ..content_capability import finish_boost

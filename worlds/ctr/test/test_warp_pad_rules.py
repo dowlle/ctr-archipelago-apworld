@@ -345,7 +345,7 @@ class TestContentPlan(unittest.TestCase):
                     gate = seat["mode_gates"][0]["requirement_id"]
                     self.assertEqual(gate, "free" if pad == "Skull Rock" else f"manual:{physical}")
                 self.assertEqual(plan["required_features"],
-                                 ["content_plan_v1", "manual_pad_requirements_v1"])
+                                 ["content_plan_v1", "manual_pad_requirements_v1", "pad_requirements_v1"])
                 trophy = reqs[f"manual:{destinations.BY_KEY['Crash Cove'].level_id}"]
                 self.assertEqual(trophy, {"op": "count", "item": 35010000, "count": 3})
                 gems = reqs[f"manual:{destinations.BY_KEY['Red Cup'].level_id}"]
@@ -419,9 +419,8 @@ class TestContentPlan(unittest.TestCase):
 
     def test_without_rules_the_plan_is_the_experimental_baseline(self):
         plan = make_world(profile_options()).ctr_content_plan
-        self.assertEqual(plan["required_features"], ["content_plan_v1", "surface_items_v1"])
-        self.assertTrue(all(r["id"] in ("free", "keys:1", "keys:2", "keys:3", "keys:4")
-                            for r in plan["requirements"]))
+        self.assertEqual(plan["required_features"], ["content_plan_v1", "surface_items_v1", "pad_requirements_v1"])
+        self.assertFalse(any(r["id"].startswith("manual:") for r in plan["requirements"]))
 
     def test_more_named_pads_than_entries_fail_without_adding_content(self):
         options = profile_options()

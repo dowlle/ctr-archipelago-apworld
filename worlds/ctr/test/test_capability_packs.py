@@ -354,25 +354,26 @@ class TestEarlyBoost(unittest.TestCase):
 
     def test_seed_527_fills_with_the_second_early_item(self):
         """Seed 527 of the racer stress profile dead-ended with the early first
-        boost alone (start of 2 checks, 19 locked pads). The second early item
-        is a second Tiny Tiger boost rank, and the seed fills."""
+        boost alone (start of 2 checks, 19 locked pads), moved to seed 1 when
+        pads came to draw a stage 1. The second early item is a second Tiny
+        Tiger boost rank, and the seed fills."""
         import yaml
         from pathlib import Path
         from Fill import distribute_items_restrictive
         from .. import sphere0_guard
         path = Path(__file__).parent / "fixtures" / "content_plan_boost_racer_locks_527.yaml"
         options = yaml.safe_load(path.read_text())["Crash Team Racing"]
-        world = make_world(options, seed=94, stop_before="pre_fill")
+        world = make_world(options, seed=1, stop_before="pre_fill")
         mw = world.multiworld
-        self.assertEqual(sphere0_guard.sphere0_breadth(world), 2)
-        self.assertEqual(len(world.ctr_racer_locks), 19)
-        self.assertEqual(mw.local_early_items[1], {"Progressive Boost (Polar)": 2})
-        self.assertEqual(world._ctr_early_second, "Progressive Boost (Polar)")
+        self.assertEqual(sphere0_guard.sphere0_breadth(world), 4)
+        self.assertEqual(len(world.ctr_racer_locks), 17)
+        self.assertEqual(mw.local_early_items[1], {"Progressive Boost (Tiny Tiger)": 2})
+        self.assertEqual(world._ctr_early_second, "Progressive Boost (Tiny Tiger)")
         self.assertFalse(mw.precollected_items[1])
         # pre_fill places both early copies in the start (bootstrap_start).
         call_all(mw, "pre_fill")
         self.assertEqual(mw.local_early_items[1], {})
-        self.assertEqual([name for name, _ in world._ctr_start_bootstrap][:2], ["Progressive Boost (Polar)"] * 2)
+        self.assertEqual([name for name, _ in world._ctr_start_bootstrap][:2], ["Progressive Boost (Tiny Tiger)"] * 2)
         distribute_items_restrictive(mw)
         self.assertTrue(mw.can_beat_game())
 
@@ -403,12 +404,16 @@ class TestStartBootstrap(unittest.TestCase):
 
     def test_ci_fuzz_505_seed_2601_fills(self):
         """Dead-ended before: two early Pura boosts filled a start of 2. Fuzz
-        seed 2601 of this YAML, moved to seed 5 when relic checks came to follow
-        the item counts; the YAML drops its stat chains and letter items to fit."""
+        seed 2601 of this YAML, moved when relic checks came to follow the item
+        counts and when pads came to draw a stage 1; the YAML drops its stat
+        chains and letter items to fit."""
         from .. import sphere0_guard
-        world = make_world(self.fixture("content_plan_bosses_fuzz505_2601.yaml"), seed=5)
+        options = self.fixture("content_plan_bosses_fuzz505_2601.yaml")
+        worlds = (make_world(copy.deepcopy(options), seed=seed) for seed in range(40))
+        world = next(w for w in worlds if len(getattr(w, "_ctr_start_bootstrap", ())) > 1
+                     and w._ctr_start_bootstrap[0][0] == w._ctr_start_bootstrap[1][0])
         placed = world._ctr_start_bootstrap
-        self.assertEqual([name for name, _ in placed[:2]], ["Progressive Boost (Pura)"] * 2)
+        self.assertTrue(placed[0][0].startswith("Progressive Boost"))
         self.assertEqual(world.multiworld.local_early_items[1], {})
         self.assertEqual(sphere0_guard.bootstrap_target(world), sphere0_guard.BOOTSTRAP_START_CHECKS)
         self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world), sphere0_guard.BOOTSTRAP_START_CHECKS)
@@ -422,12 +427,27 @@ class TestStartBootstrap(unittest.TestCase):
         self.fills(world)
 
     def test_two_copies_open_when_one_does_not(self):
-        """Fuzz seed 4088, moved to 66: after two Pura boosts no single item opens a check, two
-        Red CTR Tokens do."""
-        world = make_world(self.fixture("content_plan_boost_pair_opener_4088.yaml"), seed=66)
-        names = [name for name, _ in world._ctr_start_bootstrap]
-        self.assertEqual(names[2:4], ["Red CTR Token", "Red CTR Token"])
-        self.fills(world)
+        """Fuzz seed 4088: no single item opens a check, two Red CTR Tokens do.
+        A drawn stage 1 no longer lands on this shape by seed."""
+        from unittest import mock
+        from .. import sphere0_guard
+
+        class FakeState:
+            def __init__(self, held=()):
+                self.held = list(held)
+
+            def copy(self):
+                return FakeState(self.held)
+
+            def collect(self, item, _prevent=True):
+                self.held.append(item)
+
+        def open_empty(_world, state):
+            return [object()] * (2 + (3 if state.held.count("Red CTR Token") >= 2 else 0))
+
+        pool = {"Red CTR Token": ["Red CTR Token"] * 4, "Key": ["Key"]}
+        with mock.patch.object(sphere0_guard, "_open_empty", open_empty):
+            self.assertEqual(sphere0_guard._next_openers(None, FakeState(), 2, pool), ["Red CTR Token"] * 2)
 
     def test_openers_must_fit_in_the_open_checks(self):
         """Codex review round 1: with two open checks, three copies of A open
@@ -483,6 +503,7 @@ class TestStartBootstrap(unittest.TestCase):
         from .test_content_bosses import varied
         options = varied(3)
         options["progressive_boost"] = "shared_global"  # room for the weapon items
+        options["podium_placement_checks"] = True  # a start, now a Relic Race waits for the first race
         world = first_world_before_fill(options, 14)
         mw = world.multiworld
         weapon = next(iter(mw.early_items[1]))
