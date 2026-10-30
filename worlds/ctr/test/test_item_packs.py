@@ -159,6 +159,18 @@ class TestEnvelope(unittest.TestCase):
         other = make_world({}, seed=999, passthrough=wire)
         self.assertEqual(other.fill_slot_data(), wire)
 
+    def test_tracker_yaml_cannot_change_an_omitted_send_mask(self):
+        # Finding 4 of the 0.3.0 review: a seed that omitted death_link_send
+        # follows death_link; the tracking player's own YAML must not leak in.
+        world = make_world(pack_options(death_link="mask_reset"), seed=3)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        self.assertNotIn("death_link_send", wire["ctr_options"])
+        for yaml_value in ([], ["weapon_hit", "race_loss"]):
+            with self.subTest(tracker_yaml=yaml_value):
+                other = make_world({"death_link_send": yaml_value}, seed=999, passthrough=wire)
+                self.assertEqual(other.options.death_link_send.value, {"follow_death_link"})
+                self.assertEqual(other.fill_slot_data(), wire)
+
     def test_trap_identities_on_every_room(self):
         world = make_world(profile_options(), seed=3)
         self.assertEqual(world.fill_slot_data()["trap_identities"], traps.trap_identities_block(world.item_name_to_id))
