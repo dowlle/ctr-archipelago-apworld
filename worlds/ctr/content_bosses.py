@@ -263,6 +263,12 @@ def _ceilings(rows):
             row["requirement_ceiling"] if isinstance(row, dict) else row.requirement_ceiling for row in rows}
 
 
+def goal_location(record):
+    """The code of the Oxide goal check, excluded from progression placement,
+    or None when N. Oxide is not the goal."""
+    return {GOAL_ANY: OXIDE_FIRST, GOAL_FINAL: OXIDE_FINAL}.get(record["oxide_goal"])
+
+
 def resolve_relic_count(world, record, rows):
     """The legacy count rulings on the plan's base supply: a one-tier mode asks
     at most 18 (2026-09-18), and every mode at most what its tiers hold
@@ -747,7 +753,7 @@ def install(world, plan, menu, predicate, with_boost):
     pads = {p["id"]: p for p in plan["pads"]}
     checks = {c["location"]: c for c in plan["checks"]}
     record = plan["bosses"]
-    goal_code = {GOAL_ANY: OXIDE_FIRST, GOAL_FINAL: OXIDE_FINAL}.get(record["oxide_goal"])
+    goal_code = goal_location(record)
     for enc in plan["encounters"]:
         region = Region(enc["entry_id"], player, mw)
         mw.regions.append(region)

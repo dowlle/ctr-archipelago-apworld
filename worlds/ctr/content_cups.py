@@ -145,8 +145,8 @@ def settings(raw):
               "and cortex_vortex.")
     custom = _bounds(composition.get("custom_legs", {"min": 0, "max": LEGS}), "cups.composition.custom_legs", LEGS)
     # A YAML `off` reaches us as false.
-    tracks = "off" if raw.get("tracks") is False else raw.get("tracks")
-    if tracks is None:
+    tracks = "off" if raw.get("tracks") is False else raw.get("tracks", "")
+    if "tracks" not in raw:
         tracks = "random" if out["within_cup"] else "random_no_repeats"
     elif tracks not in CUP_TRACKS:
         error("cups.tracks must be off, random or random_no_repeats.")

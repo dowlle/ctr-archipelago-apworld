@@ -7,7 +7,7 @@ import unittest
 
 from Options import OptionError
 
-from .. import content_cups, content_item_pool, content_plan, cup_checks, gem_cup_legs
+from .. import content_bosses, content_cups, content_item_pool, content_plan, cup_checks, gem_cup_legs
 from .test_content_plan import make_world, profile_options
 from .test_track_modes import mode_pool
 
@@ -179,8 +179,9 @@ class TestCupTracks(unittest.TestCase):
         self.assertEqual(spec["tracks"], "random_no_repeats")
 
     def test_unknown_value_refuses(self):
-        with self.assertRaisesRegex(OptionError, "cups.tracks must be"):
-            content_cups.settings(dict(count=1, tracks="shuffled"))
+        for value in ("shuffled", None, True, 0):
+            with self.assertRaisesRegex(OptionError, "cups.tracks must be"):
+                content_cups.settings(dict(count=1, tracks=value))
 
     def test_off_needs_the_original_tracks_of_the_seeds_cups(self):
         options = plan_options(dict(count=5, tracks="off"))
@@ -242,6 +243,14 @@ class TestSurfaceItems(unittest.TestCase):
         with self.assertRaisesRegex(OptionError, "An excluded check holds only filler"):
             make_world(options)
         options["exclude_locations"] = ["Crash Cove: Trophy Race"]
+        self.assertEqual(make_world(options).ctr_content_plan["items"]["filler_count"], 1)
+
+    def test_the_goal_check_counts_once(self):
+        from .test_content_bosses import boss_options
+        options = boss_options()
+        options["item_pool"]["extra"] = dict(trophies=18)  # one filler slot, for the goal check
+        name = content_plan.LOCATION_BY_CODE[content_bosses.OXIDE_FIRST]
+        options["exclude_locations"] = [name]
         self.assertEqual(make_world(options).ctr_content_plan["items"]["filler_count"], 1)
 
     def test_a_name_outside_the_seed_is_not_counted(self):

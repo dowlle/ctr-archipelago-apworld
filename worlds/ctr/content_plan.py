@@ -1341,7 +1341,9 @@ def generate(world):
     assert len(checks) == check_count
     # Archipelago fills an excluded check from filler alone. The names that are
     # checks of this seed count; the ledger's reserve above is an upper bound.
-    excluded = len(set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks})
+    goal_check = content_bosses.goal_location(boss_record) if oxide_filler else None
+    excluded = len(set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks
+                                                     if c["location"] != goal_check})
     if excluded + oxide_filler > world.ctr_content_items.filler_count:
         error(f"exclude_locations names {excluded} checks of this seed and the item pool leaves "
               f"{world.ctr_content_items.filler_count} filler slots"
