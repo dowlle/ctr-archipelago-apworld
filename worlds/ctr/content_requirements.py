@@ -441,9 +441,10 @@ def draw(view, mode, collapse):
     return {title: (stages[1], stages[2]) for title, stages in best.items() if title in view.ctr_sim_pads}
 
 
-def check_record(plan, stage1, stage2, rows, require):
+def check_record(plan, stage1, stage2, manual, rows, require):
     """The `pad_requirements` record against the plan's gates. The draw is not
-    recomputed (the plan carries the result); vanilla is a fixed table, and the
+    recomputed (the plan carries the result). Vanilla is a fixed table; a drawn
+    stage keeps its count ceiling and a stage 2 asks more than its stage 1; the
     no-4-Key mode bars the Key count everywhere it is drawn."""
     record = plan["pad_requirements"]
     mode = record["mode"]
@@ -458,7 +459,21 @@ def check_record(plan, stage1, stage2, rows, require):
                 "vanilla stage 1 requirements do not match the physical pads")
         require({int(rid.split(":")[1]): row["predicate"] for rid, row in stage2.items()} == want2,
                 "vanilla stage 2 requirements do not match the physical pads")
-    elif mode == "random_without_4_keys":
+        return
+    first = {int(rid.split(":")[1]): row["predicate"] for rid, row in {**stage1, **manual}.items()}
+    for row in stage1.values():
+        predicate = row["predicate"]
+        require(predicate.get("item") == key or predicate["count"] <= warp_pad_logic._STAGE1_COUNT_CEILING,
+                "a drawn stage 1 asks above its count ceiling")
+    for rid, row in stage2.items():
+        predicate = row["predicate"]
+        require(predicate.get("item") == key or predicate["count"] <= warp_pad_logic._STAGE2_COUNT_CEILING,
+                "a drawn stage 2 asks above its count ceiling")
+        before = first.get(int(rid.split(":")[1]))
+        require(before is None or predicate["count"] > before["count"]
+                or not set(before.get("items", [before.get("item")])) <= set(predicate.get("items", [predicate.get("item")])),
+                "a stage 2 asks no more than its stage 1")
+    if mode == "random_without_4_keys":
         require(not any(row["predicate"]["op"] == "count" and row["predicate"]["item"] == key
                         and row["predicate"]["count"] >= 4 for row in {**stage1, **stage2}.values()),
                 "random_without_4_keys asks for 4 Keys")

@@ -424,7 +424,7 @@ class TestGarageRoll(unittest.TestCase):
             req = {r["id"]: r["predicate"] for r in plan["requirements"]}
             for g in range(4):
                 pred = req[f"boss:{g}"]
-                content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g)
+                content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g, "randomized")
                 if pred.get("item") == content_bosses.KEY_ITEM:
                     self.assertTrue(content_bosses.GARAGES[g][2] < pred["count"] <= 3)
                 seen.add(json.dumps(pred, sort_keys=True))

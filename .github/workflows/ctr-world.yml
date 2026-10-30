@@ -299,12 +299,12 @@ jobs:
             sed -e "s/__COUNT__/$cups/" -e "s/__TRACKS__/$cup_tracks/" ../world-src/.github/fuzz/content-plan-gem-cups-meta.yaml > ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
-          uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
           if [[ "$CHECK_META" == pads-* ]]; then
             IFS=- read -r _ unlock placement density <<< "$CHECK_META"
             sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
           if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ] || [[ "$CHECK_META" == gem-cups-* ]] || [[ "$CHECK_META" == pads-* ]]; then
             # A refused option set is "ignored", not a failure. If the meta file
             # stopped matching the profile, every seed would be ignored and the

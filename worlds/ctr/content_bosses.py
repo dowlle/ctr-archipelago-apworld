@@ -141,6 +141,8 @@ LEVELS = ("standard", "high", "very_high", "chaotic")
 DEFAULT_LEVEL = "high"
 #: The Trophies of each garage with vanilla pad requirements.
 VANILLA_TROPHIES = (4, 8, 12, 16)
+#: A plan without the `pad_requirements` record drew exactly this many.
+OLD_GARAGE_TROPHIES = 4
 GARAGE_KEY_MAX = 3
 #: {level: garage depth 0..3 -> (low, high) fraction of the base supply}.
 #: The first three rise with depth; `chaotic` takes the full range anywhere.
@@ -448,12 +450,13 @@ def draw_requirements(world, record, rows, vanilla=False):
     return out
 
 
-def check_garage_requirement(predicate, rows, garage, vanilla=False):
+def check_garage_requirement(predicate, rows, garage, mode=None):
     """Refuses a garage predicate the roll cannot produce: one family over its
     base items, Keys above the hub gate and at most three, any other count 1
     to the family's base supply; with vanilla pad requirements the Trophy
-    table. The level and the draw are not recomputed (the plan carries the
-    result, as for pad rules)."""
+    table, and on a plan without the `pad_requirements` record (`mode` None)
+    exactly four Trophies, as those plans drew. The level and the draw are not
+    recomputed (the plan carries the result, as for pad rules)."""
     from . import warp_pad_rules
     ceiling = _ceilings(rows)
     items = content_item_pool.ITEMS
@@ -462,7 +465,9 @@ def check_garage_requirement(predicate, rows, garage, vanilla=False):
     count = predicate.get("count")
     if type(count) is not int:
         error(f"garage {garage}: requirement count must be an integer")
-    if vanilla and (predicate != dict(op="count", item=items["Trophy"], count=count)
+    if mode is None and predicate.get("item") == items["Trophy"] and count != OLD_GARAGE_TROPHIES:
+        error(f"garage {garage}: a Trophy garage asks exactly four Trophies")
+    if mode == "vanilla" and (predicate != dict(op="count", item=items["Trophy"], count=count)
                     or count != min(VANILLA_TROPHIES[garage], ceiling.get(items["Trophy"], 0))):
         error(f"garage {garage}: vanilla pad requirements ask {VANILLA_TROPHIES[garage]} Trophies here")
     if predicate["op"] == "count":
@@ -598,7 +603,7 @@ def encounter_rows(record, venues, final_track):
     return rows
 
 
-def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None, vanilla=False):
+def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None, mode=None):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
@@ -614,7 +619,7 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
         eid, nid = encounter_id(g, index), entry_id(g, index)
         if g < OXIDE_GARAGE:
             rid = f"boss:{g}"
-            check_garage_requirement(garage_reqs[g], rows, g, vanilla)
+            check_garage_requirement(garage_reqs[g], rows, g, mode)
             requirements.append(dict(id=rid, predicate=garage_reqs[g]))
         elif index == 0:
             rid = "free"
@@ -834,5 +839,5 @@ def expected(plan, retail, cortex):
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
                   {g: own.get(f"boss:{g}") for g in range(4)}, cups,
-                  plan.get("pad_requirements", {}).get("mode") == "vanilla")
+                  plan.get("pad_requirements", {}).get("mode"))
     return built + (tracks,)

@@ -1239,9 +1239,10 @@ def generate(world):
     # it one place back; a per-pad order puts it at a uniformly drawn later
     # place. Seeds without those Lettersanity modes draw exactly as before.
     ctr_last = settings.get("lettersanity") in (2, 3)
-    # A Relic Race that holds no check is not a pad's first mode either: its
-    # win would open the pad's second stage for nothing. The CTR rule wins on a
-    # pad with only those two modes, which has no first mode that opens a check.
+    # A Relic Race with no tier check is not a pad's first mode either: no check
+    # proves its win, and a Perfect check is more than a win. The CTR rule wins
+    # on a pad with only those two modes, whose later race then counts on its
+    # items alone.
     entry_modes = {}
     for index in multi:
         modes = list(chosen[index]["modes"])
@@ -1249,7 +1250,7 @@ def generate(world):
             world.random.shuffle(modes)
         else:
             modes.sort(key=seed_order.index)
-        if modes[0] == "relic" and not relics.get(chosen[index]["id"]) and not settings.get("relic_perfect"):
+        if modes[0] == "relic" and not relics.get(chosen[index]["id"]):
             modes.append(modes.pop(0))
         if ctr_last and modes[0] == "ctr":
             if mode_order == "per_pad":
@@ -1318,7 +1319,7 @@ def generate(world):
                                                         unlock_mode == 0)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
-            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, unlock_mode == 0)
+            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, content_requirements.MODES[unlock_mode])
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
@@ -1582,7 +1583,7 @@ def create_regions(world):
         return has_boost if rule is None else (lambda state, rule=rule: rule(state) and has_boost(state))
 
     def first_race(pad):
-        """Names of the checks that prove the pad's first race was won, those
+        """Codes of the checks that prove the pad's first race was won, those
         of its first mode. Empty when the mode holds no check of its own (a
         Relic Race with no tier check): then only the items count, as on
         native. Empty too on a pad with one race, and on a plan from before
@@ -1590,8 +1591,7 @@ def create_regions(world):
         modes = [g["mode"] for g in pad["mode_gates"]]
         if len(modes) < 2 or "pad_requirements" not in plan:
             return ()
-        return tuple(LOCATION_BY_CODE[c["location"]] for c in by_pad.get(pad["id"], ())
-                     if c["kind"] == modes[0])
+        return tuple(c["location"] for c in by_pad.get(pad["id"], ()) if c["kind"] == modes[0])
 
     def stage_gate(route):
         """The test of a route's later race, or None for a pad's first race. A
@@ -1609,7 +1609,7 @@ def create_regions(world):
 
         def test(state, items=items, won=won):
             return ((items is None or items(state))
-                    and (not won or any(state.can_reach_location(name, player) for name in won)))
+                    and (not won or any(placed[code].can_reach(state) for code in won)))
         return test
 
     def with_letters(rule, check):
@@ -1625,6 +1625,9 @@ def create_regions(world):
     if plan["encounters"]:
         content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check))
     by_pad = {}
+    # Locations by code: Universal Tracker renames custom tracks' locations, so
+    # a rule holds the Location, not its name.
+    placed = {}
     shared = []
     legs = []
     for check in plan['checks']:
@@ -1657,6 +1660,7 @@ def create_regions(world):
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
+            placed[check["location"]] = location
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
             tests = [stage_gate(r) for r in check["routes"]]
@@ -2147,7 +2151,7 @@ def validate(plan):
         require(goal == want, "goal does not match the bosses record")
     require("pad_requirements" in plan or not drawn, "a stage 1 record needs the pad_requirements record")
     if "pad_requirements" in plan:
-        content_requirements.check_record(plan, drawn, later, [
+        content_requirements.check_record(plan, drawn, later, manual, [
             content_item_pool.ItemRow(name=ITEM_BY_CODE.get(r["item"], str(r["item"])), **r) for r in item_plan["rows"]],
             require)
     for rid, row in {**manual, **drawn, **later}.items():

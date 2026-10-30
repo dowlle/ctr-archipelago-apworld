@@ -166,6 +166,42 @@ class TestRandomRequirements(unittest.TestCase):
         with self.assertRaisesRegex(OptionError, "4 Keys"):
             content_plan.validate(forged)
 
+    def test_forged_counts_are_refused(self):
+        plan = make_world(options(), seed=1).ctr_content_plan
+        forged = copy.deepcopy(plan)
+        row = next(r for r in forged["requirements"] if r["id"].startswith("stage2:"))
+        row["predicate"] = dict(op="count", item=35010000, count=5)
+        with self.assertRaisesRegex(OptionError, "above its count ceiling"):
+            content_plan.validate(forged)
+        forged = copy.deepcopy(plan)
+        row = next(r for r in forged["requirements"] if r["id"].startswith("stage1:"))
+        row["predicate"] = dict(op="count", item=35010000, count=9)
+        with self.assertRaisesRegex(OptionError, "above its count ceiling"):
+            content_plan.validate(forged)
+
+    def test_a_stage_2_met_by_its_stage_1_is_refused(self):
+        plan = make_world(options(), seed=1).ctr_content_plan
+        physical = sorted(set(records(plan, "stage1:")) & set(records(plan, "stage2:")))[0]
+        forged = copy.deepcopy(plan)
+        row = next(r for r in forged["requirements"] if r["id"] == f"stage2:{physical}")
+        row["predicate"] = copy.deepcopy(records(plan, "stage1:")[physical])
+        row["predicate"]["count"] = 1
+        with self.assertRaises(OptionError):
+            content_plan.validate(forged)
+
+    def test_a_relic_race_with_no_tier_check_is_never_first(self):
+        o = options(relic_perfect_checks=True)
+        o["item_pool"] = {"base": {"relics": {"sapphire": 2, "gold": 1}}}
+        o["pad_layout"]["mode_order"] = "per_pad"
+        o["oxide_final_challenge_unlock"] = "any_relic_type"
+        o["oxide_final_challenge_relic_count"] = 1
+        for seed in range(12):
+            plan = make_world(copy.deepcopy(o), seed=seed, stop_before="pre_fill").ctr_content_plan
+            tiers = {c["routes"][0]["own_pad_id"] for c in plan["checks"] if c["kind"] == "relic"}
+            for pad in plan["pads"]:
+                if len(pad["mode_gates"]) > 1 and pad["id"] not in tiers:
+                    self.assertNotEqual(pad["mode_gates"][0]["mode"], "relic")
+
     def test_the_stand_ins_keep_the_simulation_walking(self):
         """Stage 1 reaches the deep counts of a walked seed, not the fallback's."""
         counts = []
