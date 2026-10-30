@@ -434,6 +434,16 @@ def bootstrap_start(world) -> None:
             name = queue.pop(0)
             if name in pool:
                 names = [name]
+        # A marked item that opens nothing yet waits for what does: on a start
+        # of two it would leave one spot for an opener that needs two (row 3).
+        if names:
+            probe = state.copy()
+            probe.collect(pool[names[0]][0], True)
+            if len(_open_empty(world, probe)) <= len(spots):
+                openers = _next_openers(world, state, len(spots), pool)
+                if openers and len(openers) <= len(spots):
+                    queue.insert(0, names[0])
+                    names = openers
         if not names:
             names = _next_openers(world, state, len(spots), pool)
         if not names or len(names) > len(spots):

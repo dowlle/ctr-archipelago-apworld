@@ -175,29 +175,30 @@ def capacity_met(seated, seats, rungs):
     return True
 
 
-def seat_content(world, chosen, seats, placement, manual, rungs, opens, start_checks):
+def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks):
     """(content in pad order, seats with the occupied ones first): `seats[i]`
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
     early pads or too few checks open at the start is drawn again, at most
-    PLACEMENT_REDRAWS times. `opens(seat)` says a pad can open at the start,
-    `start_checks(content)` counts the checks it then opens with no items, aimed
-    at the start the guards call wide. The start counts because arenas, cups or
-    boost terms can leave little on the two open pads of vanilla requirements.
-    If none fits, the draw with the widest start stands. Vanilla placement never
-    redraws."""
+    PLACEMENT_REDRAWS times. `reach(seat)` is 2 for a pad that can open at the
+    start, 1 for one just behind it, else 0; `start_checks(content)` counts the
+    checks it then opens with no items, aimed at the start the guards call
+    wide. The start counts because arenas, cups or boost terms can leave little
+    on the two open pads of vanilla requirements. If none fits, the draw with
+    the best early pads stands. Vanilla placement never redraws."""
     seats = list(seats)
-    open_pads = [seat[0] for seat in seats if opens(seat)]
+    weight = {seat[0]: reach(seat) for seat in seats}
     need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen))
-    best, best_start = None, -1
+    best, best_score = None, -1
     for _ in range(PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
         seated = _seat(world, chosen, seats, placement, manual)
-        start = sum(start_checks(seated[p]) for p in open_pads if p in seated)
+        start = sum(start_checks(item) for physical, item in seated.items() if weight[physical] == 2)
         if placement == "vanilla" or (not own_content(seated) and capacity_met(seated, seats, rungs) and start >= need):
             best = None
             break
-        if start > best_start:
-            best, best_start = (list(seats), seated), start
+        score = sum(weight[physical] * start_checks(item) for physical, item in seated.items())
+        if score > best_score:
+            best, best_score = (list(seats), seated), score
     if best:
         seats, seated = best
     ordered = sorted(seated, key=[seat[0] for seat in seats].index)

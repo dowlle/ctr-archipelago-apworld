@@ -50,6 +50,9 @@ MODE_FEATURE = "track_modes_v1"
 MODES = ("trophy", "ctr", "relic")
 #: Second-stage gate record of a physical pad: `stage2:<physical LevelID>`.
 STAGE2_PREFIX = "stage2:"
+#: With vanilla requirements, Mystery Caves (1 Trophy) and Sewer Speedway (3)
+#: are the pads behind the two open ones.
+VANILLA_NEAR_TROPHIES = 3
 RELIC_TIERS = ("Sapphire", "Gold", "Platinum")
 #: (route award, named-block key, location suffix) of every check a mode owns.
 #: Codes come from the frozen names: retail `<Track>: <suffix>`, named blocks by
@@ -1085,6 +1088,13 @@ def generate(world):
         rule = (content_requirements.vanilla_rule(physical) if unlock_mode == 0 else manual.get(physical))
         return keys == 0 and rule_met(rule, held)
 
+    def seat_reach(seat):
+        # 2: opens at the start. 1: a vanilla pad a few Trophies behind it.
+        if opens_at_start(seat):
+            return 2
+        rule = content_requirements.vanilla_rule(seat[0]) if unlock_mode == 0 else None
+        return int(seat[2] == 0 and rule is not None and rule[0] == "Trophy" and rule[1] <= VANILLA_NEAR_TROPHIES)
+
     def start_checks(item):
         # Checks a pad's content opens with no items: the first race and its
         # rungs that need no boost rank. Modes in their fixed order are enough
@@ -1099,7 +1109,7 @@ def generate(world):
                    for kind, award in terms)
 
     chosen, registry = content_requirements.seat_content(world, chosen, pad_registry(), placement, manual,
-                                                         len(settings.get("podium_rungs", ())), opens_at_start,
+                                                         len(settings.get("podium_rungs", ())), seat_reach,
                                                          start_checks)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings

@@ -399,6 +399,18 @@ class TestStartGuards(unittest.TestCase):
             sphere0_guard.bootstrap_start(world)
         self.assertEqual(mw.early_items[1], weapons)
 
+    def test_a_marked_item_that_opens_nothing_waits_for_an_opener(self):
+        from .. import sphere0_guard
+        for seed in range(30):
+            world = make_world(options(warppad_unlock_requirements="vanilla", progressive_boost="shared_global",
+                                       podium_placement_checks=False), seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            if sphere0_guard.sphere0_breadth(world) > 3 or "Progressive Boost" not in mw.local_early_items[1]:
+                continue
+            call_all(mw, "pre_fill")
+            distribute_items_restrictive(mw)
+            self.assertTrue(mw.can_beat_game(), seed)
+
     def test_the_collapse_message_is_silent(self):
         with self.assertNoLogs(level="WARNING"):
             make_world(options(), seed=0, stop_before="pre_fill")
