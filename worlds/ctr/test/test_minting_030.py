@@ -23,8 +23,8 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "e01959af45848777e11508e8bf357fd143f9f68b"
-REGISTRY_DIGEST = "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
+REGISTRY_COMMIT = "9f61917477b48c59d97862a1ef602239d41533d0"
+REGISTRY_DIGEST = "0ced7b087966941aafdf451244cf4206d6b51238193a85031e1828206ae20ae0"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")
@@ -171,12 +171,12 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(doc["registry"], {"repository": "https://github.com/dowlle/ctr-track-registry",
                                            "commit": REGISTRY_COMMIT, "digest": REGISTRY_DIGEST})
         blocks = [row["block_index"] for row in doc["tracks"]]
-        self.assertEqual(blocks, sorted(set(range(85)) - {14, 16, 68}))
+        self.assertEqual(blocks, sorted(set(range(89)) - {14, 16, 68}))
         keys = {row["track_key"] for row in doc["tracks"]}
         # 14 and 68 are `reserved` (hubs, no race mode confirmed); 16 is
         # `builtin` (the hard-coded Cortex Vortex block).
         self.assertFalse(keys & {"christmas-hub", "st-patricks-day-hub-world", "cortex-vortex"})
-        self.assertEqual(len(nt.NAMED_TRACKS), 82)
+        self.assertEqual(len(nt.NAMED_TRACKS), 86)
 
     def test_offset_layout_of_the_0_3_0_step(self):
         self.assertEqual(L["Baby T Park: Cup Leg Victory"], nt.location_code(8, "cup_leg_victory"))
@@ -187,6 +187,37 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(I["Letter R (Baby T Park)"], 35100042)
         self.assertEqual(L["Acid Lake: Trophy Race"], 35200000)
         self.assertEqual(L["Yoshi Circuit Legacy: Item Box 15"], 35216834)
+
+
+class TestThirdPassLrg2Blocks(unittest.TestCase):
+    """The 0.3.0 third id step (2026-10-29): blocks 85 to 88, the four new
+    LRG2Pancho entries of the track registry, in case-folded title order. No
+    other name or id changes; the 15 LRG2 revisions of existing tracks add only
+    content ids to `named_tracks.json`."""
+
+    BLOCKS = ((85, "sewer-baby-park", "Sewer Baby Park", 35217000, 35100425),
+              (86, "sids-house", "Sid's House", 35217200, 35100430),
+              (87, "specter-station", "Specter Station", 35217400, 35100435),
+              (88, "tizi-challenge", "Tizi Challenge", 35217600, 35100440))
+
+    def test_blocks_keys_and_names(self):
+        rows = {r.block_index: r for r in nt.NAMED_TRACKS}
+        for block, key, name, first_location, first_letter in self.BLOCKS:
+            with self.subTest(name):
+                self.assertEqual((rows[block].track_key, rows[block].ap_name), (key, name))
+                self.assertEqual(L[f"{name}: Trophy Race"], first_location)
+                self.assertEqual(nt.location_code(block, "trophy"), first_location)
+                self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
+                self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
+                                 [first_letter, first_letter + 1, first_letter + 2])
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 32)
+
+    def test_sids_house_key_has_no_dash_before_the_s(self):
+        self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
+        self.assertNotIn("sid-s-house", {r.track_key for r in nt.NAMED_TRACKS})
+
+    def test_block_89_and_up_are_not_minted(self):
+        self.assertNotIn(89, {r.block_index for r in nt.NAMED_TRACKS})
 
 
 class TestMintedItems(unittest.TestCase):
