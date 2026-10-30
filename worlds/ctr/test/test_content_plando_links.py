@@ -165,7 +165,9 @@ class TestExplicitPlando(unittest.TestCase):
 class TestItemLinks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.mw = room(players=2, links={1: LINK, 2: LINK})
+        options = profile_options()
+        options["item_pool"]["base"]["trophies"] = 5
+        cls.mw = room(players=2, links={1: LINK, 2: LINK}, options=options)
 
     def test_members_receive_their_whole_supply(self):
         mw = self.mw
@@ -181,7 +183,9 @@ class TestItemLinks(unittest.TestCase):
         self.assertTrue(mw.can_beat_game())
 
     def test_wire_is_unchanged_by_the_link(self):
-        plain = room(players=2)
+        options = profile_options()
+        options["item_pool"]["base"]["trophies"] = 5
+        plain = room(players=2, options=options)
         for player in (1, 2):
             self.assertEqual(json.loads(json.dumps(self.mw.worlds[player].fill_slot_data()))["content_plan"],
                              json.loads(json.dumps(plain.worlds[player].fill_slot_data()))["content_plan"])

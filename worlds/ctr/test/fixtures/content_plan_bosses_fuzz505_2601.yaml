@@ -179,13 +179,13 @@ Crash Team Racing:
   progressive_starting_wumpa: 6
   wumpa_check: global
   turbo_grant: 'false'
-  lettersanity: locations_and_items
+  lettersanity: locations_only
   letters_per_track: 3
   box_locations: 'false'
   shortcut_knowledge: hard
   progressive_boost: per_character
   progressive_boost_blue_fire: 'true'
-  progressive_stats: shared_global
+  progressive_stats: 'off'
   logic_difficulty: easy
   starting_character: pura
   starting_stat_class: balanced

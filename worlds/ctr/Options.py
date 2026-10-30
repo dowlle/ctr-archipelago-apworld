@@ -1398,7 +1398,14 @@ class ContentPool(OptionDict):
     `bosses.enabled: true` puts the boss races back in the five garages: each
     boss on its home track, or on its Boss Track Shuffle track, and N. Oxide's
     two challenges, with Oxide Goal and Bosses Required Goal; false leaves the
-    garages empty. Unsupported selected content fails clearly.
+    garages empty. `cups.count` sets how many cups the seed has. The first five
+    are the original Gem Cups, Red first, and a sixth cup onward takes a name
+    from the cup name pool. `cups.tracks` is off, random or random_no_repeats
+    (the default): off races a Gem Cup's original four tracks, and a sixth cup
+    onward draws four different tracks; random draws every race with repeats
+    allowed; random_no_repeats draws four different tracks per cup. It wins over
+    `cups.composition.repeats.within_cup`. Slide Coliseum and Turbo Track are
+    never cup races. Unsupported selected content fails clearly.
     """
     display_name = "Content Pool (Experimental)"
     default = {}
@@ -1420,8 +1427,13 @@ class ContentPadLayout(OptionDict):
 class ContentItemPool(OptionDict):
     """Exact base and extra item counts, independent of selected content.
 
-    Four base Keys are mandatory. Gems are randomized. Extras replace filler;
-    capacity shortages fail without reducing counts or granting free starts.
+    Four base Keys are mandatory. Gems are randomized. Platinum Relics default
+    to 0. A relic tier's Time Trial checks exist on as many Relic Races as there
+    are items of that tier, drawn at random, capped by the Relic Races in the
+    seed; items beyond that land on other checks. Extras replace filler. The
+    five surface items are created too, and are dropped together when the items
+    do not fit; any other capacity shortage fails without reducing counts or
+    granting free starts.
     """
     display_name = "Item Pool (Experimental)"
     default = {}

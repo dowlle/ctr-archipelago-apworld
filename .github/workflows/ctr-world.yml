@@ -160,6 +160,18 @@ jobs:
           # .github/fuzz/content-plan-full-meta.yaml, under the same cap.
           - {check_name: content-plan-full,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-full'}
           - {check_name: content-plan-full-ut,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-full'}
+          # Original Gem Cups on the forced content plan (one generator row 2):
+          # the default item pool, so Platinum 0, the surface items and relic
+          # checks that follow the item counts are in every seed, with three and
+          # seven cups under each cup track value. The arm name carries both;
+          # .github/fuzz/content-plan-gem-cups-meta.yaml holds the rest.
+          - {check_name: gem-cups-3-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-off'}
+          - {check_name: gem-cups-3-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random'}
+          - {check_name: gem-cups-3-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random_no_repeats'}
+          - {check_name: gem-cups-7-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-off'}
+          - {check_name: gem-cups-7-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random'}
+          - {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
+          - {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -167,7 +179,7 @@ jobs:
           repository: dowlle/Archipelago-index
           path: index-repo
       - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
-        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || matrix.check_tracker == 'yes'
+        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || startsWith(matrix.check_meta, 'gem-cups-') || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -268,8 +280,13 @@ jobs:
             cp ../world-src/.github/fuzz/content-plan-full-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [[ "$CHECK_META" == gem-cups-* ]]; then
+            IFS=- read -r _ _ cups cup_tracks <<< "$CHECK_META"
+            sed -e "s/__COUNT__/$cups/" -e "s/__TRACKS__/$cup_tracks/" ../world-src/.github/fuzz/content-plan-gem-cups-meta.yaml > ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
-          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ]; then
+          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ] || [[ "$CHECK_META" == gem-cups-* ]]; then
             # A refused option set is "ignored", not a failure. If the meta file
             # stopped matching the profile, every seed would be ignored and the
             # arm would pass without testing anything, so cap the ignored share.

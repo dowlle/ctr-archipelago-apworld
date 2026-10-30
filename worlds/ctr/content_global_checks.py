@@ -210,9 +210,11 @@ def fallback(plan):
 
 
 def cup_indices(plan):
-    """The name indices of the plan's cups (#133 PR 5b), the keys of the
-    encounter block's `content_cups`."""
-    return sorted(int(e["id"].removeprefix("entry/cup:")) for e in plan["entries"] if e["kind"] == content_cups.KIND)
+    """The name indices of the plan's pool cups (#133 PR 5b), the keys of the
+    encounter block's `content_cups`. A Gem Cup draws from the block's own
+    `cups` order for its LevelID, which every block carries."""
+    return sorted(int(e["id"].removeprefix("entry/cup:")) for e in plan["entries"]
+                  if e["kind"] == content_cups.KIND and content_cups.gem_colour(e["id"]) is None)
 
 
 def encounter_block(world, plan):

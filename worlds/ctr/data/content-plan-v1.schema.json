@@ -86,10 +86,13 @@
           "global_checks_v1",
           "item_boxes_v1",
           "cup_entries_v1",
-          "boss_encounters_v1"
+          "boss_encounters_v1",
+          "gem_cups_v1",
+          "surface_items_v1",
+          "relic_tier_checks_v1"
         ]
       },
-      "maxItems": 17,
+      "maxItems": 20,
       "minItems": 1,
       "uniqueItems": true
     },
