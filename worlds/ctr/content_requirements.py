@@ -180,18 +180,26 @@ def seat_content(world, chosen, seats, placement, manual, rungs, opens, start_ch
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
     early pads or too few checks open at the start is drawn again, at most
     PLACEMENT_REDRAWS times. `opens(seat)` says a pad can open at the start,
-    `start_checks(content)` counts the checks it then opens with no items. The
-    start counts because a player's boost terms can close whatever lands on
-    the few open pads of vanilla requirements. Vanilla placement never redraws."""
+    `start_checks(content)` counts the checks it then opens with no items, aimed
+    at the start the guards call wide. The start counts because arenas, cups or
+    boost terms can leave little on the two open pads of vanilla requirements.
+    If none fits, the draw with the widest start stands. Vanilla placement never
+    redraws."""
     seats = list(seats)
     open_pads = [seat[0] for seat in seats if opens(seat)]
-    need = min(sphere0_guard.MIN_STARTING_CHECKS, sum(start_checks(item) for item in chosen))
+    need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen))
+    best, best_start = None, -1
     for _ in range(PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
         seated = _seat(world, chosen, seats, placement, manual)
-        if placement == "vanilla" or (not own_content(seated) and capacity_met(seated, seats, rungs)
-                                      and sum(start_checks(seated[p]) for p in open_pads if p in seated) >= need):
+        start = sum(start_checks(seated[p]) for p in open_pads if p in seated)
+        if placement == "vanilla" or (not own_content(seated) and capacity_met(seated, seats, rungs) and start >= need):
+            best = None
             break
+        if start > best_start:
+            best, best_start = (list(seats), seated), start
+    if best:
+        seats, seated = best
     ordered = sorted(seated, key=[seat[0] for seat in seats].index)
     by_physical = {seat[0]: seat for seat in seats}
     return [seated[p] for p in ordered], [by_physical[p] for p in ordered] + [s for s in seats if s[0] not in seated]

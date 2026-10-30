@@ -373,6 +373,32 @@ class TestStartGuards(unittest.TestCase):
         seats = occupied(plan)
         self.assertTrue({3, 6} & set(seats))
 
+    def test_the_early_weapon_gives_way_on_a_start_with_no_spare_check(self):
+        from unittest import mock
+        from .. import sphere0_guard
+        world = make_world(options(itemsanity=True, hit_character=False), stop_before="pre_fill")
+        mw = world.multiworld
+        self.assertTrue(mw.early_items[1])
+        spots = [object(), object()]
+        with mock.patch.object(sphere0_guard, "_open_empty", lambda _world, _state: spots), \
+                mock.patch.object(sphere0_guard, "bootstrap_target", lambda _world: 12), \
+                mock.patch.object(sphere0_guard, "_next_openers", lambda *_args: []):
+            sphere0_guard.bootstrap_start(world)
+        self.assertFalse(mw.early_items[1])
+
+    def test_a_start_with_room_keeps_the_early_weapon(self):
+        from unittest import mock
+        from .. import sphere0_guard
+        world = make_world(options(itemsanity=True, hit_character=False), stop_before="pre_fill")
+        mw = world.multiworld
+        weapons = dict(mw.early_items[1])
+        spots = [object()] * 3
+        with mock.patch.object(sphere0_guard, "_open_empty", lambda _world, _state: spots), \
+                mock.patch.object(sphere0_guard, "bootstrap_target", lambda _world: 12), \
+                mock.patch.object(sphere0_guard, "_next_openers", lambda *_args: []):
+            sphere0_guard.bootstrap_start(world)
+        self.assertEqual(mw.early_items[1], weapons)
+
     def test_the_collapse_message_is_silent(self):
         with self.assertNoLogs(level="WARNING"):
             make_world(options(), seed=0, stop_before="pre_fill")

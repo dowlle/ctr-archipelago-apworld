@@ -408,6 +408,14 @@ def bootstrap_start(world) -> None:
         return
     # A player's non_local_items stay out of their own start.
     non_local = set(world.options.non_local_items.value)
+    # Itemsanity's early weapon opens nothing. On a start with no spare check
+    # it would take the spot of the item that does, and the fill dead-ends
+    # (vanilla requirements with two single-check pads open, row 3), so it
+    # gives up its early place. Nothing is precollected.
+    early = mw.early_items.get(player, {})
+    if len(_open_empty(world, base)) <= sum(n for name, n in early.items() if name not in non_local) + 1:
+        for name in [name for name in early if name not in non_local]:
+            del early[name]
     marked = mw.local_early_items.setdefault(player, {})
     queue = [name for name, count in list(marked.items()) for _ in range(count)]
     placed = []
