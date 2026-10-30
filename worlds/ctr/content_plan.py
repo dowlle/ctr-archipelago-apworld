@@ -1109,8 +1109,8 @@ def generate(world):
                    for kind, award in terms)
 
     chosen, registry = content_requirements.seat_content(world, chosen, pad_registry(), placement, manual,
-                                                         len(settings.get("podium_rungs", ())), seat_reach,
-                                                         start_checks)
+                                                         len(settings.get("podium_rungs", ())),
+                                                         seat_reach if unlock_mode == 0 else None, start_checks)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep

@@ -179,17 +179,18 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
     """(content in pad order, seats with the occupied ones first): `seats[i]`
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
     early pads or too few checks open at the start is drawn again, at most
-    PLACEMENT_REDRAWS times. `reach(seat)` is 2 for a pad that can open at the
-    start, 1 for one just behind it, else 0; `start_checks(content)` counts the
-    checks it then opens with no items, aimed at the start the guards call
-    wide. The start counts because arenas, cups or boost terms can leave little
-    on the two open pads of vanilla requirements. If none fits, the best draw
+    PLACEMENT_REDRAWS times. With vanilla requirements `reach(seat)` is 2 for a
+    pad that can open at the start, 1 for one just behind it, else 0, and
+    `start_checks(content)` counts the checks it then opens with no items, aimed
+    at the start the guards call wide: arenas, cups or boost terms can leave
+    little on the two open pads. Random requirements pass None: their free pads
+    are drawn with the start in mind (draw). If none fits, the best draw
     stands: one that passes the first two tests, then the best early pads, and
     `shuffle` then trades content onto the open pads. Vanilla placement never
     redraws."""
     seats = list(seats)
-    weight = {seat[0]: reach(seat) for seat in seats}
-    need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen))
+    weight = {seat[0]: reach(seat) if reach else 0 for seat in seats}
+    need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen)) if reach else 0
     best, best_score = None, (False, -1)
     for _ in range(PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
@@ -204,7 +205,7 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
             best, best_score = (list(seats), seated), score
     if best:
         seats, seated = best
-    if placement == "shuffle":
+    if placement == "shuffle" and reach:
         # Still short: content that opens nothing at the start trades places
         # with content that does, as the open empty pad swap does for a gap.
         for physical in [p for p in seated if weight[p] == 2]:
