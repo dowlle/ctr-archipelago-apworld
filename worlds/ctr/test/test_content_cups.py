@@ -69,6 +69,7 @@ def cups_of(plan):
 
 class TestCupDraw(unittest.TestCase):
     def test_varied_profiles_generate_validate_and_restore(self):
+        generated = 0
         for seed in range(24):
             with self.subTest(seed=seed):
                 options = cup_options(seed)
@@ -77,6 +78,7 @@ class TestCupDraw(unittest.TestCase):
                 except OptionError as exc:  # the boost terms can leave a narrow start
                     self.assertIn("at the start", str(exc))
                     continue
+                generated += 1
                 plan = world.ctr_content_plan
                 self.assertTrue(content_plan.validate(plan))
                 cups = cups_of(plan)
@@ -104,6 +106,7 @@ class TestCupDraw(unittest.TestCase):
                 restored = make_world({}, passthrough=wire)
                 self.assertEqual(restored.ctr_content_plan, plan)
                 self.assertEqual(bool(restored.options.cup_sweep_checks.value), options["cup_sweep_checks"])
+        self.assertGreater(generated, 20)
 
     def test_no_cups_draws_nothing(self):
         plan = make_world(profile_options()).ctr_content_plan
@@ -113,14 +116,17 @@ class TestCupDraw(unittest.TestCase):
     def test_across_cups_off_keeps_tracks_apart(self):
         options = cup_options(2)
         options["content_pool"]["cups"]["count"] = 4
-        for seed in range(6):
+        generated = 0
+        for seed in range(12):
             try:
                 plan = make_world(options, seed=seed).ctr_content_plan
             except OptionError as exc:  # the boost terms can leave a narrow start
                 self.assertIn("at the start", str(exc))
                 continue
+            generated += 1
             legs = [leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]]
             self.assertEqual(len(legs), len(set(legs)))
+        self.assertGreater(generated, 0)
 
     def test_custom_leg_range(self):
         options = cup_options(1)
@@ -196,7 +202,7 @@ class TestCupChecks(unittest.TestCase):
         options["logic_difficulty"] = "hard"
         options["content_pool"]["cups"] = dict(count=6, composition=dict(sources=["retail"]))
         found = False
-        for seed in range(10):
+        for seed in range(30):
             try:
                 plan = make_world(options, seed=seed).ctr_content_plan
             except OptionError as exc:  # the boost terms can leave a narrow start

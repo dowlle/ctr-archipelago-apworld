@@ -1240,8 +1240,9 @@ def generate(world):
     # it one place back; a per-pad order puts it at a uniformly drawn later
     # place. Seeds without those Lettersanity modes draw exactly as before.
     ctr_last = settings.get("lettersanity") in (2, 3)
-    # A Relic Race that holds no check is never a pad's first mode either: its
-    # win would open the pad's second stage for nothing.
+    # A Relic Race that holds no check is not a pad's first mode either: its
+    # win would open the pad's second stage for nothing. The CTR rule wins on a
+    # pad with only those two modes, which has no first mode that opens a check.
     entry_modes = {}
     for index in multi:
         modes = list(chosen[index]["modes"])
@@ -1338,6 +1339,14 @@ def generate(world):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req=gate, mode_gates=[], racer_lock=None))
     assert len(checks) == check_count
+    # Archipelago fills an excluded check from filler alone. The names that are
+    # checks of this seed count; the ledger's reserve above is an upper bound.
+    excluded = len(set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks})
+    if excluded + oxide_filler > world.ctr_content_items.filler_count:
+        error(f"exclude_locations names {excluded} checks of this seed and the item pool leaves "
+              f"{world.ctr_content_items.filler_count} filler slots"
+              + (", one of them for the Oxide goal check" if oxide_filler else "")
+              + ". An excluded check holds only filler. Lower an item_pool count or exclude fewer checks.")
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()

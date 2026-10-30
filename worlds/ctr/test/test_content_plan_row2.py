@@ -235,6 +235,21 @@ class TestSurfaceItems(unittest.TestCase):
         self.assertEqual(plan.filler_count, 7)
         self.assertFalse(any(row.name == "Ignore Ice" for row in plan.rows))
 
+    def test_more_excluded_checks_than_filler_refuses(self):
+        options = plan_options(dict(count=0))
+        options["item_pool"]["base"]["trophies"] = 9  # 18 counted items on 19 checks, one filler slot
+        options["exclude_locations"] = ["Crash Cove: Trophy Race", "Roo's Tubes: Trophy Race"]
+        with self.assertRaisesRegex(OptionError, "An excluded check holds only filler"):
+            make_world(options)
+        options["exclude_locations"] = ["Crash Cove: Trophy Race"]
+        self.assertEqual(make_world(options).ctr_content_plan["items"]["filler_count"], 1)
+
+    def test_a_name_outside_the_seed_is_not_counted(self):
+        options = plan_options(dict(count=0))
+        options["item_pool"]["base"]["trophies"] = 9
+        options["exclude_locations"] = ["Crash Cove: Trophy Race", "Sewer Speedway: Sapphire Time Trial"]
+        self.assertEqual(make_world(options).ctr_content_plan["items"]["filler_count"], 1)
+
     def test_a_start_of_a_dropped_item_refuses_with_a_reason(self):
         raw = dict(base=dict(trophies=7, relics=dict(sapphire=0, gold=0, platinum=0),
                              tokens=dict.fromkeys(content_item_pool.COLOURS, 0)))

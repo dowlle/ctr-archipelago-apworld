@@ -48,8 +48,9 @@ def varied(seed):
     if seed % 6 == 5:
         options.update(progressive_boost="shared_global", hit_character=True)
     if seed % 7 == 3:
-        options.update(progressive_boost="shared_global", character_unlocks=True, racer_locked_pads=4,
+        options.update(progressive_boost="per_character", character_unlocks=True, racer_locked_pads=4,
                        itemsanity=True, hit_character=True)
+        options["item_pool"]["base"]["trophies"] = 12  # room for the boost, racer and weapon items
     if seed % 4 == 1:
         options["content_pool"]["cups"] = dict(count=dict(min=1, max=3))
         options["content_pool"]["tracks"]["cortex_vortex"] = True
@@ -267,6 +268,7 @@ class TestBossEncounters(unittest.TestCase):
         self.assertTrue(mw.completion_condition[1](all_state))
 
     def test_varied_profiles_generate_validate_and_restore(self):
+        generated = 0
         for seed in range(30):
             with self.subTest(seed=seed):
                 try:
@@ -274,6 +276,7 @@ class TestBossEncounters(unittest.TestCase):
                 except OptionError as exc:  # the boost terms can leave a narrow start
                     self.assertIn("at the start", str(exc))
                     continue
+                generated += 1
                 plan = world.ctr_content_plan
                 self.assertTrue(content_plan.validate(plan))
                 coded = [loc for loc in world.multiworld.get_locations(1) if loc.address is not None]
@@ -286,6 +289,7 @@ class TestBossEncounters(unittest.TestCase):
                 all_state = world.multiworld.get_all_state(False)
                 for location in world.multiworld.get_locations(1):
                     self.assertTrue(location.can_reach(all_state), location.name)
+        self.assertGreater(generated, 20)
 
     def test_forged_rooms_refuse(self):
         world = make_world(boss_options(boss_track_shuffle=True, bosses_required_goal=2, gems_required_goal=2))
