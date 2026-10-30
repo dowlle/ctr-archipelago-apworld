@@ -13,13 +13,21 @@ from . import CTRTestBase
 from .test_content_item_pool import small_pool
 
 
+def profile_pool():
+    """A small pool that leaves five filler slots beside the surface items on
+    the profile's 19 checks."""
+    pool = small_pool()
+    pool["base"]["trophies"] = 0
+    return pool
+
+
 def profile_options():
     return dict(content_pool=dict(preset="mixed", tracks=dict(retail="all", modes=["trophy"],
                                                             custom=[copy.deepcopy(content_plan.PACKAGES[1])]),
                                   cups=dict(count=0), crystals=dict(count=0), bosses=dict(enabled=False),
                                   required_entries=["custom/baby-t-park/1.0.2"]),
                 pad_layout=dict(placement="shuffle", stages="single", mode_order="fixed", merge_trophy_ctr=False),
-                item_pool=small_pool(), oxide_goal="disabled", bosses_required_goal=0, gems_required_goal=5,
+                item_pool=profile_pool(), oxide_goal="disabled", bosses_required_goal=0, gems_required_goal=5,
                 character_unlocks=False, podium_placement_checks=False, accessibility="full")
 
 
@@ -159,7 +167,7 @@ class TestContentPlan(CTRTestBase):
 
     def test_capacity_and_unsupported_requests_do_not_downgrade(self):
         options = profile_options()
-        options["item_pool"]["extra"] = {"keys": 6}
+        options["item_pool"]["extra"] = {"keys": 11}
         with self.assertRaisesRegex(OptionError, "Short by 1 checks"):
             make_world(options)
         options = profile_options()

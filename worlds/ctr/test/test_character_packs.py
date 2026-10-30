@@ -84,13 +84,14 @@ class TestUnlocks(unittest.TestCase):
         plan = world.ctr_content_plan
         start = characters.ROSTER_CHARACTER_ID[world.ctr_starting_character]
         self.assertEqual(plan["racers"], dict(starting_character=start, remove_playable_oxide=False, requested_locks=0))
-        self.assertEqual(plan["required_features"][-1], content_plan.RACER_FEATURE)
+        self.assertIn(content_plan.RACER_FEATURE, plan["required_features"])
         rows = racer_rows(plan)
         self.assertEqual(sorted(rows), sorted(n for n in ROSTER if n != world.ctr_starting_character))
         self.assertTrue(all((r["base"], r["extra"], r["remaining"]) == (1, 0, 1) for r in rows.values()))
         self.assertEqual(sorted(n for n in pool_names(world) if n in ROSTER), sorted(rows))
-        # Fifteen filler slots became the racers; no location was added.
-        self.assertEqual(plan["items"]["filler_count"], off.ctr_content_plan["items"]["filler_count"] - 15)
+        # The racers took the filler slots and the five surface items' slots,
+        # which were dropped together; no location was added.
+        self.assertEqual(plan["items"]["filler_count"], off.ctr_content_plan["items"]["filler_count"] - 15 + 5)
         self.assertEqual(len(world.multiworld.get_locations(1)), len(off.multiworld.get_locations(1)))
         # Nothing names a racer in logic without locks, so they stay useful.
         self.assertFalse(any(i.advancement for i in world.multiworld.itempool if i.name in ROSTER))

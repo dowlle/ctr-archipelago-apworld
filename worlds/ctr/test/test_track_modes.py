@@ -14,7 +14,7 @@ from BaseClasses import CollectionState
 from Options import OptionError
 from worlds.AutoWorld import call_all
 
-from .. import content_plan, named_tracks
+from .. import content_plan, named_tracks, sphere0_guard
 from .test_content_plan import make_world, profile_options
 from .test_custom_packages import UNKNOWN, named_fixture
 
@@ -22,8 +22,10 @@ CTR_PACKAGE = "custom/baby-t-park/1.0.2"
 
 
 def mode_pool():
-    """Base items in every counted family, so second-stage draws vary."""
-    return {"base": {"trophies": 6, "relics": {"sapphire": 4, "gold": 3, "platinum": 2},
+    """Base items in every counted family, so second-stage draws vary. Relic
+    Time Trial checks follow these counts, so every Relic Race of the full
+    profiles keeps all three tiers."""
+    return {"base": {"trophies": 6, "relics": {"sapphire": 18, "gold": 18, "platinum": 18},
                      "tokens": {"red": 2, "green": 2, "blue": 1, "yellow": 0, "purple": 0},
                      "gems": ["red", "green", "blue", "yellow", "purple"], "keys": 4}}
 
@@ -85,8 +87,9 @@ class TestModesByCapability(unittest.TestCase):
             make_world(mode_options(custom=[d]))
 
     def test_global_modes_filter_and_overrides_narrow(self):
-        plan = make_world(mode_options(modes=["ctr", "relic"], custom=[],
-                                       overrides={"retail:3": ["relic"]})).ctr_content_plan
+        options = mode_options(modes=["ctr", "relic"], custom=[], overrides={"retail:3": ["relic"]})
+        options["item_pool"]["base"]["trophies"] = 0
+        plan = make_world(options).ctr_content_plan
         by_id = {t["id"]: t["modes"] for t in plan["tracks"]}
         self.assertEqual(by_id.get("retail:3", ["relic"]), ["relic"])
         self.assertTrue(all(m == ["ctr", "relic"] for i, m in by_id.items() if i != "retail:3"))
@@ -347,8 +350,15 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
         self.assertEqual(len(mw.precollected_items[1]), 0)
 
     def test_wide_start_takes_no_early_item(self):
-        world = make_world(artifact_244_options(), seed=711, stop_before="pre_fill")
-        self.assertEqual(world.multiworld.local_early_items[1], {})
+        wide = 0
+        for seed in range(700, 730):
+            world = make_world(artifact_244_options(), seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
+            if len(start) >= sphere0_guard.NARROW_START_CHECKS:
+                wide += 1
+                self.assertEqual(mw.local_early_items[1], {})
+        self.assertGreater(wide, 0)
 
     def test_plan_without_second_stage_gates_takes_no_early_item(self):
         world = make_world(artifact_244_options(stages="single"), seed=710, stop_before="pre_fill")
@@ -356,9 +366,16 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
 
     def test_without_a_key_opener_the_widest_opener_is_chosen(self):
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=710, stop_before="pre_fill")
+        narrow = None
+        for seed in range(700, 760):
+            world = make_world(artifact_244_options(), seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            mw.itempool = [item for item in mw.itempool if item.name != "Key"]
+            if sphere0_guard.early_opener(world) is not None:
+                narrow = world
+                break
+        world = narrow
         mw = world.multiworld
-        mw.itempool = [item for item in mw.itempool if item.name != "Key"]
         state = sphere0_guard._base_state(world)
         start = sphere0_guard._reachable_empty(world, state)
         reach = {}

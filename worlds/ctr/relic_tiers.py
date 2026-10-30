@@ -88,6 +88,13 @@ def resolve_comfort_guards(options) -> Tuple[bool, bool]:
     return comfort_guards, force_vanilla_turbotrack
 
 
+def draw_tier(world, pool: List[str], count: int) -> FrozenSet[str]:
+    """`count` members of `pool`, drawn uniformly: which of a tier's checks
+    this seed creates. Normal seeds pass location names, content plans the
+    tracks that hold a Relic Race (content_plan.draw_relic_checks)."""
+    return frozenset(world.random.sample(pool, count))
+
+
 def draw_relic_tier_keep(world) -> Tuple[Dict[str, FrozenSet[str]], Dict[str, int]]:
     """Roll which of each tier's 18 Time Trial locations this seed creates.
 
@@ -135,8 +142,7 @@ def draw_relic_tier_keep(world) -> Tuple[Dict[str, FrozenSet[str]], Dict[str, in
                         f"warp-pad unlocks and unshuffled Gems.",
                         logger)
                     n = len(pool)
-        chosen = world.random.sample(pool, n)
-        keep[relic_item] = frozenset(chosen)
+        keep[relic_item] = draw_tier(world, pool, n)
         created[relic_item] = n
     return keep, created
 

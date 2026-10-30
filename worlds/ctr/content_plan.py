@@ -28,7 +28,7 @@ from Options import OptionError
 from .Options import DL_SEND_BITS
 
 from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
-               sphere0_guard, traps, warp_pad_rules, wumpa_family)
+               relic_tiers, sphere0_guard, traps, warp_pad_rules, wumpa_family)
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
@@ -59,6 +59,15 @@ MODE_CHECKS = {
     "ctr": (("win_letters", "ctr_token", "CTR Token Challenge"),),
     "relic": tuple((tier.lower(), "relic_" + tier.lower(), tier + " Time Trial") for tier in RELIC_TIERS),
 }
+#: Relic tier checks follow the item counts (ruled 2026-10-30): a tier's Time
+#: Trial checks exist on as many Relic Races as there are items of the tier,
+#: drawn per seed. The plan's check list says which, as with Lettersanity's
+#: letters. The feature is declared when some Relic Race lacks a tier.
+RELIC_FEATURE = "relic_tier_checks_v1"
+#: The five surface items: ledger rows that add no check and no rule, all five
+#: or none (content_item_pool.resolve).
+SURFACE_FEATURE = "surface_items_v1"
+SURFACE_CODES = frozenset(content_item_pool.ITEMS[name] for name in content_item_pool.SURFACE_NAMES)
 #: Per-track check families (#133 PR 3b), each with its own feature: podium
 #: rungs on a Trophy Race, Reach 10 Wumpa on a Trophy Race or CTR Challenge,
 #: and the C, T and R letters of a CTR Challenge (Lettersanity). The plan's
@@ -285,10 +294,22 @@ def manual_requirements(manual, rows):
     return out
 
 
+def relic_supply(rows):
+    """{tier: base + extra copies} from the ledger's wire rows."""
+    by_code = {row["item"]: row for row in rows}
+    return {tier.lower(): by_code[content_item_pool.ITEMS[f"{tier} Relic"]]["base"]
+            + by_code[content_item_pool.ITEMS[f"{tier} Relic"]]["extra"] for tier in RELIC_TIERS}
+
+
+def relic_races(entries):
+    """Track entries with a Relic Race: the races a tier's checks are drawn on."""
+    return sum(e["kind"] == "track" and "relic" in e["modes"] for e in entries)
+
+
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
-                      global_checks=None, item_boxes=None, bosses=None):
+                      global_checks=None, item_boxes=None, bosses=None, rows=()):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
-    # garages (#133 PR 6) last.
+    # garages (#133 PR 6) next, the row 2 plan content last.
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -306,7 +327,12 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_global_checks.FEATURE] if global_checks else [])
             + ([content_item_boxes.FEATURE] if item_boxes else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
-            + ([content_bosses.FEATURE] if bosses is not None else []))
+            + ([content_bosses.FEATURE] if bosses is not None else [])
+            + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
+                                                 and content_cups.gem_colour(e["id"]) is not None for e in entries) else [])
+            + ([SURFACE_FEATURE] if any(row["item"] in SURFACE_CODES for row in rows) else [])
+            + ([RELIC_FEATURE] if rows and any(count < relic_races(entries) for count in relic_supply(rows).values())
+               else []))
 
 
 def family_settings(options):
@@ -607,12 +633,33 @@ def track_location(track, key, suffix):
     return name, CTR_LOCATION_IDS[name]
 
 
-def mode_checks(track, mode):
-    """[(award, location name, code, display suffix)] a track's mode owns."""
+def mode_checks(track, mode, relics=None):
+    """[(award, location name, code, display suffix)] a track's mode owns.
+    `relics` narrows a Relic Race to the tiers it holds a check for."""
     out = []
     for award, key, suffix in MODE_CHECKS[mode]:
+        if mode == "relic" and relics is not None and award not in relics:
+            continue
         name, code = track_location(track, key, suffix)
         out.append((award, name, code, suffix))
+    return out
+
+
+def plan_relics(plan, track):
+    """The tiers a track's Relic Race holds a check for, read from the plan."""
+    present = {check["location"] for check in plan["checks"]}
+    return {award for award, _name, code, _suffix in mode_checks(track, "relic") if code in present}
+
+
+def draw_relic_checks(world, tracks, totals):
+    """{track id: tiers it holds a check for}. Each tier takes as many of the
+    seed's Relic Races as `totals` holds copies of it, drawn at random, capped
+    by the Relic Races in the seed. Items beyond that land on other checks. A
+    tier with a copy for every race takes no draw."""
+    out = {track: set() for track in tracks}
+    for tier, total in totals.items():
+        for track in tracks if total >= len(tracks) else relic_tiers.draw_tier(world, tracks, total):
+            out[track].add(tier)
     return out
 
 
@@ -713,7 +760,7 @@ def route(entry_id, mode, pad_id, award):
 
 
 def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None,
-                 item_boxes=None):
+                 item_boxes=None, relics=None):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -728,7 +775,10 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
 
     With Item Box Locations on (#133 PR 4e), the track's box checks come
     last, each with a route per mode of the entry and its legacy box terms
-    (content_item_boxes)."""
+    (content_item_boxes).
+
+    `relics` is the set of tiers this track's Relic Race holds a check for
+    (draw_relic_checks), all three when None."""
     title = room_title(track)
     settings = settings or {}
 
@@ -737,7 +787,7 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
                     routes=[route(entry_id, mode, pad_id, award) for mode, award in routes])
     out = []
     for mode in modes:
-        for award, _name, code, suffix in mode_checks(track, mode):
+        for award, _name, code, suffix in mode_checks(track, mode, relics):
             out.append(check(code, mode, suffix, [(mode, award)]))
         if mode == "trophy":
             for key in settings.get("podium_rungs", ()):
@@ -989,8 +1039,9 @@ def generate(world):
         # One uniform draw among the feasible (cups, crystals) pairs (#133 PR
         # 5), never one count drawn first and the other trimmed.
         legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
+        fixed_legs = content_cups.fixed_legs(cup_spec, candidates)
         pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
-                                            len(required) - len(chosen_arenas), legs_other, legs_custom)
+                                            len(required) - len(chosen_arenas), legs_other, legs_custom, fixed_legs)
         if not pairs:
             repeats = cup_spec["repeats"]
             error(f"no cup and crystal counts fit: cups.count {cup_spec['bounds'][0]} to {cup_spec['bounds'][1]}, "
@@ -999,7 +1050,10 @@ def generate(world):
                   f"Cortex Vortex leg tracks, custom_legs {cup_spec['custom_legs'][0]} to "
                   f"{cup_spec['custom_legs'][1]} per cup (repeats within a cup "
                   f"{'on' if repeats['within_cup'] else 'off'}, across cups "
-                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads. No content count was changed.")
+                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads"
+                  + (f", with cups.tracks off and tracks.retail leaving {len(fixed_legs)} of the five Gem Cups "
+                     "their original tracks" if fixed_legs is not None else "")
+                  + ". No content count was changed.")
         cup_count, arena_count = world.random.choice(pairs)
     if len(chosen_arenas)>arena_count:
         error('required arena entries exceed crystals.count; no content count was changed.')
@@ -1012,10 +1066,10 @@ def generate(world):
     chosen += chosen_arenas
     cups = []
     if cup_count:
-        # Cups take their legs from the seed's tracks and a name from the pool
-        # (#133 PR 5); they are seated with the other entries.
+        # The first five are the Gem Cups; a sixth cup onward takes a name
+        # from the pool (#133 PR 5). They are seated with the other entries.
         cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
-                                      bool(o.one_lap_cups.value))
+                                      bool(o.one_lap_cups.value), fixed_legs)
     # Room titles of the seed's custom tracks, also those raced only as cup legs.
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:
@@ -1085,6 +1139,10 @@ def generate(world):
             for i in letter_layout(track, settings, letters.get(index, ()))[1]:
                 name, code = letter_item(track, i)
                 letter_packs[name] = code
+    # Relic tier checks follow the item counts (ruled 2026-10-30), so a tier is
+    # drawn before the ledger is sized, among the tracks raced as a Relic Race.
+    relics = draw_relic_checks(world, [t["id"] for t in chosen if is_track(t) and "relic" in t["modes"]],
+                               content_item_pool.relic_totals(o.item_pool.value))
     # Cups (#133 PR 5): the leg tracks' records, and the sweep check switch.
     track_records = {t["id"]: t for t in candidates}
     sweep = bool(o.cup_sweep_checks.value) and bool(cup_count)
@@ -1112,7 +1170,8 @@ def generate(world):
         # Boss cups (#133 PR 6b): which garages hold a cup, and their legs.
         boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
-                                       package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
+                                       package_by_id.get(t.get("package_id")), item_boxes=item_boxes,
+                                       relics=relics.get(t["id"])))
                       if is_track(t)
                       else len(content_cups.checks(content_cups.entry(t), "pad:0", track_records, None, None,
                                                    sweep)) if "cup_index" in t
@@ -1153,15 +1212,18 @@ def generate(world):
     selected.update(content_capability.item_counts(capability))
     # Itemsanity (#133 PR 4d): one row per weapon item.
     selected.update(content_global_checks.item_counts(global_checks))
+    # Boss garages (#133 PR 6): the Oxide goal location holds filler only
+    # (issue #27, excluded from progression), so the ledger keeps one filler
+    # slot for it, as the legacy rung sizer reserves one. The surface items
+    # stay out of that slot and of the slots a player's exclude_locations need.
+    oxide_filler = (boss_record is not None
+                    and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL))
     world.ctr_content_items = content_item_pool.resolve(
         o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
         additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
+        surface=content_item_pool.SURFACE_NAMES, filler_reserve=int(oxide_filler) + len(o.exclude_locations.value),
         **(dict(selected_packs=selected, pack_codes=letter_packs) if selected else {}))
-    # Boss garages (#133 PR 6): the Oxide goal location holds filler only
-    # (issue #27, excluded from progression), so the ledger keeps one filler
-    # slot for it, as the legacy rung sizer reserves one.
-    if (boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)
-            and world.ctr_content_items.filler_count < 1):
+    if oxide_filler and world.ctr_content_items.filler_count < 1:
         error("the Oxide goal check holds only filler, but the item pool fills every check: "
               f"{check_count} checks for {check_count} selected copies. Lower an item_pool count or extra, or add "
               "content, so one filler slot is left. Your settings were not changed.")
@@ -1178,16 +1240,21 @@ def generate(world):
     # it one place back; a per-pad order puts it at a uniformly drawn later
     # place. Seeds without those Lettersanity modes draw exactly as before.
     ctr_last = settings.get("lettersanity") in (2, 3)
+    # A Relic Race that holds no check is never a pad's first mode either: its
+    # win would open the pad's second stage for nothing.
     entry_modes = {}
     for index in multi:
         modes = list(chosen[index]["modes"])
         if mode_order == "per_pad":
             world.random.shuffle(modes)
-            if ctr_last and modes[0] == "ctr":
-                modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
         else:
             modes.sort(key=seed_order.index)
-            if ctr_last and modes[0] == "ctr":
+        if modes[0] == "relic" and not relics.get(chosen[index]["id"]) and not settings.get("relic_perfect"):
+            modes.append(modes.pop(0))
+        if ctr_last and modes[0] == "ctr":
+            if mode_order == "per_pad":
+                modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
+            else:
                 modes[0], modes[1] = modes[1], modes[0]
         entry_modes[index] = modes
     stage2 = {}
@@ -1231,7 +1298,7 @@ def generate(world):
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
                                            letters.get(index, ()), package_by_id.get(track.get("package_id")),
-                                           capability, item_boxes))
+                                           capability, item_boxes, relics.get(track["id"])))
         pads.append(pad)
     standalone = [t for t in chosen if is_track(t)]
     plan_tracks = standalone + cup_only_tracks(standalone, entries, track_records)
@@ -1284,7 +1351,8 @@ def generate(world):
                 tracks=plan_tracks, entries=entries, pads=pads, encounters=encounters, requirements=requirements,
                 checks=checks, items=world.ctr_content_items.wire(), goal=content_bosses.goal(boss_record, gem_term),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
-                                                    global_checks,item_boxes,boss_record))
+                                                    global_checks,item_boxes,boss_record,
+                                                    world.ctr_content_items.wire()["rows"]))
     if settings:
         plan["track_checks"] = settings
     if packs:
@@ -1705,7 +1773,7 @@ def validate(plan):
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
-                                                         global_checks,item_boxes,boss_record),
+                                                         global_checks,item_boxes,boss_record,plan['items']['rows']),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1768,6 +1836,7 @@ def validate(plan):
                 for rid in later), "second-stage requirement without a pad that uses it")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
+    relic_counts = {}
     # Generic-slot room titles are recomputed from the plan's own tracks; a
     # forged title (a retail or named track's name, or a repeated one) differs.
     try:
@@ -1778,7 +1847,8 @@ def validate(plan):
         expected_titles = {}
     arena_ids=set()
     # Cups (#133 PR 5): sweeps exist for every cup or none; leg laps share one
-    # switch; leg tracks need no standalone entry.
+    # switch; leg tracks need no standalone entry. The Gem Cups come first.
+    content_cups.check_lineup(plan["entries"])
     sweep = any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"])
     shortened, cup_names, leg_tracks = None, set(), set()
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
@@ -1857,8 +1927,11 @@ def validate(plan):
         require(len(locations) == (settings["letters_per_track"] if settings.get("lettersanity") in (1, 2)
                                    and "ctr" in track["modes"] else 0),
                 "letter checks do not match letters_per_track")
+        relics = plan_relics(plan, track) if "relic" in track["modes"] else None
+        for tier in relics or ():
+            relic_counts[tier] = relic_counts.get(tier, 0) + 1
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
-                                  packages.get(track.get("package_id")), capability, item_boxes):
+                                  packages.get(track.get("package_id")), capability, item_boxes, relics):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
     # A track raced only in cups is checked like a standalone one (#133 PR 5).
@@ -1938,12 +2011,20 @@ def validate(plan):
     # Itemsanity (#133 PR 4d): one row per weapon item.
     pack_rows.update({content_item_pool.ITEMS[name]: count
                       for name, count in content_global_checks.item_counts(global_checks).items()})
+    # The five surface items are pooled together or not at all.
+    surface = set(rows) & SURFACE_CODES
+    require(surface in (set(), SURFACE_CODES), "the five surface items are pooled together")
+    pack_rows.update(dict.fromkeys(surface, 1))
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
             | set(letter_items) | set(pack_rows), "item family registry mismatch")
+    # A tier's checks follow its copies, capped by the Relic Races in the seed.
+    races = relic_races(plan["entries"])
+    require(all(relic_counts.get(tier, 0) == min(total, races) for tier, total in relic_supply(item_plan["rows"]).items()),
+            "relic tier checks do not follow the item counts")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
     require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
-            "a pack, racer, capability or weapon item row disagrees with its record")
+            "a pack, racer, capability, weapon or surface item row disagrees with its record")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")

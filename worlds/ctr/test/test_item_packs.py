@@ -61,7 +61,7 @@ class TestPacks(unittest.TestCase):
         world = make_world(pack_options(psw=4), seed=5)
         plan = world.ctr_content_plan
         self.assertEqual(plan["item_packs"], dict(progressive_starting_wumpa=4, turbo_grant=True, tizi_helper=True))
-        self.assertEqual(plan["required_features"][-1], content_plan.PACK_FEATURE)
+        self.assertIn(content_plan.PACK_FEATURE, plan["required_features"])
         rows = rows_of(plan)
         for code, count in ((PSW, 4), (TURBO, 1), (TIZI, 1)):
             self.assertEqual((rows[code]["base"], rows[code]["extra"], rows[code]["remaining"]), (count, 0, count))
@@ -89,7 +89,7 @@ class TestPacks(unittest.TestCase):
 
     def test_a_full_pool_refuses_instead_of_dropping_a_pack(self):
         options = profile_options()
-        options["progressive_starting_wumpa"] = 10
+        options.update(progressive_starting_wumpa=10, turbo_grant=True)
         with self.assertRaisesRegex(OptionError, "Short by"):
             make_world(options)
 

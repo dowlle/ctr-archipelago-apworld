@@ -40,6 +40,9 @@
 # are the ones the
 # content-plan profile still refuses; everything else is randomized by the
 # fuzzer as in the other arms.
+# Relic checks follow the item counts since one generator row 2, so relic items
+# no longer leave spare checks: per-racer boost and letter items lean low to keep
+# the ignored share under the arm's cap.
 Crash Team Racing:
   accessibility: full
   content_pool:
@@ -91,16 +94,16 @@ Crash Team Racing:
   gems_required_goal: {1: 1, 3: 1, 5: 2}
   custom_tracks: {}
   cortex_vortex_track: false
-  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost: {"off": 2, shared_global: 2, per_character: 1}
   progressive_stats: {"off": 1, shared_global: 1}
-  lettersanity: {"off": 1, locations_only: 2, locations_and_items: 2, items_only: 1}
+  lettersanity: {"off": 2, locations_only: 3, locations_and_items: 1, items_only: 1}
   letters_per_track: {1: 1, 2: 1, 3: 1}
   podium_placement_checks: {true: 7, false: 1}
   podium_held_rungs: {true: 3, false: 1}
   podium_held_fifth_rung: {true: 1, false: 1}
   podium_finish_rungs: {true: 1, false: 1}
   podium_any_position_rung: {true: 1, false: 1}
-  wumpa_check: {"off": 1, global: 1, per_track: 6}
-  relic_perfect_checks: {true: 7, false: 1}
+  wumpa_check: {global: 1, per_track: 7}
+  relic_perfect_checks: true
   boss_track_shuffle: false
   warp_pad_rules: {}

@@ -13,6 +13,7 @@ from BaseClasses import CollectionState
 from .. import content_cups, content_global_checks, content_plan, cup_checks, hit_character
 from .test_content_plan import make_world, profile_options
 from .test_custom_packages import UNKNOWN, named_fixture
+from .test_track_modes import mode_pool
 
 
 def cup_options(seed=0):
@@ -45,6 +46,9 @@ def cup_options(seed=0):
     if composition:
         pool["cups"]["composition"] = composition
     pool["crystals"] = dict(count=dict(min=0, max=seed % 4))
+    if "relic" in pool["tracks"]["modes"]:
+        options["item_pool"] = mode_pool()
+        options["item_pool"]["base"].update(trophies=0, relics=dict(sapphire=8, gold=6, platinum=4))
     options["one_lap_cups"] = seed % 2 == 0
     options["cup_sweep_checks"] = seed % 4 in (1, 2) or seed % 8 == 7
     if seed % 4 == 2:
@@ -53,7 +57,7 @@ def cup_options(seed=0):
     if seed % 6 == 5:
         options["logic_difficulty"] = "hard"
         options["podium_placement_checks"] = True
-        options["progressive_boost"] = "per_character"
+        options["progressive_boost"] = "shared_global"
         options["character_unlocks"] = True
         options["racer_locked_pads"] = 4
     return options
@@ -68,14 +72,18 @@ class TestCupDraw(unittest.TestCase):
         for seed in range(24):
             with self.subTest(seed=seed):
                 options = cup_options(seed)
-                world = make_world(options, seed=seed)
+                try:
+                    world = make_world(options, seed=seed)
+                except OptionError as exc:  # the boost terms can leave a narrow start
+                    self.assertIn("at the start", str(exc))
+                    continue
                 plan = world.ctr_content_plan
                 self.assertTrue(content_plan.validate(plan))
                 cups = cups_of(plan)
                 low, high = options["content_pool"]["cups"]["count"].values()
                 self.assertTrue(low <= len(cups) <= high)
                 self.assertIn(content_cups.FEATURE, plan["required_features"])
-                self.assertEqual(plan["required_features"][-1], content_cups.FEATURE)
+                self.assertIn(content_cups.GEM_FEATURE, plan["required_features"])
                 tracks = {t["id"]: t for t in plan["tracks"]}
                 names = [e["display_name"] for e in cups]
                 self.assertEqual(len(set(names)), len(names))
@@ -106,7 +114,11 @@ class TestCupDraw(unittest.TestCase):
         options = cup_options(2)
         options["content_pool"]["cups"]["count"] = 4
         for seed in range(6):
-            plan = make_world(options, seed=seed).ctr_content_plan
+            try:
+                plan = make_world(options, seed=seed).ctr_content_plan
+            except OptionError as exc:  # the boost terms can leave a narrow start
+                self.assertIn("at the start", str(exc))
+                continue
             legs = [leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]]
             self.assertEqual(len(legs), len(set(legs)))
 
@@ -160,10 +172,17 @@ class TestCupChecks(unittest.TestCase):
             plan = make_world(options, seed=seed).ctr_content_plan
             trophy = {e["track_id"] for e in plan["entries"] if e["kind"] == "track" and "trophy" in e["modes"]}
             legs = {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]}
-            for cup in cups_of(plan):
+            cups = sorted(cups_of(plan), key=lambda c: (content_cups.gem_colour(c["id"]) is None, c["id"]))
+            for position, cup in enumerate(cups):
                 index = int(cup["id"].split(":")[1])
-                win = next(c for c in plan["checks"] if c["location"] == 35027000 + index)
-                self.assertEqual(win["display_name"], f"{cup_checks.CUP_NAMES[index]}: Win")
+                if position < 5:
+                    self.assertEqual((cup["id"], cup["display_name"]),
+                                     (f"entry/gem_cup:{position}", cup_checks.GEM_CUPS[position]))
+                    win = next(c for c in plan["checks"] if c["location"] == 35011200 + index)
+                    self.assertEqual(win["display_name"], f"{cup_checks.GEM_CUPS[index]}: Gem")
+                else:
+                    win = next(c for c in plan["checks"] if c["location"] == 35027000 + index)
+                    self.assertEqual(win["display_name"], f"{cup_checks.CUP_NAMES[index]}: Win")
             victories = [c for c in plan["checks"] if c["kind"] == "cup_leg"]
             self.assertEqual({c["owner"] for c in victories}, legs - trophy)
             for check in victories:
@@ -178,7 +197,11 @@ class TestCupChecks(unittest.TestCase):
         options["content_pool"]["cups"] = dict(count=6, composition=dict(sources=["retail"]))
         found = False
         for seed in range(10):
-            plan = make_world(options, seed=seed).ctr_content_plan
+            try:
+                plan = make_world(options, seed=seed).ctr_content_plan
+            except OptionError as exc:  # the boost terms can leave a narrow start
+                self.assertIn("at the start", str(exc))
+                continue
             for cup in cups_of(plan):
                 win = next(c for c in plan["checks"] if c["kind"] == "cup" and c["routes"][0]["entry_id"] == cup["id"])
                 usf = any(leg["track_id"] in ("retail:7", "retail:13") for leg in cup["legs"])  # Hot Air Skyway, Oxide Station
@@ -234,8 +257,8 @@ class TestCupHitCharacter(unittest.TestCase):
                 plan = world.ctr_content_plan
                 wire = json.loads(json.dumps(world.fill_slot_data()))
                 block = wire["hit_character_encounters"]
-                indices = sorted(int(e["id"].split(":")[1]) for e in cups_of(plan))
-                self.assertEqual(sorted(map(int, block["content_cups"])), indices)
+                indices = content_global_checks.cup_indices(plan)
+                self.assertEqual(sorted(map(int, block.get("content_cups", ()))), indices)
                 seed32 = block["policy"]["seed"]
                 for index in indices:
                     self.assertEqual(block["content_cups"][str(index)]["order"],
@@ -334,7 +357,9 @@ class TestCupHitCharacter(unittest.TestCase):
         world = None
         for seed in range(10):
             try:
-                world = make_world(hit_cup_options(1), seed=seed)
+                options = hit_cup_options(1)
+                options["content_pool"]["cups"]["count"] = 7
+                world = make_world(options, seed=seed)
                 break
             except OptionError:
                 continue

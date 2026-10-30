@@ -178,7 +178,7 @@ Crash Team Racing:
   progressive_starting_wumpa: 6
   wumpa_check: per_track
   turbo_grant: 'false'
-  lettersanity: locations_and_items
+  lettersanity: locations_only
   letters_per_track: 2
   box_locations: 'false'
   shortcut_knowledge: hard

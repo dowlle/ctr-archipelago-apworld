@@ -277,7 +277,7 @@ class TestCtrNeverFirstWithLetterItems(unittest.TestCase):
         for letters in (2, 3):
             for order in ("per_seed", "per_pad", "fixed"):
                 for seed in range(40):
-                    options = check_options(rungs=False, letters=letters, per_track=2, order=order)
+                    options = check_options(rungs=True, letters=letters, per_track=2, order=order)
                     if order == "fixed":
                         options["content_pool"]["tracks"]["overrides"] = {"retail:3": ["ctr", "relic"]}
                     with self.subTest(letters=letters, order=order, seed=seed):
