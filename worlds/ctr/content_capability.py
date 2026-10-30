@@ -11,11 +11,10 @@ then no check has a `boost` field, so such a plan keeps its earlier wire.
 
 Which rank a check needs follows the legacy rules for the same race
 (`Rules.py`, `usf_finish.py`, `capability_contract.py`), keyed by what the
-check pays for, with one difference: in a content plan no mode needs a win in
-another (Wayfinder ticket 16), so a CTR Challenge, a Time Trial or a letter
-does not inherit the Trophy Race's own Logic Difficulty term the way the
-legacy `can_reach(<track>: Trophy Race)` prerequisite passes it on. The finish
-term does carry over, because every one of those checks crosses the line.
+check pays for. Since row 3, a later race needs the pad's first race won via
+`can_reach` on its check. It therefore inherits that first race's rule,
+including its Logic Difficulty term. Each check also keeps its own finish
+term, because it crosses the line.
 
   * finish term F: two ranks (USF) on the confirmed finish tracks (Hot Air
     Skyway, Cortex Castle, Cortex Vortex; Oxide Station unless Shortcut

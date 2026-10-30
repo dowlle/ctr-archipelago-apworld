@@ -31,7 +31,7 @@ class TestArcadeArenas(unittest.TestCase):
             self.assertEqual([c['location'] for c in checks],[ac.completion_code(lid)]+[ac.pickup_code(lid,n) for n in range(1,21)])
             for c in checks:self.assertEqual(CTR_LOCATION_IDS[c['display_name']],c['location'])
         self.assertEqual(sum(i.name=='Purple CTR Token' for i in w.multiworld.itempool),0)
-        self.assertEqual(p['required_features'],['content_plan_v1','crystal_entries_v1','crystal_pickups_v1','arcade_crystals_v1','surface_items_v1'])
+        self.assertEqual(p['required_features'],['content_plan_v1','crystal_entries_v1','crystal_pickups_v1','arcade_crystals_v1','surface_items_v1','pad_requirements_v1'])
 
     def test_added_arena_timers(self):
         # Decision 6, 2026-10-29: Parking Lot 1:05, Lab Basement 0:50, The North Bowl 1:30 (960 ticks per second).

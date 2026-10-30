@@ -172,6 +172,20 @@ jobs:
           - {check_name: gem-cups-7-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random'}
           - {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
           - {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
+          # Pad placement and requirements (one generator row 3): the vanilla-shape
+          # plan at each unlock mode, pad_layout.placement and two_stage_density,
+          # accessibility full. .github/fuzz/content-plan-pads-meta.yaml holds the rest.
+          - {check_name: pads-vanilla-vanilla,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-vanilla-full'}
+          - {check_name: pads-vanilla-within,        check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle_within_kind-full'}
+          - {check_name: pads-vanilla-shuffle,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full'}
+          - {check_name: pads-within,                check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle_within_kind-full'}
+          - {check_name: pads-no-4-keys,             check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-random_without_4_keys-shuffle-full'}
+          - {check_name: pads-density-off,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-off'}
+          - {check_name: pads-density-light,         check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-light'}
+          - {check_name: pads-density-standard,      check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-standard'}
+          - {check_name: pads-density-deep,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-deep'}
+          - {check_name: pads-density-full,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full'}
+          - {check_name: pads-ut,                     check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -179,7 +193,7 @@ jobs:
           repository: dowlle/Archipelago-index
           path: index-repo
       - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
-        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || startsWith(matrix.check_meta, 'gem-cups-') || matrix.check_tracker == 'yes'
+        if: matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || startsWith(matrix.check_meta, 'gem-cups-') || startsWith(matrix.check_meta, 'pads-') || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -285,8 +299,13 @@ jobs:
             sed -e "s/__COUNT__/$cups/" -e "s/__TRACKS__/$cup_tracks/" ../world-src/.github/fuzz/content-plan-gem-cups-meta.yaml > ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [[ "$CHECK_META" == pads-* ]]; then
+            IFS=- read -r _ unlock placement density <<< "$CHECK_META"
+            sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log
-          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ] || [[ "$CHECK_META" == gem-cups-* ]]; then
+          if [ "$CHECK_META" = "content-plan" ] || [ "$CHECK_META" = "content-plan-cups" ] || [ "$CHECK_META" = "content-plan-bosses" ] || [ "$CHECK_META" = "content-plan-full" ] || [[ "$CHECK_META" == gem-cups-* ]] || [[ "$CHECK_META" == pads-* ]]; then
             # A refused option set is "ignored", not a failure. If the meta file
             # stopped matching the profile, every seed would be ignored and the
             # arm would pass without testing anything, so cap the ignored share.

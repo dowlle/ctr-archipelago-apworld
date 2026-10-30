@@ -89,10 +89,11 @@
           "boss_encounters_v1",
           "gem_cups_v1",
           "surface_items_v1",
-          "relic_tier_checks_v1"
+          "relic_tier_checks_v1",
+          "pad_requirements_v1"
         ]
       },
-      "maxItems": 20,
+      "maxItems": 21,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -116,6 +117,9 @@
     },
     "bosses": {
       "$ref": "#/$defs/Bosses"
+    },
+    "pad_requirements": {
+      "$ref": "#/$defs/PadRequirements"
     }
   },
   "required": [
@@ -1762,6 +1766,22 @@
         "cups"
       ],
       "additionalProperties": false
+    },
+    "PadRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "vanilla",
+            "randomized",
+            "random_without_4_keys"
+          ]
+        }
+      }
     }
   }
 }
