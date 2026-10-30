@@ -498,5 +498,5 @@ def check_record(plan, stage1, stage2, manual, rows, require):
                 "a stage 2 asks no more than its stage 1")
     if mode == "random_without_4_keys":
         require(not any(row["predicate"]["op"] == "count" and row["predicate"]["item"] == key
-                        and row["predicate"]["count"] >= 4 for row in {**stage1, **stage2}.values()),
+                        and row["predicate"]["count"] >= 4 for row in {**stage1, **stage2, **manual}.values()),
                 "random_without_4_keys asks for 4 Keys")

@@ -168,6 +168,14 @@ class TestRandomRequirements(unittest.TestCase):
             for table in (records(plan, "stage1:"), records(plan, "stage2:")):
                 self.assertFalse(any(p.get("item") == KEY and p["count"] >= 4 for p in table.values()))
 
+    def test_forged_four_keys_on_a_manual_rule_is_refused(self):
+        o = options(warppad_unlock_requirements="random_without_4_keys",
+                    warp_pad_rules={"Coco Park": dict(item="Key", count=3)})
+        plan = make_world(o, seed=1, stop_before="pre_fill").ctr_content_plan
+        next(r for r in plan["requirements"] if r["id"].startswith("manual:"))["predicate"]["count"] = 4
+        with self.assertRaisesRegex(OptionError, "4 Keys"):
+            content_plan.validate(plan)
+
     def test_forged_four_keys_is_refused(self):
         plan = make_world(options(warppad_unlock_requirements="random_without_4_keys"), seed=1).ctr_content_plan
         forged = copy.deepcopy(plan)
