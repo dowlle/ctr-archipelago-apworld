@@ -9,12 +9,9 @@ WHAT THE OPTIONS DO. Three Toggles, all off by default, any combination:
 
   * `boss_track_shuffle` (tier 1): the garage races on a drawn venue.
   * `boss_opponent_shuffle` (tier 2): the garage races a drawn racer. The
-    pool (`POOL`, built so custom characters can join later) is the 15
-    retail racers other than N. Oxide, plus N. Oxide with
-    `boss_oxide_in_pool` (decision 7 of 2026-10-28), narrowed by
-    `boss_character_allowlist` (empty = no narrowing) and then
-    `boss_character_blocklist`. With `boss_oxide_in_pool` N. Oxide's own
-    garage (both races) also races a drawn racer other than N. Oxide, and
+    pool (`POOL`, built so custom characters can join later) is
+    `boss_character_pool`, by default the 15 retail racers other than N. Oxide.
+    With N. Oxide listed (decision 7 of 2026-10-28) N. Oxide's own garage (both races) also races a drawn racer other than N. Oxide, and
     all five bosses differ. With track shuffle off the venue stays the
     garage's own track (design ruling 2026-10-13, answer 1). With both on,
     `boss_track_assignment: character_home_track` (default) races the drawn
@@ -26,12 +23,12 @@ WHAT THE OPTIONS DO. Three Toggles, all off by default, any combination:
     boss profile. `boss_attack_intensity` scales every segment's cooldown
     only, never the families or checkpoints. `boss_loss_easing` (default on)
     keeps the retail rule that each lost race lengthens the cooldowns.
-    `boss_powerup_blocklist` removes families.
+    `boss_weapon_pool` holds the families.
   * `purple_cup_boss_gauntlet` (needs the kit switch): each Purple Gem Cup
     leg arms garage i's racer with garage i's kit on that leg's track.
   * `oxide_attack_profile: all_compatible` (independent of the switches):
     N. Oxide's garage gets a composed 13-segment profile from every family,
-    the Super Engine included, minus `oxide_powerup_blocklist`.
+    the Super Engine included, as `oxide_weapon_pool` allows.
 
 Every garage keeps its physical identity: the `<Boss> Garage: Boss Race`
 check and code, the Key, the door requirement, the personal-win event, the
@@ -61,7 +58,7 @@ certification applies.
 
 THE DRAW lives in content_bosses.py: this module holds the tables, pools and
 kit helpers the plan draws from. Nothing here runs on a seed without
-`content_pool`. Encounters never repeat (decision 7): four distinct venues,
+a content plan. Encounters never repeat (decision 7): four distinct venues,
 opponents (five with N. Oxide's garage) and kits; the whole assignment is
 tested, so impossible filters fail generation.
 
@@ -117,8 +114,7 @@ POOL: Tuple[Tuple[str, str, int, str, str], ...] = tuple(
     for name, cid in ROSTER_CHARACTER_ID.items())
 #: Every pool racer by roster name, N. Oxide included.
 POOL_NAMES: Tuple[str, ...] = tuple(rec[0] for rec in POOL)
-#: Racers a garage may draw without `boss_oxide_in_pool`: the pool without
-#: N. Oxide.
+#: The default `boss_character_pool`: the pool without N. Oxide.
 OPPONENT_NAMES: Tuple[str, ...] = tuple(n for n in POOL_NAMES if n != "Nitros Oxide")
 #: {roster name -> wire key}. The four bosses' keys are the garage keys.
 OPPONENT_KEY: Dict[str, str] = {rec[0]: rec[1] for rec in POOL}
@@ -240,10 +236,9 @@ def kit_on(options) -> bool:
 
 
 def oxide_in_pool(options) -> bool:
-    """Effective `boss_oxide_in_pool`: only with opponent shuffle on
+    """N. Oxide listed in `boss_character_pool`: only with opponent shuffle on
     (decision 7 of 2026-10-28)."""
-    return opponent_on(options) and bool(getattr(options, "boss_oxide_in_pool", None)
-                                         and options.boss_oxide_in_pool.value)
+    return opponent_on(options) and OXIDE_NAME in options.boss_character_pool.value
 
 
 def oxide_profile_all(options) -> bool:
@@ -280,43 +275,10 @@ def family_of(weapon: int) -> Optional[str]:
 
 # --------------------------------------------------------------------- options
 
-def validate_options(world) -> None:
-    """Subordinate controls without their switch are ignored with a notice,
-    not refused: the 2026-10-15 tier 1 ruling (the DeathLink Send pattern),
-    applied the same way to the new controls. Impossible draws with a switch
-    on still stop generation."""
-    o = world.options
-    from .notices import note_ignored
-    if not opponent_on(o):
-        for name, label in (("boss_character_allowlist", "Boss Character Allowlist"),
-                            ("boss_character_blocklist", "Boss Character Blocklist")):
-            if getattr(o, name).value:
-                note_ignored(world, f"{label} (Boss Opponent Shuffle off)")
-        if o.boss_oxide_in_pool.value:
-            note_ignored(world, "Boss Pool Includes N. Oxide (Boss Opponent Shuffle off)")
-    if int(o.boss_track_assignment.value) != 0 and not (bts.enabled(o) and opponent_on(o)):
-        note_ignored(world, "Boss Track Assignment (needs Boss Track Shuffle and Boss Opponent Shuffle)")
-    if not kit_on(o):
-        if int(o.boss_attack_assignment.value) != 0:
-            note_ignored(world, "Boss Attack Assignment (Boss Kit Shuffle off)")
-        if int(o.boss_attack_intensity.value) != 1:
-            note_ignored(world, "Boss Attack Intensity (Boss Kit Shuffle off)")
-        if not o.boss_loss_easing.value:
-            note_ignored(world, "Boss Loss Easing (Boss Kit Shuffle off)")
-        if o.boss_powerup_blocklist.value:
-            note_ignored(world, "Boss Powerup Blocklist (Boss Kit Shuffle off)")
-    if not oxide_profile_all(o) and o.oxide_powerup_blocklist.value:
-        note_ignored(world, "N. Oxide Powerup Blocklist (N. Oxide Attack Profile retail)")
-
-
 def opponent_pool(options) -> List[str]:
-    """Pool names, `all_compatible` narrowed by the allowlist, then the
-    blocklist. N. Oxide only with `boss_oxide_in_pool` (decision 7)."""
-    allow = set(options.boss_character_allowlist.value)
-    block = set(options.boss_character_blocklist.value)
-    with_oxide = oxide_in_pool(options)
-    return [n for n in POOL_NAMES
-            if (with_oxide or n != OXIDE_NAME) and (not allow or n in allow) and n not in block]
+    """`boss_character_pool` in pool order. N. Oxide only when it lists him
+    (decision 7)."""
+    return [n for n in POOL_NAMES if n in options.boss_character_pool.value]
 
 
 def final_pool(options) -> List[str]:
@@ -326,20 +288,18 @@ def final_pool(options) -> List[str]:
 
 
 def allowed_families(options) -> List[str]:
-    """Garage and gauntlet families after `boss_powerup_blocklist`."""
-    block = set(options.boss_powerup_blocklist.value)
-    return [f for f in GARAGE_FAMILIES if f not in block]
+    """Garage and gauntlet families of `boss_weapon_pool`."""
+    return [f for f in GARAGE_FAMILIES if f in options.boss_weapon_pool.value]
 
 
 def oxide_families(options) -> List[str]:
-    """N. Oxide's `all_compatible` families after `oxide_powerup_blocklist`
-    (Wayfinder D2a: independent of `boss_powerup_blocklist`)."""
-    block = set(options.oxide_powerup_blocklist.value)
-    return [f for f in FAMILIES if f not in block]
+    """N. Oxide's `all_compatible` families of `oxide_weapon_pool` (Wayfinder
+    D2a: independent of `boss_weapon_pool`)."""
+    return [f for f in FAMILIES if f in options.oxide_weapon_pool.value]
 
 
 def allowed_signatures(options) -> List[str]:
-    """Retail profiles whose weapons all survive the blocklist."""
+    """Retail profiles whose weapons are all in `boss_weapon_pool`."""
     fams = set(allowed_families(options))
     return [key for key, rows in SIGNATURES.items()
             if all(family_of(r[0]) in fams for r in rows if r[0] != 0x0F)]
@@ -432,12 +392,11 @@ def _row_problem(seg, garage_row: bool) -> Optional[str]:
 def _clear_subordinates(o) -> None:
     # The filters shaped the draw only; the pinned record is the answer.
     # Reset them so the tracker's own YAML cannot add notices or errors.
-    o.boss_character_allowlist.value = set()
-    o.boss_character_blocklist.value = set()
+    o.boss_character_pool.value = set(OPPONENT_NAMES)
     o.boss_track_assignment.value = 0
     o.boss_attack_assignment.value = 0
     o.boss_attack_intensity.value = 1
     o.boss_loss_easing.value = 1
-    o.boss_powerup_blocklist.value = set()
+    o.boss_weapon_pool.value = set(GARAGE_FAMILIES)
 
 

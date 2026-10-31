@@ -11,6 +11,7 @@ from test.general import gen_steps
 from .. import ctrAPWorld, content_plan
 from . import CTRTestBase
 from .test_content_item_pool import small_pool
+from .plan_options import plan_options
 
 
 def profile_pool():
@@ -42,7 +43,7 @@ def make_world(options, seed=420, passthrough=None, stop_before=None):
     mw.seed_name = str(seed)
     args = Namespace()
     for name, cls in ctrAPWorld.options_dataclass.type_hints.items():
-        setattr(args, name, {1: cls.from_any(copy.deepcopy(options.get(name, cls.default)))})
+        setattr(args, name, {1: cls.from_any(copy.deepcopy(plan_options(options).get(name, cls.default)))})
     mw.set_options(args)
     if passthrough:
         mw.re_gen_passthrough = {ctrAPWorld.game: passthrough}

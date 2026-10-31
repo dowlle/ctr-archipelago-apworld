@@ -20,6 +20,7 @@ from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld, content_item_pool
 from .test_content_plan import make_world, profile_options
+from .plan_options import plan_options
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules", "connect_entrances")
 TROPHY = ["Crash Cove: Trophy Race", "Roo's Tubes: Trophy Race", "Mystery Caves: Trophy Race",
@@ -41,7 +42,7 @@ def room(players=1, plando=None, links=None, seed=7, options=None, stop=None):
     opts = options or profile_options()
     args = Namespace()
     for name, cls in ctrAPWorld.options_dataclass.type_hints.items():
-        setattr(args, name, {p: cls.from_any(copy.deepcopy(opts.get(name, cls.default))) for p in ids})
+        setattr(args, name, {p: cls.from_any(copy.deepcopy(plan_options(opts).get(name, cls.default))) for p in ids})
     args.plando_items = {p: PlandoItems.from_any(copy.deepcopy((plando or {}).get(p, []))) for p in ids}
     args.item_links = {p: ItemLinks.from_any(copy.deepcopy((links or {}).get(p, []))) for p in ids}
     mw.set_options(args)

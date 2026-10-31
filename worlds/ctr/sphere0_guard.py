@@ -362,6 +362,14 @@ def _open_empty(world, state):
             and loc.can_reach(state)]
 
 
+def _opened(world, probe):
+    """Open empty checks of `probe`, with what placed items it reaches hand over:
+    a Key fixed on its boss opens the next hub."""
+    probe.sweep_for_advancements(locations=[loc for loc in world.multiworld.get_locations(world.player)
+                                            if loc.item is not None])
+    return len(_open_empty(world, probe))
+
+
 def _next_openers(world, state, start, pool):
     """Names of the pool items to place next: one item that opens the most
     further checks, else the fewest copies of one item, else two different
@@ -371,7 +379,7 @@ def _next_openers(world, state, start, pool):
     for name, copies in pool.items():
         probe = state.copy()
         probe.collect(copies[0], True)
-        opened = len(_open_empty(world, probe))
+        opened = _opened(world, probe)
         if opened > start:
             single[name] = opened
     if single:
@@ -382,7 +390,7 @@ def _next_openers(world, state, start, pool):
             probe = state.copy()
             for item in copies[:count]:
                 probe.collect(item, True)
-            opened = len(_open_empty(world, probe))
+            opened = _opened(world, probe)
             if opened > start:
                 groups[(name,) * count] = opened
                 break
@@ -392,12 +400,40 @@ def _next_openers(world, state, start, pool):
             probe = state.copy()
             probe.collect(pool[first][0], True)
             probe.collect(pool[second][0], True)
-            opened = len(_open_empty(world, probe))
+            opened = _opened(world, probe)
             if opened > start:
                 groups[(first, second)] = opened
     if not groups:
         return []
     return list(max(sorted(groups), key=lambda g: (groups[g] - start) / len(g)))
+
+
+def _seat_first_key(world, state) -> None:
+    """With vanilla requirements a fixed first Key waits behind its garage's
+    Trophies, and only a few checks stand in front of it. Left to the fill, other
+    items take those checks and the last Trophies have nowhere to go. So the path
+    generate found (content_fixed.first_key_path) is seated here, on the hub's
+    Wumpa Shop when the pads run out. Takes nothing that no longer fits."""
+    from BaseClasses import LocationProgressType
+    mw, player = world.multiworld, world.player
+    marked = mw.local_early_items.setdefault(player, {})
+    for step in getattr(world, "ctr_first_key_path", ()):
+        name = step if step == "Trophy" else starting_boost_item(world)
+        item = next((item for item in mw.itempool if item.player == player and item.name == name), None)
+        spots = _open_empty(world, state) or [
+            loc for loc in mw.get_unfilled_locations(player)
+            if loc.address is not None and loc.progress_type != LocationProgressType.EXCLUDED
+            and loc.can_reach(state) and loc.can_fill(state, item, True)]
+        if item is None or not spots:
+            return
+        location = world.random.choice(sorted(spots, key=lambda loc: loc.name))
+        del mw.itempool[next(i for i, pooled in enumerate(mw.itempool) if pooled is item)]
+        location.place_locked_item(item)
+        if marked.get(name):
+            marked[name] -= 1
+            if not marked[name]:
+                del marked[name]
+        state.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
 
 
 def bootstrap_start(world) -> None:
@@ -408,6 +444,7 @@ def bootstrap_start(world) -> None:
     mw, player = world.multiworld, world.player
     target = bootstrap_target(world)
     state = _base_state(world)
+    _seat_first_key(world, state)
     # The start as AP's early pass sees it: only event items (no address) are
     # swept, placed items never are.
     base = CollectionState(mw)

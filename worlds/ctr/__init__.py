@@ -542,18 +542,16 @@ class ctrAPWorld(World):
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
-        if passthrough and "content_plan" in passthrough:
-            from . import content_plan
+        from . import content_plan
+        if passthrough:
+            if "content_plan" not in passthrough:
+                raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
-            return
-        if self.options.content_pool.value:
-            from . import content_plan
+        else:
+            # Every seed is a plan (one generator row 7). The original generator
+            # below stays unreachable until row 12 deletes it.
             content_plan.generate(self)
-            return
-        if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
-            raise OptionError("include_arcade_arenas requires an explicit content_pool with Crystal entries; no silent legacy migration.")
-        if self.options.item_pool.value or self.options.pad_layout.value:
-            raise OptionError("CTR item_pool and pad_layout require an explicit content_pool; no silent legacy migration.")
+        return
         # Cortex Vortex pad track (2026-09-13 contract): draw the destination
         # that goes without a pad FIRST, because the letter selection below and
         # the relic-tier draw both leave its checks out. A Universal Tracker

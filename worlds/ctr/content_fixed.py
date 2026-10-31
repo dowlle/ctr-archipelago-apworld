@@ -28,7 +28,10 @@ ordinary track.
 
 With vanilla requirements a fixed first Key sits behind 4 Trophies, and the later
 races of every pad behind that Key, so few checks are open before it. The
-placement and the mode order draw again until FIRST_KEY_CHECKS are.
+placement and the mode order draw again until FIRST_KEY_CHECKS are, and until
+`first_key_path` finds room for what opens the Key. The best draw stands: no seed
+is refused for this. The start bootstrap seats that path before the fill, which
+would otherwise fill those few checks with other items.
 
 Random garages draw their kind before the fill, so a fixed Key or Gem can sit
 behind a garage that needs it: `draw_garages` draws again, and what stays stuck
@@ -38,7 +41,7 @@ stand-ins, so a pad only asks for what the simulated player holds there.
 """
 from Options import OptionError
 
-from . import content_bosses, content_cups, content_item_pool, content_requirements
+from . import content_bosses, content_cups, content_item_pool, content_requirements, sphere0_guard
 
 FEATURE = "fixed_items_v1"
 KEYS = ("keys", "gems", "oxide_1_filler")
@@ -55,6 +58,10 @@ GARAGE_REDRAWS = content_requirements.PLACEMENT_REDRAWS
 #: fewer checks than this open before it (measured on row 4's CI failures), so the
 #: placement and the mode order draw again below it.
 FIRST_KEY_CHECKS = 9
+#: The first fixed Key sits behind this many Trophies with vanilla requirements.
+FIRST_KEY_TROPHIES = content_bosses.VANILLA_TROPHIES[0]
+#: Steps of first_key_path.
+TROPHY, BOOST = "Trophy", "boost"
 
 
 def error(message):
@@ -72,6 +79,37 @@ def settings(options, bosses, gem_cups):
     if bosses is not None and bosses["oxide_goal"] == content_bosses.GOAL_FINAL and int(options.oxide_1_optional.value) == 2:
         out["oxide_1_filler"] = True
     return out
+
+
+def first_key_path(pads, shop=0, boost_ladder=False):
+    """The items to seat, in order, to reach a first Key fixed behind
+    FIRST_KEY_TROPHIES Trophies: a list of `TROPHY` and `BOOST`, or None when there
+    is no room. `pads` lists the pads open before the Key, as (Trophies the pad
+    asks, [boost ranks of the checks its first race opens], does it bank fruit).
+    Every Trophy and boost rank takes one of the open checks, so a step only counts
+    while a check is free, and the start needs its own minimum of open checks.
+    `shop` slots of the first hub join once a pad banks fruit. With `boost_ladder`
+    the first rank has to fit too, or the first Key opens races nobody can win.
+    Arenas, cups and boost terms on the near pads can leave too few."""
+    if sum(not rank for asked, ranks, _track in pads if not asked for rank in ranks) < sphere0_guard.MIN_STARTING_CHECKS:
+        return None
+    top = max([rank for _trophies, ranks, _track in pads for rank in ranks] + [int(boost_ladder)])
+    paths = {(0, 0): []}
+    todo = [(0, 0)]
+    while todo:
+        trophies, boost = todo.pop(0)
+        if trophies >= FIRST_KEY_TROPHIES and boost >= int(boost_ladder):
+            return paths[(trophies, boost)]
+        open_ranks = [(rank, track) for asked, ranks, track in pads if asked <= trophies for rank in ranks
+                      if rank <= boost]
+        free = len(open_ranks) + (shop if any(track for _rank, track in open_ranks) else 0) - trophies - boost
+        if free <= 0:
+            continue
+        for step, item in (((trophies + 1, boost), TROPHY), ((trophies, boost + 1), BOOST)):
+            if step not in paths and step[1] <= top and step[0] <= FIRST_KEY_TROPHIES:
+                paths[step] = paths[(trophies, boost)] + [item]
+                todo.append(step)
+    return None
 
 
 def check_settings(plan):

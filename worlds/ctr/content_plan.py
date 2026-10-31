@@ -87,10 +87,10 @@ LETTER_FEATURE = "lettersanity_v1"
 #: Rung keys in podium.SLOT_ORDER and their frozen location suffixes.
 RUNG_SUFFIX = {key: suffix for key, _offset, suffix in named_tracks.LOCATION_OFFSETS
                if key in podium.SLOT_ORDER}
-#: The rung sets a seed can create: podium.created_rung_keys over its four
-#: sub-toggles, without the empty set (podium checks off).
-RUNG_SETS = tuple(sorted({tuple(podium.created_rung_keys(*bits))
-                          for bits in itertools.product((False, True), repeat=4)} - {()}))
+#: The rung sets a seed can create: any nonempty subset of podium.SLOT_ORDER, in
+#: that order (`podium_rungs`, no parent switches).
+RUNG_SETS = tuple(sorted(rungs for size in range(1, len(podium.SLOT_ORDER) + 1)
+                         for rungs in itertools.combinations(podium.SLOT_ORDER, size)))
 LETTERS = ("C", "T", "R")
 LETTER_KEYS = ("letter_c", "letter_t", "letter_r")
 WUMPA_SUFFIX = "Reach 10 Wumpa"
@@ -112,6 +112,8 @@ CORTEX_ORIGIN = "cortex_vortex"
 CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 CORTEX_LAPS = 3
+#: `cortex_vortex_track: own_pad`.
+CORTEX_OWN_PAD = 2
 #: Colour index of the Purple Gem Cup, the fifth Gem Cup.
 PURPLE_GEM_CUP = 4
 
@@ -266,7 +268,7 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw, where="tracks.custom"):
+def resolve_packages(raw, where="custom_tracks"):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
         return custom_packages.admit_all(raw, where)
@@ -420,8 +422,7 @@ def family_settings(options):
     """The plan's `track_checks` record from the seed's options; {} when the
     podium rungs, Wumpa checks and Lettersanity are all off (#133 PR 3b).
 
-    `podium_rungs` lists the created rung keys in podium.SLOT_ORDER (the
-    sub-toggles decide them, as on the legacy path); `wumpa` is `global` or
+    `podium_rungs` lists the created rung keys in podium.SLOT_ORDER; `wumpa` is `global` or
     `per_track`; `lettersanity` is the mode 1 to 3, with `letters_per_track`
     only for the two location-bearing modes. `relic_perfect` is true when
     Relic Race Perfect checks are on (#133 PR 3c)."""
@@ -983,96 +984,70 @@ def mode_gates(modes, first_requirement, stages, physical):
     return gates
 
 
-def crystal_selection(world, raw):
-    """(eligible arenas, count): a range draws its count here, as before cups."""
-    eligible, (low, high) = crystal_bounds(world, raw)
-    return eligible, (low if low == high else world.random.randint(low, high))
+def crystal_settings(options):
+    """(eligible arena LevelIDs, count) from `crystal_arenas` and
+    `crystal_challenge_count`."""
+    eligible = [lid for lid, name in arena_content.ARENAS.items() if name in options.crystal_arenas.value]
+    count = int(options.crystal_challenge_count.value)
+    if count > len(eligible):
+        error(f"crystal_challenge_count is {count}, but crystal_arenas lists {len(eligible)} arenas. List more "
+              "arenas or lower the count.")
+    return eligible, count
 
 
-def crystal_bounds(world, raw):
-    """(eligible arenas, (low, high)) without a draw. With cups (#133 PR 5a)
-    the count is drawn together with the cup count (content_cups.feasible_pairs)."""
-    o=world.options
-    pool=raw.get('pool','all')
-    allowed=list(arena_content.ARENAS)
-    if pool!='all' and (not isinstance(pool,list) or any(type(i) is not int or i not in allowed for i in pool) or len(set(pool))!=len(pool)):
-        error('crystals.pool must be all or distinct arena LevelIDs 18 through 24.')
-    eligible=(list(arena_content.ARENAS) if pool=='all' else list(pool))
-    if not o.include_battle_arenas.value:
-        return [],(0,0)
-    if not o.include_arcade_arenas.value:
-        if pool!='all' and any(i in arena_content.ARCADE for i in eligible):
-            error('an arcade arena in crystals.pool requires include_arcade_arenas.')
-        eligible=[i for i in eligible if i not in arena_content.ARCADE]
-    count=raw.get('count',0)
-    if isinstance(count,dict) and set(count)=={'min','max'}:
-        low,high=count['min'],count['max']
-        if type(low) is not int or type(high) is not int or not 0<=low<=high<=len(eligible):
-            error('crystals.count range exceeds the eligible arena pool.')
-        return eligible,(low,high)
-    if type(count) is not int or not 0<=count<=len(eligible):
-        error('crystals.count must fit the eligible arena pool.')
-    return eligible,(count,count)
+def track_modes(options):
+    """(default modes, {track name: modes}) from `track_modes`, shape-checked."""
+    raw = dict(options.track_modes.value)
+    for name, modes in raw.items():
+        if (not isinstance(modes, list) or not modes or any(m not in MODES for m in modes)
+                or len(set(modes)) != len(modes)):
+            error(f"track_modes {name!r} must be a nonempty list of distinct races from trophy, ctr and relic.")
+        if "ctr" in modes and "trophy" not in modes:
+            error(f"track_modes {name!r} lists ctr without trophy. A CTR Challenge needs the Trophy Race in the "
+                  "same list.")
+    return raw.pop("default", list(MODES)), raw
 
 
-def track_modes(raw_tracks):
-    """(global modes, overrides) from content_pool.tracks, shape-checked.
+def retail_selection(options):
+    """The LevelIDs of `retail_tracks`, in LevelID order."""
+    chosen = options.retail_tracks.value
+    return sorted(i for i, name in RETAIL.items() if "all" in chosen or name in chosen)
 
-    `modes` is a nonempty list of distinct modes (default all three). An
-    override maps a logical track id to a nonempty narrower list; it never
-    adds a mode the global list leaves out."""
-    modes = raw_tracks.get("modes", list(MODES))
-    if (not isinstance(modes, list) or not modes or any(m not in MODES for m in modes)
-            or len(set(modes)) != len(modes)):
-        error("tracks.modes must be a nonempty list of distinct modes from trophy, ctr and relic.")
-    overrides = raw_tracks.get("overrides", {})
-    if not isinstance(overrides, dict):
-        error("tracks.overrides must map logical track ids to mode lists.")
-    for track_id, narrowed in overrides.items():
-        if (not isinstance(narrowed, list) or not narrowed or any(m not in MODES for m in narrowed)
-                or len(set(narrowed)) != len(narrowed)):
-            error(f"tracks.overrides[{track_id!r}] must be a nonempty list of distinct modes.")
-        if set(narrowed) - set(modes):
-            error(f"tracks.overrides[{track_id!r}] adds {', '.join(m for m in narrowed if m not in modes)}, "
-                  "which tracks.modes leaves out; an override can only narrow the selected modes.")
-    return modes, overrides
+
+def track_names(track, package):
+    """The names a YAML may call a track by: its title, and a custom track's key."""
+    return {track["display_name"]} | ({package["content_id"]} if package else set())
+
+
+def required_ids(options, candidates, arenas, packages):
+    """The logical ids of `required_entries`, then Cortex Vortex with `own_pad`."""
+    names = {}
+    for item in candidates + arenas:
+        for name in track_names(item, packages.get(item.get("package_id"))):
+            names[name] = item["id"]
+    wanted = list(options.required_entries.value)
+    if destinations.CORTEX_VORTEX in wanted:
+        error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
+    if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
+            or len(wanted) > content_cups.PADS):
+        error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads.")
+    out = [names[name] for name in wanted]
+    if int(options.cortex_vortex_track.value) == CORTEX_OWN_PAD:
+        out.append(CORTEX_TRACK_ID)
+    return out
 
 
 def generate(world):
     o = world.options
-    raw = closed(o.content_pool.value, ("preset", "tracks", "cups", "crystals", "bosses", "required_entries"), "content_pool")
-    if raw.get("preset", "mixed") != "mixed":
-        error("the experimental standalone profile currently requires preset: mixed.")
-    tracks = closed(raw.get("tracks", {}), ("retail", "custom", "cortex_vortex", "modes", "overrides"), "tracks")
-    selected_modes, overrides = track_modes(tracks)
-    with_cortex = tracks.get("cortex_vortex", False)
-    if type(with_cortex) is not bool:
-        error("tracks.cortex_vortex must be true or false.")
-    # Cups (#133 PR 5): a count or range and the composition. A plan without
-    # cups draws its crystal count exactly as before.
-    cup_spec = content_cups.settings(raw.get("cups", {}))
-    crystals = closed(raw.get("crystals", {}), ("pool", "count"), "crystals")
-    if cup_spec["bounds"][1] == 0:
-        arena_pool, arena_count = crystal_selection(world, crystals)
-    else:
-        arena_pool, crystal_range = crystal_bounds(world, crystals)
+    selected_modes, overrides = track_modes(o)
+    with_cortex = bool(o.cortex_vortex_track.value)
+    cup_spec = content_cups.settings(o)
+    arena_pool, arena_count = crystal_settings(o)
+    crystal_range = (arena_count, arena_count)
     # Boss garages (#133 PR 6): the encounter settings, or None with bosses off.
-    boss_record = content_bosses.settings(world, closed(raw.get("bosses", {}), ("enabled", "requirement_level", "cups"), "bosses"))
-    layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
-    stages = layout.get("stages", "two")
-    mode_order = layout.get("mode_order", "fixed")
-    placement = layout.get("placement", "shuffle")
-    if placement not in content_requirements.PLACEMENTS:
-        error("pad_layout.placement must be vanilla, shuffle_within_kind or shuffle.")
-    if stages not in ("single", "two"):
-        error("pad_layout.stages must be single or two.")
-    if mode_order not in ("fixed", "per_seed", "per_pad"):
-        error("pad_layout.mode_order must be fixed, per_seed or per_pad.")
-    if layout.get("merge_trophy_ctr", False) is not False:
-        error("pad_layout.merge_trophy_ctr: the merged Trophy/CTR race is not built yet; it comes in a "
-              "separate change after the track modes. Set merge_trophy_ctr: false. No content was changed.")
-    if o.custom_tracks.value or o.cortex_vortex_track.value:
-        error("legacy custom_tracks/cortex_vortex_track cannot be mixed with content_pool.")
+    boss_record = content_bosses.settings(world)
+    mode_order = o.race_mode_order.current_key
+    placement = o.pad_placement.current_key
     # An explicit death_link_send list rides the envelope (#133 PR 4a). No
     # one-way DeathLink (ruling 2026-09-30): the normal seed's resolution, no draw.
     from . import forced_options
@@ -1080,19 +1055,8 @@ def generate(world):
     # Character packs (#133 PR 4b): the normal seed's refusal and notes for
     # the character options. They take no draw.
     forced_options.raise_if_starting_as_removed_oxide(world)
-    for note in (forced_options.warn_editable_stats_overridden_by_progressive,
-                 forced_options.warn_penta_stats_without_vanilla_stats,
-                 forced_options.warn_racer_locked_pads_boolean_normalized,
-                 forced_options.warn_racer_locks_without_character_unlocks,
-                 forced_options.warn_remove_playable_oxide_without_character_unlocks):
-        note(world)
-    retail = tracks.get("retail", "all")
-    if retail == "all":
-        retail = sorted(RETAIL)
-    if (not isinstance(retail, list) or any(type(i) is not int or i not in RETAIL for i in retail)
-            or len(set(retail)) != len(retail)):
-        error("tracks.retail must be all or a list of distinct retail engine track IDs 0..17.")
-    packages = resolve_packages(tracks.get("custom", []))
+    forced_options.warn_racer_locked_pads_boolean_normalized(world)
+    packages = resolve_packages(list(o.custom_tracks.value))
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
@@ -1105,7 +1069,7 @@ def generate(world):
     # recompute them from the plan alone.
     # (track record without its modes, package or None, named-block fields).
     pool = [(dict(id=f"retail:{i}", origin="retail", retail_id=i, display_name=RETAIL[i], laps=RETAIL_LAPS),
-             None, {}) for i in sorted(retail)]
+             None, {}) for i in retail_selection(o)]
     # Cortex Vortex is a candidate only when selected, so a plan without it
     # draws exactly as before (#133 PR 3c).
     if with_cortex:
@@ -1117,61 +1081,47 @@ def generate(world):
                           display_name=package["display_name"], laps=package["laps"]),
                      package, dict(named_block=block.block_index, room_title=block.ap_name) if block else {}))
     package_by_id = {p["id"]: p for p in packages}
-    unknown = sorted(set(overrides) - {track["id"] for track, _package, _addressing in pool})
+    # A name of the 18 original tracks that this seed leaves out has no effect.
+    known = set(RETAIL.values()) | {name for track, package, _addressing in pool for name in track_names(track, package)}
+    unknown = sorted(set(overrides) - known)
     if unknown:
-        error(f"tracks.overrides names {', '.join(unknown)}, which is not a selected retail or custom track.")
+        error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        wanted = overrides.get(track["id"], selected_modes)
-        supported = supported_modes(track["origin"], package)
-        if track["id"] in overrides and set(wanted) - set(supported):
-            error(f"tracks.overrides[{track['id']!r}] asks for "
-                  f"{', '.join(m for m in wanted if m not in supported)}, which this track cannot run "
-                  "(its package capabilities do not allow it). No content was changed.")
-        modes = [m for m in MODES if m in wanted and m in supported]
+        wanted = next((overrides[name] for name in track_names(track, package) if name in overrides), selected_modes)
+        modes = [m for m in MODES if m in wanted and m in supported_modes(track["origin"], package)]
         if not modes:
             if package is not None:
-                error(f"custom track {package['id']} can run none of the selected modes "
-                      f"({', '.join(selected_modes)}): Trophy needs arcade, CTR needs arcade and ctr_tokens, "
-                      "Relic needs relic and time_trial. Remove it from tracks.custom or select a mode it "
-                      "supports. No content was changed.")
+                error(f"custom track {package['id']} can run none of the races track_modes gives it "
+                      f"({', '.join(wanted)}): Trophy needs arcade, CTR needs arcade and ctr_tokens, Relic needs "
+                      "relic and time_trial. Remove it from custom_tracks or give it a race it supports.")
             continue
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
         candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
-    required = raw.get("required_entries", [])
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
-    ids = {t["id"] for t in candidates+arena_candidates}
-    if (not isinstance(required, list) or any(type(i) is not str or i not in ids for i in required)
-            or len(set(required)) != len(required) or len(required) > 27):
-        error("required_entries must be distinct eligible logical track IDs, fitting the 27 normal pads.")
+    required = required_ids(o, candidates, arena_candidates, package_by_id)
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
     cup_count = 0
     if cup_spec["bounds"][1]:
-        # One uniform draw among the feasible (cups, crystals) pairs (#133 PR
-        # 5), never one count drawn first and the other trimmed.
+        # Whether the cups fit, and their legs (#133 PR 5).
         legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
         fixed_legs = content_cups.fixed_legs(cup_spec, candidates)
         pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
                                             len(required) - len(chosen_arenas), legs_other, legs_custom, fixed_legs)
         if not pairs:
-            repeats = cup_spec["repeats"]
-            error(f"no cup and crystal counts fit: cups.count {cup_spec['bounds'][0]} to {cup_spec['bounds'][1]}, "
-                  f"crystals.count {crystal_range[0]} to {crystal_range[1]} of {len(arena_pool)} eligible arenas, "
-                  f"{len(required)} required entries, {len(legs_other)} retail and {len(legs_custom)} custom or "
-                  f"Cortex Vortex leg tracks, custom_legs {cup_spec['custom_legs'][0]} to "
-                  f"{cup_spec['custom_legs'][1]} per cup (repeats within a cup "
-                  f"{'on' if repeats['within_cup'] else 'off'}, across cups "
-                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads"
-                  + (f", with cups.tracks off and tracks.retail leaving {len(fixed_legs)} of the five Gem Cups "
+            error(f"{cup_spec['bounds'][0]} cups do not fit: crystal_challenge_count {arena_count}, "
+                  f"{len(required)} required entries, {len(legs_other)} original and {len(legs_custom)} custom or "
+                  f"Cortex Vortex leg tracks, cup_custom_legs {cup_spec['custom_legs'][1]}, and 27 normal pads"
+                  + (f", with cup_tracks off and retail_tracks leaving {len(fixed_legs)} of the five Gem Cups "
                      "their original tracks" if fixed_legs is not None else "")
-                  + ". No content count was changed.")
-        cup_count, arena_count = world.random.choice(pairs)
+                  + ".")
+        cup_count = cup_spec["bounds"][0]
     if len(chosen_arenas)>arena_count:
-        error('required arena entries exceed crystals.count; no content count was changed.')
+        error('required_entries names more arenas than crystal_challenge_count.')
     chosen_arenas+=world.random.sample([a for a in arena_candidates if a['id'] not in required],arena_count-len(chosen_arenas))
     chosen = [t for t in candidates if t["id"] in required]
     if len(chosen)+arena_count+cup_count>27:
-        error('required entries and selected arenas exceed the 27 normal pads.')
+        error('required_entries and crystal_challenge_count exceed the 27 normal pads.')
     optional = [t for t in candidates if t["id"] not in required]
     chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen) - arena_count - cup_count))
     chosen += chosen_arenas
@@ -1251,10 +1201,37 @@ def generate(world):
         return (unlock_mode == 0 and "gems" in fixed and physical == content_fixed.GEM_PAD
                 and item.get("gem_cup") is not None)
 
-    chosen, registry = content_requirements.seat_content(world, chosen, pad_registry(), placement, manual,
+    def seat_trophies(physical):
+        # Trophies a near pad asks: 0 for a pad that opens with its hub.
+        rule = content_requirements.vanilla_rule(physical)
+        return rule[1] if rule and rule[0] == "Trophy" else 0
+
+    def start_ranks(item):
+        # Boost ranks of the checks start_checks counts, for the first Key.
+        if not is_track(item):
+            return [] if start_checks(item) == 0 else [0]
+        package = package_by_id.get(item.get("package_id"))
+        return [content_capability.check_boost(item, kind, award, capability, package, None)
+                for kind, award in [("trophy", "win")] + [("podium", key) for key in settings.get("podium_rungs", ())]]
+
+    def banks_fruit(item):
+        return item.get("origin") == "retail" and item["retail_id"] <= content_wumpa.INCOME_RETAIL_MAX
+
+    def key_room(seated):
+        by_physical = {seat[0]: seat for seat in all_seats}
+        return content_fixed.first_key_path([(seat_trophies(physical), start_ranks(item), banks_fruit(item))
+                                             for physical, item in seated.items() if seat_reach(by_physical[physical])],
+                                            first_hub_slots, boost_ladder) is not None
+
+    all_seats = pad_registry()
+    # Wumpa Shop slots of N. Sanity Beach that can hold a Trophy.
+    first_hub_slots = 0 if int(o.wumpa_shop_progression.value) else int(o.wumpa_shop_slots.value)
+    boost_ladder = bool(capability.get("boost_mode"))
+    chosen, registry = content_requirements.seat_content(world, chosen, all_seats, placement, manual,
                                                          len(settings.get("podium_rungs", ())),
                                                          seat_reach if unlock_mode == 0 else None, start_checks,
-                                                         needs_own_gem, first_key_floor)
+                                                         needs_own_gem, first_key_floor,
+                                                         key_room if first_key_floor else None)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
@@ -1323,21 +1300,21 @@ def generate(world):
                  | {leg["id"] for cup in chosen if "cup_index" in cup for leg in cup["legs"]})
         boss_custom = [(content_bosses.venue_key(t),
                         content_bosses.custom_venue_points(t, package_by_id.get(t.get("package_id"))))
-                       for t in candidates if t.get("origin") == "cortex_vortex"
-                       or (t.get("origin") == "custom" and t["id"] in raced)]
+                       for t in candidates if (t.get("origin") == "cortex_vortex"
+                                               or (t.get("origin") == "custom" and t["id"] in raced))
+                       and content_bosses.in_track_pool(o, *track_names(t, package_by_id.get(t.get("package_id"))))]
         # Boss opponent shuffle (job J11): with character_home_track the
         # racers are drawn first and race their home tracks; otherwise the
         # venue draw is unchanged and the racers are drawn after it. Nothing
         # is drawn with the switches off.
-        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs. Home
-        # pairing needs them first, because a cup garage races any racer.
+        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs, come
+        # first: a cup garage races any racer and needs no track of its own.
+        boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         if content_bosses.home_paired(boss_record):
-            boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
             boss_venues, boss_racers, boss_final_racer = content_bosses.draw_home_venues(world, boss_record, boss_cups)
         else:
-            boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom)
+            boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom, boss_cups)
             boss_racers, boss_final_racer = content_bosses.draw_racers(world, boss_record)
-            boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
                       else content_bosses.OXIDE_STATION)
         # Boss kit shuffle and N. Oxide's profile (job J11), on the plan's venues.
@@ -1481,22 +1458,30 @@ def generate(world):
         out.update(first_modes)
         return out
 
-    def first_key_checks(orders):
-        # Checks open before a fixed first Key: the first race of the pads
-        # seat_content calls near the start.
-        total = 0
+    def first_key_pads(orders):
+        # The pads seat_content calls near the start, as first_key_fits reads them.
+        out = []
         for index, item in enumerate(chosen):
             if not seat_reach(registry[index]):
                 continue
             if not is_track(item):
-                total += start_checks(item)
+                out.append((seat_trophies(registry[index][0]), start_ranks(item), False))
                 continue
             modes = orders.get(index, item["modes"])
-            total += sum(any(r["mode"] == modes[0] for r in c["routes"]) and not c.get("boost")
-                         for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings, letters.get(index, ()),
-                                               package_by_id.get(item.get("package_id")), capability, item_boxes,
-                                               relics.get(item["id"]), ctr_first=index in first_modes))
-        return total
+            out.append((seat_trophies(registry[index][0]),
+                        [c.get("boost", 0) for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings,
+                                                                 letters.get(index, ()),
+                                                                 package_by_id.get(item.get("package_id")), capability,
+                                                                 item_boxes, relics.get(item["id"]),
+                                                                 ctr_first=index in first_modes)
+                         if any(r["mode"] == modes[0] for r in c["routes"])], banks_fruit(item)))
+        return out
+
+    def first_key_score(orders):
+        # Room for what opens a fixed first Key, then checks open before it.
+        near = first_key_pads(orders)
+        return (content_fixed.first_key_path(near, first_hub_slots, boost_ladder) is not None,
+                sum(not rank for _trophies, ranks, _track in near for rank in ranks))
 
     # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
     # the whole seed; or one per pad. Only entries with two or more modes take a
@@ -1504,13 +1489,16 @@ def generate(world):
     # fixed first Key short of checks draws again; the best one stands.
     entry_modes = draw_mode_order()
     if first_key_floor and mode_order != "fixed" and multi:
-        best = first_key_checks(entry_modes)
+        best = first_key_score(entry_modes)
         for _ in range(content_requirements.PLACEMENT_REDRAWS):
-            if best >= first_key_floor:
+            if best[0] and best[1] >= first_key_floor:
                 break
             orders = draw_mode_order()
-            if first_key_checks(orders) > best:
-                entry_modes, best = orders, first_key_checks(orders)
+            if first_key_score(orders) > best:
+                entry_modes, best = orders, first_key_score(orders)
+    # The start bootstrap seats this path before the fill.
+    world.ctr_first_key_path = (content_fixed.first_key_path(first_key_pads(entry_modes), first_hub_slots, boost_ladder) or []
+                                if first_key_floor else [])
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
@@ -1613,7 +1601,7 @@ def generate(world):
     by_name = {row.name: row for row in world.ctr_content_items.rows}
     pad_modes = {pad_physical(pad): next(e for e in entries if e["id"] == pad["entry_id"]).get("modes", ())
                  for pad in pads if pad["entry_id"] is not None}
-    density_off = stages == "single" or not o.two_stage_density.value
+    density_off = not o.two_stage_density.value
     if unlock_mode == 0:
         stage1, stage2 = content_requirements.vanilla_requirements(pad_modes, by_name, density_off)
     else:
@@ -1692,9 +1680,6 @@ def generate(world):
         early_count = world.random.randint(1, 2)
         weapon = world.random.sample(WEAPONS, early_count)[0]
         world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
-    from .notices import emit_ignored_summary
-    from .forced_options import logger
-    emit_ignored_summary(world, logger)
     return plan
 
 
@@ -2678,8 +2663,6 @@ def restore(world, slot_data):
     content_bosses.restore_options(world, plan)
     content_fixed.restore_options(world, plan)
     world.options.crystalsanity.value=int(any(c['kind']=='crystal_pickup' for c in plan['checks']))
-    world.options.include_battle_arenas.value=int(any(e['kind']=='crystal' for e in plan['entries']))
-    world.options.include_arcade_arenas.value=int(any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']))
     world.options.death_link.value = co.get("death_link", 0)
     # An explicit send list (#133 PR 4a) is the bits of the mask; an absent key
     # is the default, which follows death_link.
@@ -2716,11 +2699,8 @@ def restore(world, slot_data):
     # The plan's own check families (#133 PR 3b), for code that reads options.
     settings = plan.get("track_checks", {})
     rungs = settings.get("podium_rungs", ())
-    world.options.podium_placement_checks.value = int(bool(rungs))
-    world.options.podium_held_rungs.value = int("held_1st" in rungs)
-    world.options.podium_held_fifth_rung.value = int("held_5th" in rungs)
-    world.options.podium_finish_rungs.value = int("finish_podium" in rungs)
-    world.options.podium_any_position_rung.value = int("finish_any" in rungs)
+    world.options.podium_rungs.value = {key for key in world.options.podium_rungs.valid_keys
+                                        if podium.RUNG_OPTION_KEYS.get(key, key) in rungs}
     world.options.wumpa_check.value = {"global": 1, "per_track": 2}.get(settings.get("wumpa"), 0)
     world.options.lettersanity.value = settings.get("lettersanity", 0)
     if "letters_per_track" in settings:

@@ -1,10 +1,10 @@
 # Every feature of row 5 at once, for the tracker arms.
-    bosses: {enabled: true, cups: {min: 0, max: 2}}
+  boss_cups: {0: 1, 1: 1, 2: 1}
   adventure_structure: {classic: 1, ctr_first: 1}
   boss_track_shuffle: {true: 1, false: 1}
   boss_opponent_shuffle: true
   boss_kit_shuffle: true
-  boss_oxide_in_pool: {true: 1, false: 1}
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Nitros Oxide, Penta Penguin]
   oxide_attack_profile: {retail: 1, all_compatible: 1}
   purple_cup_boss_gauntlet: {true: 1, false: 1}
   wumpa_shop_slots: {0: 1, 5: 1, 10: 2}

@@ -208,11 +208,10 @@ def _who(world) -> str:
 
 
 def venue_pool(options) -> List[str]:
-    """`all_compatible` narrowed by the allowlist, then the blocklist."""
-    allow = set(options.boss_track_allowlist.value)
-    block = set(options.boss_track_blocklist.value)
-    return [t for t in VENUES
-            if (not allow or t in allow) and t not in block]
+    """`all_compatible` narrowed by `retail_tracks` and `boss_track_pool`."""
+    retail = options.retail_tracks.value
+    pool = options.boss_track_pool.value
+    return [t for t in VENUES if ("all" in retail or t in retail) and (not pool or t in pool)]
 
 
 def garage_candidates(options) -> Dict[str, List[str]]:
