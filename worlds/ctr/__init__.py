@@ -23,9 +23,6 @@ from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITE
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
-from . import spoiler_items
-from . import race_structure
-from . import tracker_pad_launch
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -497,14 +494,6 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
-        # Spoiler Items (#459): restored so the regenerated pool holds the same
-        # reveal items. Absent key is a pre-#459 seed and restores to off.
-        spoiler_items.restore_slot_data(o, co)
-        # Adventure structure and race type menu (#208). Absent keys are a
-        # pre-#208 room and restore to classic and the 0.3.0 menu default.
-        race_structure.restore_slot_data(o, co)
-        # Tracker pad launch (#375): absent is a pre-#375 room, off.
-        tracker_pad_launch.restore_slot_data(o, co)
         # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
         # always-emitted scalar. Prefer the scalar; fall back to block presence
         # for a pre-widening seed, where a present block always meant the single
@@ -556,15 +545,9 @@ class ctrAPWorld(World):
         if passthrough and "content_plan" in passthrough:
             from . import content_plan
             content_plan.restore(self, passthrough)
-            # #208: content-plan rooms carry neither structure key and are
-            # always classic; never keep the tracking player's own value.
-            race_structure.restore_slot_data(self.options, {})
-            # #375: the envelope carries it as an additive Boolean.
-            tracker_pad_launch.restore_slot_data(self.options, passthrough.get("ctr_options", {}))
             return
         if self.options.content_pool.value:
             from . import content_plan
-            race_structure.raise_if_content_plan(self.options)
             content_plan.generate(self)
             return
         if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
@@ -740,6 +723,10 @@ class ctrAPWorld(World):
             # copies and pay for explicit plando items with this world's filler.
             from . import content_item_pool
             self.ctr_framework_accounting = content_item_pool.settle_after_plando(self)
+            # Narrow starts (0.3.0 review finding 1): open the start before
+            # the fill, see sphere0_guard.bootstrap_start.
+            from . import sphere0_guard
+            sphere0_guard.bootstrap_start(self)
             # Independent supply never uses automatic progression starts. Manual
             # pad rules still get the solo fill check, so a dead end names them.
             if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:
@@ -1448,6 +1435,13 @@ class ctrAPWorld(World):
             spoiler_handle.write("\nCTR independent content/item plan:\n")
             json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
             spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            # Boss opponent and kit shuffle on content plans.
+            from . import content_bosses
+            _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
+            if _lines:
+                spoiler_handle.write(f"CTR boss encounters ({self.multiworld.player_name[self.player]}):\n")
+                for _line in _lines:
+                    spoiler_handle.write(f"  {_line}\n")
             # Plando and item links (#133 PR 4f): only when either moved an item.
             accounting = getattr(self, "ctr_framework_accounting", None)
             if accounting and any(accounting.values()):

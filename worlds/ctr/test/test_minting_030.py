@@ -23,11 +23,11 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "e01959af45848777e11508e8bf357fd143f9f68b"
-REGISTRY_DIGEST = "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
+REGISTRY_COMMIT = "9f61917477b48c59d97862a1ef602239d41533d0"
+REGISTRY_DIGEST = "0ced7b087966941aafdf451244cf4206d6b51238193a85031e1828206ae20ae0"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
-               "custom_item_boxes")
+               "custom_item_boxes", "wumpa_shop")
 
 
 class TestFixedFamilies(unittest.TestCase):
@@ -98,7 +98,11 @@ class TestReservedNotMinted(unittest.TestCase):
         (35027300, 35027399, "later cup names, Win All Legs"),
         (35028503, 35028519, "arcade completion expansion"),
         (35028580, 35028599, "arcade crystal expansion"),
-        (35028600, 35028799, "Wumpa Shop"),
+        (35028625, 35028639, "Wumpa Shop expansion, N. Sanity Beach"),
+        (35028665, 35028679, "Wumpa Shop expansion, Gem Stone Valley"),
+        (35028705, 35028719, "Wumpa Shop expansion, Lost Ruins"),
+        (35028745, 35028759, "Wumpa Shop expansion, Glacier Park"),
+        (35028785, 35028799, "Wumpa Shop expansion, Citadel City"),
     )
 
     def test_reserved_ranges_hold_no_id(self):
@@ -124,18 +128,55 @@ class TestReservedNotMinted(unittest.TestCase):
                              list(range(35028520+20*a,35028540+20*a)))
 
 
+class TestSecondPassWumpaShop(unittest.TestCase):
+    """The 0.3.0 second id step (2026-10-27): the 125 Wumpa Shop slots of the
+    #249 design, `35028600 + 40 * hub + (n - 1)`. No item is minted."""
+
+    HUBS = ("N. Sanity Beach", "Gem Stone Valley", "Lost Ruins", "Glacier Park", "Citadel City")
+
+    def test_names_and_codes(self):
+        for h, hub in enumerate(self.HUBS):
+            with self.subTest(hub):
+                self.assertEqual([L[f"{hub} Shop: Slot {n}"] for n in range(1, 26)],
+                                 list(range(35028600 + 40 * h, 35028625 + 40 * h)))
+                self.assertNotIn(f"{hub} Shop: Slot 26", L)
+                self.assertNotIn(f"{hub} Shop: Slot 01", L)
+                self.assertEqual(ctrAPWorld.location_name_to_id[f"{hub} Shop: Slot 1"],
+                                 35028600 + 40 * h)
+
+    def test_whole_shop_reservation_holds_only_shop_names(self):
+        codes = {n: c for n, c in L.items() if 35028600 <= c <= 35028799}
+        self.assertEqual(len(codes), 125)
+        self.assertTrue(all(" Shop: Slot " in n for n in codes))
+        self.assertFalse({c for c in I.values() if 35028600 <= c <= 35028799})
+
+    def test_shop_stems_are_reserved_for_custom_titles(self):
+        """Like every minted stem, `<Hub> Shop` now clashes with a custom
+        title of that exact name, which gets the `(Custom)` suffix (#306)."""
+        from ..custom_track_titles import reserved_stems, room_title
+        for hub in self.HUBS:
+            self.assertIn(f"{hub} Shop".casefold(), reserved_stems())
+        self.assertEqual(room_title("Glacier Park Shop"), "Glacier Park Shop (Custom)")
+        self.assertEqual(room_title("Glacier Park Shopping"), "Glacier Park Shopping")
+
+    def test_no_event_or_item_identity(self):
+        self.assertNotIn("Wumpa Income", L)
+        self.assertNotIn("Wumpa Income", I)
+        self.assertNotIn("Wumpa Tax", I)
+
+
 class TestNamedBatch(unittest.TestCase):
     def test_pinned_registry_commit_and_mint_entries_only(self):
         doc = json.loads(pkgutil.get_data("worlds.ctr", "data/named_tracks.json").decode("utf-8"))
         self.assertEqual(doc["registry"], {"repository": "https://github.com/dowlle/ctr-track-registry",
                                            "commit": REGISTRY_COMMIT, "digest": REGISTRY_DIGEST})
         blocks = [row["block_index"] for row in doc["tracks"]]
-        self.assertEqual(blocks, sorted(set(range(85)) - {14, 16, 68}))
+        self.assertEqual(blocks, sorted(set(range(89)) - {14, 16, 68}))
         keys = {row["track_key"] for row in doc["tracks"]}
         # 14 and 68 are `reserved` (hubs, no race mode confirmed); 16 is
         # `builtin` (the hard-coded Cortex Vortex block).
         self.assertFalse(keys & {"christmas-hub", "st-patricks-day-hub-world", "cortex-vortex"})
-        self.assertEqual(len(nt.NAMED_TRACKS), 82)
+        self.assertEqual(len(nt.NAMED_TRACKS), 86)
 
     def test_offset_layout_of_the_0_3_0_step(self):
         self.assertEqual(L["Baby T Park: Cup Leg Victory"], nt.location_code(8, "cup_leg_victory"))
@@ -146,6 +187,37 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(I["Letter R (Baby T Park)"], 35100042)
         self.assertEqual(L["Acid Lake: Trophy Race"], 35200000)
         self.assertEqual(L["Yoshi Circuit Legacy: Item Box 15"], 35216834)
+
+
+class TestThirdPassLrg2Blocks(unittest.TestCase):
+    """The 0.3.0 third id step (2026-10-29): blocks 85 to 88, the four new
+    LRG2Pancho entries of the track registry, in case-folded title order. No
+    other name or id changes; the 15 LRG2 revisions of existing tracks add only
+    content ids to `named_tracks.json`."""
+
+    BLOCKS = ((85, "sewer-baby-park", "Sewer Baby Park", 35217000, 35100425),
+              (86, "sids-house", "Sid's House", 35217200, 35100430),
+              (87, "specter-station", "Specter Station", 35217400, 35100435),
+              (88, "tizi-challenge", "Tizi Challenge", 35217600, 35100440))
+
+    def test_blocks_keys_and_names(self):
+        rows = {r.block_index: r for r in nt.NAMED_TRACKS}
+        for block, key, name, first_location, first_letter in self.BLOCKS:
+            with self.subTest(name):
+                self.assertEqual((rows[block].track_key, rows[block].ap_name), (key, name))
+                self.assertEqual(L[f"{name}: Trophy Race"], first_location)
+                self.assertEqual(nt.location_code(block, "trophy"), first_location)
+                self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
+                self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
+                                 [first_letter, first_letter + 1, first_letter + 2])
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 32)
+
+    def test_sids_house_key_has_no_dash_before_the_s(self):
+        self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
+        self.assertNotIn("sid-s-house", {r.track_key for r in nt.NAMED_TRACKS})
+
+    def test_block_89_and_up_are_not_minted(self):
+        self.assertNotIn(89, {r.block_index for r in nt.NAMED_TRACKS})
 
 
 class TestMintedItems(unittest.TestCase):

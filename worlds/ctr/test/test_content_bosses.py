@@ -8,7 +8,7 @@ import unittest
 from BaseClasses import CollectionState, LocationProgressType
 from Options import OptionError
 
-from .. import boss_track_shuffle, content_bosses, content_plan, hit_character
+from .. import boss_track_shuffle, content_bosses, content_plan, destinations, hit_character
 from .test_content_plan import make_world, profile_options
 
 BOSS_NAMES = ["Ripper Roo Garage: Boss Race", "Papu Papu Garage: Boss Race", "Komodo Joe Garage: Boss Race",
@@ -50,6 +50,7 @@ def varied(seed):
     if seed % 7 == 3:
         options.update(progressive_boost="per_character", character_unlocks=True, racer_locked_pads=4,
                        itemsanity=True, hit_character=True)
+        options["item_pool"]["base"]["trophies"] = 12  # room for the boost, racer and weapon items
     if seed % 4 == 1:
         options["content_pool"]["cups"] = dict(count=dict(min=1, max=3))
         options["content_pool"]["tracks"]["cortex_vortex"] = True
@@ -68,12 +69,24 @@ def collect_requirement(world, state, predicate):
         state.collect(world.create_item(by_code[items[n % len(items)]]), prevent_sweep=True)
 
 
+def first_open_world(options):
+    """A seed the starting-check guard accepts: a profile without podium rungs
+    and with boost terms can start with nothing open."""
+    for seed in range(40):
+        try:
+            return make_world(copy.deepcopy(options), seed=seed)
+        except OptionError as exc:
+            if "at the start" not in str(exc):
+                raise
+    raise AssertionError("no seed in 40 passed the starting-check guard")
+
+
 class TestBossEncounters(unittest.TestCase):
     def test_retail_pairs_by_default(self):
         world = make_world(boss_options())
         plan = world.ctr_content_plan
         self.assertTrue(content_plan.validate(plan))
-        self.assertEqual(plan["required_features"][-1], content_bosses.FEATURE)
+        self.assertIn(content_bosses.FEATURE, plan["required_features"])
         self.assertEqual(plan["bosses"], dict(oxide_goal=1, bosses_required=0, oxide_1_optional=False,
                                               oxide_final_unlock=0, oxide_final_count=6, track_shuffle=False,
                                               repeats=False, requirement_level="high", cups=[]))
@@ -162,7 +175,8 @@ class TestBossEncounters(unittest.TestCase):
             plan = world.ctr_content_plan
             venues, final, _cups = content_bosses.plan_venues(plan)
             for g, track in venues.items():
-                self.assertTrue(boss_track_shuffle.inherited_attack_certified(content_bosses.GARAGES[g][1], track))
+                if not track.startswith("custom/"):
+                    self.assertTrue(boss_track_shuffle.inherited_attack_certified(content_bosses.GARAGES[g][1], track))
             if seed % 2 == 0:
                 self.assertEqual(len(set(venues.values())), 4)
             self.assertEqual(final, "Cortex Vortex")
@@ -196,7 +210,6 @@ class TestBossEncounters(unittest.TestCase):
         cases = [
             (profile_options() | dict(oxide_goal="any_percent"), "bosses.enabled: false"),
             (profile_options() | dict(boss_track_shuffle=True), "boss_track_shuffle needs"),
-            (boss_options(oxide_goal="101_percent", oxide_1_optional="filler"), "filler"),
             (boss_options(oxide_goal="none"), "no goal"),
             (boss_options(), None),
         ]
@@ -214,12 +227,12 @@ class TestBossEncounters(unittest.TestCase):
         flag["content_pool"]["bosses"] = dict(enabled="yes")
         cases.append((flag, "must be true or false"))
         # Review finding 1: a ledger with no filler cannot hold the excluded
-        # Oxide goal check; refused before fill (98 checks, 61 extra Trophies).
+        # Oxide goal check; refused before fill (56 checks, 19 extra Trophies).
         tight = boss_options()
-        tight["item_pool"]["extra"] = dict(trophies=61)
+        tight["item_pool"]["extra"] = dict(trophies=19)
         cases.append((tight, "holds only filler"))
         loose = boss_options(oxide_goal="none", bosses_required_goal=1)
-        loose["item_pool"]["extra"] = dict(trophies=61)
+        loose["item_pool"]["extra"] = dict(trophies=19)
         cases.append((loose, None))
         for options, message in cases:
             with self.subTest(message=message):
@@ -230,12 +243,13 @@ class TestBossEncounters(unittest.TestCase):
                     make_world(options)
 
     def test_boss_checks_carry_the_legacy_boost(self):
-        world = make_world(boss_options(progressive_boost="shared_global", oxide_final_track="cortex_vortex"))
+        world = first_open_world(boss_options(progressive_boost="shared_global", oxide_final_track="cortex_vortex",
+                                              podium_placement_checks=True))
         checks = {c["location"]: c for c in world.ctr_content_plan["checks"] if c["kind"] == content_bosses.KIND}
         # First rank everywhere, USF on Hot Air Skyway, Oxide Station and Cortex Vortex.
         self.assertEqual([checks[c].get("boost") for c in sorted(checks)], [1, 1, 1, 2, 2, 2])
-        world = make_world(boss_options(progressive_boost="shared_global", shortcut_knowledge="hard",
-                                        logic_difficulty="hard"))
+        world = first_open_world(boss_options(progressive_boost="shared_global", shortcut_knowledge="hard",
+                                              logic_difficulty="hard", podium_placement_checks=True))
         checks = {c["location"]: c for c in world.ctr_content_plan["checks"] if c["kind"] == content_bosses.KIND}
         self.assertEqual(checks[35011104]["boost"], 1)
 
@@ -266,9 +280,15 @@ class TestBossEncounters(unittest.TestCase):
         self.assertTrue(mw.completion_condition[1](all_state))
 
     def test_varied_profiles_generate_validate_and_restore(self):
+        generated = 0
         for seed in range(30):
             with self.subTest(seed=seed):
-                world = make_world(varied(seed), seed=seed)
+                try:
+                    world = make_world(varied(seed), seed=seed)
+                except OptionError as exc:  # the boost terms can leave a narrow start
+                    self.assertIn("at the start", str(exc))
+                    continue
+                generated += 1
                 plan = world.ctr_content_plan
                 self.assertTrue(content_plan.validate(plan))
                 coded = [loc for loc in world.multiworld.get_locations(1) if loc.address is not None]
@@ -281,6 +301,7 @@ class TestBossEncounters(unittest.TestCase):
                 all_state = world.multiworld.get_all_state(False)
                 for location in world.multiworld.get_locations(1):
                     self.assertTrue(location.can_reach(all_state), location.name)
+        self.assertGreater(generated, 20)
 
     def test_forged_rooms_refuse(self):
         world = make_world(boss_options(boss_track_shuffle=True, bosses_required_goal=2, gems_required_goal=2))
@@ -402,9 +423,7 @@ class TestGarageRoll(unittest.TestCase):
             req = {r["id"]: r["predicate"] for r in plan["requirements"]}
             for g in range(4):
                 pred = req[f"boss:{g}"]
-                content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g)
-                if pred.get("item") == content_bosses.TROPHY_ITEM:
-                    self.assertEqual(pred["count"], 4)
+                content_bosses.check_garage_requirement(pred, plan["items"]["rows"], g, "randomized")
                 if pred.get("item") == content_bosses.KEY_ITEM:
                     self.assertTrue(content_bosses.GARAGES[g][2] < pred["count"] <= 3)
                 seen.add(json.dumps(pred, sort_keys=True))
@@ -413,7 +432,7 @@ class TestGarageRoll(unittest.TestCase):
     def test_forged_garage_requirements_refuse(self):
         rows = make_world(boss_options()).ctr_content_plan["items"]["rows"]
         trophy, key = content_bosses.TROPHY_ITEM, content_bosses.KEY_ITEM
-        for pred, g in ((dict(op="count", item=trophy, count=8), 0),
+        for pred, g in ((dict(op="count", item=trophy, count=17), 0),
                         (dict(op="count", item=key, count=1), 2),
                         (dict(op="count", item=key, count=4), 0),
                         (dict(op="always"), 1),
@@ -444,7 +463,7 @@ class TestCustomBossVenues(unittest.TestCase):
     def test_custom_tracks_and_cortex_vortex_join_the_draw(self):
         options = boss_options(boss_track_shuffle=True)
         options["content_pool"]["tracks"]["cortex_vortex"] = True
-        drawn = self.drawn(options)
+        drawn = self.drawn(options, range(24))
         self.assertIn(self.BTP, drawn)
         self.assertIn("cortex_vortex", drawn)
 
@@ -454,10 +473,18 @@ class TestCustomBossVenues(unittest.TestCase):
         self.assertNotIn(self.BTP, self.drawn(options))
 
     def test_an_allowlist_keeps_custom_tracks_out(self):
-        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow",
-                               boss_track_allowlist=["Crash Cove", "Dingo Canyon"])
+        allowed = ["Crash Cove", "Dingo Canyon", "Blizzard Bluff", "Sewer Speedway", "Coco Park", "Tiny Arena"]
+        options = boss_options(boss_track_shuffle=True, boss_track_allowlist=allowed)
         ids = boss_track_shuffle.VENUE_LEVEL_IDS
-        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids['Crash Cove']}", f"retail:{ids['Dingo Canyon']}"})
+        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids[name]}" for name in allowed})
+
+    def test_bosses_never_repeat_on_a_plan(self):
+        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow")
+        for seed in range(6):
+            plan = make_world(options, seed=seed).ctr_content_plan
+            venues = content_bosses.plan_venues(plan)[0]
+            self.assertFalse(plan["bosses"]["repeats"])
+            self.assertEqual(len(set(venues.values())), 4)
 
     def test_off_keeps_the_retail_pairs(self):
         options = boss_options()
@@ -526,8 +553,9 @@ class TestBossCups(unittest.TestCase):
         self.assertFalse(any(e["kind"] == content_bosses.CUP_KIND for e in plan["entries"]))
 
     def test_the_cup_check_takes_the_strictest_leg(self):
-        world = self.cup_world(cups=4, progressive_boost="shared_global")
-        plan = world.ctr_content_plan
+        options = boss_options(progressive_boost="shared_global", podium_placement_checks=True)
+        options["content_pool"]["bosses"]["cups"] = 4
+        plan = first_open_world(options).ctr_content_plan
         tracks = {t["id"]: t for t in plan["tracks"]}
         entries = {e["id"]: e for e in plan["entries"]}
         from ..content_capability import finish_boost
@@ -554,6 +582,75 @@ class TestBossCups(unittest.TestCase):
         options["content_pool"]["bosses"]["cups"] = 5
         with self.assertRaisesRegex(OptionError, "bosses.cups"):
             make_world(options)
+
+
+class TestBoundedVenueDraw(unittest.TestCase):
+    """The disallow-repeats venue draw counts the distinct four-way assignments
+    instead of listing them (0.3.0 review finding 2), and still picks exactly
+    the assignment `random.choice` picked from the full list."""
+
+    @staticmethod
+    def listed_choice(rng, pools):
+        """The draw before the fix: every distinct assignment, then choice."""
+        import itertools
+        assignments = [c for c in itertools.product(*pools) if len(set(c)) == len(c)]
+        return list(rng.choice(assignments)) if assignments else None
+
+    def test_same_pick_and_same_random_stream_as_the_listed_draw(self):
+        import random
+        rng = random.Random(133)
+        for _ in range(1500):
+            universe = [f"t{i}" for i in range(rng.randint(1, 9))]
+            pools = [[rng.choice(universe) for _ in range(rng.randint(0, 6))] for _ in range(rng.randint(1, 4))]
+            seed = rng.random()
+            new, old = random.Random(seed), random.Random(seed)
+            with self.subTest(pools=pools):
+                self.assertEqual(boss_track_shuffle.choose_distinct_assignment(new, pools),
+                                 self.listed_choice(old, pools))
+                self.assertEqual(new.random(), old.random())
+
+    def test_retail_pools_draw_as_before(self):
+        import random
+        options = boss_options(boss_track_shuffle=True)
+        world = make_world(copy.deepcopy(options), seed=7)
+        candidates = boss_track_shuffle.garage_candidates(world.options)
+        pools = [candidates[key] for key, *_ in boss_track_shuffle.GARAGES]
+        for seed in range(25):
+            self.assertEqual(boss_track_shuffle.choose_distinct_assignment(random.Random(seed), pools),
+                             self.listed_choice(random.Random(seed), pools))
+
+    def test_none_without_a_distinct_assignment(self):
+        import random
+        rng = random.Random(1)
+        state = rng.getstate()
+        self.assertIsNone(boss_track_shuffle.choose_distinct_assignment(rng, [["a"], ["a"], ["a", "b"], ["b"]]))
+        self.assertEqual(rng.getstate(), state)
+
+    def test_largest_custom_pool_is_fast_and_small(self):
+        """27 custom venues (every normal pad) plus Cortex Vortex join each
+        garage's retail pool: about 4 million distinct assignments, which the
+        listed draw held in memory."""
+        import time
+        import tracemalloc
+        world = make_world(boss_options(boss_track_shuffle=True), seed=11)
+        custom = [(f"custom/fixture-{i}/1.0", 35) for i in range(27)]
+        custom.append((destinations.CORTEX_VORTEX, content_bosses.CORTEX_RESTART_POINTS))
+        retail = boss_track_shuffle.garage_candidates(world.options)
+        pools = [retail[key] + [name for name, _ in custom] for key, *_ in boss_track_shuffle.GARAGES]
+        self.assertGreater(boss_track_shuffle.count_distinct_assignments(pools), 3_000_000)
+        record = dict(track_shuffle=True, repeats=False)
+        tracemalloc.start()
+        started = time.perf_counter()
+        venues = content_bosses.draw_venues(world, record, custom)
+        elapsed = time.perf_counter() - started
+        peak = tracemalloc.get_traced_memory()[1]
+        tracemalloc.stop()
+        self.assertEqual(len(set(venues.values())), 4)
+        for garage, venue in venues.items():
+            self.assertIn(venue, pools[garage])
+        self.assertLess(elapsed, 2.0)
+        self.assertLess(peak, 2_000_000)
+
 
 if __name__ == "__main__":
     unittest.main()

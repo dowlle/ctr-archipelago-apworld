@@ -13,17 +13,28 @@ from . import CTRTestBase
 from .test_content_item_pool import small_pool
 
 
+def profile_pool():
+    """A small pool that leaves five filler slots beside the surface items on
+    the profile's 19 checks."""
+    pool = small_pool()
+    pool["base"]["trophies"] = 0
+    return pool
+
+
 def profile_options():
     return dict(content_pool=dict(preset="mixed", tracks=dict(retail="all", modes=["trophy"],
                                                             custom=[copy.deepcopy(content_plan.PACKAGES[1])]),
                                   cups=dict(count=0), crystals=dict(count=0), bosses=dict(enabled=False),
                                   required_entries=["custom/baby-t-park/1.0.2"]),
                 pad_layout=dict(placement="shuffle", stages="single", mode_order="fixed", merge_trophy_ctr=False),
-                item_pool=small_pool(), oxide_goal="disabled", bosses_required_goal=0, gems_required_goal=5,
-                character_unlocks=False, podium_placement_checks=False, accessibility="full")
+                item_pool=profile_pool(), oxide_goal="disabled", bosses_required_goal=0, gems_required_goal=5,
+                character_unlocks=False, podium_placement_checks=False, accessibility="full",
+                # The Wumpa Shop is on by default on content plans; the profile
+                # keeps its earlier plan with it off.
+                wumpa_shop_slots=0)
 
 
-def make_world(options, seed=420, passthrough=None):
+def make_world(options, seed=420, passthrough=None, stop_before=None):
     mw = MultiWorld(1)
     mw.game[1] = ctrAPWorld.game
     mw.player_name = {1: "ContentPlan"}
@@ -38,6 +49,8 @@ def make_world(options, seed=420, passthrough=None):
         mw.generation_is_fake = True
     mw.state = CollectionState(mw)
     for step in gen_steps:
+        if step == stop_before:
+            break
         call_all(mw, step)
     return mw.worlds[1]
 
@@ -50,14 +63,19 @@ class TestContentPlan(CTRTestBase):
         self.assertTrue(content_plan.validate(plan))
         self.assertEqual(len(plan["checks"]), 19)
         self.assertEqual(len(self.multiworld.get_locations(1)), 19)
-        self.assertEqual(len(self.multiworld.itempool), 19)
+        # pre_fill may already place start openers (sphere0_guard.bootstrap_start).
+        placed = len(getattr(self.world, "_ctr_start_bootstrap", ()))
+        self.assertEqual(len(self.multiworld.itempool) + placed, 19)
         self.assertEqual(plan["items"]["filler_count"], 5)
         self.assertEqual(len([p for p in plan["pads"] if p["kind"] == "normal" and p["entry_id"] is None]), 8)
         # baby-t-park has a named block since the 0.3.0 id step (#306).
         self.assertIn("Baby T Park: Trophy Race", [loc.name for loc in self.multiworld.get_locations(1)])
         self.assertEqual(plan["packages"], [content_plan.PACKAGES[1]])
-        self.assertEqual(sum(item.name == "Key" for item in self.multiworld.itempool), 4)
-        self.assertEqual(sum(item.name.endswith(" Gem") for item in self.multiworld.itempool), 5)
+        # Count the start openers too: bootstrap_start may have placed a Key or a Gem.
+        names = [item.name for item in self.multiworld.itempool]
+        names += [name for name, _ in getattr(self.world, "_ctr_start_bootstrap", ())]
+        self.assertEqual(sum(name == "Key" for name in names), 4)
+        self.assertEqual(sum(name.endswith(" Gem") for name in names), 5)
         self.assertEqual(len(self.multiworld.precollected_items[1]), 0)
         self.assertFalse(hasattr(self.world, "_ctr_backstop_fired"))
 
@@ -152,7 +170,7 @@ class TestContentPlan(CTRTestBase):
 
     def test_capacity_and_unsupported_requests_do_not_downgrade(self):
         options = profile_options()
-        options["item_pool"]["extra"] = {"keys": 6}
+        options["item_pool"]["extra"] = {"keys": 11}
         with self.assertRaisesRegex(OptionError, "Short by 1 checks"):
             make_world(options)
         options = profile_options()

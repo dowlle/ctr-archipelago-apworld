@@ -7,10 +7,18 @@
 # left to the fuzzer, so both lap rules and the Win All Legs checks reach the
 # fill; with eight cups some leg tracks hold no standalone pad and take a Cup
 # Leg Victory check.
+# Relic checks follow the item counts since one generator row 2, so relic items
+# no longer leave spare checks: per-racer boost and letter items lean low to keep
+# the ignored share under the arm's cap.
 Crash Team Racing:
   accessibility: full
-  # #208: the content plan has no ctr_first mode yet and refuses it.
-  adventure_structure: classic
+  # Job J11: content plans take the Wumpa Shop, the Wumpa goal and ctr_first.
+  # Weighted so most seeds carry the shop and the goal, and one in four runs
+  # ctr_first; a large `excluded` shop or a ctr_first start behind letter
+  # items can refuse, so the weights keep the ignored share under the cap.
+  goal_wumpa: {0: 2, 300: 1, 2500: 1}
+  wumpa_shop_slots: {0: 1, 2: 1, 5: 1, 10: 1}
+  adventure_structure: {classic: 3, ctr_first: 1}
   content_pool:
     preset: mixed
     tracks:
@@ -60,16 +68,30 @@ Crash Team Racing:
   gems_required_goal: {1: 1, 3: 1, 5: 2}
   custom_tracks: {}
   cortex_vortex_track: false
-  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost: {"off": 2, shared_global: 2, per_character: 1}
   progressive_stats: {"off": 1, shared_global: 1}
-  lettersanity: {"off": 1, locations_only: 2, locations_and_items: 2, items_only: 1}
+  lettersanity: {"off": 2, locations_only: 3, locations_and_items: 1, items_only: 1}
   letters_per_track: {1: 1, 2: 1, 3: 1}
   podium_placement_checks: {true: 7, false: 1}
   podium_held_rungs: {true: 3, false: 1}
   podium_held_fifth_rung: {true: 1, false: 1}
   podium_finish_rungs: {true: 1, false: 1}
   podium_any_position_rung: {true: 1, false: 1}
-  wumpa_check: {"off": 1, global: 1, per_track: 6}
-  relic_perfect_checks: {true: 7, false: 1}
+  wumpa_check: {global: 1, per_track: 7}
+  relic_perfect_checks: true
   boss_track_shuffle: false
+  # Bosses are off here: the opponent, kit and N. Oxide switches need the
+  # garages (job J11), so they stay off; content-plan-030-meta.yaml forces them.
+  boss_opponent_shuffle: false
+  boss_kit_shuffle: false
+  boss_oxide_in_pool: false
+  purple_cup_boss_gauntlet: false
+  oxide_attack_profile: retail
   warp_pad_rules: {}
+  # Keys stay shuffled here; the pads-fixed arms fix them.
+  shuffle_keys: true
+  # Random lists refuse most boss draws, and the gauntlet has its own arms.
+  boss_character_allowlist: []
+  boss_character_blocklist: []
+  boss_powerup_blocklist: []
+  oxide_powerup_blocklist: []

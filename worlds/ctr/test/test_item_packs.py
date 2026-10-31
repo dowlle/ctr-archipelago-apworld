@@ -61,7 +61,7 @@ class TestPacks(unittest.TestCase):
         world = make_world(pack_options(psw=4), seed=5)
         plan = world.ctr_content_plan
         self.assertEqual(plan["item_packs"], dict(progressive_starting_wumpa=4, turbo_grant=True, tizi_helper=True))
-        self.assertEqual(plan["required_features"][-1], content_plan.PACK_FEATURE)
+        self.assertIn(content_plan.PACK_FEATURE, plan["required_features"])
         rows = rows_of(plan)
         for code, count in ((PSW, 4), (TURBO, 1), (TIZI, 1)):
             self.assertEqual((rows[code]["base"], rows[code]["extra"], rows[code]["remaining"]), (count, 0, count))
@@ -89,7 +89,7 @@ class TestPacks(unittest.TestCase):
 
     def test_a_full_pool_refuses_instead_of_dropping_a_pack(self):
         options = profile_options()
-        options["progressive_starting_wumpa"] = 10
+        options.update(progressive_starting_wumpa=10, turbo_grant=True)
         with self.assertRaisesRegex(OptionError, "Short by"):
             make_world(options)
 
@@ -158,6 +158,18 @@ class TestEnvelope(unittest.TestCase):
         self.assertEqual((wire["ctr_options"]["death_link"], wire["ctr_options"].get("death_link_send")), (4, None))
         other = make_world({}, seed=999, passthrough=wire)
         self.assertEqual(other.fill_slot_data(), wire)
+
+    def test_tracker_yaml_cannot_change_an_omitted_send_mask(self):
+        # Finding 4 of the 0.3.0 review: a seed that omitted death_link_send
+        # follows death_link; the tracking player's own YAML must not leak in.
+        world = make_world(pack_options(death_link="mask_reset"), seed=3)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        self.assertNotIn("death_link_send", wire["ctr_options"])
+        for yaml_value in ([], ["weapon_hit", "race_loss"]):
+            with self.subTest(tracker_yaml=yaml_value):
+                other = make_world({"death_link_send": yaml_value}, seed=999, passthrough=wire)
+                self.assertEqual(other.options.death_link_send.value, {"follow_death_link"})
+                self.assertEqual(other.fill_slot_data(), wire)
 
     def test_trap_identities_on_every_room(self):
         world = make_world(profile_options(), seed=3)

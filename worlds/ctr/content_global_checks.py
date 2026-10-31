@@ -51,7 +51,7 @@ count keeps the earlier routes (every real package measured has crates).
 """
 from Options import OptionError
 
-from . import characters, content_bosses, content_cups, hit_character, itemsanity, progressive_capability
+from . import characters, content_bosses, content_cups, hit_character, itemsanity, logic_terms, progressive_capability
 from .Locations import CTR_LOCATION_IDS
 
 FEATURE = "global_checks_v1"
@@ -205,14 +205,19 @@ def plan_codes(plan):
 
 
 def fallback(plan):
-    """{guest engine id: Key count} for the guests with no unlock win in the plan."""
-    return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS)
+    """{guest engine id: Key count} for the guests with no unlock win in the
+    plan. The unlock wins follow the racers the plan's boss races seat (job
+    J11, decision 9): a retail boss raced nowhere falls back to Keys too."""
+    triggers = hit_character.unlock_triggers_for(content_bosses.identity(plan))
+    return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS, triggers)
 
 
 def cup_indices(plan):
-    """The name indices of the plan's cups (#133 PR 5b), the keys of the
-    encounter block's `content_cups`."""
-    return sorted(int(e["id"].removeprefix("entry/cup:")) for e in plan["entries"] if e["kind"] == content_cups.KIND)
+    """The name indices of the plan's pool cups (#133 PR 5b), the keys of the
+    encounter block's `content_cups`. A Gem Cup draws from the block's own
+    `cups` order for its LevelID, which every block carries."""
+    return sorted(int(e["id"].removeprefix("entry/cup:")) for e in plan["entries"]
+                  if e["kind"] == content_cups.KIND and content_cups.gem_colour(e["id"]) is None)
 
 
 def encounter_block(world, plan):
@@ -220,8 +225,9 @@ def encounter_block(world, plan):
     with the plan's fallback and one order per cup. The block's only draw,
     taken only with Hit Character on; the cup orders derive from the seed."""
     seed = int(world.random.getrandbits(32))
-    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan))
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
+    bosses = content_bosses.identity(plan)
+    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan), bosses)
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan), bosses)
     world.ctr_hit_character_seed = seed
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_fallback = fallback(plan)
@@ -241,7 +247,8 @@ def check_encounter_block(plan, slot_data):
         return
     block = slot_data.get("hit_character_encounters")
     block = hit_character._tuples_to_lists(block) if hit_character._has_tuple(block) else block
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan))
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan),
+                                  content_bosses.identity(plan))
     got = {int(g): e["fallback_keys"] for g, e in block["unlock_triggers"].items() if "fallback_keys" in e}
     if got != fallback(plan):
         error("hit_character_encounters fallback disagrees with the plan's unlock wins")
@@ -318,7 +325,8 @@ def install(world, check, location, route_tests):
         names = hit_character._location_name_by_code(world)
         present = {c["location"] for c in plan["checks"]}
         triggers = tuple(world.multiworld.get_location(names[code], player)
-                         for code in hit_character.UNLOCK_TRIGGERS[target][0] if code in present)
+                         for code in hit_character.unlock_triggers_for(
+                             world.ctr_hit_character_encounters["bosses"])[target][0] if code in present)
     weapons = bool(plan.get("global_checks", {}).get("itemsanity"))
     unlocks = characters.unlocks_enabled(world)
 
@@ -372,6 +380,4 @@ def tiger_temple_door(world):
         names.append(door_box)
     for name in names:
         location = world.multiworld.get_location(name, player)
-        previous = location.access_rule
-        location.access_rule = (lambda state, previous=previous:
-                                previous(state) and state.has_any(TIGER_TEMPLE_DOOR_OPENERS, player))
+        logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))

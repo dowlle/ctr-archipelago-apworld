@@ -12,6 +12,7 @@ from typing import Mapping
 from Options import OptionError
 
 from .Items import load_item_table
+from .item_creation import SURFACE_ITEM_NAMES
 
 COLOURS = ("red", "green", "blue", "yellow", "purple")
 TIERS = ("sapphire", "gold", "platinum")
@@ -20,6 +21,12 @@ ITEMS = {item["name"]: item["code"] for item in load_item_table()}
 COUNTED_NAMES = ("Trophy", *(f"{x.title()} Relic" for x in TIERS),
                  *(f"{x.title()} CTR Token" for x in COLOURS),
                  *(f"{x.title()} Gem" for x in COLOURS), "Key")
+#: The base counts of the three relic tiers. Platinum is 0 so that no needed
+#: item sits behind the hardest times (ruled 2026-10-29, one generator).
+RELIC_DEFAULTS = {"sapphire": 18, "gold": 18, "platinum": 0}
+#: The five surface items, in code order. A plan creates them together and
+#: drops them together (`resolve`).
+SURFACE_NAMES = tuple(sorted(SURFACE_ITEM_NAMES, key=ITEMS.__getitem__))
 MAX_COUNT = 2147483647
 
 
@@ -51,12 +58,12 @@ def normalize(raw):
         for family, name, default in (("trophies", "Trophy", 16), ("keys", "Key", 4)):
             output[name] = exact_count(config.get(family, default if side == "base" else 0),
                                        f"{side}.{family}")
-        for family, parts, suffix, default in (("relics", TIERS, "Relic", 18),
-                                                ("tokens", COLOURS, "CTR Token", 4)):
+        for family, parts, suffix, defaults in (("relics", TIERS, "Relic", RELIC_DEFAULTS),
+                                                 ("tokens", COLOURS, "CTR Token", dict.fromkeys(COLOURS, 4))):
             nested = fields(config.get(family, {}), parts, f"{side}.{family}")
             for part in parts:
                 output[f"{part.title()} {suffix}"] = exact_count(
-                    nested.get(part, default if side == "base" else 0), f"{side}.{family}.{part}")
+                    nested.get(part, defaults[part] if side == "base" else 0), f"{side}.{family}.{part}")
         if side == "base":
             gems = config.get("gems", list(COLOURS))
             if (not isinstance(gems, list) or any(type(x) is not str or x not in COLOURS for x in gems)
@@ -70,6 +77,13 @@ def normalize(raw):
     if base["Key"] != 4:
         fail("base.keys must be 4; all four hub Keys remain mandatory.")
     return base, extra
+
+
+def relic_totals(raw):
+    """{tier: base + extra copies} of `item_pool`, the counts a plan's Time
+    Trial checks follow."""
+    base, extra = normalize(raw)
+    return {tier: base[f"{tier.title()} Relic"] + extra[f"{tier.title()} Relic"] for tier in TIERS}
 
 
 @dataclass(frozen=True)
@@ -107,16 +121,25 @@ class ItemPlan:
 
 
 def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
-            locked_checks=0, trap_percentage=0, selected_packs=None, pack_codes=None):
+            locked_checks=0, trap_percentage=0, selected_packs=None, pack_codes=None,
+            surface=(), filler_reserve=0):
     """Resolve B+E-S-Q and capacity, without changing caller options or RNG.
 
-    `locked` describes selected copies already placed by their owner. Future
-    framework plando must not be entered here: it consumes its copies later.
+    `locked` describes selected copies already placed by their owner, and
+    `locked_checks` the checks those and any other fixed item sit on (content_fixed).
+    Future framework plando must not be entered here: it consumes its copies later.
     `selected_packs` supplies exact registered identities from the existing
     capability/racer/weapon/letter controls; it never changes counted families.
     Filler includes traps; trap_count is the portion replaced with traps.
     `pack_codes` names the codes of pack identities outside data/items.json
     (the named-block and generic custom letter items, #133 PR 3b).
+
+    `surface` names the items created together and dropped together (the five
+    surface items). They stay in only while `filler_reserve` filler slots are
+    left, the ones the excluded checks need. There is no filler to give up
+    first: filler is what remains once every selected copy has a check, so the
+    order of the Rulebook (filler, then the surface items, then the refusal)
+    holds by construction, and a refusal never counts a dropped surface item.
     """
     base, extra = normalize(raw)
     codes = dict(ITEMS)
@@ -131,7 +154,7 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
         if not isinstance(values, Mapping):
             fail(f"{label} must be a mapping.")
         for name, count in values.items():
-            if name not in base:
+            if name not in base and name not in surface:
                 fail(f"{label} refers to unselected identity {name!r}.")
             exact_count(count, f"{label}.{name}")
     for label, value in (("coded_checks", coded_checks), ("locked_checks", locked_checks)):
@@ -143,6 +166,19 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
         fail("trap_percentage must be at most 100.")
     if sum((locked or {}).values()) > locked_checks:
         fail("locked selected copies exceed realized locked checks.")
+    if surface:
+        taken = sum(base[name] + extra[name] for name in base) - sum((starts or {}).values()) \
+            - sum((locked or {}).values()) + len(surface)
+        if coded_checks - locked_checks - taken >= filler_reserve:
+            base.update(dict.fromkeys(surface, 1))
+            extra.update(dict.fromkeys(surface, 0))
+        else:
+            # A start cannot take a copy the seed no longer creates.
+            for label, values in (("starts", starts or {}), ("additional", additional or {})):
+                for name in values:
+                    if name in surface:
+                        fail(f"{label} names {name!r}, but the surface items do not fit in this seed's "
+                             "checks and were dropped. Your settings were not changed.")
     rows = []
     for name in sorted(base, key=codes.__getitem__):
         b, e = base[name], extra[name]
@@ -274,10 +310,13 @@ def settle_after_plando(world):
     created = world.ctr_created_items
     created_ids = {id(item) for item in created}
     pool_ids = {id(item) for item in mw.itempool}
+    # Fixed items sit on their own checks from the start; they are not created
+    # pool copies and no plando placed them (content_fixed).
+    fixed = {id(item) for item in getattr(world, "ctr_fixed_items", ())}
     placed, added = [], []
     for location in mw.get_filled_locations():
         item = location.item
-        if item.player != player:
+        if item.player != player or id(item) in fixed:
             continue
         if id(item) in created_ids:
             placed.append(location)

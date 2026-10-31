@@ -293,6 +293,39 @@ class Families(Term):
         return enc.families(self.families, self.count)
 
 
+class Local(Term):
+    """A rule that never reaches the export: a plan's goal arms and Item Box
+    stat terms, which are no win check. `wire` refuses, so a win check that
+    ever holds one fails generation instead of exporting a guess."""
+
+    def __init__(self, rule: Callable, what: str):
+        self.rule = rule
+        self.what = what
+
+    def _build(self):
+        return self.rule
+
+    def wire(self, enc):
+        from .win_logic import WinLogicExportError
+        raise WinLogicExportError(f"CTR win_logic: {self.what} has no wire form")
+
+
+class EventTerm(Term):
+    """`state.has(event)`, on the wire the term that collects the event. Items
+    with no id cannot travel, and `resolve` gives what the event stands for."""
+
+    def __init__(self, event: str, player: int, resolve: Callable[[], Term]):
+        self.event = event
+        self.player = player
+        self.resolve = resolve
+
+    def _build(self):
+        return lambda state, e=self.event, p=self.player: state.has(e, p)
+
+    def wire(self, enc):
+        return self.resolve().wire(enc)
+
+
 class Ref(Term):
     """`Location.can_reach(state)`: region access AND that location's own rule.
     On the wire, a reference to that check's entry.

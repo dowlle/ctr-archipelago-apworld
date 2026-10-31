@@ -21,6 +21,22 @@ tracks:
     and `across_cups` (default true: a track may lead several cups), the
     shape of the retail Gem Cups. These defaults are engineering choices.
 
+CUP TRACKS (`tracks`, ruled 2026-10-30). `off`: a Gem Cup races its original
+four tracks (data/gem_cup_legs.json) and a sixth cup onward draws as
+`random_no_repeats`. `random`: every leg is drawn, repeats allowed.
+`random_no_repeats`, the default: four different tracks per cup. An explicit
+`tracks` decides repeats within a cup and wins over
+`composition.repeats.within_cup`; without it that older key still picks between
+the two drawn values, until row 7 removes it. `composition` shapes drawn cups
+only, never the original legs of `off`.
+
+GEM CUPS (ruled 2026-10-30). The first five cups of a plan are the original Gem
+Cups, Red first, with their names and frozen checks; a plan with fewer keeps the
+first ones. A sixth cup onward takes a name from the pool. A Gem Cup is the
+entry `entry/gem_cup:<colour>`, with colour 0 (Red) to 4 (Purple), owned by
+`gem_cup:<colour>`, and the plan declares GEM_FEATURE. Its Gem is a shuffled item
+unless the plan fixes it (content_fixed).
+
 A leg track may also hold its own standalone pad, or appear only in cups.
 
 LAPS. A leg races its track's authored laps (retail and Cortex Vortex 3, a
@@ -39,14 +55,16 @@ block's `content_cups`), frozen for every leg and retry, custom legs
 included; every leg is then a Hit route (content_global_checks).
 
 CHECKS.
-  * `<Cup>: Win` (35027000 + name index) on a points win. Each cup takes one
-    name from the 27-name pool (cup_checks.CUP_NAMES), drawn per seed (naming
+  * `<Cup>: Win` (35027000 + name index) on a points win, `<Colour> Gem Cup:
+    Gem` (35011200 + colour) on a Gem Cup. A sixth cup onward takes one name
+    from the 27-name pool (cup_checks.CUP_NAMES), drawn per seed (naming
     model ruled 2026-10-13 21:47 CEST). Its `boost` is the legs' highest
     finish rank (usf_finish.cup_finish_t: USF when a leg is a USF finish
     track).
-  * `<Cup>: Win All Legs` (35027200 + name index) with `cup_sweep_checks`:
-    first place in all four legs of one uninterrupted attempt (#246). Its
-    `boost` is the legs' highest Trophy Race rank.
+  * `<Cup>: Win All Legs` (35027200 + name index, 35028300 + colour on a Gem
+    Cup) with `cup_sweep_checks`: first place in all four legs of one
+    uninterrupted attempt (#246). Its `boost` is the legs' highest Trophy Race
+    rank.
   * `<Track>: Cup Leg Victory` for a leg track with no standalone Trophy Race
     check in the plan (ruling 17 and 29, 2026-09-01): first place in that
     leg, paid at the leg's finish. Every occurrence is a route to the one
@@ -58,11 +76,12 @@ A plan without cups draws nothing here and keeps its wire exactly.
 """
 from Options import OptionError
 
-from . import cup_checks, named_tracks
+from . import cup_checks, gem_cup_legs, named_tracks
 from .content_capability import check_boost, finish_boost
 from .Locations import CTR_LOCATION_IDS
 
 FEATURE = "cup_entries_v1"
+GEM_FEATURE = "gem_cups_v1"
 KIND = "cup"
 SWEEP_KIND = "cup_sweep"
 LEG_KIND = "cup_leg"
@@ -79,6 +98,9 @@ PADS = 27
 SOURCES = ("retail", "custom", "cortex_vortex")
 REPEAT_KEYS = ("within_cup", "across_cups")
 DEFAULT_REPEATS = {"within_cup": False, "across_cups": True}
+CUP_TRACKS = ("off", "random", "random_no_repeats")
+GEM_CUPS = cup_checks.GEM_CUPS
+GEM_ENTRY_PREFIX = "entry/gem_cup:"
 
 
 def error(message):
@@ -99,9 +121,9 @@ def _bounds(value, path, ceiling):
 
 def settings(raw):
     """The `content_pool.cups` record, checked: {bounds, repeats, sources,
-    custom_legs}. `count` stays required (an explicit 0 for no cups)."""
-    if not isinstance(raw, dict) or set(raw) - {"count", "composition"}:
-        error("content_pool.cups must be a mapping with only count and composition.")
+    custom_legs, tracks}. `count` stays required (an explicit 0 for no cups)."""
+    if not isinstance(raw, dict) or set(raw) - {"count", "composition", "tracks"}:
+        error("content_pool.cups must be a mapping with only count, tracks and composition.")
     if "count" not in raw:
         error("cups.count is required; use an explicit 0 for no cups. The requested settings were not changed.")
     bounds = _bounds(raw["count"], "cups.count", PADS)
@@ -122,7 +144,14 @@ def settings(raw):
         error("cups.composition.sources must be a nonempty list of distinct sources from retail, custom "
               "and cortex_vortex.")
     custom = _bounds(composition.get("custom_legs", {"min": 0, "max": LEGS}), "cups.composition.custom_legs", LEGS)
-    return dict(bounds=bounds, repeats=out, sources=set(sources), custom_legs=custom)
+    # A YAML `off` reaches us as false.
+    tracks = "off" if raw.get("tracks") is False else raw.get("tracks", "")
+    if "tracks" not in raw:
+        tracks = "random" if out["within_cup"] else "random_no_repeats"
+    elif tracks not in CUP_TRACKS:
+        error("cups.tracks must be off, random or random_no_repeats.")
+    out["within_cup"] = tracks == "random"
+    return dict(bounds=bounds, repeats=out, sources=set(sources), custom_legs=custom, tracks=tracks)
 
 
 def leg_pools(candidates, packages, sources):
@@ -136,6 +165,22 @@ def leg_pools(candidates, packages, sources):
     custom.sort(key=lambda t: t["custom_slot"])
     custom += [t for t in candidates if t.get("origin") == "cortex_vortex" and "cortex_vortex" in sources]
     return other, custom
+
+
+def fixed_legs(spec, candidates):
+    """[[four track records]] of the Gem Cups that race their original tracks,
+    in cup order, or None when no cup does (any value but `off`). The list stops
+    at the first cup with a track the seed's selection leaves out."""
+    if spec["tracks"] != "off":
+        return None
+    records = {t["display_name"]: t for t in candidates if t.get("origin") == "retail"}
+    table = gem_cup_legs.load_vanilla_cup_legs()
+    out = []
+    for cup in GEM_CUPS:
+        if any(name not in records for name in table[cup]):
+            break
+        out.append([records[name] for name in table[cup]])
+    return out
 
 
 def _cup_ok(k, custom_left, other_left, within):
@@ -173,17 +218,22 @@ def _fits(cups, custom_left, other_left, krange, repeats):
     return custom_left + other_left >= cups
 
 
-def feasible_pairs(spec, crystal_bounds, crystal_pool, required_arenas, required_tracks, other, custom):
+def feasible_pairs(spec, crystal_bounds, crystal_pool, required_arenas, required_tracks, other, custom, fixed=None):
     """Every (cups, crystals) pair the seed can seat: both counts in their
     ranges, the crystals within the eligible arena pool and at least the
     required arena entries, cups plus crystals plus required tracks within the
-    27 normal pads, a name for every cup, and the legs drawable."""
+    27 normal pads, a name for every cup, and the legs drawable. `fixed` is
+    fixed_legs: a Gem Cup in the seed has to be among them, and draws nothing."""
     cup_bounds = spec["bounds"]
+
+    def drawn(cups):
+        return cups if fixed is None else cups - min(cups, len(GEM_CUPS))
     return [(c, k) for c in range(cup_bounds[0], cup_bounds[1] + 1)
             for k in range(crystal_bounds[0], crystal_bounds[1] + 1)
             if required_arenas <= k <= crystal_pool and c + k + required_tracks <= PADS
             and c <= len(cup_checks.CUP_NAMES)
-            and _fits(c, len(custom), len(other), spec["custom_legs"], spec["repeats"])]
+            and (fixed is None or min(c, len(GEM_CUPS)) <= len(fixed))
+            and _fits(drawn(c), len(custom), len(other), spec["custom_legs"], spec["repeats"])]
 
 
 def _pick(world, pool, count, within, available):
@@ -234,21 +284,43 @@ def leg_laps(track, shortened):
     return max(1, base_laps(track) // 2) if shortened else base_laps(track)
 
 
-def draw_cups(world, count, other, custom, spec, shortened):
-    """The seed's cups as plan candidates: {cup_index, id, legs, shortened}.
-    The legs are drawn first, then a sample of the pool's name indices."""
-    legs = draw_legs(world, count, other, custom, spec)
-    names = world.random.sample(range(len(cup_checks.CUP_NAMES)), count)
-    return [dict(cup_index=index, id=f"cup:{index}", legs=cup_legs, shortened=shortened)
-            for index, cup_legs in zip(names, legs)]
+def draw_cups(world, count, other, custom, spec, shortened, fixed=None):
+    """The seed's cups as plan candidates: {cup_index, id, legs, shortened}. The
+    first five are the Gem Cups, Red first, with `gem_cup` their colour and
+    `cup_index` None. The drawn legs come first, then a sample of the pool's
+    name indices for a sixth cup onward. `fixed` is fixed_legs."""
+    gems = min(count, len(GEM_CUPS))
+    kept = (fixed or [])[:gems]
+    legs = kept + draw_legs(world, count - len(kept), other, custom, spec)
+    names = world.random.sample(range(len(cup_checks.CUP_NAMES)), count - gems)
+    return ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[colour], shortened=shortened)
+             for colour in range(gems)]
+            + [dict(cup_index=index, id=f"cup:{index}", legs=cup_legs, shortened=shortened)
+               for index, cup_legs in zip(names, legs[gems:])])
 
 
 def entry_id(index):
     return f"entry/cup:{index}"
 
 
+def gem_entry_id(colour):
+    return f"{GEM_ENTRY_PREFIX}{colour}"
+
+
 def owner(index):
     return f"cup:{index}"
+
+
+def gem_owner(colour):
+    return f"gem_cup:{colour}"
+
+
+def gem_colour(eid):
+    """The colour of a Gem Cup's entry id, None for any other id."""
+    if not eid.startswith(GEM_ENTRY_PREFIX):
+        return None
+    digits = eid.removeprefix(GEM_ENTRY_PREFIX)
+    return int(digits) if digits in ("0", "1", "2", "3", "4") else None
 
 
 def win_code(index):
@@ -261,8 +333,10 @@ def sweep_code(index):
 
 def entry(cup):
     """The plan's Cup entry record for a drawn cup."""
-    eid = entry_id(cup["cup_index"])
-    return dict(id=eid, kind=KIND, display_name=cup_checks.CUP_NAMES[cup["cup_index"]],
+    gem = cup.get("gem_cup")
+    eid = entry_id(cup["cup_index"]) if gem is None else gem_entry_id(gem)
+    return dict(id=eid, kind=KIND,
+                display_name=cup_checks.CUP_NAMES[cup["cup_index"]] if gem is None else GEM_CUPS[gem],
                 legs=[dict(id=f"{eid}/leg:{n}", track_id=track["id"], laps=leg_laps(track, cup["shortened"]))
                       for n, track in enumerate(cup["legs"])],
                 roster=[dict(r) for r in ROSTER], field_size=FIELD_SIZE)
@@ -283,14 +357,19 @@ def checks(cup_entry, pad_id, tracks, capability=None, packages=None, sweep=Fals
     `sweep`, with their boost ranks when Progressive Boost is on. `tracks`
     maps track id to record, `packages` package id to descriptor."""
     index = int(cup_entry["id"].split(":")[1])
-    name = cup_checks.CUP_NAMES[index]
+    gem = gem_colour(cup_entry["id"]) is not None
+    name = GEM_CUPS[index] if gem else cup_checks.CUP_NAMES[index]
+    win_name = f"{name}: Gem" if gem else cup_checks.cup_win_name(name)
+    win_location = CTR_LOCATION_IDS[win_name] if gem else win_code(index)
+    sweep_location = cup_checks.GEM_CUP_SWEEP_CODE_BASE + index if gem else sweep_code(index)
+    owned_by = gem_owner(index) if gem else owner(index)
     legs = [tracks[leg["track_id"]] for leg in cup_entry["legs"]]
     packages = packages or {}
 
     def package(track):
         return packages.get(track.get("package_id"))
     boost = bool(capability and capability.get("boost_mode"))
-    win = dict(location=win_code(index), owner=owner(index), kind=KIND, display_name=cup_checks.cup_win_name(name),
+    win = dict(location=win_location, owner=owned_by, kind=KIND, display_name=win_name,
                routes=[_route(cup_entry, pad_id, AWARD)])
     if boost:
         need = max(finish_boost(t, capability, package(t)) for t in legs)
@@ -298,7 +377,7 @@ def checks(cup_entry, pad_id, tracks, capability=None, packages=None, sweep=Fals
             win["boost"] = need
     out = [win]
     if sweep:
-        all_legs = dict(location=sweep_code(index), owner=owner(index), kind=SWEEP_KIND,
+        all_legs = dict(location=sweep_location, owner=owned_by, kind=SWEEP_KIND,
                         display_name=cup_checks.cup_sweep_name(name), routes=[_route(cup_entry, pad_id, SWEEP_AWARD)])
         if boost:
             need = max(check_boost(t, "trophy", "win", capability, package(t)) for t in legs)
@@ -320,8 +399,11 @@ def leg_victory_code(track):
 def leg_victories(tracks, entries, pads, titles):
     """Every `Cup Leg Victory` check of the plan: one per leg track without a
     standalone Trophy Race check, with a route per occurrence in entry order,
-    then leg order. `titles` maps track id to its room title."""
-    with_trophy = {e["track_id"] for e in entries if e["kind"] == "track" and "trophy" in e["modes"]}
+    then leg order. `titles` maps track id to its room title. A standalone
+    track has its Trophy Race check when its track record lists the trophy
+    mode: a ctr_first entry (job J11) runs it as its CTR Challenge."""
+    with_trophy = {e["track_id"] for e in entries
+                   if e["kind"] == "track" and "trophy" in tracks[e["track_id"]]["modes"]}
     pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
     out = {}
     for cup_entry in entries:
@@ -369,19 +451,30 @@ def prefix_boost(cup_entry, leg_id, tracks, capability, packages=None):
     raise KeyError(leg_id)
 
 
+def check_lineup(entries):
+    """The plan's cups are the Gem Cups Red first, and a pool cup only after
+    all five."""
+    ids = [e["id"] for e in entries if e["kind"] == KIND]
+    gems = sorted(colour for colour in map(gem_colour, ids) if colour is not None)
+    if gems != list(range(len(gems))) or (len(gems) < len(GEM_CUPS) and len(gems) != len(ids)):
+        error("a plan's first five cups are the Gem Cups, Red first")
+
+
 def check_entry(cup_entry, tracks, packages, shortened):
     """Shape and registry of one Cup entry against the plan's tracks. Returns
-    (name index, shortened) where `shortened` is the plan-wide lap switch seen
+    (entry id, shortened) where `shortened` is the plan-wide lap switch seen
     so far (None before the first leg that tells)."""
     eid = cup_entry["id"]
-    try:
-        index = int(eid.removeprefix("entry/cup:"))
-    except ValueError:
-        index = -1
-    if not (eid == entry_id(index) and 0 <= index < len(cup_checks.CUP_NAMES)):
-        error("cup entry id is not entry/cup:<name index>")
-    if cup_entry["display_name"] != cup_checks.CUP_NAMES[index]:
-        error("cup display name is not its pool name")
+    gem = gem_colour(eid)
+    if gem is None:
+        try:
+            index = int(eid.removeprefix("entry/cup:"))
+        except ValueError:
+            index = -1
+        if not (eid == entry_id(index) and 0 <= index < len(cup_checks.CUP_NAMES)):
+            error("cup entry id is not entry/cup:<name index> or entry/gem_cup:<colour>")
+    if cup_entry["display_name"] != (GEM_CUPS[gem] if gem is not None else cup_checks.CUP_NAMES[index]):
+        error("cup display name is not its Gem Cup or pool name")
     if cup_entry["roster"] != [dict(r) for r in ROSTER] or cup_entry["field_size"] != FIELD_SIZE:
         error("cup roster or field size is not the Adventure field")
     legs = cup_entry["legs"]
@@ -403,4 +496,4 @@ def check_entry(cup_entry, tracks, packages, shortened):
             if shortened is not None and this != shortened:
                 error("cup legs shorten their laps in some legs and not in others")
             shortened = this
-    return index, shortened
+    return eid, shortened

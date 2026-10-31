@@ -1,0 +1,7 @@
+  boss_track_shuffle: true
+  boss_opponent_shuffle: true
+  boss_kit_shuffle: true
+  boss_oxide_in_pool: {true: 1, false: 1}
+  oxide_attack_profile: {retail: 1, all_compatible: 1}
+  boss_track_assignment: {character_home_track: 1, independent_track: 1}
+  boss_attack_assignment: {mixed_loadouts: 2, signature_profiles: 1}

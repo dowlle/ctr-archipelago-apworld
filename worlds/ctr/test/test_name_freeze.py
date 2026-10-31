@@ -69,8 +69,9 @@ EXPECTED_CLASSES = [
     # last so every earlier class keeps its datapackage order.
     ("hit_character", 16, (35025000,)),
     # #306 named custom-track blocks: the 0.3.0 id step minted the 82 `mint`
-    # entries of registry commit e01959a, 32 names each (offsets 0..16, 20..34).
-    ("named_track", 82 * 32, tuple(range(35200000, 35217000, 1000))),
+    # entries of registry commit e01959a, 32 names each (offsets 0..16, 20..34);
+    # the third step (2026-10-29) added blocks 85 to 88 from registry commit 9f61917.
+    ("named_track", 86 * 32, tuple(range(35200000, 35218000, 1000))),
     # The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST), appended
     # after the named blocks. All inert until their feature PRs.
     ("cup_win", 27, (35027000,)),
@@ -83,6 +84,8 @@ EXPECTED_CLASSES = [
     ("custom_wumpa", 132, (35016000,)),
     ("custom_item_boxes", 1980, (35017000, 35018000)),
     ("arcade_arena", 63, (35028500,35028520)),
+    # 0.3.0 second id step: Wumpa Shop slots (#249), 5 hubs x 25.
+    ("wumpa_shop", 125, (35028600,)),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -147,14 +150,16 @@ class TestNameFreezeCensus(unittest.TestCase):
         # the three trap identities the rework minted (#280).
         # + the three Cortex Vortex pad-track letter items (2026-09-13).
         # + the 0.3.0 id step: five items and 82 x 3 named-block letters.
-        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246)
+        # + the third step (2026-10-29): 4 x 3 letters of the LRG2 blocks 85 to 88.
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
         # + 13 Cortex Vortex pad-track names (2026-09-13 unfreeze).
         # + the 16 Hit Character encounter names (0.2.1 candidate).
         # + the 0.3.0 id step: 3,682 fixed-family names and 82 x 32 named.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 82 * 32 + 63)
+        # + the third step (2026-10-29): 4 x 32 for the LRG2 blocks 85 to 88.
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:

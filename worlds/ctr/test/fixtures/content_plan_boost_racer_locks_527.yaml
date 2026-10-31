@@ -111,9 +111,9 @@ Crash Team Racing:
   custom_tracks: {}
   cortex_vortex_track: false
   progressive_boost: per_character
-  progressive_stats: shared_global
+  progressive_stats: 'off'
   itemsanity: false
-  lettersanity: locations_and_items
+  lettersanity: locations_only
   letters_per_track: 3
   box_locations: false
   hit_character: false
