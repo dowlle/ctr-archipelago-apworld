@@ -1698,6 +1698,17 @@ class ContentItemPool(OptionDict):
     default = {}
 
 
+# These options work on content plans only until the generator switch (row 7).
+# They stay out of the spoiler's option list, so a seed without content_pool keeps
+# its spoiler byte for byte; the plan's own spoiler lines name the draws.
+for _plan_option in (BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlist, BossCharacterBlocklist,
+                     BossTrackAssignment, BossKitShuffle, BossAttackAssignment, BossAttackIntensity, BossLossEasing,
+                     BossPowerupBlocklist, PurpleCupBossGauntlet, OxideAttackProfile, OxidePowerupBlocklist,
+                     WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints, GoalWumpa, SpoilerItems,
+                     AdventureStructure):
+    _plan_option.visibility = Visibility.all & ~Visibility.spoiler
+
+
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
 

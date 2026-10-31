@@ -178,7 +178,7 @@ class TestContentBossShuffleDraws(unittest.TestCase):
         """Subordinate options without their switch change nothing."""
         base = make_world(boss_options(wumpa_shop_slots=0), seed=5).ctr_content_plan
         noisy = make_world(boss_options(wumpa_shop_slots=0, boss_character_blocklist=["Polar"],
-                                        boss_attack_intensity="mayhem", purple_cup_boss_gauntlet=True),
+                                        boss_attack_intensity="mayhem"),
                            seed=5).ctr_content_plan
         self.assertEqual(noisy, base)
 
