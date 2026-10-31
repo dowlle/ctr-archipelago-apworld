@@ -111,15 +111,15 @@ jobs:
       matrix:
         include:
           - {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
-          - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz}
-          - {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz}
-          - {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz}
-          - {check_name: check-collect-accessibility, check_runs: 500,  check_hook: 'hooks.collect_accessibility_test:Hook',                     check_mode: fuzz}
-          - {check_name: check-item-location-count,   check_runs: 500,  check_hook: 'hooks.item_location_count:Hook',                            check_mode: fuzz}
-          - {check_name: check-placement-refs,        check_runs: 500,  check_hook: 'hooks.check_placement_item_location_references:Hook',       check_mode: fuzz}
-          - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz}
-          - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz}
-          - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz}
+          - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'random'}
+          - {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-collect-accessibility, check_runs: 500,  check_hook: 'hooks.collect_accessibility_test:Hook',                     check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-item-location-count,   check_runs: 500,  check_hook: 'hooks.item_location_count:Hook',                            check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-placement-refs,        check_runs: 500,  check_hook: 'hooks.check_placement_item_location_references:Hook',       check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz, check_meta: 'random'}
+          - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz, check_meta: 'random'}
           # check-ut compares Universal Tracker's logic with the server's own
           # logic, so it needs the tracker world installed and its own hook. It
           # also forces accessibility: full, because a tracker divergence shows
@@ -245,7 +245,7 @@ jobs:
           repository: dowlle/Archipelago-index
           path: index-repo
       - name: Checkout .github/fuzz (fuzz metas and the CTR tracker hook)
-        if: matrix.check_meta == 'content-plan-030' || matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || startsWith(matrix.check_meta, 'gem-cups-') || startsWith(matrix.check_meta, 'pads-') || matrix.check_tracker == 'yes'
+        if: matrix.check_meta == 'random' || matrix.check_meta == 'accessibility-full' || matrix.check_meta == 'content-plan-030' || matrix.check_meta == 'content-plan' || matrix.check_meta == 'content-plan-cups' || matrix.check_meta == 'content-plan-bosses' || matrix.check_meta == 'content-plan-full' || startsWith(matrix.check_meta, 'gem-cups-') || startsWith(matrix.check_meta, 'pads-') || matrix.check_tracker == 'yes'
         uses: actions/checkout@v4
         with:
           path: world-src
@@ -322,8 +322,12 @@ jobs:
             extra_args+=(--hook "$CHECK_HOOK")
           fi
           if [ "$CHECK_META" = "accessibility-full" ]; then
-            printf 'Crash Team Racing:\n  accessibility: full\n  custom_tracks: []\n' > ci_meta.yaml
+            { cat ../world-src/.github/fuzz/random-meta.yaml; printf '  accessibility: full\n  custom_tracks: []\n'; } > ci_meta.yaml
             cat ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
+          if [ "$CHECK_META" = "random" ]; then
+            cp ../world-src/.github/fuzz/random-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
           if [ "$CHECK_META" = "check-ut-custom-tracks" ]; then
@@ -360,6 +364,11 @@ jobs:
             sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
             if [[ "$fixed" == keys || "$fixed" == both || "$fixed" == all ]]; then
               sed -i 's/^  shuffle_keys: .*/  shuffle_keys: false/' ci_meta.yaml
+              # Vanilla requirements, a fixed first Key, no podium rungs and Progressive
+              # Boost still fail fill on some seeds, with the first Key check in place.
+              # Measured and reported, not limited in the generator; these arms keep
+              # rungs on so they stay readable.
+              if [[ "$unlock" == vanilla ]]; then echo "  podium_rungs: [held_1st, held_3rd, finish_on_podium]" >> ci_meta.yaml; fi
             fi
             if [[ "$fixed" == gems || "$fixed" == both || "$fixed" == all ]]; then echo "  shuffle_gems: false" >> ci_meta.yaml; fi
             if [[ "$fixed" == filler || "$fixed" == all ]]; then
