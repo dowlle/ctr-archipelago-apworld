@@ -34,8 +34,8 @@ GEM CUPS (ruled 2026-10-30). The first five cups of a plan are the original Gem
 Cups, Red first, with their names and frozen checks; a plan with fewer keeps the
 first ones. A sixth cup onward takes a name from the pool. A Gem Cup is the
 entry `entry/gem_cup:<colour>`, with colour 0 (Red) to 4 (Purple), owned by
-`gem_cup:<colour>`, and the plan declares GEM_FEATURE. Its Gem stays a shuffled
-item until fixed placements arrive.
+`gem_cup:<colour>`, and the plan declares GEM_FEATURE. Its Gem is a shuffled item
+unless the plan fixes it (content_fixed).
 
 A leg track may also hold its own standalone pad, or appear only in cups.
 

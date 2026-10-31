@@ -186,6 +186,20 @@ jobs:
           - {check_name: pads-density-deep,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-deep'}
           - {check_name: pads-density-full,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full'}
           - {check_name: pads-ut,                     check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full'}
+          # One generator row 4: items fixed to their own check, with vanilla and
+          # random requirements, on the pads meta at accessibility full. The last
+          # part of check_meta picks keys, gems, both, filler (oxide_1_optional on
+          # its goal, 101_percent) or all of them.
+          - {check_name: pads-fixed-keys-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-keys'}
+          - {check_name: pads-fixed-gems-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-gems'}
+          - {check_name: pads-fixed-both-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both'}
+          - {check_name: pads-fixed-keys-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-keys'}
+          - {check_name: pads-fixed-gems-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-gems'}
+          - {check_name: pads-fixed-both-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both'}
+          - {check_name: pads-filler-vanilla,        check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-filler'}
+          - {check_name: pads-filler-random,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-filler'}
+          - {check_name: pads-fixed-ut-vanilla,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-all'}
+          - {check_name: pads-fixed-ut-random,       check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-all'}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -300,8 +314,21 @@ jobs:
             extra_args+=(-m ci_meta.yaml)
           fi
           if [[ "$CHECK_META" == pads-* ]]; then
-            IFS=- read -r _ unlock placement density <<< "$CHECK_META"
+            IFS=- read -r _ unlock placement density fixed <<< "$CHECK_META"
             sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
+            if [[ "$fixed" == keys || "$fixed" == both || "$fixed" == all ]]; then
+              sed -i 's/^  shuffle_keys: .*/  shuffle_keys: false/' ci_meta.yaml
+              # Vanilla requirements, a fixed first Key, no podium rungs and Progressive
+              # Boost fail fill on about a third of seeds. Measured and reported, not
+              # limited in the generator; these arms keep rungs on so they stay readable.
+              if [[ "$unlock" == vanilla ]]; then
+                sed -i -e 's/^  podium_placement_checks: .*/  podium_placement_checks: true/' -e 's/^  podium_held_rungs: .*/  podium_held_rungs: true/' ci_meta.yaml
+              fi
+            fi
+            if [[ "$fixed" == gems || "$fixed" == both || "$fixed" == all ]]; then echo "  shuffle_gems: false" >> ci_meta.yaml; fi
+            if [[ "$fixed" == filler || "$fixed" == all ]]; then
+              sed -i -e 's/^  oxide_goal: .*/  oxide_goal: 101_percent/' -e 's/^  oxide_1_optional: .*/  oxide_1_optional: filler/' ci_meta.yaml
+            fi
             extra_args+=(-m ci_meta.yaml)
           fi
           uv run python fuzz.py -j 2 -g ctr -r "$CHECK_RUNS" -n 1 -t 120 "${extra_args[@]}" | tee fuzz.log

@@ -175,32 +175,36 @@ def capacity_met(seated, seats, rungs):
     return True
 
 
-def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks):
+def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks, cycle=None, near_floor=0):
     """(content in pad order, seats with the occupied ones first): `seats[i]`
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
-    early pads or too few checks open at the start is drawn again, at most
-    PLACEMENT_REDRAWS times. With vanilla requirements `reach(seat)` is 2 for a
+    early pads, too few checks open at the start or content on a pad that needs
+    that content's own fixed item (`cycle(physical, content)`) is drawn again, at
+    most PLACEMENT_REDRAWS times. With vanilla requirements `reach(seat)` is 2 for a
     pad that can open at the start, 1 for one just behind it, else 0, and
     `start_checks(content)` counts the checks it then opens with no items, aimed
     at the start the guards call wide: arenas, cups or boost terms can leave
     little on the two open pads. Random requirements pass None: their free pads
     are drawn with the start in mind (draw). If none fits, the best draw
-    stands: one that passes the first two tests, then the best early pads, and
-    `shuffle` then trades content onto the open pads. Vanilla placement never
-    redraws."""
+    stands: one with no such cycle, then one that passes the first two tests,
+    then the best early pads, and `shuffle` then trades content onto the open
+    pads. Vanilla placement never redraws. `near_floor` asks that many checks of
+    the pads with `reach`, for a fixed first Key behind a Trophy garage."""
     seats = list(seats)
     weight = {seat[0]: reach(seat) if reach else 0 for seat in seats}
     need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen)) if reach else 0
-    best, best_score = None, (False, -1)
+    best, best_score = None, (False, False, -1)
     for _ in range(PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
         seated = _seat(world, chosen, seats, placement, manual)
         start = sum(start_checks(item) for physical, item in seated.items() if weight[physical] == 2)
         fits = not own_content(seated) and capacity_met(seated, seats, rungs)
-        if placement == "vanilla" or (fits and start >= need):
+        clear = not (cycle and any(cycle(physical, item) for physical, item in seated.items()))
+        near = sum(start_checks(item) for physical, item in seated.items() if weight[physical])
+        if placement == "vanilla" or (clear and fits and start >= need and near >= near_floor):
             best = None
             break
-        score = (fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))
+        score = (clear, fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))
         if score > best_score:
             best, best_score = (list(seats), seated), score
     if best:
@@ -212,10 +216,19 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
             if sum(start_checks(seated[p]) for p in seated if weight[p] == 2) >= need:
                 break
             donors = sorted((p for p in seated if weight[p] < 2 and p not in manual
-                             and start_checks(seated[p]) > start_checks(seated[physical])),
+                             and start_checks(seated[p]) > start_checks(seated[physical])
+                             and not (cycle and cycle(p, seated[physical]))),
                             key=lambda p: (-start_checks(seated[p]), p))
             if donors and physical not in manual:
                 seated[physical], seated[donors[0]] = seated[donors[0]], seated[physical]
+    # No redraw cleared a cycle: its content trades places, the deepest pad first.
+    for physical in [p for p, item in seated.items() if cycle and cycle(p, item)]:
+        others = sorted((p for p in seated if not cycle(p, seated[physical]) and not cycle(physical, seated[p])
+                         and p not in manual), key=lambda p: (weight[p], p))
+        if others:
+            seated[physical], seated[others[0]] = seated[others[0]], seated[physical]
+        else:
+            seated[next(seat[0] for seat in seats if seat[0] not in seated)] = seated.pop(physical)
     ordered = sorted(seated, key=[seat[0] for seat in seats].index)
     by_physical = {seat[0]: seat for seat in seats}
     return [seated[p] for p in ordered], [by_physical[p] for p in ordered] + [s for s in seats if s[0] not in seated]
@@ -223,9 +236,10 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
 
 # Reference placement
 
-def stand_ins(world, checks, entries, pads, pad_modes, rows, skip):
-    """{check location: stand-in item name}. Keys come first: the n-th Key goes
-    on a check open with n - 1 Keys, a first race on a pad of that hub depth, so
+def stand_ins(world, checks, entries, pads, pad_modes, rows, skip, pins=None):
+    """{check location: stand-in item name}. Fixed items stand on their own checks
+    (`pins`, {location code: item name}). Then the Keys: the n-th Key goes on a
+    check open with n - 1 Keys, a first race on a pad of that hub depth, so
     the simulated player always walks on to the next hub. A garage asks for a
     drawn requirement, and a Key held behind it could freeze the simulation at
     N. Sanity Beach, leaving every later pad a trivial requirement. Then a check
@@ -234,7 +248,9 @@ def stand_ins(world, checks, entries, pads, pad_modes, rows, skip):
     the base items take part, as a requirement never asks above them. `skip`
     lists checks that hold no progression (the Oxide goal, excluded checks)."""
     supply = {row.name: row.requirement_ceiling for row in rows if row.name in content_item_pool.COUNTED_NAMES}
-    out = {}
+    out = {code: name for code, name in (pins or {}).items() if name in supply}
+    for name in out.values():
+        supply[name] -= 1
     entry_by_id = {e["id"]: e for e in entries}
     pad_by_id = {pad["id"]: pad for pad in pads}
     usable = []
@@ -317,13 +333,14 @@ class _Exit:
 
 class _Location:
     """A check of the reference placement. `logic_text` is only set while the
-    start is measured: a check that needs a boost rank or stats is not open at
-    the start, but the simulated player can still win it later."""
+    start is measured: a check that needs a boost rank or stats, or that holds a
+    fixed item, is not open at the start, but the simulated player can still win
+    it later."""
 
     def __init__(self, view, name, check):
         self.view, self.name = view, name
         self.stand_in = view.stands.get(check["location"]) if check else None
-        self.gated = bool(check and (check.get("boost") or check.get("stats")))
+        self.gated = bool(check and (check.get("boost") or check.get("stats") or check["location"] in view.pins))
 
     @property
     def logic_text(self):
@@ -355,13 +372,13 @@ class ReferenceWorld:
     start_region = None
     measuring = False
 
-    def __init__(self, world, pads, pad_modes, checks, encounters, requirements, stands, relics, by_code):
+    def __init__(self, world, pads, pad_modes, checks, encounters, requirements, stands, relics, by_code, pins=()):
         self.random = world.random
         self.options = _Options(world.options)
         self.player = world.player
         self._ctr_relic_created = relics
         self._ctr_pad_rules = getattr(world, "_ctr_pad_rules", None)
-        self.stands = stands
+        self.stands, self.pins = stands, pins
         menu = _Region("Menu")
         regions = [menu]
         by_pad = {}

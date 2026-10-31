@@ -210,7 +210,6 @@ class TestBossEncounters(unittest.TestCase):
         cases = [
             (profile_options() | dict(oxide_goal="any_percent"), "bosses.enabled: false"),
             (profile_options() | dict(boss_track_shuffle=True), "boss_track_shuffle needs"),
-            (boss_options(oxide_goal="101_percent", oxide_1_optional="filler"), "filler"),
             (boss_options(oxide_goal="none"), "no goal"),
             (boss_options(), None),
         ]

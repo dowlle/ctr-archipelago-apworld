@@ -125,8 +125,9 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
             surface=(), filler_reserve=0):
     """Resolve B+E-S-Q and capacity, without changing caller options or RNG.
 
-    `locked` describes selected copies already placed by their owner. Future
-    framework plando must not be entered here: it consumes its copies later.
+    `locked` describes selected copies already placed by their owner, and
+    `locked_checks` the checks those and any other fixed item sit on (content_fixed).
+    Future framework plando must not be entered here: it consumes its copies later.
     `selected_packs` supplies exact registered identities from the existing
     capability/racer/weapon/letter controls; it never changes counted families.
     Filler includes traps; trap_count is the portion replaced with traps.
@@ -309,10 +310,13 @@ def settle_after_plando(world):
     created = world.ctr_created_items
     created_ids = {id(item) for item in created}
     pool_ids = {id(item) for item in mw.itempool}
+    # Fixed items sit on their own checks from the start; they are not created
+    # pool copies and no plando placed them (content_fixed).
+    fixed = {id(item) for item in getattr(world, "ctr_fixed_items", ())}
     placed, added = [], []
     for location in mw.get_filled_locations():
         item = location.item
-        if item.player != player:
+        if item.player != player or id(item) in fixed:
             continue
         if id(item) in created_ids:
             placed.append(location)

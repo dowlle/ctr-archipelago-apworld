@@ -209,9 +209,6 @@ def settings(world, raw):
         error("no goal: oxide_goal is none or disabled, and bosses_required_goal and gems_required_goal are 0. "
               "Set at least one goal condition.")
     optional = int(o.oxide_1_optional.value)
-    if goal == GOAL_FINAL and optional == 2:
-        error("oxide_1_optional: filler places a locked Wumpa Fruit on N. Oxide's Challenge, and content plans "
-              "have no locked placements yet. Use mandatory or optional. No content was changed.")
     shuffle = bool(o.boss_track_shuffle.value)
     oxide = goal != GOAL_DISABLED
     from .content_cups import _bounds
@@ -220,7 +217,7 @@ def settings(world, raw):
     if level not in LEVELS:
         error("content_pool.bosses.requirement_level must be one of " + ", ".join(LEVELS) + ". No content was changed.")
     return dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level, cups=cup_bounds,
-                oxide_1_optional=goal == GOAL_FINAL and optional == 1,
+                oxide_1_optional=goal == GOAL_FINAL and optional in (1, 2),
                 oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
                 oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
                 track_shuffle=shuffle, repeats=shuffle and bool(o.boss_encounter_repeats.value))

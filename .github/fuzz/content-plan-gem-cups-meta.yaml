@@ -75,3 +75,5 @@ Crash Team Racing:
   relic_perfect_checks: true
   boss_track_shuffle: {true: 1, false: 1}
   warp_pad_rules: {}
+  # Keys stay shuffled here; the pads-fixed arms fix them.
+  shuffle_keys: true
