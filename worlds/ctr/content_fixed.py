@@ -26,6 +26,10 @@ counts eligible checks, and the item counts stay exact (relic guard, dispatcher
 decision of 2026-10-30, `guarded_track`). A Turbo Track on another pad is an
 ordinary track.
 
+With vanilla requirements a fixed first Key sits behind 4 Trophies, and the later
+races of every pad behind that Key, so few checks are open before it. The
+placement and the mode order draw again until FIRST_KEY_CHECKS are.
+
 Random garages draw their kind before the fill, so a fixed Key or Gem can sit
 behind a garage that needs it: `draw_garages` draws again, and what stays stuck
 asks Trophies instead (Rulebook: a requirement that cannot be proven is replaced).
@@ -46,6 +50,11 @@ FILLER = "Wumpa Fruit"
 GEM_PAD = next(physical for physical, kind in content_requirements.PHYSICAL_KIND.items()
                if kind == "track" and content_requirements.vanilla_rule(physical) == ("AnyGem", 5))
 GARAGE_REDRAWS = content_requirements.PLACEMENT_REDRAWS
+#: With vanilla requirements a fixed first Key sits behind 4 Trophies, and every
+#: multi-race pad's later races need that Key. Fill failures sit on seeds with
+#: fewer checks than this open before it (measured on row 4's CI failures), so the
+#: placement and the mode order draw again below it.
+FIRST_KEY_CHECKS = 9
 
 
 def error(message):

@@ -314,6 +314,20 @@ class TestGarages(unittest.TestCase):
                  for seed in range(30)]
         self.assertGreater(sum(count) / len(count), 15)
 
+    def test_a_fixed_first_key_gets_its_checks(self):
+        layout = dict(placement="shuffle", stages="two", mode_order="per_pad", merge_trophy_ctr=False)
+        short = 0
+        for seed in range(30):
+            plan = make_world(options(shuffle_keys=False, pad_layout=layout, **VANILLA), seed=seed,
+                              stop_before="pre_fill").ctr_content_plan
+            pads = occupied(plan)
+            near = [pads[p] for p in (3, 6, 8, 9) if p in pads]
+            first = {e["id"]: e["modes"][0] for e in near if e["kind"] == "track"}
+            total = len(near) - len(first) + sum(any(r["mode"] == first.get(r["entry_id"]) for r in c["routes"])
+                                                 for c in plan["checks"])
+            short += total < content_fixed.FIRST_KEY_CHECKS
+        self.assertLessEqual(short, 3)
+
     def test_stand_ins_hold_the_pins(self):
         world = make_world(options(shuffle_keys=False, shuffle_gems=False))
         plan = world.ctr_content_plan

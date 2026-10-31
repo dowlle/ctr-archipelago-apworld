@@ -175,7 +175,7 @@ def capacity_met(seated, seats, rungs):
     return True
 
 
-def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks, cycle=None):
+def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks, cycle=None, near_floor=0):
     """(content in pad order, seats with the occupied ones first): `seats[i]`
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
     early pads, too few checks open at the start or content on a pad that needs
@@ -188,7 +188,8 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
     are drawn with the start in mind (draw). If none fits, the best draw
     stands: one with no such cycle, then one that passes the first two tests,
     then the best early pads, and `shuffle` then trades content onto the open
-    pads. Vanilla placement never redraws."""
+    pads. Vanilla placement never redraws. `near_floor` asks that many checks of
+    the pads with `reach`, for a fixed first Key behind a Trophy garage."""
     seats = list(seats)
     weight = {seat[0]: reach(seat) if reach else 0 for seat in seats}
     need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen)) if reach else 0
@@ -199,7 +200,8 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
         start = sum(start_checks(item) for physical, item in seated.items() if weight[physical] == 2)
         fits = not own_content(seated) and capacity_met(seated, seats, rungs)
         clear = not (cycle and any(cycle(physical, item) for physical, item in seated.items()))
-        if placement == "vanilla" or (clear and fits and start >= need):
+        near = sum(start_checks(item) for physical, item in seated.items() if weight[physical])
+        if placement == "vanilla" or (clear and fits and start >= need and near >= near_floor):
             best = None
             break
         score = (clear, fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))

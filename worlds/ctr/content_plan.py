@@ -1131,6 +1131,8 @@ def generate(world):
         # with one check first, so the other open pad may be all the start has.
         return min(count, 1) if "gems" in fixed and mode_order != "fixed" else count
 
+    first_key_floor = content_fixed.FIRST_KEY_CHECKS if unlock_mode == 0 and "keys" in fixed else 0
+
     def needs_own_gem(physical, item):
         return (unlock_mode == 0 and "gems" in fixed and physical == content_fixed.GEM_PAD
                 and item.get("gem_cup") is not None)
@@ -1138,7 +1140,7 @@ def generate(world):
     chosen, registry = content_requirements.seat_content(world, chosen, pad_registry(), placement, manual,
                                                          len(settings.get("podium_rungs", ())),
                                                          seat_reach if unlock_mode == 0 else None, start_checks,
-                                                         needs_own_gem)
+                                                         needs_own_gem, first_key_floor)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
@@ -1285,34 +1287,68 @@ def generate(world):
     # the whole seed; or one per pad. Only entries with two or more modes take a
     # draw, so a Trophy-only plan draws nothing here.
     multi = [index for index in range(len(chosen)) if len(chosen[index].get("modes", ())) > 1]
-    seed_order = list(MODES)
-    if mode_order == "per_seed" and multi:
-        world.random.shuffle(seed_order)
     # With Lettersanity 2 or 3 a CTR Challenge needs letter items, so it is
     # never a pad's first mode when the pad has another (ruling 2026-10-17):
     # a CTR-first start would open no check. A fixed or per-seed order moves
     # it one place back; a per-pad order puts it at a uniformly drawn later
     # place. Seeds without those Lettersanity modes draw exactly as before.
     ctr_last = settings.get("lettersanity") in (2, 3)
-    # A Relic Race with no tier check is not a pad's first mode either: no check
-    # proves its win, and a Perfect check is more than a win. The CTR rule wins
-    # on a pad with only those two modes, whose later race then counts on its
-    # items alone.
-    entry_modes = {}
-    for index in multi:
-        modes = list(chosen[index]["modes"])
-        if mode_order == "per_pad":
-            world.random.shuffle(modes)
-        else:
-            modes.sort(key=seed_order.index)
-        if modes[0] == "relic" and not relics.get(chosen[index]["id"]):
-            modes.append(modes.pop(0))
-        if ctr_last and modes[0] == "ctr":
+
+    def draw_mode_order():
+        seed_order = list(MODES)
+        if mode_order == "per_seed" and multi:
+            world.random.shuffle(seed_order)
+        # A Relic Race with no tier check is not a pad's first mode either: no check
+        # proves its win, and a Perfect check is more than a win. The CTR rule wins
+        # on a pad with only those two modes, whose later race then counts on its
+        # items alone.
+        out = {}
+        for index in multi:
+            modes = list(chosen[index]["modes"])
             if mode_order == "per_pad":
-                modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
+                world.random.shuffle(modes)
             else:
-                modes[0], modes[1] = modes[1], modes[0]
-        entry_modes[index] = modes
+                modes.sort(key=seed_order.index)
+            if modes[0] == "relic" and not relics.get(chosen[index]["id"]):
+                modes.append(modes.pop(0))
+            if ctr_last and modes[0] == "ctr":
+                if mode_order == "per_pad":
+                    modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
+                else:
+                    modes[0], modes[1] = modes[1], modes[0]
+            out[index] = modes
+        return out
+
+    def first_key_checks(orders):
+        # Checks open before a fixed first Key: the first race of the pads
+        # seat_content calls near the start.
+        total = 0
+        for index, item in enumerate(chosen):
+            if not seat_reach(registry[index]):
+                continue
+            if not is_track(item):
+                total += start_checks(item)
+                continue
+            modes = orders.get(index, item["modes"])
+            total += sum(any(r["mode"] == modes[0] for r in c["routes"]) and not c.get("boost")
+                         for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings, letters.get(index, ()),
+                                               package_by_id.get(item.get("package_id")), capability, item_boxes,
+                                               relics.get(item["id"])))
+        return total
+
+    # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
+    # the whole seed; or one per pad. Only entries with two or more modes take a
+    # draw, so a Trophy-only plan draws nothing here. A drawn order that leaves a
+    # fixed first Key short of checks draws again; the best one stands.
+    entry_modes = draw_mode_order()
+    if first_key_floor and mode_order != "fixed" and multi:
+        best = first_key_checks(entry_modes)
+        for _ in range(content_requirements.PLACEMENT_REDRAWS):
+            if best >= first_key_floor:
+                break
+            orders = draw_mode_order()
+            if first_key_checks(orders) > best:
+                entry_modes, best = orders, first_key_checks(orders)
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
