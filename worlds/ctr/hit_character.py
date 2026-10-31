@@ -187,69 +187,6 @@ def unlock_triggers_for(bosses) -> Dict[int, Tuple[Tuple[int, ...], str]]:
     return out
 
 
-def identity_shuffled(bosses) -> bool:
-    """Does a `bosses` table differ from the retail encounters? Then the Key
-    fallback uses `CONTENT_PLAN_FALLBACK_KEYS`, which gives every guest a
-    count, because a retail boss may be raced nowhere."""
-    return {int(code): int(cid) for code, cid in dict(bosses).items()} != BOSS_WIN_OPPONENTS
-
-
-def fallback_table_for(bosses) -> Dict[int, int]:
-    return CONTENT_PLAN_FALLBACK_KEYS if identity_shuffled(bosses) else FALLBACK_KEYS
-
-
-def world_boss_identity(world) -> Dict[int, int]:
-    """The normal room's {boss win code -> raced engine id}: the resolved
-    boss encounters (`boss_encounters.boss_identity`)."""
-    from . import boss_encounters
-    return boss_encounters.boss_identity(world.options)
-
-
-#: `policy` block, verbatim.
-POLICY_SELF_CHARACTER = "never_seat_player"
-
-
-class HitCharacterLocationClass(LocationClass):
-    """The sixteen Hit Character checks as a `LocationClass` (#176 shape).
-
-    Global, not per-track: a hit can land wherever you race, so every check
-    parents to the world's root `Menu` region exactly as itemsanity does.
-    """
-
-    key = "hit_character"
-    display_name = "Hit Character Encounters"
-    code_blocks = (HIT_CHARACTER_CODE_BASE,)
-
-    #: The AP region every Hit Character check parents to.
-    REGION = "Menu"
-
-    def all_locations(self):
-        return [
-            (self.location_name(cid), HIT_CHARACTER_CODE_BASE + cid, self.REGION)
-            for cid in sorted(characters.CHARACTER_ID_TO_NAME)
-        ]
-
-    def location_name(self, engine_id: int) -> str:
-        """AP location name for an engine character id, e.g. 'Hit N. Tropy'."""
-        return f"Hit {characters.CHARACTER_ID_TO_NAME[int(engine_id)]}"
-
-    def created_location_names(self, options):
-        """All sixteen checks when the toggle is on, otherwise none."""
-        if options is None:
-            return []
-        toggle = getattr(options, "hit_character", None)
-        if toggle is None:
-            return []
-        value = getattr(toggle, "value", toggle)
-        if not bool(value):
-            return []
-        return list(self.names())
-
-
-#: The registered Hit Character class. `Locations.py` registers this instance.
-HIT_CHARACTER_CLASS = HitCharacterLocationClass()
-
-
 # ---------------------------------------------------------------------------
 # Deterministic resolution
 # ---------------------------------------------------------------------------
@@ -428,9 +365,8 @@ def resolve_for_generation(world) -> Dict[str, object] | None:
         return cached
     seed = int(world.random.getrandbits(32))
     world.ctr_hit_character_seed = seed
-    identity = world_boss_identity(world)
-    block = build_encounters(seed, bosses=identity)
-    _validate_block(block, fallback_table_for(identity), bosses=identity)
+    block = build_encounters(seed)
+    _validate_block(block)
     world.ctr_hit_character_encounters = block
     return block
 
@@ -540,12 +476,9 @@ def resolve_fallback(world, player: int) -> Dict[int, int]:
             if "fallback_keys" in entry
         }
     else:
-        identity = {int(code): int(cid) for code, cid in block["bosses"].items()}
-        triggers = unlock_triggers_for(identity)
-        table = fallback_table_for(identity)
-        fallback = fallback_guests(created_trigger_codes(world, player, triggers), table, triggers)
+        fallback = fallback_guests(created_trigger_codes(world, player))
         apply_fallback(block, fallback)
-        _validate_block(block, table, bosses=identity)
+        _validate_block(block)
     world.ctr_hit_character_fallback = fallback
     return fallback
 
@@ -850,13 +783,7 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    identity = bosses
-    if table is None:
-        # A normal room: the boss encounters were restored first (decision
-        # 9), so the block must name the racers those boss races seat.
-        identity = world_boss_identity(world)
-        table = fallback_table_for(identity)
-    _validate_block(block, table, content_cups, bosses=identity)
+    _validate_block(block, table, content_cups, bosses=bosses)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
     # The fallback determination is part of the restored data, not something a

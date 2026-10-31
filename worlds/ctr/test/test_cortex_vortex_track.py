@@ -219,9 +219,7 @@ class TestEligibility(unittest.TestCase):
         from .. import rung_sizer
         doc = yaml.safe_load((Path(__file__).parent / "fixtures"
                               / "scope_20261002_4003.yaml").read_text())
-        # The roll predates the Wumpa Shop (#249), whose default would add 50
-        # locations and hide the margin this pins.
-        options = dict(doc[ctrAPWorld.game], wumpa_shop_slots=0)
+        options = doc[ctrAPWorld.game]
         steps = STEPS + ("connect_entrances", "generate_basic")
         # Precondition: the fixture reproduces the refusal with the bare threshold.
         with mock.patch.object(rung_sizer, "target_categories",

@@ -27,12 +27,12 @@ nothing is drawn, so an option-off seed keeps its RNG stream and its output.
     lap position. A venue is certified for a garage only when that mapping
     keeps every segment distinct and in order (`inherited_attack_certified`),
     so a venue that cannot carry the inherited attack is rejected, as ruled.
-  * The four garages always get four distinct venues (decision 7 of
-    2026-10-28 removed `boss_encounter_repeats: allow`), drawn uniformly over
-    every valid four-way assignment. The whole assignment is tested, so
-    filters that look sufficient garage by garage but admit no matching fail
-    generation instead of falling back to a repeat. A track that also appears
-    on an ordinary pad or a Gem Cup leg never counts as a repeat.
+  * `boss_encounter_repeats: disallow` (default) draws four distinct venues,
+    uniformly over every valid four-way assignment. The whole assignment is
+    tested, so filters that look sufficient garage by garage but admit no
+    matching fail generation instead of falling back to a repeat. `allow`
+    draws each garage independently. A track that also appears on an ordinary
+    pad or a Gem Cup leg never counts as a repeat.
 
 THE STATIC EVIDENCE. `VENUES` records, per retail race track, the restart
 point (checkpoint) count of its 1P LEV, read from the NTSC-U disc
@@ -198,6 +198,8 @@ def validate_options(world) -> None:
                         ("boss_track_blocklist", "Boss Track Blocklist")):
         if getattr(o, name).value:
             note_ignored(world, f"{label} (Boss Track Shuffle off)")
+    if o.boss_encounter_repeats.value:
+        note_ignored(world, "Boss Encounter Repeats (no boss draw is on)")
 
 
 def _who(world) -> str:
@@ -244,24 +246,25 @@ def draw(world) -> None:
                 f"track left for {region} after boss_track_allowlist and "
                 "boss_track_blocklist.")
     keys = [key for key, _r, _c, _h in GARAGES]
-    # Boss encounters never repeat (decision 7, 2026-10-28; the former
-    # boss_encounter_repeats: allow is gone). Same draw as choosing from every
-    # distinct four-way assignment, without listing them (0.3.0 review
-    # finding 2).
-    picked = choose_distinct_assignment(
-        world.random, [candidates[key] for key in keys])
-    if picked is None:
-        raise OptionError(
-            f"CTR ({_who(world)}): boss_track_shuffle cannot give the four "
-            "boss garages four different tracks from the allowed pool ("
-            + ", ".join(venue_pool(o)) + "). Allow more tracks.")
+    if int(o.boss_encounter_repeats.value) == 1:
+        picked = [world.random.choice(candidates[key]) for key in keys]
+    else:
+        picked = choose_distinct_assignment(
+            world.random, [candidates[key] for key in keys])
+        if picked is None:
+            raise OptionError(
+                f"CTR ({_who(world)}): boss_track_shuffle cannot give the four "
+                "boss garages four different tracks from the allowed pool ("
+                + ", ".join(venue_pool(o)) + "). Allow more tracks or set "
+                "boss_encounter_repeats: allow.")
     drawn = {key: track for key, track in zip(keys, picked)}
     if existing is None:
         o._boss_track_venues = drawn
         return
     if (sorted(existing) != sorted(keys)
             or any(existing[key] not in candidates[key] for key in keys)
-            or len(set(existing.values())) != len(keys)):
+            or (int(o.boss_encounter_repeats.value) == 0
+                and len(set(existing.values())) != len(keys))):
         raise ValueError(f"CTR: preset boss venues {existing} are not a valid "
                          "draw for this option set")
 
@@ -428,6 +431,7 @@ def restore_from_wire(world, passthrough: Mapping) -> None:
     # the subordinate-option guard.
     o.boss_track_allowlist.value = set()
     o.boss_track_blocklist.value = set()
+    o.boss_encounter_repeats.value = 0
     o._boss_track_venues = parse_wire(block) if flag else dict(retail_venues())
 
 

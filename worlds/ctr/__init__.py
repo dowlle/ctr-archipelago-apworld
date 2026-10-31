@@ -17,16 +17,12 @@ from .Items import load_item_table
 from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
 from . import boss_track_shuffle
-from . import boss_encounters
 from . import cortex_vortex_track
 from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
 from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITEM_NAMES
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from . import wumpa_family
-from . import wumpa_shop
-from . import spoiler_items
-from . import race_structure
 from . import lettersanity
 from .Options import (ctrAPOptions, OxideGoal, FinalOxideUnlock,
                       create_option_groups)
@@ -274,9 +270,8 @@ class ctrAPWorld(World):
         co = passthrough.get("ctr_options", {})
         from .cup_sweeps import restore_options as restore_sweep_options
         restore_sweep_options(o, passthrough)
-        # #169: pin the seed's boss encounters (venue, opponent, kit) from
-        # the wire, never redraw.
-        boss_encounters.restore_from_wire(self, passthrough)
+        # #169 tier 1: pin the seed's boss venues from the wire, never redraw.
+        boss_track_shuffle.restore_from_wire(self, passthrough)
 
         def _restore(opt_name: str, key: str) -> None:
             if key in co:
@@ -499,12 +494,6 @@ class ctrAPWorld(World):
         # pre-activation seed and restore to off / zero, which is honest --
         # such a seed created none of these items.
         wumpa_family.restore_slot_data(o, co)
-        # Spoiler Items (#459): restored so the regenerated pool holds the same
-        # reveal items. Absent key is a pre-#459 seed and restores to off.
-        spoiler_items.restore_slot_data(o, co)
-        # Adventure structure and race type menu (#208). Absent keys are a
-        # pre-#208 room and restore to classic and the 0.3.0 menu default.
-        race_structure.restore_slot_data(o, co)
         # The wumpa CHECK is a three-way mode (2026-08-29 spec) with an
         # always-emitted scalar. Prefer the scalar; fall back to block presence
         # for a pre-widening seed, where a present block always meant the single
@@ -536,9 +525,6 @@ class ctrAPWorld(World):
         # options emit (Cortex Vortex's dropped destination was restored
         # above), otherwise the restore refuses. See relic_perfect.
         relic_perfect.restore_from_wire(o, passthrough)
-        # #249: the shop and goal values; absent keys are a seed with banking
-        # off, whatever the tracking player's own YAML default says.
-        wumpa_shop.restore_options(o, passthrough)
 
     def generate_early(self) -> None:
         """Universal Tracker restore, then the option interaction / constraint
@@ -558,10 +544,6 @@ class ctrAPWorld(World):
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         if passthrough and "content_plan" in passthrough:
             from . import content_plan
-            # #208: content-plan rooms carry no `ctr_options` structure key;
-            # the plan's `adventure_structure` (job J11) is restored by
-            # content_plan.restore, after the menu default here.
-            race_structure.restore_slot_data(self.options, {})
             content_plan.restore(self, passthrough)
             return
         if self.options.content_pool.value:
@@ -593,11 +575,11 @@ class ctrAPWorld(World):
             _forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups(self)
             # No one-way DeathLink (2026-09-30): sending implies receiving.
             _forced_options.resolve_death_link_off_when_send_conditions_set(self)
-            # Boss encounters (#169): freeze the four garage venues, opponents
-            # and kits before the Cortex Vortex draw, whose supply check
-            # counts Wumpa locations a boss venue can keep. Draws nothing
-            # with the switches off, so such a seed keeps its RNG stream.
-            boss_encounters.draw(self)
+            # Boss track shuffle (#169 tier 1): freeze the four garage venues
+            # before the Cortex Vortex draw, whose supply check counts Wumpa
+            # locations a boss venue can keep. Draws nothing with the option
+            # off, so such a seed keeps its RNG stream.
+            boss_track_shuffle.draw(self)
             cortex_vortex_track.draw_dropped_destination(self)
         if not hasattr(self.options, "_lettersanity_selected"):
             mode = int(self.options.lettersanity.value)
@@ -1092,8 +1074,6 @@ class ctrAPWorld(World):
         schema>=7-aware native never reads this for evaluation. -1 when the
         composed goal has no single-condition legacy analogue."""
         o = self.options
-        if o.goal_wumpa.value > 0:
-            return -1  # no single-condition legacy goal banks fruit
         oxide = o.oxide_goal.value
         bosses = o.bosses_required_goal.value
         gems = o.gems_required_goal.value
@@ -1241,12 +1221,6 @@ class ctrAPWorld(World):
         if o.gems_required_goal.value > 0:
             self._ctr_gems_predicate = self.gemgoal(
                 player, o.gems_required_goal.value, predicates)
-
-        # #249: bank N fruit over the seed. Logic needs only that fruit can be
-        # banked (`Wumpa Income`); the amount costs time, not items. Native
-        # counts its own persisted banking, never checked or Collected slots.
-        if o.goal_wumpa.value > 0:
-            predicates.append(wumpa_shop.goal_term(self).compile())
 
         # generate_early's raise_if_composed_goal_is_empty already rejects the
         # all-off combination, so this can never be empty here; the assert is
@@ -1480,14 +1454,6 @@ class ctrAPWorld(World):
                     f"CTR Hit Character ({self.multiworld.player_name[self.player]}): "
                     f"{characters.CHARACTER_ID_TO_NAME[int(_guest)]} has no unlock race in this seed and "
                     f"joins races at {_keys} {'Key' if _keys == 1 else 'Keys'}.\n")
-            # Boss opponent and kit shuffle on content plans (job J11): the
-            # same lines as a normal seed's; nothing when nothing is drawn.
-            from . import content_bosses
-            _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
-            if _lines:
-                spoiler_handle.write(f"CTR boss encounters ({self.multiworld.player_name[self.player]}):\n")
-                for _line in _lines:
-                    spoiler_handle.write(f"  {_line}\n")
             return
         # Character phase (#54/#209): which racer this seed starts you as, and
         # which pads demand a specific racer. Both are per-seed DRAWS rather
@@ -1497,13 +1463,9 @@ class ctrAPWorld(World):
         spoiler_handle.write(
             f"\n\nCTR starting character ({_player_name}): "
             f"{getattr(self, 'ctr_starting_character', '?')}\n")
-        _boss_venues = boss_encounters.spoiler_lines(self.options)
+        _boss_venues = boss_track_shuffle.spoiler_lines(self.options)
         if _boss_venues:
-            spoiler_handle.write(f"CTR boss encounters ({_player_name}):\n"
-                                 if boss_encounters.opponent_on(self.options)
-                                 or boss_encounters.kit_on(self.options)
-                                 or boss_encounters.final_on(self.options)
-                                 else f"CTR boss tracks ({_player_name}):\n")
+            spoiler_handle.write(f"CTR boss tracks ({_player_name}):\n")
             for _line in _boss_venues:
                 spoiler_handle.write(f"  {_line}\n")
         _locks = getattr(self, "ctr_racer_locks", {}) or {}

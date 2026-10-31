@@ -43,9 +43,6 @@ SEEDS = (1, 2, 3, 17, 183, 404)
 
 
 def _build(seed, **options):
-    # Research seeds from before the Wumpa Shop (#249): its default of ten
-    # slots per hub changes the fill, so pin it off.
-    options.setdefault("wumpa_shop_slots", 0)
     return setup_multiworld(ctrAPWorld, seed=seed, options=options)
 
 

@@ -37,7 +37,6 @@ unminted for growth. Every name registers unconditionally. Approved in the
 
 FROZEN-NAME WARNING: once released these names and codes are permanent.
 """
-from random import Random
 from typing import Dict, List, Tuple
 
 from .location_class import LocationClass
@@ -74,8 +73,7 @@ class WumpaShopLocationClass(LocationClass):
         return shop_name(hub, slot)
 
     def created_location_names(self, options) -> List[str]:
-        n = shop_slots(options)
-        return [shop_name(hub, k) for hub in SHOP_HUBS for k in range(1, n + 1)]
+        return []
 
 
 WUMPA_SHOP_CLASS = WumpaShopLocationClass()
@@ -98,8 +96,6 @@ PRICE_BANDS: Dict[str, Tuple[int, int]] = {
 UNLOCK_STEP = 50
 
 WUMPA_INCOME = "Wumpa Income"
-WUMPA_INCOME_REGION = "Wumpa Income"
-SHOP_BLOCK_VERSION = 1
 LOCATION_TYPE = "wumpa_shop"
 
 
@@ -125,11 +121,6 @@ def goal_wumpa(options) -> int:
     return max(0, _value(options, "goal_wumpa", 0))
 
 
-def banking_active(options) -> bool:
-    """Native banks fruit when the shop or the Wumpa goal is on."""
-    return shop_slots(options) > 0 or goal_wumpa(options) > 0
-
-
 def initial_shelves(slots: int) -> int:
     """Slots on sale from the start: the first half, rounded up, and at least
     two (design review 2026-10-16)."""
@@ -149,157 +140,9 @@ def progression_excluded(options) -> bool:
     return _value(options, "wumpa_shop_progression", 0) == 1
 
 
-def restricted_slot_count(options) -> int:
-    """Shop slots that cannot hold progression: every slot with `excluded`,
-    none with `allowed`. The rung sizer counts them as room for useful items
-    and filler only."""
-    return len(SHOP_HUBS) * shop_slots(options) if progression_excluded(options) else 0
-
-
 def unlock_banked(slot: int, slots: int, percent: int) -> int:
     """Lifetime banked fruit that puts `slot` on sale (0 = from the start)."""
     later = slot - initial_shelves(slots)
     return 0 if later <= 0 else _scale(UNLOCK_STEP * later, percent)
 
 
-def income_tracks(world) -> List[str]:
-    """Retail trophy tracks this seed keeps whose finish banks fruit."""
-    from . import cortex_vortex_track
-    from .wumpa_checks import WUMPA_ALWAYS_RACEABLE_TRACKS
-    dropped = cortex_vortex_track.dropped_track(world.options)
-    return [t for t in WUMPA_ALWAYS_RACEABLE_TRACKS if t != dropped]
-
-
-# ── generation ──────────────────────────────────────────────────────────────
-
-def create_locations(world, regions: list, region_lookup: dict) -> None:
-    """Create the `Wumpa Income` event and this seed's shop slots. Draws one
-    random value only when the shop is on, so a seed with the shop off keeps
-    its random stream."""
-    from BaseClasses import Entrance, Location, Region
-    from .Locations import create_location
-    o, player, mw = world.options, world.player, world.multiworld
-    world.ctr_wumpa_shop_base_prices = {}
-    if not banking_active(o):
-        return
-    income = Region(WUMPA_INCOME_REGION, player, mw)
-    income.type = "wumpa_income"
-    mw.regions.append(income)
-    regions.append(income)
-    region_lookup[income.name] = income
-    world.ctr_wumpa_income_entrances = []
-    for track in income_tracks(world):
-        source = region_lookup.get(track)
-        if source is None:
-            continue
-        ent = Entrance(player=player, name=f"{track} -> {WUMPA_INCOME_REGION}",
-                       parent=source)
-        ent.access_rule_text = "True"
-        ent.connect(income)
-        source.exits.append(ent)
-        mw.regions.entrance_cache[player][ent.name] = ent
-        world.ctr_wumpa_income_entrances.append((track, ent.name))
-    if not world.ctr_wumpa_income_entrances:
-        from Options import OptionError
-        raise OptionError("CTR: the Wumpa Shop and the Wumpa goal need a retail "
-                          "race to bank fruit, and this seed keeps none.")
-    event = Location(player, WUMPA_INCOME, None, income)
-    event.logic_text = "True"
-    event.place_locked_item(world.create_event(WUMPA_INCOME))
-    income.locations.append(event)
-    mw.regions.location_cache[player][WUMPA_INCOME] = event
-
-    slots = shop_slots(o)
-    if not slots:
-        return
-    rng = Random(world.random.getrandbits(64))
-    excluded = progression_excluded(o)
-    for hub in SHOP_HUBS:
-        region = region_lookup[hub]
-        low, high = PRICE_BANDS[hub]
-        for n in range(1, slots + 1):
-            name = shop_name(hub, n)
-            loc = create_location(player, name, region)
-            loc.type = LOCATION_TYPE
-            loc.logic_text = "True"
-            # `excluded` keeps progression out of every slot; useful items
-            # and filler may still go there (design: "only filler and useful
-            # items land there"), so it is an item rule, not AP EXCLUDED.
-            if excluded:
-                loc.item_rule = lambda item: not item.advancement
-            region.locations.append(loc)
-            mw.regions.location_cache[player][name] = loc
-            world.ctr_wumpa_shop_base_prices[name] = rng.randint(low, high)
-
-
-def install_rules(world, player: int) -> None:
-    """Income routes take the track's finish requirement, as its Finish (Any
-    Position) rung does: the USF finish term on the USF tracks, nothing more
-    elsewhere (the pad entrance already carries the unlock and racer lock).
-    Shop slots need income."""
-    from .logic_terms import Has, and_term
-    from .usf_finish import ALL_USF_FINISH_TRACKS, track_finish_t
-    mw = world.multiworld
-    for track, name in getattr(world, "ctr_wumpa_income_entrances", ()):
-        if track in ALL_USF_FINISH_TRACKS:
-            and_term(mw.get_entrance(name, player), track_finish_t(track, world))
-    for name in getattr(world, "ctr_wumpa_shop_base_prices", {}):
-        and_term(mw.get_location(name, player), Has(WUMPA_INCOME, 1, player))
-
-
-def goal_term(world):
-    """The goal arm's logic: fruit can be banked at all. The amount is time."""
-    from .logic_terms import Has
-    return Has(WUMPA_INCOME, 1, world.player)
-
-
-def slot_price(world, name: str) -> int:
-    """Final price: the drawn band price scaled, or the hub's lowest price
-    when the slot holds progression after fill."""
-    hub = name.split(" Shop: Slot ")[0]
-    percent = _value(world.options, "wumpa_shop_prices", 100)
-    loc = world.multiworld.get_location(name, world.player)
-    if loc.item is not None and loc.item.advancement:
-        return price_band(hub, percent)[0]
-    return _scale(world.ctr_wumpa_shop_base_prices[name], percent)
-
-
-def options_to_wire(options) -> Dict[str, object]:
-    """The five `ctr_options` keys, emitted when banking is on."""
-    return {"wumpa_shop_slots": shop_slots(options),
-            "wumpa_shop_prices": _value(options, "wumpa_shop_prices", 100),
-            "wumpa_shop_progression": _value(options, "wumpa_shop_progression", 0),
-            "wumpa_shop_hints": bool(_value(options, "wumpa_shop_hints", 1)),
-            "goal_wumpa": goal_wumpa(options)}
-
-
-def block_from(slots: int, percent: int, price_of) -> Dict[str, object]:
-    """The `wumpa_shop` block for `slots` per hub; `price_of(name)` gives each
-    slot's final price. Pure, so the shared wire fixture can pin it."""
-    return {"version": SHOP_BLOCK_VERSION, "hubs": [
-        {"level": SHOP_LEVEL_IDS[hub],
-         "slots": [{"code": shop_code(hub, n),
-                    "price": price_of(shop_name(hub, n)),
-                    "unlock_banked": unlock_banked(n, slots, percent)}
-                   for n in range(1, slots + 1)]}
-        for hub in SHOP_HUBS]}
-
-
-def wire_block(world) -> Dict[str, object]:
-    """The `wumpa_shop` slot_data block (emitted when slots > 0)."""
-    o = world.options
-    return block_from(shop_slots(o), _value(o, "wumpa_shop_prices", 100),
-                      lambda name: slot_price(world, name))
-
-
-def restore_options(options, wire: Dict[str, object]) -> None:
-    """Universal Tracker: the seed's five values. A wire without them is a
-    seed with banking off, whatever the tracking player's YAML says. Prices
-    and shelf unlocks are not in logic, so the block itself is not needed."""
-    co = wire.get("ctr_options", {}) or {}
-    for key, fallback in (("wumpa_shop_slots", 0), ("wumpa_shop_prices", 100),
-                          ("wumpa_shop_progression", 0), ("wumpa_shop_hints", 1),
-                          ("goal_wumpa", 0)):
-        value = co.get(key, fallback)
-        option = getattr(options, key)
-        option.value = int(value) if type(value) in (int, bool) else fallback

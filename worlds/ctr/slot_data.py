@@ -10,8 +10,7 @@ import logging
 from typing import Dict, List
 
 from . import (characters, cortex_vortex_track, hit_character,
-               progressive_capability, traps, version, wumpa_family, spoiler_items,
-               race_structure)
+               progressive_capability, traps, version, wumpa_family)
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS
 from .custom_tracks import (custom_tracks_to_wire, resolved_custom_tracks)
 from .gem_cup_legs import cup_legs_to_wire, resolved_gem_cup_legs_table
@@ -50,16 +49,6 @@ def resolve_warp_pad_map(world) -> Dict[str, int]:
         if 0 <= lid < world.WARP_PAD_ID_RANGE or meta.get("kind") == "cup":
             m[str(lid)] = int(target_track_id)
     return m
-
-
-def _boss_oxide_in_pool(o) -> bool:
-    from .boss_encounters import oxide_in_pool
-    return oxide_in_pool(o)
-
-
-def _boss_gauntlet(o) -> bool:
-    from .boss_encounters import gauntlet_on
-    return gauntlet_on(o)
 
 
 def resolve_gem_cup_legs(world) -> Dict[str, List[int]]:
@@ -237,7 +226,7 @@ def fill_slot_data(world) -> Dict[str, object]:
         from . import content_plan
         wire = content_plan.wire(world)
         wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
-        wire["ctr_options"].update(spoiler_items.fill_slot_data(world))
+        wire["ctr_options"]["spoiler_items"] = bool(world.options.spoiler_items.value)
         return wire
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -365,17 +354,6 @@ def fill_slot_data(world) -> Dict[str, object]:
             # #169 tier 1 (schema 18): always emitted; True exactly when
             # the top-level boss_encounters block below is present.
             "boss_track_shuffle": bool(o.boss_track_shuffle.value),
-            # #169 tiers 2 and 3 (schema 18): always emitted; either True
-            # makes boss_encounters a version 2 block.
-            "boss_opponent_shuffle": bool(o.boss_opponent_shuffle.value),
-            "boss_kit_shuffle": bool(o.boss_kit_shuffle.value),
-            # Decisions 5 to 7 of 2026-10-28 (schema 18): always emitted.
-            # boss_oxide_in_pool is the effective value (needs the opponent
-            # switch); any of these makes boss_encounters a version 2 block.
-            "boss_oxide_in_pool": _boss_oxide_in_pool(o),
-            "purple_cup_boss_gauntlet": _boss_gauntlet(o),
-            "oxide_attack_profile": ("all_compatible" if int(o.oxide_attack_profile.value) == 1
-                                     else "retail"),
             # Warp-pad item display (issue #59): 0 one_pile / 1
             # by_reward_type. ADDITIVE key, no schema bump -- the one_lap_cups
             # precedent: native json_int defaults the absent key to 0, which
@@ -538,17 +516,6 @@ def fill_slot_data(world) -> Dict[str, object]:
             # location membership. Reading a config flag as well would add a
             # second source of truth for one boolean.
             "turbo_grant": bool(o.turbo_grant.value),
-            # Spoiler Items (#459, schema 18): always emitted. Native READS
-            # this key: on, it hides the pad reward previews until Warp Pad
-            # Preview arrives and keeps AP boxes pink until AP Box Colours
-            # arrives. Absent means off, today's previews. Display only: no
-            # rule reads it or the two items.
-            **spoiler_items.fill_slot_data(world),
-            # Adventure structure and race type menu (#208, schema 18):
-            # always emitted, as strings. Native READS both: absent means
-            # classic and the 0.3.0 `always` menu. ctr_first also emits the
-            # top-level `race_structure` block below.
-            **race_structure.fill_slot_data(world),
             "lettersanity": int(o.lettersanity.value),
             # #109 box scalars, same convention: both always emitted raw
             # (shortcut_knowledge even when box_locations is false, so
@@ -633,20 +600,6 @@ def fill_slot_data(world) -> Dict[str, object]:
         from .crystal_checks import wire_block
         slot_data["ctr_options"]["crystalsanity"] = True
         slot_data["crystal_checks"] = wire_block(world)
-    from . import wumpa_shop
-    if wumpa_shop.banking_active(o):
-        # #249 (schema 18): the five option values ride ctr_options only when
-        # the shop or the Wumpa goal is on, so a seed with both off keeps its
-        # wire. Native reads goal_wumpa and wumpa_shop_hints; the block below
-        # carries every live slot with its price and shelf unlock.
-        slot_data["ctr_options"].update(wumpa_shop.options_to_wire(o))
-        if wumpa_shop.shop_slots(o):
-            slot_data["wumpa_shop"] = wumpa_shop.wire_block(world)
-    structure_block = race_structure.race_structure_block(world)
-    if structure_block is not None:
-        # #208 ctr_first: which CTR Challenge win also sends which Trophy
-        # Race check. Omitted in classic, so a classic room keeps its shape.
-        slot_data["race_structure"] = structure_block
     if o.itemsanity.value:
         # Additive under schema 7.  Omitted when off, so disabled seeds do
         # not gain a dormant 22-slot feature block.
@@ -724,10 +677,10 @@ def fill_slot_data(world) -> Dict[str, object]:
             "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
             world.player_name, error)
     slot_data["trap_identities"] = traps.trap_identities_block(world.item_name_to_id)
-    # #169 (schema 18): the four resolved boss garage encounters, keyed by
-    # physical garage. Absent = retail encounters.
-    from .boss_encounters import wire_block as boss_encounters_block
-    boss_encounters = boss_encounters_block(o, world)
+    # #169 tier 1 (schema 18): the four resolved boss garage encounters,
+    # keyed by physical garage. Absent = retail encounters.
+    from .boss_track_shuffle import wire_block as boss_encounters_block
+    boss_encounters = boss_encounters_block(o)
     if boss_encounters is not None:
         slot_data["boss_encounters"] = boss_encounters
     return slot_data

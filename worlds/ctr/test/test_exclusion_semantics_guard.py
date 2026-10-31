@@ -122,9 +122,6 @@ EVENT_ALLBOSSES_SAMPLE = "Ripper Roo Boss Race Won"
 def _build(seed=_PRIMARY_SEED, **option_overrides):
     """A multiworld through set_rules -- i.e. exactly where Main.py is when it
     starts running exclusion_rules and the priority loop, per Main.py:110-135."""
-    # Pool-capacity fixture from before the Wumpa Shop (#249): its default of
-    # ten slots per hub adds 50 locations, so pin it off.
-    option_overrides.setdefault("wumpa_shop_slots", 0)
     return setup_multiworld(ctrAPWorld, steps=_STEPS, seed=seed,
                             options=option_overrides)
 
