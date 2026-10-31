@@ -1015,16 +1015,17 @@ def _draw_racers(world, record, pools):
     return {g: picked[g] for g in range(4)}, (picked[4] if with_final else be.OXIDE_NAME)
 
 
-def draw_home_venues(world, record):
+def draw_home_venues(world, record, cups=()):
     """character_home_track: ({garage: home track venue}, racers, final
     racer). The racers are drawn first among those whose home track is in the
-    boss track pool and carries the garage's attack, as on the ordinary room."""
+    boss track pool and carries the garage's attack. A boss cup garage races
+    its drawn legs, so any racer of the pool fits it."""
     be = _be()
     o = world.options
     boss_track_shuffle.validate_options(world)
     pool = set(boss_track_shuffle.venue_pool(o))
     pools = [[n for n in be.opponent_pool(o)
-              if be.HOME_TRACK[n] in pool and boss_track_shuffle.inherited_attack_certified(_venue_key(g),
+              if g in cups or be.HOME_TRACK[n] in pool and boss_track_shuffle.inherited_attack_certified(_venue_key(g),
                                                                                            be.HOME_TRACK[n])]
              for g in range(4)]
     racers, final = _draw_racers(world, record, pools)

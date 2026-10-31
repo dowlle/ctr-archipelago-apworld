@@ -1316,15 +1316,15 @@ def generate(world):
         # racers are drawn first and race their home tracks; otherwise the
         # venue draw is unchanged and the racers are drawn after it. Nothing
         # is drawn with the switches off.
+        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs.
+        boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         if content_bosses.home_paired(boss_record):
-            boss_venues, boss_racers, boss_final_racer = content_bosses.draw_home_venues(world, boss_record)
+            boss_venues, boss_racers, boss_final_racer = content_bosses.draw_home_venues(world, boss_record, boss_cups)
         else:
             boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom)
             boss_racers, boss_final_racer = content_bosses.draw_racers(world, boss_record)
         boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
                       else content_bosses.OXIDE_STATION)
-        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs.
-        boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         # Boss kit shuffle and N. Oxide's profile (job J11), on the plan's venues.
         boss_opponents = content_bosses.draw_encounters(world, boss_record, boss_venues, boss_racers,
                                                         boss_final_racer, dict(boss_custom), boss_cups)

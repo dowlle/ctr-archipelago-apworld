@@ -89,6 +89,11 @@ class TestBossCups(unittest.TestCase):
         self.assertEqual(plan["bosses"]["track_assignment"], "character_home_track")
         self.assertTrue(content_plan.validate(plan))
 
+    def test_home_tracks_do_not_limit_a_cup_garage(self):
+        o = options(bosses=dict(cups=4), boss_track_shuffle=True, boss_opponent_shuffle=True,
+                    boss_track_allowlist=["Roo's Tubes"])
+        self.assertEqual(sorted(make_world(o, seed=1).ctr_content_plan["bosses"]["cups"]), [0, 1, 2, 3])
+
     def test_a_forged_cup_kit_is_refused(self):
         plan = copy.deepcopy(self.cup_world().ctr_content_plan)
         g = plan["bosses"]["cups"][0]
