@@ -1,0 +1,5 @@
+  oxide_goal: disabled
+  bosses_required_goal: 0
+  gems_required_goal: 0
+  goal_wumpa: {300: 1, 1000: 1, 5000: 1}
+  wumpa_shop_slots: {0: 1, 5: 1, 10: 2}

@@ -31,8 +31,6 @@ OFF IS GENERATION-NEUTRAL. With the option off this module creates nothing and
 takes no random draw; the only wire difference from a pre-#459 seed is the
 always-emitted `false`.
 """
-from typing import List
-
 #: The two reveal items, minted in minted_items_030 (frozen names and codes).
 WARP_PAD_PREVIEW_ITEM = "Warp Pad Preview"
 WARP_PAD_PREVIEW_CODE = 35010204
@@ -43,69 +41,6 @@ ITEM_CODES = {WARP_PAD_PREVIEW_ITEM: WARP_PAD_PREVIEW_CODE,
               AP_BOX_COLOURS_ITEM: AP_BOX_COLOURS_CODE}
 
 
-def enabled(world) -> bool:
-    """The seed's value, read from the connected room on a Tracker restore.
-
-    The content-plan restore bypasses the ordinary option restorer, so this
-    resolves the option the same way `wumpa_family.reserve_top_up_enabled`
-    does, for both the item creator and the wire emitter.
-    """
-    passthrough = getattr(getattr(world, "multiworld", None), "re_gen_passthrough", {}).get(
-        getattr(world, "game", ""))
-    if passthrough:
-        world.options.spoiler_items.value = int(bool(
-            passthrough.get("ctr_options", {}).get("spoiler_items", False)))
-    return bool(world.options.spoiler_items.value)
-
-
 def box_colours_item_wanted(options) -> bool:
     """Whether the seed has coloured AP boxes for AP Box Colours to reveal."""
     return bool(options.box_locations.value) and bool(options.color_boxes_by_item.value)
-
-
-def created_item_names(world) -> List[str]:
-    """The reveal items this seed creates: none, one or two, in code order."""
-    if not enabled(world):
-        return []
-    names = [WARP_PAD_PREVIEW_ITEM]
-    if box_colours_item_wanted(world.options):
-        names.append(AP_BOX_COLOURS_ITEM)
-    return names
-
-
-def raise_if_items_do_not_fit(pool_size: int, unfilled: int, names) -> None:
-    """Refuse a seed whose enabled reveal items are what overflows its pool.
-
-    Fires only when the pool without the reveal items fits and the pool with
-    them does not, so the message blames the right family. Any other overflow
-    is left to the character-unlock and general capacity checks after it.
-    """
-    from Options import OptionError
-    count = len(names)
-    if not count or pool_size <= unfilled or pool_size - count > unfilled:
-        return
-    missing = pool_size - unfilled
-    raise OptionError(
-        f"CTR: Spoiler Items needs {missing} more location(s) for "
-        f"{' and '.join(names[-missing:])}, which add no location of their own "
-        f"({pool_size} items, {unfilled} locations). Enable more checks (item "
-        "boxes, itemsanity, podium rungs or lettersanity locations) or turn "
-        "off Spoiler Items.")
-
-
-def fill_slot_data(world) -> dict:
-    """The always-emitted wire scalar."""
-    return {"spoiler_items": enabled(world)}
-
-
-def restore_slot_data(options, ctr_options) -> None:
-    """Universal Tracker restore: an absent key is a pre-#459 seed, off.
-
-    AP Box Colours depends on `color_boxes_by_item` too, which the ordinary
-    restore deliberately leaves alone (display only, pinned by
-    test_color_boxes_by_item). On a Spoiler Items room it decides the pool, so
-    restore it there from the always-emitted key; otherwise the Tracker's
-    default (on) would add an AP Box Colours the seed never created."""
-    options.spoiler_items.value = int(bool(ctr_options.get("spoiler_items", 0)))
-    if options.spoiler_items.value and "color_boxes_by_item" in ctr_options:
-        options.color_boxes_by_item.value = int(bool(ctr_options["color_boxes_by_item"]))

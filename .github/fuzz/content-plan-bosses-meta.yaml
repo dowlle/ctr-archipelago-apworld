@@ -78,6 +78,7 @@ Crash Team Racing:
   oxide_1_optional: {mandatory: 1, optional: 1}
   oxide_final_track: {cortex_vortex: 1, oxide_station: 1}
   oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, platinum_relics: 1, any_relic_type: 1, total_relics: 1}
+  boss_encounter_repeats: {disallow: 1, allow: 1}
   oxide_final_challenge_relic_count: {1: 1, 4: 1, 12: 1, 18: 1, 30: 1}
   boss_track_allowlist: []
   boss_track_blocklist: []
@@ -95,15 +96,12 @@ Crash Team Racing:
   wumpa_check: {global: 1, per_track: 7}
   relic_perfect_checks: true
   boss_track_shuffle: {true: 1, false: 1}
-  # Job J11: boss cups do not take a drawn opponent or kit yet and this arm
-  # draws boss cups, so the opponent and kit switches stay off here
-  # (content-plan-030-meta.yaml forces them). N. Oxide's all_compatible
-  # profile composes with boss cups and is drawn; the Purple Gem Cup
-  # gauntlet is ignored with a notice on content plans.
-  boss_opponent_shuffle: false
-  boss_kit_shuffle: false
+  # The opponent and kit switches compose with boss cups. The gauntlet needs the
+  # Purple Gem Cup, so it has its own arms.
+  boss_opponent_shuffle: {false: 1, true: 1}
+  boss_kit_shuffle: {false: 1, true: 1}
   boss_oxide_in_pool: false
-  purple_cup_boss_gauntlet: {false: 3, true: 1}
+  purple_cup_boss_gauntlet: false
   oxide_attack_profile: {retail: 1, all_compatible: 1}
   oxide_powerup_blocklist: []
   warp_pad_rules: {}

@@ -72,5 +72,10 @@ Crash Team Racing:
   relic_perfect_checks: true
   boss_track_shuffle: {true: 1, false: 1}
   warp_pad_rules: {}
+  # The Wumpa Shop is on by default; these arms roll it, and the row 5 overlays
+  # (.github/fuzz/overlays) set everything else row 5 added. A random gauntlet
+  # roll is refused without the kit switch, so it stays off here.
+  wumpa_shop_slots: {0: 1, 5: 1, 10: 2}
+  purple_cup_boss_gauntlet: false
   # Keys stay shuffled here; the pads-fixed arms fix them.
   shuffle_keys: true

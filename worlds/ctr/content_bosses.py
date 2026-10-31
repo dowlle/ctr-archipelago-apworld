@@ -190,12 +190,6 @@ def settings(world, raw):
     options, or None with bosses off. Takes no draw. The Final Challenge
     count is lowered to the base supply later (`resolve_relic_count`)."""
     o = world.options
-    from .notices import note_ignored
-    # The Purple Gem Cup gauntlet (decision 5) arms that cup's legs; content
-    # plans have no Purple Gem Cup, so it is ignored with a notice (job J11).
-    if o.purple_cup_boss_gauntlet.value:
-        note_ignored(world, "Purple Gem Cup Boss Gauntlet (content plans have no Purple Gem Cup)")
-        o.purple_cup_boss_gauntlet.value = 0
     wumpa = bool(o.goal_wumpa.value)
     enabled = raw.get("enabled")
     if type(enabled) is not bool:

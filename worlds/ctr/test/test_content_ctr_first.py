@@ -52,6 +52,15 @@ def assert_complete(case, world):
     case.assertEqual([loc.name for loc in mw.get_locations(world.player) if not loc.can_reach(state)], [])
 
 
+def all_but(mw, name):
+    """A state holding every pool item but those whose name starts with `name`."""
+    state = CollectionState(mw)
+    for item in mw.itempool:
+        if not item.name.startswith(name):
+            state.collect(item, True)
+    return state
+
+
 def first_world(seed=20261029, **overrides):
     for s in range(seed, seed + 40):
         try:
@@ -179,7 +188,7 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         world = None
         for seed in range(1, 60):
             try:
-                world = make_world(options, seed=seed)
+                world = make_world(options, seed=seed, stop_before="pre_fill")
                 break
             except OptionError:
                 continue
@@ -187,9 +196,7 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         mw = world.multiworld
         plan = world.ctr_content_plan
         pad = pad_of(plan, entry_of(plan, "retail:3"))
-        state = CollectionState(mw)
-        for _ in range(4):
-            state.collect(world.create_item("Key"), True)
+        state = all_but(mw, "Letter")
         trophy = mw.get_location("Crash Cove: Trophy Race", 1)
         ctr = mw.get_location("Crash Cove: CTR Token Challenge", 1)
         rung = next(mw.get_location(content_plan.LOCATION_BY_CODE[c["location"]], 1) for c in plan["checks"]
@@ -229,7 +236,7 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         world = None
         for seed in range(1, 60):
             try:
-                world = make_world(options, seed=seed)
+                world = make_world(options, seed=seed, stop_before="pre_fill")
                 break
             except OptionError:
                 continue
@@ -239,9 +246,7 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         self.assertEqual(by_name["Crash Cove: Trophy Race"].get("boost", 0), 0)
         self.assertEqual(by_name["Crash Cove: CTR Token Challenge"]["boost"], 1)
         mw = world.multiworld
-        state = CollectionState(mw)
-        for _ in range(4):
-            state.collect(world.create_item("Key"), True)
+        state = all_but(mw, "Progressive Boost")
         trophy = mw.get_location("Crash Cove: Trophy Race", 1)
         token = mw.get_location("Crash Cove: CTR Token Challenge", 1)
         if pad_of(plan, entry_of(plan, "retail:3"))["racer_lock"] is not None:

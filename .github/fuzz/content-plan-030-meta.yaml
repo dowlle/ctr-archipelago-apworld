@@ -5,13 +5,11 @@
 # pinned option) with every J11 feature forced on: adventure_structure
 # ctr_first, the Wumpa Shop (2 to 10 slots, allowed or excluded, any price
 # percentage) and the Wumpa goal, and Boss Opponent and Kit Shuffle with
-# N. Oxide in the pool and N. Oxide's all_compatible profile drawn. Boss cups
-# take no drawn opponent or kit yet, so this arm has none; the track
-# assignment, kit assignment, intensity and loss easing are drawn, and the
-# character and powerup lists stay empty (random lists refuse most draws:
-# bosses never repeat). Lettersanity leans to locations only: a ctr_first
-# start behind letter items has few open checks and the slot guard refuses
-# some of them.
+# N. Oxide in the pool and N. Oxide's all_compatible profile drawn, boss cups
+# included; the track assignment, kit assignment, intensity and loss easing are
+# drawn, and the character and powerup lists stay empty (random lists refuse
+# most draws: bosses never repeat). The gauntlet needs the Purple Gem Cup, so it
+# has its own arms.
 Crash Team Racing:
   accessibility: full
   # Job J11: content plans take the Wumpa Shop, the Wumpa goal and ctr_first.
@@ -56,7 +54,7 @@ Crash Team Racing:
           evidence: []
     cups: {count: {min: 0, max: 4}}
     crystals: {count: {min: 0, max: 4}}
-    bosses: {enabled: true, cups: 0}
+    bosses: {enabled: true, cups: {min: 0, max: 2}}
     required_entries: [custom/baby-t-park/1.0.2, custom/fuzz-fixture-loop/1.0]
   pad_layout: {placement: shuffle, stages: two, mode_order: per_pad, merge_trophy_ctr: false}
   item_pool:
@@ -99,6 +97,6 @@ Crash Team Racing:
   boss_character_blocklist: []
   boss_powerup_blocklist: []
   oxide_powerup_blocklist: []
-  purple_cup_boss_gauntlet: {false: 3, true: 1}
+  purple_cup_boss_gauntlet: false
   hit_character: {true: 1, false: 1}
   warp_pad_rules: {}

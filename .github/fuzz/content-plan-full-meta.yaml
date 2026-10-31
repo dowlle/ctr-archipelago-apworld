@@ -94,7 +94,7 @@ Crash Team Racing:
   boss_opponent_shuffle: false
   boss_kit_shuffle: false
   boss_oxide_in_pool: false
-  purple_cup_boss_gauntlet: {false: 3, true: 1}
+  purple_cup_boss_gauntlet: false
   oxide_attack_profile: {retail: 1, all_compatible: 1}
   oxide_powerup_blocklist: []
   warp_pad_rules: {}

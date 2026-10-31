@@ -2551,6 +2551,8 @@ def validate(plan):
     content_wumpa.check_supply(shop, item_plan, int(
         boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)))
     content_wumpa.check_income(plan)
+    require(not (boss_record or {}).get("gauntlet") or any(e["id"] == content_cups.gem_entry_id(PURPLE_GEM_CUP) for e in plan["entries"]),
+            "bosses.gauntlet needs the Purple Gem Cup")
     require("pad_requirements" in plan or not drawn, "a stage 1 record needs the pad_requirements record")
     if "pad_requirements" in plan:
         content_requirements.check_record(plan, drawn, later, manual, [

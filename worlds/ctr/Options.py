@@ -220,9 +220,9 @@ class BossOpponentShuffle(Toggle):
     boss-grade driving. With Boss Track Shuffle off, the race stays on the
     garage's own track; with both on, Boss Track Assignment decides the
     track. Each garage gets a different racer. N. Oxide is drawn only with
-    Boss Pool Includes N. Oxide on."""
-    # #169 tier 2 (0.3.0). Wire: ctr_options.boss_opponent_shuffle plus the
-    # version 2 boss_encounters block. See boss_encounters.py.
+    Boss Pool Includes N. Oxide on. Works with content_pool only."""
+    # #169 tier 2 (0.3.0). Wire: the plan's bosses record and boss race entries.
+    # See content_bosses.py.
     display_name = "Boss Opponent Shuffle"
 
 
@@ -232,8 +232,7 @@ class BossOxideInPool(Toggle):
     randomly drawn racer instead of N. Oxide (both of its races). All five
     bosses are different racers. N. Oxide's garage keeps its door, its
     checks and the goal. Ignored when Boss Opponent Shuffle is off."""
-    # Decision 7 of 2026-10-28. Wire: ctr_options.boss_oxide_in_pool and the
-    # boss_encounters `final` record. See boss_encounters.py.
+    # Decision 7 of 2026-10-28. Wire: the plan's bosses record. See content_bosses.py.
     display_name = "Boss Pool Includes N. Oxide"
 
 
@@ -274,9 +273,10 @@ class BossKitShuffle(Toggle):
 
     Each boss gets a new set of weapons, used at set points of the lap. The
     garage, its Key, its check and its racer stay the same unless the other
-    boss switches change them. N. Oxide keeps his own attacks."""
-    # #169 tier 3 (0.3.0). Wire: ctr_options.boss_kit_shuffle plus the
-    # version 2 boss_encounters block. See boss_encounters.py.
+    boss switches change them. N. Oxide keeps his own attacks. Works with
+    content_pool only."""
+    # #169 tier 3 (0.3.0). Wire: the plan's bosses record and boss race entries.
+    # See content_bosses.py.
     display_name = "Boss Kit Shuffle"
 
 
@@ -331,11 +331,10 @@ class PurpleCupBossGauntlet(Toggle):
     kit made the same way as the boss garage kits. The cup's tracks, racers
     and checks do not change, but the podium places get harder.
 
-    Needs Boss Kit Shuffle on; a YAML with this on and Boss Kit Shuffle off
-    is refused."""
-    # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire:
-    # ctr_options.purple_cup_boss_gauntlet and the boss_encounters `gauntlet`
-    # record. See boss_encounters.py.
+    Needs Boss Kit Shuffle on and the Purple Gem Cup in the seed; a YAML
+    without either is refused. Works with content_pool only."""
+    # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire: the plan's
+    # bosses.gauntlet. See content_bosses.py.
     display_name = "Purple Gem Cup Boss Gauntlet"
 
 
@@ -784,7 +783,7 @@ class WumpaShopSlots(Range):
 
     Later slots of each shop go on sale once enough fruit has been banked over
     the whole seed. Any slot may hold any item unless Wumpa Shop Progression
-    is excluded. Buying needs a connection to the server."""
+    is excluded. Buying needs a connection to the server. Works with content_pool only."""
     display_name = "Wumpa Shop Slots"
     range_start = 0
     range_end = 25
@@ -828,7 +827,7 @@ class GoalWumpa(Range):
     0 (default) turns this condition off. Banked fruit is the fruit you collect
     while already holding 10, plus the fruit you hold when you finish a race.
     Spending fruit in the Wumpa Shop never lowers this count. Every goal
-    condition you set must be met. 1000 is a long goal of many races."""
+    condition you set must be met. 1000 is a long goal of many races. Works with content_pool only."""
     display_name = "Wumpa Goal"
     range_start = 0
     range_end = 5000
@@ -1053,7 +1052,7 @@ class SpoilerItems(Toggle):
 
     Both are useful items that add no location, so each one takes a slot that
     would otherwise hold filler. Pads still open, close and count their checks
-    as usual; only the previews wait for the items."""
+    as usual; only the previews wait for the items. Works with content_pool only."""
     display_name = "Spoiler Items"
 
 
@@ -1063,15 +1062,15 @@ class AdventureStructure(Choice):
     - **classic** (default): as in the retail game. Win the Trophy Race
       first; the CTR Challenge and the Relic Race open after it.
     - **ctr_first**: the first race on each track is its CTR Challenge.
-      Winning it with the letters sends both that track's CTR Token
-      Challenge check and its Trophy Race check. The track has no plain
-      Trophy Race: item boxes, Wumpa and placement checks come from the CTR
-      Challenge race, and placement counts even without all the letters.
+      First place sends that track's Trophy Race check, and first place with
+      the letters also sends its CTR Token Challenge check. The track has no
+      plain Trophy Race: item boxes, Wumpa and placement checks come from the
+      CTR Challenge race, and placement counts even without the letters.
       The Relic Race still opens after that, behind the warp pad's second
       requirement.
 
-    The checks keep their names: "Trophy Race" stays the track's first
-    check even though a CTR Challenge win earns it. A track without a CTR
+    Works with content_pool only. The checks keep their names: "Trophy Race"
+    stays the track's first check even though the CTR Challenge earns it. A track without a CTR
     Challenge (a trial track set to trophy_race, a custom track without
     one) keeps the classic order. Not available with the experimental
     content plan."""
@@ -1079,26 +1078,6 @@ class AdventureStructure(Choice):
     option_classic = 0
     option_ctr_first = 1
     default = 0
-
-
-class RaceTypeSelector(Choice):
-    """When a warp pad asks which race to run.
-
-    - **always** (default): every race pad you can enter opens the race
-      type menu, with Trophy Race, CTR Challenge and Relic Race where the
-      track has them and the pad allows them. Under adventure_structure
-      ctr_first a track with a CTR Challenge has no Trophy Race row.
-    - **productive**: the menu opens only when more than one race type still
-      has a check, or when none has; with exactly one, the pad loads it.
-
-    Race types with nothing left to check are grey but you can still pick
-    them to race again. This is the starting value: the client's Options
-    menu can change it at any time. It only changes the menu, never what is
-    in logic."""
-    display_name = "Race Type Selector"
-    option_productive = 0
-    option_always = 1
-    default = 1
 
 
 class WarpPadUnlockRequirements(Choice):
@@ -1823,7 +1802,6 @@ class ctrAPOptions(PerGameCommonOptions):
     spoiler_items: SpoilerItems
     # race structure and the pad race type menu (#208)
     adventure_structure: AdventureStructure
-    race_type_selector: RaceTypeSelector
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1902,7 +1880,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem, SpoilerItems, RaceTypeSelector],
+                        ColorBoxesByItem, SpoilerItems],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 
