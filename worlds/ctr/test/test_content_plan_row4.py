@@ -257,6 +257,21 @@ class TestRelicGuard(unittest.TestCase):
         for seed in range(30):
             make_world(options(shuffle_gems=False, pad_layout=layout, **VANILLA), seed=seed)
 
+    def test_no_draw_leaves_a_cycle(self):
+        class World:
+            import random as random
+        cups_ = [dict(cup_index=i, gem_cup=i) for i in range(5)]
+        tracks = [dict(id=f"retail:{i}", retail_id=i) for i in range(4)]
+        seats = content_plan.pad_registry()
+        # Every draw is a cycle: only the last repair can clear it.
+        cycle_pad = content_fixed.GEM_PAD
+        for chosen in (cups_ + tracks, cups_):
+            for seed in range(30):
+                World.random.seed(seed)
+                content, seated = cr.seat_content(World, chosen, seats, "shuffle", {}, 0, lambda seat: 0,
+                                                  lambda item: 1, lambda physical, item: physical == cycle_pad and "gem_cup" in item)
+                self.assertFalse(any(seat[0] == cycle_pad and "gem_cup" in item for item, seat in zip(content, seated)))
+
     def test_gem_cup_never_needs_its_own_gem(self):
         for seed in range(60):
             plan = make_world(options(shuffle_gems=False, **VANILLA), seed=seed).ctr_content_plan
@@ -327,6 +342,32 @@ class TestGarages(unittest.TestCase):
                                                  for c in plan["checks"])
             short += total < content_fixed.FIRST_KEY_CHECKS
         self.assertLessEqual(short, 3)
+
+    def test_stuck_garages_ask_a_free_kind(self):
+        world = make_world(options(shuffle_keys=False), stop_before="pre_fill")
+        rows = world.ctr_content_items.rows
+        pins = dict.fromkeys(content_bosses.BOSS_CODES, "Key")
+        key = dict(op="count", item=KEY, count=1)
+
+        class Stuck:
+            random = world.random
+        original = content_bosses.draw_requirements
+        content_bosses.draw_requirements = lambda *_args: {g: dict(key) for g in range(4)}
+        try:
+            out = content_fixed.draw_garages(Stuck, world.ctr_content_plan["bosses"], rows, False, pins, [])
+        finally:
+            content_bosses.draw_requirements = original
+        self.assertEqual(content_fixed.stuck_garages(out, rows, pins, []), [])
+        self.assertEqual({p["item"] for p in out.values()}, {content_item_pool.ITEMS["Trophy"]})
+
+    def test_garages_without_trophies_stay_free_of_pins(self):
+        pool_ = dict(base=dict(trophies=0))
+        for seed in range(10):
+            world = make_world(options(shuffle_keys=False, item_pool=pool_), seed=seed, stop_before="pre_fill")
+            plan = world.ctr_content_plan
+            reqs = {int(r["id"].split(":")[1]): r["predicate"] for r in plan["requirements"] if r["id"].startswith("boss:")}
+            self.assertEqual(content_fixed.stuck_garages(reqs, world.ctr_content_items.rows,
+                                                         content_fixed.plan_placements(plan), plan["pads"]), [])
 
     def test_stand_ins_hold_the_pins(self):
         world = make_world(options(shuffle_keys=False, shuffle_gems=False))

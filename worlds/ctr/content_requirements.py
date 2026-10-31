@@ -216,10 +216,19 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
             if sum(start_checks(seated[p]) for p in seated if weight[p] == 2) >= need:
                 break
             donors = sorted((p for p in seated if weight[p] < 2 and p not in manual
-                             and start_checks(seated[p]) > start_checks(seated[physical])),
+                             and start_checks(seated[p]) > start_checks(seated[physical])
+                             and not (cycle and cycle(p, seated[physical]))),
                             key=lambda p: (-start_checks(seated[p]), p))
             if donors and physical not in manual:
                 seated[physical], seated[donors[0]] = seated[donors[0]], seated[physical]
+    # No redraw cleared a cycle: its content trades places, the deepest pad first.
+    for physical in [p for p, item in seated.items() if cycle and cycle(p, item)]:
+        others = sorted((p for p in seated if not cycle(p, seated[physical]) and not cycle(physical, seated[p])
+                         and p not in manual), key=lambda p: (weight[p], p))
+        if others:
+            seated[physical], seated[others[0]] = seated[others[0]], seated[physical]
+        else:
+            seated[next(seat[0] for seat in seats if seat[0] not in seated)] = seated.pop(physical)
     ordered = sorted(seated, key=[seat[0] for seat in seats].index)
     by_physical = {seat[0]: seat for seat in seats}
     return [seated[p] for p in ordered], [by_physical[p] for p in ordered] + [s for s in seats if s[0] not in seated]

@@ -169,7 +169,8 @@ def draw_garages(world, record, rows, vanilla, pins, pads):
     """{garage: predicate} of the four ordinary garages. Without a pin, or with
     the Trophy table of vanilla requirements, this is the plain draw. Otherwise a
     roll that leaves a garage stuck behind its own pins is drawn again, at most
-    GARAGE_REDRAWS times, and a garage still stuck asks Trophies."""
+    GARAGE_REDRAWS times. A garage still stuck asks for the first kind no pin holds,
+    Trophies when the seed has them, and a pool with no such kind is refused."""
     out = content_bosses.draw_requirements(world, record, rows, vanilla)
     if vanilla or not locked_copies(pins):
         return out
@@ -178,10 +179,14 @@ def draw_garages(world, record, rows, vanilla, pins, pads):
             return out
         out = content_bosses.draw_requirements(world, record, rows, vanilla)
     by_name = {row.name: row for row in rows}
-    supply = by_name["Trophy"].requirement_ceiling
-    for g in stuck_garages(out, rows, pins, pads) if supply else ():
-        low, high = content_bosses.garage_band(record["requirement_level"], g, supply)
-        out[g] = dict(op="count", item=by_name["Trophy"].item, count=world.random.randint(low, high))
+    pinned = set(locked_copies(pins))
+    for g in stuck_garages(out, rows, pins, pads):
+        kinds = [o for o in content_bosses.garage_options(by_name, g, record["requirement_level"]) if not pinned & set(o[1])]
+        if not kinds:
+            error("a boss garage can only ask for Keys or Gems that sit behind the garages themselves. Add other "
+                  "items to item_pool or shuffle the Keys or Gems. No content was changed.")
+        _label, names, _weight, low, high = kinds[0]
+        out[g] = content_bosses._predicate(by_name, names, world.random.randint(low, high))
     return out
 
 
