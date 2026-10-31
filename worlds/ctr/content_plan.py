@@ -1711,6 +1711,30 @@ def pad_physical(pad):
     return int(pad["id"].split(":")[1])
 
 
+def hint_text(plan):
+    """{location code: "the <pad> pad"} of the checks on a pad that holds other
+    content than it does in the original game: the entrance text of a hint."""
+    entries = {e["id"]: e for e in plan["entries"]}
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    label = {}
+    for pad in plan["pads"]:
+        entry = entries.get(pad["entry_id"])
+        if pad["kind"] != "normal" or entry is None:
+            continue
+        item = tracks.get(entry.get("track_id"), entry)
+        if entry["kind"] == content_cups.KIND:
+            colour = content_cups.gem_colour(entry["id"])
+            item = dict(cup_index=0, gem_cup=colour) if colour is not None else dict(cup_index=0)
+        if content_requirements.home_pad(item) != pad_physical(pad):
+            label[pad["id"]] = f"the {content_requirements.KEY_BY_PHYSICAL[pad_physical(pad)]} pad"
+    out = {}
+    for check in plan["checks"]:
+        own = {route["own_pad_id"] for route in check["routes"]}
+        if len(own) == 1 and next(iter(own)) in label:
+            out[check["location"]] = label[next(iter(own))]
+    return out
+
+
 def pad_gates(entry, first, two_stages, physical):
     """A pad's mode gates from its entry and stage-1 requirement id."""
     if entry["kind"] == content_cups.KIND:

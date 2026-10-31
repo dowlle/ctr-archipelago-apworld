@@ -1324,6 +1324,12 @@ class ctrAPWorld(World):
         Identity / vanilla seeds have an empty warp_pad_map, so this emits no hint
         text (a location's own name already carries its track) -- the correct no-op.
         """
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            text = content_plan.hint_text(self.ctr_content_plan)
+            if text:
+                hint_data[self.player] = text
+            return
         warp_pad_map = getattr(self, "warp_pad_map", None)
         if not warp_pad_map:
             return

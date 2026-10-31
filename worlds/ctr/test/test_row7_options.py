@@ -194,6 +194,25 @@ class TestQuietOutput(unittest.TestCase):
             make_world(options, stop_before="create_regions")
 
 
+class TestEntranceHints(unittest.TestCase):
+    def test_a_moved_check_names_its_physical_pad(self):
+        world = make_world({}, 420)
+        hints = {}
+        world.extend_hint_information(hints)
+        text = hints[world.player]
+        self.assertTrue(all(value.startswith("the ") and value.endswith(" pad") for value in text.values()))
+        plan = world.ctr_content_plan
+        check = next(c for c in plan["checks"] if c["location"] in text and c["kind"] == "trophy")
+        pad = check["routes"][0]["own_pad_id"]
+        self.assertIn(content_requirements.KEY_BY_PHYSICAL[int(pad.split(":")[1])], text[check["location"]])
+
+    def test_vanilla_placement_has_no_hints(self):
+        world = make_world(dict(pad_placement="vanilla"), 420)
+        hints = {}
+        world.extend_hint_information(hints)
+        self.assertEqual(hints, {})
+
+
 class TestStartGuardOnThePlan(unittest.TestCase):
     def test_a_start_with_no_open_check_is_refused(self):
         refused = 0
