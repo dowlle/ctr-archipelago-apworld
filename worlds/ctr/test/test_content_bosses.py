@@ -36,7 +36,7 @@ def varied(seed):
     goals = ["any_percent", "101_percent", "none", "disabled"]
     options = boss_options(oxide_goal=goals[seed % 4], bosses_required_goal=seed % 5,
                            gems_required_goal=[0, 1, 3, 5][(seed // 2) % 4],
-                           boss_track_shuffle=seed % 3 != 0,
+                           boss_track_shuffle=seed % 3 != 0, boss_encounter_repeats=["disallow", "allow"][seed % 2],
                            oxide_final_track=["cortex_vortex", "oxide_station"][(seed // 3) % 2],
                            oxide_1_optional=["mandatory", "optional"][(seed // 5) % 2],
                            oxide_final_challenge_unlock=["sapphire_relics", "gold_relics", "platinum_relics",
@@ -170,7 +170,8 @@ class TestBossEncounters(unittest.TestCase):
 
     def test_track_shuffle_draws_certified_venues(self):
         for seed in range(12):
-            world = make_world(boss_options(boss_track_shuffle=True), seed=seed)
+            world = make_world(boss_options(boss_track_shuffle=True,
+                                            boss_encounter_repeats="allow" if seed % 2 else "disallow"), seed=seed)
             plan = world.ctr_content_plan
             venues, final, _cups = content_bosses.plan_venues(plan)
             for g, track in venues.items():
@@ -179,7 +180,8 @@ class TestBossEncounters(unittest.TestCase):
             if seed % 2 == 0:
                 self.assertEqual(len(set(venues.values())), 4)
             self.assertEqual(final, "Cortex Vortex")
-            again = make_world(boss_options(boss_track_shuffle=True), seed=seed)
+            again = make_world(boss_options(boss_track_shuffle=True,
+                                            boss_encounter_repeats="allow" if seed % 2 else "disallow"), seed=seed)
             self.assertEqual(again.ctr_content_plan, plan)
 
     def test_final_on_oxide_station(self):
@@ -471,10 +473,18 @@ class TestCustomBossVenues(unittest.TestCase):
         self.assertNotIn(self.BTP, self.drawn(options))
 
     def test_an_allowlist_keeps_custom_tracks_out(self):
-        four = ["Crash Cove", "Dingo Canyon", "Coco Park", "Polar Pass"]
-        options = boss_options(boss_track_shuffle=True, boss_track_allowlist=four)
+        allowed = ["Crash Cove", "Dingo Canyon", "Blizzard Bluff", "Sewer Speedway", "Coco Park", "Tiny Arena"]
+        options = boss_options(boss_track_shuffle=True, boss_track_allowlist=allowed)
         ids = boss_track_shuffle.VENUE_LEVEL_IDS
-        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids[t]}" for t in four})
+        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids[name]}" for name in allowed})
+
+    def test_bosses_never_repeat_on_a_plan(self):
+        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow")
+        for seed in range(6):
+            plan = make_world(options, seed=seed).ctr_content_plan
+            venues = content_bosses.plan_venues(plan)[0]
+            self.assertFalse(plan["bosses"]["repeats"])
+            self.assertEqual(len(set(venues.values())), 4)
 
     def test_off_keeps_the_retail_pairs(self):
         options = boss_options()

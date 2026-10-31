@@ -112,19 +112,23 @@ CORTEX_ORIGIN = "cortex_vortex"
 CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 CORTEX_LAPS = 3
+#: Colour index of the Purple Gem Cup, the fifth Gem Cup.
+PURPLE_GEM_CUP = 4
 
 
-#: adventure_structure: ctr_first on content plans (job J11, decisions 4 and
-#: 14 of 2026-10-28). The plan's optional `adventure_structure` key is the
-#: string `ctr_first`; it is absent in `classic`, so such a plan keeps its
-#: wire. A track entry is ctr_first exactly when the plan has the key and its
-#: track record's modes hold both `trophy` and `ctr`: its entry lists the CTR
-#: Challenge (stage 1) and the Relic Race when the track has one (stage 2),
-#: no Trophy Race, and takes no mode-order draw. Its checks are the classic
-#: entry's checks in the classic (fixed) order; only the routes of the Trophy
-#: Race check and the podium rungs move to the `ctr` mode (a qualifying CTR
-#: win sends both codes; the rungs are earned by finishing place in the CTR
-#: Challenge). Any other entry keeps the classic order (decision 4).
+#: adventure_structure: ctr_first on content plans (decisions 4 and 14 of
+#: 2026-10-28, award rule of 2026-10-29). The plan's optional
+#: `adventure_structure` key is the string `ctr_first`; it is absent in
+#: `classic`, so such a plan keeps its wire. A track entry is ctr_first exactly
+#: when the plan has the key and its track record's modes hold both `trophy`
+#: and `ctr`: its entry lists the CTR Challenge (stage 1) and the Relic Race
+#: when the track has one (stage 2), no Trophy Race, and takes no mode-order
+#: draw. Its checks are the classic entry's checks in the classic (fixed)
+#: order; only the routes of the Trophy Race check and the podium rungs move to
+#: the `ctr` mode. First place pays the Trophy Race check (award `win`), first
+#: place with the letters also pays the CTR Token check (`win_letters`), and the
+#: rungs go by finishing place. Any other entry keeps the classic order
+#: (decision 4).
 CTR_FIRST = "ctr_first"
 CTR_FIRST_FEATURE = "ctr_first_v1"
 
@@ -135,6 +139,19 @@ def ctr_first_modes(track_modes):
     if "trophy" not in track_modes or "ctr" not in track_modes:
         return None
     return ["ctr"] + (["relic"] if "relic" in track_modes else [])
+
+
+def merged_race(checks):
+    """Do these checks of one pad come from a ctr_first entry, whose Trophy Race
+    check routes from the CTR Challenge?"""
+    return any(c["kind"] == "trophy" and c["routes"][0]["mode"] == "ctr" for c in checks)
+
+
+def first_race_checks(checks, mode):
+    """Codes of the checks that prove the pad's first race (`mode`) was won. On
+    a ctr_first entry that is the Trophy Race check: the win without the
+    letters, which the CTR Token check needs on top."""
+    return tuple(c["location"] for c in checks if c["kind"] == ("trophy" if merged_race(checks) else mode))
 
 
 def plan_ctr_first(plan, track):
@@ -1160,6 +1177,11 @@ def generate(world):
         if "named_block" not in track:
             track["room_title"] = titles[track["custom_slot"]]
     chosen += cups
+    # The Purple Gem Cup gauntlet (ruled 2026-10-30): one message for both needs.
+    if o.purple_cup_boss_gauntlet.value and not (o.boss_kit_shuffle.value and boss_record is not None
+                                                 and any(cup.get("gem_cup") == PURPLE_GEM_CUP for cup in cups)):
+        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and the Purple Gem Cup in the seed. Turn on "
+              "boss_kit_shuffle and keep five Gem Cups, or turn off purple_cup_boss_gauntlet.")
     manual = manual_rules(o)
     unlock_mode = int(o.warppad_unlock_requirements.value)
     if unlock_mode and not warp_pad_logic.effective_custom_weights(world)["Trophy"]:
@@ -1305,7 +1327,7 @@ def generate(world):
         boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         # Boss kit shuffle and N. Oxide's profile (job J11), on the plan's venues.
         boss_opponents = content_bosses.draw_encounters(world, boss_record, boss_venues, boss_racers,
-                                                        boss_final_racer, dict(boss_custom))
+                                                        boss_final_racer, dict(boss_custom), boss_cups)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id")), item_boxes=item_boxes,
                                        relics=relics.get(t["id"])))
@@ -1396,9 +1418,6 @@ def generate(world):
         error("the Oxide goal check holds only filler, but the item pool fills every check: "
               f"{check_count} checks for {check_count} selected copies. Lower an item_pool count or extra, or add "
               "content, so one filler slot is left. Your settings were not changed.")
-    # The Wumpa Shop's `excluded` needs a non-progression copy per slot.
-    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), int(
-        boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)))
     # adventure_structure: ctr_first (job J11): every track entry whose
     # track has a Trophy Race and a CTR Challenge runs the CTR Challenge first
     # and has no Trophy Race; it takes no mode-order draw (decision 14). Any
@@ -1564,6 +1583,9 @@ def generate(world):
               f"{world.ctr_content_items.filler_count} filler slots"
               + (", one of them for the Oxide goal check" if oxide_filler else "")
               + ". An excluded check holds only filler. Lower an item_pool count or exclude fewer checks.")
+    # The Wumpa Shop's `excluded` needs a non-progression copy per slot, beside the
+    # filler the excluded checks hold.
+    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), excluded + oxide_filler)
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
@@ -1876,7 +1898,7 @@ def create_regions(world):
         modes = [g["mode"] for g in pad["mode_gates"]]
         if len(modes) < 2 or "pad_requirements" not in plan:
             return ()
-        return tuple(c["location"] for c in by_pad.get(pad["id"], ()) if c["kind"] == modes[0])
+        return first_race_checks(by_pad.get(pad["id"], ()), modes[0])
 
     def stage_gate(route):
         """The test of a route's later race, or None for a pad's first race. A
@@ -1947,11 +1969,8 @@ def create_regions(world):
             gates.append(lambda state, racer=racer: state.has(racer, player))
         menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
                      (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
-        ctr_location = None
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
-            if check["kind"] == "ctr":
-                ctr_location = location
             placed[check["location"]] = location
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
@@ -1963,16 +1982,13 @@ def create_regions(world):
             if rule is not None:
                 location.access_rule = rule
             region.locations.append(location)
-        # ctr_first (job J11): the Trophy Race check is sent by the qualifying
-        # CTR win, so it needs everything the CTR Token Challenge needs (its
-        # stage gate, boost floor, letter items, and any term set_rules adds
-        # later), AND its own Trophy rank. Read at call time, never looser.
-        for location in region.locations:
-            check = checks_by_code[location.address]
-            if check["kind"] == "trophy" and check["routes"][0]["mode"] == "ctr":
-                own = location.access_rule
-                location.access_rule = (lambda state, own=own, ctr=ctr_location:
-                                        own(state) and ctr.can_reach(state))
+        # ctr_first: first place pays the Trophy Race check, and first place
+        # with the letters also pays the CTR Token check, so the CTR Token needs
+        # everything the Trophy Race check needs. Read at call time, never looser.
+        if merged_race(by_pad.get(pad["id"], ())):
+            by_kind = {checks_by_code[location.address]["kind"]: location for location in region.locations}
+            ctr, trophy = by_kind["ctr"], by_kind["trophy"]
+            ctr.access_rule = lambda state, own=ctr.access_rule, won=trophy: own(state) and won.can_reach(state)
     # Itemsanity and Hit Character checks (#133 PR 4d) take their rules in
     # set_rules, once every trigger location exists.
     world.ctr_global_routes = []
@@ -2011,9 +2027,8 @@ def create_regions(world):
                        for entry, need, racer in tests)
         location.access_rule = any_leg
         menu.locations.append(location)
-    # The Wumpa Shop and the Wumpa goal (job J11): the `Wumpa Income` event
-    # and the shop slots.
-    content_wumpa.install(world, plan, menu, lambda rid: predicate(world, req[rid]), stage_gate)
+    # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
+    content_wumpa.install(world, plan, menu, stage_gate)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 

@@ -351,7 +351,7 @@ class TestFirstRaceWon(unittest.TestCase):
         plan, mw = world.ctr_content_plan, world.multiworld
         names = content_plan.LOCATION_BY_CODE
         pad = next(p for p in plan["pads"] if len(p["mode_gates"]) == 3)
-        checks = [c for c in plan["checks"] if c["routes"][0]["own_pad_id"] == pad["id"] and len(c["routes"]) == 1]
+        checks = [c for c in plan["checks"] if len(c["routes"]) == 1 and c["routes"][0]["own_pad_id"] == pad["id"]]
         win = next(c for c in checks if c["kind"] == pad["mode_gates"][0]["mode"])
         later = next(c for c in checks if c["kind"] == pad["mode_gates"][1]["mode"])
         all_items = mw.get_all_state(False)

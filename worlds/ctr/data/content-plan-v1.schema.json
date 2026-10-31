@@ -1831,6 +1831,9 @@
         "kit_shuffle": {
           "type": "boolean"
         },
+        "gauntlet": {
+          "type": "boolean"
+        },
         "kit": {
           "anyOf": [
             {

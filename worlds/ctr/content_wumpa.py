@@ -168,9 +168,10 @@ def attainable_prices(hub, percent):
 
 def non_progression_codes():
     """Ledger item codes that are never progression on a content plan: the
-    pool-only pack items (all `useful`)."""
+    pool-only pack items and the surface items (all `useful`)."""
+    from .content_item_pool import ITEMS, SURFACE_NAMES
     from .content_plan import PACK_ITEMS, pack_code
-    return {pack_code(name) for _key, name in PACK_ITEMS}
+    return {pack_code(name) for _key, name in PACK_ITEMS} | {ITEMS[name] for name in SURFACE_NAMES}
 
 
 def non_progression_supply(items):
@@ -245,11 +246,11 @@ def check_income(plan):
               "the trophy or ctr mode, or turn the shop and the Wumpa goal off. No content was changed.")
 
 
-def install(world, plan, menu, predicate_of, stage_gate):
+def install(world, plan, menu, stage_gate):
     """The `Wumpa Income` event (in Menu, any income route) and the shop
     locations (in Menu, the hub's Key floor and `Wumpa Income`), with the
-    `excluded` item rule. `predicate_of(requirement id)` builds a test,
-    `stage_gate(route)` gives a route's stage-2 requirement id or None."""
+    `excluded` item rule. `stage_gate(route)` gives the test of a route's
+    later race, or None for a pad's first race."""
     if not banking(plan):
         return
     from BaseClasses import Location
@@ -262,11 +263,11 @@ def install(world, plan, menu, predicate_of, stage_gate):
     pads = {p["id"]: p for p in plan["pads"]}
     routes = []
     for entry_id, pad_id, mode, track in income_routes(plan):
-        rid = stage_gate(dict(own_pad_id=pad_id, mode=mode))
+        test = stage_gate(dict(own_pad_id=pad_id, mode=mode))
         lock = pads[pad_id]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         need = finish_boost(track, capability) if capability.get("boost_mode") else 0
-        routes.append((entry_id, predicate_of(rid) if rid is not None else None, need, racer))
+        routes.append((entry_id, test, need, racer))
     routes = tuple(routes)
 
     def income(state):

@@ -174,8 +174,9 @@ class BossTrackShuffle(Toggle):
 
     Ripper Roo, Papu Papu, Komodo Joe and Pinstripe keep their garage, their
     Key, their door requirement and their own attacks; only the track they
-    race on changes. Each boss gets a different track. N. Oxide is not
-    affected, and the Purple Gem Cup keeps its own tracks."""
+    race on changes. Each boss gets a different track unless Boss Encounter
+    Repeats allows repeats. N. Oxide is not affected, and the Purple Gem Cup
+    keeps its own tracks."""
     # #169 tier 1 (0.3.0). Wire: ctr_options.boss_track_shuffle plus the
     # boss_encounters block (schema 18). See boss_track_shuffle.py.
     display_name = "Boss Track Shuffle"
@@ -196,6 +197,20 @@ class BossTrackBlocklist(OptionSet):
     display_name = "Boss Track Blocklist"
     valid_keys = sorted(BOSS_VENUE_TRACKS)
     default = frozenset()
+
+
+class BossEncounterRepeats(Choice):
+    """Whether two boss garages may use the same drawn track.
+
+    - **disallow** (default): the four bosses race on four different tracks.
+    - **allow**: each garage draws on its own, so tracks can repeat.
+
+    A track that is also an ordinary race or a Gem Cup leg never counts as a
+    repeat."""
+    display_name = "Boss Encounter Repeats"
+    option_disallow = 0
+    option_allow = 1
+    default = 0
 
 
 class BossOpponentShuffle(Toggle):
@@ -1725,6 +1740,7 @@ class ctrAPOptions(PerGameCommonOptions):
     boss_track_shuffle: BossTrackShuffle
     boss_track_allowlist: BossTrackAllowlist
     boss_track_blocklist: BossTrackBlocklist
+    boss_encounter_repeats: BossEncounterRepeats
     # boss encounters (#169 tiers 2 and 3: opponent and kit switches)
     boss_opponent_shuffle: BossOpponentShuffle
     boss_character_allowlist: BossCharacterAllowlist
@@ -1848,7 +1864,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
              GoalWumpa, FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
-                        BossTrackBlocklist,
+                        BossTrackBlocklist, BossEncounterRepeats,
                         BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlist,
                         BossCharacterBlocklist, BossTrackAssignment,
                         BossKitShuffle, BossAttackAssignment,

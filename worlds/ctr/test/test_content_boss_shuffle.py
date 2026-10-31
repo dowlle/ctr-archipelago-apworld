@@ -41,7 +41,7 @@ class TestContentBossShuffle(unittest.TestCase):
     def test_record_and_feature(self):
         record = self.plan["bosses"]
         self.assertEqual({k: record[k] for k in content_bosses.ENCOUNTER_KEYS},
-                         dict(opponent_shuffle=True, oxide_in_pool=True, kit_shuffle=True,
+                         dict(opponent_shuffle=True, oxide_in_pool=True, kit_shuffle=True, gauntlet=False,
                               kit=dict(assignment="mixed_loadouts", intensity="standard", loss_easing=True),
                               oxide_attack_profile="all_compatible", track_assignment="independent_track"))
         features = self.plan["required_features"]
@@ -250,11 +250,6 @@ class TestContentBossShuffleDraws(unittest.TestCase):
         self.assertTrue(content_plan.validate(plan))
 
     def test_refusals(self):
-        cups = boss_options(boss_opponent_shuffle=True, wumpa_shop_slots=0)
-        cups["content_pool"]["bosses"]["cups"] = 1
-        with self.assertRaises(OptionError) as caught:
-            make_world(cups, seed=1)
-        self.assertIn("boss cups do not take a drawn opponent or kit yet", str(caught.exception))
         off = boss_options(boss_kit_shuffle=True, wumpa_shop_slots=0, oxide_goal="disabled", gems_required_goal=2)
         off["content_pool"]["bosses"]["enabled"] = False
         with self.assertRaises(OptionError):

@@ -7,6 +7,7 @@ from BaseClasses import CollectionState
 from Options import OptionError
 
 from .. import content_plan
+from .test_content_item_pool import small_pool
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN
 from .test_track_checks import BTP, LOOP, check_options, checks_of, refused, track_of
@@ -26,7 +27,7 @@ def first_options(**overrides):
     options = check_options(wumpa="per_track", letters=1, per_track=2, custom=custom)
     options["content_pool"]["tracks"]["retail"] = list(RETAIL)
     options["content_pool"]["tracks"]["overrides"] = {CTR_LESS: ["trophy", "relic"]}
-    options.update(adventure_structure="ctr_first", wumpa_shop_slots=0)
+    options.update(adventure_structure="ctr_first", wumpa_shop_slots=0, item_pool=small_pool())
     options.update(overrides)
     return options
 
@@ -92,7 +93,9 @@ class TestContentCtrFirst(unittest.TestCase):
         self.assertEqual(own[0]["kind"], "trophy")
         self.assertEqual(own[0]["display_name"], "Crash Cove: Trophy Race")
         self.assertEqual(own[0]["location"], content_plan.CTR_LOCATION_IDS["Crash Cove: Trophy Race"])
-        self.assertEqual([(r["mode"], r["award"]) for r in own[0]["routes"]], [("ctr", "win_letters")])
+        self.assertEqual([(r["mode"], r["award"]) for r in own[0]["routes"]], [("ctr", "win")])
+        token = next(c for c in own if c["kind"] == "ctr")
+        self.assertEqual([(r["mode"], r["award"]) for r in token["routes"]], [("ctr", "win_letters")])
         self.assertEqual(own[0]["routes"][0]["entry_id"], entry["id"])
         rungs = [c for c in own if c["kind"] == "podium"]
         self.assertTrue(rungs)
@@ -143,7 +146,7 @@ class TestContentCtrFirst(unittest.TestCase):
             next(c for c in p["checks"] if c["owner"] == "retail:3" and c["kind"] == "podium")["routes"][0]["mode"] = "trophy"
 
         def trophy_award(p):
-            next(c for c in p["checks"] if c["owner"] == "retail:3" and c["kind"] == "trophy")["routes"][0]["award"] = "win"
+            next(c for c in p["checks"] if c["owner"] == "retail:3" and c["kind"] == "trophy")["routes"][0]["award"] = "win_letters"
 
         def drop_key(p):
             del p["adventure_structure"]
@@ -168,10 +171,9 @@ class TestContentCtrFirst(unittest.TestCase):
 
 
 class TestContentCtrFirstLogic(unittest.TestCase):
-    def test_trophy_needs_what_the_ctr_challenge_needs(self):
-        """Lettersanity 3: the CTR Challenge needs its three letter items, so
-        the Trophy Race check (sent by the same CTR win) needs them too; the
-        rungs do not (finishing place, letters or not)."""
+    def test_first_place_pays_the_trophy_and_the_letters_pay_the_token(self):
+        """Lettersanity 3 (ruled 2026-10-29): the CTR Token check needs its three
+        letter items; the Trophy Race check and the rungs do not."""
         options = first_options(lettersanity=3)
         options["pad_layout"]["stages"] = "single"
         world = None
@@ -195,16 +197,32 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         if pad["racer_lock"] is not None:
             self.skipTest("racer-locked pad")
         self.assertTrue(state.can_reach(rung))
+        self.assertTrue(state.can_reach(trophy))
         self.assertFalse(state.can_reach(ctr))
-        self.assertFalse(state.can_reach(trophy))
         for letter in "CTR":
             state.collect(world.create_item(f"Letter {letter} (Crash Cove)"), True)
         self.assertTrue(state.can_reach(ctr))
-        self.assertTrue(state.can_reach(trophy))
 
-    def test_trophy_needs_the_stricter_of_both_boost_ranks(self):
-        """Progressive Boost on: the Trophy Race check needs its own rank and
-        the CTR Challenge's floor, never less than either."""
+    def test_the_token_needs_what_the_trophy_needs(self):
+        """The CTR Token check is paid by the same first place."""
+        world = make_world(first_options(), seed=20261029, stop_before="pre_fill")
+        trophy = world.multiworld.get_location("Crash Cove: Trophy Race", 1)
+        ctr = world.multiworld.get_location("Crash Cove: CTR Token Challenge", 1)
+        state = world.multiworld.get_all_state(False)
+        self.assertTrue(state.can_reach(ctr))
+        trophy.access_rule = lambda state: False
+        self.assertFalse(state.can_reach(ctr))
+
+    def test_the_first_race_is_proved_by_the_trophy_check(self):
+        plan = make_world(first_options(lettersanity=3), seed=20261029).ctr_content_plan
+        pad = pad_of(plan, entry_of(plan, "retail:3"))
+        checks = [c for c in plan["checks"] if c["routes"] and c["routes"][0]["own_pad_id"] == pad["id"]]
+        self.assertEqual(content_plan.first_race_checks(checks, "ctr"),
+                         (content_plan.CTR_LOCATION_IDS["Crash Cove: Trophy Race"],))
+
+    def test_each_check_keeps_its_own_boost_rank(self):
+        """Progressive Boost on: the Trophy Race check needs its own rank, the
+        CTR Token check its own and the Trophy Race's."""
         options = first_options(progressive_boost="shared_global", logic_difficulty="hard")
         options["pad_layout"]["stages"] = "single"
         options["content_pool"]["tracks"]["retail"] = [3, 6, 16, 7]  # Hot Air Skyway: USF finish
@@ -225,14 +243,16 @@ class TestContentCtrFirstLogic(unittest.TestCase):
         for _ in range(4):
             state.collect(world.create_item("Key"), True)
         trophy = mw.get_location("Crash Cove: Trophy Race", 1)
+        token = mw.get_location("Crash Cove: CTR Token Challenge", 1)
         if pad_of(plan, entry_of(plan, "retail:3"))["racer_lock"] is not None:
             self.skipTest("racer-locked pad")
-        self.assertFalse(state.can_reach(trophy))
-        state.collect(world.create_item("Progressive Boost"), True)
         self.assertTrue(state.can_reach(trophy))
+        self.assertFalse(state.can_reach(token))
+        state.collect(world.create_item("Progressive Boost"), True)
+        self.assertTrue(state.can_reach(token))
         # Hot Air Skyway: the Trophy rank (USF, two) is above the CTR floor.
         self.assertEqual(by_name["Hot Air Skyway: Trophy Race"]["boost"], 2)
-        sky = mw.get_location("Hot Air Skyway: Trophy Race", 1)
+        sky = mw.get_location("Hot Air Skyway: CTR Token Challenge", 1)
         if pad_of(plan, entry_of(plan, "retail:7"))["racer_lock"] is None:
             self.assertFalse(state.can_reach(sky))
             state.collect(world.create_item("Progressive Boost"), True)

@@ -255,10 +255,9 @@ def oxide_profile_all(options) -> bool:
 
 
 def gauntlet_on(options) -> bool:
-    """`purple_cup_boss_gauntlet`; `validate_options` refuses it without the
-    kit switch (design answer 3, 2026-10-13)."""
-    return kit_on(options) and bool(getattr(options, "purple_cup_boss_gauntlet", None)
-                                    and options.purple_cup_boss_gauntlet.value)
+    """`purple_cup_boss_gauntlet`, only with the kit switch. The plan refuses
+    it without the switch or the Purple Gem Cup (content_plan.generate)."""
+    return kit_on(options) and bool(options.purple_cup_boss_gauntlet.value)
 
 
 def home_pairing(options) -> bool:
@@ -288,15 +287,9 @@ def validate_options(world) -> None:
     """Subordinate controls without their switch are ignored with a notice,
     not refused: the 2026-10-15 tier 1 ruling (the DeathLink Send pattern),
     applied the same way to the new controls. Impossible draws with a switch
-    on still stop generation (see `draw`). The Purple Gem Cup gauntlet
-    without Boss Kit Shuffle is refused (design answer 3, 2026-10-13)."""
+    on still stop generation."""
     o = world.options
     from .notices import note_ignored
-    if (getattr(o, "purple_cup_boss_gauntlet", None) and o.purple_cup_boss_gauntlet.value
-            and not kit_on(o)):
-        raise OptionError(
-            f"CTR ({_who(world)}): purple_cup_boss_gauntlet needs boss_kit_shuffle on. Turn on "
-            "boss_kit_shuffle or turn off purple_cup_boss_gauntlet.")
     if not opponent_on(o):
         for name, label in (("boss_character_allowlist", "Boss Character Allowlist"),
                             ("boss_character_blocklist", "Boss Character Blocklist")):
@@ -388,6 +381,10 @@ def _mixed_rows(rng, families: Sequence[str], segments: int = SEGMENTS,
     order = chosen + [rng.choice(chosen) for _ in range(segments - k)]
     rng.shuffle(order)
     return tuple(rng.choice(FAMILY_VARIANTS[f]) for f in order)
+
+
+def _intensity(options) -> int:
+    return int(options.boss_attack_intensity.value) if kit_on(options) else 1
 
 
 def _draw_oxide_profile(world) -> Tuple[Segment, ...]:

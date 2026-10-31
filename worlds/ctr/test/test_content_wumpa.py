@@ -71,7 +71,8 @@ class TestContentWumpaShop(unittest.TestCase):
         self.assertEqual(location.progress_type.name, "DEFAULT")
 
     def test_logic_needs_income_and_the_hub_key_floor(self):
-        mw = self.world.multiworld
+        world = make_world(shop_options(), seed=20261029, stop_before="pre_fill")
+        mw = world.multiworld
         state = CollectionState(mw)
         beach = mw.get_location("N. Sanity Beach Shop: Slot 1", 1)
         citadel = mw.get_location("Citadel City Shop: Slot 1", 1)
@@ -79,11 +80,11 @@ class TestContentWumpaShop(unittest.TestCase):
         self.assertFalse(beach.can_reach(state))  # the event is not collected yet
         state.sweep_for_advancements()
         self.assertEqual(beach.can_reach(state), income.can_reach(state))
-        state.collect(self.world.create_item("Key"), True)
-        state.collect(self.world.create_item("Key"), True)
+        state.collect(world.create_item("Key"), True)
+        state.collect(world.create_item("Key"), True)
         self.assertFalse(citadel.can_reach(state))
         for _ in range(2):
-            state.collect(self.world.create_item("Key"), True)
+            state.collect(world.create_item("Key"), True)
         state.sweep_for_advancements()
         self.assertTrue(income.can_reach(state))
         self.assertTrue(citadel.can_reach(state))
