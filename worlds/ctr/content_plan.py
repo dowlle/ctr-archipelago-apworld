@@ -1548,6 +1548,7 @@ def generate(world):
     # requirements and checks, and the venues raced nowhere else as plan
     # tracks (the trophy mode only, like a track raced only in cups).
     encounters, boss_entries, boss_requirements, boss_checks, boss_hits = [], [], [], [], {}
+    near_key = None
     if boss_record is not None:
         content_bosses.resolve_relic_count(world, boss_record, world.ctr_content_items.rows)
         have = {t["id"] for t in plan_tracks}
@@ -1559,8 +1560,11 @@ def generate(world):
             if record["id"] not in have:
                 have.add(record["id"])
                 plan_tracks.append(record)
+        open_pads = {pad["id"] for pad in pads if pad["entrance_req"] == "free"}
+        near_key = (sum(c["routes"][0]["own_pad_id"] in open_pads and c["location"] not in pins for c in checks)
+                    + (first_hub_slots if shop else 0))
         garage_reqs = content_fixed.draw_garages(world, boss_record, world.ctr_content_items.rows, unlock_mode == 0,
-                                                 pins, pads)
+                                                 pins, pads, near_key)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
@@ -1607,7 +1611,7 @@ def generate(world):
     else:
         stage1, stage2 = draw_pad_requirements(world, pads, pad_modes, entries + boss_entries, checks, encounters,
                                                boss_requirements, manual, by_name, unlock_mode, density_off,
-                                               oxide_filler and goal_check, pins, boss_record)
+                                               oxide_filler and goal_check, pins, boss_record, near_key)
     requirements += [dict(id=f"{content_requirements.STAGE1_PREFIX}{physical}", predicate=stage1[physical])
                      for physical in sorted(stage1)]
     gate_for = {physical: "free" if rule is None else f"manual:{physical}" for physical, rule in manual.items()}
@@ -1717,7 +1721,7 @@ def pad_gates(entry, first, two_stages, physical):
 
 
 def draw_pad_requirements(world, pads, pad_modes, entries, checks, encounters, boss_requirements, manual, by_name,
-                          mode, density_off, goal_check, pins, boss_record):
+                          mode, density_off, goal_check, pins, boss_record, near_key=None):
     """({physical: stage 1 predicate}, {physical: stage 2 predicate}) of the two
     random modes, from the simulated playthrough over the reference placement
     (content_requirements). A manual pad keeps its rule at stage 1; a pad whose
@@ -1745,7 +1749,7 @@ def draw_pad_requirements(world, pads, pad_modes, entries, checks, encounters, b
         best, kept = drawn, [row["predicate"] for row in garages]
         for _ in range(content_fixed.GARAGE_REDRAWS if seconds(drawn) < multi else 0):
             for row, predicate in zip(garages, content_fixed.draw_garages(
-                    world, boss_record, world.ctr_content_items.rows, False, pins, pads).values()):
+                    world, boss_record, world.ctr_content_items.rows, False, pins, pads, near_key).values()):
                 row["predicate"] = predicate
             drawn = simulate()
             if seconds(drawn) > seconds(best):

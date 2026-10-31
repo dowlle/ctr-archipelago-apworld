@@ -203,17 +203,24 @@ def stuck_garages(requirements, rows, pins, pads):
             held[item] = held.get(item, 0) + 1
 
 
-def draw_garages(world, record, rows, vanilla, pins, pads):
+def draw_garages(world, record, rows, vanilla, pins, pads, near=None):
     """{garage: predicate} of the four ordinary garages. Without a pin, or with
     the Trophy table of vanilla requirements, this is the plain draw. Otherwise a
     roll that leaves a garage stuck behind its own pins is drawn again, at most
     GARAGE_REDRAWS times. A garage still stuck asks for the first kind no pin holds,
-    Trophies when the seed has them, and a pool with no such kind is refused."""
+    Trophies when the seed has them, and a pool with no such kind is refused.
+    `near` counts the checks in front of a fixed first Key: its garage may ask at
+    most half of them (the final capacity check, see `first_key_path`)."""
     out = content_bosses.draw_requirements(world, record, rows, vanilla)
     if vanilla or not locked_copies(pins):
         return out
+    limit = max(1, near // 2) if near is not None and "Key" in pins.values() else None
+
+    def too_wide(drawn):
+        return limit is not None and drawn[0]["count"] > limit
+
     for _ in range(GARAGE_REDRAWS):
-        if not stuck_garages(out, rows, pins, pads):
+        if not stuck_garages(out, rows, pins, pads) and not too_wide(out):
             return out
         out = content_bosses.draw_requirements(world, record, rows, vanilla)
     by_name = {row.name: row for row in rows}
@@ -225,6 +232,12 @@ def draw_garages(world, record, rows, vanilla, pins, pads):
                   "items to item_pool or shuffle the Keys or Gems. No content was changed.")
         _label, names, _weight, low, high = kinds[0]
         out[g] = content_bosses._predicate(by_name, names, world.random.randint(low, high))
+    if too_wide(out):
+        kinds = [o for o in content_bosses.garage_options(by_name, 0, record["requirement_level"])
+                 if not pinned & set(o[1]) and o[3] <= limit]
+        if kinds:
+            _label, names, _weight, low, high = min(kinds, key=lambda o: o[3])
+            out[0] = content_bosses._predicate(by_name, names, world.random.randint(low, min(high, limit)))
     return out
 
 

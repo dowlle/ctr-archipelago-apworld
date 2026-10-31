@@ -244,5 +244,13 @@ class TestFirstKeyPath(unittest.TestCase):
         self.assertFalse(any(loc.item is not None and loc.item.name == "Trophy" and loc.address is not None
                              for loc in world.multiworld.get_locations(world.player)))
 
+    def test_a_drawn_first_garage_fits_the_checks_in_front_of_it(self):
+        rows = make_world({}, stop_before="create_regions").ctr_content_items.rows
+        record = dict(requirement_level="chaotic")
+        world = make_world({}, stop_before="create_regions")
+        for _ in range(40):
+            out = content_fixed.draw_garages(world, record, rows, False, {35011100: "Key"}, [], 6)
+            self.assertLessEqual(out[0]["count"], 3)
+
     def test_redraws_stay_a_draw(self):
         self.assertGreater(content_requirements.FIRST_KEY_REDRAWS, content_requirements.PLACEMENT_REDRAWS)
