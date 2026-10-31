@@ -88,7 +88,7 @@ boss track, that track keeps its Wumpa check, paid from the boss race. The old
 
 ### Wumpa Shop and Wumpa Goal
 
-With the shop or a Wumpa goal on, every fruit you collect while already holding
+The shop and the goal work with `content_pool` only for now. With the shop or a Wumpa goal on, every fruit you collect while already holding
 10 is banked, and so is the fruit you hold when you finish a race. Fruit you
 receive that would take you past 10 is banked too, even outside a race.
 Quitting or restarting a race banks nothing you hold, and neither does a race

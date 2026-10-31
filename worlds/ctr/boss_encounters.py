@@ -59,20 +59,17 @@ positions (`boss_track_shuffle.translated_schedule`), so a venue that
 carries the inherited attack also carries a composed one; the same
 certification applies.
 
-THE DRAW. Once in `generate_early` (`draw`), pinned from the wire under
-Universal Tracker (`restore_from_wire`). Native never redraws. With both new
-switches off nothing here draws, so a tier 1 seed keeps its RNG stream and
-its version 1 wire block exactly. Encounters never repeat (decision 7):
-four distinct venues, opponents (five with N. Oxide's garage) and kits;
-the whole assignment is tested, so impossible filters fail generation.
+THE DRAW lives in content_bosses.py: this module holds the tables, pools and
+kit helpers the plan draws from. Nothing here runs on a seed without
+`content_pool`. Encounters never repeat (decision 7): four distinct venues,
+opponents (five with N. Oxide's garage) and kits; the whole assignment is
+tested, so impossible filters fail generation.
 
 LOGIC. Kits do not change reachability (design: enemy weapons are not
-player unlocks). A venue moved by the home-track pairing goes through the
-same `_boss_track_venues` table tier 1 uses: the boss win's finish term and
-the garage's Wumpa route. The opponent changes the Hit Character checks
-(decision 9): `boss_identity` feeds the Hit block's `bosses` table and its
-unlock triggers, so a boss-race Hit route follows the drawn racer and
-beating a garage unlocks the drawn racer as an opponent in other races.
+player unlocks). The opponent changes the Hit Character checks (decision 9):
+content_bosses.identity feeds the Hit block's `bosses` table and its unlock
+triggers, so a boss-race Hit route follows the drawn racer and beating a garage
+unlocks the drawn racer as an opponent in other races.
 """
 from __future__ import annotations
 

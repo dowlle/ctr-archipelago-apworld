@@ -16,20 +16,17 @@ goal rule reads either item, so they change no reachability and Universal
 Tracker's logic graph is the same with or without them.
 
 SUPPLY. Like Tizi Helper and Turbo Grant they add no location, so each copy
-spends one slot that would otherwise hold filler. The legacy item creator puts
-them in the pool before overflow shedding, so a tight seed sheds filler or the
-comfort pack for them first, and refuses with a message naming them when they
-still do not fit (the design forbids silently omitting an enabled reveal item).
-The content plan budgets them as `item_packs` ledger rows.
+spends one slot that would otherwise hold filler. The content plan budgets them
+as `item_packs` ledger rows: a tight seed sheds filler and the surface items
+first, and refuses with a message naming them when they still do not fit (the
+design forbids silently omitting an enabled reveal item).
 
-WIRE. `ctr_options.spoiler_items` is always emitted (schema 18, Contract running
-section). Native reads it: absent means off, so an older seed shows previews as
-before. The reveal state itself comes from ReceivedItems, rebuilt on every
-connect.
+WIRE. `ctr_options.spoiler_items` is emitted on content plans (schema 18). Native
+reads it: absent means off. The reveal state itself comes from ReceivedItems,
+rebuilt on every connect.
 
-OFF IS GENERATION-NEUTRAL. With the option off this module creates nothing and
-takes no random draw; the only wire difference from a pre-#459 seed is the
-always-emitted `false`.
+OFF IS GENERATION-NEUTRAL: with the option off this creates nothing and takes no
+random draw.
 """
 #: The two reveal items, minted in minted_items_030 (frozen names and codes).
 WARP_PAD_PREVIEW_ITEM = "Warp Pad Preview"

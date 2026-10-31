@@ -6,28 +6,9 @@ that hub's save screen. Five hubs, n 1..25 decimal and unpadded (the approved
 25-slot cap; 10 per hub is the planned option default). A server-Collected slot
 is SOLD without a charge. `Wumpa Income` is an address-free event, not minted.
 
-WHO OWNS THE SEMANTICS. The apworld owns names, codes, the per-seed subset
-(`wumpa_shop_slots` per hub), prices, shelf unlocks, placement limits and the
-`wumpa_shop` slot_data block; native owns banking, the wallet, the purchase
-and its DataStorage records.
-
-LOGIC. Fruit can be earned again by replaying a race, so logic models it as
-one code-free event, `Wumpa Income`, reached by finishing a race on any of
-the ordinary retail trophy tracks this seed keeps (the USF finish term on USF
-tracks, as the race checks use it). Every retail track has fruit crates, so a
-finish there always banks. Custom tracks, trial tracks and Cortex Vortex add
-no income route in logic (native still banks there): fewer routes only makes
-logic stricter. A shop slot needs its hub region and `Wumpa Income`; the
-goal arm needs `Wumpa Income`. Prices and shelf unlocks cost time, not
-items, so they are not in logic (design 2026-10-13, "Generation and logic").
-
-PLACEMENT. The first `initial_shelves(n)` slots of each hub are on sale from
-the start; later slots open at a lifetime banked total. With `allowed` any
-slot may hold any item, progression and traps included (ruled 2026-10-28,
-decisions 24 and 25); a slot holding progression is priced at its hub's
-lowest band price after fill. `excluded` keeps progression out of every slot
-(useful items, filler and traps only). Shop slots never count as starting checks
-(`sphere0_guard`).
+The shop and the Wumpa goal run on content plans (content_wumpa.py), which
+reads the bands, unlock steps and options from here. The location class creates
+nothing on a seed without `content_pool`.
 
 DATAPACKAGE STABILITY. `35028600 + 40 * hub + (n - 1)`, hub order N. Sanity
 Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, inside the
