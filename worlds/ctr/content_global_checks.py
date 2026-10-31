@@ -51,7 +51,7 @@ count keeps the earlier routes (every real package measured has crates).
 """
 from Options import OptionError
 
-from . import characters, content_bosses, content_cups, hit_character, itemsanity, progressive_capability
+from . import characters, content_bosses, content_cups, hit_character, itemsanity, logic_terms, progressive_capability
 from .Locations import CTR_LOCATION_IDS
 
 FEATURE = "global_checks_v1"
@@ -380,6 +380,4 @@ def tiger_temple_door(world):
         names.append(door_box)
     for name in names:
         location = world.multiworld.get_location(name, player)
-        previous = location.access_rule
-        location.access_rule = (lambda state, previous=previous:
-                                previous(state) and state.has_any(TIGER_TEMPLE_DOOR_OPENERS, player))
+        logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))

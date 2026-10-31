@@ -95,10 +95,11 @@
           "ctr_first_v1",
           "boss_opponents_v1",
           "wumpa_shop_v1",
-          "wumpa_goal_v1"
+          "wumpa_goal_v1",
+          "pad_client_v1"
         ]
       },
-      "maxItems": 26,
+      "maxItems": 27,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -135,6 +136,26 @@
     },
     "fixed_items": {
       "$ref": "#/$defs/FixedItems"
+    },
+    "pad_client": {
+      "description": "Plan pads in the client (one generator row 6): when the race type menu opens, and whether the in-game tracker can start pads. No logic.",
+      "type": "object",
+      "properties": {
+        "race_type_selector": {
+          "enum": [
+            "productive",
+            "always"
+          ]
+        },
+        "tracker_pad_launch": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "race_type_selector",
+        "tracker_pad_launch"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

@@ -1056,6 +1056,40 @@ class SpoilerItems(Toggle):
     display_name = "Spoiler Items"
 
 
+class RaceTypeSelector(Choice):
+    """When a warp pad asks which race to run.
+
+    - **always** (default): every race pad you can enter opens the race
+      type menu, with the races the pad has open now, in the pad's order.
+    - **productive**: the menu opens only when more than one race type still
+      has a check, or when none has; with exactly one, the pad loads it.
+
+    Race types with nothing left to check are grey but you can still pick
+    them to race again. This is the starting value: the client's Options
+    menu can change it at any time. It only changes the menu, never what is
+    in logic. Works with content_pool only."""
+    display_name = "Race Type Selector"
+    option_productive = 0
+    option_always = 1
+    default = 1
+
+
+class TrackerPadLaunch(DefaultOnToggle):
+    """Start warp pad and boss garage activities from the in-game tracker.
+
+    On (default): in a hub, pause and open the tracker, pick a pad or boss
+    garage and press Cross to see what it offers. Modes you can start now are
+    listed first; modes you cannot start yet stay in the list, grey, with the
+    reason (hub Keys, the pad's requirement, a racer, the second requirement).
+    Starting one takes you to that pad's hub and enters the pad exactly as if
+    you had driven onto it, with the same requirements.
+
+    Off: the tracker only shows information. A race or sync host can turn
+    this off for everyone. This never changes what is in logic. Works with
+    content_pool only."""
+    display_name = "Tracker Pad Launch"
+
+
 class AdventureStructure(Choice):
     """Which race on a track earns its Trophy Race check.
 
@@ -1705,7 +1739,7 @@ for _plan_option in (BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlis
                      BossTrackAssignment, BossKitShuffle, BossAttackAssignment, BossAttackIntensity, BossLossEasing,
                      BossPowerupBlocklist, PurpleCupBossGauntlet, OxideAttackProfile, OxidePowerupBlocklist,
                      WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints, GoalWumpa, SpoilerItems,
-                     AdventureStructure):
+                     AdventureStructure, RaceTypeSelector, TrackerPadLaunch):
     _plan_option.visibility = Visibility.all & ~Visibility.spoiler
 
 
@@ -1813,6 +1847,9 @@ class ctrAPOptions(PerGameCommonOptions):
     spoiler_items: SpoilerItems
     # race structure and the pad race type menu (#208)
     adventure_structure: AdventureStructure
+    race_type_selector: RaceTypeSelector
+    # start pad activities from the in-game tracker (#375)
+    tracker_pad_launch: TrackerPadLaunch
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1891,7 +1928,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem, SpoilerItems],
+                        ColorBoxesByItem, SpoilerItems, RaceTypeSelector,
+                        TrackerPadLaunch],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 

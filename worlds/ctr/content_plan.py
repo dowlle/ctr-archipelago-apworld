@@ -38,7 +38,7 @@ from . import (content_item_pool, characters, cortex_vortex_track, destinations,
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import (arena_content, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
+from . import (arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
                turbo_grant)
 from .Locations import CTR_LOCATION_IDS
@@ -207,6 +207,11 @@ ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_c
 #: open at the start may carry a `racer_lock`. The record is absent when
 #: Character Unlocks is off, so such a plan keeps its earlier wire.
 RACER_FEATURE = "character_unlocks_v1"
+#: Plan pads in the client (one generator row 6): the plan's `pad_client` record
+#: holds `race_type_selector` and `tracker_pad_launch`. A plan from before the
+#: record has neither: native reads `always` and starts nothing from the tracker.
+PAD_CLIENT_FEATURE = "pad_client_v1"
+RACE_MENU_VALUES = ("productive", "always")
 RACER_KEYS = ("starting_character", "remove_playable_oxide", "requested_locks")
 #: The client stat settings (#133 PR 4b): optional envelope keys, present only
 #: when set. The stat trio is the resolved outcome of
@@ -369,12 +374,13 @@ def relic_races(entries):
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
-                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False):
+                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
     # each only when present: ctr_first, boss opponents (the bosses record has
-    # `opponent_shuffle`), the Wumpa Shop and the Wumpa goal. `guarded` names the
+    # `opponent_shuffle`), the Wumpa Shop and the Wumpa goal; row 6's `pad_client`
+    # record comes last. `guarded` names the
     # track of the relic guard, whose Relic Race holds no tier check.
     races = relic_races(entries)
     eligible = races - (guarded is not None)
@@ -406,7 +412,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([CTR_FIRST_FEATURE] if ctr_first else [])
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
-            + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else []))
+            + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
+            + ([PAD_CLIENT_FEATURE] if pad_client else []))
 
 
 def family_settings(options):
@@ -515,6 +522,12 @@ def pack_counts(packs):
     """{item name: copies} the ledger pools for an `item_packs` record."""
     return {item: (packs[key] if key == "progressive_starting_wumpa" else 1)
             for key, item in PACK_ITEMS if key in packs}
+
+
+def pad_client(options):
+    """The plan's `pad_client` record: two client settings, no logic and no draw."""
+    return dict(race_type_selector=RACE_MENU_VALUES[int(options.race_type_selector.value)],
+                tracker_pad_launch=bool(options.tracker_pad_launch.value))
 
 
 def envelope_options(options):
@@ -1629,8 +1642,8 @@ def generate(world):
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes,boss_record,
                                                     world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
-                                                    ctr_first, shop, bool(wumpa_goal)),
-                pad_requirements=pad_record)
+                                                    ctr_first, shop, bool(wumpa_goal), True),
+                pad_requirements=pad_record, pad_client=pad_client(o))
     if ctr_first:
         plan["adventure_structure"] = CTR_FIRST
     if fixed:
@@ -1823,31 +1836,39 @@ def generic_room_titles(tracks, packages):
     return {slot: titles.get(slot, f"Custom Track {slot}") for slot, _ in rows}
 
 
-def predicate(world, node):
+def predicate_term(world, node):
+    """A plan predicate as a logic term: one definition for the access rule and
+    the `win_logic` export (one generator row 6, Contract 7m)."""
     player = world.player
     if node["op"] == "always":
-        return lambda state: True
+        return logic_terms.TRUE
     if node["op"] == "count":
-        return lambda state: state.has(ITEM_BY_CODE[node["item"]], player, node["count"])
+        return logic_terms.Has(ITEM_BY_CODE[node["item"]], node["count"], player)
     if node["op"] == "sum":
-        names = [ITEM_BY_CODE[code] for code in node["items"]]
-        return lambda state: sum(state.count(name, player) for name in names) >= node["count"]
+        return logic_terms.ItemSum([ITEM_BY_CODE[code] for code in node["items"]], node["count"], player)
     if node["op"] == "distinct":
-        return lambda state: sum(state.has(ITEM_BY_CODE[code], player) for code in node["items"]) >= node["count"]
+        return logic_terms.Distinct([ITEM_BY_CODE[code] for code in node["items"]], node["count"], player)
     if node["op"] == "checked":
         # Encounters the player personally won (#133 PR 6): their companion
         # events, never the location's checked state (content_bosses.EVENTS).
         events = [content_bosses.EVENTS[code] for code in node["locations"]]
-        return lambda state: sum(state.has(name, player) for name in events) >= node["count"]
+        if sorted(node["locations"]) == sorted(content_bosses.BOSS_CODES):
+            return logic_terms.BossWins(events, node["count"], player)
+        return logic_terms.Local(lambda state, events=tuple(events), count=node["count"]:
+                                 sum(state.has(name, player) for name in events) >= count, "a single encounter")
     if node["op"] == content_wumpa.GOAL_OP:
         # The Wumpa goal arm (job J11): fruit can be banked; the amount is time.
-        return lambda state: state.has(content_wumpa.INCOME, player)
+        return logic_terms.Local(lambda state: state.has(content_wumpa.INCOME, player), "the Wumpa goal arm")
     if node["op"] in ("all", "any"):
-        tests = tuple(predicate(world, term) for term in node["terms"])
+        terms = [predicate_term(world, term) for term in node["terms"]]
         if node["op"] == "all":
-            return lambda state: all(t(state) for t in tests)
-        return lambda state: any(t(state) for t in tests)
+            return logic_terms.all_of(*terms) if terms else logic_terms.TRUE
+        return (terms[0] if len(terms) == 1 else logic_terms.Or(*terms)) if terms else logic_terms.FALSE
     error("unsupported predicate in experimental content plan.")
+
+
+def predicate(world, node):
+    return predicate_term(world, node).compile()
 
 
 def create_regions(world):
@@ -1869,30 +1890,28 @@ def create_regions(world):
 
     from .progressive_capability import STAT_CHAINS
 
-    def with_boost(rule, check):
+    def with_boost(term, check):
         """A check's boost rank (#133 PR 4c), and an Item Box check's stat
         term (#133 PR 4e, one copy of each stat chain), bound to its pad's racer
         lock: one racer must meet both, as the legacy box gate reads it."""
         need = check.get("boost", 0)
         stat_mins = {chain: 1 for chain in STAT_CHAINS} if check.get("stats") else None
         if not need and not stat_mins:
-            return rule
+            return term
         lock = pad_by_id[check["routes"][0]["own_pad_id"]]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         track = track_by_id.get(check["owner"])
         arm = (content_capability.weapon_arm(track, check["kind"], check["routes"][0]["award"], plan["capability"],
                                              package_by_id.get(track.get("package_id")))
                if weapons and track is not None and need == 1 else None)
-
-        def has_boost(state, need=need, racer=racer, arm=arm, stat_mins=stat_mins):
-            if gate_satisfied(world, state, player, boost_min=need, stat_mins=stat_mins, required_character=racer):
-                return True
-            if arm is None:
-                return False
-            if arm[0] == "families":
-                return family_count(state, player, USEFUL_WEAPON_FAMILIES) >= arm[1]
-            return state.has_any(arm[1], player)
-        return has_boost if rule is None else (lambda state, rule=rule: rule(state) and has_boost(state))
+        gate = (logic_terms.Cap(world, need, racer) if not stat_mins else logic_terms.Local(
+            lambda state, need=need, racer=racer, stat_mins=stat_mins: gate_satisfied(
+                world, state, player, boost_min=need, stat_mins=stat_mins, required_character=racer),
+            "a stat term"))
+        if arm is not None:
+            gate = logic_terms.Or(gate, logic_terms.Families(USEFUL_WEAPON_FAMILIES, arm[1], player)
+                                  if arm[0] == "families" else logic_terms.HasAny(arm[1], player))
+        return gate if term is None else logic_terms.And(term, gate)
 
     def first_race(pad):
         """Codes of the checks that prove the pad's first race was won, those
@@ -1905,8 +1924,8 @@ def create_regions(world):
             return ()
         return first_race_checks(by_pad.get(pad["id"], ()), modes[0])
 
-    def stage_gate(route):
-        """The test of a route's later race, or None for a pad's first race. A
+    def stage_term(route):
+        """The term of a route's later race, or None for a pad's first race. A
         later race counts only once the pad's first race is won, on every pad
         (ruled 2026-10-30), and a stage-2 mode also needs its requirement."""
         pad = pad_by_id[route["own_pad_id"]]
@@ -1914,30 +1933,29 @@ def create_regions(world):
         if not gates or gates[0]["mode"] == route["mode"]:
             return None
         rid = next((g["requirement_id"] for g in gates if g["mode"] == route["mode"] and g["stage"] == 2), None)
-        items = predicate(world, req[rid]) if rid is not None else None
-        won = first_race(pad)
-        if items is None and not won:
-            return None
+        terms = [predicate_term(world, req[rid])] if rid is not None else []
+        won = [logic_terms.Reached(placed, code, pad["id"]) for code in first_race(pad)]
+        if won:
+            terms.append(won[0] if len(won) == 1 else logic_terms.Or(*won))
+        return logic_terms.all_of(*terms) if terms else None
 
-        def test(state, items=items, won=won):
-            return ((items is None or items(state))
-                    and (not won or any(placed[code].can_reach(state) for code in won)))
-        return test
+    def stage_gate(route):
+        term = stage_term(route)
+        return None if term is None else term.compile()
 
-    def with_letters(rule, check):
+    def with_letters(term, check):
         names = letters_needed.get(check["location"])
         if not names:
-            return rule
-        def has_letters(state, names=names):
-            return state.has_all(names, player)
-        return has_letters if rule is None else (lambda state, rule=rule: rule(state) and has_letters(state))
+            return term
+        letters = logic_terms.HasEach(names, player, "has_all")
+        return letters if term is None else logic_terms.And(term, letters)
 
     # Boss garages (#133 PR 6): one region per encounter, behind its garage's
     # hub gate and its own requirement, with its check and companion event.
     # With the Wumpa goal on, the N. Oxide race that finishes the seed waits for
     # the fruit target natively (decision 19), so it also needs `Wumpa Income`.
     if plan["encounters"]:
-        content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check),
+        content_bosses.install(world, plan, menu, predicate_term, with_boost,
                                content_wumpa.INCOME if content_wumpa.goal_arm(plan["goal"]) else None)
     by_pad = {}
     # Locations by code: Universal Tracker renames custom tracks' locations, so
@@ -1957,6 +1975,7 @@ def create_regions(world):
             by_pad.setdefault(check['routes'][0]['own_pad_id'], []).append(check)
         else:
             shared.append(check)  # `wumpa: global`, one route per race
+    wins = win_kinds(plan)
     for pad in plan["pads"]:
         if pad["entry_id"] is None:
             continue
@@ -1966,34 +1985,31 @@ def create_regions(world):
         # stage-1 gate of a pad shares one record). A later mode's checks also
         # need the first race won and, on a stage-2 mode, that mode's own gate.
         first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
-        gates = [predicate(world, req[rid]) for rid in [pad["entrance_req"]] + first]
+        gates = [predicate_term(world, req[rid]) for rid in [pad["entrance_req"]] + first]
         # A racer lock (#133 PR 4b) is ANDed onto the pad's own gates, never in
         # place of them (Rules.add_racer_lock_rules on the legacy path).
         if pad["racer_lock"] is not None:
-            racer = characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]]
-            gates.append(lambda state, racer=racer: state.has(racer, player))
-        menu.connect(region, pad["id"], gates[0] if len(gates) == 1 else
-                     (lambda state, gates=tuple(gates): all(g(state) for g in gates)))
+            gates.append(logic_terms.Has(characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]], 1, player))
+        logic_terms.set_term(menu.connect(region, pad["id"]), logic_terms.all_of(*gates))
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
             placed[check["location"]] = location
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
-            tests = [stage_gate(r) for r in check["routes"]]
-            rule = None
+            tests = [stage_term(r) for r in check["routes"]]
+            term = None
             if all(test is not None for test in tests):
-                rule = tests[0] if len(tests) == 1 else (lambda state, tests=tuple(tests): any(t(state) for t in tests))
-            rule = with_boost(with_letters(rule, check), check)
-            if rule is not None:
-                location.access_rule = rule
+                term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
+            term = with_boost(with_letters(term, check), check)
+            if term is not None or check["location"] in wins:
+                logic_terms.set_term(location, term or logic_terms.TRUE)
             region.locations.append(location)
         # ctr_first: first place pays the Trophy Race check, and first place
         # with the letters also pays the CTR Token check, so the CTR Token needs
         # everything the Trophy Race check needs. Read at call time, never looser.
         if merged_race(by_pad.get(pad["id"], ())):
             by_kind = {checks_by_code[location.address]["kind"]: location for location in region.locations}
-            ctr, trophy = by_kind["ctr"], by_kind["trophy"]
-            ctr.access_rule = lambda state, own=ctr.access_rule, won=trophy: own(state) and won.can_reach(state)
+            logic_terms.and_term(by_kind["ctr"], logic_terms.Reached(placed, by_kind["trophy"].address, pad["id"]))
     # Itemsanity and Hit Character checks (#133 PR 4d) take their rules in
     # set_rules, once every trigger location exists.
     world.ctr_global_routes = []
@@ -2033,7 +2049,7 @@ def create_regions(world):
         location.access_rule = any_leg
         menu.locations.append(location)
     # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
-    content_wumpa.install(world, plan, menu, stage_gate)
+    content_wumpa.install(world, plan, menu, stage_gate, stage_term)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 
@@ -2090,6 +2106,26 @@ def relic_progression_map(world):
     if final_required:
         needed.add("Sapphire Relic")
     return {name: name in needed for name in tiers}
+
+
+def win_kinds(plan):
+    """{check code: `win_logic` kind} of the plan's win checks (Contract 7m).
+    A cup's Win and sweep are the Gem's kinds on every cup, and a garage's race
+    or cup is named by its encounter."""
+    relic = {route: route for route in ("sapphire", "gold", "platinum")}
+    kinds = {}
+    for check in plan["checks"]:
+        kind = check["kind"]
+        if kind in ("trophy", "ctr", "crystal"):
+            kinds[check["location"]] = kind
+        elif kind == "relic":
+            kinds[check["location"]] = relic[check["routes"][0]["award"]]
+        elif kind in (content_cups.KIND, content_cups.SWEEP_KIND):
+            kinds[check["location"]] = "gem"
+        elif kind in content_bosses.KINDS:
+            kinds[check["location"]] = {content_bosses.OXIDE_FIRST: "oxide",
+                                        content_bosses.OXIDE_FINAL: "oxide_final"}.get(check["location"], "boss")
+    return kinds
 
 
 def set_rules(world):
@@ -2242,7 +2278,7 @@ def validate(plan):
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
-                                                         ctr_first, shop, wumpa_arm is not None),
+                                                         ctr_first, shop, wumpa_arm is not None, "pad_client" in plan),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -2732,3 +2768,8 @@ def restore(world, slot_data):
     # Job J11: the five Wumpa options and adventure_structure from the plan.
     content_wumpa.restore_options(world, plan)
     world.options.adventure_structure.value = int(plan.get("adventure_structure") == CTR_FIRST)
+    # Row 6: the two client settings; a plan without the record has the menu's
+    # default and no tracker starts.
+    client = plan.get("pad_client", dict(race_type_selector="always", tracker_pad_launch=False))
+    world.options.race_type_selector.value = RACE_MENU_VALUES.index(client["race_type_selector"])
+    world.options.tracker_pad_launch.value = int(client["tracker_pad_launch"])

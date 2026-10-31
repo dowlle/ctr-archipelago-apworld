@@ -39,7 +39,7 @@ from random import Random
 
 from Options import OptionError
 
-from . import wumpa_shop
+from . import logic_terms, wumpa_shop
 
 SHOP_FEATURE = "wumpa_shop_v1"
 GOAL_FEATURE = "wumpa_goal_v1"
@@ -246,11 +246,17 @@ def check_income(plan):
               "the trophy or ctr mode, or turn the shop and the Wumpa goal off. No content was changed.")
 
 
-def install(world, plan, menu, stage_gate):
+def income_term(world):
+    """What `Wumpa Income` stands for, for the `win_logic` export: any income
+    route, with its pad's gate, as `install` built them."""
+    return world.ctr_income_term
+
+
+def install(world, plan, menu, stage_gate, stage_term):
     """The `Wumpa Income` event (in Menu, any income route) and the shop
     locations (in Menu, the hub's Key floor and `Wumpa Income`), with the
     `excluded` item rule. `stage_gate(route)` gives the test of a route's
-    later race, or None for a pad's first race."""
+    later race, or None for a pad's first race; `stage_term` its term."""
     if not banking(plan):
         return
     from BaseClasses import Location
@@ -262,13 +268,23 @@ def install(world, plan, menu, stage_gate):
     capability = plan.get("capability", {})
     pads = {p["id"]: p for p in plan["pads"]}
     routes = []
+    wires = []
     for entry_id, pad_id, mode, track in income_routes(plan):
-        test = stage_gate(dict(own_pad_id=pad_id, mode=mode))
+        route = dict(own_pad_id=pad_id, mode=mode)
+        test = stage_gate(route)
         lock = pads[pad_id]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         need = finish_boost(track, capability) if capability.get("boost_mode") else 0
         routes.append((entry_id, test, need, racer))
+        terms = [logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
+        stage = stage_term(route)
+        if stage is not None:
+            terms.append(stage)
+        if need:
+            terms.append(logic_terms.Cap(world, need, racer))
+        wires.append(logic_terms.all_of(*terms))
     routes = tuple(routes)
+    world.ctr_income_term = wires[0] if len(wires) == 1 else logic_terms.Or(*wires)
 
     def income(state):
         return any(state.can_reach(entry, "Region", player) and (test is None or test(state))

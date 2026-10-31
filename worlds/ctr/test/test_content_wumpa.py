@@ -34,7 +34,7 @@ class TestContentWumpaShop(unittest.TestCase):
     def test_record_features_and_goal(self):
         plan = self.plan
         self.assertEqual(plan["wumpa_shop"], dict(slots=3, prices=150, progression="excluded", hints=True))
-        self.assertEqual(plan["required_features"][-2:], ["wumpa_shop_v1", "wumpa_goal_v1"])
+        self.assertEqual(plan["required_features"][-3:], ["wumpa_shop_v1", "wumpa_goal_v1", "pad_client_v1"])
         self.assertEqual(plan["goal"]["op"], "all")
         self.assertEqual(plan["goal"]["terms"][-1], dict(op="wumpa_banked", count=750))
         self.assertEqual(plan["goal"]["terms"][0]["op"], "distinct")
@@ -161,7 +161,7 @@ class TestContentWumpaRules(unittest.TestCase):
     def test_wumpa_only_goal(self):
         plan = make_world(shop_options(slots=0, goal=1000, gems_required_goal=0), seed=7).ctr_content_plan
         self.assertEqual(plan["goal"], dict(op="wumpa_banked", count=1000))
-        self.assertEqual(plan["required_features"][-1], "wumpa_goal_v1")
+        self.assertEqual(plan["required_features"][-2:], ["wumpa_goal_v1", "pad_client_v1"])
         self.assertTrue(content_plan.validate(plan))
 
     def test_no_goal_still_refuses(self):

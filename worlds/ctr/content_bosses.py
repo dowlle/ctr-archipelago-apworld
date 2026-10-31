@@ -96,7 +96,7 @@ room's garage, Oxide and goal code from it (ap_content_plan_impl.hpp).
 """
 from Options import OptionError
 
-from . import boss_track_shuffle, content_item_pool, destinations
+from . import boss_track_shuffle, content_item_pool, destinations, logic_terms
 from .content_capability import finish_boost
 from .Locations import CTR_LOCATION_IDS
 from .content_cups import LEG_RETAIL_IDS
@@ -764,14 +764,15 @@ def check_venues(record, venues, final, points=None, raced=None, cups=None):
         error("N. Oxide's Final Challenge races Cortex Vortex or Oxide Station")
 
 
-def install(world, plan, menu, predicate, with_boost, oxide_event=None):
+def install(world, plan, menu, predicate_term, with_boost, oxide_event=None):
     """Regions, locations and companion events of the plan's encounters
-    (content_plan.create_regions). `predicate` builds a requirement test,
-    `with_boost` adds a check's boost rank. `oxide_event` names an event
+    (content_plan.create_regions). `predicate_term` builds a requirement's
+    term, `with_boost` adds a check's boost rank. `oxide_event` names an event
     item the N. Oxide race that finishes the seed also needs (`Wumpa Income`
     with the Wumpa goal on), or None. The other N. Oxide race never waits."""
     from BaseClasses import Location, LocationProgressType, Region
     from .content_plan import LOCATION_BY_CODE
+    from .content_wumpa import income_term
     mw, player = world.multiworld, world.player
     req = {r["id"]: r["predicate"] for r in plan["requirements"]}
     pads = {p["id"]: p for p in plan["pads"]}
@@ -781,23 +782,21 @@ def install(world, plan, menu, predicate, with_boost, oxide_event=None):
     for enc in plan["encounters"]:
         region = Region(enc["entry_id"], player, mw)
         mw.regions.append(region)
-        gates = (predicate(world, req[pads[enc["pad_id"]]["entrance_req"]]),
-                 predicate(world, req[enc["requirement_id"]]))
+        gates = [predicate_term(world, req[pads[enc["pad_id"]]["entrance_req"]]),
+                 predicate_term(world, req[enc["requirement_id"]])]
         if oxide_event and enc["completion_location"] == goal_code:
-            gates += (lambda state, name=oxide_event: state.has(name, player),)
-        menu.connect(region, enc["id"], lambda state, gates=gates: all(g(state) for g in gates))
+            gates.append(logic_terms.EventTerm(oxide_event, player, lambda: income_term(world)))
+        logic_terms.set_term(menu.connect(region, enc["id"]), logic_terms.all_of(*gates))
         code = enc["completion_location"]
         check = checks[code]
         location = Location(player, LOCATION_BY_CODE[code], code, region)
-        rule = with_boost(None, check)
-        if rule is not None:
-            location.access_rule = rule
+        term = with_boost(None, check) or logic_terms.TRUE
+        logic_terms.set_term(location, term)
         if code == goal_code:
             location.progress_type = LocationProgressType.EXCLUDED
         region.locations.append(location)
         event = Location(player, EVENTS[code], None, region)
-        if rule is not None:
-            event.access_rule = rule
+        event.access_rule = term.compile()
         event.place_locked_item(world.create_event(EVENTS[code]))
         region.locations.append(event)
 

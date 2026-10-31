@@ -221,12 +221,25 @@ def resolve_itemsanity_checks(world) -> Dict[str, object]:
 SLOT_DATA_SCHEMA = 18
 
 
+def win_logic_block(world) -> Dict[str, object]:
+    """The `win_logic` key, or nothing when another world wrapped a rule."""
+    from .win_logic import ForeignRuleError, wire_block
+    try:
+        return {"win_logic": wire_block(world)}
+    except ForeignRuleError as error:
+        logging.getLogger(__name__).warning(
+            "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
+            world.player_name, error)
+        return {}
+
+
 def fill_slot_data(world) -> Dict[str, object]:
     if hasattr(world, "ctr_content_plan"):
         from . import content_plan
         wire = content_plan.wire(world)
         wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
         wire["ctr_options"]["spoiler_items"] = bool(world.options.spoiler_items.value)
+        wire.update(win_logic_block(world))
         return wire
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is
@@ -669,13 +682,7 @@ def fill_slot_data(world) -> Dict[str, object]:
     # A rule another world wrapped after set_rules (SlotLock) cannot be
     # exported; the block is then omitted, which native reads as the same
     # 0.2.3 behaviour, rather than failing generation for every slot.
-    from .win_logic import ForeignRuleError, wire_block
-    try:
-        slot_data["win_logic"] = wire_block(world)
-    except ForeignRuleError as error:
-        logging.getLogger(__name__).warning(
-            "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
-            world.player_name, error)
+    slot_data.update(win_logic_block(world))
     slot_data["trap_identities"] = traps.trap_identities_block(world.item_name_to_id)
     # #169 tier 1 (schema 18): the four resolved boss garage encounters,
     # keyed by physical garage. Absent = retail encounters.
