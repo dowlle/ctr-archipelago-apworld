@@ -187,6 +187,51 @@ def unlock_triggers_for(bosses) -> Dict[int, Tuple[Tuple[int, ...], str]]:
     return out
 
 
+#: `policy` block, verbatim.
+POLICY_SELF_CHARACTER = "never_seat_player"
+
+
+class HitCharacterLocationClass(LocationClass):
+    """The sixteen Hit Character checks as a `LocationClass` (#176 shape).
+
+    Global, not per-track: a hit can land wherever you race, so every check
+    parents to the world's root `Menu` region exactly as itemsanity does.
+    """
+
+    key = "hit_character"
+    display_name = "Hit Character Encounters"
+    code_blocks = (HIT_CHARACTER_CODE_BASE,)
+
+    #: The AP region every Hit Character check parents to.
+    REGION = "Menu"
+
+    def all_locations(self):
+        return [
+            (self.location_name(cid), HIT_CHARACTER_CODE_BASE + cid, self.REGION)
+            for cid in sorted(characters.CHARACTER_ID_TO_NAME)
+        ]
+
+    def location_name(self, engine_id: int) -> str:
+        """AP location name for an engine character id, e.g. 'Hit N. Tropy'."""
+        return f"Hit {characters.CHARACTER_ID_TO_NAME[int(engine_id)]}"
+
+    def created_location_names(self, options):
+        """All sixteen checks when the toggle is on, otherwise none."""
+        if options is None:
+            return []
+        toggle = getattr(options, "hit_character", None)
+        if toggle is None:
+            return []
+        value = getattr(toggle, "value", toggle)
+        if not bool(value):
+            return []
+        return list(self.names())
+
+
+#: The registered Hit Character class. `Locations.py` registers this instance.
+HIT_CHARACTER_CLASS = HitCharacterLocationClass()
+
+
 # ---------------------------------------------------------------------------
 # Deterministic resolution
 # ---------------------------------------------------------------------------
@@ -423,7 +468,7 @@ def fallback_guests(created_codes, table=None, triggers=None) -> Dict[int, int]:
     }
 
 
-def created_trigger_codes(world, player: int, triggers=None) -> set:
+def created_trigger_codes(world, player: int) -> set:
     """The authoritative unlock-win codes that exist as locations in this seed.
 
     Reads the same `location_cache` `trigger_proofs` reads, so the fallback
@@ -433,7 +478,7 @@ def created_trigger_codes(world, player: int, triggers=None) -> set:
     names = _location_name_by_code(world)
     cache = world.multiworld.regions.location_cache[player]
     created = set()
-    for codes, _kind in (UNLOCK_TRIGGERS if triggers is None else triggers).values():
+    for codes, _kind in UNLOCK_TRIGGERS.values():
         for code in codes:
             name = names.get(int(code))
             if name is not None and cache.get(name) is not None:
