@@ -1975,6 +1975,7 @@ def create_regions(world):
             by_pad.setdefault(check['routes'][0]['own_pad_id'], []).append(check)
         else:
             shared.append(check)  # `wumpa: global`, one route per race
+    wins = win_kinds(plan)
     for pad in plan["pads"]:
         if pad["entry_id"] is None:
             continue
@@ -1999,7 +2000,9 @@ def create_regions(world):
             term = None
             if all(test is not None for test in tests):
                 term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
-            logic_terms.set_term(location, with_boost(with_letters(term, check), check) or logic_terms.TRUE)
+            term = with_boost(with_letters(term, check), check)
+            if term is not None or check["location"] in wins:
+                logic_terms.set_term(location, term or logic_terms.TRUE)
             region.locations.append(location)
         # ctr_first: first place pays the Trophy Race check, and first place
         # with the letters also pays the CTR Token check, so the CTR Token needs
