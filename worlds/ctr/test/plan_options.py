@@ -117,4 +117,8 @@ def plan_options(options):
             relics = out.setdefault("item_pool", {}).setdefault("base", {}).setdefault("relics", {})
             relics[tier] = out.pop(key)
     out.pop("boss_encounter_repeats", None)
+    if out.get("death_link") == "any_hit":
+        out["death_link"] = "mask_reset"
+    if out.get("cortex_vortex_track") is True:
+        out["cortex_vortex_track"] = "in_pool"
     return out

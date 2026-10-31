@@ -411,6 +411,9 @@ def _seat_first_key(world, state) -> None:
     marked = mw.local_early_items.setdefault(player, {})
     for step in getattr(world, "ctr_first_key_path", ()):
         name = step if step == "Trophy" else starting_boost_item(world)
+        # A player's non_local_items stay out of their own start.
+        if name in world.options.non_local_items.value:
+            return
         item = next((item for item in mw.itempool if item.player == player and item.name == name), None)
         spots = _open_empty(world, state) or [
             loc for loc in mw.get_unfilled_locations(player)

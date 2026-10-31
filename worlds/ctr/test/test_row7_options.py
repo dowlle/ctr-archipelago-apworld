@@ -194,6 +194,21 @@ class TestQuietOutput(unittest.TestCase):
             make_world(options, stop_before="create_regions")
 
 
+class TestStartGuardOnThePlan(unittest.TestCase):
+    def test_a_start_with_no_open_check_is_refused(self):
+        refused = 0
+        for seed in range(12):
+            try:
+                make_world(dict(podium_rungs=[], progressive_boost="shared_global", logic_difficulty="easy",
+                                crystal_challenge_count=0, cup_count=0, wumpa_shop_slots=0, warppad_unlock_requirements="vanilla",
+                                track_modes={"default": ["trophy"]}, item_pool=dict(base=dict(
+                                    relics=dict(sapphire=0, gold=0), trophies=8,
+                                    tokens=dict(red=0, green=0, blue=0, yellow=0, purple=0)))), seed)
+            except OptionError as caught:
+                refused += "at the start" in str(caught) or "start" in str(caught)
+        self.assertGreater(refused, 0)
+
+
 class TestFirstKeyPath(unittest.TestCase):
     def test_four_open_checks_hold_four_trophies(self):
         pads = [(0, [0], False), (0, [0], False), (1, [0], False), (3, [0], False)]
@@ -222,6 +237,12 @@ class TestFirstKeyPath(unittest.TestCase):
         self.assertEqual(world.ctr_first_key_path.count("Trophy"), content_fixed.FIRST_KEY_TROPHIES)
         self.assertGreaterEqual(sum(loc.item is not None and loc.item.name == "Trophy" and loc.address is not None
                                     for loc in world.multiworld.get_locations(world.player)), 4)
+
+    def test_non_local_items_stay_off_the_path(self):
+        world = make_world(dict(warppad_unlock_requirements="vanilla", shuffle_keys=False, podium_rungs=[],
+                                progressive_boost="shared_global", non_local_items=["Trophy"]), 2, stop_before="fill")
+        self.assertFalse(any(loc.item is not None and loc.item.name == "Trophy" and loc.address is not None
+                             for loc in world.multiworld.get_locations(world.player)))
 
     def test_redraws_stay_a_draw(self):
         self.assertGreater(content_requirements.FIRST_KEY_REDRAWS, content_requirements.PLACEMENT_REDRAWS)
