@@ -24,6 +24,8 @@ def _count(value):
 
 
 def _track_name(track_id, packages):
+    if track_id == "cortex_vortex":
+        return "Cortex Vortex"
     if track_id.startswith("retail:"):
         return RETAIL[int(track_id.split(":")[1])]
     if track_id.startswith("arena:"):
@@ -104,8 +106,8 @@ def plan_options(options):
         with_oxide = out.pop("boss_oxide_in_pool", False)
         every = POOL_NAMES if with_oxide else OPPONENT_NAMES
         allow = out.pop("boss_character_allowlist", ())
-        out["boss_character_pool"] = [name for name in _pool(allow, out.pop("boss_character_blocklist", ()), every)
-                                      if with_oxide or name != OXIDE_NAME]
+        names = [name for name in _pool(allow, out.pop("boss_character_blocklist", ()), every) if name != OXIDE_NAME]
+        out["boss_character_pool"] = names + ([OXIDE_NAME] if with_oxide else [])
     if "boss_powerup_blocklist" in out:
         out["boss_weapon_pool"] = _pool((), out.pop("boss_powerup_blocklist"), GARAGE_FAMILIES)
     if "oxide_powerup_blocklist" in out:

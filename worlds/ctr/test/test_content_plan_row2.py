@@ -4,10 +4,12 @@ the item counts (ruled 2026-10-30)."""
 import copy
 import json
 import unittest
+from types import SimpleNamespace
 
 from Options import OptionError
 
 from .. import content_bosses, content_cups, content_item_pool, content_plan, cup_checks, gem_cup_legs
+from ..Options import CupCount, CupCustomLegs, CupTracks
 from .test_content_plan import make_world, profile_options
 from .test_track_modes import mode_pool
 
@@ -127,6 +129,10 @@ class TestGemCups(unittest.TestCase):
                          {loc.name for loc in world.multiworld.get_locations(1)})
 
 
+def flat_cups(tracks):
+    return SimpleNamespace(cup_count=CupCount(1), cup_tracks=CupTracks.from_any(tracks), cup_custom_legs=CupCustomLegs(4))
+
+
 class TestCupTracks(unittest.TestCase):
     def legs(self, plan, cup):
         names = {t["id"]: t["display_name"] for t in plan["tracks"]}
@@ -142,10 +148,10 @@ class TestCupTracks(unittest.TestCase):
                 self.assertEqual(len(set(self.legs(plan, cup))), 4)
 
     def test_a_yaml_off_reads_as_false(self):
-        self.assertEqual(content_cups.settings(dict(count=1, tracks=False))["tracks"], "off")
+        self.assertEqual(content_cups.settings(flat_cups(False))["tracks"], "off")
 
     def test_random_no_repeats_is_the_default(self):
-        spec = content_cups.settings(dict(count=1))
+        spec = content_cups.settings(flat_cups(CupTracks.default))
         self.assertEqual((spec["tracks"], spec["repeats"]["within_cup"]), ("random_no_repeats", False))
 
     def test_random_allows_repeats_inside_a_cup(self):
@@ -162,33 +168,16 @@ class TestCupTracks(unittest.TestCase):
                 legs = {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]}
                 self.assertFalse(legs & set(TRIAL_IDS), value)
 
-    def test_tracks_wins_over_the_older_repeats_key(self):
-        spec = content_cups.settings(dict(count=1, tracks="random_no_repeats",
-                                          composition=dict(repeats=dict(within_cup=True))))
-        self.assertFalse(spec["repeats"]["within_cup"])
-        spec = content_cups.settings(dict(count=1, tracks="random",
-                                          composition=dict(repeats=dict(within_cup=False))))
-        self.assertTrue(spec["repeats"]["within_cup"])
-        spec = content_cups.settings(dict(count=1, tracks="off", composition=dict(repeats=dict(within_cup=True))))
-        self.assertFalse(spec["repeats"]["within_cup"])
-
-    def test_the_older_repeats_key_still_works_alone(self):
-        spec = content_cups.settings(dict(count=1, composition=dict(repeats=dict(within_cup=True))))
-        self.assertEqual(spec["tracks"], "random")
-        spec = content_cups.settings(dict(count=1, composition=dict(repeats=dict(within_cup=False))))
-        self.assertEqual(spec["tracks"], "random_no_repeats")
-
     def test_unknown_value_refuses(self):
-        for value in ("shuffled", None, True, 0):
-            with self.assertRaisesRegex(OptionError, "cups.tracks must be"):
-                content_cups.settings(dict(count=1, tracks=value))
+        with self.assertRaises(KeyError):
+            CupTracks.from_any("shuffled")
 
     def test_off_needs_the_original_tracks_of_the_seeds_cups(self):
         options = plan_options(dict(count=5, tracks="off"))
         # Red, Green, Blue and Yellow Gem Cups, without Crash Cove (0) in the selection.
         options["content_pool"]["tracks"]["retail"] = [i for i in range(18) if i != 0]
         options["content_pool"]["required_entries"] = []
-        with self.assertRaisesRegex(OptionError, "cups.tracks off"):
+        with self.assertRaisesRegex(OptionError, "cup_tracks off"):
             make_world(options)
 
 
