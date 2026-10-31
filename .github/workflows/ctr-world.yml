@@ -236,6 +236,8 @@ jobs:
           - {check_name: pads-wumpa-fixed,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-goal-all'}
           - {check_name: pads-spoiler,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-spoiler'}
           - {check_name: pads-spoiler-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-spoiler'}
+          - {check_name: pads-client,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-client'}
+          - {check_name: pads-client-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-client'}
           - {check_name: pads-all-ut,                check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-all'}
           - {check_name: pads-all-ut-vanilla,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-all'}
     steps:
