@@ -208,8 +208,7 @@ class TestBossEncounters(unittest.TestCase):
 
     def test_refusals(self):
         cases = [
-            (profile_options() | dict(oxide_goal="any_percent"), "bosses.enabled: false"),
-            (profile_options() | dict(boss_track_shuffle=True), "boss_track_shuffle needs"),
+            (profile_options() | dict(oxide_goal="any_percent"), "with boss_garages off"),
             (boss_options(oxide_goal="none"), "no goal"),
             (boss_options(), None),
         ]
@@ -217,15 +216,9 @@ class TestBossEncounters(unittest.TestCase):
         few = boss_options()
         few["item_pool"]["base"]["trophies"] = 3
         cases.append((few, None))
-        level = boss_options()
-        level["content_pool"]["bosses"]["requirement_level"] = "extreme"
-        cases.append((level, "requirement_level must be one of"))
         none = boss_options(oxide_final_challenge_unlock="platinum_relics")
         none["item_pool"]["base"]["relics"] = dict(sapphire=6, gold=4, platinum=0)
         cases.append((none, "no base relic"))
-        flag = profile_options()
-        flag["content_pool"]["bosses"] = dict(enabled="yes")
-        cases.append((flag, "must be true or false"))
         # Review finding 1: a ledger with no filler cannot hold the excluded
         # Oxide goal check; refused before fill (56 checks, 19 extra Trophies).
         tight = boss_options()
@@ -580,7 +573,7 @@ class TestBossCups(unittest.TestCase):
     def test_cup_count_refusal(self):
         options = boss_options()
         options["content_pool"]["bosses"]["cups"] = 5
-        with self.assertRaisesRegex(OptionError, "bosses.cups"):
+        with self.assertRaisesRegex(Exception, "higher than maximum"):
             make_world(options)
 
 

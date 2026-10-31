@@ -83,42 +83,31 @@ class TestModesByCapability(unittest.TestCase):
     def test_relic_needs_a_lap_graph(self):
         d = relic_only()
         d["capabilities"]["time_trial"] = False
-        with self.assertRaisesRegex(OptionError, "can run none of the selected modes"):
+        with self.assertRaisesRegex(OptionError, "can run none of the races"):
             make_world(mode_options(custom=[d]))
 
     def test_global_modes_filter_and_overrides_narrow(self):
-        options = mode_options(modes=["ctr", "relic"], custom=[], overrides={"retail:3": ["relic"]})
+        options = mode_options(modes=["trophy", "relic"], custom=[], overrides={"retail:3": ["relic"]})
         options["item_pool"]["base"]["trophies"] = 0
         plan = make_world(options).ctr_content_plan
         by_id = {t["id"]: t["modes"] for t in plan["tracks"]}
         self.assertEqual(by_id.get("retail:3", ["relic"]), ["relic"])
-        self.assertTrue(all(m == ["ctr", "relic"] for i, m in by_id.items() if i != "retail:3"))
-        self.assertFalse(any(c["kind"] == "trophy" for c in plan["checks"]))
+        self.assertTrue(all(m == ["trophy", "relic"] for i, m in by_id.items() if i != "retail:3"))
+        self.assertFalse(any(c["kind"] == "ctr" for c in plan["checks"]))
 
     def test_override_refusals(self):
-        cases = [({"retail:3": ["trophy"]}, ["ctr", "relic"], "can only narrow"),
-                 ({"retail:99": ["relic"]}, ["relic"], "not a selected retail or custom track"),
-                 ({"custom/fixture-loop/2.1": ["ctr"]}, ["trophy", "ctr", "relic"], "cannot run"),
+        cases = [({"nowhere": ["relic"]}, ["relic"], "not a track of this seed"),
+                 ({"fixture-loop": ["ctr"]}, ["trophy", "ctr", "relic"], "ctr without trophy"),
                  ({"retail:3": []}, ["relic"], "nonempty list")]
         for overrides, modes, message in cases:
             with self.subTest(overrides=overrides), self.assertRaisesRegex(OptionError, message):
                 make_world(mode_options(modes=modes, custom=[copy.deepcopy(UNKNOWN)], overrides=overrides))
 
-    def test_unsupported_layout_requests_are_refused(self):
-        for layout, message in ((dict(merge_trophy_ctr=True), "merged Trophy/CTR race is not built yet"),
-                                (dict(placement="some"), "vanilla, shuffle_within_kind or shuffle"),
-                                (dict(stages="three"), "single or two"),
-                                (dict(mode_order="random"), "fixed, per_seed or per_pad")):
-            options = mode_options()
-            options["pad_layout"].update(layout)
-            with self.subTest(layout=layout), self.assertRaisesRegex(OptionError, message):
-                make_world(options)
-
     def test_modes_list_is_checked(self):
         for modes in ([], ["trophy", "trophy"], ["merged"], "trophy"):
             options = mode_options()
             options["content_pool"]["tracks"]["modes"] = modes
-            with self.subTest(modes=modes), self.assertRaisesRegex(OptionError, "tracks.modes"):
+            with self.subTest(modes=modes), self.assertRaisesRegex(OptionError, "track_modes"):
                 make_world(options)
 
 

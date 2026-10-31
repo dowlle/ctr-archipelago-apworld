@@ -1,7 +1,7 @@
 """Pad placement and pad requirements of a content plan (one generator row 3).
 
-Placement seats the seed's content on the physical pads (`pad_layout.placement`,
-the later `pad_placement`). Requirements come in two forms:
+Placement seats the seed's content on the physical pads (`pad_placement`).
+Requirements come in two forms:
 
 - Vanilla: each physical pad keeps its original requirement, whatever content
   lands behind it, and every pad with several races takes a Key stage 2 counted
@@ -32,6 +32,9 @@ PLACEMENTS = ("vanilla", "shuffle_within_kind", "shuffle")
 STAGE1_PREFIX = "stage1:"
 #: A redraw of the placement stops after this many tries (Rulebook, 2026-10-30).
 PLACEMENT_REDRAWS = 8
+#: Tries when a fixed first Key needs room in front of it. A narrow start can miss
+#: on most draws, and a draw costs next to nothing.
+FIRST_KEY_REDRAWS = 512
 SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
                 "AnyGem": warp_pad_rules.GEMS}
 PADS = json.loads(pkgutil.get_data(__package__, "data/warp_pad_ids.json"))["pads"]
@@ -175,7 +178,8 @@ def capacity_met(seated, seats, rungs):
     return True
 
 
-def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks, cycle=None, near_floor=0):
+def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_checks, cycle=None, near_floor=0,
+                 key_fits=None):
     """(content in pad order, seats with the occupied ones first): `seats[i]`
     holds `chosen[i]`. A draw that leaves all content at home, too many cups on
     early pads, too few checks open at the start or content on a pad that needs
@@ -189,27 +193,30 @@ def seat_content(world, chosen, seats, placement, manual, rungs, reach, start_ch
     stands: one with no such cycle, then one that passes the first two tests,
     then the best early pads, and `shuffle` then trades content onto the open
     pads. Vanilla placement never redraws. `near_floor` asks that many checks of
-    the pads with `reach`, for a fixed first Key behind a Trophy garage."""
+    the pads with `reach`, for a fixed first Key behind a Trophy garage, and
+    `key_fits(seated)` is the final capacity check in front of that Key. It only
+    ever draws again, up to FIRST_KEY_REDRAWS times: the best draw stands."""
     seats = list(seats)
     weight = {seat[0]: reach(seat) if reach else 0 for seat in seats}
     need = min(sphere0_guard.NARROW_START_CHECKS, sum(start_checks(item) for item in chosen)) if reach else 0
-    best, best_score = None, (False, False, -1)
-    for _ in range(PLACEMENT_REDRAWS):
+    best, best_score = None, (False, False, False, -1)
+    for _ in range(FIRST_KEY_REDRAWS if key_fits else PLACEMENT_REDRAWS):
         world.random.shuffle(seats)
         seated = _seat(world, chosen, seats, placement, manual)
         start = sum(start_checks(item) for physical, item in seated.items() if weight[physical] == 2)
         fits = not own_content(seated) and capacity_met(seated, seats, rungs)
         clear = not (cycle and any(cycle(physical, item) for physical, item in seated.items()))
         near = sum(start_checks(item) for physical, item in seated.items() if weight[physical])
-        if placement == "vanilla" or (clear and fits and start >= need and near >= near_floor):
+        room = key_fits is None or key_fits(seated)
+        if placement == "vanilla" or (clear and fits and start >= need and near >= near_floor and room):
             best = None
             break
-        score = (clear, fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))
+        score = (clear, room, fits, sum(weight[physical] * start_checks(item) for physical, item in seated.items()))
         if score > best_score:
             best, best_score = (list(seats), seated), score
     if best:
         seats, seated = best
-    if placement == "shuffle" and reach:
+    if placement == "shuffle" and reach and not (key_fits and key_fits(seated)):
         # Still short: content that opens nothing at the start trades places
         # with content that does, as the open empty pad swap does for a gap.
         for physical in [p for p in seated if weight[p] == 2]:
@@ -315,9 +322,15 @@ class _Variety:
     current_key = "one_table"
 
 
+class _Arenas:
+    value = 1
+
+
 class _Options:
-    """The world's options; `requirement_weights` is the one table."""
+    """The world's options as the simulation reads them: `requirement_weights`
+    is the one table, and a plan pad sits behind its hub's Keys alone."""
     requirement_variety = _Variety
+    include_battle_arenas = _Arenas
 
     def __init__(self, options):
         self._options = options

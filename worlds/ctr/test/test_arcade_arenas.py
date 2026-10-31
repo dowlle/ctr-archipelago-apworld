@@ -94,14 +94,7 @@ class TestArcadeArenas(unittest.TestCase):
             w=make_world(o,seed=seed)
             levels={e['arena_id'] for e in w.ctr_content_plan['entries'] if e['kind']=='crystal'}
             self.assertEqual(len(levels),2);self.assertIn(24,levels);self.assertTrue(levels<={20,22,24})
-        invalids=[{'pool':[20,20],'count':1},{'pool':[17],'count':1},{'count':True},
-                  {'count':8},{'count':{'min':3,'max':2}}]
-        for request in invalids:
-            bad=arena_options();bad['content_pool']['crystals']=request
-            with self.subTest(request=request),self.assertRaises(OptionError):make_world(bad)
-        bad=arena_options(1);bad['include_arcade_arenas']=False;bad['content_pool']['crystals']['pool']=[20]
-        with self.assertRaises(OptionError):make_world(bad)
-        with self.assertRaises(OptionError):make_world({'include_arcade_arenas':True})
+        with self.assertRaisesRegex(OptionError,'crystal_arenas lists 4'):make_world({'crystal_challenge_count':5})
 
     def test_refuses_forged_runtime_contract(self):
         original=make_world(arena_options()).fill_slot_data()

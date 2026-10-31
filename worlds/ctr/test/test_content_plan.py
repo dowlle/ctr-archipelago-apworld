@@ -11,6 +11,7 @@ from test.general import gen_steps
 from .. import ctrAPWorld, content_plan
 from . import CTRTestBase
 from .test_content_item_pool import small_pool
+from .plan_options import plan_options
 
 
 def profile_pool():
@@ -42,7 +43,7 @@ def make_world(options, seed=420, passthrough=None, stop_before=None):
     mw.seed_name = str(seed)
     args = Namespace()
     for name, cls in ctrAPWorld.options_dataclass.type_hints.items():
-        setattr(args, name, {1: cls.from_any(copy.deepcopy(options.get(name, cls.default)))})
+        setattr(args, name, {1: cls.from_any(copy.deepcopy(plan_options(options).get(name, cls.default)))})
     mw.set_options(args)
     if passthrough:
         mw.re_gen_passthrough = {ctrAPWorld.game: passthrough}
@@ -173,20 +174,7 @@ class TestContentPlan(CTRTestBase):
         options["item_pool"]["extra"] = {"keys": 11}
         with self.assertRaisesRegex(OptionError, "Short by 1 checks"):
             make_world(options)
-        options = profile_options()
-        # Cups are built since #133 PR 5 (test_content_cups.py); the count
-        # stays required.
-        del options["content_pool"]["cups"]["count"]
-        with self.assertRaisesRegex(OptionError, "cups.count is required"):
-            make_world(options)
-        # Options added on main after the experiment refuse instead of being
-        # dropped from the content-plan wire.
-        # Tizi Helper and an explicit death_link_send list have routes since
-        # #133 PR 4a (test_item_packs.py), Hit Character and Itemsanity since
-        # #133 PR 4d (test_global_checks.py), Item Box Locations since #133 PR
-        # 4e (test_content_item_boxes.py); Boss Track Shuffle refuses while the
-        # garages are empty (bosses on since PR 6, test_content_bosses.py).
+        # With the garages empty Boss Track Shuffle has no effect, so it is ignored.
         options = profile_options()
         options["boss_track_shuffle"] = True
-        with self.assertRaisesRegex(OptionError, "boss_track_shuffle"):
-            make_world(options)
+        self.assertEqual(make_world(options).ctr_content_plan, make_world(profile_options()).ctr_content_plan)

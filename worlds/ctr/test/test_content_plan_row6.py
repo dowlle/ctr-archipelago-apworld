@@ -147,11 +147,10 @@ class TestPadClient(unittest.TestCase):
         self.assertEqual(tracker.options.race_type_selector.value, 1)
         self.assertEqual(tracker.options.tracker_pad_launch.value, 0)
 
-    def test_a_room_without_a_plan_has_none_of_it(self):
+    def test_the_envelope_has_none_of_it(self):
         slot = make_world({}, seed=3).fill_slot_data()
         self.assertNotIn("race_type_selector", slot["ctr_options"])
         self.assertNotIn("tracker_pad_launch", slot["ctr_options"])
-        self.assertNotIn("content_plan", slot)
 
 
 class TestPlanWinLogic(unittest.TestCase):

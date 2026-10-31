@@ -130,7 +130,7 @@ FALLBACK_KEYS: Dict[int, int] = {
 }
 
 #: Key fallback on content plans (#133 PR 4d). A content plan with its garages
-#: empty (`content_pool.bosses.enabled: false`) has no boss race, so the four
+#: empty (`boss_garages` off) has no boss race, so the four
 #: boss guests have no unlock win either; they join through Keys like the other
 #: guests. The counts follow the retail boss order (Ripper Roo, Papu Papu,
 #: Komodo Joe, Pinstripe) over the same 1..4 Key range (ruled 2026-10-18).

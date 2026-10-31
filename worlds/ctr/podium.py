@@ -81,6 +81,8 @@ _NEW_INDEX = {key: i for i, (key, _s) in enumerate(NEW_RUNGS)}
 # per-track podium_checks entry is [held_1st, held_3rd, held_5th, finish_podium,
 # finish_any] of location codes (-1 = rung absent from this seed).
 SLOT_ORDER = ["held_1st", "held_3rd", "held_5th", "finish_podium", "finish_any"]
+#: `podium_rungs` values that differ from their rung key.
+RUNG_OPTION_KEYS = {"finish_on_podium": "finish_podium"}
 
 # rung key -> location-name suffix. finish_any reuses the shipped "any" name so
 # the created finish_any location IS the shipped "Finish (Any Position)" entry.
@@ -217,18 +219,11 @@ class PodiumLocationClass(LocationClass):
         return f"{track}: {_RUNG_SUFFIX[rung_key]}"
 
     def created_rung_keys(self, options):
-        """created_rung_keys read straight off a seed's options, honouring the
-        master Podium Placement Checks gate. Single source of the creation subset
+        """The rung keys of a seed's `podium_rungs`, in SLOT_ORDER. Single source of the creation subset
         shared by Regions.py, Rules.py and __init__._resolve_podium_checks so they
         can never disagree on which rungs a seed has."""
-        if not bool(options.podium_placement_checks.value):
-            return []
-        return created_rung_keys(
-            finish_on=bool(options.podium_finish_rungs.value),
-            any_on=bool(options.podium_any_position_rung.value),
-            held_on=bool(options.podium_held_rungs.value),
-            held_fifth_on=bool(options.podium_held_fifth_rung.value),
-        )
+        chosen = {RUNG_OPTION_KEYS.get(key, key) for key in options.podium_rungs.value}
+        return [key for key in SLOT_ORDER if key in chosen]
 
     def created_location_names(self, options):
         """The family-shared per-seed surface: every rung name this seed creates,

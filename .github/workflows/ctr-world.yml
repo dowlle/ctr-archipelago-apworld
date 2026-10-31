@@ -127,17 +127,15 @@ jobs:
           # Both tracker arms run .github/fuzz/ctr_ut_hook.py, which runs the
           # tracker's own hook and compares checks by location id, because the
           # tracker shows generic-slot custom-track checks under their room
-          # title (#306 B+). check-ut keeps the plain world (`custom_tracks: {}`);
-          # check-ut-custom-tracks replaces the Purple Gem Cup with the legacy
-          # `custom_tracks` Baby T Park entry on every seed, from
+          # title (#306 B+). check-ut keeps the plain world (`custom_tracks: []`);
+          # check-ut-custom-tracks puts Baby T Park on a pad on every seed, from
           # .github/fuzz/check-ut-custom-tracks-meta.yaml (ruling of 2026-10-18,
           # superseding the 2026-10-13 exclusion).
           - {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
           - {check_name: check-ut-custom-tracks,      check_runs: 1000, check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'check-ut-custom-tracks'}
-          # Forced content plan (#133 PR 2): the default options never build
-          # one, so this arm pins an explicit content_pool with two custom
-          # tracks (one named block, one generic B+ slot) from
-          # .github/fuzz/content-plan-meta.yaml and randomizes the rest.
+          # Two custom tracks (#133 PR 2, one named block, one generic B+ slot)
+          # and no cups, arenas or garages, from
+          # .github/fuzz/content-plan-meta.yaml. The rest is randomized.
           - {check_name: content-plan,                check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan'}
           # Universal Tracker on the forced content plan (#133). The meta has a
           # generic-slot (B+) track, whose checks the tracker shows under their
@@ -178,7 +176,7 @@ jobs:
           - {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
           - {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
           # Pad placement and requirements (one generator row 3): the vanilla-shape
-          # plan at each unlock mode, pad_layout.placement and two_stage_density,
+          # plan at each unlock mode, pad_placement and two_stage_density,
           # accessibility full. .github/fuzz/content-plan-pads-meta.yaml holds the rest.
           - {check_name: pads-vanilla-vanilla,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-vanilla-full'}
           - {check_name: pads-vanilla-within,        check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle_within_kind-full'}
@@ -324,7 +322,7 @@ jobs:
             extra_args+=(--hook "$CHECK_HOOK")
           fi
           if [ "$CHECK_META" = "accessibility-full" ]; then
-            printf 'Crash Team Racing:\n  accessibility: full\n  custom_tracks: {}\n' > ci_meta.yaml
+            printf 'Crash Team Racing:\n  accessibility: full\n  custom_tracks: []\n' > ci_meta.yaml
             cat ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
@@ -362,12 +360,6 @@ jobs:
             sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
             if [[ "$fixed" == keys || "$fixed" == both || "$fixed" == all ]]; then
               sed -i 's/^  shuffle_keys: .*/  shuffle_keys: false/' ci_meta.yaml
-              # Vanilla requirements, a fixed first Key, no podium rungs and Progressive
-              # Boost fail fill on about a third of seeds. Measured and reported, not
-              # limited in the generator; these arms keep rungs on so they stay readable.
-              if [[ "$unlock" == vanilla ]]; then
-                sed -i -e 's/^  podium_placement_checks: .*/  podium_placement_checks: true/' -e 's/^  podium_held_rungs: .*/  podium_held_rungs: true/' ci_meta.yaml
-              fi
             fi
             if [[ "$fixed" == gems || "$fixed" == both || "$fixed" == all ]]; then echo "  shuffle_gems: false" >> ci_meta.yaml; fi
             if [[ "$fixed" == filler || "$fixed" == all ]]; then
