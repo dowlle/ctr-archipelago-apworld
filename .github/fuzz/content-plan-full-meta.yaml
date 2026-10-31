@@ -119,3 +119,8 @@ Crash Team Racing:
   death_link_send: [mask_grab, weapon_hit, race_loss]
   # Keys stay shuffled here; the pads-fixed arms fix them.
   shuffle_keys: true
+  # Random lists refuse most boss draws, and the gauntlet has its own arms.
+  boss_character_allowlist: []
+  boss_character_blocklist: []
+  boss_powerup_blocklist: []
+  remove_playable_oxide: {false: 3, true: 1}

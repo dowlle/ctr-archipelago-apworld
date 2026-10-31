@@ -123,3 +123,8 @@ Crash Team Racing:
   warp_pad_rules: {}
   # Keys stay shuffled here; the pads-fixed arms fix them.
   shuffle_keys: true
+  # Random lists refuse most boss draws, and the gauntlet has its own arms.
+  boss_character_allowlist: []
+  boss_character_blocklist: []
+  boss_powerup_blocklist: []
+  oxide_powerup_blocklist: []
