@@ -1495,9 +1495,10 @@ def generate(world):
             orders = draw_mode_order()
             if first_key_score(orders) > best:
                 entry_modes, best = orders, first_key_score(orders)
-    # The start bootstrap seats this path before the fill.
-    world.ctr_first_key_path = (content_fixed.first_key_path(first_key_pads(entry_modes), first_hub_slots, boost_ladder) or []
-                                if first_key_floor else [])
+    # The start bootstrap seats this path before the fill, when too few checks stand
+    # before the first Key for the fill to find it alone.
+    world.ctr_first_key_path = ((content_fixed.first_key_path(first_key_pads(entry_modes), first_hub_slots, boost_ladder) or [])
+                                if first_key_floor and first_key_score(entry_modes)[1] < first_key_floor else [])
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
