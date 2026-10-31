@@ -420,7 +420,7 @@ class ReferenceWorld:
         if len(modes) < 2:
             return [_Location(self, f"{title}: {c['location']}", c) for c in checks]
         first = [c for c in checks if any(route["mode"] == modes[0] for route in c["routes"])]
-        primary = next((c for c in first if c["kind"] == modes[0]), first[0] if first else None)
+        primary = next((c for c in first if c["kind"] in (modes[0], "trophy")), first[0] if first else None)
         out = [_Location(self, f"{title}: Trophy Race", primary)]
         for check in checks:
             if check is primary:

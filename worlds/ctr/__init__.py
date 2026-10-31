@@ -1435,6 +1435,13 @@ class ctrAPWorld(World):
             spoiler_handle.write("\nCTR independent content/item plan:\n")
             json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
             spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            # Boss opponent and kit shuffle on content plans.
+            from . import content_bosses
+            _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
+            if _lines:
+                spoiler_handle.write(f"CTR boss encounters ({self.multiworld.player_name[self.player]}):\n")
+                for _line in _lines:
+                    spoiler_handle.write(f"  {_line}\n")
             # Plando and item links (#133 PR 4f): only when either moved an item.
             accounting = getattr(self, "ctr_framework_accounting", None)
             if accounting and any(accounting.values()):

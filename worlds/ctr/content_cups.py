@@ -399,8 +399,11 @@ def leg_victory_code(track):
 def leg_victories(tracks, entries, pads, titles):
     """Every `Cup Leg Victory` check of the plan: one per leg track without a
     standalone Trophy Race check, with a route per occurrence in entry order,
-    then leg order. `titles` maps track id to its room title."""
-    with_trophy = {e["track_id"] for e in entries if e["kind"] == "track" and "trophy" in e["modes"]}
+    then leg order. `titles` maps track id to its room title. A standalone
+    track has its Trophy Race check when its track record lists the trophy
+    mode: a ctr_first entry (job J11) runs it as its CTR Challenge."""
+    with_trophy = {e["track_id"] for e in entries
+                   if e["kind"] == "track" and "trophy" in tracks[e["track_id"]]["modes"]}
     pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
     out = {}
     for cup_entry in entries:

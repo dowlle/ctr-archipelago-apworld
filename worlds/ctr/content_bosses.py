@@ -12,16 +12,16 @@ ENCOUNTERS. One record per encounter (implementation packet, `Encounter`):
     own boss as the opponent, on its home track, or with `boss_track_shuffle`
     on, on the track the #169 tier 1 draw gives that garage
     (boss_track_shuffle.draw, the certified venue table, its allow and block
-    lists and `boss_encounter_repeats`). Since #133 PR 6b the draw also
+    lists; never a repeated venue, decision 7 of 2026-10-28). Since #133 PR 6b the draw also
     takes the plan's selected custom tracks and Cortex Vortex (ruling
     2026-10-15: custom tracks join the Boss Track Shuffle pool): a package
     joins when it states `ai_nav: true` and a `checkpoints` count that
     carries the garage's attack schedule (`boss_track_shuffle.schedule_fits`;
     native measures both on load and refuses a mismatch). A non-empty
     `boss_track_allowlist` names retail tracks only, so it keeps custom
-    tracks out; the blocklist does not touch them. The opponent never changes: opponent
-    and kit shuffle (#169 tiers 2 and 3) are not built, so neither are the
-    `home_track` and `independent` pairings of the implementation packet;
+    tracks out; the blocklist does not touch them. With opponent or kit
+    shuffle (#169 tiers 2 and 3, job J11) the garage races a drawn racer
+    and a composed kit, see the section at the end of this module;
   * N. Oxide's two encounters in the Oxide garage, `encounter/garage:4/0` on
     Oxide Station and `encounter/garage:4/1` on `oxide_final_track` (Cortex
     Vortex by default), unless `oxide_goal` is `disabled`.
@@ -190,43 +190,54 @@ def settings(world, raw):
     options, or None with bosses off. Takes no draw. The Final Challenge
     count is lowered to the base supply later (`resolve_relic_count`)."""
     o = world.options
+    wumpa = bool(o.goal_wumpa.value)
     enabled = raw.get("enabled")
     if type(enabled) is not bool:
         error("content_pool.bosses.enabled must be true or false. No content was changed.")
     if not enabled:
         if o.oxide_goal.value != GOAL_DISABLED or o.bosses_required_goal.value != 0 \
-                or o.gems_required_goal.value == 0:
+                or (o.gems_required_goal.value == 0 and not wumpa):
             error("with content_pool.bosses.enabled: false the garages are empty, so this profile needs "
-                  "oxide_goal: disabled, bosses_required_goal: 0 and a positive gems_required_goal. Set "
-                  "bosses.enabled: true for boss races and the Oxide and Boss goals.")
+                  "oxide_goal: disabled, bosses_required_goal: 0 and a positive gems_required_goal or goal_wumpa. "
+                  "Set bosses.enabled: true for boss races and the Oxide and Boss goals.")
         if o.boss_track_shuffle.value:
             error("boss_track_shuffle needs content_pool.bosses.enabled: true; with bosses off the garages are "
                   "empty. No content was changed.")
+        if (o.boss_opponent_shuffle.value or o.boss_kit_shuffle.value or o.boss_oxide_in_pool.value
+                or int(o.oxide_attack_profile.value) != 0):
+            error("boss_opponent_shuffle, boss_kit_shuffle, boss_oxide_in_pool and oxide_attack_profile: "
+                  "all_compatible need content_pool.bosses.enabled: true; with bosses off the garages are empty. "
+                  "No content was changed.")
         return None
     goal = int(o.oxide_goal.value)
     bosses = int(o.bosses_required_goal.value)
-    if goal not in (GOAL_ANY, GOAL_FINAL) and bosses == 0 and o.gems_required_goal.value == 0:
-        error("no goal: oxide_goal is none or disabled, and bosses_required_goal and gems_required_goal are 0. "
-              "Set at least one goal condition.")
+    if goal not in (GOAL_ANY, GOAL_FINAL) and bosses == 0 and o.gems_required_goal.value == 0 and not wumpa:
+        error("no goal: oxide_goal is none or disabled, and bosses_required_goal, gems_required_goal and "
+              "goal_wumpa are 0. Set at least one goal condition.")
     optional = int(o.oxide_1_optional.value)
     shuffle = bool(o.boss_track_shuffle.value)
     oxide = goal != GOAL_DISABLED
+    # Bosses never repeat on a plan (ruled 2026-10-28). The option goes in row 7.
+    o.boss_encounter_repeats.value = 0
     from .content_cups import _bounds
     cup_bounds = _bounds(raw.get("cups", 0), "content_pool.bosses.cups", 4)
     level = raw.get("requirement_level", DEFAULT_LEVEL)
     if level not in LEVELS:
         error("content_pool.bosses.requirement_level must be one of " + ", ".join(LEVELS) + ". No content was changed.")
-    return dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level, cups=cup_bounds,
-                oxide_1_optional=goal == GOAL_FINAL and optional in (1, 2),
-                oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
-                oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
-                track_shuffle=shuffle, repeats=shuffle and bool(o.boss_encounter_repeats.value))
+    record = dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level, cups=cup_bounds,
+                  oxide_1_optional=goal == GOAL_FINAL and optional in (1, 2),
+                  oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
+                  oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
+                  track_shuffle=shuffle, repeats=False)
+    record.update(encounter_settings(world, oxide))
+    return record
 
 
 def check_settings(record):
     """Shape and values of a plan's `bosses` record."""
-    if not isinstance(record, dict) or set(record) != set(RECORD_KEYS):
-        error("bosses must be a mapping of exactly " + ", ".join(RECORD_KEYS) + ".")
+    if not isinstance(record, dict) or set(record) not in (set(RECORD_KEYS), set(RECORD_KEYS + ENCOUNTER_KEYS)):
+        error("bosses must be a mapping of exactly " + ", ".join(RECORD_KEYS) + ", plus "
+              + ", ".join(ENCOUNTER_KEYS) + " together when an opponent, kit or N. Oxide profile is drawn.")
     goal, bosses = record["oxide_goal"], record["bosses_required"]
     unlock, count = record["oxide_final_unlock"], record["oxide_final_count"]
     if type(goal) is not int or goal not in (GOAL_NONE, GOAL_ANY, GOAL_FINAL, GOAL_DISABLED):
@@ -238,8 +249,10 @@ def check_settings(record):
             error(f"bosses.{key} must be true or false.")
     if record["oxide_1_optional"] and goal != GOAL_FINAL:
         error("bosses.oxide_1_optional belongs to oxide_goal 101_percent only.")
-    if record["repeats"] and not record["track_shuffle"]:
-        error("bosses.repeats belongs to track_shuffle only.")
+    if record["repeats"]:
+        # Decision 7 (2026-10-28): boss encounters never repeat. The field
+        # stays on the wire, always false.
+        error("bosses.repeats must be false: boss encounters never repeat.")
     if type(unlock) is not int or not 0 <= unlock <= UNLOCK_TOTAL:
         error("bosses.oxide_final_unlock must be 0 to 4.")
     if type(count) is not int or not 1 <= count <= (54 if unlock == UNLOCK_TOTAL else SINGLE_TIER_MAX):
@@ -251,6 +264,8 @@ def check_settings(record):
         error("bosses.requirement_level must be one of " + ", ".join(LEVELS) + ".")
     if goal == GOAL_DISABLED and (unlock, count) != (0, SINGLE_TIER_MAX):
         error("bosses.oxide_final_unlock and oxide_final_count keep their defaults when Oxide is disabled.")
+    if "opponent_shuffle" in record:
+        check_encounter_settings(record)
     return record
 
 
@@ -530,15 +545,11 @@ def draw_venues(world, record, custom=()):
     pools = [retail[_venue_key(g)] + [name for name, points in custom
                                       if boss_track_shuffle.schedule_fits(_venue_key(g), points)]
              for g in range(4)]
-    if record["repeats"]:
-        picked = [world.random.choice(pool) for pool in pools]
-    else:
-        # Same draw as choosing from every distinct four-way assignment, without
-        # listing them (0.3.0 review finding 2).
-        picked = boss_track_shuffle.choose_distinct_assignment(world.random, pools)
-        if picked is None:
-            error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks "
-                  "or set boss_encounter_repeats: allow.")
+    # Never repeats (decision 7). Same draw as choosing from every distinct
+    # four-way assignment, without listing them (0.3.0 review finding 2).
+    picked = boss_track_shuffle.choose_distinct_assignment(world.random, pools)
+    if picked is None:
+        error("boss_track_shuffle cannot give the four boss garages four different tracks. Allow more tracks.")
     o._boss_track_venues = {_venue_key(g): picked[g] for g in range(4)}
     return dict(enumerate(picked))
 
@@ -600,7 +611,8 @@ def encounter_rows(record, venues, final_track):
     return rows
 
 
-def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None, mode=None):
+def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None,
+          opponents=None, mode=None):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
@@ -608,7 +620,10 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
     the goal's distinct-Gem term or None, `track_records` {track id: record}
     of the venues, `garage_reqs` {garage: predicate} of the four ordinary
     garages (draw_requirements, or a plan's own records once checked),
-    `cups` {garage: [leg venue]} of the garages holding a boss cup."""
+    `cups` {garage: [leg venue]} of the garages holding a boss cup.
+    `opponents` {garage: (engine id, schedule or None)} is the drawn racer
+    and composed kit of each garage (OXIDE_GARAGE for both N. Oxide races,
+    job J11); None keeps the retail opponents and their inherited attacks."""
     cups = cups or {}
     encounters, entries, requirements, checks = [], [], [], []
     companions = companion_terms(record, gem_term)
@@ -628,8 +643,7 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
             terms = (list(companions) if record["oxide_goal"] in (GOAL_ANY, GOAL_FINAL) else []) \
                 + [relic_term(record, rows)]
             requirements.append(dict(id=rid, predicate=_all(terms)))
-        opponent_record = dict(role="opponent", slot=1, character_id=opponent,
-                               driving_profile=DRIVING_PROFILE, attack_profile=ATTACK_PROFILE)
+        opponent_record = opponent_entry(*(opponents[g] if opponents else (opponent, None)))
         cup = g < OXIDE_GARAGE and g in cups
         if cup:
             leg_ids = [track_id_of(leg) for leg in cups[g]]
@@ -750,10 +764,12 @@ def check_venues(record, venues, final, points=None, raced=None, cups=None):
         error("N. Oxide's Final Challenge races Cortex Vortex or Oxide Station")
 
 
-def install(world, plan, menu, predicate, with_boost):
+def install(world, plan, menu, predicate, with_boost, oxide_event=None):
     """Regions, locations and companion events of the plan's encounters
     (content_plan.create_regions). `predicate` builds a requirement test,
-    `with_boost` adds a check's boost rank."""
+    `with_boost` adds a check's boost rank. `oxide_event` names an event
+    item the N. Oxide race that finishes the seed also needs (`Wumpa Income`
+    with the Wumpa goal on), or None. The other N. Oxide race never waits."""
     from BaseClasses import Location, LocationProgressType, Region
     from .content_plan import LOCATION_BY_CODE
     mw, player = world.multiworld, world.player
@@ -767,6 +783,8 @@ def install(world, plan, menu, predicate, with_boost):
         mw.regions.append(region)
         gates = (predicate(world, req[pads[enc["pad_id"]]["entrance_req"]]),
                  predicate(world, req[enc["requirement_id"]]))
+        if oxide_event and enc["completion_location"] == goal_code:
+            gates += (lambda state, name=oxide_event: state.has(name, player),)
         menu.connect(region, enc["id"], lambda state, gates=gates: all(g(state) for g in gates))
         code = enc["completion_location"]
         check = checks[code]
@@ -791,6 +809,7 @@ def restore_options(world, plan):
     record = plan.get("bosses")
     gem = gem_term_of(plan["goal"])
     o.gems_required_goal.value = gem["count"] if gem else 0
+    restore_encounter_options(o, record)
     if record is None:
         o.oxide_goal.value, o.bosses_required_goal.value = GOAL_DISABLED, 0
         return
@@ -800,7 +819,6 @@ def restore_options(world, plan):
     o.oxide_final_challenge_unlock.value = record["oxide_final_unlock"]
     o.oxide_final_challenge_relic_count.value = record["oxide_final_count"]
     o.boss_track_shuffle.value = int(record["track_shuffle"])
-    o.boss_encounter_repeats.value = int(record["repeats"])
     o.boss_track_allowlist.value = set()
     o.boss_track_blocklist.value = set()
     venues, final, _cups = plan_venues(plan)
@@ -833,8 +851,462 @@ def expected(plan, retail, cortex):
         venue = venue_record(name, retail, cortex, known)
         tracks.setdefault(venue["id"], venue)
     own = {r["id"]: r["predicate"] for r in plan["requirements"]}
+    opponents = check_opponents(record, venues, points, plan_opponents(plan), cups)
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
-                  {g: own.get(f"boss:{g}") for g in range(4)}, cups,
+                  {g: own.get(f"boss:{g}") for g in range(4)}, cups, opponents,
                   plan.get("pad_requirements", {}).get("mode"))
     return built + (tracks,)
+
+
+# ---------------------------------------------------------------------------
+# Boss opponent and kit shuffle on content plans (job J11, decisions 7 and 9)
+# ---------------------------------------------------------------------------
+#
+# The ordinary room's draws (boss_encounters.py) carried over. With any of
+# `boss_opponent_shuffle`, `boss_kit_shuffle` or `oxide_attack_profile:
+# all_compatible` on, the `bosses` record gains ENCOUNTER_KEYS (feature
+# `boss_opponents_v1`); otherwise it is byte-identical to before and nothing
+# is drawn. Each boss race entry's `opponent` names the racer drawn for its
+# garage (`character_id`), and with a composed kit its `schedule` (rows
+# [checkpoint, throw, weapon, path, cooldown, juice]):
+#
+#   * ordinary garages: five segments at the garage's retail segment starts
+#     mapped onto the encounter's venue restart points (retail table, Cortex
+#     Vortex 255, a custom package's `checkpoints`), certified rows, cooldown
+#     scaled by `boss_attack_intensity` (floor 2), at least one attack, no
+#     Super Engine;
+#   * both N. Oxide races: the final racer (15 unless `boss_oxide_in_pool`
+#     drew another), and with `all_compatible` one 13-segment profile on
+#     N. Oxide's retail segment starts, any certified row, the Super Engine
+#     included (native remaps it on Cortex Vortex as on ordinary rooms).
+#
+# Racers never repeat: the four garage racers and the final racer are
+# pairwise distinct, N. Oxide is a garage racer only with
+# `boss_oxide_in_pool`, and then the final racer is never N. Oxide. With
+# `oxide_goal: disabled` there are no N. Oxide races, so no final racer is
+# drawn and `all_compatible` is ignored with a notice (conservative J11
+# choice). `boss_track_assignment: character_home_track` with both draw
+# switches on draws the racers first and races each on their home track (a
+# venue raced nowhere else becomes a trophy-only plan track, as any boss
+# venue); otherwise the content-plan venue draw is unchanged.
+#
+# A boss cup garage takes both draws (ruled 2026-10-30): one racer and one
+# weapon set through all four races. Its schedule keeps the garage's retail
+# segment starts, as if on its home track; native maps them onto each leg's
+# restart points at race start, as it does for a loaded graph that differs.
+#
+# `gauntlet` is `purple_cup_boss_gauntlet`: on the Purple Gem Cup leg i arms
+# garage i's racer with garage i's kit. It adds nothing to the wire but the
+# switch: native derives the legs from the cup and the kits. A leg that is not a
+# retail race track certified for that garage carries no attack.
+
+OPPONENT_FEATURE = "boss_opponents_v1"
+ENCOUNTER_KEYS = ("opponent_shuffle", "oxide_in_pool", "kit_shuffle", "gauntlet", "kit", "oxide_attack_profile",
+                  "track_assignment")
+ATTACK_COMPOSED = "composed"
+PROFILES = ("retail", "all_compatible")
+TRACK_ASSIGNMENTS = ("character_home_track", "independent_track")
+def _be():
+    from . import boss_encounters
+    return boss_encounters
+
+
+def _pool_by_id():
+    be = _be()
+    return {cid: name for name, cid in be.OPPONENT_ENGINE_ID.items()}
+
+
+def _intensity_names():
+    return [name for name, _num, _den in _be().INTENSITY]
+
+
+def encounter_settings(world, oxide):
+    """The record's ENCOUNTER_KEYS from the options, or {} when no opponent,
+    kit or N. Oxide profile is drawn. Takes no draw. Notes the subordinate
+    options it ignores, as the ordinary room does."""
+    be = _be()
+    o = world.options
+    from .notices import note_ignored
+    if be.oxide_profile_all(o) and not oxide:
+        note_ignored(world, "N. Oxide Attack Profile (oxide_goal: disabled, no N. Oxide races)")
+        o.oxide_attack_profile.value = 0
+    be.validate_options(world)
+    opponent, kit, profile = be.opponent_on(o), be.kit_on(o), be.oxide_profile_all(o)
+    if not (opponent or kit or profile):
+        return {}
+    return dict(opponent_shuffle=opponent, oxide_in_pool=be.oxide_in_pool(o), kit_shuffle=kit, gauntlet=be.gauntlet_on(o),
+                kit=dict(assignment=be.ASSIGNMENTS[int(o.boss_attack_assignment.value)],
+                         intensity=be.INTENSITY[int(o.boss_attack_intensity.value)][0],
+                         loss_easing=bool(o.boss_loss_easing.value)) if kit else None,
+                oxide_attack_profile=PROFILES[1] if profile else PROFILES[0],
+                track_assignment=TRACK_ASSIGNMENTS[0] if be.home_pairing(o) else TRACK_ASSIGNMENTS[1])
+
+
+def check_encounter_settings(record):
+    """Types and values of the record's ENCOUNTER_KEYS."""
+    for key in ("opponent_shuffle", "oxide_in_pool", "kit_shuffle", "gauntlet"):
+        if type(record[key]) is not bool:
+            error(f"bosses.{key} must be true or false.")
+    if record["oxide_attack_profile"] not in PROFILES:
+        error("bosses.oxide_attack_profile must be retail or all_compatible.")
+    if record["track_assignment"] not in TRACK_ASSIGNMENTS:
+        error("bosses.track_assignment must be character_home_track or independent_track.")
+    if not (record["opponent_shuffle"] or record["kit_shuffle"] or record["oxide_attack_profile"] == PROFILES[1]):
+        error("bosses encounter fields are present only with an opponent, kit or N. Oxide profile drawn.")
+    if record["oxide_in_pool"] and not record["opponent_shuffle"]:
+        error("bosses.oxide_in_pool needs opponent_shuffle.")
+    if record["gauntlet"] and not record["kit_shuffle"]:
+        error("bosses.gauntlet needs kit_shuffle.")
+    if record["track_assignment"] == TRACK_ASSIGNMENTS[0] and not (record["track_shuffle"]
+                                                                   and record["opponent_shuffle"]):
+        error("bosses.track_assignment character_home_track needs track_shuffle and opponent_shuffle.")
+    if record["oxide_goal"] == GOAL_DISABLED and record["oxide_attack_profile"] != PROFILES[0]:
+        error("bosses.oxide_attack_profile all_compatible needs N. Oxide's races (oxide_goal not disabled).")
+    kit = record["kit"]
+    if record["kit_shuffle"]:
+        be = _be()
+        if (not isinstance(kit, dict) or set(kit) != set(be.KIT_KEYS) or kit["assignment"] not in be.ASSIGNMENTS
+                or kit["intensity"] not in _intensity_names() or type(kit["loss_easing"]) is not bool):
+            error("bosses.kit must be {assignment, intensity, loss_easing} with kit_shuffle.")
+    elif kit is not None:
+        error("bosses.kit must be null without kit_shuffle.")
+
+
+def drawn(record):
+    """Does the record carry drawn encounters (ENCOUNTER_KEYS)?"""
+    return record is not None and "opponent_shuffle" in record
+
+
+def home_paired(record):
+    return drawn(record) and record["track_assignment"] == TRACK_ASSIGNMENTS[0]
+
+
+def _with_final(record):
+    return record["oxide_in_pool"] and record["oxide_goal"] != GOAL_DISABLED
+
+
+def _draw_racers(world, record, pools):
+    """{garage: roster name} and the final racer's name: one distinct draw
+    over the four garage pools, plus N. Oxide's garage with Oxide in the pool
+    and N. Oxide's races in the plan (decision 7)."""
+    be = _be()
+    o = world.options
+    regions = [row[1] for row in boss_track_shuffle.GARAGES]
+    for g in range(4):
+        if not pools[g]:
+            error(f"boss_opponent_shuffle has no racer left for {regions[g]} after boss_character_allowlist and "
+                  "boss_character_blocklist" + (" whose home track is in the boss track pool. Allow more racers or "
+                                                "tracks, or set boss_track_assignment: independent_track."
+                                                if home_paired(record) else "."))
+    lists = [list(pools[g]) for g in range(4)]
+    with_final = _with_final(record)
+    if with_final:
+        if not be.final_pool(o):
+            error("boss_oxide_in_pool has no racer other than N. Oxide left for N. Oxide Garage after "
+                  "boss_character_allowlist and boss_character_blocklist.")
+        lists.append(be.final_pool(o))
+    picked = be._distinct_draw(world.random, lists)
+    if picked is None:
+        error("boss_opponent_shuffle cannot give the "
+              + ("four boss garages and N. Oxide's garage five" if with_final else "four boss garages four")
+              + " different racers from the allowed pool (" + ", ".join(be.opponent_pool(o))
+              + f"). Bosses never repeat, so allow at least {len(lists)} racers that fit.")
+    return {g: picked[g] for g in range(4)}, (picked[4] if with_final else be.OXIDE_NAME)
+
+
+def draw_home_venues(world, record, cups=()):
+    """character_home_track: ({garage: home track venue}, racers, final
+    racer). The racers are drawn first among those whose home track is in the
+    boss track pool and carries the garage's attack. A boss cup garage races
+    its drawn legs, so any racer of the pool fits it."""
+    be = _be()
+    o = world.options
+    boss_track_shuffle.validate_options(world)
+    pool = set(boss_track_shuffle.venue_pool(o))
+    pools = [[n for n in be.opponent_pool(o)
+              if g in cups or be.HOME_TRACK[n] in pool and boss_track_shuffle.inherited_attack_certified(_venue_key(g),
+                                                                                           be.HOME_TRACK[n])]
+             for g in range(4)]
+    racers, final = _draw_racers(world, record, pools)
+    return {g: be.HOME_TRACK[racers[g]] for g in range(4)}, racers, final
+
+
+def draw_racers(world, record):
+    """(racers, final racer) by roster name: the opponent draw, or the
+    retail bosses and N. Oxide without opponent shuffle (no draw)."""
+    be = _be()
+    o = world.options
+    if not drawn(record) or not record["opponent_shuffle"]:
+        return {g: be.GARAGE_BOSS[_venue_key(g)] for g in range(4)}, be.OXIDE_NAME
+    return _draw_racers(world, record, [be.opponent_pool(o) for _g in range(4)])
+
+
+def venue_points(name, points):
+    """Restart point count of a boss venue: the retail table, Cortex Vortex,
+    or a custom track's stated `checkpoints` (`points` {venue: count})."""
+    if name in boss_track_shuffle.VENUES:
+        return boss_track_shuffle.VENUES[name]
+    if name == destinations.CORTEX_VORTEX:
+        return CORTEX_RESTART_POINTS
+    return points[name]
+
+
+def mapped_checkpoints(garage, restart_points):
+    """The garage's retail segment starts on a venue with `restart_points`
+    (boss_track_shuffle.translated_schedule for any venue)."""
+    key = _venue_key(garage)
+    home_last = boss_track_shuffle.VENUES[home_track(garage)] - 1
+    return tuple(boss_track_shuffle.translate_checkpoint(cp, home_last, restart_points - 1)
+                 for cp in boss_track_shuffle.RETAIL_ATTACK_CHECKPOINTS[key])
+
+
+def kit_points(garage, venues, points, cups):
+    """The restart point count a garage's schedule is written for: its venue's,
+    or its home track's on a boss cup, whose legs differ."""
+    return venue_points(home_track(garage) if garage in cups else venues[garage], points)
+
+
+def draw_encounters(world, record, venues, racers, final, points, cups=()):
+    """{garage: (engine id, schedule or None)} for the four garages and
+    OXIDE_GARAGE, or None when the record draws nothing (retail opponents and
+    inherited attacks). Draws the kits, on the plan's venues, and N. Oxide's
+    profile."""
+    if not drawn(record):
+        return None
+    be = _be()
+    o = world.options
+    kits = {}
+    if record["kit_shuffle"]:
+        intensity = int(o.boss_attack_intensity.value)
+        if int(o.boss_attack_assignment.value) == 1:
+            profiles = be.allowed_signatures(o)
+            if len(profiles) < 4:
+                error("boss_attack_assignment: signature_profiles needs four different retail profiles, but "
+                      "boss_powerup_blocklist leaves " + (", ".join(profiles) or "none")
+                      + ". Bosses never repeat, so unblock weapons.")
+            rows = {g: be.SIGNATURES[p] for g, p in enumerate(world.random.sample(profiles, 4))}
+        else:
+            families = be.allowed_families(o)
+            if len(families) < be.MIX_MIN:
+                error(f"boss_attack_assignment: mixed_loadouts needs at least {be.MIX_MIN} weapon types, but "
+                      "boss_powerup_blocklist leaves " + (", ".join(families) or "none") + ".")
+            rows, seen = {}, set()
+            for g in range(4):
+                mix = be._mixed_rows(world.random, families)
+                tries = 0
+                while tuple(r[0] for r in mix) in seen:
+                    tries += 1
+                    if tries > 1000:
+                        error("could not draw four different boss kits.")
+                    mix = be._mixed_rows(world.random, families)
+                seen.add(tuple(r[0] for r in mix))
+                rows[g] = mix
+        for g in range(4):
+            cps = mapped_checkpoints(g, kit_points(g, venues, points, cups))
+            kits[g] = tuple((cp, throw, weapon, path, be.scale_cooldown(cooldown, intensity), juice)
+                            for cp, (weapon, throw, path, cooldown, juice) in zip(cps, rows[g]))
+    final_schedule = None
+    if record["oxide_attack_profile"] == PROFILES[1] and record["oxide_goal"] != GOAL_DISABLED:
+        final_schedule = be._draw_oxide_profile(world)
+    out = {g: (be.OPPONENT_ENGINE_ID[racers[g]], kits.get(g)) for g in range(4)}
+    out[OXIDE_GARAGE] = (be.OPPONENT_ENGINE_ID[final], final_schedule)
+    return out
+
+
+def opponent_entry(character_id, schedule=None):
+    """A boss race entry's `opponent` record."""
+    record = dict(role="opponent", slot=1, character_id=character_id, driving_profile=DRIVING_PROFILE,
+                  attack_profile=ATTACK_COMPOSED if schedule else ATTACK_PROFILE)
+    if schedule:
+        record["schedule"] = [list(seg) for seg in schedule]
+    return record
+
+
+def plan_opponents(plan):
+    """{garage: [opponent record]} of a plan's encounters, in encounter order."""
+    entries = {e["id"]: e for e in plan["entries"]}
+    out = {}
+    for enc in plan["encounters"]:
+        entry = entries.get(enc.get("entry_id"), {})
+        garage = int(str(enc["pad_id"]).removeprefix("garage:"))
+        out.setdefault(garage, []).append(entry.get("opponent"))
+    return out
+
+
+def _base_cooldowns():
+    be = _be()
+    out = {}
+    for rows in tuple(be.FAMILY_VARIANTS.values()) + tuple(be.SIGNATURES.values()):
+        for w, t, p, c, j in rows:
+            out.setdefault((w, t, p, j), set()).add(c)
+    return out
+
+
+def _check_schedule(schedule, checkpoints, intensity, garage_row, label):
+    """A composed schedule: six-integer certified rows on exactly
+    `checkpoints`, each cooldown a certified row's base cooldown scaled by
+    `intensity`, at least one attack; the Super Engine only off a garage."""
+    be = _be()
+    if not isinstance(schedule, list) or len(schedule) != len(checkpoints):
+        error(f"{label}: a composed schedule has {len(checkpoints)} segments")
+    bases = _base_cooldowns()
+    out = []
+    for seg in schedule:
+        problem = be._row_problem(seg, garage_row)
+        if problem:
+            error(f"{label}: {problem}")
+        cp, throw, weapon, path, cooldown, juice = seg
+        if cooldown not in {be.scale_cooldown(c, intensity) for c in bases.get((weapon, throw, path, juice), ())}:
+            error(f"{label}: a segment cooldown is not its row's cooldown at this intensity")
+        out.append(tuple(seg))
+    if tuple(seg[0] for seg in out) != tuple(checkpoints):
+        error(f"{label}: schedule checkpoints are not the mapped retail segments on this venue")
+    if all(seg[2] == 0x0F for seg in out):
+        error(f"{label}: schedule never attacks")
+    return tuple(out)
+
+
+def _check_kit_shape(schedule, intensity, assignment, label, oxide=False):
+    """The kit rules native also enforces (J11 parity): a signature_profiles
+    garage kit is one retail garage profile at the kit intensity; a
+    mixed_loadouts garage kit uses two to four weapon families; N. Oxide's
+    composed profile one to six. Every row of a mixed kit or of N. Oxide's
+    profile belongs to a weapon family (no empty segment)."""
+    be = _be()
+    if not oxide and assignment == "signature_profiles":
+        rows = tuple((w, t, p, c, j) for _cp, t, w, p, c, j in schedule)
+        if not any(rows == tuple((w, t, p, be.scale_cooldown(c, intensity), j) for w, t, p, c, j in profile)
+                   for profile in be.SIGNATURES.values()):
+            error(f"{label}: a signature_profiles boss kit is not a retail garage profile at its intensity")
+        return
+    families = {be.family_of(seg[2]) for seg in schedule}
+    if None in families:
+        error(f"{label}: a boss kit row is not a weapon family row")
+    low, high = (1, 6) if oxide else (be.MIX_MIN, be.MIX_MAX)
+    if not low <= len(families) <= high:
+        error(f"{label}: " + ("N. Oxide's composed profile uses one to six weapon families" if oxide
+                              else "a mixed_loadouts boss kit uses two to four weapon families"))
+
+
+def check_opponents(record, venues, points, opponents, cups=()):
+    """Check a plan's boss opponents against its record and return them as
+    build() takes them, or None for a record without drawn encounters (build
+    then expects the retail records). The draw is not recomputed; every
+    invariant of it is (distinct racers, pool membership, N. Oxide rules, home
+    tracks, kit rows and checkpoints, distinct kits, N. Oxide's profile)."""
+    if not drawn(record):
+        return None
+    be = _be()
+    by_id = _pool_by_id()
+    names = _intensity_names()
+    intensity = names.index(record["kit"]["intensity"]) if record["kit_shuffle"] else names.index("standard")
+    out = {}
+    for g in range(4):
+        rows = opponents.get(g, [])
+        if len(rows) != 1 or not isinstance(rows[0], dict):
+            error(f"garage {g}: one boss race opponent expected")
+        opponent = rows[0]
+        cid = opponent.get("character_id")
+        if type(cid) is not int or cid not in by_id:
+            error(f"garage {g}: the opponent is not a racer of the boss pool")
+        if not record["opponent_shuffle"] and cid != GARAGES[g][4]:
+            error(f"garage {g}: the opponent moved without opponent_shuffle")
+        if cid == OXIDE_ID and not record["oxide_in_pool"]:
+            error(f"garage {g}: N. Oxide races a garage only with oxide_in_pool")
+        if home_paired(record) and g not in cups and venues[g] != be.HOME_TRACK[by_id[cid]]:
+            error(f"garage {g}: with character_home_track the racer races their home track")
+        schedule = None
+        if record["kit_shuffle"]:
+            schedule = _check_schedule(opponent.get("schedule"),
+                                       mapped_checkpoints(g, kit_points(g, venues, points, cups)),
+                                       intensity, True, f"garage {g}")
+            _check_kit_shape(schedule, intensity, record["kit"]["assignment"], f"garage {g}")
+        out[g] = (cid, schedule)
+    if len({out[g][0] for g in range(4)}) != 4:
+        error("two garages race the same racer: bosses never repeat")
+    if record["kit_shuffle"] and len({tuple(seg[2] for seg in out[g][1]) for g in range(4)}) != 4:
+        error("two garages carry the same kit: bosses never repeat")
+    finals = opponents.get(OXIDE_GARAGE, [])
+    if record["oxide_goal"] != GOAL_DISABLED:
+        if len(finals) != 2 or not all(isinstance(r, dict) for r in finals) or finals[0] != finals[1]:
+            error("both N. Oxide races seat the same racer with the same attack")
+        cid = finals[0].get("character_id")
+        if type(cid) is not int or cid not in by_id:
+            error("N. Oxide's garage: the opponent is not a racer of the boss pool")
+        if record["oxide_in_pool"]:
+            if cid == OXIDE_ID or cid in {out[g][0] for g in range(4)}:
+                error("N. Oxide's garage: with oxide_in_pool the final racer is neither N. Oxide nor a garage racer")
+        elif cid != OXIDE_ID:
+            error("N. Oxide's garage: the final racer moved without oxide_in_pool")
+        schedule = None
+        if record["oxide_attack_profile"] == PROFILES[1]:
+            schedule = _check_schedule(finals[0].get("schedule"), be.OXIDE_CHECKPOINTS, intensity, False,
+                                       "N. Oxide's garage")
+            _check_kit_shape(schedule, intensity, None, "N. Oxide's garage", oxide=True)
+        out[OXIDE_GARAGE] = (cid, schedule)
+    return out
+
+
+def identity(plan):
+    """{boss win code: engine id of the racer the boss race seats} for the
+    Hit Character block's `bosses` table (decision 9): the plan's encounters,
+    and the retail racer of a code the plan does not race (N. Oxide's codes
+    with Oxide disabled, every code with bosses off)."""
+    from .hit_character import BOSS_WIN_OPPONENTS
+    out = dict(BOSS_WIN_OPPONENTS)
+    entries = {e["id"]: e for e in plan["entries"]}
+    for enc in plan["encounters"]:
+        out[enc["completion_location"]] = entries[enc["entry_id"]]["opponent"]["character_id"]
+    return out
+
+
+def spoiler_lines(plan):
+    """The drawn encounters for the spoiler, as the ordinary room writes them;
+    () without drawn encounters."""
+    record = plan.get("bosses")
+    if not drawn(record):
+        return ()
+    be = _be()
+    by_id = _pool_by_id()
+    entries = {e["id"]: e for e in plan["entries"]}
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    lines = []
+    regions = {g: boss_track_shuffle.GARAGES[g][1] for g in range(4)}
+    regions[OXIDE_GARAGE] = boss_track_shuffle.OXIDE_GARAGE
+    for enc in plan["encounters"]:
+        entry = entries[enc["entry_id"]]
+        g = int(enc["pad_id"].removeprefix("garage:"))
+        opponent = entry["opponent"]
+        venues = [tracks[leg["track_id"]] for leg in entry["legs"]] if entry["kind"] == CUP_KIND \
+            else [tracks[entry["track_id"]]]
+        parts = [" / ".join(t.get("room_title", t["display_name"]) for t in venues),
+                 f"vs {by_id[opponent['character_id']]}"]
+        if opponent.get("schedule"):
+            parts.append(f"kit: {be.kit_label(opponent['schedule'])}")
+        label = regions[g] + (f" ({'Final Challenge' if enc['index'] else 'Challenge'})" if g == OXIDE_GARAGE else "")
+        lines.append(f"{label}: " + ", ".join(parts))
+    if record["gauntlet"]:
+        racers = [by_id[entries[enc["entry_id"]]["opponent"]["character_id"]] for enc in plan["encounters"][:4]]
+        lines.append(f"{be.PURPLE_CUP}: boss gauntlet, leg attackers " + ", ".join(racers))
+    return tuple(lines)
+
+
+def restore_encounter_options(o, record):
+    """Universal Tracker: the opponent and kit options from the record (off
+    without drawn encounters), so the tracking player's YAML cannot leak in."""
+    be = _be()
+    o.oxide_powerup_blocklist.value = set()
+    be._clear_subordinates(o)
+    on = drawn(record)
+    o.purple_cup_boss_gauntlet.value = int(on and record["gauntlet"])
+    o.boss_opponent_shuffle.value = int(on and record["opponent_shuffle"])
+    o.boss_oxide_in_pool.value = int(on and record["oxide_in_pool"])
+    o.boss_kit_shuffle.value = int(on and record["kit_shuffle"])
+    o.oxide_attack_profile.value = int(on and record["oxide_attack_profile"] == PROFILES[1])
+    if on and record["kit_shuffle"]:
+        o.boss_attack_assignment.value = be.ASSIGNMENTS.index(record["kit"]["assignment"])
+        o.boss_attack_intensity.value = _intensity_names().index(record["kit"]["intensity"])
+        o.boss_loss_easing.value = int(record["kit"]["loss_easing"])
+    if on and record["track_shuffle"] and record["opponent_shuffle"]:
+        o.boss_track_assignment.value = TRACK_ASSIGNMENTS.index(record["track_assignment"])

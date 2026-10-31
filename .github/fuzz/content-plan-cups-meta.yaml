@@ -12,6 +12,13 @@
 # the ignored share under the arm's cap.
 Crash Team Racing:
   accessibility: full
+  # Job J11: content plans take the Wumpa Shop, the Wumpa goal and ctr_first.
+  # Weighted so most seeds carry the shop and the goal, and one in four runs
+  # ctr_first; a large `excluded` shop or a ctr_first start behind letter
+  # items can refuse, so the weights keep the ignored share under the cap.
+  goal_wumpa: {0: 2, 300: 1, 2500: 1}
+  wumpa_shop_slots: {0: 1, 2: 1, 5: 1, 10: 1}
+  adventure_structure: {classic: 3, ctr_first: 1}
   content_pool:
     preset: mixed
     tracks:
@@ -73,6 +80,18 @@ Crash Team Racing:
   wumpa_check: {global: 1, per_track: 7}
   relic_perfect_checks: true
   boss_track_shuffle: false
+  # Bosses are off here: the opponent, kit and N. Oxide switches need the
+  # garages (job J11), so they stay off; content-plan-030-meta.yaml forces them.
+  boss_opponent_shuffle: false
+  boss_kit_shuffle: false
+  boss_oxide_in_pool: false
+  purple_cup_boss_gauntlet: false
+  oxide_attack_profile: retail
   warp_pad_rules: {}
   # Keys stay shuffled here; the pads-fixed arms fix them.
   shuffle_keys: true
+  # Random lists refuse most boss draws, and the gauntlet has its own arms.
+  boss_character_allowlist: []
+  boss_character_blocklist: []
+  boss_powerup_blocklist: []
+  oxide_powerup_blocklist: []

@@ -363,6 +363,7 @@ class TestEarlyBoost(unittest.TestCase):
         from .. import sphere0_guard
         path = Path(__file__).parent / "fixtures" / "content_plan_boost_racer_locks_527.yaml"
         options = yaml.safe_load(path.read_text())["Crash Team Racing"]
+        options.setdefault("wumpa_shop_slots", 0)  # captured before row 5
         world = make_world(options, seed=1, stop_before="pre_fill")
         mw = world.multiworld
         self.assertEqual(sphere0_guard.sphere0_breadth(world), 4)
@@ -390,7 +391,11 @@ class TestStartBootstrap(unittest.TestCase):
         import yaml
         from pathlib import Path
         path = Path(__file__).parent / "fixtures" / name
-        return yaml.safe_load(path.read_text())["Crash Team Racing"]
+        options = yaml.safe_load(path.read_text())["Crash Team Racing"]
+        # Captured before content plans took the Wumpa Shop (job J11), which
+        # was forced off then.
+        options.setdefault("wumpa_shop_slots", 0)
+        return options
 
     def fills(self, world):
         from Fill import distribute_items_restrictive

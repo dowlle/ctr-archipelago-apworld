@@ -226,6 +226,7 @@ def fill_slot_data(world) -> Dict[str, object]:
         from . import content_plan
         wire = content_plan.wire(world)
         wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
+        wire["ctr_options"]["spoiler_items"] = bool(world.options.spoiler_items.value)
         return wire
     o = world.options
     # DERIVED shuffle_warp_pads (slot_data v3): the deprecated boolean option is

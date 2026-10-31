@@ -9,6 +9,8 @@ from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
 from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
+from .boss_encounters import (POOL_NAMES as BOSS_OPPONENT_NAMES, GARAGE_FAMILIES as BOSS_ATTACK_FAMILIES,
+                              FAMILIES as OXIDE_ATTACK_FAMILIES)
 
 
 class OxideGoal(Choice):
@@ -156,8 +158,8 @@ class FinalOxideRelicCount(NamedRange):
 
 
 class OxideFinalTrack(Choice):
-    """Venue for N. Oxide's Final Challenge. The opponent remains Nitros
-    Oxide for both choices."""
+    """Venue for N. Oxide's Final Challenge. The opponent is N. Oxide for
+    both choices, unless Boss Pool Includes N. Oxide draws another racer."""
     # The AP location backing this challenge is 35011105 for both venue
     # choices -- an implementation detail, not something a player needs to
     # know to pick a venue (issue #355).
@@ -209,6 +211,156 @@ class BossEncounterRepeats(Choice):
     option_disallow = 0
     option_allow = 1
     default = 0
+
+
+class BossOpponentShuffle(Toggle):
+    """Race each of the four boss garages against a randomly drawn racer.
+
+    The garage keeps its Key, its door requirement, its check and its own
+    boss-grade driving. With Boss Track Shuffle off, the race stays on the
+    garage's own track; with both on, Boss Track Assignment decides the
+    track. Each garage gets a different racer. N. Oxide is drawn only with
+    Boss Pool Includes N. Oxide on. Works with content_pool only."""
+    # #169 tier 2 (0.3.0). Wire: the plan's bosses record and boss race entries.
+    # See content_bosses.py.
+    display_name = "Boss Opponent Shuffle"
+
+
+class BossOxideInPool(Toggle):
+    """With Boss Opponent Shuffle on, N. Oxide can be drawn as the racer of
+    one of the four boss garages, and N. Oxide's own garage then races a
+    randomly drawn racer instead of N. Oxide (both of its races). All five
+    bosses are different racers. N. Oxide's garage keeps its door, its
+    checks and the goal. Ignored when Boss Opponent Shuffle is off."""
+    # Decision 7 of 2026-10-28. Wire: the plan's bosses record. See content_bosses.py.
+    display_name = "Boss Pool Includes N. Oxide"
+
+
+class BossCharacterAllowlist(OptionSet):
+    """With Boss Opponent Shuffle on, draw boss opponents only from these
+    racers. Leave empty to allow every racer. Ignored when Boss Opponent
+    Shuffle is off."""
+    display_name = "Boss Character Allowlist"
+    valid_keys = sorted(BOSS_OPPONENT_NAMES)
+    default = frozenset()
+
+
+class BossCharacterBlocklist(OptionSet):
+    """With Boss Opponent Shuffle on, never draw these racers as a boss.
+    Applied after the allowlist. Ignored when Boss Opponent Shuffle is off."""
+    display_name = "Boss Character Blocklist"
+    valid_keys = sorted(BOSS_OPPONENT_NAMES)
+    default = frozenset()
+
+
+class BossTrackAssignment(Choice):
+    """With Boss Track Shuffle and Boss Opponent Shuffle both on, how the
+    track is chosen.
+
+    - **character_home_track** (default): the drawn racer races on their own
+      home track, for example Coco on Coco Park.
+    - **independent_track**: the track is drawn on its own.
+
+    Ignored unless both switches are on."""
+    display_name = "Boss Track Assignment"
+    option_character_home_track = 0
+    option_independent_track = 1
+    default = 0
+
+
+class BossKitShuffle(Toggle):
+    """Give each of the four boss garages a new attack kit.
+
+    Each boss gets a new set of weapons, used at set points of the lap. The
+    garage, its Key, its check and its racer stay the same unless the other
+    boss switches change them. N. Oxide keeps his own attacks. Works with
+    content_pool only."""
+    # #169 tier 3 (0.3.0). Wire: the plan's bosses record and boss race entries.
+    # See content_bosses.py.
+    display_name = "Boss Kit Shuffle"
+
+
+class BossAttackAssignment(Choice):
+    """With Boss Kit Shuffle on, how a kit is made.
+
+    - **mixed_loadouts** (default): each boss uses two to four different
+      weapon types.
+    - **signature_profiles**: each boss gets one of the four retail boss
+      attack patterns as a whole (Ripper Roo's TNT, Papu Papu's potions,
+      Komodo Joe's thrown TNT, Pinstripe's bombs).
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Attack Assignment"
+    option_mixed_loadouts = 0
+    option_signature_profiles = 1
+    default = 0
+
+
+class BossAttackIntensity(Choice):
+    """With Boss Kit Shuffle on, how often a boss attacks. It changes the
+    wait between attacks only, never which weapons are used.
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Attack Intensity"
+    option_relaxed = 0
+    option_standard = 1
+    option_intense = 2
+    option_mayhem = 3
+    default = 1
+
+
+class BossLossEasing(DefaultOnToggle):
+    """With Boss Kit Shuffle on, each lost race against a garage's boss makes
+    that boss attack a little less often, as in the original game. Turn off
+    to keep the attacks the same on every try.
+
+    Ignored when Boss Kit Shuffle is off."""
+    display_name = "Boss Loss Easing"
+
+
+class BossPowerupBlocklist(OptionSet):
+    """With Boss Kit Shuffle on, weapon types a boss never uses. Ignored when
+    Boss Kit Shuffle is off."""
+    display_name = "Boss Powerup Blocklist"
+    valid_keys = sorted(BOSS_ATTACK_FAMILIES)
+    default = frozenset()
+
+
+class PurpleCupBossGauntlet(Toggle):
+    """In each Purple Gem Cup race, one racer attacks you like a boss, with a
+    kit made the same way as the boss garage kits. The cup's tracks, racers
+    and checks do not change, but the podium places get harder.
+
+    Needs Boss Kit Shuffle on and the Purple Gem Cup in the seed; a YAML
+    without either is refused. Works with content_pool only."""
+    # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire: the plan's
+    # bosses.gauntlet. See content_bosses.py.
+    display_name = "Purple Gem Cup Boss Gauntlet"
+
+
+class OxideAttackProfile(Choice):
+    """How N. Oxide's garage races attack you.
+
+    - **retail** (default): N. Oxide's own attacks from the original game.
+    - **all_compatible**: a new attack kit drawn from every weapon a boss can
+      use, including the Super Engine, which only N. Oxide's garage uses.
+
+    The kit belongs to N. Oxide's garage, so it also applies when Boss Pool
+    Includes N. Oxide puts another racer there."""
+    # Wayfinder D2a (ruled 2026-09-02) and decision 5 (2026-10-28).
+    display_name = "N. Oxide Attack Profile"
+    option_retail = 0
+    option_all_compatible = 1
+    default = 0
+
+
+class OxidePowerupBlocklist(OptionSet):
+    """With N. Oxide Attack Profile all_compatible, weapon types N. Oxide's
+    garage never uses. Separate from Boss Powerup Blocklist. Ignored with
+    the retail profile."""
+    display_name = "N. Oxide Powerup Blocklist"
+    valid_keys = sorted(OXIDE_ATTACK_FAMILIES)
+    default = frozenset()
 
 
 class ShuffleGems(DefaultOnToggle):
@@ -621,6 +773,67 @@ class WumpaCheck(Choice):
         return super().from_any(data)
 
 
+class WumpaShopSlots(Range):
+    """How many Wumpa Shop slots each of the five hubs gets.
+
+    In Adventure races, every fruit you collect while already holding 10 is
+    banked, and so is the fruit you hold when you finish a race. Spend banked
+    fruit at the save screen of a hub: each slot is a check with a price. 10
+    (default) adds 50 checks, 25 adds 125. 0 turns the shop off.
+
+    Later slots of each shop go on sale once enough fruit has been banked over
+    the whole seed. Any slot may hold any item unless Wumpa Shop Progression
+    is excluded. Buying needs a connection to the server. Works with content_pool only."""
+    display_name = "Wumpa Shop Slots"
+    range_start = 0
+    range_end = 25
+    default = 10
+
+
+class WumpaShopPrices(Range):
+    """Scales every Wumpa Shop price and every shelf unlock, in percent.
+
+    100 (default) keeps the normal prices: 10 to 30 fruit in N. Sanity Beach up
+    to 40 to 80 in Citadel City. A slot that holds progression always costs
+    the lowest price of its hub."""
+    display_name = "Wumpa Shop Prices"
+    range_start = 25
+    range_end = 400
+    default = 100
+
+
+class WumpaShopProgression(Choice):
+    """Whether Wumpa Shop slots may hold progression items.
+
+    - **allowed** (default): any shop slot may hold progression, priced at
+      its hub's lowest price.
+    - **excluded**: no shop slot holds progression; useful items, filler
+      and traps only."""
+    display_name = "Wumpa Shop Progression"
+    option_allowed = 0
+    option_excluded = 1
+    default = 0
+
+
+class WumpaShopHints(DefaultOnToggle):
+    """Opening a Wumpa Shop page hints the unsold items on it, so their owners
+    see where their items are."""
+    display_name = "Wumpa Shop Hints"
+
+
+class GoalWumpa(Range):
+    """Bank this many Wumpa Fruit over the whole seed for the goal.
+
+    0 (default) turns this condition off. Banked fruit is the fruit you collect
+    while already holding 10, plus the fruit you hold when you finish a race.
+    Spending fruit in the Wumpa Shop never lowers this count. Every goal
+    condition you set must be met. 1000 is a long goal of many races. Works with content_pool only."""
+    display_name = "Wumpa Goal"
+    range_start = 0
+    range_end = 5000
+    default = 0
+
+
 class TurboGrant(Toggle):
     """Add one useful item that puts a Turbo into your weapon slot at the start
     of every race, once you have received it.
@@ -823,6 +1036,48 @@ class ColorBoxesByItem(DefaultOnToggle):
     Archipelago, Item Box Colours. When this option is off, that row shows
     "OFF (SEED)". Only does something when Item Box Locations is on."""
     display_name = "Item Box Colours"
+
+
+class SpoilerItems(Toggle):
+    """Hide reward previews until you find the items that show them.
+
+    Off (default): warp pads and AP item boxes show what they hold, as usual.
+
+    On: the floating rewards above warp pads stay hidden until you receive
+    Warp Pad Preview. Until then, a pad with any open location shows one
+    plain Archipelago marker, and a finished pad shows nothing. With Item Box
+    Locations and Item Box Colours both on, AP item boxes also stay pink until
+    you receive AP Box Colours. You can switch the in-game Item Box Colours
+    row to OFF before that, and the boxes then stay pink after it arrives.
+
+    Both are useful items that add no location, so each one takes a slot that
+    would otherwise hold filler. Pads still open, close and count their checks
+    as usual; only the previews wait for the items. Works with content_pool only."""
+    display_name = "Spoiler Items"
+
+
+class AdventureStructure(Choice):
+    """Which race on a track earns its Trophy Race check.
+
+    - **classic** (default): as in the retail game. Win the Trophy Race
+      first; the CTR Challenge and the Relic Race open after it.
+    - **ctr_first**: the first race on each track is its CTR Challenge.
+      First place sends that track's Trophy Race check, and first place with
+      the letters also sends its CTR Token Challenge check. The track has no
+      plain Trophy Race: item boxes, Wumpa and placement checks come from the
+      CTR Challenge race, and placement counts even without the letters.
+      The Relic Race still opens after that, behind the warp pad's second
+      requirement.
+
+    Works with content_pool only. The checks keep their names: "Trophy Race"
+    stays the track's first check even though the CTR Challenge earns it. A track without a CTR
+    Challenge (a trial track set to trophy_race, a custom track without
+    one) keeps the classic order. Not available with the experimental
+    content plan."""
+    display_name = "Adventure Structure"
+    option_classic = 0
+    option_ctr_first = 1
+    default = 0
 
 
 class WarpPadUnlockRequirements(Choice):
@@ -1443,6 +1698,17 @@ class ContentItemPool(OptionDict):
     default = {}
 
 
+# These options work on content plans only until the generator switch (row 7).
+# They stay out of the spoiler's option list, so a seed without content_pool keeps
+# its spoiler byte for byte; the plan's own spoiler lines name the draws.
+for _plan_option in (BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlist, BossCharacterBlocklist,
+                     BossTrackAssignment, BossKitShuffle, BossAttackAssignment, BossAttackIntensity, BossLossEasing,
+                     BossPowerupBlocklist, PurpleCupBossGauntlet, OxideAttackProfile, OxidePowerupBlocklist,
+                     WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints, GoalWumpa, SpoilerItems,
+                     AdventureStructure):
+    _plan_option.visibility = Visibility.all & ~Visibility.spoiler
+
+
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
 
@@ -1456,6 +1722,7 @@ class ctrAPOptions(PerGameCommonOptions):
     oxide_1_optional: Oxide1Optional
     bosses_required_goal: BossesRequiredGoal
     gems_required_goal: GemsRequiredGoal
+    goal_wumpa: GoalWumpa
     oxide_final_challenge_unlock: FinalOxideUnlock
     oxide_final_challenge_relic_count: FinalOxideRelicCount
     oxide_final_track: OxideFinalTrack
@@ -1464,6 +1731,21 @@ class ctrAPOptions(PerGameCommonOptions):
     boss_track_allowlist: BossTrackAllowlist
     boss_track_blocklist: BossTrackBlocklist
     boss_encounter_repeats: BossEncounterRepeats
+    # boss encounters (#169 tiers 2 and 3: opponent and kit switches)
+    boss_opponent_shuffle: BossOpponentShuffle
+    boss_character_allowlist: BossCharacterAllowlist
+    boss_character_blocklist: BossCharacterBlocklist
+    boss_track_assignment: BossTrackAssignment
+    boss_kit_shuffle: BossKitShuffle
+    boss_attack_assignment: BossAttackAssignment
+    boss_attack_intensity: BossAttackIntensity
+    boss_loss_easing: BossLossEasing
+    boss_powerup_blocklist: BossPowerupBlocklist
+    # boss encounters (decisions 5 to 7 of 2026-10-28)
+    boss_oxide_in_pool: BossOxideInPool
+    purple_cup_boss_gauntlet: PurpleCupBossGauntlet
+    oxide_attack_profile: OxideAttackProfile
+    oxide_powerup_blocklist: OxidePowerupBlocklist
     # items & pool
     shuffle_gems: ShuffleGems
     include_gem_cups: ShuffleWarpPadsGemCups
@@ -1489,6 +1771,11 @@ class ctrAPOptions(PerGameCommonOptions):
     reserve_top_up: ReserveTopUp
     progressive_starting_wumpa: ProgressiveStartingWumpa
     wumpa_check: WumpaCheck
+    # the Wumpa Shop (#249)
+    wumpa_shop_slots: WumpaShopSlots
+    wumpa_shop_prices: WumpaShopPrices
+    wumpa_shop_progression: WumpaShopProgression
+    wumpa_shop_hints: WumpaShopHints
     # in-race Turbo hand-out (#224), the second ruled namespace amendment
     turbo_grant: TurboGrant
     lettersanity: Lettersanity
@@ -1522,6 +1809,10 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     # item boxes: colour by the item inside (ruling R11)
     color_boxes_by_item: ColorBoxesByItem
+    # reward previews held back behind two items (#459)
+    spoiler_items: SpoilerItems
+    # race structure and the pad race type menu (#208)
+    adventure_structure: AdventureStructure
     # warp pads: unlock requirements
     warppad_unlock_requirements: WarpPadUnlockRequirements
     two_stage_density: TwoStageDensity
@@ -1560,10 +1851,16 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # box_locations, shortcut_knowledge, lettersanity, letters_per_track and
     # bossgarage_unlock_requirements used to end up.
     "Goal": [OxideGoal, Oxide1Optional, BossesRequiredGoal, GemsRequiredGoal,
-             FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
+             GoalWumpa, FinalOxideUnlock, FinalOxideRelicCount, OxideFinalTrack],
     "Boss Encounters": [BossTrackShuffle, BossTrackAllowlist,
-                        BossTrackBlocklist, BossEncounterRepeats],
-    "Warp Pad Unlocking": [WarpPadUnlockRequirements, TwoStageDensity,
+                        BossTrackBlocklist, BossEncounterRepeats,
+                        BossOpponentShuffle, BossOxideInPool, BossCharacterAllowlist,
+                        BossCharacterBlocklist, BossTrackAssignment,
+                        BossKitShuffle, BossAttackAssignment,
+                        BossAttackIntensity, BossLossEasing,
+                        BossPowerupBlocklist, PurpleCupBossGauntlet,
+                        OxideAttackProfile, OxidePowerupBlocklist],
+    "Warp Pad Unlocking": [AdventureStructure, WarpPadUnlockRequirements, TwoStageDensity,
                            RequirementVariety, RequirementWeights,
                            WarpPadRules, BossGarageRequirements],
     "Warp Pad Shuffle": [WarpPadShuffleCategories, WarpPadShuffleGrouping,
@@ -1581,6 +1878,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Items & Pool": [ShuffleGems, ShuffleKeys, TrapFillPercentage, TrapWeights,
                      TiziHelper, WumpaBundles, ReserveTopUp, ProgressiveStartingWumpa,
                      WumpaCheck, TurboGrant],
+    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression,
+                   WumpaShopHints],
     "Capability Items": [ProgressiveBoostMode, ProgressiveBoostBlueFire,
                          ProgressiveStatsMode, LogicDifficulty],
     # Grouped together on purpose: a player reads "who do I start as", "who can
@@ -1592,7 +1891,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Relic Difficulty": [SapphireRelicCount, GoldRelicCount,
                          PlatinumRelicCount],
     "Quality of Life": [OneLapCups, WarpPadItemDisplay, ApItemTypeColors,
-                        ColorBoxesByItem],
+                        ColorBoxesByItem, SpoilerItems],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
 }
 

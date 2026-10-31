@@ -28,7 +28,10 @@ def profile_options():
                                   required_entries=["custom/baby-t-park/1.0.2"]),
                 pad_layout=dict(placement="shuffle", stages="single", mode_order="fixed", merge_trophy_ctr=False),
                 item_pool=profile_pool(), oxide_goal="disabled", bosses_required_goal=0, gems_required_goal=5,
-                character_unlocks=False, podium_placement_checks=False, accessibility="full")
+                character_unlocks=False, podium_placement_checks=False, accessibility="full",
+                # The Wumpa Shop is on by default on content plans; the profile
+                # keeps its earlier plan with it off.
+                wumpa_shop_slots=0)
 
 
 def make_world(options, seed=420, passthrough=None, stop_before=None):

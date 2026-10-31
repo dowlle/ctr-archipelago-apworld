@@ -473,10 +473,18 @@ class TestCustomBossVenues(unittest.TestCase):
         self.assertNotIn(self.BTP, self.drawn(options))
 
     def test_an_allowlist_keeps_custom_tracks_out(self):
-        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow",
-                               boss_track_allowlist=["Crash Cove", "Dingo Canyon"])
+        allowed = ["Crash Cove", "Dingo Canyon", "Blizzard Bluff", "Sewer Speedway", "Coco Park", "Tiny Arena"]
+        options = boss_options(boss_track_shuffle=True, boss_track_allowlist=allowed)
         ids = boss_track_shuffle.VENUE_LEVEL_IDS
-        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids['Crash Cove']}", f"retail:{ids['Dingo Canyon']}"})
+        self.assertTrue(self.drawn(options, range(4)) <= {f"retail:{ids[name]}" for name in allowed})
+
+    def test_bosses_never_repeat_on_a_plan(self):
+        options = boss_options(boss_track_shuffle=True, boss_encounter_repeats="allow")
+        for seed in range(6):
+            plan = make_world(options, seed=seed).ctr_content_plan
+            venues = content_bosses.plan_venues(plan)[0]
+            self.assertFalse(plan["bosses"]["repeats"])
+            self.assertEqual(len(set(venues.values())), 4)
 
     def test_off_keeps_the_retail_pairs(self):
         options = boss_options()

@@ -14,8 +14,11 @@ checked around the framework phases (#133 PR 4f, content_item_pool.py),
 four-leg cups with their Win, sweep and Cup Leg Victory checks (#133 PR 5,
 content_cups.py), boss garages with their encounters and the Oxide and Boss
 goals (#133 PR 6, content_bosses.py), Crystal Challenge entries, pad
-placement and requirements (one generator row 3, content_requirements.py), and
-items fixed to their own check (one generator row 4, content_fixed.py).
+placement and requirements (one generator row 3, content_requirements.py),
+items fixed to their own check (one generator row 4, content_fixed.py), and
+(one generator row 5) adventure_structure ctr_first, the Wumpa Shop and the
+Wumpa goal (content_wumpa.py) and Boss Opponent and Kit Shuffle
+(content_bosses.py).
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -36,7 +39,8 @@ from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from . import (arena_content, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
-               content_item_boxes, content_requirements, custom_packages, tizi_helper, turbo_grant)
+               content_item_boxes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
+               turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from . import warp_pad_logic
 from .warp_pad_logic import HUB_STATIC
@@ -108,6 +112,51 @@ CORTEX_ORIGIN = "cortex_vortex"
 CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 CORTEX_LAPS = 3
+#: Colour index of the Purple Gem Cup, the fifth Gem Cup.
+PURPLE_GEM_CUP = 4
+
+
+#: adventure_structure: ctr_first on content plans (decisions 4 and 14 of
+#: 2026-10-28, award rule of 2026-10-29). The plan's optional
+#: `adventure_structure` key is the string `ctr_first`; it is absent in
+#: `classic`, so such a plan keeps its wire. A track entry is ctr_first exactly
+#: when the plan has the key and its track record's modes hold both `trophy`
+#: and `ctr`: its entry lists the CTR Challenge (stage 1) and the Relic Race
+#: when the track has one (stage 2), no Trophy Race, and takes no mode-order
+#: draw. Its checks are the classic entry's checks in the classic (fixed)
+#: order; only the routes of the Trophy Race check and the podium rungs move to
+#: the `ctr` mode. First place pays the Trophy Race check (award `win`), first
+#: place with the letters also pays the CTR Token check (`win_letters`), and the
+#: rungs go by finishing place. Any other entry keeps the classic order
+#: (decision 4).
+CTR_FIRST = "ctr_first"
+CTR_FIRST_FEATURE = "ctr_first_v1"
+
+
+def ctr_first_modes(track_modes):
+    """The entry modes of a ctr_first entry for a track with `track_modes`,
+    or None when the track falls back to the classic order (decision 4)."""
+    if "trophy" not in track_modes or "ctr" not in track_modes:
+        return None
+    return ["ctr"] + (["relic"] if "relic" in track_modes else [])
+
+
+def merged_race(checks):
+    """Do these checks of one pad come from a ctr_first entry, whose Trophy Race
+    check routes from the CTR Challenge?"""
+    return any(c["kind"] == "trophy" and c["routes"][0]["mode"] == "ctr" for c in checks)
+
+
+def first_race_checks(checks, mode):
+    """Codes of the checks that prove the pad's first race (`mode`) was won. On
+    a ctr_first entry that is the Trophy Race check: the win without the
+    letters, which the CTR Token check needs on top."""
+    return tuple(c["location"] for c in checks if c["kind"] == ("trophy" if merged_race(checks) else mode))
+
+
+def plan_ctr_first(plan, track):
+    """Is a plan's standalone entry for `track` a ctr_first entry?"""
+    return plan.get("adventure_structure") == CTR_FIRST and ctr_first_modes(track["modes"]) is not None
 
 
 def cortex_track():
@@ -133,7 +182,15 @@ LOCATION_BY_CODE = {code: name for name, code in CTR_LOCATION_IDS.items()}
 PACK_FEATURE = "item_packs_v1"
 PACK_ITEMS = (("progressive_starting_wumpa", "Progressive Starting Wumpa"),
               ("turbo_grant", turbo_grant.TURBO_GRANT_ITEM),
-              ("tizi_helper", tizi_helper.TIZI_HELPER_ITEM))
+              ("tizi_helper", tizi_helper.TIZI_HELPER_ITEM),
+              # Spoiler Items (#459): the two reveal items, outside
+              # data/items.json like the letter items (SPOILER_PACK_CODES).
+              ("warp_pad_preview", spoiler_items.WARP_PAD_PREVIEW_ITEM),
+              ("ap_box_colours", spoiler_items.AP_BOX_COLOURS_ITEM))
+#: Item codes of the pack identities that live outside data/items.json.
+SPOILER_PACK_CODES = dict(spoiler_items.ITEM_CODES)
+#: Pack keys that are a single true grant.
+PACK_GRANTS = ("turbo_grant", "tizi_helper", "warp_pad_preview", "ap_box_colours")
 #: Highest Progressive Starting Wumpa count (Options.ProgressiveStartingWumpa).
 STARTING_WUMPA_MAX = 10
 #: Envelope keys a content plan carries only when the option is not at the
@@ -312,11 +369,13 @@ def relic_races(entries):
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
-                      guarded=None):
+                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
-    # garages (#133 PR 6) next, the row 2 plan content, then row 3's pad
-    # requirements and row 4's fixed items last. `guarded` names the track of
-    # the relic guard, whose Relic Race holds no tier check.
+    # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
+    # and row 4's fixed items. Row 5's features close the list in a fixed order,
+    # each only when present: ctr_first, boss opponents (the bosses record has
+    # `opponent_shuffle`), the Wumpa Shop and the Wumpa goal. `guarded` names the
+    # track of the relic guard, whose Relic Race holds no tier check.
     races = relic_races(entries)
     eligible = races - (guarded is not None)
     manual = any(r["id"].startswith("manual:") for r in requirements)
@@ -343,7 +402,11 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([RELIC_FEATURE] if rows and any(min(count, eligible) < races for count in relic_supply(rows).values())
                else [])
             + ([content_requirements.FEATURE] if pad_requirements else [])
-            + ([content_fixed.FEATURE] if fixed else []))
+            + ([content_fixed.FEATURE] if fixed else [])
+            + ([CTR_FIRST_FEATURE] if ctr_first else [])
+            + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
+            + ([content_wumpa.SHOP_FEATURE] if shop else [])
+            + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else []))
 
 
 def family_settings(options):
@@ -406,6 +469,11 @@ def pack_settings(options):
         out["turbo_grant"] = True
     if options.tizi_helper.value:
         out["tizi_helper"] = True
+    # Spoiler Items (#459): the same items the legacy creator pools.
+    if options.spoiler_items.value:
+        out["warp_pad_preview"] = True
+        if spoiler_items.box_colours_item_wanted(options):
+            out["ap_box_colours"] = True
     return out
 
 
@@ -413,14 +481,34 @@ def check_pack_settings(packs):
     """Shape and values of a plan's `item_packs` record. Key order is not a
     rule: JSON objects carry none, and native reads them sorted."""
     if not isinstance(packs, dict) or not packs or set(packs) - {key for key, _item in PACK_ITEMS}:
-        error("item_packs must be a nonempty mapping of progressive_starting_wumpa, turbo_grant and "
-              "tizi_helper.")
+        error("item_packs must be a nonempty mapping of progressive_starting_wumpa, turbo_grant, "
+              "tizi_helper, warp_pad_preview and ap_box_colours.")
     count = packs.get("progressive_starting_wumpa", 1)
     if type(count) is not int or not 1 <= count <= STARTING_WUMPA_MAX:
         error(f"item_packs.progressive_starting_wumpa must be 1 to {STARTING_WUMPA_MAX} when present.")
-    if any(packs[key] is not True for key in ("turbo_grant", "tizi_helper") if key in packs):
-        error("item_packs.turbo_grant and item_packs.tizi_helper must be true when present.")
+    if any(packs[key] is not True for key in PACK_GRANTS if key in packs):
+        error("item_packs grants must be true when present.")
+    if "ap_box_colours" in packs and "warp_pad_preview" not in packs:
+        error("item_packs.ap_box_colours needs item_packs.warp_pad_preview (both are Spoiler Items).")
     return packs
+
+
+def pack_code(name):
+    """The item code of one pack identity."""
+    return SPOILER_PACK_CODES.get(name) or content_item_pool.ITEMS[name]
+
+
+def check_spoiler_envelope(plan, co):
+    """Spoiler Items (#459): the envelope's `spoiler_items` agrees with the
+    plan's reveal items, and AP Box Colours exists exactly when the plan has
+    coloured AP boxes. An absent key is an older room, off."""
+    packs = plan.get("item_packs", {})
+    on = co.get("spoiler_items", False)
+    if type(on) is not bool or on != ("warp_pad_preview" in packs):
+        error("spoiler_items envelope disagrees with the plan's item_packs")
+    boxes = "item_boxes" in plan and co.get("color_boxes_by_item") is True
+    if ("ap_box_colours" in packs) != (on and boxes):
+        error("item_packs.ap_box_colours disagrees with the plan's coloured item boxes")
 
 
 def pack_counts(packs):
@@ -785,7 +873,7 @@ def route(entry_id, mode, pad_id, award):
 
 
 def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None,
-                 item_boxes=None, relics=None):
+                 item_boxes=None, relics=None, ctr_first=False):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -803,21 +891,29 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     (content_item_boxes).
 
     `relics` is the set of tiers this track's Relic Race holds a check for
-    (draw_relic_checks), all three when None."""
+    (draw_relic_checks), all three when None.
+
+    A ctr_first entry (`ctr_first`) lists its checks in the classic fixed order
+    of its track's modes. The Trophy Race check and the podium rungs route from
+    the CTR Challenge: first place pays the Trophy Race check, first place with
+    the letters also pays the CTR Token check (ruling 2026-10-29). Every other
+    family routes from the modes the entry has."""
     title = room_title(track)
     settings = settings or {}
 
     def check(code, kind, suffix, routes):
         return dict(location=code, owner=track["id"], kind=kind, display_name=f"{title}: {suffix}",
                     routes=[route(entry_id, mode, pad_id, award) for mode, award in routes])
+    # The Trophy Race of a ctr_first entry is run as its CTR Challenge.
+    race_mode = (lambda mode: "ctr" if mode == "trophy" else mode) if ctr_first else (lambda mode: mode)
     out = []
-    for mode in modes:
+    for mode in ([m for m in MODES if m in track["modes"]] if ctr_first else modes):
         for award, _name, code, suffix in mode_checks(track, mode, relics):
-            out.append(check(code, mode, suffix, [(mode, award)]))
+            out.append(check(code, mode, suffix, [(race_mode(mode), award)]))
         if mode == "trophy":
             for key in settings.get("podium_rungs", ()):
                 out.append(check(track_location(track, key, RUNG_SUFFIX[key])[1], "podium",
-                                 RUNG_SUFFIX[key], [("trophy", key)]))
+                                 RUNG_SUFFIX[key], [(race_mode("trophy"), key)]))
         if mode == "ctr":
             for index in letter_layout(track, settings, letters)[0]:
                 out.append(check(letter_code(track, index), "letter", letter_suffix(index),
@@ -826,7 +922,7 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
             out.append(check(track_location(track, "relic_perfect", PERFECT_SUFFIX)[1], "perfect",
                              PERFECT_SUFFIX, [("relic", "perfect")]))
     if settings.get("wumpa") == "per_track":
-        reach = wumpa_modes(track, package)
+        reach = [m for m in wumpa_modes(track, package) if m in modes]
         if reach:
             out.append(check(track_location(track, "wumpa", WUMPA_SUFFIX)[1], "wumpa", WUMPA_SUFFIX,
                              [(mode, "wumpa") for mode in reach]))
@@ -1081,6 +1177,11 @@ def generate(world):
         if "named_block" not in track:
             track["room_title"] = titles[track["custom_slot"]]
     chosen += cups
+    # The Purple Gem Cup gauntlet (ruled 2026-10-30): one message for both needs.
+    if o.purple_cup_boss_gauntlet.value and not (o.boss_kit_shuffle.value and boss_record is not None
+                                                 and any(cup.get("gem_cup") == PURPLE_GEM_CUP for cup in cups)):
+        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and the Purple Gem Cup in the seed. Turn on "
+              "boss_kit_shuffle and keep five Gem Cups, or turn off purple_cup_boss_gauntlet.")
     manual = manual_rules(o)
     unlock_mode = int(o.warppad_unlock_requirements.value)
     if unlock_mode and not warp_pad_logic.effective_custom_weights(world)["Trophy"]:
@@ -1201,7 +1302,7 @@ def generate(world):
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
     # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
     # Challenge venue. Nothing is drawn with bosses off.
-    boss_venues, boss_final, boss_cups = ({}, None, {})
+    boss_venues, boss_final, boss_cups, boss_opponents = ({}, None, {}, None)
     if boss_record is not None:
         # A custom track is a boss venue only where the plan also races it
         # on a pad or in a cup (#133 PR 6b; native checks its record there).
@@ -1211,11 +1312,24 @@ def generate(world):
                         content_bosses.custom_venue_points(t, package_by_id.get(t.get("package_id"))))
                        for t in candidates if t.get("origin") == "cortex_vortex"
                        or (t.get("origin") == "custom" and t["id"] in raced)]
-        boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom)
+        # Boss opponent shuffle (job J11): with character_home_track the
+        # racers are drawn first and race their home tracks; otherwise the
+        # venue draw is unchanged and the racers are drawn after it. Nothing
+        # is drawn with the switches off.
+        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs. Home
+        # pairing needs them first, because a cup garage races any racer.
+        if content_bosses.home_paired(boss_record):
+            boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
+            boss_venues, boss_racers, boss_final_racer = content_bosses.draw_home_venues(world, boss_record, boss_cups)
+        else:
+            boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom)
+            boss_racers, boss_final_racer = content_bosses.draw_racers(world, boss_record)
+            boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
         boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
                       else content_bosses.OXIDE_STATION)
-        # Boss cups (#133 PR 6b): which garages hold a cup, and their legs.
-        boss_cups = content_bosses.draw_cups(world, boss_record, boss_custom)
+        # Boss kit shuffle and N. Oxide's profile (job J11), on the plan's venues.
+        boss_opponents = content_bosses.draw_encounters(world, boss_record, boss_venues, boss_racers,
+                                                        boss_final_racer, dict(boss_custom), boss_cups)
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
                                        package_by_id.get(t.get("package_id")), item_boxes=item_boxes,
                                        relics=relics.get(t["id"])))
@@ -1234,6 +1348,9 @@ def generate(world):
     # Boss garages (#133 PR 6): one check per encounter.
     if boss_record is not None:
         check_count += len(content_bosses.encounter_rows(boss_record, boss_venues, boss_final))
+    # The Wumpa Shop (job J11): five hubs of slots, after every other family.
+    shop = content_wumpa.settings(o)
+    check_count += content_wumpa.check_count(shop)
     # Itemsanity and Hit Character (#133 PR 4d): global checks, routed from
     # every race that can earn them once the pads are assigned.
     global_checks = content_global_checks.settings(o)
@@ -1271,22 +1388,53 @@ def generate(world):
     pins = content_fixed.placements(fixed, base_counts,
                                     {name: base_counts[name] + extra_counts[name]
                                      - o.start_inventory_from_pool.value.get(name, 0) for name in base_counts})
-    world.ctr_content_items = content_item_pool.resolve(
-        o.item_pool.value, check_count, starts=o.start_inventory_from_pool.value,
-        additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
-        locked=content_fixed.locked_copies(pins), locked_checks=len(pins),
-        surface=content_item_pool.SURFACE_NAMES,
-        filler_reserve=int(oxide_filler) + len(set(o.exclude_locations.value)
-                                               - {LOCATION_BY_CODE[code] for code in pins}),
-        **(dict(selected_packs=selected, pack_codes=letter_packs) if selected else {}))
+
+    def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
+        return content_item_pool.resolve(
+            o.item_pool.value, check_count, starts=starts,
+            additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
+            locked=content_fixed.locked_copies(pins), locked_checks=len(pins),
+            surface=content_item_pool.SURFACE_NAMES,
+            filler_reserve=int(oxide_filler) + len(set(o.exclude_locations.value)
+                                                   - {LOCATION_BY_CODE[code] for code in pins}),
+            **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
+               if chosen else {}))
+    try:
+        world.ctr_content_items = resolve_items(selected)
+    except OptionError as exc:
+        # Spoiler Items (#459): when the reveal items alone overflow the
+        # ledger, say so. resolve is pure, so the second call changes nothing.
+        reveal = [name for name in SPOILER_PACK_CODES if name in selected]
+        # Only a capacity shortage is rephrased; other ledger errors (a bad
+        # start count, for example) keep their own message.
+        if reveal and "free checks" in str(exc):
+            try:
+                resolve_items({k: v for k, v in selected.items() if k not in reveal},
+                              {k: v for k, v in o.start_inventory_from_pool.value.items() if k not in reveal})
+            except OptionError:
+                raise exc
+            error(f"Spoiler Items needs more checks for {' and '.join(reveal)}, which add no "
+                  "check of their own. Add checks or turn off Spoiler Items.")
+        raise
     if oxide_filler and world.ctr_content_items.filler_count < 1:
         error("the Oxide goal check holds only filler, but the item pool fills every check: "
               f"{check_count} checks for {check_count} selected copies. Lower an item_pool count or extra, or add "
               "content, so one filler slot is left. Your settings were not changed.")
+    # adventure_structure: ctr_first (job J11): every track entry whose
+    # track has a Trophy Race and a CTR Challenge runs the CTR Challenge first
+    # and has no Trophy Race; it takes no mode-order draw (decision 14). Any
+    # other entry keeps the classic order (decision 4).
+    ctr_first = int(o.adventure_structure.value) == 1
+    first_modes = {}
+    if ctr_first:
+        for index, track in enumerate(chosen):
+            if is_track(track) and ctr_first_modes(track["modes"]) is not None:
+                first_modes[index] = ctr_first_modes(track["modes"])
     # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
     # the whole seed; or one per pad. Only entries with two or more modes take a
     # draw, so a Trophy-only plan draws nothing here.
-    multi = [index for index in range(len(chosen)) if len(chosen[index].get("modes", ())) > 1]
+    multi = [index for index in range(len(chosen))
+             if len(chosen[index].get("modes", ())) > 1 and index not in first_modes]
     # With Lettersanity 2 or 3 a CTR Challenge needs letter items, so it is
     # never a pad's first mode when the pad has another (ruling 2026-10-17):
     # a CTR-first start would open no check. A fixed or per-seed order moves
@@ -1317,6 +1465,7 @@ def generate(world):
                 else:
                     modes[0], modes[1] = modes[1], modes[0]
             out[index] = modes
+        out.update(first_modes)
         return out
 
     def first_key_checks(orders):
@@ -1333,7 +1482,7 @@ def generate(world):
             total += sum(any(r["mode"] == modes[0] for r in c["routes"]) and not c.get("boost")
                          for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings, letters.get(index, ()),
                                                package_by_id.get(item.get("package_id")), capability, item_boxes,
-                                               relics.get(item["id"])))
+                                               relics.get(item["id"]), ctr_first=index in first_modes))
         return total
 
     # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
@@ -1378,7 +1527,8 @@ def generate(world):
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
                                            letters.get(index, ()), package_by_id.get(track.get("package_id")),
-                                           capability, item_boxes, relics.get(track["id"])))
+                                           capability, item_boxes, relics.get(track["id"]),
+                                           ctr_first=index in first_modes))
         pads.append(pad)
     standalone = [t for t in chosen if is_track(t)]
     plan_tracks = standalone + cup_only_tracks(standalone, entries, track_records)
@@ -1391,6 +1541,8 @@ def generate(world):
     gem_ids = [r.item for r in world.ctr_content_items.rows if r.name.endswith(" Gem") and r.base]
     gem_term = (dict(op="distinct", items=gem_ids, count=o.gems_required_goal.value)
                 if o.gems_required_goal.value else None)
+    # The Wumpa goal (job J11): its arm closes the goal's AND.
+    wumpa_goal = content_wumpa.goal_count(o)
     # Boss garages (#133 PR 6): the encounters, their boss race entries,
     # requirements and checks, and the venues raced nowhere else as plan
     # tracks (the trophy mode only, like a track raced only in cups).
@@ -1410,10 +1562,14 @@ def generate(world):
                                                  pins, pads)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
-            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, content_requirements.MODES[unlock_mode])
+            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
+            content_requirements.MODES[unlock_mode])
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
+    # Wumpa Shop slots (job J11), last; the prices are final at slot_data time.
+    world.ctr_wumpa_shop_base_prices = content_wumpa.draw_prices(world, shop) if shop else {}
+    checks.extend(content_wumpa.checks(shop, world.ctr_wumpa_shop_base_prices))
     for boss in range(5):
         gate = content_bosses.garage_gate(boss, any(e["pad_id"] == f"garage:{boss}" for e in encounters))
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
@@ -1429,6 +1585,12 @@ def generate(world):
               f"{world.ctr_content_items.filler_count} filler slots"
               + (", one of them for the Oxide goal check" if oxide_filler else "")
               + ". An excluded check holds only filler. Lower an item_pool count or exclude fewer checks.")
+    # The Wumpa Shop's `excluded` needs a non-progression copy per slot, beside the
+    # filler the other excluded checks hold.
+    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), oxide_filler + len(
+        set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks
+                                          if c["location"] != goal_check and c["location"] not in pins
+                                          and c["kind"] != content_wumpa.KIND}))
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
@@ -1462,11 +1624,15 @@ def generate(world):
     pad_record = dict(mode=content_requirements.MODES[unlock_mode])
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in plan_tracks)],
                 tracks=plan_tracks, entries=entries, pads=pads, encounters=encounters, requirements=requirements,
-                checks=checks, items=world.ctr_content_items.wire(), goal=content_bosses.goal(boss_record, gem_term),
+                checks=checks, items=world.ctr_content_items.wire(),
+                goal=plan_goal(boss_record, gem_term, wumpa_goal),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes,boss_record,
-                                                    world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded),
+                                                    world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
+                                                    ctr_first, shop, bool(wumpa_goal)),
                 pad_requirements=pad_record)
+    if ctr_first:
+        plan["adventure_structure"] = CTR_FIRST
     if fixed:
         plan["fixed_items"] = fixed
     if settings:
@@ -1481,6 +1647,8 @@ def generate(world):
         plan["item_boxes"] = item_boxes
     if boss_record is not None:
         plan["bosses"] = boss_record
+    if shop:
+        plan["wumpa_shop"] = shop
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -1511,7 +1679,30 @@ def generate(world):
         early_count = world.random.randint(1, 2)
         weapon = world.random.sample(WEAPONS, early_count)[0]
         world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
+    from .notices import emit_ignored_summary
+    from .forced_options import logger
+    emit_ignored_summary(world, logger)
     return plan
+
+
+def plan_goal(record, gem_term, wumpa=0):
+    """The plan's goal: the Oxide, Boss and Gem arms (content_bosses.goal),
+    and the Wumpa arm last (job J11). One arm is written alone."""
+    terms = []
+    if record is not None or gem_term is not None:
+        try:
+            base = content_bosses.goal(record, gem_term)
+        except OptionError:
+            if not wumpa:
+                raise
+            base = None
+        if base is not None:
+            terms = list(base["terms"]) if base.get("op") == "all" and record is not None else [base]
+    if wumpa:
+        terms.append(content_wumpa.goal_term(wumpa))
+    if not terms:
+        error("no goal: set gems_required_goal, an Oxide or Boss goal, or goal_wumpa.")
+    return terms[0] if len(terms) == 1 else dict(op="all", terms=terms)
 
 
 def pad_physical(pad):
@@ -1615,7 +1806,7 @@ def global_wumpa_routes(tracks, entries, pads, packages):
             continue
         track = by_track[entry["track_id"]]
         out.extend((entry["id"], pad_of[entry["id"]], mode)
-                   for mode in wumpa_modes(track, packages.get(track.get("package_id"))))
+                   for mode in wumpa_modes(track, packages.get(track.get("package_id"))) if mode in entry["modes"])
     return out
 
 
@@ -1648,6 +1839,9 @@ def predicate(world, node):
         # events, never the location's checked state (content_bosses.EVENTS).
         events = [content_bosses.EVENTS[code] for code in node["locations"]]
         return lambda state: sum(state.has(name, player) for name in events) >= node["count"]
+    if node["op"] == content_wumpa.GOAL_OP:
+        # The Wumpa goal arm (job J11): fruit can be banked; the amount is time.
+        return lambda state: state.has(content_wumpa.INCOME, player)
     if node["op"] in ("all", "any"):
         tests = tuple(predicate(world, term) for term in node["terms"])
         if node["op"] == "all":
@@ -1709,7 +1903,7 @@ def create_regions(world):
         modes = [g["mode"] for g in pad["mode_gates"]]
         if len(modes) < 2 or "pad_requirements" not in plan:
             return ()
-        return tuple(c["location"] for c in by_pad.get(pad["id"], ()) if c["kind"] == modes[0])
+        return first_race_checks(by_pad.get(pad["id"], ()), modes[0])
 
     def stage_gate(route):
         """The test of a route's later race, or None for a pad's first race. A
@@ -1740,16 +1934,20 @@ def create_regions(world):
 
     # Boss garages (#133 PR 6): one region per encounter, behind its garage's
     # hub gate and its own requirement, with its check and companion event.
+    # With the Wumpa goal on, the N. Oxide race that finishes the seed waits for
+    # the fruit target natively (decision 19), so it also needs `Wumpa Income`.
     if plan["encounters"]:
-        content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check))
+        content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check),
+                               content_wumpa.INCOME if content_wumpa.goal_arm(plan["goal"]) else None)
     by_pad = {}
     # Locations by code: Universal Tracker renames custom tracks' locations, so
     # a rule holds the Location, not its name.
     placed = {}
     shared = []
     legs = []
+    checks_by_code = {check["location"]: check for check in plan["checks"]}
     for check in plan['checks']:
-        if check["kind"] in content_bosses.KINDS:
+        if check["kind"] in content_bosses.KINDS + (content_wumpa.KIND,):
             continue
         if check["kind"] == content_cups.LEG_KIND:
             legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
@@ -1789,6 +1987,13 @@ def create_regions(world):
             if rule is not None:
                 location.access_rule = rule
             region.locations.append(location)
+        # ctr_first: first place pays the Trophy Race check, and first place
+        # with the letters also pays the CTR Token check, so the CTR Token needs
+        # everything the Trophy Race check needs. Read at call time, never looser.
+        if merged_race(by_pad.get(pad["id"], ())):
+            by_kind = {checks_by_code[location.address]["kind"]: location for location in region.locations}
+            ctr, trophy = by_kind["ctr"], by_kind["trophy"]
+            ctr.access_rule = lambda state, own=ctr.access_rule, won=trophy: own(state) and won.can_reach(state)
     # Itemsanity and Hit Character checks (#133 PR 4d) take their rules in
     # set_rules, once every trigger location exists.
     world.ctr_global_routes = []
@@ -1827,6 +2032,8 @@ def create_regions(world):
                        for entry, need, racer in tests)
         location.access_rule = any_leg
         menu.locations.append(location)
+    # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
+    content_wumpa.install(world, plan, menu, stage_gate)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 
@@ -1926,6 +2133,8 @@ def add_racer_unlock_placement_rules(world):
 def wire(world):
     o = world.options
     plan=world.ctr_content_plan
+    # Wumpa Shop prices (job J11) are final once the fill has placed items.
+    content_wumpa.final_prices(world, plan)
     extra=({'include_battle_arenas':True,
             'include_arcade_arenas':any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
             'crystalsanity':any(c['kind']=='crystal_pickup' for c in plan['checks'])}
@@ -2023,11 +2232,17 @@ def validate(plan):
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
+    # Row 5: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
+    ctr_first = plan.get("adventure_structure") == CTR_FIRST
+    require("adventure_structure" not in plan or ctr_first, "adventure_structure must be ctr_first when present")
+    shop = content_wumpa.check_settings(plan["wumpa_shop"]) if "wumpa_shop" in plan else None
+    wumpa_arm = content_wumpa.goal_arm(plan["goal"])
     fixed = content_fixed.check_settings(plan) if "fixed_items" in plan else {}
     guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
-                                                         plan.get("pad_requirements"), fixed, guarded),
+                                                         plan.get("pad_requirements"), fixed, guarded,
+                                                         ctr_first, shop, wumpa_arm is not None),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -2146,8 +2361,12 @@ def validate(plan):
         track = tracks[entry["track_id"]]
         # Track modes are canonical (MODES order); the entry lists the same
         # modes in its pad's resolved order.
+        # A ctr_first entry (job J11) lists the CTR Challenge and the Relic
+        # Race when its track has one; its track record keeps every mode.
+        first = ctr_first_modes(track["modes"]) if ctr_first and type(track["modes"]) is list else None
         require(track["modes"] == [m for m in MODES if m in track["modes"]] and track["capabilities"] == track["modes"]
-                and track["field_size"] == 8 and sorted(entry["modes"]) == sorted(track["modes"]),
+                and track["field_size"] == 8
+                and (entry["modes"] == first if first is not None else sorted(entry["modes"]) == sorted(track["modes"])),
                 "unsupported track modes or capabilities")
         if track["origin"] == "retail":
             i = track["retail_id"]
@@ -2190,7 +2409,8 @@ def validate(plan):
         for tier in relics or ():
             relic_counts[tier] = relic_counts.get(tier, 0) + 1
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
-                                  packages.get(track.get("package_id")), capability, item_boxes, relics):
+                                  packages.get(track.get("package_id")), capability, item_boxes, relics,
+                                  ctr_first=first is not None):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
     # A track raced only in cups is checked like a standalone one (#133 PR 5).
@@ -2253,6 +2473,14 @@ def validate(plan):
                                               boss_hits):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
+    # Wumpa Shop slots (job J11): the last 5 x N checks, in hub and slot
+    # order; each price lies in its hub's band (the draw is not recomputed).
+    if shop is not None:
+        shop_checks = content_wumpa.expected_checks(plan, shop)
+        require(plan["checks"][-len(shop_checks):] == shop_checks, "Wumpa Shop checks are not the last checks in order")
+        for check in shop_checks:
+            require(check["location"] not in expected_checks, "duplicate check identity")
+            expected_checks[check["location"]] = check
     require(not entries or any(p["entry_id"] is not None and p["entrance_req"] == "free" for p in pads.values()),
             "content layout has no playable starting pad")
     require(checks == expected_checks, "check registry or route ownership mismatch")
@@ -2261,7 +2489,7 @@ def validate(plan):
     # Lettersanity modes 2 and 3 pool one copy of each letter item they use.
     letter_items = plan_letter_items(plan)
     # Pool-only packs (#133 PR 4a): one row per pack item, its count from item_packs.
-    pack_rows = {content_item_pool.ITEMS[name]: count for name, count in pack_counts(packs).items()}
+    pack_rows = {pack_code(name): count for name, count in pack_counts(packs).items()}
     # Character unlocks (#133 PR 4b): one row per unlock racer.
     pack_rows.update({content_item_pool.ITEMS[name]: 1 for name in (unlock_names(racers) if racers else ())})
     # Capability packs (#133 PR 4c): the boost and stat chains.
@@ -2312,14 +2540,24 @@ def validate(plan):
     gem = content_bosses.gem_term_of(goal)
     require(gem is None or (gem["items"] == gems and 1 <= gem["count"] <= len(gems)),
             "goal must count selected distinct base Gem colours")
-    if boss_record is None:
+    # The Wumpa goal arm (job J11): 1 to 5000 banked fruit, last in the AND.
+    require(wumpa_arm is None or (type(wumpa_arm["count"]) is int
+                                  and 1 <= wumpa_arm["count"] <= content_wumpa.GOAL_MAX),
+            "the Wumpa goal arm counts 1 to 5000 banked fruit")
+    if boss_record is None and wumpa_arm is None:
         require(gem is not None and goal == gem, "goal must count selected distinct base Gem colours")
     else:
         try:
-            want = content_bosses.goal(boss_record, gem)
+            want = plan_goal(boss_record, gem, wumpa_arm["count"] if wumpa_arm else 0)
         except OptionError:
             want = None
-        require(goal == want, "goal does not match the bosses record")
+        require(goal == want, "goal does not match the bosses record and the Wumpa goal")
+    # The Wumpa Shop's `excluded` supply, and a bank for the shop and goal.
+    content_wumpa.check_supply(shop, item_plan, int(
+        boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)))
+    content_wumpa.check_income(plan)
+    require(not (boss_record or {}).get("gauntlet") or any(e["id"] == content_cups.gem_entry_id(PURPLE_GEM_CUP) for e in plan["entries"]),
+            "bosses.gauntlet needs the Purple Gem Cup")
     require("pad_requirements" in plan or not drawn, "a stage 1 record needs the pad_requirements record")
     if "pad_requirements" in plan:
         content_requirements.check_record(plan, drawn, later, manual, [
@@ -2386,10 +2624,12 @@ def restore(world, slot_data):
     check_relic_progression(co)
     check_racer_envelope(plan, co)
     check_box_envelope(plan, co)
+    check_spoiler_envelope(plan, co)
     capability = plan.get("capability", {})
     content_capability.check_envelope(capability, co)
     racers = plan.get("racers")
-    names = {**ITEM_BY_CODE, **plan_letter_items(plan)}
+    names = {**ITEM_BY_CODE, **plan_letter_items(plan),
+             **{code: name for name, code in SPOILER_PACK_CODES.items()}}
     rows = tuple(content_item_pool.ItemRow(name=names[r["item"]], **r) for r in plan["items"]["rows"])
     world.ctr_content_items = content_item_pool.ItemPlan(rows, **{k: v for k, v in plan["items"].items() if k != "rows"})
     world.ctr_content_plan = plan
@@ -2467,6 +2707,7 @@ def restore(world, slot_data):
     world.options.progressive_starting_wumpa.value = packs.get("progressive_starting_wumpa", 0)
     world.options.turbo_grant.value = int("turbo_grant" in packs)
     world.options.tizi_helper.value = int("tizi_helper" in packs)
+    world.options.spoiler_items.value = int("warp_pad_preview" in packs)
     world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
     world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
@@ -2487,4 +2728,7 @@ def restore(world, slot_data):
     if global_checks.get("hit_character"):
         from . import hit_character
         hit_character.restore_from_wire(world, slot_data, hit_character.CONTENT_PLAN_FALLBACK_KEYS,
-                                        content_global_checks.cup_indices(plan))
+                                        content_global_checks.cup_indices(plan), content_bosses.identity(plan))
+    # Job J11: the five Wumpa options and adventure_structure from the plan.
+    content_wumpa.restore_options(world, plan)
+    world.options.adventure_structure.value = int(plan.get("adventure_structure") == CTR_FIRST)

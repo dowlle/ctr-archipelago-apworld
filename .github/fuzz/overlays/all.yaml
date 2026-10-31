@@ -1,0 +1,15 @@
+# Every feature of row 5 at once, for the tracker arms.
+    bosses: {enabled: true, cups: {min: 0, max: 2}}
+  adventure_structure: {classic: 1, ctr_first: 1}
+  boss_track_shuffle: {true: 1, false: 1}
+  boss_opponent_shuffle: true
+  boss_kit_shuffle: true
+  boss_oxide_in_pool: {true: 1, false: 1}
+  oxide_attack_profile: {retail: 1, all_compatible: 1}
+  purple_cup_boss_gauntlet: {true: 1, false: 1}
+  wumpa_shop_slots: {0: 1, 5: 1, 10: 2}
+  wumpa_shop_progression: {allowed: 1, excluded: 1}
+  goal_wumpa: {0: 1, 300: 1, 2500: 1}
+  spoiler_items: {true: 1, false: 1}
+  box_locations: {true: 1, false: 1}
+  hit_character: {true: 1, false: 1}
