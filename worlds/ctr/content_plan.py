@@ -1927,15 +1927,14 @@ def create_regions(world):
     def stage_term(route):
         """The term of a route's later race, or None for a pad's first race. A
         later race counts only once the pad's first race is won, on every pad
-        (ruled 2026-10-30), and a stage-2 mode also needs its requirement. The
-        proof checks sit on this pad, so their own terms stand for reaching them."""
+        (ruled 2026-10-30), and a stage-2 mode also needs its requirement."""
         pad = pad_by_id[route["own_pad_id"]]
         gates = pad["mode_gates"]
         if not gates or gates[0]["mode"] == route["mode"]:
             return None
         rid = next((g["requirement_id"] for g in gates if g["mode"] == route["mode"] and g["stage"] == 2), None)
         terms = [predicate_term(world, req[rid])] if rid is not None else []
-        won = [check_term(checks_by_code[code]) for code in first_race(pad)]
+        won = [logic_terms.Reached(placed, code, pad["id"]) for code in first_race(pad)]
         if won:
             terms.append(won[0] if len(won) == 1 else logic_terms.Or(*won))
         return logic_terms.all_of(*terms) if terms else None
@@ -1951,27 +1950,6 @@ def create_regions(world):
         letters = logic_terms.HasEach(names, player, "has_all")
         return letters if term is None else logic_terms.And(term, letters)
 
-    check_terms = {}
-
-    def check_term(check):
-        """A check's rule on its pad. A check with several routes on its pad
-        (per-track Wumpa) is open when any of them is: a stage-1 route opens it
-        with the pad. ctr_first: first place pays the Trophy Race check, and
-        first place with the letters also pays the CTR Token check, so the CTR
-        Token needs everything the Trophy Race check needs."""
-        code = check["location"]
-        if code not in check_terms:
-            tests = [stage_term(r) for r in check["routes"]]
-            term = None
-            if all(test is not None for test in tests):
-                term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
-            term = with_boost(with_letters(term, check), check) or logic_terms.TRUE
-            on_pad = by_pad.get(check["routes"][0]["own_pad_id"], ())
-            if check["kind"] == "ctr" and merged_race(on_pad):
-                term = logic_terms.And(term, check_term(next(c for c in on_pad if c["kind"] == "trophy")))
-            check_terms[code] = term
-        return check_terms[code]
-
     # Boss garages (#133 PR 6): one region per encounter, behind its garage's
     # hub gate and its own requirement, with its check and companion event.
     # With the Wumpa goal on, the N. Oxide race that finishes the seed waits for
@@ -1980,6 +1958,9 @@ def create_regions(world):
         content_bosses.install(world, plan, menu, predicate_term, with_boost,
                                content_wumpa.INCOME if content_wumpa.goal_arm(plan["goal"]) else None)
     by_pad = {}
+    # Locations by code: Universal Tracker renames custom tracks' locations, so
+    # a rule holds the Location, not its name.
+    placed = {}
     shared = []
     legs = []
     checks_by_code = {check["location"]: check for check in plan["checks"]}
@@ -2011,8 +1992,21 @@ def create_regions(world):
         logic_terms.set_term(menu.connect(region, pad["id"]), logic_terms.all_of(*gates))
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
-            logic_terms.set_term(location, check_term(check))
+            placed[check["location"]] = location
+            # A check with several routes on its pad (per-track Wumpa) is open
+            # when any of them is: a stage-1 route opens it with the pad.
+            tests = [stage_term(r) for r in check["routes"]]
+            term = None
+            if all(test is not None for test in tests):
+                term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
+            logic_terms.set_term(location, with_boost(with_letters(term, check), check) or logic_terms.TRUE)
             region.locations.append(location)
+        # ctr_first: first place pays the Trophy Race check, and first place
+        # with the letters also pays the CTR Token check, so the CTR Token needs
+        # everything the Trophy Race check needs. Read at call time, never looser.
+        if merged_race(by_pad.get(pad["id"], ())):
+            by_kind = {checks_by_code[location.address]["kind"]: location for location in region.locations}
+            logic_terms.and_term(by_kind["ctr"], logic_terms.Reached(placed, by_kind["trophy"].address, pad["id"]))
     # Itemsanity and Hit Character checks (#133 PR 4d) take their rules in
     # set_rules, once every trigger location exists.
     world.ctr_global_routes = []

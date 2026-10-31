@@ -79,7 +79,7 @@ class TestContentCtrFirst(unittest.TestCase):
     def test_plan_key_feature_and_entry_modes(self):
         plan = self.plan
         self.assertEqual(plan["adventure_structure"], "ctr_first")
-        self.assertEqual(plan["required_features"][-1], "ctr_first_v1")
+        self.assertEqual(plan["required_features"][-2:], ["ctr_first_v1", "pad_client_v1"])
         for track_id in ("retail:3", "retail:16"):
             self.assertEqual(entry_of(plan, track_id)["modes"], ["ctr", "relic"])
             self.assertEqual(track_of(plan, track_id)["modes"], ["trophy", "ctr", "relic"])

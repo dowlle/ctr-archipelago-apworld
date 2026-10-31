@@ -310,6 +310,29 @@ class Local(Term):
         raise WinLogicExportError(f"CTR win_logic: {self.what} has no wire form")
 
 
+class Reached(Term):
+    """`Location.can_reach(state)` of a check on the same plan pad as the rule
+    that asks: the pad's first race won. The location is looked up in `placed`
+    at call time, as it may not exist yet. Both sit behind one pad entrance, so
+    the wire form is that check's own rule, read when the block is built. A
+    `Ref` cannot carry this: a race pad's later check may be a ref target too."""
+
+    def __init__(self, placed, code: int, pad_id: str):
+        self.placed = placed
+        self.code = code
+        self.pad_id = pad_id
+
+    def _build(self):
+        return lambda state, placed=self.placed, code=self.code: placed[code].can_reach(state)
+
+    def wire(self, enc):
+        term = term_of(self.placed[self.code])
+        if term is None:
+            from .win_logic import WinLogicExportError
+            raise WinLogicExportError(f"CTR win_logic: pad {self.pad_id} proof {self.code} has no term-backed rule")
+        return term.wire(enc)
+
+
 class EventTerm(Term):
     """`state.has(event)`, on the wire the term that collects the event. Items
     with no id cannot travel, and `resolve` gives what the event stands for."""

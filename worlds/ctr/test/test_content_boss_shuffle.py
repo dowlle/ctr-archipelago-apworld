@@ -299,8 +299,8 @@ class TestContentAll030(unittest.TestCase):
                 assert_complete(self, world)
                 plan = wire["content_plan"]
                 self.assertTrue(content_plan.validate(plan))
-                self.assertEqual(plan["required_features"][-4:],
-                                 ["ctr_first_v1", "boss_opponents_v1", "wumpa_shop_v1", "wumpa_goal_v1"])
+                self.assertEqual(plan["required_features"][-5:],
+                                 ["ctr_first_v1", "boss_opponents_v1", "wumpa_shop_v1", "wumpa_goal_v1", "pad_client_v1"])
                 tracker = make_world({}, seed=999, passthrough=wire)
                 self.assertEqual(tracker.fill_slot_data(), wire)
                 # The regenerated world reasons like the room: the same
