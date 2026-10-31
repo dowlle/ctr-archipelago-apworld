@@ -158,6 +158,25 @@ class TestShopLedger(unittest.TestCase):
                 self.assertFalse(location.item.advancement, location.name)
         self.assertTrue(world.multiworld.can_beat_game())
 
+    def test_an_excluded_shop_slot_counts_once(self):
+        slot = "N. Sanity Beach Shop: Slot 1"
+        o = options(wumpa_shop_slots=2, wumpa_shop_progression="excluded")
+        o["exclude_locations"] = [slot]
+        world = make_world(o, seed=2)
+        self.assertEqual(content_wumpa.check_count(world.ctr_content_plan["wumpa_shop"]), 10)
+
+    def test_only_the_race_that_finishes_the_seed_waits_for_the_fruit(self):
+        for goal, waits, free in (("any_percent", "encounter/garage:4/0", "encounter/garage:4/1"),
+                                  ("101_percent", "encounter/garage:4/1", "encounter/garage:4/0")):
+            world = make_world(options(oxide_goal=goal, goal_wumpa=300, wumpa_shop_slots=0), seed=3, stop_before="pre_fill")
+            mw = world.multiworld
+            state = CollectionState(mw)
+            for item in mw.itempool:
+                state.collect(item, True)
+            self.assertFalse(state.has(content_wumpa.INCOME, 1))
+            self.assertFalse(mw.get_entrance(waits, 1).access_rule(state), goal)
+            self.assertTrue(mw.get_entrance(free, 1).access_rule(state), goal)
+
     def test_exclude_locations_share_the_filler_with_the_shop(self):
         world = make_world(options(wumpa_shop_slots=2, wumpa_shop_progression="excluded"), seed=2)
         need = content_wumpa.non_progression_supply(world.ctr_content_plan["items"])
@@ -215,12 +234,14 @@ class TestSpoilerItems(unittest.TestCase):
         self.assertIn("Warp Pad Preview", [i.name for i in world.multiworld.itempool])
 
     def test_a_reveal_item_alone_overflowing_is_named(self):
-        o = options(spoiler_items=True, wumpa_shop_slots=0, podium_placement_checks=False, character_unlocks=False,
-                    crystal=None)
-        o.pop("crystal")
-        o["item_pool"] = dict(base=dict(trophies=33, relics=dict(sapphire=18, gold=18, platinum=0)))
-        message = refusal(o) or ""
-        self.assertTrue("Spoiler Items" in message or "free checks" in message or not message)
+        def tight(extra, **more):
+            o = options(wumpa_shop_slots=0, oxide_goal="none", bosses_required_goal=1, **more)
+            o["item_pool"] = dict(extra=dict(trophies=extra))
+            return o
+        filler = make_world(tight(0), seed=1).ctr_content_plan["items"]["filler_count"]
+        named = [refusal(tight(extra, spoiler_items=True)) for extra in range(filler, filler + 8)
+                 if refusal(tight(extra)) is None]
+        self.assertTrue(any(message and "Spoiler Items needs" in message for message in named), named)
 
     def test_the_tracker_keeps_the_rows(self):
         world = make_world(options(spoiler_items=True, box_locations=True, color_boxes_by_item=True), seed=1)

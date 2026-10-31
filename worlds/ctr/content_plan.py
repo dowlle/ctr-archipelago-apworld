@@ -1584,8 +1584,11 @@ def generate(world):
               + (", one of them for the Oxide goal check" if oxide_filler else "")
               + ". An excluded check holds only filler. Lower an item_pool count or exclude fewer checks.")
     # The Wumpa Shop's `excluded` needs a non-progression copy per slot, beside the
-    # filler the excluded checks hold.
-    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), excluded + oxide_filler)
+    # filler the other excluded checks hold.
+    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), oxide_filler + len(
+        set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks
+                                          if c["location"] != goal_check and c["location"] not in pins
+                                          and c["kind"] != content_wumpa.KIND}))
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
@@ -1929,8 +1932,8 @@ def create_regions(world):
 
     # Boss garages (#133 PR 6): one region per encounter, behind its garage's
     # hub gate and its own requirement, with its check and companion event.
-    # With the Wumpa goal on, N. Oxide's garage waits for the fruit target
-    # natively (decision 19), so his races also need `Wumpa Income` (J11).
+    # With the Wumpa goal on, the N. Oxide race that finishes the seed waits for
+    # the fruit target natively (decision 19), so it also needs `Wumpa Income`.
     if plan["encounters"]:
         content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check),
                                content_wumpa.INCOME if content_wumpa.goal_arm(plan["goal"]) else None)

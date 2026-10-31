@@ -768,8 +768,8 @@ def install(world, plan, menu, predicate, with_boost, oxide_event=None):
     """Regions, locations and companion events of the plan's encounters
     (content_plan.create_regions). `predicate` builds a requirement test,
     `with_boost` adds a check's boost rank. `oxide_event` names an event
-    item both N. Oxide races also need (`Wumpa Income` with the Wumpa goal
-    on, job J11), or None."""
+    item the N. Oxide race that finishes the seed also needs (`Wumpa Income`
+    with the Wumpa goal on), or None. The other N. Oxide race never waits."""
     from BaseClasses import Location, LocationProgressType, Region
     from .content_plan import LOCATION_BY_CODE
     mw, player = world.multiworld, world.player
@@ -783,7 +783,7 @@ def install(world, plan, menu, predicate, with_boost, oxide_event=None):
         mw.regions.append(region)
         gates = (predicate(world, req[pads[enc["pad_id"]]["entrance_req"]]),
                  predicate(world, req[enc["requirement_id"]]))
-        if oxide_event and enc["pad_id"] == f"garage:{OXIDE_GARAGE}":
+        if oxide_event and enc["completion_location"] == goal_code:
             gates += (lambda state, name=oxide_event: state.has(name, player),)
         menu.connect(region, enc["id"], lambda state, gates=gates: all(g(state) for g in gates))
         code = enc["completion_location"]
