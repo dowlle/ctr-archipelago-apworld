@@ -28,8 +28,11 @@ LOOP = "entry/custom/fixture-loop/2.1"
 
 def global_options(items=True, hits=True, retail=None, modes=("trophy", "ctr", "relic"), **extra):
     options = check_options(rungs=True, modes=modes)
+    # Room for the weapon items and racers: relic checks follow the relic items.
+    options["item_pool"]["base"].update(trophies=0, tokens=dict.fromkeys(("red", "green", "blue", "yellow", "purple"), 0))
     if retail is not None:
         options["content_pool"]["tracks"]["retail"] = retail
+        options["item_pool"]["base"]["relics"] = dict.fromkeys(("sapphire", "gold", "platinum"), len(retail))
     options.update(itemsanity=items, hit_character=hits, character_unlocks=False)
     options.update(extra)
     return options
@@ -98,7 +101,7 @@ class TestItemsanity(unittest.TestCase):
         world = make_world(global_options(hits=False), seed=3)
         plan = world.ctr_content_plan
         self.assertEqual(plan["global_checks"], {"itemsanity": True})
-        self.assertEqual(plan["required_features"][-1], content_global_checks.FEATURE)
+        self.assertIn(content_global_checks.FEATURE, plan["required_features"])
         uses = [c for c in plan["checks"] if c["kind"] == "itemsanity"]
         self.assertEqual([c["location"] for c in uses], list(range(35016000, 35016022)))
         expected = [(e, m) for _p, e, m, _o in race_routes(plan)]
@@ -147,7 +150,17 @@ class TestItemsanity(unittest.TestCase):
         self.assertFalse(loc("Crash Cove: Held 1st").can_reach(bare))
         self.assertTrue(loc("Crash Cove: Held 1st").can_reach(state_with(world, *others, "Missile x3")))
         self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(bare))
+        # Letters are a later race: past the first race, the arm alone decides.
+        plan = world.ctr_content_plan
+        wins = [loc(c["display_name"]) for c in plan["checks"]
+                if c["display_name"].startswith("Papu's Pyramid") and c["kind"] in ("trophy", "relic")]
+        rules = [win.access_rule for win in wins]
+        for win in wins:
+            win.access_rule = lambda _state: True
         self.assertTrue(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Mask")))
+        self.assertFalse(loc("Papu's Pyramid: Letter C").can_reach(state_with(world, *others, "Bomb")))
+        for win, rule in zip(wins, rules):
+            win.access_rule = rule
         # Hot Air Skyway's finish needs USF: no weapon replaces it.
         many = state_with(world, *others, *itemsanity.ITEM_NAMES)
         self.assertFalse(loc("Hot Air Skyway: Trophy Race").can_reach(many))

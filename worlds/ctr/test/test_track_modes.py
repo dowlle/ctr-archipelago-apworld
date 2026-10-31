@@ -14,7 +14,7 @@ from BaseClasses import CollectionState
 from Options import OptionError
 from worlds.AutoWorld import call_all
 
-from .. import content_plan, named_tracks
+from .. import content_plan, named_tracks, sphere0_guard
 from .test_content_plan import make_world, profile_options
 from .test_custom_packages import UNKNOWN, named_fixture
 
@@ -22,8 +22,10 @@ CTR_PACKAGE = "custom/baby-t-park/1.0.2"
 
 
 def mode_pool():
-    """Base items in every counted family, so second-stage draws vary."""
-    return {"base": {"trophies": 6, "relics": {"sapphire": 4, "gold": 3, "platinum": 2},
+    """Base items in every counted family, so second-stage draws vary. Relic
+    Time Trial checks follow these counts, so every Relic Race of the full
+    profiles keeps all three tiers."""
+    return {"base": {"trophies": 6, "relics": {"sapphire": 18, "gold": 18, "platinum": 18},
                      "tokens": {"red": 2, "green": 2, "blue": 1, "yellow": 0, "purple": 0},
                      "gems": ["red", "green", "blue", "yellow", "purple"], "keys": 4}}
 
@@ -85,8 +87,9 @@ class TestModesByCapability(unittest.TestCase):
             make_world(mode_options(custom=[d]))
 
     def test_global_modes_filter_and_overrides_narrow(self):
-        plan = make_world(mode_options(modes=["ctr", "relic"], custom=[],
-                                       overrides={"retail:3": ["relic"]})).ctr_content_plan
+        options = mode_options(modes=["ctr", "relic"], custom=[], overrides={"retail:3": ["relic"]})
+        options["item_pool"]["base"]["trophies"] = 0
+        plan = make_world(options).ctr_content_plan
         by_id = {t["id"]: t["modes"] for t in plan["tracks"]}
         self.assertEqual(by_id.get("retail:3", ["relic"]), ["relic"])
         self.assertTrue(all(m == ["ctr", "relic"] for i, m in by_id.items() if i != "retail:3"))
@@ -103,7 +106,7 @@ class TestModesByCapability(unittest.TestCase):
 
     def test_unsupported_layout_requests_are_refused(self):
         for layout, message in ((dict(merge_trophy_ctr=True), "merged Trophy/CTR race is not built yet"),
-                                (dict(placement="vanilla"), "only shuffle is built yet"),
+                                (dict(placement="some"), "vanilla, shuffle_within_kind or shuffle"),
                                 (dict(stages="three"), "single or two"),
                                 (dict(mode_order="random"), "fixed, per_seed or per_pad")):
             options = mode_options()
@@ -172,18 +175,23 @@ class TestStagesAndOrders(unittest.TestCase):
                 if len(gates) == 1:
                     self.assertNotIn(stage2, records)
                     continue
+                if stage2 not in records:  # nothing held could back one
+                    self.assertTrue(all(g["stage"] == 1 for g in gates))
+                    continue
                 self.assertTrue(all(g["stage"] == 2 and g["requirement_id"] == stage2 for g in gates[1:]))
                 predicate = records[stage2]
                 items = predicate.get("items", [predicate.get("item")])
-                self.assertNotIn(35010014, items)  # never Keys
                 supply = sum(rows[i]["requirement_ceiling"] for i in items)
-                self.assertTrue(1 <= predicate["count"] <= min(content_plan.STAGE2_COUNT_CEILING, supply))
+                ceiling = 4 if 35010014 not in items else supply
+                self.assertTrue(1 <= predicate["count"] <= min(ceiling, supply))
 
     def test_single_stage_uses_the_entrance_gate_for_every_mode(self):
         plan = make_world(mode_options(stages="single")).ctr_content_plan
         self.assertFalse(any(r["id"].startswith("stage2:") for r in plan["requirements"]))
         for pad in plan["pads"]:
-            self.assertTrue(all(g["stage"] == 1 and g["requirement_id"] == "free" for g in pad["mode_gates"]))
+            first = {g["requirement_id"] for g in pad["mode_gates"]}
+            self.assertLessEqual(len(first), 1)
+            self.assertTrue(all(g["stage"] == 1 for g in pad["mode_gates"]))
 
     def test_fixed_order_puts_trophy_first(self):
         plan = make_world(mode_options()).ctr_content_plan
@@ -209,8 +217,14 @@ class TestStagesAndOrders(unittest.TestCase):
         self.assertTrue(all(e["modes"] == ["trophy"] for e in plan["entries"] if e["kind"] == "track"))
         self.assertTrue(all(t["capabilities"] == ["trophy"] for t in plan["tracks"]))
 
-    def test_a_later_mode_needs_its_gate_and_no_earlier_win(self):
-        world = make_world(mode_options(order="per_pad"), seed=3)
+    def test_a_later_mode_needs_its_gate_and_the_first_race_won(self):
+        tested = 0
+        for seed in range(6):
+            tested += self.later_modes_of(seed)
+        self.assertGreater(tested, 0)
+
+    def later_modes_of(self, seed):
+        world = make_world(mode_options(order="per_pad"), seed=seed)
         plan = world.ctr_content_plan
         mw = world.multiworld
         records = {r["id"]: r["predicate"] for r in plan["requirements"]}
@@ -218,7 +232,8 @@ class TestStagesAndOrders(unittest.TestCase):
         tested = 0
         for entry in plan["entries"]:
             pad = pad_of(plan, entry)
-            if pad["entrance_req"] != "free" or len(entry["modes"]) < 2:
+            if (pad["entrance_req"] != "free" or len(entry["modes"]) < 2 or pad["mode_gates"][0]["requirement_id"] != "free"
+                    or f"stage2:{pad['id'].split(':')[1]}" not in records):
                 continue
             predicate = records[f"stage2:{pad['id'].split(':')[1]}"]
             first = [c for c in plan["checks"] if c["routes"][0]["entry_id"] == entry["id"]
@@ -237,8 +252,15 @@ class TestStagesAndOrders(unittest.TestCase):
                     held.collect(world.create_item(content_plan.ITEM_BY_CODE[item]), True)
             for check in later:
                 self.assertTrue(mw.get_location(names[check["location"]], 1).can_reach(held))
+            # The items alone are not enough: without a first race won, nothing.
+            wins = [mw.get_location(names[check["location"]], 1) for check in first if check["kind"] == entry["modes"][0]]
+            if wins:
+                for win in wins:
+                    win.access_rule = lambda state: False
+                for check in later:
+                    self.assertFalse(mw.get_location(names[check["location"]], 1).can_reach(held))
             tested += 1
-        self.assertGreater(tested, 0)
+        return tested
 
 
 class TestTrackerAndForgery(unittest.TestCase):
@@ -332,10 +354,10 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
     """Ruling 2026-10-17: a narrow start under second-stage gates gets one local
     early opener instead of a fill simulation; nothing is precollected."""
 
-    def test_seed_710_places_an_early_key_and_fills(self):
+    def test_a_narrow_start_places_an_early_key_and_fills(self):
         from Fill import distribute_items_restrictive
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=710, stop_before="pre_fill")
+        world = make_world(artifact_244_options(), seed=716, stop_before="pre_fill")
         mw = world.multiworld
         start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
         self.assertLess(len(start), sphere0_guard.NARROW_START_CHECKS)
@@ -347,8 +369,15 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
         self.assertEqual(len(mw.precollected_items[1]), 0)
 
     def test_wide_start_takes_no_early_item(self):
-        world = make_world(artifact_244_options(), seed=711, stop_before="pre_fill")
-        self.assertEqual(world.multiworld.local_early_items[1], {})
+        wide = 0
+        for seed in range(700, 730):
+            world = make_world(artifact_244_options(), seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
+            if len(start) >= sphere0_guard.NARROW_START_CHECKS:
+                wide += 1
+                self.assertEqual(mw.local_early_items[1], {})
+        self.assertGreater(wide, 0)
 
     def test_plan_without_second_stage_gates_takes_no_early_item(self):
         world = make_world(artifact_244_options(stages="single"), seed=710, stop_before="pre_fill")
@@ -356,9 +385,16 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
 
     def test_without_a_key_opener_the_widest_opener_is_chosen(self):
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=710, stop_before="pre_fill")
+        narrow = None
+        for seed in range(700, 760):
+            world = make_world(artifact_244_options(), seed=seed, stop_before="pre_fill")
+            mw = world.multiworld
+            mw.itempool = [item for item in mw.itempool if item.name != "Key"]
+            if sphere0_guard.early_opener(world) is not None:
+                narrow = world
+                break
+        world = narrow
         mw = world.multiworld
-        mw.itempool = [item for item in mw.itempool if item.name != "Key"]
         state = sphere0_guard._base_state(world)
         start = sphere0_guard._reachable_empty(world, state)
         reach = {}

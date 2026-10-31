@@ -35,6 +35,12 @@ by tools/build_named_tracks.py. Blocks 14 and 68 (reserved until a race mode is
 confirmed) and 16 (cortex-vortex, builtin: it maps to the hard-coded Cortex
 Vortex block) are not minted and their numbers are never reused.
 
+MINTED (third step, 2026-10-29): registry commit
+9f61917477b48c59d97862a1ef602239d41533d0 adds blocks 85 to 88 (Sewer Baby Park,
+Sid's House, Specter Station, Tizi Challenge: the new entries of the LRG2Pancho
+pack). The file then holds 86 `mint` entries. The 15 LRG2 revisions of existing
+tracks only add revision ids to their rows.
+
 DATAPACKAGE STABILITY
 
 Every row's complete family registers unconditionally (all LOCATION_OFFSETS

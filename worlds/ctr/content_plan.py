@@ -13,9 +13,12 @@ tracks (#133 PR 4e, content_item_boxes.py), plando_items and item_links
 checked around the framework phases (#133 PR 4f, content_item_pool.py),
 four-leg cups with their Win, sweep and Cup Leg Victory checks (#133 PR 5,
 content_cups.py), boss garages with their encounters and the Oxide and Boss
-goals (#133 PR 6, content_bosses.py), Crystal Challenge entries, and (job J11)
-adventure_structure ctr_first, the Wumpa Shop and the Wumpa goal
-(content_wumpa.py) and Boss Opponent and Kit Shuffle (content_bosses.py).
+goals (#133 PR 6, content_bosses.py), Crystal Challenge entries, pad
+placement and requirements (one generator row 3, content_requirements.py),
+items fixed to their own check (one generator row 4, content_fixed.py), and
+(one generator row 5) adventure_structure ctr_first, the Wumpa Shop and the
+Wumpa goal (content_wumpa.py) and Boss Opponent and Kit Shuffle
+(content_bosses.py).
 Unsupported content and check families fail explicitly while their native
 consumers are developed. This is an internal integration path, not completion
 of the full rewrite.
@@ -31,13 +34,15 @@ from Options import OptionError
 from .Options import DL_SEND_BITS
 
 from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
-               sphere0_guard, traps, warp_pad_rules, wumpa_family)
+               relic_tiers, sphere0_guard, traps, warp_pad_rules, wumpa_family)
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
-from . import (arena_content, content_bosses, content_capability, content_cups, content_global_checks,
-               content_item_boxes, content_wumpa, custom_packages, spoiler_items, tizi_helper, turbo_grant)
+from . import (arena_content, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
+               content_item_boxes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
+               turbo_grant)
 from .Locations import CTR_LOCATION_IDS
+from . import warp_pad_logic
 from .warp_pad_logic import HUB_STATIC
 
 #: Equal to slot_data.SLOT_DATA_SCHEMA: both room shapes share the 0.3.0 step
@@ -50,9 +55,9 @@ MODE_FEATURE = "track_modes_v1"
 MODES = ("trophy", "ctr", "relic")
 #: Second-stage gate record of a physical pad: `stage2:<physical LevelID>`.
 STAGE2_PREFIX = "stage2:"
-#: Highest count a drawn second-stage gate asks for. The legacy generator caps
-#: its stage-2 counts the same way (warp_pad_logic._STAGE2_COUNT_CEILING).
-STAGE2_COUNT_CEILING = 4
+#: With vanilla requirements, Mystery Caves (1 Trophy) and Sewer Speedway (3)
+#: are the pads behind the two open ones.
+VANILLA_NEAR_TROPHIES = 3
 RELIC_TIERS = ("Sapphire", "Gold", "Platinum")
 #: (route award, named-block key, location suffix) of every check a mode owns.
 #: Codes come from the frozen names: retail `<Track>: <suffix>`, named blocks by
@@ -62,6 +67,15 @@ MODE_CHECKS = {
     "ctr": (("win_letters", "ctr_token", "CTR Token Challenge"),),
     "relic": tuple((tier.lower(), "relic_" + tier.lower(), tier + " Time Trial") for tier in RELIC_TIERS),
 }
+#: Relic tier checks follow the item counts (ruled 2026-10-30): a tier's Time
+#: Trial checks exist on as many Relic Races as there are items of the tier,
+#: drawn per seed. The plan's check list says which, as with Lettersanity's
+#: letters. The feature is declared when some Relic Race lacks a tier.
+RELIC_FEATURE = "relic_tier_checks_v1"
+#: The five surface items: ledger rows that add no check and no rule, all five
+#: or none (content_item_pool.resolve).
+SURFACE_FEATURE = "surface_items_v1"
+SURFACE_CODES = frozenset(content_item_pool.ITEMS[name] for name in content_item_pool.SURFACE_NAMES)
 #: Per-track check families (#133 PR 3b), each with its own feature: podium
 #: rungs on a Trophy Race, Reach 10 Wumpa on a Trophy Race or CTR Challenge,
 #: and the C, T and R letters of a CTR Challenge (Lettersanity). The plan's
@@ -324,12 +338,29 @@ def manual_requirements(manual, rows):
     return out
 
 
+def relic_supply(rows):
+    """{tier: base + extra copies} from the ledger's wire rows."""
+    by_code = {row["item"]: row for row in rows}
+    return {tier.lower(): by_code[content_item_pool.ITEMS[f"{tier} Relic"]]["base"]
+            + by_code[content_item_pool.ITEMS[f"{tier} Relic"]]["extra"] for tier in RELIC_TIERS}
+
+
+def relic_races(entries):
+    """Track entries with a Relic Race: the races a tier's checks are drawn on."""
+    return sum(e["kind"] == "track" and "relic" in e["modes"] for e in entries)
+
+
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
-                      global_checks=None, item_boxes=None, bosses=None, ctr_first=False, shop=None, wumpa_goal=False):
+                      global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
+                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
-    # garages (#133 PR 6) after them. The J11 features follow in a fixed
-    # order, each only when present: ctr_first, boss opponents (the bosses
-    # record has `opponent_shuffle`), the Wumpa Shop and the Wumpa goal.
+    # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
+    # and row 4's fixed items. Row 5's features close the list in a fixed order,
+    # each only when present: ctr_first, boss opponents (the bosses record has
+    # `opponent_shuffle`), the Wumpa Shop and the Wumpa goal. `guarded` names the
+    # track of the relic guard, whose Relic Race holds no tier check.
+    races = relic_races(entries)
+    eligible = races - (guarded is not None)
     manual = any(r["id"].startswith("manual:") for r in requirements)
     settings = settings or {}
     return (["content_plan_v1"] + ([MANUAL_FEATURE] if manual else [])
@@ -348,6 +379,13 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_item_boxes.FEATURE] if item_boxes else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
+            + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
+                                                 and content_cups.gem_colour(e["id"]) is not None for e in entries) else [])
+            + ([SURFACE_FEATURE] if any(row["item"] in SURFACE_CODES for row in rows) else [])
+            + ([RELIC_FEATURE] if rows and any(min(count, eligible) < races for count in relic_supply(rows).values())
+               else [])
+            + ([content_requirements.FEATURE] if pad_requirements else [])
+            + ([content_fixed.FEATURE] if fixed else [])
             + ([CTR_FIRST_FEATURE] if ctr_first else [])
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
@@ -505,6 +543,15 @@ def check_envelope_options(co):
               "(2, 1 or 2, true) or Progressive Stats (1, 1 or 2, false) together when present.")
 
 
+def check_relic_progression(co):
+    if "relic_progression" not in co:
+        return
+    value = co["relic_progression"]
+    if (type(value) is not dict or set(value) != {"Sapphire Relic", "Gold Relic", "Platinum Relic"}
+            or any(type(flag) is not bool for flag in value.values())):
+        error("ctr_options.relic_progression must name exactly the three relic tiers with boolean values.")
+
+
 def box_envelope(world):
     """Item Box Locations (#133 PR 4e): `box_locations` and the seed's
     `color_boxes_by_item`, present exactly when the plan has its `item_boxes`
@@ -594,16 +641,21 @@ def lock_eligible(plan):
     """Pad ids, in physical order, that may carry a racer lock (#133 PR 4b).
 
     An occupied normal pad that does not open at the start: its hub gate needs
-    Keys, or its manual stage-1 rule (#463) is not met by the items the slot
-    starts with (from-pool and additional starts in the item ledger). Pads that
-    open at the start never take a lock, so the starting checks are the same
-    with locks on or off (the legacy rule in characters.eligible_lock_pads:
-    never a pad left free). Read from the plan alone."""
+    Keys, or its stage-1 rule is not met by the items the slot starts with
+    (from-pool and additional starts in the item ledger). Pads that open at the
+    start never take a lock, so the starting checks are the same with locks on
+    or off, and neither do the four N. Sanity Beach race pads (the legacy rule
+    in characters.eligible_lock_pads). Vanilla requirements lock no pad. Read
+    from the plan alone."""
+    record = plan.get("pad_requirements")
+    if record and record["mode"] == "vanilla":
+        return []
     held = {row["item"]: row["start_from_pool"] + row["start_additional"] for row in plan["items"]["rows"]}
     req = {row["id"]: row["predicate"] for row in plan["requirements"]}
     out = []
     for pad in plan["pads"]:
-        if pad["kind"] != "normal" or pad["entry_id"] is None:
+        if (pad["kind"] != "normal" or pad["entry_id"] is None
+                or (record and pad_physical(pad) in content_requirements.BOOTSTRAP_PADS)):
             continue
         first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
         opens = pad["entrance_req"] == "free" and all(predicate_met(req[rid], held) for rid in first)
@@ -677,12 +729,33 @@ def track_location(track, key, suffix):
     return name, CTR_LOCATION_IDS[name]
 
 
-def mode_checks(track, mode):
-    """[(award, location name, code, display suffix)] a track's mode owns."""
+def mode_checks(track, mode, relics=None):
+    """[(award, location name, code, display suffix)] a track's mode owns.
+    `relics` narrows a Relic Race to the tiers it holds a check for."""
     out = []
     for award, key, suffix in MODE_CHECKS[mode]:
+        if mode == "relic" and relics is not None and award not in relics:
+            continue
         name, code = track_location(track, key, suffix)
         out.append((award, name, code, suffix))
+    return out
+
+
+def plan_relics(plan, track):
+    """The tiers a track's Relic Race holds a check for, read from the plan."""
+    present = {check["location"] for check in plan["checks"]}
+    return {award for award, _name, code, _suffix in mode_checks(track, "relic") if code in present}
+
+
+def draw_relic_checks(world, tracks, totals):
+    """{track id: tiers it holds a check for}. Each tier takes as many of the
+    seed's Relic Races as `totals` holds copies of it, drawn at random, capped
+    by the Relic Races in the seed. Items beyond that land on other checks. A
+    tier with a copy for every race takes no draw."""
+    out = {track: set() for track in tracks}
+    for tier, total in totals.items():
+        for track in tracks if total >= len(tracks) else relic_tiers.draw_tier(world, tracks, total):
+            out[track].add(tier)
     return out
 
 
@@ -783,7 +856,7 @@ def route(entry_id, mode, pad_id, award):
 
 
 def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None,
-                 item_boxes=None, ctr_first=False):
+                 item_boxes=None, relics=None, ctr_first=False):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -800,11 +873,14 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     last, each with a route per mode of the entry and its legacy box terms
     (content_item_boxes).
 
-    A ctr_first entry (`ctr_first`, job J11) lists its checks in the classic
-    fixed order of its track's modes; the Trophy Race check routes from the
-    CTR Challenge with the CTR award (`win_letters`), the podium rungs from
-    the CTR Challenge by finishing place, and every other family from the
-    modes the entry has."""
+    `relics` is the set of tiers this track's Relic Race holds a check for
+    (draw_relic_checks), all three when None.
+
+    A ctr_first entry (`ctr_first`) lists its checks in the classic fixed order
+    of its track's modes. The Trophy Race check and the podium rungs route from
+    the CTR Challenge: first place pays the Trophy Race check, first place with
+    the letters also pays the CTR Token check (ruling 2026-10-29). Every other
+    family routes from the modes the entry has."""
     title = room_title(track)
     settings = settings or {}
 
@@ -815,9 +891,7 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     race_mode = (lambda mode: "ctr" if mode == "trophy" else mode) if ctr_first else (lambda mode: mode)
     out = []
     for mode in ([m for m in MODES if m in track["modes"]] if ctr_first else modes):
-        for award, _name, code, suffix in mode_checks(track, mode):
-            if ctr_first and mode == "trophy":
-                award = MODE_CHECKS["ctr"][0][0]
+        for award, _name, code, suffix in mode_checks(track, mode, relics):
             out.append(check(code, mode, suffix, [(race_mode(mode), award)]))
         if mode == "trophy":
             for key in settings.get("podium_rungs", ()):
@@ -870,37 +944,13 @@ def global_wumpa_check(routes):
 def mode_gates(modes, first_requirement, stages, physical):
     """The pad's mode gates: the first mode uses the entrance requirement; with
     two stages the others share `stage2:<physical>`, otherwise they use the
-    entrance requirement too (Wayfinder ticket 16, 2026-09-22)."""
+    entrance requirement too (Wayfinder ticket 16, 2026-09-22). Every later mode
+    also needs the first race won (create_regions, stage_gate)."""
     gates = [dict(mode=modes[0], stage=1, requirement_id=first_requirement)]
     for mode in modes[1:]:
         gates.append(dict(mode=mode, stage=2, requirement_id=f"{STAGE2_PREFIX}{physical}") if stages == "two"
                      else dict(mode=mode, stage=1, requirement_id=first_requirement))
     return gates
-
-
-def draw_stage2(world, rows):
-    """One second-stage gate predicate from the base supply.
-
-    Concrete counted items with a base copy, plus an Any family when two or
-    more of its items have one; never Keys, which already gate the hubs. The
-    count is 1 up to STAGE2_COUNT_CEILING and never above the base supply
-    (`requirement_ceiling`), so a gate cannot ask for items the seed lacks.
-    Returns None when the seed has no eligible base item."""
-    by_name = {row.name: row for row in rows}
-    candidates = [(name, (name,)) for name in content_item_pool.COUNTED_NAMES
-                  if name != "Key" and by_name[name].requirement_ceiling > 0]
-    for family, names in SUM_FAMILIES.items():
-        eligible = tuple(n for n in names if by_name[n].requirement_ceiling > 0)
-        if len(eligible) >= 2:
-            candidates.append((family, eligible))
-    if not candidates:
-        return None
-    label, names = world.random.choice(candidates)
-    supply = sum(by_name[n].requirement_ceiling for n in names)
-    count = world.random.randint(1, min(STAGE2_COUNT_CEILING, supply))
-    if label in SUM_FAMILIES:
-        return dict(op="sum", items=[by_name[n].item for n in names], count=count)
-    return dict(op="count", item=by_name[label].item, count=count)
 
 
 def crystal_selection(world, raw):
@@ -981,8 +1031,9 @@ def generate(world):
     layout = closed(o.pad_layout.value, ("placement", "stages", "mode_order", "merge_trophy_ctr"), "pad_layout")
     stages = layout.get("stages", "two")
     mode_order = layout.get("mode_order", "fixed")
-    if layout.get("placement", "shuffle") != "shuffle":
-        error("pad_layout.placement: only shuffle is built yet; vanilla placement is pending.")
+    placement = layout.get("placement", "shuffle")
+    if placement not in content_requirements.PLACEMENTS:
+        error("pad_layout.placement must be vanilla, shuffle_within_kind or shuffle.")
     if stages not in ("single", "two"):
         error("pad_layout.stages must be single or two.")
     if mode_order not in ("fixed", "per_seed", "per_pad"):
@@ -1069,8 +1120,9 @@ def generate(world):
         # One uniform draw among the feasible (cups, crystals) pairs (#133 PR
         # 5), never one count drawn first and the other trimmed.
         legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
+        fixed_legs = content_cups.fixed_legs(cup_spec, candidates)
         pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
-                                            len(required) - len(chosen_arenas), legs_other, legs_custom)
+                                            len(required) - len(chosen_arenas), legs_other, legs_custom, fixed_legs)
         if not pairs:
             repeats = cup_spec["repeats"]
             error(f"no cup and crystal counts fit: cups.count {cup_spec['bounds'][0]} to {cup_spec['bounds'][1]}, "
@@ -1079,7 +1131,10 @@ def generate(world):
                   f"Cortex Vortex leg tracks, custom_legs {cup_spec['custom_legs'][0]} to "
                   f"{cup_spec['custom_legs'][1]} per cup (repeats within a cup "
                   f"{'on' if repeats['within_cup'] else 'off'}, across cups "
-                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads. No content count was changed.")
+                  f"{'on' if repeats['across_cups'] else 'off'}), and 27 normal pads"
+                  + (f", with cups.tracks off and tracks.retail leaving {len(fixed_legs)} of the five Gem Cups "
+                     "their original tracks" if fixed_legs is not None else "")
+                  + ". No content count was changed.")
         cup_count, arena_count = world.random.choice(pairs)
     if len(chosen_arenas)>arena_count:
         error('required arena entries exceed crystals.count; no content count was changed.')
@@ -1092,10 +1147,10 @@ def generate(world):
     chosen += chosen_arenas
     cups = []
     if cup_count:
-        # Cups take their legs from the seed's tracks and a name from the pool
-        # (#133 PR 5); they are seated with the other entries.
+        # The first five are the Gem Cups; a sixth cup onward takes a name
+        # from the pool (#133 PR 5). They are seated with the other entries.
         cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
-                                      bool(o.one_lap_cups.value))
+                                      bool(o.one_lap_cups.value), fixed_legs)
     # Room titles of the seed's custom tracks, also those raced only as cup legs.
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:
@@ -1105,20 +1160,66 @@ def generate(world):
         if "named_block" not in track:
             track["room_title"] = titles[track["custom_slot"]]
     chosen += cups
-    world.random.shuffle(chosen)
-    registry = pad_registry()
-    world.random.shuffle(registry)
     manual = manual_rules(o)
-    if manual:
-        # Reserve every named physical seat for selected content, then keep the
-        # other seats in their shuffled order. A rule never disappears because
-        # its seat drew empty, and no content or item is added to fit it.
-        if len(manual) > len(chosen):
-            error(f"warp_pad_rules names {len(manual)} pads, but only {len(chosen)} "
-                  "entries are selected; name fewer pads or select more content. "
-                  "No content or items were added.")
-        registry = ([seat for seat in registry if seat[0] in manual]
-                    + [seat for seat in registry if seat[0] not in manual])
+    unlock_mode = int(o.warppad_unlock_requirements.value)
+    if unlock_mode and not warp_pad_logic.effective_custom_weights(world)["Trophy"]:
+        error("requirement_weights Trophy must stay above 0: at the start the simulated player only holds Trophies.")
+    # Reserve every named physical seat for selected content, then keep the
+    # other seats in their shuffled order. A rule never disappears because its
+    # seat drew empty, and no content or item is added to fit it.
+    if len(manual) > len(chosen):
+        error(f"warp_pad_rules names {len(manual)} pads, but only {len(chosen)} "
+              "entries are selected; name fewer pads or select more content. "
+              "No content or items were added.")
+    settings = family_settings(o)
+    capability = content_capability.settings(o)
+    held = starting_counts(o)
+    # Items fixed to their check (one generator row 4). Nothing is drawn.
+    fixed = content_fixed.settings(o, boss_record, [cup["gem_cup"] for cup in cups if cup.get("gem_cup") is not None])
+
+    def opens_at_start(seat):
+        # Hub gate free, and a manual rule or the pad's vanilla requirement met
+        # by the real start. Random pads are settled by the free subset below.
+        physical, _hub, keys = seat
+        rule = (content_requirements.vanilla_rule(physical) if unlock_mode == 0 else manual.get(physical))
+        return keys == 0 and rule_met(rule, held)
+
+    def seat_reach(seat):
+        # 2: opens at the start. 1: a vanilla pad a few Trophies behind it.
+        if opens_at_start(seat):
+            return 2
+        rule = content_requirements.vanilla_rule(seat[0]) if unlock_mode == 0 else None
+        return int(seat[2] == 0 and rule is not None and rule[0] == "Trophy" and rule[1] <= VANILLA_NEAR_TROPHIES)
+
+    def start_checks(item):
+        # Checks a pad's content opens with no items: the first race and its
+        # rungs that need no boost rank. Modes in their fixed order are enough
+        # to judge a start; the seed's real start is measured in generate_basic.
+        if not is_track(item):
+            if "gems" in fixed and item.get("gem_cup") is not None:
+                return 0
+            return 0 if capability.get("boost_mode") and "cup_index" in item else 1
+        if not capability.get("boost_mode"):
+            count = 1 + len(settings.get("podium_rungs", ()))
+        else:
+            package = package_by_id.get(item.get("package_id"))
+            terms = [("trophy", "win")] + [("podium", key) for key in settings.get("podium_rungs", ())]
+            count = sum(not content_capability.check_boost(item, kind, award, capability, package, None)
+                        for kind, award in terms)
+        # A fixed Gem Cup opens nothing, and a drawn mode order can put a race
+        # with one check first, so the other open pad may be all the start has.
+        return min(count, 1) if "gems" in fixed and mode_order != "fixed" else count
+
+    first_key_floor = content_fixed.FIRST_KEY_CHECKS if unlock_mode == 0 and "keys" in fixed else 0
+
+    def needs_own_gem(physical, item):
+        return (unlock_mode == 0 and "gems" in fixed and physical == content_fixed.GEM_PAD
+                and item.get("gem_cup") is not None)
+
+    chosen, registry = content_requirements.seat_content(world, chosen, pad_registry(), placement, manual,
+                                                         len(settings.get("podium_rungs", ())),
+                                                         seat_reach if unlock_mode == 0 else None, start_checks,
+                                                         needs_own_gem, first_key_floor)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
@@ -1127,18 +1228,11 @@ def generate(world):
     # empty one, until enough open seats hold content. A layout that already
     # has enough takes no draw here, so its seed is unchanged.
     need = min(len(chosen), sphere0_guard.MIN_STARTING_CHECKS)
-    held = starting_counts(o)
-
-    def opens_at_start(seat):
-        # Hub gate free, and a manual rule on this seat met by the real start.
-        physical, _hub, keys = seat
-        return keys == 0 and (physical not in manual or rule_met(manual[physical], held))
-
     while sum(opens_at_start(seat) for seat in registry[:len(chosen)]) < need:
         # A named seat is never exchanged, so its rule stays where it was set.
         gated = [i for i in range(len(chosen))
-                 if registry[i][2] != 0 and registry[i][0] not in manual]
-        empty = [i for i in range(len(chosen), len(registry)) if registry[i][2] == 0]
+                 if not opens_at_start(registry[i]) and registry[i][0] not in manual]
+        empty = [i for i in range(len(chosen), len(registry)) if opens_at_start(registry[i])]
         if not gated or not empty:
             if manual:
                 error(f"warp_pad_rules leave only "
@@ -1152,7 +1246,6 @@ def generate(world):
     # Per-track check families (#133 PR 3b). Lettersanity modes 1 and 2 draw
     # letters_per_track letters per CTR Challenge here, before the ledger is
     # sized, in pad order; nothing is drawn when Lettersanity is off.
-    settings = family_settings(o)
     letters = {}
     if settings.get("lettersanity") in (1, 2):
         for index, track in enumerate(chosen):
@@ -1165,12 +1258,23 @@ def generate(world):
             for i in letter_layout(track, settings, letters.get(index, ()))[1]:
                 name, code = letter_item(track, i)
                 letter_packs[name] = code
+    # Relic tier checks follow the item counts (ruled 2026-10-30), so a tier is
+    # drawn before the ledger is sized, among the tracks raced as a Relic Race.
+    # With vanilla requirements and Gems fixed, the Relic Race on the physical
+    # five-Gem pad holds no tier check (content_fixed); the item counts stay.
+    guarded = next((chosen[i]["id"] for i in range(len(chosen)) if unlock_mode == 0 and "gems" in fixed
+                    and registry[i][0] == content_fixed.GEM_PAD and is_track(chosen[i])
+                    and "relic" in chosen[i]["modes"]), None)
+    relics = draw_relic_checks(world, [t["id"] for t in chosen if is_track(t) and "relic" in t["modes"]
+                                       and t["id"] != guarded],
+                               content_item_pool.relic_totals(o.item_pool.value))
+    if guarded is not None:
+        relics[guarded] = set()
     # Cups (#133 PR 5): the leg tracks' records, and the sweep check switch.
     track_records = {t["id"]: t for t in candidates}
     sweep = bool(o.cup_sweep_checks.value) and bool(cup_count)
     # Every check exists before the item ledger is sized; mode order and the
-    # second-stage gates only decide which race and gate reaches each one.
-    capability = content_capability.settings(o)
+    # pad requirements only decide which race and gate reaches each one.
     # Item Box Locations (#133 PR 4e): per-track box checks.
     item_boxes = content_item_boxes.settings(o)
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
@@ -1203,7 +1307,8 @@ def generate(world):
         boss_opponents = content_bosses.draw_encounters(world, boss_record, boss_venues, boss_racers,
                                                         boss_final_racer, dict(boss_custom))
     check_count = sum(len(track_checks(t, "entry/" + t["id"], "pad:0", t["modes"], settings, letters.get(index, ()),
-                                       package_by_id.get(t.get("package_id")), item_boxes=item_boxes))
+                                       package_by_id.get(t.get("package_id")), item_boxes=item_boxes,
+                                       relics=relics.get(t["id"])))
                       if is_track(t)
                       else len(content_cups.checks(content_cups.entry(t), "pad:0", track_records, None, None,
                                                    sweep)) if "cup_index" in t
@@ -1247,10 +1352,27 @@ def generate(world):
     selected.update(content_capability.item_counts(capability))
     # Itemsanity (#133 PR 4d): one row per weapon item.
     selected.update(content_global_checks.item_counts(global_checks))
+    # Boss garages (#133 PR 6): the Oxide goal location holds filler only
+    # (issue #27, excluded from progression), so the ledger keeps one filler
+    # slot for it, as the legacy rung sizer reserves one. The surface items
+    # stay out of that slot and of the slots a player's exclude_locations need.
+    oxide_filler = (boss_record is not None
+                    and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL))
+    # Fixed items hold their checks first, so the ledger sizes what is left. An
+    # excluded check that holds one needs no filler.
+    base_counts, extra_counts = content_item_pool.normalize(o.item_pool.value)
+    pins = content_fixed.placements(fixed, base_counts,
+                                    {name: base_counts[name] + extra_counts[name]
+                                     - o.start_inventory_from_pool.value.get(name, 0) for name in base_counts})
+
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
             o.item_pool.value, check_count, starts=starts,
             additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
+            locked=content_fixed.locked_copies(pins), locked_checks=len(pins),
+            surface=content_item_pool.SURFACE_NAMES,
+            filler_reserve=int(oxide_filler) + len(set(o.exclude_locations.value)
+                                                   - {LOCATION_BY_CODE[code] for code in pins}),
             **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
                if chosen else {}))
     try:
@@ -1270,16 +1392,13 @@ def generate(world):
             error(f"Spoiler Items needs more checks for {' and '.join(reveal)}, which add no "
                   "check of their own. Add checks or turn off Spoiler Items.")
         raise
-    # Boss garages (#133 PR 6): the Oxide goal location holds filler only
-    # (issue #27, excluded from progression), so the ledger keeps one filler
-    # slot for it, as the legacy rung sizer reserves one.
-    if (boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)
-            and world.ctr_content_items.filler_count < 1):
+    if oxide_filler and world.ctr_content_items.filler_count < 1:
         error("the Oxide goal check holds only filler, but the item pool fills every check: "
               f"{check_count} checks for {check_count} selected copies. Lower an item_pool count or extra, or add "
               "content, so one filler slot is left. Your settings were not changed.")
     # The Wumpa Shop's `excluded` needs a non-progression copy per slot.
-    content_wumpa.check_supply(shop, world.ctr_content_items.wire())
+    content_wumpa.check_supply(shop, world.ctr_content_items.wire(), int(
+        boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)))
     # adventure_structure: ctr_first (job J11): every track entry whose
     # track has a Trophy Race and a CTR Challenge runs the CTR Challenge first
     # and has no Trophy Race; it takes no mode-order draw (decision 14). Any
@@ -1295,39 +1414,72 @@ def generate(world):
     # draw, so a Trophy-only plan draws nothing here.
     multi = [index for index in range(len(chosen))
              if len(chosen[index].get("modes", ())) > 1 and index not in first_modes]
-    seed_order = list(MODES)
-    if mode_order == "per_seed" and multi:
-        world.random.shuffle(seed_order)
     # With Lettersanity 2 or 3 a CTR Challenge needs letter items, so it is
     # never a pad's first mode when the pad has another (ruling 2026-10-17):
     # a CTR-first start would open no check. A fixed or per-seed order moves
     # it one place back; a per-pad order puts it at a uniformly drawn later
     # place. Seeds without those Lettersanity modes draw exactly as before.
     ctr_last = settings.get("lettersanity") in (2, 3)
-    entry_modes = {}
-    for index in multi:
-        modes = list(chosen[index]["modes"])
-        if mode_order == "per_pad":
-            world.random.shuffle(modes)
+
+    def draw_mode_order():
+        seed_order = list(MODES)
+        if mode_order == "per_seed" and multi:
+            world.random.shuffle(seed_order)
+        # A Relic Race with no tier check is not a pad's first mode either: no check
+        # proves its win, and a Perfect check is more than a win. The CTR rule wins
+        # on a pad with only those two modes, whose later race then counts on its
+        # items alone.
+        out = {}
+        for index in multi:
+            modes = list(chosen[index]["modes"])
+            if mode_order == "per_pad":
+                world.random.shuffle(modes)
+            else:
+                modes.sort(key=seed_order.index)
+            if modes[0] == "relic" and not relics.get(chosen[index]["id"]):
+                modes.append(modes.pop(0))
             if ctr_last and modes[0] == "ctr":
-                modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
-        else:
-            modes.sort(key=seed_order.index)
-            if ctr_last and modes[0] == "ctr":
-                modes[0], modes[1] = modes[1], modes[0]
-        entry_modes[index] = modes
-    entry_modes.update(first_modes)
-    stage2 = {}
-    if stages == "two":
-        for index in sorted(set(multi) | {i for i, modes in first_modes.items() if len(modes) > 1}):
-            drawn = draw_stage2(world, world.ctr_content_items.rows)
-            if drawn is not None:
-                stage2[registry[index][0]] = drawn
+                if mode_order == "per_pad":
+                    modes.insert(world.random.randint(1, len(modes) - 1), modes.pop(0))
+                else:
+                    modes[0], modes[1] = modes[1], modes[0]
+            out[index] = modes
+        out.update(first_modes)
+        return out
+
+    def first_key_checks(orders):
+        # Checks open before a fixed first Key: the first race of the pads
+        # seat_content calls near the start.
+        total = 0
+        for index, item in enumerate(chosen):
+            if not seat_reach(registry[index]):
+                continue
+            if not is_track(item):
+                total += start_checks(item)
+                continue
+            modes = orders.get(index, item["modes"])
+            total += sum(any(r["mode"] == modes[0] for r in c["routes"]) and not c.get("boost")
+                         for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings, letters.get(index, ()),
+                                               package_by_id.get(item.get("package_id")), capability, item_boxes,
+                                               relics.get(item["id"]), ctr_first=index in first_modes))
+        return total
+
+    # Mode order (Wayfinder ticket 16): fixed Trophy, CTR, Relic; one order for
+    # the whole seed; or one per pad. Only entries with two or more modes take a
+    # draw, so a Trophy-only plan draws nothing here. A drawn order that leaves a
+    # fixed first Key short of checks draws again; the best one stands.
+    entry_modes = draw_mode_order()
+    if first_key_floor and mode_order != "fixed" and multi:
+        best = first_key_checks(entry_modes)
+        for _ in range(content_requirements.PLACEMENT_REDRAWS):
+            if best >= first_key_floor:
+                break
+            orders = draw_mode_order()
+            if first_key_checks(orders) > best:
+                entry_modes, best = orders, first_key_checks(orders)
     entries, pads, checks = [], [], []
     requirements = [dict(id="free", predicate=dict(op="always"))]
     requirements += [dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)]
-    gate_for = {physical: "free" if rule is None else f"manual:{physical}"
-                for physical, rule in manual.items()}
     for index, (physical, hub, keys) in enumerate(registry):
         pad = dict(id=f"pad:{physical}", hub_id=f"hub:{hub}", kind="normal", entry_id=None,
                    entrance_req=f"keys:{keys}" if keys else "free", mode_gates=[], racer_lock=None)
@@ -1336,21 +1488,17 @@ def generate(world):
             entry_id = "entry/" + track["id"]
             crystal='arena_id' in track
             cup = "cup_index" in track
-            first = gate_for.get(physical, 'free')
             if cup:
                 entry = content_cups.entry(track)
                 entry_id = entry["id"]
-                gates = content_cups.mode_gates(first)
             elif crystal:
                 entry=dict(id=entry_id,kind='crystal',arena_id=track['arena_id'],target=20,
                            time_limit_ticks=arena_content.TIMERS[track['arena_id']])
-                gates=[dict(mode='crystal',stage=1,requirement_id=first)]
             else:
                 modes = entry_modes.get(index, track["modes"])
                 entry = dict(id=entry_id, kind='track', track_id=track['id'], modes=modes, merged=False)
-                gates = mode_gates(modes, first, "two" if physical in stage2 else "single", physical)
             entries.append(entry)
-            pad.update(entry_id=entry_id,mode_gates=gates)
+            pad.update(entry_id=entry_id)
             if cup:
                 checks.extend(content_cups.checks(entry, pad["id"], track_records, capability, package_by_id, sweep))
             elif crystal:
@@ -1358,7 +1506,8 @@ def generate(world):
             else:
                 checks.extend(track_checks(track, entry_id, pad['id'], entry['modes'], settings,
                                            letters.get(index, ()), package_by_id.get(track.get("package_id")),
-                                           capability, item_boxes, ctr_first=index in first_modes))
+                                           capability, item_boxes, relics.get(track["id"]),
+                                           ctr_first=index in first_modes))
         pads.append(pad)
     standalone = [t for t in chosen if is_track(t)]
     plan_tracks = standalone + cup_only_tracks(standalone, entries, track_records)
@@ -1388,10 +1537,12 @@ def generate(world):
             if record["id"] not in have:
                 have.add(record["id"])
                 plan_tracks.append(record)
-        garage_reqs = content_bosses.draw_requirements(world, boss_record, world.ctr_content_items.rows)
+        garage_reqs = content_fixed.draw_garages(world, boss_record, world.ctr_content_items.rows, unlock_mode == 0,
+                                                 pins, pads)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
-            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents)
+            {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
+            content_requirements.MODES[unlock_mode])
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
@@ -1403,24 +1554,60 @@ def generate(world):
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
                          kind="garage", entry_id=None, entrance_req=gate, mode_gates=[], racer_lock=None))
     assert len(checks) == check_count
+    # Archipelago fills an excluded check from filler alone. The names that are
+    # checks of this seed count; the ledger's reserve above is an upper bound.
+    goal_check = content_bosses.goal_location(boss_record) if oxide_filler else None
+    excluded = len(set(o.exclude_locations.value) & {LOCATION_BY_CODE[c["location"]] for c in checks
+                                                     if c["location"] != goal_check and c["location"] not in pins})
+    if excluded + oxide_filler > world.ctr_content_items.filler_count:
+        error(f"exclude_locations names {excluded} checks of this seed and the item pool leaves "
+              f"{world.ctr_content_items.filler_count} filler slots"
+              + (", one of them for the Oxide goal check" if oxide_filler else "")
+              + ". An excluded check holds only filler. Lower an item_pool count or exclude fewer checks.")
     if manual:
         requirements += manual_requirements(manual, world.ctr_content_items.rows)
         world._ctr_pad_rules = {key: manual[lid] for lid, key in PAD_KEY_BY_LEVEL_ID.items()
                                 if lid in manual}
+    # Pad requirements (one generator row 3), once every check, the garages and
+    # the ledger exist: the reference placement needs them all.
+    by_name = {row.name: row for row in world.ctr_content_items.rows}
+    pad_modes = {pad_physical(pad): next(e for e in entries if e["id"] == pad["entry_id"]).get("modes", ())
+                 for pad in pads if pad["entry_id"] is not None}
+    density_off = stages == "single" or not o.two_stage_density.value
+    if unlock_mode == 0:
+        stage1, stage2 = content_requirements.vanilla_requirements(pad_modes, by_name, density_off)
+    else:
+        stage1, stage2 = draw_pad_requirements(world, pads, pad_modes, entries + boss_entries, checks, encounters,
+                                               boss_requirements, manual, by_name, unlock_mode, density_off,
+                                               oxide_filler and goal_check, pins, boss_record)
+    requirements += [dict(id=f"{content_requirements.STAGE1_PREFIX}{physical}", predicate=stage1[physical])
+                     for physical in sorted(stage1)]
+    gate_for = {physical: "free" if rule is None else f"manual:{physical}" for physical, rule in manual.items()}
+    gate_for.update({physical: f"{content_requirements.STAGE1_PREFIX}{physical}" for physical in stage1})
+    for pad in pads:
+        if pad["entry_id"] is not None:
+            physical = pad_physical(pad)
+            pad["mode_gates"] = pad_gates(next(e for e in entries if e["id"] == pad["entry_id"]),
+                                          gate_for.get(physical, "free"), physical in stage2, physical)
     requirements += [dict(id=f"{STAGE2_PREFIX}{physical}", predicate=stage2[physical]) for physical in sorted(stage2)]
     if o.gems_required_goal.value > len(gem_ids):
         error("Gem goal exceeds the selected distinct base Gem colours.")
     requirements += boss_requirements
     entries += boss_entries
+    pad_record = dict(mode=content_requirements.MODES[unlock_mode])
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in plan_tracks)],
                 tracks=plan_tracks, entries=entries, pads=pads, encounters=encounters, requirements=requirements,
                 checks=checks, items=world.ctr_content_items.wire(),
                 goal=plan_goal(boss_record, gem_term, wumpa_goal),
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
-                                                    global_checks,item_boxes,boss_record,ctr_first,shop,
-                                                    bool(wumpa_goal)))
+                                                    global_checks,item_boxes,boss_record,
+                                                    world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
+                                                    ctr_first, shop, bool(wumpa_goal)),
+                pad_requirements=pad_record)
     if ctr_first:
         plan["adventure_structure"] = CTR_FIRST
+    if fixed:
+        plan["fixed_items"] = fixed
     if settings:
         plan["track_checks"] = settings
     if packs:
@@ -1489,6 +1676,70 @@ def plan_goal(record, gem_term, wumpa=0):
     if not terms:
         error("no goal: set gems_required_goal, an Oxide or Boss goal, or goal_wumpa.")
     return terms[0] if len(terms) == 1 else dict(op="all", terms=terms)
+
+
+def pad_physical(pad):
+    return int(pad["id"].split(":")[1])
+
+
+def pad_gates(entry, first, two_stages, physical):
+    """A pad's mode gates from its entry and stage-1 requirement id."""
+    if entry["kind"] == content_cups.KIND:
+        return content_cups.mode_gates(first)
+    if entry["kind"] == "crystal":
+        return [dict(mode="crystal", stage=1, requirement_id=first)]
+    return mode_gates(entry["modes"], first, "two" if two_stages else "single", physical)
+
+
+def draw_pad_requirements(world, pads, pad_modes, entries, checks, encounters, boss_requirements, manual, by_name,
+                          mode, density_off, goal_check, pins, boss_record):
+    """({physical: stage 1 predicate}, {physical: stage 2 predicate}) of the two
+    random modes, from the simulated playthrough over the reference placement
+    (content_requirements). A manual pad keeps its rule at stage 1; a pad whose
+    two stages came out equal has no second stage."""
+    skip = set(world.options.exclude_locations.value)
+    skip = {code for code in LOCATION_BY_CODE if LOCATION_BY_CODE[code] in skip} | ({goal_check} if goal_check else set())
+    relics = {name: by_name[name].requirement_ceiling for name in warp_pad_rules.RELICS}
+    multi = sum(len(modes) > 1 for modes in pad_modes.values())
+
+    def simulate():
+        stands = content_requirements.stand_ins(world, checks, entries, pads, pad_modes,
+                                                world.ctr_content_items.rows, skip, pins)
+        view = content_requirements.ReferenceWorld(world, pads, pad_modes, checks, encounters,
+                                                   {row["id"]: row["predicate"] for row in boss_requirements},
+                                                   stands, relics, ITEM_BY_CODE, frozenset(pins))
+        return content_requirements.draw(view, mode, density_off)
+
+    drawn = simulate()
+    # A fixed Key behind a garage the simulated player cannot open leaves every
+    # later pad without a second stage. Such a roll draws the garages again; the
+    # roll with the most second stages stands.
+    if "Key" in pins.values() and not density_off:
+        garages = [row for row in boss_requirements if row["id"].startswith("boss:")]
+        seconds = lambda result: sum(pair[1] is not None for pair in result.values())
+        best, kept = drawn, [row["predicate"] for row in garages]
+        for _ in range(content_fixed.GARAGE_REDRAWS if seconds(drawn) < multi else 0):
+            for row, predicate in zip(garages, content_fixed.draw_garages(
+                    world, boss_record, world.ctr_content_items.rows, False, pins, pads).values()):
+                row["predicate"] = predicate
+            drawn = simulate()
+            if seconds(drawn) > seconds(best):
+                best, kept = drawn, [row["predicate"] for row in garages]
+            if seconds(best) >= multi:
+                break
+        for row, predicate in zip(garages, kept):
+            row["predicate"] = predicate
+        drawn = best
+    stage1, stage2 = {}, {}
+    for title, (first, second) in drawn.items():
+        physical = next(lid for lid, key in PAD_KEY_BY_LEVEL_ID.items() if key == title)
+        if physical in manual:
+            first = manual[physical]
+        elif first:
+            stage1[physical] = content_requirements.rule_predicate(first, by_name)
+        if second and second != first and len(pad_modes[physical]) > 1:
+            stage2[physical] = content_requirements.rule_predicate(second, by_name)
+    return stage1, stage2
 
 
 def is_track(item):
@@ -1616,11 +1867,35 @@ def create_regions(world):
             return state.has_any(arm[1], player)
         return has_boost if rule is None else (lambda state, rule=rule: rule(state) and has_boost(state))
 
+    def first_race(pad):
+        """Codes of the checks that prove the pad's first race was won, those
+        of its first mode. Empty when the mode holds no check of its own (a
+        Relic Race with no tier check): then only the items count, as on
+        native. Empty too on a pad with one race, and on a plan from before
+        `pad_requirements_v1`."""
+        modes = [g["mode"] for g in pad["mode_gates"]]
+        if len(modes) < 2 or "pad_requirements" not in plan:
+            return ()
+        return tuple(c["location"] for c in by_pad.get(pad["id"], ()) if c["kind"] == modes[0])
+
     def stage_gate(route):
-        """The second-stage requirement id of a route's mode, or None."""
-        gates = {g["mode"]: g["requirement_id"] for g in pad_by_id[route["own_pad_id"]]["mode_gates"]
-                 if g["stage"] == 2}
-        return gates.get(route["mode"])
+        """The test of a route's later race, or None for a pad's first race. A
+        later race counts only once the pad's first race is won, on every pad
+        (ruled 2026-10-30), and a stage-2 mode also needs its requirement."""
+        pad = pad_by_id[route["own_pad_id"]]
+        gates = pad["mode_gates"]
+        if not gates or gates[0]["mode"] == route["mode"]:
+            return None
+        rid = next((g["requirement_id"] for g in gates if g["mode"] == route["mode"] and g["stage"] == 2), None)
+        items = predicate(world, req[rid]) if rid is not None else None
+        won = first_race(pad)
+        if items is None and not won:
+            return None
+
+        def test(state, items=items, won=won):
+            return ((items is None or items(state))
+                    and (not won or any(placed[code].can_reach(state) for code in won)))
+        return test
 
     def with_letters(rule, check):
         names = letters_needed.get(check["location"])
@@ -1638,6 +1913,9 @@ def create_regions(world):
         content_bosses.install(world, plan, menu, predicate, lambda rule, check: with_boost(rule, check),
                                content_wumpa.INCOME if content_wumpa.goal_arm(plan["goal"]) else None)
     by_pad = {}
+    # Locations by code: Universal Tracker renames custom tracks' locations, so
+    # a rule holds the Location, not its name.
+    placed = {}
     shared = []
     legs = []
     checks_by_code = {check["location"]: check for check in plan["checks"]}
@@ -1658,8 +1936,8 @@ def create_regions(world):
         region = Region(pad["entry_id"], player, mw)
         mw.regions.append(region)
         # The pad opens on its hub gate and its stage-1 requirement (every
-        # stage-1 gate of a pad shares one record). A stage-2 mode's checks
-        # also need that mode's own gate; no mode needs a win in another one.
+        # stage-1 gate of a pad shares one record). A later mode's checks also
+        # need the first race won and, on a stage-2 mode, that mode's own gate.
         first = [g["requirement_id"] for g in pad["mode_gates"] if g["stage"] == 1][:1]
         gates = [predicate(world, req[rid]) for rid in [pad["entrance_req"]] + first]
         # A racer lock (#133 PR 4b) is ANDed onto the pad's own gates, never in
@@ -1674,12 +1952,12 @@ def create_regions(world):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
             if check["kind"] == "ctr":
                 ctr_location = location
+            placed[check["location"]] = location
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
-            later = [stage_gate(r) for r in check["routes"]]
+            tests = [stage_gate(r) for r in check["routes"]]
             rule = None
-            if all(rid is not None for rid in later):
-                tests = [predicate(world, req[rid]) for rid in dict.fromkeys(later)]
+            if all(test is not None for test in tests):
                 rule = tests[0] if len(tests) == 1 else (lambda state, tests=tuple(tests): any(t(state) for t in tests))
             rule = with_boost(with_letters(rule, check), check)
             if rule is not None:
@@ -1702,8 +1980,7 @@ def create_regions(world):
         location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
         opens = []
         for r in check["routes"]:
-            rid = stage_gate(r)
-            opens.append((r["entry_id"], predicate(world, req[rid]) if rid is not None else None))
+            opens.append((r["entry_id"], stage_gate(r)))
         if check["kind"] in ("itemsanity", "hit"):
             world.ctr_global_routes.append((check, location, [(entry, test, r) for (entry, test), r
                                                               in zip(opens, check["routes"])]))
@@ -1743,6 +2020,7 @@ def create_regions(world):
 
 def create_items(world):
     plan = world.ctr_content_items
+    world._ctr_relic_prog = relic_progression_map(world)
     names = plan.selected_names()
     names += traps.draw_trap_names(world, plan.trap_count)
     names += [wumpa_family.draw_filler_name(world) for _ in range(plan.filler_count - plan.trap_count)]
@@ -1750,9 +2028,48 @@ def create_items(world):
     # item links, #133 PR 4f) can be audited against them.
     world.ctr_created_items = [world.create_item(name) for name in names]
     world.multiworld.itempool.extend(world.ctr_created_items)
+    # Fixed items (one generator row 4) go straight on their own checks.
+    world.ctr_fixed_items = content_fixed.place(world, content_fixed.plan_placements(world.ctr_content_plan),
+                                                LOCATION_BY_CODE)
     # Main.py has granted these starts. Consume only this world's local removal
     # request; retain the original configuration for spoiler/Tracker diagnostics.
     world.options.start_inventory_from_pool.value = {}
+
+
+def relic_progression_map(world):
+    """Classify relic tiers from the plan's gates and required access."""
+    tiers = {name: True for name in ("Sapphire Relic", "Gold Relic", "Platinum Relic")}
+    passthrough = getattr(world.multiworld, "re_gen_passthrough", {}).get(world.game)
+    if passthrough:
+        wire = (passthrough.get("ctr_options") or {}).get("relic_progression")
+        return dict(wire) if wire is not None else tiers
+    plan = world.ctr_content_plan
+    if plan.get("pad_requirements", {}).get("mode") != "vanilla":
+        return tiers
+
+    codes = {content_item_pool.ITEMS[name]: name for name in tiers}
+    needed = set()
+
+    def read(node):
+        if node["op"] == "count":
+            if node["item"] in codes:
+                needed.add(codes[node["item"]])
+        elif node["op"] in ("sum", "distinct"):
+            needed.update(codes[code] for code in node["items"] if code in codes)
+        elif node["op"] in ("all", "any"):
+            for term in node["terms"]:
+                read(term)
+
+    final_goal = plan.get("bosses", {}).get("oxide_goal") == content_bosses.GOAL_FINAL
+    access_full = world.options.accessibility.value == 0
+    final_required = access_full or final_goal
+    for row in plan["requirements"]:
+        if row["id"] != "oxide:final" or final_required:
+            read(row["predicate"])
+    read(plan["goal"])
+    if final_required:
+        needed.add("Sapphire Relic")
+    return {name: name in needed for name in tiers}
 
 
 def set_rules(world):
@@ -1809,6 +2126,10 @@ def wire(world):
     # plan's fallback, and the envelope flag that admits it.
     hit = dict(hit_character_encounters=copy.deepcopy(world.ctr_hit_character_encounters)) \
         if plan.get("global_checks", {}).get("hit_character") else {}
+    relic_progression = getattr(world, "_ctr_relic_prog", None) or relic_progression_map(world)
+    relic_option = ({"relic_progression": relic_progression}
+                    if plan.get("pad_requirements", {}).get("mode") == "vanilla"
+                    and not all(relic_progression.values()) else {})
     return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
                 ctr_options=dict(schema_version=SCHEMA, world_version=world.world_version.as_simple_string(), content_plan=True,
                                  goal=-1, **goal_envelope(plan),
@@ -1820,7 +2141,7 @@ def wire(world):
                                  progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
                                  hit_character=bool(plan.get("global_checks", {}).get("hit_character")),
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
-                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world)),
+                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world), **relic_option),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
 
 
@@ -1880,7 +2201,8 @@ def validate(plan):
     expected_requirements.update({f"keys:{n}": dict(id=f"keys:{n}", predicate=dict(op="count", item=35010014, count=n)) for n in range(1, 5)})
     manual = {rid: row for rid, row in requirements.items() if rid.startswith("manual:")}
     later = {rid: row for rid, row in requirements.items() if rid.startswith(STAGE2_PREFIX)}
-    require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later
+    drawn = {rid: row for rid, row in requirements.items() if rid.startswith(content_requirements.STAGE1_PREFIX)}
+    require({rid: row for rid, row in requirements.items() if rid not in manual and rid not in later and rid not in drawn
              and not rid.startswith(("boss:", "oxide:"))}
             == expected_requirements, "unsupported or changed physical hub requirements")
     settings = check_settings(plan["track_checks"]) if "track_checks" in plan else {}
@@ -1890,14 +2212,17 @@ def validate(plan):
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
-    # Job J11: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
+    # Row 5: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
     ctr_first = plan.get("adventure_structure") == CTR_FIRST
     require("adventure_structure" not in plan or ctr_first, "adventure_structure must be ctr_first when present")
     shop = content_wumpa.check_settings(plan["wumpa_shop"]) if "wumpa_shop" in plan else None
     wumpa_arm = content_wumpa.goal_arm(plan["goal"])
+    fixed = content_fixed.check_settings(plan) if "fixed_items" in plan else {}
+    guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
-                                                         global_checks,item_boxes,boss_record,ctr_first,shop,
-                                                         wumpa_arm is not None),
+                                                         global_checks,item_boxes,boss_record,plan['items']['rows'],
+                                                         plan.get("pad_requirements"), fixed, guarded,
+                                                         ctr_first, shop, wumpa_arm is not None),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -1938,7 +2263,11 @@ def validate(plan):
         else:
             require(pad["kind"] == "normal" and pad["entry_id"] in entries, "invalid normal entry")
             physical = pad_id.split(":")[1]
-            gate = f"manual:{physical}" if f"manual:{physical}" in manual else "free"
+            gate = (f"manual:{physical}" if f"manual:{physical}" in manual else
+                    f"{content_requirements.STAGE1_PREFIX}{physical}"
+                    if f"{content_requirements.STAGE1_PREFIX}{physical}" in drawn else "free")
+            require(f"manual:{physical}" not in manual or f"{content_requirements.STAGE1_PREFIX}{physical}" not in drawn,
+                    "a manual rule and a drawn requirement on one pad")
             entry = entries[pad['entry_id']]
             if entry['kind'] == 'crystal':
                 expected_gates = [dict(mode='crystal', stage=1, requirement_id=gate)]
@@ -1953,13 +2282,14 @@ def validate(plan):
     require(len(occupied) == len(set(occupied)) and set(occupied) | boss_entry_ids == set(entries)
             and not set(occupied) & boss_entry_ids, "entry occurrence ownership mismatch")
     require(all(f"pad:{rid.split(':')[1]}" in pads and pads[f"pad:{rid.split(':')[1]}"]["entry_id"] is not None
-                for rid in manual), "manual requirement without an occupied pad")
+                for rid in {**manual, **drawn}), "manual requirement without an occupied pad")
     # A second-stage record belongs to exactly one pad, which uses it for its
     # later modes (checked by the gate comparison above).
     require(all(any(g["requirement_id"] == rid and g["stage"] == 2 for g in pads.get(f"pad:{rid[len(STAGE2_PREFIX):]}", {}).get("mode_gates", ()))
                 for rid in later), "second-stage requirement without a pad that uses it")
     used_tracks, used_packages, slots, retail_ids = set(), set(), set(), set()
     expected_checks = {}
+    relic_counts = {}
     # Generic-slot room titles are recomputed from the plan's own tracks; a
     # forged title (a retail or named track's name, or a repeated one) differs.
     try:
@@ -1970,7 +2300,8 @@ def validate(plan):
         expected_titles = {}
     arena_ids=set()
     # Cups (#133 PR 5): sweeps exist for every cup or none; leg laps share one
-    # switch; leg tracks need no standalone entry.
+    # switch; leg tracks need no standalone entry. The Gem Cups come first.
+    content_cups.check_lineup(plan["entries"])
     sweep = any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"])
     shortened, cup_names, leg_tracks = None, set(), set()
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
@@ -2053,8 +2384,12 @@ def validate(plan):
         require(len(locations) == (settings["letters_per_track"] if settings.get("lettersanity") in (1, 2)
                                    and "ctr" in track["modes"] else 0),
                 "letter checks do not match letters_per_track")
+        relics = plan_relics(plan, track) if "relic" in track["modes"] else None
+        require(track["id"] != guarded or not relics, "the Relic Race on the guarded five-Gem pad holds a tier check")
+        for tier in relics or ():
+            relic_counts[tier] = relic_counts.get(tier, 0) + 1
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
-                                  packages.get(track.get("package_id")), capability, item_boxes,
+                                  packages.get(track.get("package_id")), capability, item_boxes, relics,
                                   ctr_first=first is not None):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
@@ -2143,23 +2478,37 @@ def validate(plan):
     # Itemsanity (#133 PR 4d): one row per weapon item.
     pack_rows.update({content_item_pool.ITEMS[name]: count
                       for name, count in content_global_checks.item_counts(global_checks).items()})
+    # The five surface items are pooled together or not at all.
+    surface = set(rows) & SURFACE_CODES
+    require(surface in (set(), SURFACE_CODES), "the five surface items are pooled together")
+    pack_rows.update(dict.fromkeys(surface, 1))
     require(len(rows) == len(item_plan["rows"]) and set(rows) == {content_item_pool.ITEMS[n] for n in content_item_pool.COUNTED_NAMES}
             | set(letter_items) | set(pack_rows), "item family registry mismatch")
+    # A tier's checks follow its copies, capped by the Relic Races in the seed.
+    races = relic_races(plan["entries"]) - (guarded is not None)
+    require(all(relic_counts.get(tier, 0) == min(total, races) for tier, total in relic_supply(item_plan["rows"]).items()),
+            "relic tier checks do not follow the item counts")
     require(all(rows[code]["base"] == 1 and rows[code]["extra"] == 0 for code in letter_items),
             "a letter item is pooled once")
     require(all(rows[code]["base"] == count and rows[code]["extra"] == 0 for code, count in pack_rows.items()),
-            "a pack, racer, capability or weapon item row disagrees with its record")
+            "a pack, racer, capability, weapon or surface item row disagrees with its record")
+    # Fixed items (one generator row 4): the ledger's locked fields are what the
+    # record pins, recomputed from it.
+    pins = content_fixed.plan_placements(plan)
+    locked = {content_item_pool.ITEMS[name]: count for name, count in content_fixed.locked_copies(pins).items()}
+    require(set(pins) <= set(checks), "a fixed item without its check")
     for row in rows.values():
         require(row["start_from_pool"] <= 10000 and row["start_additional"] <= 10000,
                 "starting count exceeds the framework ItemDict bound")
-        require(row["locked_selected"] == 0 and row["remaining"] == row["base"] + row["extra"] - row["start_from_pool"],
+        require(row["locked_selected"] == locked.get(row["item"], 0)
+                and row["remaining"] == row["base"] + row["extra"] - row["start_from_pool"] - row["locked_selected"],
                 "invalid remaining selected count")
         require(row["receipt_cap"] == row["base"] + row["extra"] + row["start_additional"] and
                 row["requirement_ceiling"] == row["base"], "invalid receipt cap or base requirement ceiling")
     require(rows[35010014]["base"] == 4, "four base Keys are mandatory")
     require(all(rows[i]["base"] in (0, 1) for i in range(35010009, 35010014)), "base Gems are distinct colours")
-    require(item_plan["coded_checks"] == len(checks) and item_plan["locked_checks"] == 0 and
-            sum(r["remaining"] for r in rows.values()) + item_plan["filler_count"] == len(checks) and
+    require(item_plan["coded_checks"] == len(checks) and item_plan["locked_checks"] == len(pins) and
+            sum(r["remaining"] for r in rows.values()) + item_plan["filler_count"] + len(pins) == len(checks) and
             item_plan["trap_count"] <= item_plan["filler_count"], "item/check capacity mismatch")
     # Boss garages (#133 PR 6): the excluded Oxide goal check needs one filler slot.
     require(boss_record is None or boss_record["oxide_goal"] not in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)
@@ -2184,9 +2533,15 @@ def validate(plan):
             want = None
         require(goal == want, "goal does not match the bosses record and the Wumpa goal")
     # The Wumpa Shop's `excluded` supply, and a bank for the shop and goal.
-    content_wumpa.check_supply(shop, item_plan)
+    content_wumpa.check_supply(shop, item_plan, int(
+        boss_record is not None and boss_record["oxide_goal"] in (content_bosses.GOAL_ANY, content_bosses.GOAL_FINAL)))
     content_wumpa.check_income(plan)
-    for rid, row in {**manual, **later}.items():
+    require("pad_requirements" in plan or not drawn, "a stage 1 record needs the pad_requirements record")
+    if "pad_requirements" in plan:
+        content_requirements.check_record(plan, drawn, later, manual, [
+            content_item_pool.ItemRow(name=ITEM_BY_CODE.get(r["item"], str(r["item"])), **r) for r in item_plan["rows"]],
+            require)
+    for rid, row in {**manual, **drawn, **later}.items():
         predicate_ = row["predicate"]
         if predicate_["op"] == "count":
             item = predicate_["item"]
@@ -2244,6 +2599,7 @@ def restore(world, slot_data):
                                    for key, value in goal_envelope(plan).items()):
         error("goal envelope disagrees with the plan")
     check_envelope_options(co)
+    check_relic_progression(co)
     check_racer_envelope(plan, co)
     check_box_envelope(plan, co)
     check_spoiler_envelope(plan, co)
@@ -2262,6 +2618,7 @@ def restore(world, slot_data):
     world.options.start_inventory.value = {r.name: r.start_additional for r in rows if r.start_additional}
     # The goal and the boss options (#133 PR 6) follow the plan.
     content_bosses.restore_options(world, plan)
+    content_fixed.restore_options(world, plan)
     world.options.crystalsanity.value=int(any(c['kind']=='crystal_pickup' for c in plan['checks']))
     world.options.include_battle_arenas.value=int(any(e['kind']=='crystal' for e in plan['entries']))
     world.options.include_arcade_arenas.value=int(any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']))
@@ -2271,12 +2628,18 @@ def restore(world, slot_data):
     if "death_link_send" in co:
         world.options.death_link_send.value = {key for key, bit in DL_SEND_BITS.items()
                                                if co["death_link_send"] & bit}
+    else:
+        # The tracking player's own YAML must not leak into a seed that omitted it.
+        world.options.death_link_send.value = {"follow_death_link"}
     world.options.deathlink_amnesty.value = co.get("deathlink_amnesty", 1)
     # Optional legacy classifiers must not read the tracking player's unrelated YAML.
     # Character packs (#133 PR 4b) come from the plan and the envelope.
     world.options.character_unlocks.value = int(racers is not None)
     world.options.remove_playable_oxide.value = int(bool(racers and racers["remove_playable_oxide"]))
     world.options.racer_locked_pads.value = racers["requested_locks"] if racers else 0
+    if "pad_requirements" in plan:
+        world.options.warppad_unlock_requirements.value = {name: value for value, name in content_requirements.MODES.items()}[
+            plan["pad_requirements"]["mode"]]
     world.options.racer_locked_pads.legacy_boolean_auto = False
     world.ctr_racer_locks = plan_racer_locks(plan)
     world.ctr_racer_lock_counts = {"requested": racers["requested_locks"] if racers else 0,

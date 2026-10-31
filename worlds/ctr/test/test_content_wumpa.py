@@ -121,6 +121,9 @@ class TestContentWumpaShop(unittest.TestCase):
         cases = dict(
             price_high=lambda p: last(p).update(price=1000),
             price_low=lambda p: last(p).update(price=1),
+            # Inside Citadel City's band at 150 percent (60 to 120), but no
+            # whole band price scales to 61 (40 gives 60, 41 gives 62).
+            price_unreachable=lambda p: last(p).update(price=61),
             unlock=lambda p: last(p).update(unlock_banked=last(p)["unlock_banked"] + 1),
             route=lambda p: last(p)["routes"].append(copy.deepcopy(p["checks"][0]["routes"][0])),
             owner=lambda p: last(p).update(owner="hub:26"),
@@ -175,6 +178,16 @@ class TestContentWumpaRules(unittest.TestCase):
         # The same plan with `allowed` generates.
         options["wumpa_shop_progression"] = "allowed"
         self.assertTrue(make_world(options, seed=7, stop_before="generate_basic").ctr_content_plan["wumpa_shop"])
+
+    def test_oxide_reserve_counts_against_the_shop(self):
+        """The excluded Oxide goal check keeps one filler copy, so the shop
+        cannot also count it (J11 review round 1)."""
+        record = dict(slots=1, prices=100, progression="excluded", hints=True)
+        items = dict(filler_count=5, rows=[])
+        content_wumpa.check_supply(record, items)
+        with self.assertRaises(OptionError):
+            content_wumpa.check_supply(record, items, reserved=1)
+        content_wumpa.check_supply(record, dict(filler_count=6, rows=[]), reserved=1)
 
     def test_forged_supply_refuses(self):
         plan = copy.deepcopy(make_world(shop_options(slots=25), seed=7).ctr_content_plan)

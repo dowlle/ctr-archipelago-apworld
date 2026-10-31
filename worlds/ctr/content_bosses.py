@@ -61,15 +61,16 @@ encounter; an empty garage keeps `free`, so plans without bosses are
 unchanged. The encounter's own requirement:
 
   * `boss:<g>`: the mixed-item garage roll (#133 PR 6b, ruling 2026-10-23,
-    the 2026-09-01 garage requirement design): one received-item family per garage, Trophy (always
-    exactly four) or any other counted family (a Relic tier, a Token or Gem
-    colour, Any Relic, Any CTR Token, Any Gem, Keys), never free. The count
-    is drawn from a band of the base supply set by
+    the 2026-09-01 garage requirement design): one received-item family per garage, Trophies or
+    any other counted family (a Relic tier, a Token or Gem colour, Any Relic,
+    Any CTR Token, Any Gem, Keys), never free. The count is drawn from a band of the base supply set by
     `content_pool.bosses.requirement_level` (`standard`, `high` default,
     `very_high`, `chaotic`) and the garage's depth (`garage_band`); a family
     an earlier garage took is rerolled once (variety bias). Keys ask more
-    than the garage's own hub Key gate and at most three. Native validates
-    the shape and the base supply, it does not redraw (`check_garage_requirement`);
+    than the garage's own hub Key gate and at most three. Vanilla pad
+    requirements ask 4, 8, 12 and 16 Trophies instead (one generator row 3).
+    Native validates the shape and the base supply, it does not redraw
+    (`check_garage_requirement`);
   * N. Oxide's Challenge: `free`, or `oxide:first` with the goal's companion
     terms when `oxide_goal` is `any_percent` (the 2026-09-03 contract);
   * N. Oxide's Final Challenge: `oxide:final`, the companion terms when Oxide
@@ -138,7 +139,10 @@ MODES = (MODE, CUP_MODE)
 #: content_pool.bosses.requirement_level (2026-09-01 Wayfinder ruling C3a).
 LEVELS = ("standard", "high", "very_high", "chaotic")
 DEFAULT_LEVEL = "high"
-GARAGE_TROPHIES = 4
+#: The Trophies of each garage with vanilla pad requirements.
+VANILLA_TROPHIES = (4, 8, 12, 16)
+#: A plan without the `pad_requirements` record drew exactly this many.
+OLD_GARAGE_TROPHIES = 4
 GARAGE_KEY_MAX = 3
 #: {level: garage depth 0..3 -> (low, high) fraction of the base supply}.
 #: The first three rise with depth; `chaotic` takes the full range anywhere.
@@ -217,9 +221,6 @@ def settings(world, raw):
         error("no goal: oxide_goal is none or disabled, and bosses_required_goal, gems_required_goal and "
               "goal_wumpa are 0. Set at least one goal condition.")
     optional = int(o.oxide_1_optional.value)
-    if goal == GOAL_FINAL and optional == 2:
-        error("oxide_1_optional: filler places a locked Wumpa Fruit on N. Oxide's Challenge, and content plans "
-              "have no locked placements yet. Use mandatory or optional. No content was changed.")
     shuffle = bool(o.boss_track_shuffle.value)
     oxide = goal != GOAL_DISABLED
     from .content_cups import _bounds
@@ -228,7 +229,7 @@ def settings(world, raw):
     if level not in LEVELS:
         error("content_pool.bosses.requirement_level must be one of " + ", ".join(LEVELS) + ". No content was changed.")
     record = dict(oxide_goal=goal, bosses_required=bosses, requirement_level=level, cups=cup_bounds,
-                  oxide_1_optional=goal == GOAL_FINAL and optional == 1,
+                  oxide_1_optional=goal == GOAL_FINAL and optional in (1, 2),
                   oxide_final_unlock=int(o.oxide_final_challenge_unlock.value) if oxide else 0,
                   oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
                   track_shuffle=shuffle, repeats=False)
@@ -280,6 +281,12 @@ def _ceilings(rows):
     """{item code: base supply} of the plan's counted rows."""
     return {row["item"] if isinstance(row, dict) else row.item:
             row["requirement_ceiling"] if isinstance(row, dict) else row.requirement_ceiling for row in rows}
+
+
+def goal_location(record):
+    """The code of the Oxide goal check, excluded from progression placement,
+    or None when N. Oxide is not the goal."""
+    return {GOAL_ANY: OXIDE_FIRST, GOAL_FINAL: OXIDE_FINAL}.get(record["oxide_goal"])
 
 
 def resolve_relic_count(world, record, rows):
@@ -400,9 +407,10 @@ def garage_band(level, depth, supply):
 
 def garage_options(by_name, garage, level):
     """[(label, names, weight, low, high)] a garage may roll on the base
-    supply `by_name` (ledger rows by item name). Trophy only with four base
-    Trophies, at exactly four; Keys above the garage's own hub Key gate and
-    at most GARAGE_KEY_MAX; an aggregate only over two or more base items."""
+    supply `by_name` (ledger rows by item name). Trophies draw a count like
+    every other kind (ruled 2026-10-29); Keys above the garage's own hub Key
+    gate and at most GARAGE_KEY_MAX; an aggregate only over two or more base
+    items."""
     out = []
     weighted = level != "standard"
     for label, names, kind in _families():
@@ -410,16 +418,11 @@ def garage_options(by_name, garage, level):
         if not eligible or (label.startswith("Any") and len(eligible) < 2):
             continue
         supply = sum(by_name[n].requirement_ceiling for n in eligible)
-        if label == "Trophy":
-            if supply < GARAGE_TROPHIES:
+        lo, hi = garage_band(level, garage, supply)
+        if label == "Key":
+            lo, hi = max(lo, GARAGES[garage][2] + 1), min(hi, GARAGE_KEY_MAX)
+            if lo > hi:
                 continue
-            lo = hi = GARAGE_TROPHIES
-        else:
-            lo, hi = garage_band(level, garage, supply)
-            if label == "Key":
-                lo, hi = max(lo, GARAGES[garage][2] + 1), min(hi, GARAGE_KEY_MAX)
-                if lo > hi:
-                    continue
         out.append((label, eligible, 2 if weighted and kind in BOSS_WEIGHTED else 1, lo, hi, kind))
     # A group (Trophy, Keys, a Relic tier, a Token colour, a Gem colour, each
     # aggregate) carries its weight once; its tiers or colours share it, so
@@ -436,11 +439,18 @@ def _predicate(by_name, names, count):
     return dict(op="sum", items=[by_name[n].item for n in names], count=count)
 
 
-def draw_requirements(world, record, rows):
+def draw_requirements(world, record, rows, vanilla=False):
     """{garage: predicate} of the four ordinary garages (the mixed-item roll,
     see REQUIREMENTS). Draws in garage order with world.random; only called
-    with bosses on, so other plans keep their stream."""
+    with bosses on, so other plans keep their stream. Vanilla pad requirements
+    ask the Trophy table instead, as far as the seed has Trophies."""
     by_name = {row.name: row for row in rows}
+    if vanilla:
+        supply = by_name["Trophy"].requirement_ceiling
+        if not supply:
+            error("vanilla pad requirements ask Trophies at the boss garages, but the item pool holds no base "
+                  "Trophies. No content was changed.")
+        return {g: _predicate(by_name, ("Trophy",), min(count, supply)) for g, count in enumerate(VANILLA_TROPHIES)}
     out, used = {}, set()
     for g in range(4):
         options = garage_options(by_name, g, record["requirement_level"])
@@ -456,11 +466,13 @@ def draw_requirements(world, record, rows):
     return out
 
 
-def check_garage_requirement(predicate, rows, garage):
+def check_garage_requirement(predicate, rows, garage, mode=None):
     """Refuses a garage predicate the roll cannot produce: one family over its
-    base items, Trophy exactly four, Keys above the hub gate and at most
-    three, any other count 1 to the family's base supply. The level and the
-    draw are not recomputed (the plan carries the result, as for pad rules)."""
+    base items, Keys above the hub gate and at most three, any other count 1
+    to the family's base supply; with vanilla pad requirements the Trophy
+    table, and on a plan without the `pad_requirements` record (`mode` None)
+    exactly four Trophies, as those plans drew. The level and the draw are not
+    recomputed (the plan carries the result, as for pad rules)."""
     from . import warp_pad_rules
     ceiling = _ceilings(rows)
     items = content_item_pool.ITEMS
@@ -469,6 +481,11 @@ def check_garage_requirement(predicate, rows, garage):
     count = predicate.get("count")
     if type(count) is not int:
         error(f"garage {garage}: requirement count must be an integer")
+    if mode is None and predicate.get("item") == items["Trophy"] and count != OLD_GARAGE_TROPHIES:
+        error(f"garage {garage}: a Trophy garage asks exactly four Trophies")
+    if mode == "vanilla" and (predicate != dict(op="count", item=items["Trophy"], count=count)
+                    or count != min(VANILLA_TROPHIES[garage], ceiling.get(items["Trophy"], 0))):
+        error(f"garage {garage}: vanilla pad requirements ask {VANILLA_TROPHIES[garage]} Trophies here")
     if predicate["op"] == "count":
         if set(predicate) != {"op", "item", "count"}:
             error(f"garage {garage}: malformed requirement")
@@ -476,10 +493,7 @@ def check_garage_requirement(predicate, rows, garage):
         supply = ceiling.get(predicate["item"], 0)
         if not names or supply < 1:
             error(f"garage {garage}: requirement item has no base copy")
-        if names[0] == "Trophy":
-            if count != GARAGE_TROPHIES or supply < GARAGE_TROPHIES:
-                error(f"garage {garage}: a Trophy garage asks exactly four of at least four base Trophies")
-        elif names[0] == "Key":
+        if names[0] == "Key":
             if not GARAGES[garage][2] < count <= min(GARAGE_KEY_MAX, supply):
                 error(f"garage {garage}: a Key garage asks more than its hub gate and at most three")
         elif not 1 <= count <= supply:
@@ -602,7 +616,7 @@ def encounter_rows(record, venues, final_track):
 
 
 def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None,
-          opponents=None):
+          opponents=None, mode=None):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
@@ -621,7 +635,7 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
         eid, nid = encounter_id(g, index), entry_id(g, index)
         if g < OXIDE_GARAGE:
             rid = f"boss:{g}"
-            check_garage_requirement(garage_reqs[g], rows, g)
+            check_garage_requirement(garage_reqs[g], rows, g, mode)
             requirements.append(dict(id=rid, predicate=garage_reqs[g]))
         elif index == 0:
             rid = "free"
@@ -767,7 +781,7 @@ def install(world, plan, menu, predicate, with_boost, oxide_event=None):
     pads = {p["id"]: p for p in plan["pads"]}
     checks = {c["location"]: c for c in plan["checks"]}
     record = plan["bosses"]
-    goal_code = {GOAL_ANY: OXIDE_FIRST, GOAL_FINAL: OXIDE_FINAL}.get(record["oxide_goal"])
+    goal_code = goal_location(record)
     for enc in plan["encounters"]:
         region = Region(enc["entry_id"], player, mw)
         mw.regions.append(region)
@@ -844,7 +858,8 @@ def expected(plan, retail, cortex):
     opponents = check_opponents(record, venues, points, plan_opponents(plan), cups)
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
-                  {g: own.get(f"boss:{g}") for g in range(4)}, cups, opponents)
+                  {g: own.get(f"boss:{g}") for g in range(4)}, cups, opponents,
+                  plan.get("pad_requirements", {}).get("mode"))
     return built + (tracks,)
 
 

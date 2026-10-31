@@ -87,13 +87,18 @@
           "item_boxes_v1",
           "cup_entries_v1",
           "boss_encounters_v1",
+          "gem_cups_v1",
+          "surface_items_v1",
+          "relic_tier_checks_v1",
+          "pad_requirements_v1",
+          "fixed_items_v1",
           "ctr_first_v1",
           "boss_opponents_v1",
           "wumpa_shop_v1",
           "wumpa_goal_v1"
         ]
       },
-      "maxItems": 21,
+      "maxItems": 26,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -124,6 +129,12 @@
     },
     "wumpa_shop": {
       "$ref": "#/$defs/WumpaShop"
+    },
+    "pad_requirements": {
+      "$ref": "#/$defs/PadRequirements"
+    },
+    "fixed_items": {
+      "$ref": "#/$defs/FixedItems"
     }
   },
   "required": [
@@ -1912,6 +1923,38 @@
         "hints"
       ],
       "additionalProperties": false
+    },
+    "FixedItems": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "keys": {
+          "const": true
+        },
+        "gems": {
+          "const": true
+        },
+        "oxide_1_filler": {
+          "const": true
+        }
+      }
+    },
+    "PadRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "vanilla",
+            "randomized",
+            "random_without_4_keys"
+          ]
+        }
+      }
     }
   }
 }

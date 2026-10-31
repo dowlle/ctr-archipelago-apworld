@@ -117,3 +117,5 @@ Crash Team Racing:
   progressive_starting_wumpa: {0: 1, 3: 1, 10: 1}
   death_link: {mask_reset: 1, race_loss: 1, weapon_hit: 1}
   death_link_send: [mask_grab, weapon_hit, race_loss]
+  # Keys stay shuffled here; the pads-fixed arms fix them.
+  shuffle_keys: true

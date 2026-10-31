@@ -152,10 +152,18 @@ def expected_checks(plan, record):
     for hub, n, code, _name in slots(record):
         price = by_code.get(code, {}).get("price")
         low, high = wumpa_shop.price_band(hub, record["prices"])
-        if type(price) is not int or not low <= price <= high:
-            error(f"{wumpa_shop.shop_name(hub, n)}: price outside its hub's band {low} to {high}")
+        if type(price) is not int or price not in attainable_prices(hub, record["prices"]):
+            error(f"{wumpa_shop.shop_name(hub, n)}: price is not a scaled price of its hub's band {low} to {high}")
         out.append(check(record, hub, n, price))
     return out
+
+
+def attainable_prices(hub, percent):
+    """Every price the draw can give a slot of `hub`: each whole band price
+    scaled by `wumpa_shop_prices` (the band bottom, the progression price,
+    included). Native recomputes the same set (J11 review round 1)."""
+    low, high = wumpa_shop.PRICE_BANDS[hub]
+    return {wumpa_shop._scale(value, percent) for value in range(low, high + 1)}
 
 
 def non_progression_codes():
@@ -172,15 +180,18 @@ def non_progression_supply(items):
     return items["filler_count"] + sum(row["remaining"] for row in items["rows"] if row["item"] in codes)
 
 
-def check_supply(record, items):
-    """`excluded` needs one non-progression copy per shop slot."""
+def check_supply(record, items, reserved=0):
+    """`excluded` needs one non-progression copy per shop slot, on top of the
+    `reserved` filler copies other checks already claim (the excluded Oxide
+    goal check holds one; J11 review round 1)."""
     if not record or record["progression"] != "excluded":
         return
-    need = check_count(record)
+    need = check_count(record) + reserved
     have = non_progression_supply(items)
     if have < need:
         error(f"wumpa_shop_progression: excluded keeps progression out of all {need} shop slots, but the item "
-              f"pool holds only {have} filler, trap and other non-progression copies. Lower wumpa_shop_slots, "
+              f"pool holds only {have} filler, trap and other non-progression copies"
+              + (f" and one of them is kept for the Oxide goal check." if reserved else ".") + f" Lower wumpa_shop_slots, "
               "add filler (lower an item_pool count or add content) or set wumpa_shop_progression: allowed. "
               "Your settings were not changed.")
 
