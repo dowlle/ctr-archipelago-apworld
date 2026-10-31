@@ -36,7 +36,9 @@ def _pool_names(multiworld, player):
 
 
 def _capability_counts(multiworld, player):
-    names = _pool_names(multiworld, player)
+    # The start bootstrap may already have seated a copy.
+    names = _pool_names(multiworld, player) + [loc.item.name for loc in multiworld.get_locations(player)
+                                               if loc.item is not None and loc.address is not None]
     return {n: names.count(n) for n in set(names)
             if n.startswith(CAPABILITY_ITEM_PREFIXES)}
 
