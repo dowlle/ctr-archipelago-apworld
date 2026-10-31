@@ -167,6 +167,7 @@ class TestPlanWinLogic(unittest.TestCase):
 
     def test_parity_on_every_mix(self):
         for name, extra in MIXES.items():
+            compared = 0
             for seed in range(3):
                 with self.subTest(name, seed=seed):
                     try:
@@ -176,3 +177,5 @@ class TestPlanWinLogic(unittest.TestCase):
                         continue
                     self.assertEqual(compare(world, random.Random(seed)), [])
                     self.assertLess(wire_size(wire_block(world)), 32 * 1024)
+                    compared += 1
+            self.assertGreater(compared, 0, name)
