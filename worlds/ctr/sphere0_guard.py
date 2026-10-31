@@ -362,14 +362,6 @@ def _open_empty(world, state):
             and loc.can_reach(state)]
 
 
-def _opened(world, probe):
-    """Open empty checks of `probe`, with what placed items it reaches hand over:
-    a Key fixed on its boss opens the next hub."""
-    probe.sweep_for_advancements(locations=[loc for loc in world.multiworld.get_locations(world.player)
-                                            if loc.item is not None])
-    return len(_open_empty(world, probe))
-
-
 def _next_openers(world, state, start, pool):
     """Names of the pool items to place next: one item that opens the most
     further checks, else the fewest copies of one item, else two different
@@ -379,7 +371,7 @@ def _next_openers(world, state, start, pool):
     for name, copies in pool.items():
         probe = state.copy()
         probe.collect(copies[0], True)
-        opened = _opened(world, probe)
+        opened = len(_open_empty(world, probe))
         if opened > start:
             single[name] = opened
     if single:
@@ -390,7 +382,7 @@ def _next_openers(world, state, start, pool):
             probe = state.copy()
             for item in copies[:count]:
                 probe.collect(item, True)
-            opened = _opened(world, probe)
+            opened = len(_open_empty(world, probe))
             if opened > start:
                 groups[(name,) * count] = opened
                 break
@@ -400,7 +392,7 @@ def _next_openers(world, state, start, pool):
             probe = state.copy()
             probe.collect(pool[first][0], True)
             probe.collect(pool[second][0], True)
-            opened = _opened(world, probe)
+            opened = len(_open_empty(world, probe))
             if opened > start:
                 groups[(first, second)] = opened
     if not groups:
