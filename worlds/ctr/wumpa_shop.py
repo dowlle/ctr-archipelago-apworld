@@ -7,8 +7,7 @@ that hub's save screen. Five hubs, n 1..25 decimal and unpadded (the approved
 is SOLD without a charge. `Wumpa Income` is an address-free event, not minted.
 
 The shop and the Wumpa goal run on content plans (content_wumpa.py), which
-reads the bands, unlock steps and options from here. The location class creates
-nothing on a seed without `content_pool`.
+reads the bands, unlock steps and options from here.
 
 DATAPACKAGE STABILITY. `35028600 + 40 * hub + (n - 1)`, hub order N. Sanity
 Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, inside the

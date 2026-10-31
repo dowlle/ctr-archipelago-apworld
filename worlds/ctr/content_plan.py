@@ -1,6 +1,6 @@
-"""Experimental content-plan generation, independent of legacy cup displacement.
+"""The content plan: the one generator (one generator row 7).
 
-The executable profile builds standalone track entries with their Trophy Race,
+The profile builds standalone track entries with their Trophy Race,
 CTR Challenge and Relic Race modes (#133 PR 3), their podium rungs, Reach 10
 Wumpa and C/T/R letter checks (#133 PR 3b), Cortex Vortex as a track and the
 Relic Race Perfect checks (#133 PR 3c, #453), pool-only packs (#133 PR 4a),
@@ -19,9 +19,8 @@ items fixed to their own check (one generator row 4, content_fixed.py), and
 (one generator row 5) adventure_structure ctr_first, the Wumpa Shop and the
 Wumpa goal (content_wumpa.py) and Boss Opponent and Kit Shuffle
 (content_bosses.py).
-Unsupported content and check families fail explicitly while their native
-consumers are developed. This is an internal integration path, not completion
-of the full rewrite.
+Every YAML comes through here. A YAML that sets no content gets the vanilla-shape
+plan: the options' defaults are the original game's counts.
 """
 import copy
 import itertools

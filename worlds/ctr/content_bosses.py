@@ -1,6 +1,6 @@
 """Boss garages on content plans (#133 PR 6).
 
-With `content_pool.bosses.enabled: true` the five garages hold encounters
+With `boss_garages` on the five garages hold encounters
 again, as in a normal room. The plan's optional `bosses` record carries the
 seed's settings (feature `boss_encounters_v1`); with bosses off it is absent
 and every earlier plan keeps its wire exactly.
@@ -31,7 +31,7 @@ track, its three laps and the opponent with the retail driving profile and
 the inherited attack kit) and a requirement record.
 
 BOSS CUPS (#133 PR 6b, ruling 2026-10-23: boss AI on every leg). With
-`content_pool.bosses.cups` (an exact count or {min, max}, 0 to 4, default 0)
+`boss_cups` (0 to 4, default 0)
 that many ordinary garages, drawn uniformly, hold a `boss_cup` entry instead:
 four legs against the garage's own boss alone, who drives and attacks as in
 his boss race on every leg; a points win completes the garage's encounter
@@ -64,7 +64,7 @@ unchanged. The encounter's own requirement:
     the 2026-09-01 garage requirement design): one received-item family per garage, Trophies or
     any other counted family (a Relic tier, a Token or Gem colour, Any Relic,
     Any CTR Token, Any Gem, Keys), never free. The count is drawn from a band of the base supply set by
-    `content_pool.bosses.requirement_level` (`standard`, `high` default,
+    `garage_requirement_level` (`standard`, `high` default,
     `very_high`, `chaotic`) and the garage's depth (`garage_band`); a family
     an earlier garage took is rerolled once (variety bias). Keys ask more
     than the garage's own hub Key gate and at most three. Vanilla pad
@@ -136,7 +136,7 @@ CUP_MODE = "boss_cup"
 CUP_LEGS = 4
 KINDS = (KIND, CUP_KIND)
 MODES = (MODE, CUP_MODE)
-#: content_pool.bosses.requirement_level (2026-09-01 Wayfinder ruling C3a).
+#: garage_requirement_level (2026-09-01 Wayfinder ruling C3a).
 LEVELS = ("standard", "high", "very_high", "chaotic")
 DEFAULT_LEVEL = "high"
 #: The Trophies of each garage with vanilla pad requirements.
