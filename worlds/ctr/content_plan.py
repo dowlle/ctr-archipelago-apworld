@@ -1190,7 +1190,9 @@ def draw_plan(world, key_estimate=True):
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:
         raced += [t for t in cup["legs"] if t.get("origin") == "custom" and t not in raced]
-    titles = generic_room_titles(sorted(raced, key=lambda t: t["custom_slot"]), package_by_id)
+    # A cup leg is its own record: one track on a pad and in a cup still has one title.
+    titles = generic_room_titles(sorted({t["custom_slot"]: t for t in raced}.values(),
+                                        key=lambda t: t["custom_slot"]), package_by_id)
     for track in raced:
         if "named_block" not in track:
             track["room_title"] = titles[track["custom_slot"]]

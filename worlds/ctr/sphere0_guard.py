@@ -50,14 +50,33 @@ def _reachable_empty(world, state) -> int:
                and loc.can_reach(state))
 
 
+def _own_item(world, item) -> bool:
+    """An item of this slot's opening: its own, or an item link group's copy of an
+    item this slot shares. Linked items leave the slot's pool before pre_fill, and
+    the group's copy is what the fill places."""
+    if item.player == world.player:
+        return True
+    group = getattr(world.multiworld, "groups", {}).get(item.player)
+    return group is not None and world.player in group["players"] and item.name in group["item_pool"]
+
+
+def _placed(world):
+    """Locations whose items count for this slot: its own, and its receipts of the
+    item link groups it shares in."""
+    mw, player = world.multiworld, world.player
+    placed = [loc for loc in mw.get_locations(player) if loc.item is not None]
+    for group_id, group in getattr(mw, "groups", {}).items():
+        if player in group["players"]:
+            placed += [loc for loc in mw.get_locations(group_id) if loc.item is not None and loc.item.player == player]
+    return placed
+
+
 def _base_state(world):
     from BaseClasses import CollectionState
     state = CollectionState(world.multiworld)
     # Locked rewards and goal events are already placed; collect what is
     # reachable of them, since the fill would too.
-    state.sweep_for_advancements(
-        locations=[loc for loc in world.multiworld.get_locations(world.player)
-                   if loc.item is not None])
+    state.sweep_for_advancements(locations=_placed(world))
     return state
 
 
@@ -421,11 +440,10 @@ def _room(world, state):
 
 def _collect(world, state, items):
     """`state` with `items` held and every placed item it now reaches."""
-    mw, player = world.multiworld, world.player
     probe = state.copy()
     for item in items:
         probe.collect(item, True)
-    probe.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+    probe.sweep_for_advancements(locations=_placed(world))
     return probe
 
 
@@ -462,13 +480,12 @@ def _lock(world, chosen):
 def _first_key_tight(world, state, items):
     """Do the checks in front of a fixed first Key leave too few to spare, with
     `items` seated? Everything else held, the Key's own opening excluded."""
-    mw, player = world.multiworld, world.player
+    mw = world.multiworld
     probe = state.copy()
     for item in mw.itempool:
-        if item.player == player and item.advancement and item.name != "Key":
+        if _own_item(world, item) and item.advancement and item.name != "Key":
             probe.collect(item, True)
-    probe.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player)
-                                            if loc.item is not None and loc.item.name != "Key"])
+    probe.sweep_for_advancements(locations=[loc for loc in _placed(world) if loc.item.name != "Key"])
     return len(_room(world, probe)) - len(items) < bootstrap_target(world)
 
 
@@ -505,7 +522,7 @@ def _place_openers(world, state, base, target, queue, non_local):
             break
         pool = {}
         for item in mw.itempool:
-            if (item.player == player and item.advancement and item.location is None
+            if (_own_item(world, item) and item.advancement and item.location is None
                     and item.name not in non_local
                     and item.name not in mw.early_items.get(player, {})):
                 pool.setdefault(item.name, []).append(item)
@@ -547,8 +564,7 @@ def _place_openers(world, state, base, target, queue, non_local):
             _lock(world, [(item, location)])
             placed.append((name, location.name))
         else:
-            state.sweep_for_advancements(
-                locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+            state.sweep_for_advancements(locations=_placed(world))
             continue
         break
     return placed
@@ -575,7 +591,7 @@ def plan_opening(world, state, target, non_local, reach=None):
                                        if plan.get("capability", {}).get("boost_mode") else None)
     pool = {}
     for item in mw.itempool:
-        if (item.player == player and item.advancement and item.location is None and item.name in gates
+        if (_own_item(world, item) and item.advancement and item.location is None and item.name in gates
                 and item.name not in non_local):
             pool.setdefault(item.name, []).append(item)
 
