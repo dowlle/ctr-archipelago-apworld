@@ -56,6 +56,13 @@ PORT_LAST = 38320
 HOST = "127.0.0.1"
 ROOM_ID_HEX = 16
 ALLOWED_GAMES = {"Archipelago", GAME}
+#: Every solo seed, whatever its YAML says: a solo room has no
+#: other players. The client also ignores DeathLink in a solo session, for rooms
+#: imported as they are.
+SOLO_FORCED = {"death_link": "off", "death_link_send": ["follow_death_link"]}
+#: The Custom Tracks page: a row is off, in the pool or guaranteed a pad.
+PICK_POOL, PICK_OWN_PAD = 1, 2
+CORTEX_ID = CORTEX_FOLDER = "cortex-vortex"
 
 # The protocol stream. Everything else printed by Archipelago goes to stderr.
 _PROTOCOL_OUT = sys.stdout
@@ -547,6 +554,10 @@ def _run_generation(player_yaml: str, out_dir: str, seed: int | None, stop_after
     except Exception as error:
         cause = error.__cause__ or error
         raise _option_error(cause)
+    # Triggers and weights can still set DeathLink when the YAML is rolled.
+    hints = world_class().options_dataclass.type_hints
+    for name, value in SOLO_FORCED.items():
+        getattr(erargs, name)[1] = hints[name].from_any(value)
 
     original_call_all = AutoWorld.call_all
     seen = set()
@@ -614,7 +625,8 @@ def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str
     doc = read_player_yaml(source)
     doc = apply_overrides(doc, name, settings)
     if tracks:
-        doc = apply_tracks(paths, doc, tracks["assets"], tracks["picked"], tracks["guaranteed"])
+        doc = apply_tracks(paths, doc, tracks["assets"], tracks["picked"], tracks["guaranteed"], tracks["page"])
+    doc[GAME].update(json.loads(json.dumps(SOLO_FORCED)))
     presets = os.path.realpath(paths.presets)
     if stamp or os.path.commonpath([presets, os.path.realpath(source)]) == presets:
         doc = stamp_requires(doc)  # a bundled preset is always this client's own YAML
@@ -690,12 +702,8 @@ def _room_world_version(multidata: dict, slot_id) -> str | None:
 
 
 def _custom_tracks(doc: dict | None) -> list:
-    if not doc:
-        return []
-    section = doc.get(GAME) or {}
-    pool = section.get("content_pool") if isinstance(section, dict) else None
-    tracks = (pool or {}).get("tracks", {}) if isinstance(pool, dict) else {}
-    custom = tracks.get("custom") if isinstance(tracks, dict) else None
+    section = (doc or {}).get(GAME)
+    custom = section.get("custom_tracks") if isinstance(section, dict) else None
     return custom if isinstance(custom, list) else []
 
 
@@ -955,60 +963,81 @@ def installed_tracks(paths: Paths, assets: str) -> list:
     return result
 
 
-def list_tracks(paths: Paths, assets: str) -> dict:
+def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict:
+    """The Custom Tracks page. With a YAML each row starts as that YAML has it
+    (`custom_tracks`, `required_entries`, `cortex_vortex_track`)."""
     tracks = installed_tracks(paths, assets)
-    return {"tracks": [{k: v for k, v in t.items() if k != "descriptor"} for t in tracks],
-            "tracks_path": paths.tracks}
+    section = _section(read_player_yaml(yaml_path)) if yaml_path else {}
+    rows = [{**{k: v for k, v in t.items() if k != "descriptor"}, "start": _start_pick(section, t["descriptor"])}
+            for t in tracks]
+    cortex = _cortex_pick(section)
+    if cortex or os.path.isdir(os.path.join(assets, "tracks", CORTEX_FOLDER)):
+        rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
+                        "modes": ["trophy", "ctr", "relic"], "source": "built-in", "start": cortex})
+    return {"tracks": rows, "tracks_path": paths.tracks}
 
 
-def _merge_missing(target: dict, defaults: dict) -> None:
-    for key, value in defaults.items():
-        if key not in target:
-            target[key] = json.loads(json.dumps(value))
-        elif isinstance(target[key], dict) and isinstance(value, dict):
-            _merge_missing(target[key], value)
+def _section(doc: dict | None) -> dict:
+    section = (doc or {}).get(GAME)
+    return section if isinstance(section, dict) else {}
 
 
-def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaranteed: list[str]) -> dict:
-    """Put the picked installed tracks into content_pool.tracks.custom and the
-    guaranteed ones into content_pool.required_entries. A YAML without a
-    content plan gets the overlay's content profile where it sets nothing."""
-    if not picked and not guaranteed:
+def _start_pick(section: dict, descriptor: dict) -> int:
+    """How a YAML already has a custom track: 0 off, PICK_POOL or PICK_OWN_PAD."""
+    if descriptor not in _custom_tracks({GAME: section}):
+        return 0
+    required = section.get("required_entries")
+    names = {descriptor["content_id"], descriptor["display_name"]}
+    return PICK_OWN_PAD if isinstance(required, list) and names & set(map(str, required)) else PICK_POOL
+
+
+def _cortex_pick(section: dict) -> int:
+    value = section.get("cortex_vortex_track")
+    return {"in_pool": PICK_POOL, "own_pad": PICK_OWN_PAD}.get(value, 0) if isinstance(value, str) else 0
+
+
+def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaranteed: list[str],
+                 page: bool = False) -> dict:
+    """Put the picked installed tracks into `custom_tracks`, the guaranteed ones
+    into `required_entries`, and the Cortex Vortex pick into `cortex_vortex_track`.
+    `page` says the Custom Tracks page was shown: the picks then replace what the
+    YAML said about the tracks on that page. Without it the YAML keeps what it has."""
+    if not picked and not guaranteed and not page:
         return doc
     if set(guaranteed) - set(picked):
         raise SoloError("track", "A guaranteed track must also be picked.")
     by_id = {t["id"]: t for t in installed_tracks(paths, assets)}
-    missing = [p for p in picked if p not in by_id]
+    packages = [p for p in picked if p != CORTEX_ID]
+    missing = [p for p in packages if p not in by_id]
     if missing:
         raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
-    keys = [by_id[p]["content_id"] for p in picked]
-    twice = next((p for p in picked if keys.count(by_id[p]["content_id"]) > 1), None)
+    keys = [by_id[p]["content_id"] for p in packages]
+    twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
     if twice:
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
     doc = json.loads(json.dumps(doc))
     section = doc.setdefault(GAME, {})
-    for legacy in ("custom_tracks", "cortex_vortex_track"):
-        if section.get(legacy):
-            raise SoloError("option", f"This YAML uses {legacy}, which cannot be mixed with picked tracks.",
-                            option=legacy)
-    if section.get("content_pool") in (None, {}):
-        profile = load_overlay(paths).get("custom_tracks", {}).get("profile")
-        if not isinstance(profile, dict) or not isinstance(profile.get("content_pool"), dict):
-            raise SoloError("runtime", "The options overlay has no custom-track profile.")
-        section["content_pool"] = {}
-        _merge_missing(section, profile)
-    pool = section["content_pool"]
-    tracks = pool.setdefault("tracks", {}) if isinstance(pool, dict) else None
-    custom = tracks.setdefault("custom", []) if isinstance(tracks, dict) else None
-    required = pool.setdefault("required_entries", []) if isinstance(pool, dict) else None
+    start = _cortex_pick(section)
+    cortex = PICK_OWN_PAD if CORTEX_ID in guaranteed else PICK_POOL if CORTEX_ID in picked else 0
+    if cortex != start and (page or cortex):
+        section["cortex_vortex_track"] = {0: "off", PICK_POOL: "in_pool", PICK_OWN_PAD: "own_pad"}[cortex]
+    custom = section.get("custom_tracks", [])
+    required = section.get("required_entries", [])
+    if custom == {}:
+        custom = []
     if not isinstance(custom, list) or not isinstance(required, list):
-        raise SoloError("option", "This YAML's content_pool cannot take picked tracks: content_pool, its tracks and "
-                        "tracks.custom must be mappings and lists as the option describes.", option="content_pool")
+        return doc  # the world refuses these with its own message
+    if page:  # a track the page showed and the player turned off leaves the YAML
+        for entry in by_id.values():
+            if entry["id"] not in picked and entry["descriptor"] in custom:
+                custom.remove(entry["descriptor"])
+                names = (entry["content_id"], entry["display_name"])
+                required[:] = [name for name in required if name not in names]
     # A YAML that already lists a picked track must list exactly the installed
     # one: another version or other file pins is a conflict, refused rather
     # than guessed at (round 2 decision 5). The same descriptor is not added
     # twice, and a guarantee the YAML already has is not repeated.
-    for track_id in picked:
+    for track_id in packages:
         key = by_id[track_id]["content_id"]
         other = next((d for d in custom if isinstance(d, dict) and d.get("content_id") == key
                       and d != by_id[track_id]["descriptor"]), None)
@@ -1017,14 +1046,24 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                             f"(version {other.get('revision', '?')}) differently from the installed version "
                             f"{by_id[track_id]['revision']}. Remove it from the YAML or leave the track off.",
                             track=track_id)
-    for track_id in picked:
+    for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         if descriptor not in custom:
             custom.append(descriptor)
     for track_id in guaranteed:
-        entry = by_id[track_id]["track_id"]
-        if entry not in required:
-            required.append(entry)
+        if track_id == CORTEX_ID:
+            continue
+        if _start_pick({"custom_tracks": custom, "required_entries": required},
+                       by_id[track_id]["descriptor"]) != PICK_OWN_PAD:
+            required.append(by_id[track_id]["content_id"])
+    if custom:
+        section["custom_tracks"] = custom
+    else:
+        section.pop("custom_tracks", None)
+    if required:
+        section["required_entries"] = required
+    else:
+        section.pop("required_entries", None)
     return doc
 
 
@@ -1450,6 +1489,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("list")
     cmd = sub.add_parser("tracks")
     cmd.add_argument("--assets", default=None, help="the client's assets folder (default <client>/assets)")
+    cmd.add_argument("--yaml", default=None, help="start each track as this YAML has it")
     cmd = sub.add_parser("describe")
     cmd.add_argument("--yaml", default=None, help="report the overlay options' values in this YAML")
     for name in ("validate", "generate"):
@@ -1464,6 +1504,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help="include this installed custom track (repeatable)")
         cmd.add_argument("--guarantee", action="append", default=[], metavar="PACKAGE_ID",
                          help="give this picked track an Adventure pad (repeatable)")
+        cmd.add_argument("--tracks-page", action="store_true",
+                         help="the Custom Tracks page was shown: the picks replace the YAML's own")
         if name == "generate":
             cmd.add_argument("--seed", type=int, default=None)
             cmd.add_argument("--preset", default=None)
@@ -1502,12 +1544,13 @@ def main(argv: list[str] | None = None) -> int:
             clear_tmp(paths)
         bootstrap_core(paths, load_worlds=True)
         assets = os.path.abspath(getattr(args, "assets", None) or os.path.join(client, "assets"))
-        tracks = ({"assets": assets, "picked": args.track, "guaranteed": args.guarantee}
+        tracks = ({"assets": assets, "picked": args.track, "guaranteed": args.guarantee,
+                   "page": args.tracks_page}
                   if args.command in ("validate", "generate") else None)
         if args.command == "describe":
             emit("result", **describe(paths, args.yaml))
         elif args.command == "tracks":
-            emit("result", **list_tracks(paths, assets))
+            emit("result", **list_tracks(paths, assets, args.yaml))
         elif args.command == "validate":
             emit("result", **validate(paths, args.yaml, args.name, args.set, args.stamp_requires, tracks))
         elif args.command == "generate":

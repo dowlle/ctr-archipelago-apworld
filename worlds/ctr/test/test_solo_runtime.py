@@ -310,15 +310,12 @@ class TestCustomTracks(SoloTestCase):
             pass
         self.assertEqual([t["id"] for t in self.tracks()], ["package/fixture-loop/2.1"])
 
-    def yaml_with_plan(self, name: str, **pool_edits) -> str:
-        """An imported-style YAML with its own content plan (cups 2, crystals 1)."""
+    def yaml_with_content(self, name: str, **edits) -> str:
+        """An imported-style YAML that sets its own content (2 cups, 1 Crystal Challenge)."""
         import yaml
-        section = dict(content_pool=dict(preset="mixed", tracks=dict(retail="all", modes=["trophy", "relic"]),
-                                         cups=dict(count=2), crystals=dict(count=1), bosses=dict(enabled=True)),
-                       pad_layout=dict(placement="shuffle", stages="single", mode_order="fixed",
-                                       merge_trophy_ctr=False),
-                       death_link="off", accessibility="full")
-        section["content_pool"].update(pool_edits)
+        section = dict(cup_count=2, crystal_challenge_count=1, two_stage_density="off",
+                       track_modes=dict(default=["trophy", "relic"]), death_link="off", accessibility="full")
+        section.update(edits)
         return write_yaml(self.work, name, yaml.safe_dump({"name": "Imported", "game": GAME, GAME: section}))
 
     def room_section(self, events) -> dict:
@@ -329,24 +326,20 @@ class TestCustomTracks(SoloTestCase):
 
     def test_a_yaml_that_lists_the_same_track_keeps_one_entry(self):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
-        source = self.yaml_with_plan("same.yaml", tracks=dict(retail="all", modes=["trophy", "relic"],
-                                                              custom=[loop]),
-                                     required_entries=["custom/fixture-loop/2.1"])
+        source = self.yaml_with_content("same.yaml", custom_tracks=[loop], required_entries=["fixture-loop"])
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--track", loop["id"],
                                  "--guarantee", loop["id"], "--seed", "3")
         self.assertEqual(code, 0, events)
-        pool = self.room_section(events)["content_pool"]
-        self.assertEqual(pool["tracks"]["custom"], [loop])
-        self.assertEqual(pool["required_entries"], ["custom/fixture-loop/2.1"])
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop])
+        self.assertEqual(section["required_entries"], ["fixture-loop"])
 
     def test_a_yaml_that_lists_the_track_differently_is_refused(self):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         stale = json.loads(json.dumps(loop))
         stale["files"][0]["sha256"] = "a1" * 32
         stale.update(id="package/fixture-loop/2.0", revision="2.0")  # an older revision of the same track
-        source = self.yaml_with_plan("stale.yaml", tracks=dict(retail="all", modes=["trophy", "relic"],
-                                                               custom=[stale]),
-                                     required_entries=["custom/fixture-loop/2.0"])
+        source = self.yaml_with_content("stale.yaml", custom_tracks=[stale], required_entries=["fixture-loop"])
         events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
         self.assertNotEqual(code, 0)
         self.assertEqual(last(events)["kind"], "track")
@@ -355,74 +348,124 @@ class TestCustomTracks(SoloTestCase):
         # The same revision with other file pins is a conflict too.
         pinned = json.loads(json.dumps(loop))
         pinned["files"][0]["sha256"] = "a1" * 32
-        source = self.yaml_with_plan("pinned.yaml", tracks=dict(retail="all", modes=["trophy", "relic"],
-                                                                custom=[pinned]))
+        source = self.yaml_with_content("pinned.yaml", custom_tracks=[pinned])
         events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
         self.assertNotEqual(code, 0)
         self.assertEqual(last(events)["kind"], "track")
-        for pool in ({"tracks": {"custom": {}}}, [], False):
-            with self.subTest(pool=pool):
-                import yaml
-                broken = write_yaml(self.work, "broken.yaml", yaml.safe_dump(
-                    {"name": "Solo", "game": GAME, GAME: {"content_pool": pool}}))
-                events, code = self.call("validate", "--yaml", broken, "--assets", self.assets, "--track", loop["id"])
-                self.assertNotEqual(code, 0)
-                self.assertEqual(last(events)["kind"], "option")
-                self.assertEqual(last(events)["option"], "content_pool")
 
-    def test_a_yaml_with_a_content_plan_keeps_its_counts(self):
+    def test_a_yaml_with_its_own_content_keeps_its_counts(self):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         hill = self.install("fixture-hill", "1.0", "Fixture Hill")
-        source = self.yaml_with_plan("plan.yaml", required_entries=["retail:3"])
+        source = self.yaml_with_content("plan.yaml", required_entries=["Dingo Canyon"])
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--track", loop["id"],
                                  "--track", hill["id"], "--guarantee", hill["id"], "--seed", "5")
         self.assertEqual(code, 0, events)
         section = self.room_section(events)
-        pool = section["content_pool"]
-        self.assertEqual(pool["cups"], {"count": 2})
-        self.assertEqual(pool["crystals"], {"count": 1})
-        self.assertEqual(pool["tracks"]["modes"], ["trophy", "relic"])
-        self.assertEqual(pool["required_entries"], ["retail:3", "custom/fixture-hill/1.0"])
-        self.assertEqual([d["id"] for d in pool["tracks"]["custom"]], [loop["id"], hill["id"]])
-        self.assertEqual(section["pad_layout"]["stages"], "single")
-        self.assertNotIn("item_pool", section)
+        self.assertEqual(section["cup_count"], 2)
+        self.assertEqual(section["crystal_challenge_count"], 1)
+        self.assertEqual(section["two_stage_density"], "off")
+        self.assertEqual(section["required_entries"], ["Dingo Canyon", "fixture-hill"])
+        self.assertEqual([d["id"] for d in section["custom_tracks"]], [loop["id"], hill["id"]])
 
-    def test_a_yaml_without_a_content_plan_gets_the_vanilla_shape_where_it_sets_nothing(self):
+    def test_a_yaml_that_sets_no_content_stays_on_the_defaults(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         source = write_yaml(self.work, "plain.yaml", yaml.safe_dump(
-            {"name": "Imported", "game": GAME, GAME: dict(oxide_goal="any_percent", death_link="off",
-                                                          pad_layout=dict(stages="single"))}))
+            {"name": "Imported", "game": GAME, GAME: dict(oxide_goal="any_percent", death_link="off")}))
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--track", loop["id"],
                                  "--guarantee", loop["id"], "--seed", "4")
         self.assertEqual(code, 0, events)
         section = self.room_section(events)
-        with open(os.path.join(SOLO, "options-overlay.json"), encoding="utf-8") as handle:
-            profile = json.load(handle)["custom_tracks"]["profile"]
-        self.assertEqual(section["oxide_goal"], "any_percent")
-        self.assertEqual(section["pad_layout"]["stages"], "single")  # the YAML's own value
-        self.assertEqual(section["pad_layout"]["mode_order"], "fixed")  # filled in
-        self.assertEqual(section["content_pool"]["cups"], {"count": 5})
-        self.assertEqual(section["content_pool"]["crystals"]["count"], 4)
-        self.assertEqual(section["item_pool"], profile["item_pool"])
-        self.assertEqual(section["content_pool"]["required_entries"], ["custom/fixture-loop/2.1"])
+        self.assertEqual(sorted(section), ["custom_tracks", "death_link", "death_link_send", "oxide_goal",
+                                           "required_entries"])
 
-    def test_a_yaml_that_does_not_fit_is_refused_with_the_world_message(self):
+    def test_the_merge_leaves_what_the_new_options_refuse_to_the_world(self):
+        import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
-        # 30 required entries cannot fit the 27 normal pads.
-        source = self.yaml_with_plan("toomany.yaml", required_entries=[f"retail:{i}" for i in range(18)] +
-                                     [f"arena:{i}" for i in range(18, 25)] + [f"retail:{i}" for i in range(2)])
+        cases = ((dict(custom_tracks=dict(purple_gem_cup="baby_t_park")), "custom_tracks"),
+                 (dict(required_entries="not a list"), "required_entries"))
+        for section, option in cases:
+            with self.subTest(option=option):
+                source = write_yaml(self.work, "world.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: section}))
+                events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
+                self.assertNotEqual(code, 0, events)
+                self.assertEqual(last(events)["kind"], "option")
+                self.assertNotIn("picked tracks", last(events)["message"])
+        source = self.yaml_with_content("unknown.yaml", required_entries=["No Such Track"])
         events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--track", loop["id"])
         self.assertNotEqual(code, 0)
-        self.assertEqual(last(events)["event"], "error")
-        self.assertNotEqual(last(events)["message"], "")
+        self.assertEqual(last(events)["kind"], "option")
+        self.assertIn("required_entries", last(events)["message"])
+
+    def test_removed_options_are_ignored_silently(self):
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        section = dict(include_battle_arenas=False, include_gem_cups=False, randomize_gem_cup_tracks=True,
+                       podium_placement_checks=False, sapphire_relic_count=4, boss_encounter_repeats="allow",
+                       requirement_variety="trophy_heavy_legacy", warp_pad_shuffle_categories=["tracks"],
+                       content_pool=dict(cups=dict(count=2), tracks=dict(custom=[{"id": "gone"}])),
+                       pad_layout=dict(placement="vanilla"), slide_coliseum_races="all")
+        source = write_yaml(self.work, "old.yaml", yaml.safe_dump({"name": "Old", "game": GAME, GAME: section}))
+        for extra in ([], ["--track", loop["id"]]):
+            events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "6", *extra)
+            self.assertEqual(code, 0, events)
+            self.assertEqual([e for e in events if e["event"] == "error"], [])
+            self.assertEqual(last(events)["custom_tracks"], [loop] if extra else [])
+
+    def test_a_yaml_sets_the_starting_picks(self):
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        hill = self.install("fixture-hill", "1.0", "Fixture Hill")
+        self.install("fixture-rock", "1.0", "Fixture Rock")
+        source = write_yaml(self.work, "picks.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[loop, hill], required_entries=["Fixture Hill"], cortex_vortex_track="own_pad")}))
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        starts = {t["id"]: t["start"] for t in last(events)["tracks"]}
+        self.assertEqual(starts, {"cortex-vortex": 2, hill["id"]: 2, loop["id"]: 1, "package/fixture-rock/1.0": 0})
+
+    def test_cortex_vortex_is_a_row_once_its_files_are_there(self):
+        self.install("fixture-loop", "2.1", "Fixture Loop")
+        self.assertNotIn("cortex-vortex", [t["id"] for t in self.tracks()])
+        os.makedirs(os.path.join(self.assets, "tracks", "cortex-vortex"))
+        row = self.tracks()[0]
+        self.assertEqual((row["id"], row["start"]), ("cortex-vortex", 0))
+        for args, want in ((["--track", "cortex-vortex"], "in_pool"),
+                           (["--track", "cortex-vortex", "--guarantee", "cortex-vortex"], "own_pad")):
+            events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
+                                     "--seed", "2", *args)
+            self.assertEqual(code, 0, events)
+            self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
+
+    def test_the_page_replaces_the_yaml_picks(self):
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        hill = self.install("fixture-hill", "1.0", "Fixture Hill")
+        source = write_yaml(self.work, "picks.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[loop, hill], required_entries=["fixture-hill", "Dingo Canyon"],
+            cortex_vortex_track="in_pool")}))
+        common = ("generate", "--yaml", source, "--assets", self.assets, "--seed", "8")
+        # The page was shown and hill was turned off.
+        events, code = self.call(*common, "--tracks-page", "--track", loop["id"])
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop])
+        self.assertEqual(section["required_entries"], ["Dingo Canyon"])
+        self.assertEqual(section["cortex_vortex_track"], "off")
+        shutil.rmtree(os.path.join(self.solo, "rooms", last(events)["room_id"]))
+        # No page: the YAML generates as it is.
+        events, code = self.call(*common)
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop, hill])
+        self.assertEqual(section["cortex_vortex_track"], "in_pool")
 
     def test_files_may_sit_in_the_revision_folder(self):
         # The client keeps Baby T Park 1.0.2 in tracks/baby-t-park-1.0.2.
         self.install("fixture-loop", "2.1", "Fixture Loop", folder="fixture-loop-2.1", lev_name="track.lev")
         self.assertEqual([t["id"] for t in self.tracks()], ["package/fixture-loop/2.1"])
 
-    def test_picked_tracks_go_into_the_content_plan(self):
+    def test_picked_tracks_go_into_the_options(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         hill = self.install("fixture-hill", "1.0", "Fixture Hill")
@@ -432,34 +475,25 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(code, 0, events)
         result = last(events)
         self.assertEqual([d["id"] for d in result["custom_tracks"]], [loop["id"], hill["id"]])
-        with open(os.path.join(self.solo, "rooms", result["room_id"], "player.yaml"), encoding="utf-8") as handle:
-            section = yaml.safe_load(handle)[GAME]
-        pool = section["content_pool"]
-        self.assertEqual(pool["tracks"]["custom"], [loop, hill])
-        self.assertEqual(pool["required_entries"], ["custom/fixture-hill/1.0"])
-        with open(os.path.join(SOLO, "options-overlay.json"), encoding="utf-8") as handle:
-            profile = json.load(handle)["custom_tracks"]["profile"]
-        self.assertEqual(section["pad_layout"], profile["pad_layout"])
-        self.assertEqual(section["item_pool"], profile["item_pool"])
-        self.assertEqual(pool["cups"], {"count": 5})
-        self.assertEqual(pool["crystals"], {"count": 4, "pool": [21, 19, 23, 18]})
-        self.assertEqual(pool["bosses"], profile["content_pool"]["bosses"])
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop, hill])
+        self.assertEqual(section["required_entries"], ["fixture-hill"])
         self.assertEqual(section["death_link"], "off")
-        # The room is a content-plan room: its tracks are listed afterwards
-        # even without the descriptor files.
+        self.assertEqual(sorted(section), ["custom_tracks", "death_link", "death_link_send", "required_entries"])
+        # Its tracks are listed afterwards even without the descriptor files.
         shutil.rmtree(self.descriptors)
         self.assertEqual(sorted(t["source"] for t in self.tracks()), ["room", "room"])
 
     def test_every_start_takes_one_and_two_tracks_and_a_guaranteed_pad(self):
         """Probe matrix of round 2 decision 5: the three presets and two
-        imported YAMLs (with and without a content plan), seeds 1 and 2."""
+        imported YAMLs (with and without their own content), seeds 1 and 2."""
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         hill = self.install("fixture-hill", "1.0", "Fixture Hill")
         plain = write_yaml(self.work, "plain.yaml", yaml.safe_dump(
             {"name": "Imported", "game": GAME, GAME: dict(oxide_goal="any_percent", death_link="off",
                                                           itemsanity=True, accessibility="full")}))
-        planned = self.yaml_with_plan("planned.yaml")
+        planned = self.yaml_with_content("planned.yaml")
         starts = [self.preset(n) for n in ("quick.yaml", "standard.yaml", "full_adventure.yaml")] + [plain, planned]
         picks = (([loop], []), ([loop], [loop]), ([loop, hill], [hill]), ([loop, hill], [loop, hill]))
         for source in starts:
@@ -491,11 +525,6 @@ class TestCustomTracks(SoloTestCase):
                                  "--guarantee", loop["id"])
         self.assertNotEqual(code, 0)
         self.assertEqual(last(events)["kind"], "track")
-        legacy = write_yaml(self.work, "legacy.yaml",
-                            f"name: Solo\ngame: {GAME}\n{GAME}:\n  cortex_vortex_track: true\n")
-        events, code = self.call("validate", "--yaml", legacy, "--assets", self.assets, "--track", loop["id"])
-        self.assertNotEqual(code, 0)
-        self.assertEqual(last(events)["option"], "cortex_vortex_track")
 
     def test_no_track_leaves_the_preset_alone(self):
         import yaml
@@ -504,7 +533,53 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(code, 0, events)
         with open(os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml"),
                   encoding="utf-8") as handle:
-            self.assertNotIn("content_pool", yaml.safe_load(handle)[GAME])
+            self.assertNotIn("custom_tracks", yaml.safe_load(handle)[GAME])
+
+
+class TestDeathLink(SoloTestCase):
+    """DeathLink is off in every solo seed, whatever a YAML says."""
+
+    def slot_options(self, room_id: str) -> dict:
+        import pickle
+        import zipfile
+        import zlib
+        room = os.path.join(self.solo, "rooms", room_id)
+        name = next(n for n in os.listdir(room) if n.startswith("AP_"))
+        with zipfile.ZipFile(os.path.join(room, name)) as archive:
+            data = archive.read(next(n for n in archive.namelist() if n.endswith(".archipelago")))
+        return pickle.loads(zlib.decompress(data[1:]))["slot_data"][1]["ctr_options"]
+
+    def check(self, body: str, seed: str) -> None:
+        import yaml
+        source = write_yaml(self.work, "dl.yaml", f"name: Solo\ngame: {GAME}\n" + body)
+        events, code = self.call("generate", "--yaml", source, "--seed", seed)
+        self.assertEqual(code, 0, events)
+        room_id = last(events)["room_id"]
+        options = self.slot_options(room_id)
+        self.assertEqual(options.get("death_link", 0), 0, options)
+        self.assertEqual(options.get("death_link_send", 0), 0, options)
+        with open(os.path.join(self.solo, "rooms", room_id, "player.yaml"), encoding="utf-8") as handle:
+            section = yaml.safe_load(handle)[GAME]
+        self.assertEqual((section["death_link"], section["death_link_send"]), ("off", ["follow_death_link"]))
+
+    def test_an_imported_yaml_cannot_turn_it_on(self):
+        for seed, body in enumerate((
+                f"{GAME}:\n  death_link: race_loss\n",
+                f"{GAME}:\n  death_link: mask_reset\n  death_link_send: [mask_grab, weapon_hit, race_loss]\n",
+                f"{GAME}:\n  death_link: \"off\"\n  death_link_send: [race_loss]\n",
+                f"{GAME}:\n  death_link: {{race_loss: 1, weapon_hit: 1}}\n",
+                # A trigger sets it after the YAML's own value is read.
+                f"{GAME}:\n  oxide_goal: any_percent\n  triggers:\n    - option_name: oxide_goal\n"
+                f"      option_result: any_percent\n      options:\n        {GAME}:\n"
+                "          death_link: race_loss\n          death_link_send: [race_loss]\n"), start=1):
+            with self.subTest(body=body):
+                self.check(body, str(seed))
+
+    def test_a_set_option_cannot_turn_it_on(self):
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--set", "death_link=race_loss",
+                                 "--seed", "9")
+        self.assertEqual(code, 0, events)
+        self.assertEqual(self.slot_options(last(events)["room_id"]).get("death_link", 0), 0)
 
 
 class TestRefusals(SoloTestCase):
