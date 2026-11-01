@@ -23,6 +23,8 @@ FIT_ROOM = 5
 #: Spots to spare in front of each fixed Key. Dense pools fill most of them with
 #: other progression (row 8b: 16 Relics asked of 21 spots stalled the fill).
 KEY_SLACK = 12
+#: Largest group of three or more kinds of item.
+MIXED_GROUP = 5
 #: `room` calls of one search. A fair search takes a few dozen.
 PROBES = 300
 
@@ -58,21 +60,37 @@ def search(pool, room, target, reached=None, probes=PROBES):
     def left(held, name):
         return pool[name] - held.count(name)
 
+    def opening(held, spots, groups):
+        """The groups that open something, within the probe budget."""
+        out = []
+        for group in groups:
+            if len(memo) >= probes:
+                break
+            if free(held + group) + len(group) > spots:
+                out.append(group)
+        return out
+
+    def fits(held, group):
+        return all(left(held, name) >= group.count(name) for name in set(group))
+
     def moves(held, spots):
         singles = sorted(((free(held + (name,)), name) for name in sorted(pool) if left(held, name)), reverse=True)
-        opening = [(name,) for after, name in singles if after + 1 > spots]
-        if opening:
-            return opening
+        found = [(name,) for after, name in singles if after + 1 > spots]
+        if found:
+            return found
+        # One or two kinds first: a garage asks that, at any count. Then any mix.
         for size in range(2, spots + 1):
-            groups = [(name,) * size for name in needed if left(held, name) >= size]
-            groups += [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2)
-                       for n in range(1, size) if left(held, a) >= n and left(held, b) >= size - n]
-            if size >= 3:
-                groups += [names for names in itertools.combinations(needed, size)
-                           if all(left(held, name) for name in names)]
-            opening = [group for group in groups if free(held + group) + size > spots]
-            if opening:
-                return opening
+            groups = [(name,) * size for name in needed] + [(a,) * n + (b,) * (size - n)
+                                                            for a, b in itertools.combinations(needed, 2)
+                                                            for n in range(1, size)]
+            found = opening(held, spots, [group for group in groups if fits(held, group)])
+            if found:
+                return found
+        for size in range(3, min(spots, MIXED_GROUP) + 1):
+            found = opening(held, spots, (group for group in itertools.combinations_with_replacement(needed, size)
+                                          if len(set(group)) > 2 and fits(held, group)))
+            if found:
+                return found
         return []
 
     best = (done(()), start, ())
@@ -117,8 +135,9 @@ def term_met(node, held):
 
 def gate_names(plan, by_code, boost_item):
     """Names of the items a pad, garage or boss asks for, with the boost and the
-    racer locks. Other items open at most their own check, so an opening has no use
-    for them, and Lettersanity alone would add over a hundred names to the search."""
+    racer locks. Other items open little more than their own check, so an opening
+    can do without them, and Lettersanity alone would add over a hundred names to
+    the search. That only ever finds less room than the seed has."""
     from .characters import CHARACTER_ID_TO_NAME
     from .progressive_capability import boost_item_name
     codes = set()
@@ -231,6 +250,7 @@ class PlanReach:
                 self.checks.append((code, spot, None, [(region(route), later(route), route, rank(check, route), boost_of(route))
                                                        for route in check["routes"]]))
         self.income = [dict(own_pad_id=pad_id, mode=mode, later=later(dict(own_pad_id=pad_id, mode=mode)),
+                            boost=boost_of(dict(own_pad_id=pad_id)),
                             need=content_capability.finish_boost(track, capability) if capability.get("boost_mode") else 0)
                        for _entry, pad_id, mode, track in content_wumpa.income_routes(plan)]
 
@@ -291,7 +311,7 @@ class PlanReach:
         first = set(opened)
         opened.update(code for code, usable in waiting if any(stage_met(route, first) for _later, route in usable))
         opened -= {code for code, trophy in self.merged.items() if trophy not in opened}
-        income = any(route["need"] <= held.get(self.boost, 0) and region_open[route["own_pad_id"]]
+        income = any(route["need"] <= held.get(route["boost"], 0) and region_open[route["own_pad_id"]]
                      and (not route["later"] or stage_met(route, first)) for route in self.income)
         key = self.code.get("Key")
         opened.update(code for code, _spot, floor, routes in self.checks

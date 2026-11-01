@@ -45,6 +45,22 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(sorted(names), ["Blue", "Green", "Red"])
         self.assertEqual(room, 8)
 
+    def test_a_gate_of_a_mixed_group_opens(self):
+        gate = dict(Trophy=2, Racer=1, Boost=1)
+        names, room = content_opening.search(dict(Trophy=4, Racer=1, Boost=1), spots(4, [(gate, 9)]), 5)
+        self.assertEqual(sorted(names), ["Boost", "Racer", "Trophy", "Trophy"])
+        self.assertEqual(room, 9)
+
+    def test_the_probe_budget_bounds_the_groups(self):
+        calls = []
+
+        def room(held):
+            calls.append(held)
+            return 7
+
+        content_opening.search({f"Item {n}": 3 for n in range(14)}, room, 9, probes=300)
+        self.assertLess(len(set(calls)), 340)
+
     def test_the_search_stops_at_its_target(self):
         names, room = content_opening.search(dict(Key=4), spots(1, [(dict(Key=1), 6), (dict(Key=2), 90)]), 5)
         self.assertEqual((names, room), (["Key"], 6))
