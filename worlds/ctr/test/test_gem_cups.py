@@ -142,11 +142,12 @@ class TestGemCupsShuffledCupsOff(CupPinningMixin, CTRTestBase):
         # total supply of each Gem is untouched.
         for gem in GEM_NAMES:
             with self.subTest(gem=gem):
-                pinned = sum(1 for loc in self._cup_locations()
+                # The start bootstrap may have seated a Gem on any check.
+                placed = sum(1 for loc in self.multiworld.get_locations(self.player)
                              if loc.item and loc.item.name == gem)
                 pooled = sum(1 for item in self.multiworld.itempool
                              if item.player == self.player and item.name == gem)
-                self.assertEqual(pinned + pooled, _item_table_count(gem))
+                self.assertEqual(placed + pooled, _item_table_count(gem))
 
 
 class TestGemCupsOn(CupPinningMixin, CTRTestBase):
@@ -172,17 +173,22 @@ class TestGemCupsOn(CupPinningMixin, CTRTestBase):
                     f"on-state must keep them as multiworld checks")
 
     def test_cup_checks_remain_fillable(self):
-        unfilled = {loc.name
-                    for loc in self.multiworld.get_unfilled_locations(self.player)}
+        # A check the start bootstrap seated took a pool item, so it stayed fillable.
+        pins = content_fixed.plan_placements(self.world.ctr_content_plan)
+        fillable = {loc.name for loc in self.multiworld.get_locations(self.player)
+                    if loc.address not in pins}
         for name in CUP_LOCATIONS:
             with self.subTest(location=name):
-                self.assertIn(name, unfilled)
+                self.assertIn(name, fillable)
 
     def test_gems_stay_in_pool(self):
         for gem in GEM_NAMES:
             with self.subTest(gem=gem):
+                # The start bootstrap may have seated a Gem on a check in pre_fill.
                 in_pool = [item for item in self.multiworld.itempool
                            if item.player == self.player and item.name == gem]
+                in_pool += [loc.item for loc in self.multiworld.get_locations(self.player)
+                            if loc.item is not None and loc.item.name == gem]
                 self.assertEqual(len(in_pool), _item_table_count(gem))
 
 
