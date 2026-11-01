@@ -67,6 +67,9 @@ def search(pool, room, target, reached=None, probes=PROBES):
             groups = [(name,) * size for name in needed if left(held, name) >= size]
             groups += [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2)
                        for n in range(1, size) if left(held, a) >= n and left(held, b) >= size - n]
+            if size >= 3:
+                groups += [names for names in itertools.combinations(needed, size)
+                           if all(left(held, name) for name in names)]
             opening = [group for group in groups if free(held + group) + size > spots]
             if opening:
                 return opening
@@ -117,6 +120,7 @@ def gate_names(plan, by_code, boost_item):
     racer locks. Other items open at most their own check, so an opening has no use
     for them, and Lettersanity alone would add over a hundred names to the search."""
     from .characters import CHARACTER_ID_TO_NAME
+    from .progressive_capability import boost_item_name
     codes = set()
 
     def walk(node):
@@ -129,8 +133,11 @@ def gate_names(plan, by_code, boost_item):
     for row in plan["requirements"]:
         walk(row["predicate"])
     names = {by_code[code] for code in codes if code in by_code}
-    names.update(CHARACTER_ID_TO_NAME[pad["racer_lock"]] for pad in plan["pads"] if pad["racer_lock"] is not None)
-    return names | ({boost_item} if boost_item else set())
+    racers = {CHARACTER_ID_TO_NAME[pad["racer_lock"]] for pad in plan["pads"] if pad["racer_lock"] is not None}
+    names |= racers | ({boost_item} if boost_item else set())
+    if plan.get("capability", {}).get("boost_mode") == 2:
+        names.update(boost_item_name(racer) for racer in racers)
+    return names
 
 
 class PlanReach:
@@ -142,7 +149,9 @@ class PlanReach:
     Itemsanity and Hit checks, whose rules ask for a weapon or a kart."""
 
     def __init__(self, plan, rows, excluded, boost_item):
+        from .characters import CHARACTER_ID_TO_NAME
         from .content_plan import first_race_checks, letter_requirements, merged_race
+        from .progressive_capability import boost_item_name
         self.req = {row["id"]: row["predicate"] for row in plan["requirements"]}
         self.pads = {pad["id"]: pad for pad in plan["pads"]}
         self.encounters = {e["id"]: e for e in plan["encounters"]}
@@ -202,6 +211,13 @@ class PlanReach:
             gates = self.pads[route["own_pad_id"]]["mode_gates"]
             return bool(gates) and gates[0]["mode"] != route["mode"]
 
+        def boost_of(route):
+            # Per racer boost: a locked pad counts that racer's own ranks.
+            lock = self.pads[route["own_pad_id"]]["racer_lock"]
+            if capability.get("boost_mode") != 2 or lock is None:
+                return self.boost
+            return self.code.get(boost_item_name(CHARACTER_ID_TO_NAME[lock]))
+
         self.checks = []
         for check in plan["checks"]:
             code = check["location"]
@@ -212,7 +228,7 @@ class PlanReach:
                 spot = spot and spare_shop
                 self.checks.append((code, spot, floors[code], None))
             else:
-                self.checks.append((code, spot, None, [(region(route), later(route), route, rank(check, route))
+                self.checks.append((code, spot, None, [(region(route), later(route), route, rank(check, route), boost_of(route))
                                                        for route in check["routes"]]))
         self.income = [dict(own_pad_id=pad_id, mode=mode, later=later(dict(own_pad_id=pad_id, mode=mode)),
                             need=content_capability.finish_boost(track, capability) if capability.get("boost_mode") else 0)
@@ -244,7 +260,6 @@ class PlanReach:
                 held[item] = held.get(item, 0) + 1
 
     def _open(self, held):
-        rank = held.get(self.boost, 0)
         region_open = {pad_id: pad["entry_id"] is not None and self._pad_open(pad, held)
                        for pad_id, pad in self.pads.items()}
         for encounter in self.encounters.values():
@@ -267,7 +282,8 @@ class PlanReach:
         for code, _spot, _floor, routes in self.checks:
             if routes is None or not letters_held(code):
                 continue
-            usable = [(later, route) for own, later, route, need in routes if need <= rank and region_open[own]]
+            usable = [(later, route) for own, later, route, need, boost in routes
+                      if need <= held.get(boost, 0) and region_open[own]]
             if any(not later for later, _route in usable):
                 opened.add(code)
             elif usable:
@@ -275,7 +291,7 @@ class PlanReach:
         first = set(opened)
         opened.update(code for code, usable in waiting if any(stage_met(route, first) for _later, route in usable))
         opened -= {code for code, trophy in self.merged.items() if trophy not in opened}
-        income = any(route["need"] <= rank and region_open[route["own_pad_id"]]
+        income = any(route["need"] <= held.get(self.boost, 0) and region_open[route["own_pad_id"]]
                      and (not route["later"] or stage_met(route, first)) for route in self.income)
         key = self.code.get("Key")
         opened.update(code for code, _spot, floor, routes in self.checks

@@ -1654,7 +1654,8 @@ def draw_plan(world, key_estimate=True):
                     and not (settings.get("lettersanity") in (2, 3) and check["kind"] in ("ctr", "letter")))
 
         open_entries = {pad["entry_id"] for pad in pads if pad["id"] in open_pads}
-        banks = any(banks_fruit(t) for t in standalone if "entry/" + t["id"] in open_entries)
+        banks = any(banks_fruit(t) and not (capability.get("boost_mode") and content_capability.finish_boost(t, capability))
+                    for t in standalone if "entry/" + t["id"] in open_entries)
         near_key = sum(map(holds_before_key, checks)) + (first_hub_slots if shop and banks else 0)
         garage_reqs = content_fixed.draw_garages(world, boss_record, world.ctr_content_items.rows, unlock_mode == 0,
                                                  pins, pads, near_key)

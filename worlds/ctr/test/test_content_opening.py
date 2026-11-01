@@ -40,6 +40,11 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(sorted(names), ["Key", "Trophy", "Trophy"])
         self.assertEqual(room, 8)
 
+    def test_a_gate_of_three_different_items_is_a_group(self):
+        names, room = content_opening.search(dict(Red=1, Blue=1, Green=1), spots(3, [(dict(Red=1, Blue=1, Green=1), 8)]), 5)
+        self.assertEqual(sorted(names), ["Blue", "Green", "Red"])
+        self.assertEqual(room, 8)
+
     def test_the_search_stops_at_its_target(self):
         names, room = content_opening.search(dict(Key=4), spots(1, [(dict(Key=1), 6), (dict(Key=2), 90)]), 5)
         self.assertEqual((names, room), (["Key"], 6))
@@ -76,6 +81,19 @@ class TestPlanReach(unittest.TestCase):
 
     def test_it_reads_vanilla_requirements(self):
         self.assert_matches(VANILLA, range(3))
+
+    def test_a_locked_pad_counts_its_own_racers_boost(self):
+        world = make_world(dict(progressive_boost="per_character", character_unlocks=True, racer_locked_pads=8),
+                           seed=1, stop_before="pre_fill")
+        plan = world.ctr_content_plan
+        start = sphere0_guard.starting_boost_item(world)
+        reach = content_opening.PlanReach(plan, world.ctr_content_items.rows, set(), start)
+        locked = [pad["id"] for pad in plan["pads"] if pad["racer_lock"] is not None]
+        self.assertTrue(locked)
+        for _code, _spot, _floor, routes in reach.checks:
+            for _own, _later, route, _need, boost in routes or ():
+                if route["own_pad_id"] in locked:
+                    self.assertNotEqual(boost, reach.code[start])
 
     def test_it_reads_a_fixed_first_key(self):
         self.assert_matches(TIGHT, range(3))
