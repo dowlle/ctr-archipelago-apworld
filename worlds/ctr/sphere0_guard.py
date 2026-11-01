@@ -489,6 +489,7 @@ def _seat_first_key(world, state):
     if chosen is None:
         return state
     _lock(world, chosen)
+    world._ctr_start_bootstrap = [(item.name, location.name) for item, location in chosen]
     return _collect(world, state, [])
 
 
@@ -649,4 +650,4 @@ def bootstrap_start(world) -> None:
             _lock(world, chosen)
             placed = [(item.name, location.name) for item, location in chosen]
     if placed:
-        world._ctr_start_bootstrap = placed
+        world._ctr_start_bootstrap = getattr(world, "_ctr_start_bootstrap", []) + placed
