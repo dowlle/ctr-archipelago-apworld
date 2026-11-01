@@ -1327,7 +1327,8 @@ class CustomTracks(OptionList):
     to you: use it as it is. The game checks the files against it when it loads
     the track. A custom track takes the place of an original track on a pad,
     and a seed with more tracks than pads leaves some out. `required_entries`
-    keeps one in the seed. A track with a named block keeps its own check names
+    keeps one in the seed. A YAML may list up to 132 tracks. A track with a
+    named block keeps its own check names
     (for example "Baby T Park: Trophy Race"). Any other track shows its title,
     and a title that matches an original track gets "(Custom)" added.
 

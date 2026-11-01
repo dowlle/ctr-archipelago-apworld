@@ -138,9 +138,9 @@ class TestAdmission(unittest.TestCase):
         same_uuid["uuid"] = UNKNOWN["uuid"]
         with self.assertRaisesRegex(custom_packages.PackageError, "package uuid"):
             custom_packages.admit_all([UNKNOWN, same_uuid])
-        with self.assertRaisesRegex(custom_packages.PackageError, "at most 32"):
-            custom_packages.admit_all([UNKNOWN] * 33)
-        with self.assertRaisesRegex(custom_packages.PackageError, "at most 32"):
+        with self.assertRaisesRegex(custom_packages.PackageError, "at most 132"):
+            custom_packages.admit_all([UNKNOWN] * 133)
+        with self.assertRaisesRegex(custom_packages.PackageError, "at most 132"):
             custom_packages.admit_all({"fixture-loop": UNKNOWN})
 
 

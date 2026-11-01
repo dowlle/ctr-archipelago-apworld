@@ -83,8 +83,8 @@ OPTIONAL = ("relic_targets", "locator")
 LOCATOR_REQUIRED = ("kind", "patch_sha256", "bigfile_index")
 LOCATOR_OPTIONAL = ("patch_name", "source_url")
 BIGFILE_INDEX_MAX = 4095
-#: The most descriptors one content plan may list; also the generic slot count.
-MAX_PACKAGES = 32
+#: The most descriptors one seed may list, one per generic slot.
+MAX_PACKAGES = 132
 MAX_LAPS = 7  # GameTracker.lapTime has seven entries
 LEV_MAX_BYTES = 16 * 1024 * 1024  # native_custom_content_verify.c LEV_MAX
 VRM_MAX_BYTES = 4 * 1024 * 1024  # native_custom_content_verify.c VRM_MAX

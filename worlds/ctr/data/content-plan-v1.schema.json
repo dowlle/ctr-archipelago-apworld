@@ -17,7 +17,7 @@
       "items": {
         "$ref": "#/$defs/Track"
       },
-      "maxItems": 132,
+      "maxItems": 151,
       "minItems": 0
     },
     "entries": {

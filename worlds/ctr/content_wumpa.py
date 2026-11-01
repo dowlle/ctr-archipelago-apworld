@@ -239,6 +239,27 @@ def income_routes(plan):
     return sorted(out, key=lambda r: (int(r[1].split(":")[1]), INCOME_MODES.index(r[2])))
 
 
+def keep_income_track(world, chosen, drawn, optional):
+    """The tracks drawn for the pads, with one swapped for a track that can bank
+    fruit when the shop or the Wumpa goal needs one and the draw left none. A long
+    `custom_tracks` list leaves that to chance on a seed check_income then refuses,
+    so a seed that had one draws as before and no draw is ever refused for this."""
+    o = world.options
+    if not (o.wumpa_shop_slots.value or goal_count(o)) or not drawn or any(_earns(t) for t in chosen):
+        return drawn
+    spare = [t for t in optional if _earns(t) and t not in drawn]
+    if not spare:
+        return drawn
+    kept = list(drawn)
+    kept[world.random.randrange(len(kept))] = world.random.choice(spare)
+    return kept
+
+
+def _earns(track):
+    return (track.get("origin") == "retail" and 0 <= track.get("retail_id", -1) <= INCOME_RETAIL_MAX
+            and any(mode in track["modes"] for mode in INCOME_MODES))
+
+
 def check_income(plan):
     if banking(plan) and not income_routes(plan):
         error("the Wumpa Shop and the Wumpa goal need a Trophy Race or CTR Challenge on a retail race track "
