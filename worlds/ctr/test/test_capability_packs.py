@@ -489,7 +489,9 @@ class TestStartBootstrap(unittest.TestCase):
         self.assertFalse(names & {"Red CTR Token", "Key"})
 
     def test_placed_items_sit_in_starting_checks_of_the_slot(self):
-        world = make_world(self.fixture("content_plan_bosses_fuzz505_2601.yaml"), seed=5)
+        # A plan draws again when its opening does not fit, so look for a narrow start.
+        worlds = (make_world(self.fixture("content_plan_bosses_fuzz505_2601.yaml"), seed=seed) for seed in range(5, 40))
+        world = next(world for world in worlds if hasattr(world, "_ctr_start_bootstrap"))
         mw = world.multiworld
         state = CollectionState(mw)
         for name, location in world._ctr_start_bootstrap:
