@@ -1,4 +1,3 @@
   boss_kit_shuffle: true
   purple_cup_boss_gauntlet: true
   boss_opponent_shuffle: {true: 1, false: 1}
-  boss_oxide_in_pool: false

@@ -1,34 +1,18 @@
 """Cups on content plans (#133 PR 5).
 
-A content plan may seat cups on its 27 normal pads. `content_pool.cups`
-asks for a `count`, exact or an inclusive `{min, max}` range, and optionally
-a `composition`. With crystals also drawn from a range, the generator
-chooses uniformly among the feasible (cups, crystals) pairs instead of
-drawing one count and trimming the other (implementation packet, Proposed
-authoring surface). Tracks fill the remaining pads as before.
+A content plan seats `cup_count` cups on its 27 normal pads. Tracks fill the
+remaining pads.
 
-COMPOSITION. A cup has exactly four ordered legs, drawn from the seed's own
-tracks:
+LEGS. A cup has exactly four ordered legs, drawn from the seed's own tracks:
+the 16 retail race tracks of `retail_tracks` (no trial track), the custom tracks
+that can run a Trophy race (eight karts with AI paths) and Cortex Vortex when
+`cortex_vortex_track` is on. `cup_custom_legs` is the most custom and Cortex
+Vortex legs per cup. A track may always lead several cups.
 
-  * `sources`: which tracks a leg may be, any of `retail` (the 16 retail race
-    tracks of the `tracks.retail` selection, no trial track, as the #166 Gem
-    Cup pool clamp), `custom` (the selected custom tracks that can run a
-    Trophy race: eight karts with AI paths) and `cortex_vortex` (when
-    `tracks.cortex_vortex` is on). Default: all three.
-  * `custom_legs`: `{min, max}` custom and Cortex Vortex legs per cup, default
-    0 to 4.
-  * `repeats`: `within_cup` (default false: four different tracks per cup)
-    and `across_cups` (default true: a track may lead several cups), the
-    shape of the retail Gem Cups. These defaults are engineering choices.
-
-CUP TRACKS (`tracks`, ruled 2026-10-30). `off`: a Gem Cup races its original
+CUP TRACKS (`cup_tracks`, ruled 2026-10-30). `off`: a Gem Cup races its original
 four tracks (data/gem_cup_legs.json) and a sixth cup onward draws as
-`random_no_repeats`. `random`: every leg is drawn, repeats allowed.
-`random_no_repeats`, the default: four different tracks per cup. An explicit
-`tracks` decides repeats within a cup and wins over
-`composition.repeats.within_cup`; without it that older key still picks between
-the two drawn values, until row 7 removes it. `composition` shapes drawn cups
-only, never the original legs of `off`.
+`random_no_repeats`. `random` (`random_repeats`): every leg is drawn, repeats allowed.
+`random_no_repeats`, the default: four different tracks per cup.
 
 GEM CUPS (ruled 2026-10-30). The first five cups of a plan are the original Gem
 Cups, Red first, with their names and frozen checks; a plan with fewer keeps the
@@ -107,51 +91,14 @@ def error(message):
     raise OptionError("CTR content plan: " + message)
 
 
-def _bounds(value, path, ceiling):
-    if type(value) is int:
-        low = high = value
-    elif isinstance(value, dict) and set(value) == {"min", "max"} and all(type(v) is int for v in value.values()):
-        low, high = value["min"], value["max"]
-    else:
-        error(f"{path} must be an exact count or {{min, max}}. The requested settings were not changed.")
-    if not 0 <= low <= high <= ceiling:
-        error(f"{path} must satisfy 0 <= min <= max <= {ceiling}. The requested settings were not changed.")
-    return low, high
-
-
-def settings(raw):
-    """The `content_pool.cups` record, checked: {bounds, repeats, sources,
-    custom_legs, tracks}. `count` stays required (an explicit 0 for no cups)."""
-    if not isinstance(raw, dict) or set(raw) - {"count", "composition", "tracks"}:
-        error("content_pool.cups must be a mapping with only count, tracks and composition.")
-    if "count" not in raw:
-        error("cups.count is required; use an explicit 0 for no cups. The requested settings were not changed.")
-    bounds = _bounds(raw["count"], "cups.count", PADS)
-    composition = raw.get("composition", {})
-    if not isinstance(composition, dict) or set(composition) - {"repeats", "sources", "custom_legs"}:
-        error("cups.composition must be a mapping with only repeats, sources and custom_legs.")
-    repeats = composition.get("repeats", {})
-    if not isinstance(repeats, dict) or set(repeats) - set(REPEAT_KEYS):
-        error("cups.composition.repeats must be a mapping with only within_cup and across_cups.")
-    out = dict(DEFAULT_REPEATS)
-    for key, value in repeats.items():
-        if type(value) is not bool:
-            error(f"cups.composition.repeats.{key} must be true or false.")
-        out[key] = value
-    sources = composition.get("sources", list(SOURCES))
-    if (not isinstance(sources, list) or not sources or any(s not in SOURCES for s in sources)
-            or len(set(sources)) != len(sources)):
-        error("cups.composition.sources must be a nonempty list of distinct sources from retail, custom "
-              "and cortex_vortex.")
-    custom = _bounds(composition.get("custom_legs", {"min": 0, "max": LEGS}), "cups.composition.custom_legs", LEGS)
-    # A YAML `off` reaches us as false.
-    tracks = "off" if raw.get("tracks") is False else raw.get("tracks", "")
-    if "tracks" not in raw:
-        tracks = "random" if out["within_cup"] else "random_no_repeats"
-    elif tracks not in CUP_TRACKS:
-        error("cups.tracks must be off, random or random_no_repeats.")
-    out["within_cup"] = tracks == "random"
-    return dict(bounds=bounds, repeats=out, sources=set(sources), custom_legs=custom, tracks=tracks)
+def settings(options):
+    """The seed's cup settings from `cup_count`, `cup_tracks` and `cup_custom_legs`:
+    {bounds, repeats, sources, custom_legs, tracks}. A track may always lead
+    several cups."""
+    count = int(options.cup_count.value)
+    tracks = CUP_TRACKS[int(options.cup_tracks.value)]
+    return dict(bounds=(count, count), repeats=dict(DEFAULT_REPEATS, within_cup=tracks == "random"),
+                sources=set(SOURCES), custom_legs=(0, int(options.cup_custom_legs.value)), tracks=tracks)
 
 
 def leg_pools(candidates, packages, sources):

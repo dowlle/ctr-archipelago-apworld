@@ -8,6 +8,12 @@ available setting and value documented inside it. The defaults provide the full
 randomizer experience. For a gentler first seed, use vanilla warp-pad unlock
 requirements or reduce the two-stage gate and trap settings.
 
+A YAML that sets no content gets the original game's shape: the 18 original race
+tracks, 5 Gem Cups, 4 Crystal Challenges and the five garages, shuffled onto the
+27 warp pads, with the cup races drawn. Custom tracks and Cortex Vortex join the
+same pool. YAML files from v0.2.x need a new look: option names that are gone are
+ignored without a message. A v0.2.x room plays on the v0.2.4 client only.
+
 ## What does randomization do to this game?
 
 CTR Archipelago turns Adventure mode into a multiworld. A seed can randomize
@@ -76,19 +82,17 @@ broken (the crate counter reads full). It needs the same access as that
 track's Sapphire Time Trial. With Progressive Boost on, every perfect check
 also needs Ultimate Sacred Fire at every Logic Difficulty, because some time
 crates sit on routes that need boost.
-If Cortex Vortex Track takes a track's pad, that track has no Relic Race and
-no perfect check.
 
 ### Wumpa Check
 
-With `per_track`, Slide Coliseum and Turbo Track only have a Wumpa check when
-their Trophy Race is in the seed. If Cortex Vortex Track takes the pad of a
-boss track, that track keeps its Wumpa check, paid from the boss race. The old
-`true` and `false` values still work and mean `global` and `off`.
+With `per_track`, every track with a Trophy Race or CTR Challenge in the seed has
+a Wumpa check. A boss track that races nowhere else keeps its Wumpa check, paid
+from the boss race. The old `true` and `false` values still work and mean
+`global` and `off`.
 
 ### Wumpa Shop and Wumpa Goal
 
-The shop and the goal work with `content_pool` only for now. With the shop or a Wumpa goal on, every fruit you collect while already holding
+With the shop or a Wumpa goal on, every fruit you collect while already holding
 10 is banked, and so is the fruit you hold when you finish a race. Fruit you
 receive that would take you past 10 is banked too, even outside a race.
 Quitting or restarting a race banks nothing you hold, and neither does a race
@@ -123,15 +127,17 @@ its Key and the garage door requirement do not change. The garage shows the
 drawn track, and so does the in-game tracker. A boss race on another track
 pays that track's Wumpa check, and its finish needs whatever that track
 needs, such as Ultimate Sacred Fire on Hot Air Skyway with Progressive Boost
-on. N. Oxide and the Purple Gem Cup are not affected. Allowlist and
-Blocklist narrow the tracks; if they leave too few tracks for four different
-boss tracks, generation stops with an error.
+on. N. Oxide is not affected. Boss Track Pool narrows the tracks, and it also
+takes Cortex Vortex and custom tracks that are in the seed. If it leaves too few
+tracks for different boss tracks, generation stops with an error. A boss cup
+needs four different tracks of its own.
 
 ### Cortex Vortex Track
 
-Destination shuffle can move Cortex Vortex like any other destination, and it
-can be a Gem Cup leg when Randomize Gem Cup Tracks is on. With Progressive
-Boost on, its finish checks need two Progressive Boosts.
+With `in_pool` the seed may use Cortex Vortex on a warp pad or as a cup race, or
+not at all. With `own_pad` it is sure to get a pad. It takes no other content's
+checks with it. With Progressive Boost on, its finish checks need two Progressive
+Boosts.
 
 ### Racer-Locked Warp Pads
 
@@ -166,7 +172,6 @@ trap_weights:
 For example, to ask for Keys and Sapphire Relics more often than Trophies:
 
 ```yaml
-requirement_variety: custom
 requirement_weights:
   Trophy: 30
   Key: 40
@@ -200,11 +205,13 @@ random_without_4_keys refuses a rule of 4 Keys.
 
 ### Custom Tracks
 
-The entry must match a track package this version of the apworld knows,
-field for field, so copy it rather than writing it. The game checks the
-track's files against the entry when you connect. If they do not match, it
-does not load the custom track and the Purple Gem Cup runs its four normal
-tracks instead.
+`custom_tracks` is a list of track packages. Copy each entry from the track's
+download rather than writing it. The game checks the track's files against the
+entry when you connect. A custom track joins the pool with the original tracks,
+so a seed with more tracks than pads may leave it out; list its track key in
+`required_entries` to keep it. Cups take custom tracks up to Custom Races Per Cup.
+A pad needs the track installed, and the Custom Content page shows what a seed
+asks for.
 
 ## Which items can be in another player's world?
 

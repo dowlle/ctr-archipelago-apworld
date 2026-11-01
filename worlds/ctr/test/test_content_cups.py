@@ -21,7 +21,7 @@ def cup_options(seed=0):
     sweeps, boost, racer locks and custom tracks."""
     options = profile_options()
     pool = options["content_pool"]
-    pool["tracks"]["modes"] = [["trophy"], ["trophy", "ctr", "relic"], ["ctr", "relic"]][seed % 3]
+    pool["tracks"]["modes"] = [["trophy"], ["trophy", "ctr", "relic"], ["trophy", "relic"]][seed % 3]
     pool["tracks"]["custom"] = [[copy.deepcopy(content_plan.PACKAGES[1])],
                                 [copy.deepcopy(content_plan.PACKAGES[1]), named_fixture(), copy.deepcopy(UNKNOWN)],
                                 []][seed % 3]
@@ -113,35 +113,20 @@ class TestCupDraw(unittest.TestCase):
         self.assertFalse(cups_of(plan))
         self.assertNotIn(content_cups.FEATURE, plan["required_features"])
 
-    def test_across_cups_off_keeps_tracks_apart(self):
-        options = cup_options(2)
-        options["content_pool"]["cups"]["count"] = 4
-        generated = 0
-        for seed in range(12):
-            try:
-                plan = make_world(options, seed=seed).ctr_content_plan
-            except OptionError as exc:  # the boost terms can leave a narrow start
-                self.assertIn("at the start", str(exc))
-                continue
-            generated += 1
-            legs = [leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]]
-            self.assertEqual(len(legs), len(set(legs)))
-        self.assertGreater(generated, 0)
-
     def test_custom_leg_range(self):
         options = cup_options(1)
         options["content_pool"]["tracks"]["custom"] = [copy.deepcopy(content_plan.PACKAGES[1]), named_fixture()]
-        options["content_pool"]["cups"] = dict(count=3, composition=dict(custom_legs=dict(min=1, max=2)))
+        options["content_pool"]["cups"] = dict(count=3, composition=dict(custom_legs=dict(max=2)))
         for seed in range(6):
             plan = make_world(options, seed=seed).ctr_content_plan
             tracks = {t["id"]: t for t in plan["tracks"]}
             for cup in cups_of(plan):
                 custom = sum(tracks[leg["track_id"]]["origin"] != "retail" for leg in cup["legs"])
-                self.assertTrue(1 <= custom <= 2)
+                self.assertLessEqual(custom, 2)
 
     def test_retail_legs_are_race_tracks(self):
         options = cup_options(0)
-        options["content_pool"]["cups"] = dict(count=3, composition=dict(sources=["retail"]))
+        options["content_pool"]["cups"] = dict(count=3, composition=dict(custom_legs=dict(max=0)))
         plan = make_world(options).ctr_content_plan
         for cup in cups_of(plan):
             for leg in cup["legs"]:
@@ -155,17 +140,10 @@ class TestCupDraw(unittest.TestCase):
 
     def test_refusals(self):
         for name, change, text in [
-                ("count missing", lambda o: o["content_pool"]["cups"].pop("count"), "cups.count is required"),
-                ("count too high", lambda o: o["content_pool"]["cups"].__setitem__("count", 28), "cups.count"),
-                ("bad source", lambda o: o["content_pool"]["cups"].__setitem__(
-                    "composition", dict(sources=["trial"])), "sources"),
-                ("no fit", lambda o: o["content_pool"]["cups"].__setitem__(
-                    "composition", dict(repeats=dict(within_cup=False, across_cups=False))), "no cup and crystal"),
-                ("custom legs without custom", lambda o: o["content_pool"]["cups"].__setitem__(
-                    "composition", dict(sources=["retail"], custom_legs=dict(min=1, max=4))), "no cup and crystal")]:
+                ("no fit", lambda o: o["content_pool"]["tracks"].__setitem__("retail", [0, 1, 2]), "do not fit")]:
             with self.subTest(name):
                 options = cup_options(2)
-                options["content_pool"]["cups"]["count"] = 5 if name == "no fit" else 1
+                options["content_pool"]["cups"]["count"] = 1
                 change(options)
                 with self.assertRaisesRegex(OptionError, text):
                     make_world(options)
@@ -204,7 +182,7 @@ class TestCupChecks(unittest.TestCase):
         options = cup_options(2)
         options["progressive_boost"] = "shared_global"
         options["logic_difficulty"] = "hard"
-        options["content_pool"]["cups"] = dict(count=6, composition=dict(sources=["retail"]))
+        options["content_pool"]["cups"] = dict(count=6, composition=dict(custom_legs=dict(max=0)))
         found = False
         for seed in range(30):
             try:

@@ -103,9 +103,9 @@ class TestContentBossShuffle(unittest.TestCase):
         tracker = make_world(dict(boss_opponent_shuffle=False, boss_character_blocklist=["Crash Bandicoot"]),
                              seed=999, passthrough=wire)
         o = tracker.options
-        self.assertEqual((o.boss_opponent_shuffle.value, o.boss_kit_shuffle.value, o.boss_oxide_in_pool.value,
-                          o.oxide_attack_profile.value), (1, 1, 1, 1))
-        self.assertEqual(o.boss_character_blocklist.value, set())
+        self.assertEqual((o.boss_opponent_shuffle.value, o.boss_kit_shuffle.value,
+                          "Nitros Oxide" in o.boss_character_pool.value, o.oxide_attack_profile.value), (1, 1, True, 1))
+        self.assertIn("Crash Bandicoot", o.boss_character_pool.value)
         self.assertEqual(tracker.fill_slot_data(), wire)
 
     def test_forged_plans_refuse(self):
@@ -250,11 +250,7 @@ class TestContentBossShuffleDraws(unittest.TestCase):
         self.assertTrue(content_plan.validate(plan))
 
     def test_refusals(self):
-        off = boss_options(boss_kit_shuffle=True, wumpa_shop_slots=0, oxide_goal="disabled", gems_required_goal=2)
-        off["content_pool"]["bosses"]["enabled"] = False
-        with self.assertRaises(OptionError):
-            make_world(off, seed=1)
-        small = shuffle_options(boss_character_allowlist=["Crash Bandicoot", "Coco Bandicoot", "Polar", "Pura"])
+        small = shuffle_options(boss_character_allowlist=["Crash Bandicoot", "Coco Bandicoot", "Polar"])
         with self.assertRaises(OptionError) as caught:
             make_world(small, seed=1)
         self.assertIn("never repeat", str(caught.exception))

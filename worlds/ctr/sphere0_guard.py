@@ -400,6 +400,41 @@ def _next_openers(world, state, start, pool):
     return list(max(sorted(groups), key=lambda g: (groups[g] - start) / len(g)))
 
 
+def _seat_first_key(world, state) -> None:
+    """With vanilla requirements a fixed first Key waits behind its garage's
+    Trophies, and on a narrow start only a few checks stand in front of it. Left
+    to the fill, other items take those checks and the last Trophies have nowhere
+    to go. So the path generate found (content_fixed.first_key_path) is seated
+    here, on the hub's Wumpa Shop when the pads run out. Takes nothing that no
+    longer fits. Random requirements take no path: seating a drawn garage's items
+    measured worse than leaving them to the fill (10 against 2 failures in 1,200)."""
+    from BaseClasses import LocationProgressType
+    mw, player = world.multiworld, world.player
+    marked = mw.local_early_items.setdefault(player, {})
+    for step in getattr(world, "ctr_first_key_path", ()):
+        name = starting_boost_item(world) if step == "boost" else step
+        # A player's non_local_items stay out of their own start.
+        if name in world.options.non_local_items.value:
+            return
+        item = next((item for item in mw.itempool if item.player == player and item.name == name), None)
+        if item is None:
+            return
+        spots = _open_empty(world, state) or [
+            loc for loc in mw.get_unfilled_locations(player)
+            if loc.address is not None and loc.progress_type != LocationProgressType.EXCLUDED
+            and loc.can_reach(state) and loc.can_fill(state, item, True)]
+        if not spots:
+            return
+        location = world.random.choice(sorted(spots, key=lambda loc: loc.name))
+        del mw.itempool[next(i for i, pooled in enumerate(mw.itempool) if pooled is item)]
+        location.place_locked_item(item)
+        if marked.get(name):
+            marked[name] -= 1
+            if not marked[name]:
+                del marked[name]
+        state.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+
+
 def bootstrap_start(world) -> None:
     """Content plans: place openers in this slot's start until at least
     bootstrap_target checks are open and empty (see above). Runs in
@@ -408,6 +443,7 @@ def bootstrap_start(world) -> None:
     mw, player = world.multiworld, world.player
     target = bootstrap_target(world)
     state = _base_state(world)
+    _seat_first_key(world, state)
     # The start as AP's early pass sees it: only event items (no address) are
     # swept, placed items never are.
     base = CollectionState(mw)

@@ -91,7 +91,7 @@ class TestBossCups(unittest.TestCase):
 
     def test_home_tracks_do_not_limit_a_cup_garage(self):
         o = options(bosses=dict(cups=4), boss_track_shuffle=True, boss_opponent_shuffle=True,
-                    boss_track_allowlist=["Roo's Tubes"])
+                    boss_track_allowlist=["Roo's Tubes", "Crash Cove", "Mystery Caves", "Sewer Speedway"])
         self.assertEqual(sorted(make_world(o, seed=1).ctr_content_plan["bosses"]["cups"]), [0, 1, 2, 3])
 
     def test_a_forged_cup_kit_is_refused(self):
@@ -255,16 +255,3 @@ class TestSpoilerItems(unittest.TestCase):
         again.multiworld.re_gen_passthrough = {again.game: wire}
         content_plan.restore(again, wire)
         self.assertEqual(again.options.spoiler_items.value, 1)
-
-
-class TestDefaultPath(unittest.TestCase):
-    def test_a_yaml_without_content_pool_ignores_row_5(self):
-        extras = dict(adventure_structure="ctr_first", goal_wumpa=500, wumpa_shop_slots=25, spoiler_items=True,
-                      boss_opponent_shuffle=True, boss_kit_shuffle=True, purple_cup_boss_gauntlet=True)
-        plain = make_world({}, seed=8, stop_before="pre_fill")
-        loud = make_world(extras, seed=8, stop_before="pre_fill")
-        names = lambda w: sorted(l.name for l in w.multiworld.get_locations(w.player))
-        items = lambda w: sorted(i.name for i in w.multiworld.itempool)
-        self.assertEqual(names(plain), names(loud))
-        self.assertEqual(items(plain), items(loud))
-        self.assertFalse(hasattr(plain, "ctr_content_plan"))

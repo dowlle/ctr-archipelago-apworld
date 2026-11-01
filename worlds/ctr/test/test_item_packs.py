@@ -188,7 +188,7 @@ class TestEnvelope(unittest.TestCase):
 
 class TestTrackerAndFill(unittest.TestCase):
     def test_tracker_restores_packs_and_envelope(self):
-        options = pack_options(psw=5, death_link="any_hit", death_link_send=["race_loss"],
+        options = pack_options(psw=5, death_link="race_loss", death_link_send=["race_loss"],
                                warp_pad_item_display="by_reward_type", ap_item_type_colors=False)
         world = make_world(options, seed=11)
         wire = json.loads(json.dumps(world.fill_slot_data()))

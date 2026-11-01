@@ -76,16 +76,6 @@ class TestOffKeepsThePlan(unittest.TestCase):
                 self.assertEqual(make_world(absent, seed=seed).ctr_content_plan,
                                  make_world(cv_options(cortex=False, perfect=False), seed=seed).ctr_content_plan)
 
-    def test_cortex_vortex_must_be_a_boolean(self):
-        for value in (1, "true", None):
-            with self.subTest(value=value), self.assertRaisesRegex(OptionError, "cortex_vortex"):
-                make_world(cv_options(cortex=value, required=False), seed=1)
-
-    def test_legacy_cortex_track_still_refused(self):
-        with self.assertRaisesRegex(OptionError, "legacy custom_tracks/cortex_vortex_track"):
-            make_world(cv_options(cortex_vortex_track="on"), seed=1)
-
-
 class TestCortexVortexTrack(unittest.TestCase):
     def test_record_modes_and_frozen_codes(self):
         world = make_world(cv_options(podium_placement_checks=True, wumpa_check="per_track",

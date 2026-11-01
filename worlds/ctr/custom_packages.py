@@ -7,7 +7,7 @@ names the field. The apworld cannot see the track's files: native checks the
 bytes against the pins when it loads them, and refuses a package whose bytes
 lack a capability the descriptor claims.
 
-Descriptor (YAML `content_pool.tracks.custom[]`, wire `content_plan.packages[]`):
+Descriptor (YAML `custom_tracks[]`, wire `content_plan.packages[]`):
 
     id            "package/<content_id>/<revision>", at most 64 bytes
     content_id    the registry track key: lowercase letters and digits in

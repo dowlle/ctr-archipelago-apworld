@@ -20,43 +20,42 @@ Crash Team Racing:
   wumpa_shop_slots: {2: 1, 5: 1, 10: 1}
   wumpa_shop_progression: {allowed: 1, excluded: 1}
   adventure_structure: ctr_first
-  content_pool:
-    preset: mixed
-    tracks:
-      retail: all
-      cortex_vortex: true
-      modes: [trophy, ctr, relic]
-      custom:
-        - id: package/baby-t-park/1.0.2
-          content_id: baby-t-park
-          uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
-          revision: "1.0.2"
-          display_name: Baby T Park
-          author: Lockheart
-          laps: 7
-          capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8, checkpoints: 35, ai_nav: true}
-          files:
-            - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
-            - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
-          evidence: []
-        - id: package/fuzz-fixture-loop/1.0
-          content_id: fuzz-fixture-loop
-          uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
-          revision: "1.0"
-          display_name: Fuzz Fixture Loop
-          author: Fixture Author
-          laps: 3
-          capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 12}
-          relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
-          files:
-            - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
-            - {role: vrm, sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2, bytes: 458808, format: ctr-vrm, format_version: 1}
-          evidence: []
-    cups: {count: {min: 0, max: 4}}
-    crystals: {count: {min: 0, max: 4}}
-    bosses: {enabled: true, cups: {min: 0, max: 2}}
-    required_entries: [custom/baby-t-park/1.0.2, custom/fuzz-fixture-loop/1.0]
-  pad_layout: {placement: shuffle, stages: two, mode_order: per_pad, merge_trophy_ctr: false}
+  retail_tracks: [all]
+  cortex_vortex_track: in_pool
+  custom_tracks:
+    - id: package/baby-t-park/1.0.2
+      content_id: baby-t-park
+      uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+      revision: "1.0.2"
+      display_name: Baby T Park
+      author: Lockheart
+      laps: 7
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8, checkpoints: 35, ai_nav: true}
+      files:
+        - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+    - id: package/fuzz-fixture-loop/1.0
+      content_id: fuzz-fixture-loop
+      uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+      revision: "1.0"
+      display_name: Fuzz Fixture Loop
+      author: Fixture Author
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: true, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 12}
+      relic_targets: {sapphire: 96000, gold: 86400, platinum: 76800}
+      files:
+        - {role: lev, sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1, bytes: 1234567, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  cup_count: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}
+  crystal_challenge_count: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court]
+  boss_garages: true
+  boss_cups: {0: 1, 1: 1, 2: 1}
+  required_entries: [baby-t-park, fuzz-fixture-loop]
+  pad_placement: shuffle
+  race_mode_order: per_pad
   item_pool:
     base:
       trophies: 16
@@ -71,32 +70,18 @@ Crash Team Racing:
   oxide_final_track: {cortex_vortex: 1, oxide_station: 1}
   oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, platinum_relics: 1, any_relic_type: 1, total_relics: 1}
   oxide_final_challenge_relic_count: {1: 1, 4: 1, 12: 1, 18: 1, 30: 1}
-  boss_track_allowlist: []
-  boss_track_blocklist: []
-  custom_tracks: {}
-  cortex_vortex_track: false
   progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
   progressive_stats: {"off": 1, shared_global: 1}
   lettersanity: {"off": 2, locations_only: 3, locations_and_items: 1, items_only: 1}
   letters_per_track: {1: 1, 2: 1, 3: 1}
-  podium_placement_checks: {true: 7, false: 1}
-  podium_held_rungs: {true: 3, false: 1}
-  podium_held_fifth_rung: {true: 1, false: 1}
-  podium_finish_rungs: {true: 1, false: 1}
-  podium_any_position_rung: {true: 1, false: 1}
   wumpa_check: {"off": 1, global: 1, per_track: 6}
   relic_perfect_checks: {true: 7, false: 1}
   boss_track_shuffle: {true: 1, false: 1}
   boss_opponent_shuffle: true
   boss_kit_shuffle: true
-  boss_oxide_in_pool: {true: 2, false: 1}
   oxide_attack_profile: {retail: 1, all_compatible: 2}
   boss_track_assignment: {character_home_track: 1, independent_track: 1}
   boss_attack_assignment: {mixed_loadouts: 2, signature_profiles: 1}
-  boss_character_allowlist: []
-  boss_character_blocklist: []
-  boss_powerup_blocklist: []
-  oxide_powerup_blocklist: []
   purple_cup_boss_gauntlet: false
   hit_character: {true: 1, false: 1}
   warp_pad_rules: {}
