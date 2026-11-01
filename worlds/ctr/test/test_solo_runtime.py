@@ -424,6 +424,36 @@ class TestCustomTracks(SoloTestCase):
         starts = {t["id"]: t["start"] for t in last(events)["tracks"]}
         self.assertEqual(starts, {"cortex-vortex": 2, hill["id"]: 2, loop["id"]: 1, "package/fixture-rock/1.0": 0})
 
+    def test_a_yaml_entry_with_another_author_is_the_same_track(self):
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        listed = dict(loop, author="Someone Else")
+        source = write_yaml(self.work, "author.yaml", yaml.safe_dump(
+            {"name": "Solo", "game": GAME, GAME: dict(custom_tracks=[listed])}))
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        self.assertEqual(last(events)["tracks"][0]["start"], 1)
+        common = ("generate", "--yaml", source, "--assets", self.assets, "--seed", "4", "--tracks-page")
+        events, code = self.call(*common, "--track", loop["id"])
+        self.assertEqual(code, 0, events)
+        self.assertEqual(self.room_section(events)["custom_tracks"], [listed])
+        shutil.rmtree(os.path.join(self.solo, "rooms", last(events)["room_id"]))
+        events, code = self.call(*common)  # the page turned it off
+        self.assertEqual(code, 0, events)
+        self.assertNotIn("custom_tracks", self.room_section(events))
+
+    def test_picking_another_version_than_the_yaml_lists_is_refused(self):
+        import yaml
+        newer = self.install("fixture-loop", "2.1", "Fixture Loop")
+        older = self.install("fixture-loop", "2.0", "Fixture Loop")
+        source = write_yaml(self.work, "version.yaml", yaml.safe_dump(
+            {"name": "Solo", "game": GAME, GAME: dict(custom_tracks=[older])}))
+        events, code = self.call("validate", "--yaml", source, "--assets", self.assets, "--tracks-page",
+                                 "--track", newer["id"])
+        self.assertNotEqual(code, 0, events)
+        self.assertEqual(last(events)["kind"], "track")
+        self.assertIn("2.0", last(events)["message"])
+
     def test_cortex_vortex_is_a_row_once_its_files_are_there(self):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         self.assertNotIn("cortex-vortex", [t["id"] for t in self.tracks()])

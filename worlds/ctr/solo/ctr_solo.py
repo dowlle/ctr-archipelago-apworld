@@ -994,9 +994,22 @@ def _section(doc: dict | None) -> dict:
     return section if isinstance(section, dict) else {}
 
 
+def _pins(descriptor: dict) -> list:
+    files = descriptor.get("files")
+    return sorted((pin.get("role"), pin.get("sha256"), pin.get("bytes")) for pin in files
+                  if isinstance(pin, dict)) if isinstance(files, list) else []
+
+
+def _same_package(listed, descriptor: dict) -> bool:
+    """A YAML's entry for this installed package: the same id and files. The rest
+    of a descriptor, such as its author, does not name another package."""
+    return (isinstance(listed, dict) and listed.get("id") == descriptor["id"]
+            and _pins(listed) == _pins(descriptor))
+
+
 def _start_pick(section: dict, descriptor: dict) -> int:
     """How a YAML already has a custom track: 0 off, PICK_POOL or PICK_OWN_PAD."""
-    if descriptor not in _custom_tracks({GAME: section}):
+    if not any(_same_package(listed, descriptor) for listed in _custom_tracks({GAME: section})):
         return 0
     required = section.get("required_entries")
     names = {descriptor["content_id"], descriptor["display_name"]}
@@ -1039,29 +1052,29 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         custom = []
     if not isinstance(custom, list) or not isinstance(required, list):
         return doc  # the world refuses these with its own message
-    if page:  # a row the page showed leaves the YAML as the player set it
-        for entry in by_id.values():
-            if entry["id"] not in picked and entry["descriptor"] in custom:
-                custom.remove(entry["descriptor"])
-            if entry["id"] not in guaranteed:
-                names = (entry["content_id"], entry["display_name"])
-                required[:] = [name for name in required if name not in names]
     # A YAML that already lists a picked track must list exactly the installed
     # one: another version or other file pins is a conflict, refused rather
-    # than guessed at (round 2 decision 5). The same descriptor is not added
+    # than guessed at (round 2 decision 5). The same package is not added
     # twice, and a guarantee the YAML already has is not repeated.
     for track_id in packages:
-        key = by_id[track_id]["content_id"]
-        other = next((d for d in custom if isinstance(d, dict) and d.get("content_id") == key
-                      and d != by_id[track_id]["descriptor"]), None)
+        descriptor = by_id[track_id]["descriptor"]
+        other = next((d for d in custom if isinstance(d, dict) and d.get("content_id") == descriptor["content_id"]
+                      and not _same_package(d, descriptor)), None)
         if other is not None:
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
                             f"(version {other.get('revision', '?')}) differently from the installed version "
                             f"{by_id[track_id]['revision']}. Remove it from the YAML or leave the track off.",
                             track=track_id)
+    if page:  # a row the page showed leaves the YAML as the player set it
+        for entry in by_id.values():
+            if entry["id"] not in picked:
+                custom[:] = [d for d in custom if not _same_package(d, entry["descriptor"])]
+            if entry["id"] not in guaranteed:
+                names = (entry["content_id"], entry["display_name"])
+                required[:] = [name for name in required if name not in names]
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
-        if descriptor not in custom:
+        if not any(_same_package(d, descriptor) for d in custom):
             custom.append(descriptor)
     for track_id in guaranteed:
         if track_id == CORTEX_ID:
