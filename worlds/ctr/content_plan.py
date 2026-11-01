@@ -30,7 +30,7 @@ import pkgutil
 from BaseClasses import Region, Location
 from Options import OptionError
 
-from .Options import DL_SEND_BITS
+from .Options import DL_SEND_BITS, final_on_cortex
 
 from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
                relic_tiers, sphere0_guard, traps, warp_pad_rules, wumpa_family)
@@ -412,6 +412,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_fixed.FEATURE] if fixed else [])
             + ([CTR_FIRST_FEATURE] if ctr_first else [])
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
+            + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
@@ -1374,7 +1375,7 @@ def draw_plan(world, key_estimate=True):
         else:
             boss_venues = content_bosses.draw_venues(world, boss_record, boss_custom, boss_cups)
             boss_racers, boss_final_racer = content_bosses.draw_racers(world, boss_record)
-        boss_final = (destinations.CORTEX_VORTEX if int(o.oxide_final_track.value) == 0
+        boss_final = (destinations.CORTEX_VORTEX if final_on_cortex(o.oxide_final_track)
                       else content_bosses.OXIDE_STATION)
         # Boss kit shuffle and N. Oxide's profile (job J11), on the plan's venues.
         boss_opponents = content_bosses.draw_encounters(world, boss_record, boss_venues, boss_racers,

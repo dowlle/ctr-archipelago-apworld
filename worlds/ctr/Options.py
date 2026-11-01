@@ -159,16 +159,31 @@ class FinalOxideRelicCount(NamedRange):
 
 
 class OxideFinalTrack(Choice):
-    """Venue for N. Oxide's Final Challenge. The opponent is N. Oxide for
-    both choices, unless Nitros Oxide is in Boss Character Pool and another
-    racer takes his races."""
-    # The AP location backing this challenge is 35011105 for both venue
-    # choices -- an implementation detail, not something a player needs to
-    # know to pick a venue (issue #355).
+    """Venue for N. Oxide's Final Challenge. The opponent is N. Oxide on the
+    first two choices, unless Nitros Oxide is in Boss Character Pool and
+    another racer takes his races. Vanilla Chaos (Oxide Station) and Vortex
+    Chaos (Cortex Vortex) race all five of the seed's bosses at once: they
+    take turns firing from one shared attack schedule, and you must finish
+    first. N. Oxide's Challenge is not changed."""
+    # The AP location backing this challenge is 35011105 for every choice --
+    # an implementation detail, not something a player needs to know to pick
+    # a venue (issue #355).
     display_name = "Oxide Final Challenge Track"
     option_cortex_vortex = 0
     option_oxide_station = 1
+    option_vanilla_chaos = 2
+    option_vortex_chaos = 3
     default = 0
+
+
+def final_on_cortex(option) -> bool:
+    """Is the Final Challenge raced on Cortex Vortex? (`oxide_final_track`)"""
+    return int(option.value) in (OxideFinalTrack.option_cortex_vortex, OxideFinalTrack.option_vortex_chaos)
+
+
+def final_chaos(option) -> bool:
+    """Is the Final Challenge the chaos race? (`oxide_final_track`)"""
+    return int(option.value) in (OxideFinalTrack.option_vanilla_chaos, OxideFinalTrack.option_vortex_chaos)
 
 
 class BossTrackShuffle(Toggle):

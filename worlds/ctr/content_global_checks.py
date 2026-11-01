@@ -36,7 +36,10 @@ one). With bosses off the four boss guests have no boss race, so they take the
 content-plan Key fallback (hit_character.CONTENT_PLAN_FALLBACK_KEYS); with
 bosses on (#133 PR 6) each joins through its own boss race win like a normal
 room, and a boss can also be hit in its boss race (one `boss_race` route per
-encounter, after the others). Before PR 5b a guest was routed
+encounter, after the others). With random bosses the slots swap (ruled
+2026-10-30): a racer drawn as a boss, default racers too, joins through that
+boss race win, and an original boss raced nowhere takes ordinary routes from
+the start, with no Key term. Before PR 5b a guest was routed
 from retail races only and a custom-served race kept the stock field of the
 player's arcade pack.
 
@@ -321,12 +324,16 @@ def install(world, check, location, route_tests):
     legs = tuple(legs)
     fallback_keys = world.ctr_hit_character_fallback.get(target)
     triggers = ()
-    if target not in hit_character.DEFAULT_RACER_IDS and fallback_keys is None:
-        names = hit_character._location_name_by_code(world)
-        present = {c["location"] for c in plan["checks"]}
-        triggers = tuple(world.multiworld.get_location(names[code], player)
-                         for code in hit_character.unlock_triggers_for(
-                             world.ctr_hit_character_encounters["bosses"])[target][0] if code in present)
+    if fallback_keys is None:
+        table = world.ctr_hit_character_encounters["bosses"]
+        # The roster swap: a default racer drawn as a boss waits for that boss
+        # race like a guest does. An original boss raced nowhere has no term.
+        wins = (hit_character.boss_codes(table, target) if target in hit_character.DEFAULT_RACER_IDS
+                else hit_character.unlock_triggers_for(table)[target][0])
+        if wins:
+            names = hit_character._location_name_by_code(world)
+            present = {c["location"] for c in plan["checks"]}
+            triggers = tuple(world.multiworld.get_location(names[code], player) for code in wins if code in present)
     weapons = bool(plan.get("global_checks", {}).get("itemsanity"))
     unlocks = characters.unlocks_enabled(world)
 

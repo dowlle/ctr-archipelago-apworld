@@ -79,9 +79,10 @@ class TestContentBossShuffle(unittest.TestCase):
         rows = opponents(self.plan)
         drawn = {o["character_id"] for _e, o in rows}
         triggers = block["unlock_triggers"]
-        for boss, keys in ((10, 1), (9, 2), (11, 3), (8, 4)):
+        # The roster swap (ruled 2026-10-30): a boss with no garage needs no Keys.
+        for boss in (10, 9, 11, 8):
             if boss not in drawn:
-                self.assertEqual(triggers[str(boss)].get("fallback_keys"), keys)
+                self.assertEqual(triggers[str(boss)], dict(kind="boss", any_of=[]))
         hits = {c["location"] - hit_character.HIT_CHARACTER_CODE_BASE: c for c in self.plan["checks"]
                 if c["kind"] == "hit"}
         for eid, opponent in rows:
