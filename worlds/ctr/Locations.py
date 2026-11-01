@@ -86,6 +86,10 @@ for _minted_030 in (CUP_WIN_CLASS, CUP_SWEEP_CLASS, CUP_LEG_VICTORY_CLASS, LAP_C
 from .arena_content import ARCADE_ARENA_CLASS
 CTR_LOCATION_CLASSES.register(ARCADE_ARENA_CLASS)
 
+# 0.3.0 second id step: the 125 Wumpa Shop slots (#249), appended last. Inert.
+from .wumpa_shop import WUMPA_SHOP_CLASS
+CTR_LOCATION_CLASSES.register(WUMPA_SHOP_CLASS)
+
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
 )

@@ -542,18 +542,16 @@ class ctrAPWorld(World):
         `create_items` reads `_ctr_relic_created` to size the relic item
         pool (R3)."""
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
-        if passthrough and "content_plan" in passthrough:
-            from . import content_plan
+        from . import content_plan
+        if passthrough:
+            if "content_plan" not in passthrough:
+                raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
-            return
-        if self.options.content_pool.value:
-            from . import content_plan
+        else:
+            # Every seed is a plan (one generator row 7). The original generator
+            # below stays unreachable until row 12 deletes it.
             content_plan.generate(self)
-            return
-        if self.options.include_arcade_arenas.value and self.options.include_battle_arenas.value:
-            raise OptionError("include_arcade_arenas requires an explicit content_pool with Crystal entries; no silent legacy migration.")
-        if self.options.item_pool.value or self.options.pad_layout.value:
-            raise OptionError("CTR item_pool and pad_layout require an explicit content_pool; no silent legacy migration.")
+        return
         # Cortex Vortex pad track (2026-09-13 contract): draw the destination
         # that goes without a pad FIRST, because the letter selection below and
         # the relic-tier draw both leave its checks out. A Universal Tracker
@@ -723,6 +721,10 @@ class ctrAPWorld(World):
             # copies and pay for explicit plando items with this world's filler.
             from . import content_item_pool
             self.ctr_framework_accounting = content_item_pool.settle_after_plando(self)
+            # Narrow starts (0.3.0 review finding 1): open the start before
+            # the fill, see sphere0_guard.bootstrap_start.
+            from . import sphere0_guard
+            sphere0_guard.bootstrap_start(self)
             # Independent supply never uses automatic progression starts. Manual
             # pad rules still get the solo fill check, so a dead end names them.
             if warp_pad_rules.fixed(self) and len(self.multiworld.worlds) == 1:
@@ -1322,6 +1324,12 @@ class ctrAPWorld(World):
         Identity / vanilla seeds have an empty warp_pad_map, so this emits no hint
         text (a location's own name already carries its track) -- the correct no-op.
         """
+        if hasattr(self, "ctr_content_plan"):
+            from . import content_plan
+            text = content_plan.hint_text(self.ctr_content_plan)
+            if text:
+                hint_data[self.player] = text
+            return
         warp_pad_map = getattr(self, "warp_pad_map", None)
         if not warp_pad_map:
             return
@@ -1431,6 +1439,13 @@ class ctrAPWorld(World):
             spoiler_handle.write("\nCTR independent content/item plan:\n")
             json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
             spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+            # Boss opponent and kit shuffle on content plans.
+            from . import content_bosses
+            _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
+            if _lines:
+                spoiler_handle.write(f"CTR boss encounters ({self.multiworld.player_name[self.player]}):\n")
+                for _line in _lines:
+                    spoiler_handle.write(f"  {_line}\n")
             # Plando and item links (#133 PR 4f): only when either moved an item.
             accounting = getattr(self, "ctr_framework_accounting", None)
             if accounting and any(accounting.values()):

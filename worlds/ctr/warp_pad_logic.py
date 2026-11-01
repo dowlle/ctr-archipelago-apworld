@@ -289,7 +289,10 @@ def build_graph(world, reward_track_for, include_gem_cups=False):
             name = loc.name
             gate = _parse_requires(getattr(loc, "logic_text", ""))
             sfx = name.split(":", 1)[1].strip() if ":" in name else name
-            reward = _vanilla_reward(rname, rtype, dest_track, sfx, include_gem_cups)
+            # A content plan's reference placement (content_requirements) holds
+            # its stand-in item on the location; a real Location has none.
+            reward = (loc.stand_in if hasattr(loc, "stand_in") else
+                      _vanilla_reward(rname, rtype, dest_track, sfx, include_gem_cups))
             is_tt = name.endswith("Time Trial") or name.endswith("CTR Token Challenge")
             trophy_loc = None
             if is_tt:
@@ -457,6 +460,11 @@ def _load_requirement_preset(world):
     elif preset == "custom":
         REQ_WEIGHTS = effective_custom_weights(world)
         collapse_key = "custom"
+    elif preset == "one_table":
+        # Content plans: requirement_weights is the one table (ruled 2026-10-30),
+        # with the any-of counts of icebound_beta5.
+        REQ_WEIGHTS = effective_custom_weights(world)
+        collapse_key = "icebound_beta5"
     else:  # trophy_heavy_legacy + any unknown/missing value
         REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
         collapse_key = "trophy_heavy_legacy"
@@ -528,6 +536,12 @@ def stage2_met_by_stage1(s1, s2):
     return False
 
 
+def _stage2_set(world):
+    """The destinations that carry a stage 2: the fixed set, or the pads of a
+    content plan's reference placement (content_requirements.ReferenceWorld)."""
+    return getattr(world, "ctr_stage2_destinations", STAGE2_DESTINATIONS)
+
+
 def _note_assigned_requirement(req):
     """Record a KEPT requirement's family for the diversity discount. Called only
     at the two primary assignment sites in run_sphere_search (stage-1 pad reqs and
@@ -550,6 +564,9 @@ def _load_two_stage_density(world):
     if key not in _TWO_STAGE_DENSITY_PARAMS:
         key = "standard"
     _STAGE2_REAL_CAP, _STAGE2_COLLAPSE_CHANCE = _TWO_STAGE_DENSITY_PARAMS[key]
+    # On a content plan up to 27 pads can hold a track; `full` means all of them.
+    if key == "full" and hasattr(world, "ctr_stage2_destinations"):
+        _STAGE2_REAL_CAP = len(world.ctr_stage2_destinations)
     _DIVERSITY_K = 0.0 if key == "standard" else 0.5
     _DIVERSITY_COUNTS = {}
 
@@ -754,7 +771,7 @@ def _free_candidates_live(exits, start):
     return legacy_first + sorted(zero - set(legacy_first))
 
 
-def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
+def _sphere0_breadth(world, out, reward_track_for, include_gem_cups, held=()):
     """How many CTR locations a FINISHED requirement DAG leaves open at ZERO items.
 
     This is the "sphere-0 breadth" the fill-tail repair below is measured against.
@@ -772,12 +789,18 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
 
     Pure read-only: writes nothing to `world` and consumes no RNG, so calling it
     between sphere-search attempts cannot perturb generation determinism.
+
+    `held` names items to count as owned instead of the empty inventory: what a
+    single opener would add to the start (content_requirements).
     """
     exits, locations, _ = build_graph(world, reward_track_for, include_gem_cups)
     start = world.start_region.name if world.start_region else "Menu"
     pad_reqs = {t: out[t][1] for t in out}
     s2_by_region = {reward_track_for(t): out[t][2] for t in out}
+    stage2_dests = _stage2_set(world)
     inv = Inv()
+    for item in held:
+        inv.add(item)
 
     def passes(reqs):
         return all(inv.count(i) >= c for i, c in reqs)
@@ -809,7 +832,7 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
             if tl is None or tl["region"] not in seen or not passes(tl["gate"]):
                 continue
             region = meta["region"]
-            if region in STAGE2_DESTINATIONS:
+            if region in stage2_dests:
                 s2 = s2_by_region.get(region, "UNSET")
                 if s2 == "UNSET":
                     continue
@@ -820,7 +843,8 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups):
 
 
 def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
-                                collected, start):
+                                collected, start,
+                                stage2_dests=STAGE2_DESTINATIONS):
     """Sweep the AP graph with the current inventory + the per-pad requirements
     decided so far, collecting every reachable location's vanilla reward into the
     inventory (to a fixed point). Returns the set of OPEN, still-unassigned pads
@@ -888,7 +912,7 @@ def _reachable_pads_and_collect(inv, exits, locations, pad_reqs, stage2_reqs,
                 # STAGE-2 gate: relic-race / CTR-token-challenge content on the 16
                 # trophy pads opens only once that pad's stage 2 is assigned AND met.
                 region = meta["region"]
-                if region in STAGE2_DESTINATIONS:
+                if region in stage2_dests:
                     s2 = stage2_reqs.get(region, "UNSET")
                     if s2 == "UNSET":
                         continue  # stage 2 not yet assigned -> content still closed
@@ -1154,6 +1178,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # stage2_reqs: dest-track keyed; only the 16 trophy tracks. When collapsed
     # (autounlock), pre-set every trophy track to None (= open, no stage-2 gate)
     # so the loop never assigns one and collection never holds rewards back.
+    stage2_dests = _stage2_set(world)
     stage2_reqs = ({t: None for t in _stage2_destinations(world)}
                    if collapse_stage2 else {})
 
@@ -1171,9 +1196,11 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     inv = Inv()
     collected = set()
     _reachable_pads_and_collect(
-        inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
+        inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
+        stage2_dests)
 
-    remaining_pads = sorted(t for t in HUB_STATIC if t not in pad_reqs)
+    remaining_pads = sorted(t for t in getattr(world, "ctr_sim_pads", HUB_STATIC)
+                            if t not in pad_reqs)
 
     def _stage2_pending():
         # A trophy dest track whose Trophy Race is collected but whose stage 2 is
@@ -1181,7 +1208,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         # a satisfiable stage 1, so this drains to empty.)
         return any(
             d not in stage2_reqs and f"{d}: Trophy Race" in collected
-            for d in STAGE2_DESTINATIONS
+            for d in stage2_dests
         )
 
     # 2) sphere loop: assign stage-1 reqs to every pad AND stage-2 reqs to every
@@ -1203,14 +1230,15 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             raise RuntimeError("CTR warp-pad sphere-search failed to converge")
 
         open_unassigned = _reachable_pads_and_collect(
-            inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
+            inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
+        stage2_dests)
 
         # 2a) assign stage 2 for any trophy dest track now reachable (its Trophy
         # Race collected) but still unassigned. Draw from the current inventory --
         # which excludes that pad's own still-locked relics/tokens. OPEN model: a
         # real tier-2 requirement is the DEFAULT; the relaxation fallbacks below
         # only collapse a pad's tier 2 to its tier 1 when needed.
-        for dest in sorted(STAGE2_DESTINATIONS):
+        for dest in sorted(stage2_dests):
             if dest in stage2_reqs:
                 continue
             if f"{dest}: Trophy Race" in collected:
@@ -1242,7 +1270,8 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
                 stage2_reqs[dest] = s2
         # re-collect: a just-opened stage 2 may add relics/tokens to inventory.
         open_unassigned = _reachable_pads_and_collect(
-            inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
+            inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
+        stage2_dests)
 
         # 2b) assign stage 1 to one reachable unassigned pad (unchanged logic).
         if remaining_pads:
@@ -1260,7 +1289,8 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             _note_assigned_requirement(pad_reqs[track])
             remaining_pads.remove(track)
             _reachable_pads_and_collect(
-                inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
+                inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
+        stage2_dests)
 
     # 3) post-pass (ports lines 465-510), over a sorted copy. Only LOWERS counts,
     # so it cannot break the solvable DAG built above. Applied to both stages.
@@ -1399,7 +1429,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     out = {}
     for t in HUB_STATIC:
         dest = reward_track_for(t)
-        s2 = stage2_reqs.get(dest) if dest in STAGE2_DESTINATIONS else None
+        s2 = stage2_reqs.get(dest) if dest in stage2_dests else None
         out[t] = {1: pad_reqs.get(t), 2: s2}
     return out
 
@@ -1443,6 +1473,8 @@ def _stage2_destinations(world):
     CREATE an entry (the stage-2 collapse), so an option-off seed builds the
     exact dict it always built."""
     from .cortex_vortex_track import track_on
+    if hasattr(world, "ctr_stage2_destinations"):
+        return world.ctr_stage2_destinations
     if track_on(world.options):
         return STAGE2_DESTINATIONS
     return TROPHY_TRACKS

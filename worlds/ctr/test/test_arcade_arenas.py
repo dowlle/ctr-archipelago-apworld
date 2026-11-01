@@ -31,7 +31,14 @@ class TestArcadeArenas(unittest.TestCase):
             self.assertEqual([c['location'] for c in checks],[ac.completion_code(lid)]+[ac.pickup_code(lid,n) for n in range(1,21)])
             for c in checks:self.assertEqual(CTR_LOCATION_IDS[c['display_name']],c['location'])
         self.assertEqual(sum(i.name=='Purple CTR Token' for i in w.multiworld.itempool),0)
-        self.assertEqual(p['required_features'],['content_plan_v1','crystal_entries_v1','crystal_pickups_v1','arcade_crystals_v1'])
+        self.assertEqual(p['required_features'],['content_plan_v1','crystal_entries_v1','crystal_pickups_v1','arcade_crystals_v1','surface_items_v1','pad_requirements_v1','pad_client_v1'])
+
+    def test_added_arena_timers(self):
+        # Decision 6, 2026-10-29: Parking Lot 1:05, Lab Basement 0:50, The North Bowl 1:30 (960 ticks per second).
+        self.assertEqual({lid:ac.TIMERS[lid] for lid in (20,22,24)},{20:62400,22:86400,24:48000})
+        self.assertEqual(ac.TIMERS[20]//960,65)
+        self.assertEqual(ac.TIMERS[24]//960,50)
+        self.assertEqual(ac.TIMERS[22]//960,90)
 
     def test_completion_only_and_retail_only(self):
         o=arena_options(pickups=False)
@@ -87,14 +94,7 @@ class TestArcadeArenas(unittest.TestCase):
             w=make_world(o,seed=seed)
             levels={e['arena_id'] for e in w.ctr_content_plan['entries'] if e['kind']=='crystal'}
             self.assertEqual(len(levels),2);self.assertIn(24,levels);self.assertTrue(levels<={20,22,24})
-        invalids=[{'pool':[20,20],'count':1},{'pool':[17],'count':1},{'count':True},
-                  {'count':8},{'count':{'min':3,'max':2}}]
-        for request in invalids:
-            bad=arena_options();bad['content_pool']['crystals']=request
-            with self.subTest(request=request),self.assertRaises(OptionError):make_world(bad)
-        bad=arena_options(1);bad['include_arcade_arenas']=False;bad['content_pool']['crystals']['pool']=[20]
-        with self.assertRaises(OptionError):make_world(bad)
-        with self.assertRaises(OptionError):make_world({'include_arcade_arenas':True})
+        with self.assertRaisesRegex(OptionError,'crystal_arenas lists 4'):make_world({'crystal_challenge_count':5})
 
     def test_refuses_forged_runtime_contract(self):
         original=make_world(arena_options()).fill_slot_data()

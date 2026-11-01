@@ -1,0 +1,14 @@
+# The arms with no meta of their own (.github/workflows/ctr-world.yml): the fuzzer
+# draws every other option.
+Crash Team Racing:
+  # Random sets and switches here refuse most seeds, and a refused seed tests
+  # nothing: Crystal Challenge Count above the listed arenas, cups the listed
+  # tracks cannot fill, a boss pool too small, a gauntlet without its parts, and
+  # empty garages under an Oxide goal. The other arms cover what these leave out.
+  retail_tracks: [all]
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
+  boss_garages: true
+  purple_cup_boss_gauntlet: false
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
+  boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
+  oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]

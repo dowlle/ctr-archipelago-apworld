@@ -1,13 +1,14 @@
 """Lap completion check names (#344), minted in the 0.3.0 id step. Names only;
-no seed creates them yet.
+content_laps.py creates them on the plan.
 
 WHAT THIS CHECKS. `<Track>: Complete One Lap`: the first accepted lap in any
-lap-based race mode on that track, Cup legs included; one check per track
-across all its appearances (ruled 2026-10-13 21:37 CEST, #344 answer 1).
+lap-based race mode on that track, Cup legs and boss races included; one check
+per track across all its appearances (ruled 2026-10-13 21:37 CEST, #344 answer 1).
 
 WHO OWNS THE SEMANTICS. The apworld owns names, codes and the per-seed subset
-(option `lap_completion_checks`, not built yet); native owns the lap crossing
-send in game/PlayLevel.c. This class returns an empty per-seed subset.
+(option `lap_completion_checks`, content_laps.py); native owns the lap crossing
+send in game/PlayLevel.c. This class returns an empty per-seed subset: the plan
+creates its own locations.
 
 DATAPACKAGE STABILITY. Retail tracks `35028000 + i` in the canonical retail
 order (BOX_TRACKS, the Reach 10 Wumpa order), Cortex Vortex at 35026009 (the
