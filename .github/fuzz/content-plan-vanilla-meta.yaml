@@ -7,7 +7,8 @@
 # track's place, and cup legs draw from the same pool. The goal and boss options
 # and the packs are drawn as in the bosses meta (content-plan-meta.yaml explains
 # every pinned option), with accessibility: full. DeathLink stays to the fuzzer:
-# the wrapper forces it off, and it changes nothing in the fill.
+# the wrapper forces it off, and it changes nothing in the fill. `platinum_relics`
+# is left out of the Final Challenge unlock: the default pool has no Platinum Relics.
 Crash Team Racing:
   accessibility: full
   custom_tracks:
@@ -58,7 +59,7 @@ Crash Team Racing:
   gems_required_goal: {0: 1, 1: 1, 3: 1, 5: 1}
   oxide_1_optional: {mandatory: 1, optional: 1}
   oxide_final_track: {cortex_vortex: 1, oxide_station: 1}
-  oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, platinum_relics: 1, any_relic_type: 1, total_relics: 1}
+  oxide_final_challenge_unlock: {sapphire_relics: 2, gold_relics: 1, any_relic_type: 1, total_relics: 1}
   oxide_final_challenge_relic_count: {1: 1, 4: 1, 12: 1, 18: 1, 30: 1}
   progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
   progressive_stats: {"off": 1, shared_global: 1}

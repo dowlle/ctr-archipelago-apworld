@@ -81,3 +81,16 @@ class TestVanillaShapeProfile(unittest.TestCase):
             seen[(on_pad, in_cup)] += 1
             self.assertEqual(sum(e["kind"] == "track" for e in plan["entries"]), 18)
         self.assertGreater(seen[(True, True)], 0)
+
+    def test_a_track_twice_in_one_cup_gets_one_title(self):
+        # Counted twice, the track clashed with itself and the plan check refused the seed.
+        twice = 0
+        for seed in range(1, 41):
+            world = make_world(dict(profile_options([copy.deepcopy(UNKNOWN)], []), cup_tracks="random_repeats",
+                                    cup_custom_legs=4), seed=seed)
+            plan = world.ctr_content_plan
+            twice += any(sum(LOOP in leg["track_id"] for leg in e["legs"]) > 1
+                         for e in plan["entries"] if e["kind"] == "cup")
+            track = next(t for t in plan["tracks"] if t["origin"] == "custom")
+            self.assertEqual(track.get("room_title", track["display_name"]), track["display_name"])
+        self.assertGreater(twice, 0)
