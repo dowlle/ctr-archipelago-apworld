@@ -42,6 +42,12 @@ class PresetsContractTest(unittest.TestCase):
                 self.assertEqual(unknown, set())
                 self.assertEqual(doc[GAME]["death_link"], "off")
 
+    def test_each_preset_id_names_its_own_file(self):
+        # Swapping two files in the index would pass every other check.
+        self.assertEqual({p["id"]: p["file"] for p in self.index()["presets"]},
+                         {"quick": "quick.yaml", "standard": "standard.yaml",
+                          "full_adventure": "full_adventure.yaml"})
+
     def test_every_file_in_the_folder_is_indexed(self):
         listed = {p["file"] for p in self.index()["presets"]} | {"presets.json"}
         self.assertEqual(set(os.listdir(PRESETS)), listed)
