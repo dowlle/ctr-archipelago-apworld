@@ -34,6 +34,7 @@ import json
 import pkgutil
 
 from . import CTRTestBase
+from .. import content_fixed
 
 CUP_LOCATIONS = (
     "Red Gem Cup: Gem",
@@ -161,10 +162,12 @@ class TestGemCupsOn(CupPinningMixin, CTRTestBase):
     }
 
     def test_nothing_is_pinned(self):
+        # The start bootstrap may seat an opener on any open check; that is no pin.
+        pins = content_fixed.plan_placements(self.world.ctr_content_plan)
         for loc in self._cup_locations():
             with self.subTest(location=loc.name):
-                self.assertFalse(
-                    loc.locked,
+                self.assertNotIn(
+                    loc.address, pins,
                     f"{loc.name} was pinned with cups INCLUDED; the option's "
                     f"on-state must keep them as multiworld checks")
 
