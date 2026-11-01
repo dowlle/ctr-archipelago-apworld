@@ -427,7 +427,12 @@ class TestCustomTracks(SoloTestCase):
     def test_cortex_vortex_is_a_row_once_its_files_are_there(self):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         self.assertNotIn("cortex-vortex", [t["id"] for t in self.tracks()])
-        os.makedirs(os.path.join(self.assets, "tracks", "cortex-vortex"))
+        folder = os.path.join(self.assets, "tracks", "cortex-vortex")
+        os.makedirs(folder)
+        self.assertNotIn("cortex-vortex", [t["id"] for t in self.tracks()])
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x")
         row = self.tracks()[0]
         self.assertEqual((row["id"], row["start"]), ("cortex-vortex", 0))
         for args, want in ((["--track", "cortex-vortex"], "in_pool"),
@@ -452,6 +457,15 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(section["custom_tracks"], [loop])
         self.assertEqual(section["required_entries"], ["Dingo Canyon"])
         self.assertEqual(section["cortex_vortex_track"], "off")
+        shutil.rmtree(os.path.join(self.solo, "rooms", last(events)["room_id"]))
+        # Own pad back to In pool on the page.
+        events, code = self.call(*common, "--tracks-page", "--track", loop["id"], "--track", hill["id"],
+                                 "--track", "cortex-vortex")
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop, hill])
+        self.assertEqual(section["required_entries"], ["Dingo Canyon"])
+        self.assertEqual(section["cortex_vortex_track"], "in_pool")
         shutil.rmtree(os.path.join(self.solo, "rooms", last(events)["room_id"]))
         # No page: the YAML generates as it is.
         events, code = self.call(*common)
@@ -938,6 +952,28 @@ class TestServe(SoloTestCase):
         self.assertEqual(last(events)["room_id"], room["room_id"])
         events, code = run(self.client, "import-room", copy, solo=other, home=self.home)
         self.assertEqual(last(events)["kind"], "exists")
+
+
+class TestImportRoom(SoloTestCase):
+    def test_a_room_without_a_content_plan_is_refused(self):
+        import pickle
+        import zipfile
+        import zlib
+        events, code = self.call("generate", "--yaml", self.preset("quick.yaml"), "--seed", "1")
+        self.assertEqual(code, 0, events)
+        room = os.path.join(self.solo, "rooms", last(events)["room_id"])
+        name = next(n for n in os.listdir(room) if n.startswith("AP_"))
+        with zipfile.ZipFile(os.path.join(room, name)) as archive:
+            inner = next(n for n in archive.namelist() if n.endswith(".archipelago"))
+            data = archive.read(inner)
+        multidata = pickle.loads(zlib.decompress(data[1:]))
+        del multidata["slot_data"][1]["content_plan"]
+        old = os.path.join(self.work, "old.archipelago")
+        with open(old, "wb") as handle:
+            handle.write(data[:1] + zlib.compress(pickle.dumps(multidata)))
+        events, code = self.call("import-room", old)
+        self.assertNotEqual(code, 0, events)
+        self.assertEqual(last(events)["message"], "This room was made with v0.2.x. Play it on the v0.2.4 client.")
 
 
 class TestLinks(SoloTestCase):

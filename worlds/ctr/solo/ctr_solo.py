@@ -679,6 +679,9 @@ def room_facts(multidata: dict) -> dict:
     slot_id, info = next(iter(players.items()))
     if info.game != GAME:
         raise SoloError("game", f"This room is for {info.game}, not {GAME}.")
+    slot_data = multidata.get("slot_data", {}).get(slot_id)
+    if not isinstance(slot_data, dict) or not isinstance(slot_data.get("content_plan"), dict):
+        raise SoloError("room", "This room was made with v0.2.x. Play it on the v0.2.4 client.")
     locations = multidata.get("locations", {}).get(slot_id, {})
     version = multidata.get("version")
     return {"seed_name": multidata.get("seed_name"), "slot": info.name, "slot_id": int(slot_id),
@@ -963,6 +966,15 @@ def installed_tracks(paths: Paths, assets: str) -> list:
     return result
 
 
+def _cortex_installed(assets: str) -> bool:
+    """The client's Cortex Vortex pair: a LEV and a VRM in assets/tracks/cortex-vortex."""
+    try:
+        names = [name.lower() for name in os.listdir(os.path.join(assets, "tracks", CORTEX_FOLDER))]
+    except OSError:
+        return False
+    return all(any(name.endswith(suffix) for name in names) for suffix in TRACK_FILE_SUFFIX.values())
+
+
 def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict:
     """The Custom Tracks page. With a YAML each row starts as that YAML has it
     (`custom_tracks`, `required_entries`, `cortex_vortex_track`)."""
@@ -971,7 +983,7 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
     rows = [{**{k: v for k, v in t.items() if k != "descriptor"}, "start": _start_pick(section, t["descriptor"])}
             for t in tracks]
     cortex = _cortex_pick(section)
-    if cortex or os.path.isdir(os.path.join(assets, "tracks", CORTEX_FOLDER)):
+    if cortex or _cortex_installed(assets):
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
                         "modes": ["trophy", "ctr", "relic"], "source": "built-in", "start": cortex})
     return {"tracks": rows, "tracks_path": paths.tracks}
@@ -1027,10 +1039,11 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         custom = []
     if not isinstance(custom, list) or not isinstance(required, list):
         return doc  # the world refuses these with its own message
-    if page:  # a track the page showed and the player turned off leaves the YAML
+    if page:  # a row the page showed leaves the YAML as the player set it
         for entry in by_id.values():
             if entry["id"] not in picked and entry["descriptor"] in custom:
                 custom.remove(entry["descriptor"])
+            if entry["id"] not in guaranteed:
                 names = (entry["content_id"], entry["display_name"])
                 required[:] = [name for name in required if name not in names]
     # A YAML that already lists a picked track must list exactly the installed
