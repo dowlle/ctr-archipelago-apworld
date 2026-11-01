@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "e01959af45848777e11508e8bf357fd143f9f68b",
-    "digest": "b0ff7ced66135542d4588bcec2c44e04aba37e1034675e890920b5ec06ce5ea3"
+    "commit": "9f61917477b48c59d97862a1ef602239d41533d0",
+    "digest": "0ced7b087966941aafdf451244cf4206d6b51238193a85031e1828206ae20ae0"
   },
   "tracks": [
     {
@@ -12,7 +12,8 @@
       "ap_name": "Acid Lake",
       "shipped_in": null,
       "revisions": [
-        "8542c8ef94dfa0b1c1dc353aad8d0c4c92c8b8cadd9ae54cd734df8fad502254"
+        "8542c8ef94dfa0b1c1dc353aad8d0c4c92c8b8cadd9ae54cd734df8fad502254",
+        "ad828af1f5d9b13d3cafeb329e03669eaece02d738af55d525a0a8ba053bbdf7"
       ]
     },
     {
@@ -23,7 +24,8 @@
       "revisions": [
         "6a6110f19a00c62fef61cec8c9423a72a33a724e506f1ad86550101b50c1ae08",
         "5d18efb6c58d2ff8474870d1b56bdb98d9aef36bcb666c80c8f7a12dd4f5c127",
-        "0938a63985faff72516d8f755865f25f692567a304cf7a36b76d6514caa3386f"
+        "0938a63985faff72516d8f755865f25f692567a304cf7a36b76d6514caa3386f",
+        "c3297b4b5598d3ea8aff5dd5ebdf76a2351fec860e5e46d5645937a9a78d0cbb"
       ]
     },
     {
@@ -100,7 +102,8 @@
       "ap_name": "Big Forest",
       "shipped_in": null,
       "revisions": [
-        "04e2f20a78bb78b4ce440632ece8e38174ac805329a7393188fa5b0238340dc6"
+        "04e2f20a78bb78b4ce440632ece8e38174ac805329a7393188fa5b0238340dc6",
+        "0f062f09944d956e874f4acc74bdf9ad41cbb94ca105799a0b2174a0fc30fd0e"
       ]
     },
     {
@@ -134,7 +137,8 @@
         "9bbaa6e074b407f1ad15199ef6aecdfe8ff60721b1d4bc9d420792a19a076b54",
         "fbcb6b051f367cca5aa3061843ba4613aadfb8f45fe28aec2851bf7d9709c847",
         "bcb582f29e65d9bdcb895dd5810522a27a15447324bfea6296b4468db7475056",
-        "5671c3d5bf2b20bd99bf29268fc461eca306559e6b072a34837b058d97865254"
+        "5671c3d5bf2b20bd99bf29268fc461eca306559e6b072a34837b058d97865254",
+        "04a4f55f58c95581fb83faf8d0b9362b0c7a2032e3131a7b61bce3fbc2f62eda"
       ]
     },
     {
@@ -163,7 +167,8 @@
       "revisions": [
         "c87e79818be537c261f0d223fe75443c9a728b4675233a5432bf69e287622cd2",
         "15416baffd043b0d6386899de2343791ab7d9083ddd92d849d7733a1d6572a70",
-        "07a627e0d2163470935a74d638e1fd530c12dfb3fd1d6a590f59d9a312d81095"
+        "07a627e0d2163470935a74d638e1fd530c12dfb3fd1d6a590f59d9a312d81095",
+        "94a58f3526e117412aa2ae136af93c0b2334b45f70e238561bc7dad0ec05b472"
       ]
     },
     {
@@ -222,7 +227,8 @@
       "ap_name": "Diwali",
       "shipped_in": null,
       "revisions": [
-        "5c0c11c7d6f99b05a0e8b8cb2c70789dbc8e135c36d9329ca719bd37faa0352c"
+        "5c0c11c7d6f99b05a0e8b8cb2c70789dbc8e135c36d9329ca719bd37faa0352c",
+        "9f3f1464b184a66c0fe80d4f7ba27164206c03501657e693286e89d0ba60168e"
       ]
     },
     {
@@ -249,7 +255,8 @@
       "ap_name": "Draculas Castle",
       "shipped_in": null,
       "revisions": [
-        "ee668f9fbe5aa44c8b3419949b02b8f7143566d0441a05bff2ad3d1f1a27ece8"
+        "ee668f9fbe5aa44c8b3419949b02b8f7143566d0441a05bff2ad3d1f1a27ece8",
+        "c6bf6f3a8cfc19689709bfece90d37f48354cc8c7a85d9c4a9e455b402808553"
       ]
     },
     {
@@ -306,7 +313,8 @@
       "ap_name": "Garden Speedway",
       "shipped_in": null,
       "revisions": [
-        "7326d1d16438d0fff5d80573ebbc15c277fd5e97ce7e28952bc64534abd8717c"
+        "7326d1d16438d0fff5d80573ebbc15c277fd5e97ce7e28952bc64534abd8717c",
+        "76134af1cb93bc2cef9efd868a7dd31d5cbb1b4df9e81391422f707c8daab8a1"
       ]
     },
     {
@@ -443,7 +451,8 @@
       "ap_name": "Mario Circuit 1",
       "shipped_in": null,
       "revisions": [
-        "6c8b4d876bab45f30d4268b81f869103b7e3cad57da77a59ced21f11c53bb213"
+        "6c8b4d876bab45f30d4268b81f869103b7e3cad57da77a59ced21f11c53bb213",
+        "d323eb0f92c37362d49ab22d627712a40528cc0b04ad6e0ef1d40f7c350e5796"
       ]
     },
     {
@@ -498,7 +507,8 @@
       "ap_name": "Neonstadion",
       "shipped_in": null,
       "revisions": [
-        "a4421fbb2490ea3f5ce1113ccaa52c9be759305b4c0e94dc2ee2680d93b1793e"
+        "a4421fbb2490ea3f5ce1113ccaa52c9be759305b4c0e94dc2ee2680d93b1793e",
+        "190fbe8be4fd87de13f03311e2a088ce0666f4753e1639cb60b9a61d8200726d"
       ]
     },
     {
@@ -544,7 +554,8 @@
       "ap_name": "Pepsi City",
       "shipped_in": null,
       "revisions": [
-        "c5a26630efd1106a8796817e3dc982b06f4f0274fbe44a902a0cc277eaf9c4c9"
+        "c5a26630efd1106a8796817e3dc982b06f4f0274fbe44a902a0cc277eaf9c4c9",
+        "afb070ee8e777df0d13d3b81230cf75178a79833e597ad5240f1412c5695b51c"
       ]
     },
     {
@@ -631,7 +642,8 @@
       "revisions": [
         "d9c2e7984702dabcd0e8626b127ebcb1c7462b54b5022fe1f29e17bd0edd1b3b",
         "5b7d1cd6949e648d12769c624abd53d389452261f3b301c51165e20cb2c5860a",
-        "b8cf7f26a69360e2c20cb26d2d6d1cda90a9ea7d4c2efeaf7b8408fc7b3c7e4c"
+        "b8cf7f26a69360e2c20cb26d2d6d1cda90a9ea7d4c2efeaf7b8408fc7b3c7e4c",
+        "b84978b8bcbe66a47411da210313a724c0a9d2c0694fc4f4e33acb5ba945102b"
       ]
     },
     {
@@ -677,7 +689,8 @@
       "ap_name": "The Dairy Track",
       "shipped_in": null,
       "revisions": [
-        "efe7900a9c4905ce6e91b0d72e72b52966b621ce060155f7a8098f91720cf0ad"
+        "efe7900a9c4905ce6e91b0d72e72b52966b621ce060155f7a8098f91720cf0ad",
+        "15f58d2404d4d1383fe3102e70a945cb035428ba8076e55e70022a8f3b23cee8"
       ]
     },
     {
@@ -697,7 +710,8 @@
       "revisions": [
         "0bb48a836098d2b38409ab8f1bcf7931cb309bea0028e7caf514a6ff0e61ba23",
         "8c7e3fddba0173d4bf7b01560594279f0181d3bb04598ca5b2494b644cf8ac65",
-        "6958bbfc0c810bdb26f2d717b0d54cfb9333a2a8d347f42a89971bf8cf2c1ab4"
+        "6958bbfc0c810bdb26f2d717b0d54cfb9333a2a8d347f42a89971bf8cf2c1ab4",
+        "3721745dc996bc769aef69a7bf46d31024bfde43ed6620b47106fb58455e3e36"
       ]
     },
     {
@@ -707,7 +721,8 @@
       "shipped_in": null,
       "revisions": [
         "9a34ae462ca0401a8286d48c23755c82707a25bbc58f7e2dab2d6fa205ca0b04",
-        "6e3b3b0fd7ef9c8b514cc22163b6536a5a5d4bfcd27f9060e7acf3d20818b4ed"
+        "6e3b3b0fd7ef9c8b514cc22163b6536a5a5d4bfcd27f9060e7acf3d20818b4ed",
+        "ce15a4325c8a8a9a297d71fc8be41832290cbba9b65eb7b4475c1d9cdc0303e6"
       ]
     },
     {
@@ -795,6 +810,42 @@
       "revisions": [
         "2cce90d7738f25438319b1ec25e54071bf2ba2580fabcec0839bf4f561afe5e3",
         "671ab316cbdfb509699924218718761fd5b56cd995fd8eff497d8694d81b6bb6"
+      ]
+    },
+    {
+      "track_key": "sewer-baby-park",
+      "block_index": 85,
+      "ap_name": "Sewer Baby Park",
+      "shipped_in": null,
+      "revisions": [
+        "07715e7ae62522071f6209adf97b1cdcceaec0791f0dfd24964780140b7125e0"
+      ]
+    },
+    {
+      "track_key": "sids-house",
+      "block_index": 86,
+      "ap_name": "Sid's House",
+      "shipped_in": null,
+      "revisions": [
+        "5a67fe78e113c89a753015f8550266ac13f15b42d6d6e2e8b31f55d7cf62c830"
+      ]
+    },
+    {
+      "track_key": "specter-station",
+      "block_index": 87,
+      "ap_name": "Specter Station",
+      "shipped_in": null,
+      "revisions": [
+        "5a36eee2d742a91f77d9acdb8331d5b5c11fab7e1ef1be5882a257401bec5f55"
+      ]
+    },
+    {
+      "track_key": "tizi-challenge",
+      "block_index": 88,
+      "ap_name": "Tizi Challenge",
+      "shipped_in": null,
+      "revisions": [
+        "977c2b0b9f7f3e36d6fb97becff20a33df3118a7a9474bd4f16023ad0aa89589"
       ]
     }
   ]

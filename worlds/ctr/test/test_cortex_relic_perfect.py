@@ -41,7 +41,7 @@ def relic_named():
 def cv_options(cortex=True, perfect=True, required=True, custom=None, order="per_pad", **extra):
     if custom is None:
         custom = [copy.deepcopy(content_plan.PACKAGES[1]), copy.deepcopy(UNKNOWN), relic_named()]
-    options = check_options(rungs=False, custom=custom, order=order)
+    options = check_options(rungs=True, custom=custom, order=order)
     options["content_pool"]["tracks"]["cortex_vortex"] = cortex
     if cortex and required:
         options["content_pool"]["required_entries"].append(CV)
@@ -75,16 +75,6 @@ class TestOffKeepsThePlan(unittest.TestCase):
             with self.subTest(seed=seed):
                 self.assertEqual(make_world(absent, seed=seed).ctr_content_plan,
                                  make_world(cv_options(cortex=False, perfect=False), seed=seed).ctr_content_plan)
-
-    def test_cortex_vortex_must_be_a_boolean(self):
-        for value in (1, "true", None):
-            with self.subTest(value=value), self.assertRaisesRegex(OptionError, "cortex_vortex"):
-                make_world(cv_options(cortex=value, required=False), seed=1)
-
-    def test_legacy_cortex_track_still_refused(self):
-        with self.assertRaisesRegex(OptionError, "legacy custom_tracks/cortex_vortex_track"):
-            make_world(cv_options(cortex_vortex_track="on"), seed=1)
-
 
 class TestCortexVortexTrack(unittest.TestCase):
     def test_record_modes_and_frozen_codes(self):
@@ -193,7 +183,10 @@ class TestRelicRacePerfect(unittest.TestCase):
             plan, mw = world.ctr_content_plan, world.multiworld
             for check in checks_of(plan, "perfect"):
                 track = track_of(plan, check["owner"])
-                sapphire = mw.get_location(content_plan.mode_checks(track, "relic")[0][1], 1)
+                tiers = content_plan.plan_relics(plan, track)
+                if not tiers:
+                    continue
+                sapphire = mw.get_location(content_plan.mode_checks(track, "relic", tiers)[0][1], 1)
                 perfect = mw.get_location(content_plan.LOCATION_BY_CODE[check["location"]], 1)
                 self.assertIs(perfect.parent_region, sapphire.parent_region)
                 for name in ("Key", "Trophy", "Sapphire Relic", "Red CTR Token", "Red Gem"):

@@ -1,0 +1,5 @@
+  oxide_goal: 101_percent
+  oxide_1_optional: {mandatory: 1, optional: 1, filler: 1}
+  bosses_required_goal: 0
+  gems_required_goal: 0
+  goal_wumpa: 0

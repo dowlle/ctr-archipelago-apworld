@@ -1,0 +1,4 @@
+  oxide_goal: none
+  bosses_required_goal: 0
+  gems_required_goal: {1: 1, 3: 1, 5: 1}
+  goal_wumpa: 0

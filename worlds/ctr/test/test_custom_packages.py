@@ -185,13 +185,13 @@ class TestOpenAdmissionGeneration(unittest.TestCase):
     def test_track_without_a_selected_mode_is_refused_not_dropped(self):
         descriptor = copy.deepcopy(UNKNOWN)
         descriptor["capabilities"]["arcade"] = False
-        with self.assertRaisesRegex(OptionError, "can run none of the selected modes"):
+        with self.assertRaisesRegex(OptionError, "can run none of the races"):
             make_world(options_with([descriptor]))
 
     def test_malformed_descriptor_names_the_field(self):
         descriptor = copy.deepcopy(UNKNOWN)
         descriptor["laps"] = 9
-        with self.assertRaisesRegex(OptionError, r"tracks\.custom\[0\]\.laps: 9 is outside 1 to 7"):
+        with self.assertRaisesRegex(OptionError, r"custom_tracks\[0\]\.laps: 9 is outside 1 to 7"):
             make_world(options_with([descriptor]))
 
     def test_wire_forgery_is_refused(self):
@@ -293,7 +293,7 @@ class TestDocumentedFixture(unittest.TestCase):
     def test_documented_yaml_generates(self):
         import os
         import yaml
-        path = os.path.join(os.path.dirname(__file__), "..", "docs", "experimental-content-plan.yaml")
+        path = os.path.join(os.path.dirname(__file__), "..", "docs", "custom-track-example.yaml")
         with open(path, encoding="utf-8") as handle:
             options = yaml.safe_load(handle)["Crash Team Racing"]
         world = make_world(options)

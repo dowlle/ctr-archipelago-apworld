@@ -15,9 +15,11 @@ def small_pool():
 class TestContentItemPool(unittest.TestCase):
     def test_defaults_are_independent_retail_supply(self):
         base, extras = normalize({})
-        self.assertEqual(sum(base.values()), 99)
+        self.assertEqual(sum(base.values()), 81)
         self.assertEqual(sum(extras.values()), 0)
-        self.assertEqual(base["Platinum Relic"], 18)
+        self.assertEqual(base["Sapphire Relic"], 18)
+        self.assertEqual(base["Gold Relic"], 18)
+        self.assertEqual(base["Platinum Relic"], 0)
         self.assertEqual(base["Purple CTR Token"], 4)
 
     def test_extras_replace_filler_without_raising_requirements(self):

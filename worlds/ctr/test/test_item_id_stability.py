@@ -96,7 +96,7 @@ class TestItemIdStability(unittest.TestCase):
         named = {f"Letter {letter} ({row['ap_name']})": 35100000 + 5 * row["block_index"] + li
                  for row in named_doc["tracks"]
                  for li, letter in enumerate(("C", "T", "R"))}
-        self.assertEqual(len(named), 246)
+        self.assertEqual(len(named), 86 * 3)  # 82 + the four LRG2 blocks 85 to 88 (2026-10-29)
         self.assertEqual(world_type.item_name_to_id,
                          {**explicit, **custom, **vortex, **minted, **named})
 

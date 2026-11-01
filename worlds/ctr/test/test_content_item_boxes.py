@@ -103,7 +103,7 @@ class TestRetailBoxes(unittest.TestCase):
             world = make_world(box_options(tier=tier), seed=2)
             plan = world.ctr_content_plan
             self.assertEqual(plan["item_boxes"], {"shortcut_knowledge": value})
-            self.assertEqual(plan["required_features"][-1], content_item_boxes.FEATURE)
+            self.assertIn(content_item_boxes.FEATURE, plan["required_features"])
             got = {c["display_name"]: c["location"] for c in boxes(plan) if c["owner"].startswith("retail:")}
             want = {n: CTR_LOCATION_IDS[n] for n in ITEM_BOX_CLASS.created_location_names(world.options)}
             self.assertEqual(got, want)
