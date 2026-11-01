@@ -24,7 +24,7 @@ FIT_ROOM = 5
 #: other progression (row 8b: 16 Relics asked of 21 spots stalled the fill).
 KEY_SLACK = 12
 #: Largest group of three or more kinds of item.
-MIXED_GROUP = 5
+MIXED_GROUP = 4
 #: `room` calls of one search. A fair search takes a few dozen.
 PROBES = 300
 
@@ -38,6 +38,7 @@ def search(pool, room, target, reached=None, probes=PROBES):
     `reached(held)`, an opening also has to reach what it tests, and one that does
     beats one that does not."""
     memo = {}
+    spent = [0]
 
     def free(held):
         key = tuple(sorted(held))
@@ -63,9 +64,8 @@ def search(pool, room, target, reached=None, probes=PROBES):
     def opening(held, spots, groups):
         """The groups that open something, within the probe budget."""
         out = []
-        for group in groups:
-            if len(memo) >= probes:
-                break
+        for group in itertools.islice(groups, max(0, probes - spent[0])):
+            spent[0] += 1
             if free(held + group) + len(group) > spots:
                 out.append(group)
         return out
@@ -74,6 +74,7 @@ def search(pool, room, target, reached=None, probes=PROBES):
         return all(left(held, name) >= group.count(name) for name in set(group))
 
     def moves(held, spots):
+        spent[0] += len(pool)
         singles = sorted(((free(held + (name,)), name) for name in sorted(pool) if left(held, name)), reverse=True)
         found = [(name,) for after, name in singles if after + 1 > spots]
         if found:
@@ -84,19 +85,19 @@ def search(pool, room, target, reached=None, probes=PROBES):
                                                             for a, b in itertools.combinations(needed, 2)
                                                             for n in range(1, size)]
             found = opening(held, spots, [group for group in groups if fits(held, group)])
-            if found:
+            if found or spent[0] >= probes:
                 return found
         for size in range(3, min(spots, MIXED_GROUP) + 1):
             found = opening(held, spots, (group for group in itertools.combinations_with_replacement(needed, size)
                                           if len(set(group)) > 2 and fits(held, group)))
-            if found:
+            if found or spent[0] >= probes:
                 return found
         return []
 
     best = (done(()), start, ())
     todo = [(not best[0], -start, 0, ())]
     seen = {()}
-    while todo and len(memo) < probes:
+    while todo and spent[0] < probes:
         _undone, _rank, _length, held = heapq.heappop(todo)
         spots = free(held)
         finished = done(held)
