@@ -125,7 +125,7 @@ class TestPodiumCupLegReachability(CTRTestBase):
     cup-leg-only case that was False before the joint-region fix."""
     options = {
         "warppad_unlock_requirements": "vanilla",
-        "warp_pad_shuffle_categories": [],  # identity destinations: pin a
+        "pad_placement": "vanilla",  # identity destinations: pin a
         # deterministic topology (default shuffle would re-key which physical pad
         # loads Hot Air Skyway per seed; the shuffle case is covered by the
         # randomized TestTopology* classes above, and the fix is shuffle-correct

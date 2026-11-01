@@ -51,9 +51,12 @@ class TestItemsanityOn(CTRTestBase):
                          list(ITEMSANITY_CLASS.names()))
 
     def test_one_of_each_weapon_enters_the_progression_pool(self):
+        # The start bootstrap may have seated a weapon on a check in pre_fill.
         items = [item for item in self.multiworld.itempool
                  if item.player == self.player and item.name in ITEM_NAMES]
-        self.assertEqual([item.name for item in items], list(ITEM_NAMES))
+        items += [location.item for location in self.multiworld.get_locations(self.player)
+                  if location.item is not None and location.item.name in ITEM_NAMES]
+        self.assertEqual(sorted(item.name for item in items), sorted(ITEM_NAMES))
         self.assertTrue(all(item.advancement for item in items))
 
     def test_wire_is_enabled_and_uses_frozen_order(self):

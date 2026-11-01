@@ -197,8 +197,9 @@ class _NoFourKeyMatrix(_FourKeyScan):
         simply because the config stopped producing Key gates at all."""
         for seed in self._all_seeds():
             self.world_setup(seed=seed)
-            world = self.world
-            for _where, req in self._concrete_reqs(world):
+            # No local for the world: the skip's traceback would keep it alive past
+            # the base test's leak check.
+            for _where, req in self._concrete_reqs(self.world):
                 if req is not None and req[0] == "Key" and req[1] == 3:
                     return
         self.skipTest("no Key x3 gate in this config's seed range")

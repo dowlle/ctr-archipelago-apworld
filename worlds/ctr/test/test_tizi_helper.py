@@ -60,7 +60,11 @@ class TestTiziHelperName(unittest.TestCase):
 
     def test_it_mints_no_location(self) -> None:
         location_names = {n for n, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
-        self.assertFalse({n for n in location_names if "Tizi" in n})
+        # The helper owns no location. "Tizi Challenge" is also the title of a
+        # track of the LRG2Pancho pack (named block 88, 2026-10-29), so its
+        # `Tizi Challenge: <suffix>` names are that track's, not the helper's.
+        self.assertFalse({n for n in location_names
+                          if "Tizi" in n and not n.startswith("Tizi Challenge: ")})
 
 
 class TestTiziHelperOff(CTRTestBase):

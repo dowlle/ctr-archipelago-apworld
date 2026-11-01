@@ -1,0 +1,4 @@
+  boss_kit_shuffle: true
+  boss_attack_assignment: {mixed_loadouts: 2, signature_profiles: 1}
+  boss_attack_intensity: {relaxed: 1, standard: 1, intense: 1, mayhem: 1}
+  boss_loss_easing: {true: 1, false: 1}

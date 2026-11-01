@@ -1,0 +1,5 @@
+  oxide_goal: {any_percent: 1, 101_percent: 1}
+  bosses_required_goal: 4
+  gems_required_goal: 5
+  goal_wumpa: {300: 1, 2500: 1}
+  wumpa_shop_slots: {0: 1, 5: 1, 10: 2}
