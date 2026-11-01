@@ -382,11 +382,6 @@ jobs:
             sed -e "s/__UNLOCK__/$unlock/" -e "s/__PLACEMENT__/$placement/" -e "s/__DENSITY__/$density/" ../world-src/.github/fuzz/content-plan-pads-meta.yaml > ci_meta.yaml
             if [[ "$fixed" == keys || "$fixed" == both || "$fixed" == all ]]; then
               sed -i 's/^  shuffle_keys: .*/  shuffle_keys: false/' ci_meta.yaml
-              # Vanilla requirements, a fixed first Key, no podium rungs and Progressive
-              # Boost still fail fill on some seeds, with the first Key check in place.
-              # Measured and reported, not limited in the generator; these arms keep
-              # rungs on so they stay readable.
-              if [[ "$unlock" == vanilla ]]; then echo "  podium_rungs: [held_1st, held_3rd, finish_on_podium]" >> ci_meta.yaml; fi
             fi
             if [[ "$fixed" == gems || "$fixed" == both || "$fixed" == all ]]; then echo "  shuffle_gems: false" >> ci_meta.yaml; fi
             if [[ "$fixed" == filler || "$fixed" == all ]]; then

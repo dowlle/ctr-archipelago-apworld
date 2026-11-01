@@ -36,6 +36,8 @@ Runs in `generate_basic`, after every rule exists. Takes no random draw.
 """
 from Options import OptionError
 
+from . import content_opening
+
 
 def _reachable_empty(world, state) -> int:
     """Empty coded locations reachable in `state`. Wumpa Shop slots never
@@ -338,6 +340,12 @@ def raise_if_narrow(world) -> None:
 # Nothing is precollected, no supply, gate or rule changes, and the fill is not
 # simulated: like the early items, this only measures what opens. A plan whose
 # start already has the open checks takes no draw and is unchanged.
+#
+# That order measures one item at a time and can spend the last spots in front of
+# a gate that needs several (one generator row 8b: a start of two, two Keys and a
+# boost seated, no spot left for two Trophies). When it stops short of the target
+# nothing of it stays: content_opening.search plans the whole opening on the real
+# rules, with the fixed Keys it reaches, and it is reserved before any of it locks.
 BOOTSTRAP_START_CHECKS = 12
 BOOTSTRAP_MAX_COPIES = 4
 
@@ -400,70 +408,95 @@ def _next_openers(world, state, start, pool):
     return list(max(sorted(groups), key=lambda g: (groups[g] - start) / len(g)))
 
 
-def _seat_first_key(world, state) -> None:
-    """With vanilla requirements a fixed first Key waits behind its garage's
-    Trophies, and on a narrow start only a few checks stand in front of it. Left
-    to the fill, other items take those checks and the last Trophies have nowhere
-    to go. So the path generate found (content_fixed.first_key_path) is seated
-    here, on the hub's Wumpa Shop when the pads run out. Takes nothing that no
-    longer fits. Random requirements take no path: seating a drawn garage's items
-    measured worse than leaving them to the fill (10 against 2 failures in 1,200)."""
+def _room(world, state):
+    """Spots an opening may take: the open checks, then the Wumpa Shop slots that
+    can hold progression. Excluded checks hold filler only."""
     from BaseClasses import LocationProgressType
+    from .wumpa_shop import LOCATION_TYPE as SHOP
+    shop = not int(world.options.wumpa_shop_progression.value)
+    return [loc for loc in world.multiworld.get_unfilled_locations(world.player)
+            if loc.address is not None and loc.progress_type != LocationProgressType.EXCLUDED
+            and (shop or getattr(loc, "type", None) != SHOP) and loc.can_reach(state)]
+
+
+def _collect(world, state, items):
+    """`state` with `items` held and every placed item it now reaches."""
+    mw, player = world.multiworld, world.player
+    probe = state.copy()
+    for item in items:
+        probe.collect(item, True)
+    probe.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+    return probe
+
+
+def _reserve(world, state, items):
+    """[(item, spot)] seating `items` in order, each on a spot open before it, or
+    None when one finds no spot. Locks nothing. The checks go first, then the shop."""
+    chosen, probe = [], state
+    for index, item in enumerate(items):
+        taken = [location for _item, location in chosen]
+        spots = [loc for loc in sorted(_room(world, probe), key=lambda loc: loc.name)
+                 if loc not in taken and loc.can_fill(probe, item, True)]
+        if not spots:
+            return None
+        checks = _open_empty(world, probe)
+        chosen.append((item, world.random.choice([loc for loc in spots if loc in checks] or spots)))
+        probe = _collect(world, state, items[:index + 1])
+    return chosen
+
+
+def _lock(world, chosen):
+    """Lock a reservation, with the items' early marks."""
     mw, player = world.multiworld, world.player
     marked = mw.local_early_items.setdefault(player, {})
-    for step in getattr(world, "ctr_first_key_path", ()):
-        name = starting_boost_item(world) if step == "boost" else step
-        # A player's non_local_items stay out of their own start.
-        if name in world.options.non_local_items.value:
-            return
-        item = next((item for item in mw.itempool if item.player == player and item.name == name), None)
-        if item is None:
-            return
-        spots = _open_empty(world, state) or [
-            loc for loc in mw.get_unfilled_locations(player)
-            if loc.address is not None and loc.progress_type != LocationProgressType.EXCLUDED
-            and loc.can_reach(state) and loc.can_fill(state, item, True)]
-        if not spots:
-            return
-        location = world.random.choice(sorted(spots, key=lambda loc: loc.name))
+    for item, location in chosen:
+        # Item equality is by name; remove this very copy.
         del mw.itempool[next(i for i, pooled in enumerate(mw.itempool) if pooled is item)]
         location.place_locked_item(item)
-        if marked.get(name):
-            marked[name] -= 1
-            if not marked[name]:
-                del marked[name]
-        state.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
+        if marked.get(item.name):
+            marked[item.name] -= 1
+            if not marked[item.name]:
+                del marked[item.name]
 
 
-def bootstrap_start(world) -> None:
-    """Content plans: place openers in this slot's start until at least
-    bootstrap_target checks are open and empty (see above). Runs in
-    pre_fill, after plando and item links. Draws only when it places."""
-    from BaseClasses import CollectionState
+def _first_key_tight(world, state, items):
+    """Do the checks in front of a fixed first Key leave too few to spare, with
+    `items` seated? Everything else held, the Key's own opening excluded."""
     mw, player = world.multiworld, world.player
-    target = bootstrap_target(world)
-    state = _base_state(world)
-    _seat_first_key(world, state)
-    # The start as AP's early pass sees it: only event items (no address) are
-    # swept, placed items never are.
-    base = CollectionState(mw)
-    base.sweep_for_advancements(
-        locations=[loc for loc in mw.get_locations(player)
-                   if loc.item is not None and loc.address is None])
-    if len(_open_empty(world, state)) >= target:
-        return
-    # A player's non_local_items stay out of their own start.
-    non_local = set(world.options.non_local_items.value)
-    # Itemsanity's early weapon opens nothing. On a start with no spare check
-    # it would take the spot of the item that does, and the fill dead-ends
-    # (vanilla requirements with two single-check pads open, row 3), so it
-    # gives up its early place. Nothing is precollected.
-    early = mw.early_items.get(player, {})
-    if len(_open_empty(world, base)) <= sum(n for name, n in early.items() if name not in non_local) + 1:
-        for name in [name for name in early if name not in non_local]:
-            del early[name]
+    probe = state.copy()
+    for item in mw.itempool:
+        if item.player == player and item.advancement and item.name != "Key":
+            probe.collect(item, True)
+    probe.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player)
+                                            if loc.item is not None and loc.item.name != "Key"])
+    return len(_room(world, probe)) - len(items) < bootstrap_target(world)
+
+
+def _seat_first_key(world, state):
+    """A fixed first Key waits behind its garage, and on a narrow start only a few
+    checks stand in front of it. Left to the fill, other items take those checks
+    and the last items the garage asks for have nowhere to go, with vanilla or
+    random requirements. So when few checks are to spare, the opening that reaches
+    the Key is seated here, on the hub's Wumpa Shop when the pads run out. All of
+    it or nothing: it is reserved before any of it locks. Returns the state after."""
+    mw, player = world.multiworld, world.player
+    if not world.ctr_content_plan.get("fixed_items", {}).get("keys"):
+        return state
+    items, _spots = plan_opening(world, state, 1, set(world.options.non_local_items.value), "Key")
+    if not items or not _collect(world, state, items).has("Key", player) or not _first_key_tight(world, state, items):
+        return state
+    chosen = _reserve(world, state, items)
+    if chosen is None:
+        return state
+    _lock(world, chosen)
+    return _collect(world, state, [])
+
+
+def _place_openers(world, state, base, target, queue, non_local):
+    """The greedy bootstrap: one opener after another, each item measured alone,
+    until `target` checks are open and empty. Returns (name, location name) pairs."""
+    mw, player = world.multiworld, world.player
     marked = mw.local_early_items.setdefault(player, {})
-    queue = [name for name, count in list(marked.items()) for _ in range(count)]
     placed = []
     while True:
         spots = _open_empty(world, state)
@@ -510,18 +543,110 @@ def bootstrap_start(world) -> None:
             if not fits:
                 break
             location = world.random.choice(fits)
-            # Item equality is by name; remove this very copy.
-            del mw.itempool[next(i for i, pooled in enumerate(mw.itempool) if pooled is item)]
-            location.place_locked_item(item)
+            _lock(world, [(item, location)])
             placed.append((name, location.name))
-            if marked.get(name):
-                marked[name] -= 1
-                if not marked[name]:
-                    del marked[name]
         else:
             state.sweep_for_advancements(
                 locations=[loc for loc in mw.get_locations(player) if loc.item is not None])
             continue
         break
+    return placed
+
+
+def _unlock(world, placed):
+    """Take the greedy bootstrap's placements back."""
+    mw = world.multiworld
+    for _name, location_name in placed:
+        location = mw.get_location(location_name, world.player)
+        item = location.item
+        location.locked = False
+        location.item = None
+        item.location = None
+
+
+def plan_opening(world, state, target, non_local, reach=None):
+    """(items to seat, spots they leave) of the best opening on the real rules. With
+    `reach`, an item name, the opening has to hold it, on a fixed check or in `held`."""
+    from .content_plan import ITEM_BY_CODE
+    mw, player = world.multiworld, world.player
+    plan = world.ctr_content_plan
+    gates = content_opening.gate_names(plan, ITEM_BY_CODE, starting_boost_item(world)
+                                       if plan.get("capability", {}).get("boost_mode") else None)
+    pool = {}
+    for item in mw.itempool:
+        if (item.player == player and item.advancement and item.location is None and item.name in gates
+                and item.name not in non_local):
+            pool.setdefault(item.name, []).append(item)
+
+    def held_items(held):
+        taken = {}
+        items = []
+        for name in held:
+            items.append(pool[name][taken.get(name, 0)])
+            taken[name] = taken.get(name, 0) + 1
+        return items
+
+    states = {}
+
+    def after(held):
+        if held not in states:
+            states[held] = _collect(world, state, held_items(held))
+        return states[held]
+
+    names, room = content_opening.search({name: len(copies) for name, copies in pool.items()},
+                                         lambda held: len(_room(world, after(held))), target,
+                                         (lambda held: after(held).has(reach, player)) if reach else None)
+    return held_items(names), room
+
+
+def bootstrap_start(world) -> None:
+    """Content plans: place openers in this slot's start until at least
+    bootstrap_target checks are open and empty (see above). Runs in
+    pre_fill, after plando and item links. Draws only when it places."""
+    from BaseClasses import CollectionState
+    mw, player = world.multiworld, world.player
+    target = bootstrap_target(world)
+    state = _seat_first_key(world, _base_state(world))
+    # The start as AP's early pass sees it: only event items (no address) are
+    # swept, placed items never are.
+    base = CollectionState(mw)
+    base.sweep_for_advancements(
+        locations=[loc for loc in mw.get_locations(player)
+                   if loc.item is not None and loc.address is None])
+    if len(_open_empty(world, state)) >= target:
+        return
+    # A player's non_local_items stay out of their own start.
+    non_local = set(world.options.non_local_items.value)
+    # Itemsanity's early weapon opens nothing. On a start with no spare check
+    # it would take the spot of the item that does, and the fill dead-ends
+    # (vanilla requirements with two single-check pads open, row 3), so it
+    # gives up its early place. Nothing is precollected.
+    early = mw.early_items.get(player, {})
+    if len(_open_empty(world, base)) <= sum(n for name, n in early.items() if name not in non_local) + 1:
+        for name in [name for name in early if name not in non_local]:
+            del early[name]
+    marked = mw.local_early_items.setdefault(player, {})
+    queue = [name for name, count in list(marked.items()) for _ in range(count)]
+    # The greedy order measures one item at a time, so it can spend the last spots
+    # in front of a gate that needs several. When it stops short, its placements
+    # are taken back and a whole opening that leaves more room is seated instead.
+    pool, marks, draw = list(mw.itempool), dict(marked), world.random.getstate()
+    trial = state.copy()
+    placed = _place_openers(world, trial, base, target, list(queue), non_local)
+    if len(_open_empty(world, trial)) < target:
+        room = len(_room(world, trial))
+        _unlock(world, placed)
+        mw.itempool[:] = pool
+        marked.clear()
+        marked.update(marks)
+        world.random.setstate(draw)
+        items, best = plan_opening(world, state, target, non_local)
+        chosen = _reserve(world, state, items) if best > room else None
+        if chosen is None:
+            world.random.setstate(draw)
+            placed = _place_openers(world, state.copy(), base, target, queue, non_local)
+        else:
+            _lock(world, chosen)
+            placed = [(item.name, location.name) for item, location in chosen]
     if placed:
         world._ctr_start_bootstrap = placed

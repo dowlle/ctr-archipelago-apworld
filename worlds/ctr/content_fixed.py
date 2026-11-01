@@ -29,9 +29,12 @@ ordinary track.
 With vanilla requirements a fixed first Key sits behind 4 Trophies, and the later
 races of every pad behind that Key, so few checks are open before it. The
 placement and the mode order draw again until FIRST_KEY_CHECKS are, and until
-`first_key_path` finds room for what opens the Key. The best draw stands: no seed
-is refused for this. The start bootstrap seats that path before the fill, which
-would otherwise fill those few checks with other items.
+`first_key_path` finds room for what opens the Key. Only a check that can hold
+progression in front of the Key counts: not a CTR Token behind a Trophy win or
+letter items, a stat term or an excluded check. The best draw stands: no seed is
+refused for this. The start bootstrap seats that path before the fill, which would
+otherwise fill those few checks with other items. A whole plan is judged once it
+exists (content_opening), and draws again when its opening does not fit.
 
 Random garages draw their kind before the fill, so a fixed Key or Gem can sit
 behind a garage that needs it: `draw_garages` draws again, and what stays stuck

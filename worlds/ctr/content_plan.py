@@ -1043,7 +1043,56 @@ def required_ids(options, candidates, arenas, packages):
     return out
 
 
+#: Full draws of a plan whose opening does not fit. Random pads with their
+#: simulation take the longest, and few draws fall short (content_opening).
+OPENING_REDRAWS = 16
+
+
 def generate(world):
+    """Draw the plan. One whose opening does not fit draws again, as the layout is
+    what decides it (content_opening), and the best draw stands: no seed is refused
+    for this. A plan that fits at once takes no extra draw, so it is unchanged."""
+    from . import content_opening
+    best_state, best_estimate = world.random.getstate(), True
+    plan = draw_plan(world)
+    room, need = content_opening.fit(world, plan)
+    if room < need:
+        for _ in range(OPENING_REDRAWS):
+            state = world.random.getstate()
+            try:
+                plan = draw_plan(world, False)
+            except OptionError:
+                continue
+            found, need = content_opening.fit(world, plan)
+            if found > room:
+                room, best_state, best_estimate = found, state, False
+            if found >= need:
+                break
+        else:
+            world.random.setstate(best_state)
+            plan = draw_plan(world, best_estimate)
+    validate(plan)
+    # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
+    # draw, and the fallback from the plan's checks. Itemsanity: one weapon
+    # type marked early, the legacy draw (item_creation.create_items). Neither
+    # draws while its option is off, so other plans are unchanged.
+    global_checks = plan.get("global_checks", {})
+    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
+    if global_checks.get("hit_character"):
+        content_global_checks.encounter_block(world, plan)
+    if global_checks.get("itemsanity"):
+        from .itemsanity import WEAPONS
+        early_count = world.random.randint(1, 2)
+        weapon = world.random.sample(WEAPONS, early_count)[0]
+        world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
+    return plan
+
+
+def draw_plan(world, key_estimate=True):
+    """One draw of the plan. `key_estimate` lets the first Key's estimate pick the
+    layout. It knows no boss rank and no Relic Race first, so a redraw goes without
+    it, or it would keep picking layouts of the same shape (generate). A redraw also
+    skips the garage draws for more second stages, each a whole simulated playthrough."""
     o = world.options
     selected_modes, overrides = track_modes(o)
     with_cortex = bool(o.cortex_vortex_track.value)
@@ -1236,8 +1285,8 @@ def generate(world):
     chosen, registry = content_requirements.seat_content(world, chosen, all_seats, placement, manual,
                                                          len(settings.get("podium_rungs", ())),
                                                          seat_reach if unlock_mode == 0 else None, start_checks,
-                                                         needs_own_gem, first_key_floor,
-                                                         key_room if first_key_floor else None)
+                                                         needs_own_gem, first_key_floor if key_estimate else 0,
+                                                         key_room if first_key_floor and key_estimate else None)
     # Empty pads are valid, but a fresh Adventure must start with at least
     # sphere0_guard.MIN_STARTING_CHECKS open checks (start-check rulings
     # 2026-10-01 and 2026-10-02), or generate_basic refuses the slot. Keep
@@ -1475,6 +1524,27 @@ def generate(world):
         out.update(first_modes)
         return out
 
+    excluded_names = set(o.exclude_locations.value)
+
+    def first_key_ranks(index, track, modes):
+        # Boost ranks of the checks of a pad's first race that can hold a Trophy or
+        # a boost before the first Key. A CTR Token check on a `ctr_first` entry waits
+        # for the Trophy win, a letter item's check for its letters, and a stat term
+        # or a player's excluded check holds none of them.
+        rows = track_checks(track, "entry/" + track["id"], "pad:0", modes, settings, letters.get(index, ()),
+                            package_by_id.get(track.get("package_id")), capability, item_boxes,
+                            relics.get(track["id"]), ctr_first=index in first_modes)
+        win = next((c.get("boost", 0) for c in rows if c["kind"] == "trophy"), 0) if index in first_modes else 0
+        gated = settings.get("lettersanity") in (2, 3)
+        out = []
+        for check in rows:
+            if (not any(r["mode"] == modes[0] for r in check["routes"]) or check.get("stats")
+                    or LOCATION_BY_CODE[check["location"]] in excluded_names
+                    or (gated and (check["kind"] == "ctr" or check["kind"] == "letter"))):
+                continue
+            out.append(max(check.get("boost", 0), win) if check["kind"] == "ctr" else check.get("boost", 0))
+        return out
+
     def first_key_pads(orders):
         # The pads seat_content calls near the start, as first_key_fits reads them.
         out = []
@@ -1484,14 +1554,8 @@ def generate(world):
             if not is_track(item):
                 out.append((seat_trophies(registry[index][0]), start_ranks(item), False))
                 continue
-            modes = orders.get(index, item["modes"])
-            out.append((seat_trophies(registry[index][0]),
-                        [c.get("boost", 0) for c in track_checks(item, "entry/" + item["id"], "pad:0", modes, settings,
-                                                                 letters.get(index, ()),
-                                                                 package_by_id.get(item.get("package_id")), capability,
-                                                                 item_boxes, relics.get(item["id"]),
-                                                                 ctr_first=index in first_modes)
-                         if any(r["mode"] == modes[0] for r in c["routes"])], banks_fruit(item)))
+            out.append((seat_trophies(registry[index][0]), first_key_ranks(index, item, orders.get(index, item["modes"])),
+                        banks_fruit(item)))
         return out
 
     def first_key_score(orders):
@@ -1576,8 +1640,22 @@ def generate(world):
                 have.add(record["id"])
                 plan_tracks.append(record)
         open_pads = {pad["id"] for pad in pads if pad["entrance_req"] == "free"}
-        near_key = (sum(c["routes"][0]["own_pad_id"] in open_pads and c["location"] not in pins for c in checks)
-                    + (first_hub_slots if shop else 0))
+        # What can hold a garage's items in front of the first Key: a first race on
+        # an open pad, not a check behind a Trophy win, letters, stats or a later race.
+        by_entry = {e["id"]: e for e in entries}
+        first_mode = {pad["id"]: by_entry[pad["entry_id"]].get("modes", (None,))[0] for pad in pads
+                      if pad["id"] in open_pads and pad["entry_id"] is not None}
+
+        def holds_before_key(check):
+            route = check["routes"][0]
+            return (route["own_pad_id"] in open_pads and first_mode.get(route["own_pad_id"]) in (None, route["mode"])
+                    and check["location"] not in pins and not check.get("stats")
+                    and LOCATION_BY_CODE[check["location"]] not in excluded_names
+                    and not (settings.get("lettersanity") in (2, 3) and check["kind"] in ("ctr", "letter")))
+
+        open_entries = {pad["entry_id"] for pad in pads if pad["id"] in open_pads}
+        banks = any(banks_fruit(t) for t in standalone if "entry/" + t["id"] in open_entries)
+        near_key = sum(map(holds_before_key, checks)) + (first_hub_slots if shop and banks else 0)
         garage_reqs = content_fixed.draw_garages(world, boss_record, world.ctr_content_items.rows, unlock_mode == 0,
                                                  pins, pads, near_key)
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
@@ -1629,7 +1707,8 @@ def generate(world):
     else:
         stage1, stage2 = draw_pad_requirements(world, pads, pad_modes, entries + boss_entries, checks, encounters,
                                                boss_requirements, manual, by_name, unlock_mode, density_off,
-                                               oxide_filler and goal_check, pins, boss_record, near_key)
+                                               oxide_filler and goal_check, pins, boss_record, near_key,
+                                               content_fixed.GARAGE_REDRAWS if key_estimate else 0)
     requirements += [dict(id=f"{content_requirements.STAGE1_PREFIX}{physical}", predicate=stage1[physical])
                      for physical in sorted(stage1)]
     gate_for = {physical: "free" if rule is None else f"manual:{physical}" for physical, rule in manual.items()}
@@ -1680,7 +1759,6 @@ def generate(world):
         plan["racers"] = racers
         draw_racer_locks(world, plan, racers)
         world.ctr_racer_locks = plan_racer_locks(plan)
-    validate(plan)
     world.ctr_content_plan = plan
     # Item links (#133 PR 4f): Main.py has already formed the groups.
     content_item_pool.check_item_links(world)
@@ -1690,18 +1768,6 @@ def generate(world):
     world.ctr_content_original_starts = copy.deepcopy(o.start_inventory_from_pool.value)
     if racers is None:
         world.ctr_starting_character = characters.resolve_starting_character(world)
-    # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
-    # draw, and the fallback from the plan's checks. Itemsanity: one weapon
-    # type marked early, the legacy draw (item_creation.create_items). Neither
-    # draws while its option is off, so other plans are unchanged.
-    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
-    if global_checks.get("hit_character"):
-        content_global_checks.encounter_block(world, plan)
-    if global_checks.get("itemsanity"):
-        from .itemsanity import WEAPONS
-        early_count = world.random.randint(1, 2)
-        weapon = world.random.sample(WEAPONS, early_count)[0]
-        world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
     return plan
 
 
@@ -1763,7 +1829,8 @@ def pad_gates(entry, first, two_stages, physical):
 
 
 def draw_pad_requirements(world, pads, pad_modes, entries, checks, encounters, boss_requirements, manual, by_name,
-                          mode, density_off, goal_check, pins, boss_record, near_key=None):
+                          mode, density_off, goal_check, pins, boss_record, near_key=None,
+                          garage_redraws=content_fixed.GARAGE_REDRAWS):
     """({physical: stage 1 predicate}, {physical: stage 2 predicate}) of the two
     random modes, from the simulated playthrough over the reference placement
     (content_requirements). A manual pad keeps its rule at stage 1; a pad whose
@@ -1789,7 +1856,7 @@ def draw_pad_requirements(world, pads, pad_modes, entries, checks, encounters, b
         garages = [row for row in boss_requirements if row["id"].startswith("boss:")]
         seconds = lambda result: sum(pair[1] is not None for pair in result.values())
         best, kept = drawn, [row["predicate"] for row in garages]
-        for _ in range(content_fixed.GARAGE_REDRAWS if seconds(drawn) < multi else 0):
+        for _ in range(garage_redraws if seconds(drawn) < multi else 0):
             for row, predicate in zip(garages, content_fixed.draw_garages(
                     world, boss_record, world.ctr_content_items.rows, False, pins, pads, near_key).values()):
                 row["predicate"] = predicate
