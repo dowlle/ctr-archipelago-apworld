@@ -1,0 +1,6 @@
+# Row 8: lap checks with goal any.
+  oxide_goal: any_percent
+  bosses_required_goal: 0
+  gems_required_goal: 0
+  goal_wumpa: 0
+  lap_completion_checks: true

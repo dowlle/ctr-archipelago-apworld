@@ -469,6 +469,16 @@ class CupSweepChecks(Toggle):
     display_name = "Cup Sweep Checks"
 
 
+class LapCompletionChecks(Toggle):
+    """Completing the first lap of a race on a track sends one check for that track.
+
+    Any race with laps counts, Cup legs and boss races included, and finishing
+    position does not matter. Each track has one check, however often it appears
+    in the seed. Crystal Challenges have no laps and give no lap check.
+    """
+    display_name = "Lap Completion Checks"
+
+
 class Crystalsanity(Toggle):
     """Each authored crystal in an included Crystal Challenge is a check.
 
@@ -1620,6 +1630,7 @@ class ctrAPOptions(PerGameCommonOptions):
     lettersanity: Lettersanity
     letters_per_track: LettersPerTrack
     cup_sweep_checks: CupSweepChecks
+    lap_completion_checks: LapCompletionChecks
     box_locations: BoxLocations
     itemsanity: Itemsanity
     crystalsanity: Crystalsanity
@@ -1680,8 +1691,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks, BoxLocations,
-               Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
+    "Checks": [PodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks, LapCompletionChecks,
+               BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper],
@@ -1702,7 +1713,7 @@ def create_option_groups() -> List[OptionGroup]:
 
 
 # Retired options (one generator row 7). They are in no option list, so a YAML that
-# still names them has that name ignored silently (Stef, 2026-10-30). The original
+# still names them has that name ignored silently (ruled 2026-10-30). The original
 # generator's code still names some of them; row 12 deletes both.
 
 class BossTrackAllowlist(OptionSet):

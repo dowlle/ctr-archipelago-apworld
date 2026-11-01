@@ -38,7 +38,7 @@ from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from . import (arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
-               content_item_boxes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
+               content_item_boxes, content_laps, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
                turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from . import warp_pad_logic
@@ -414,7 +414,9 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
-            + ([PAD_CLIENT_FEATURE] if pad_client else []))
+            + ([PAD_CLIENT_FEATURE] if pad_client else [])
+            # Lap completion checks (#344) last.
+            + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else []))
 
 
 def family_settings(options):
@@ -874,6 +876,11 @@ def plan_letter_items(plan):
             name, code = letter_item(track, i)
             out[code] = name
     return out
+
+
+def lap_location(track):
+    """A track's `Complete One Lap` code (#344, content_laps)."""
+    return track_location(track, "lap", content_laps.SUFFIX)[1]
 
 
 def room_title(track):
@@ -1337,6 +1344,17 @@ def generate(world):
     # Boss garages (#133 PR 6): one check per encounter.
     if boss_record is not None:
         check_count += len(content_bosses.encounter_rows(boss_record, boss_venues, boss_final))
+    # Lap completion (#344): one per track raced on a pad, a cup leg or a boss race.
+    laps = bool(o.lap_completion_checks.value)
+    venue_names = []
+    if boss_record is not None:
+        venue_names = [v for g, v in boss_venues.items() if g not in boss_cups] \
+            + [leg for g in sorted(boss_cups) for leg in boss_cups[g]] + ([content_bosses.OXIDE_STATION, boss_final]
+                                                  if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else [])
+    venue_record = lambda name: content_bosses.venue_record(name, RETAIL, cortex_track(),
+                                                            {t["id"]: t for t in candidates if t.get("origin") == "custom"})
+    if laps:
+        check_count += content_laps.count(chosen, is_track, [venue_record(name)["id"] for name in venue_names])
     # The Wumpa Shop (job J11): five hubs of slots, after every other family.
     shop = content_wumpa.settings(o)
     check_count += content_wumpa.check_count(shop)
@@ -1552,11 +1570,8 @@ def generate(world):
     if boss_record is not None:
         content_bosses.resolve_relic_count(world, boss_record, world.ctr_content_items.rows)
         have = {t["id"] for t in plan_tracks}
-        for name in [v for g, v in boss_venues.items() if g not in boss_cups] \
-                + [leg for g in sorted(boss_cups) for leg in boss_cups[g]] + ([content_bosses.OXIDE_STATION, boss_final]
-                                                  if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []):
-            record = content_bosses.venue_record(name, RETAIL, cortex_track(),
-                                                 {t["id"]: t for t in candidates if t.get("origin") == "custom"})
+        for name in venue_names:
+            record = venue_record(name)
             if record["id"] not in have:
                 have.add(record["id"])
                 plan_tracks.append(record)
@@ -1572,6 +1587,9 @@ def generate(world):
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
+    if laps:
+        checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
+                                          {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
     # Wumpa Shop slots (job J11), last; the prices are final at slot_data time.
     world.ctr_wumpa_shop_base_prices = content_wumpa.draw_prices(world, shop) if shop else {}
     checks.extend(content_wumpa.checks(shop, world.ctr_wumpa_shop_base_prices))
@@ -1976,12 +1994,16 @@ def create_regions(world):
     placed = {}
     shared = []
     legs = []
+    laps = []
     checks_by_code = {check["location"]: check for check in plan["checks"]}
     for check in plan['checks']:
         if check["kind"] in content_bosses.KINDS + (content_wumpa.KIND,):
             continue
         if check["kind"] == content_cups.LEG_KIND:
             legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
+            continue
+        if check["kind"] == content_laps.KIND:
+            laps.append(check)  # Complete One Lap (#344), standalone and Cup leg routes
             continue
         pads_of = {r["own_pad_id"] for r in check["routes"]}
         if len(pads_of) == 1:
@@ -2060,6 +2082,34 @@ def create_regions(world):
                        and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
                        for entry, need, racer in tests)
         location.access_rule = any_leg
+        menu.locations.append(location)
+    # Complete One Lap (#344, content_laps): any route. A standalone route
+    # needs its pad, its mode's second-stage gate and the track's finish rank;
+    # a Cup route the Cup pad and the finish of every leg up to its own; a boss
+    # route its encounter and the same finish terms. All bound to the route
+    # pad's racer lock.
+    for check in laps:
+        location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
+        track = track_by_id[check["owner"]]
+        tests = []
+        for r in check["routes"]:
+            need = (content_capability.finish_boost(track, capability, package_by_id.get(track.get("package_id")))
+                    if capability.get("boost_mode") else 0)
+            gate = None
+            if r["leg_id"] is not None:
+                need = max(need, content_cups.prefix_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id,
+                                                           capability, package_by_id))
+            elif r["encounter_id"] is None:
+                gate = stage_gate(r)
+            lock = pad_by_id[r["own_pad_id"]]["racer_lock"]
+            racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
+            tests.append((r["entry_id"], gate, need, racer))
+
+        def any_lap(state, tests=tuple(tests)):
+            return any(state.can_reach(entry, "Region", player) and (gate is None or gate(state))
+                       and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
+                       for entry, gate, need, racer in tests)
+        location.access_rule = any_lap
         menu.locations.append(location)
     # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
     content_wumpa.install(world, plan, menu, stage_gate, stage_term)
@@ -2507,6 +2557,17 @@ def validate(plan):
             require(venue["retail_id"] not in retail_ids, "unknown or duplicate retail track")
             retail_ids.add(venue["retail_id"])
         used_tracks.add(track_id)
+    # Lap completion (#344): every track the seed races, or none.
+    if any(c["kind"] == content_laps.KIND for c in plan["checks"]):
+        try:
+            laps = content_laps.checks(tracks, plan["entries"], plan["pads"], boss_encounters,
+                                       {t["id"]: room_title(t) for t in plan["tracks"]}, lap_location)
+        except KeyError:
+            laps = []
+            error("a lap check names a track without a lap identity")
+        for check in laps:
+            require(check["location"] not in expected_checks, "duplicate check identity")
+            expected_checks[check["location"]] = check
     for check in boss_checks:
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
@@ -2736,6 +2797,7 @@ def restore(world, slot_data):
     world.options.relic_perfect_checks.value = int(settings.get("relic_perfect", False))
     # Cups (#133 PR 5): the sweep checks and the shortened legs follow the plan.
     world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
+    world.options.lap_completion_checks.value = int(any(c["kind"] == content_laps.KIND for c in plan["checks"]))
     shortened = None
     tracks_by_id = {t["id"]: t for t in plan["tracks"]}
     for entry in plan["entries"]:

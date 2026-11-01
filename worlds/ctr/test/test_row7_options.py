@@ -11,7 +11,7 @@ from ..custom_tracks import BABY_T_PARK_CURRENT
 from .test_content_plan import make_world
 from .test_content_plan_row3 import SHAPE  # noqa: F401, the module's inputs stay importable
 
-#: Plan section 2, by table. `lap_completion_checks` arrives with row 8.
+#: Plan section 2, by table.
 SECTION_2 = """
 retail_tracks track_modes custom_tracks cortex_vortex_track required_entries
 cup_count cup_tracks cup_custom_legs one_lap_cups crystal_challenge_count crystal_arenas
@@ -22,7 +22,8 @@ oxide_goal oxide_1_optional bosses_required_goal gems_required_goal goal_wumpa o
 oxide_final_challenge_relic_count oxide_final_track
 pad_placement race_mode_order adventure_structure warppad_unlock_requirements requirement_weights two_stage_density
 warp_pad_rules racer_locked_pads shuffle_keys shuffle_gems
-podium_rungs relic_perfect_checks lettersanity letters_per_track cup_sweep_checks box_locations itemsanity
+podium_rungs relic_perfect_checks lettersanity letters_per_track cup_sweep_checks lap_completion_checks
+box_locations itemsanity
 crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_progression wumpa_shop_hints
 item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up
 progressive_starting_wumpa turbo_grant tizi_helper
@@ -32,7 +33,6 @@ progressive_boost progressive_boost_blue_fire logic_difficulty shortcut_knowledg
 death_link death_link_send deathlink_amnesty
 warp_pad_item_display ap_item_type_colors color_boxes_by_item spoiler_items race_type_selector tracker_pad_launch
 """.split()
-ROW_8 = {"lap_completion_checks"}
 #: Plan section 2, what happens to every current option: the names that go.
 RETIRED = """
 content_pool pad_layout boss_track_allowlist boss_track_blocklist boss_character_allowlist boss_character_blocklist
@@ -57,7 +57,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2) + len(ROW_8), 89)
+        self.assertEqual(len(SECTION_2), 89)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))

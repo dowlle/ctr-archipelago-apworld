@@ -96,10 +96,11 @@
           "boss_opponents_v1",
           "wumpa_shop_v1",
           "wumpa_goal_v1",
-          "pad_client_v1"
+          "pad_client_v1",
+          "lap_checks_v1"
         ]
       },
-      "maxItems": 27,
+      "maxItems": 28,
       "minItems": 1,
       "uniqueItems": true
     },

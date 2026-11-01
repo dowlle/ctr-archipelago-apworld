@@ -145,23 +145,22 @@ class TestBothPacksSharedGlobalPoolBalance(CTRTestBase):
 
 
 class TestCapabilityPoolOverflowRaises(CTRTestBase):
-    """Podium checks off leaves only 83 locations (measured); maxing both
-    packs (15 new items) on top of the ~99 fixed items overflows that
-    supply. Must raise a clean OptionError (issue #178 shape), never a raw
-    FillError."""
+    """Counted items past the seed's checks, with both packs maxed, on every
+    seed: a clean OptionError (issue #178 shape), never a raw FillError."""
 
     auto_construct = False
     options = {
         "progressive_boost": "shared_global",
         "progressive_boost_blue_fire": True,
         "progressive_stats": "shared_global",
-        "podium_placement_checks": False,
+        "item_pool": {"extra": {"trophies": 200}},
     }
 
     def test_setup_raises_option_error(self):
-        with self.assertRaises(OptionError) as ctx:
-            self.world_setup()
-        self.assertIn("Progressive Boost", str(ctx.exception))
+        for seed in range(8):
+            with self.subTest(seed=seed), self.assertRaises(OptionError) as ctx:
+                self.world_setup(seed)
+            self.assertIn("selected copies", str(ctx.exception))
 
 
 class TestBoostPerCharacter(CTRTestBase):

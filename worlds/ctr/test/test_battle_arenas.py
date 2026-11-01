@@ -17,8 +17,10 @@ ARENA_LOCATIONS = {f"{track}: Crystal Challenge" for track in ARENA_TRACKS}
 
 
 def _purple_count(multiworld, player):
-    return sum(item.name == "Purple CTR Token" for item in multiworld.itempool
-               if item.player == player)
+    # The start bootstrap may have seated a Token on a check in pre_fill.
+    return sum(item.name == "Purple CTR Token" for item in multiworld.itempool if item.player == player) + sum(
+        location.item is not None and location.item.name == "Purple CTR Token"
+        for location in multiworld.get_locations(player))
 
 
 class ArenaChecksMixin:
