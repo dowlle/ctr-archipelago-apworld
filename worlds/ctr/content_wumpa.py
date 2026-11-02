@@ -12,11 +12,11 @@ Sanity Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, slot
 order 1..N. Each is the frozen `<Hub> Shop: Slot <n>` location
 (wumpa_shop.shop_code), owned by `hub:<level id>`, kind `wumpa_shop`, no
 route (no pad pays it), with its final `price` and its `unlock_banked`
-(wumpa_shop.unlock_banked). The price is the ordinary one: a band price
-drawn at generation and scaled by `prices`, or the band bottom when the slot
-holds progression after fill; it is written when slot_data is built
-(`final_prices`). There is no top-level `wumpa_shop` block and no new
-envelope key: native builds its shop from the plan.
+(wumpa_shop.unlock_banked). The price is a band price drawn at generation and
+scaled by `prices`, the same way whatever the slot holds, so the price says
+nothing about the item (ruling of 2026-11-02; progression no longer costs the
+band bottom). There is no top-level `wumpa_shop` block and no new envelope
+key: native builds its shop from the plan.
 
 LOGIC. A shop slot needs its hub's Key floor (`KEY_FLOORS`) and `Wumpa
 Income`. On a content plan `Wumpa Income` is reached by any route of a track
@@ -123,31 +123,11 @@ def draw_prices(world, record):
 
 
 def checks(record, base_prices):
-    """The shop checks with their prices before fill (the drawn price scaled)."""
+    """The shop checks, each with its drawn price scaled."""
     if not record:
         return []
     return [check(record, hub, n, wumpa_shop._scale(base_prices[name], record["prices"]))
             for hub, n, _code, name in slots(record)]
-
-
-def final_prices(world, plan):
-    """Write each shop check's final price once the fill has placed its item:
-    the band bottom for progression, else the drawn price scaled
-    (wumpa_shop.slot_price)."""
-    record = plan.get("wumpa_shop")
-    if not record:
-        return
-    by_code = {c["location"]: c for c in plan["checks"]}
-    base = getattr(world, "ctr_wumpa_shop_base_prices", None) or {}
-    for hub, _n, code, name in slots(record):
-        if name not in base:
-            continue  # Universal Tracker: the room's prices stand.
-        location = world.multiworld.get_location(name, world.player)
-        if location.item is not None and location.item.advancement:
-            price = wumpa_shop.price_band(hub, record["prices"])[0]
-        else:
-            price = wumpa_shop._scale(base[name], record["prices"])
-        by_code[code]["price"] = price
 
 
 def expected_checks(plan, record):
@@ -166,8 +146,8 @@ def expected_checks(plan, record):
 
 def attainable_prices(hub, percent):
     """Every price the draw can give a slot of `hub`: each whole band price
-    scaled by `wumpa_shop_prices` (the band bottom, the progression price,
-    included). Native recomputes the same set (J11 review round 1)."""
+    scaled by `wumpa_shop_prices`. Native recomputes the same set (J11 review
+    round 1)."""
     low, high = wumpa_shop.PRICE_BANDS[hub]
     return {wumpa_shop._scale(value, percent) for value in range(low, high + 1)}
 
@@ -371,4 +351,3 @@ def restore_options(world, plan):
     o.wumpa_shop_progression.value = PROGRESSION.index(record["progression"]) if record else 0
     o.wumpa_shop_hints.value = int(record["hints"]) if record else 1
     o.goal_wumpa.value = arm["count"] if arm else 0
-    world.ctr_wumpa_shop_base_prices = {}

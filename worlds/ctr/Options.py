@@ -655,8 +655,8 @@ class WumpaShopPrices(Range):
     """Scales every Wumpa Shop price and every shelf unlock, in percent.
 
     100 (default) keeps the normal prices: 10 to 30 fruit in N. Sanity Beach up
-    to 40 to 80 in Citadel City. A slot that holds progression always costs
-    the lowest price of its hub."""
+    to 40 to 80 in Citadel City. Every slot draws its price from its hub's
+    range the same way, whatever it holds."""
     display_name = "Wumpa Shop Prices"
     range_start = 25
     range_end = 400
@@ -666,8 +666,8 @@ class WumpaShopPrices(Range):
 class WumpaShopProgression(Choice):
     """Whether Wumpa Shop slots may hold progression items.
 
-    - **allowed** (default): any shop slot may hold progression, priced at
-      its hub's lowest price.
+    - **allowed** (default): any shop slot may hold progression, priced like
+      any other slot.
     - **excluded**: no shop slot holds progression; useful items, filler
       and traps only."""
     display_name = "Wumpa Shop Progression"

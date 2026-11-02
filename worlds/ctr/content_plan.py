@@ -1727,9 +1727,8 @@ def draw_plan(world, key_estimate=True):
     if laps:
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
-    # Wumpa Shop slots (job J11), last; the prices are final at slot_data time.
-    world.ctr_wumpa_shop_base_prices = content_wumpa.draw_prices(world, shop) if shop else {}
-    checks.extend(content_wumpa.checks(shop, world.ctr_wumpa_shop_base_prices))
+    # Wumpa Shop slots (job J11), last, each with its drawn price.
+    checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
         gate = content_bosses.garage_gate(boss, any(e["pad_id"] == f"garage:{boss}" for e in encounters))
         pads.append(dict(id=f"garage:{boss}", hub_id=f"hub:{26 + boss if boss < 4 else 25}",
@@ -2388,8 +2387,6 @@ def add_racer_unlock_placement_rules(world):
 def wire(world):
     o = world.options
     plan=world.ctr_content_plan
-    # Wumpa Shop prices (job J11) are final once the fill has placed items.
-    content_wumpa.final_prices(world, plan)
     extra=({'include_battle_arenas':True,
             'include_arcade_arenas':any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
             'crystalsanity':any(c['kind']=='crystal_pickup' for c in plan['checks'])}
