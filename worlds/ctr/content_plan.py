@@ -1450,8 +1450,8 @@ def draw_plan(world, key_estimate=True):
         [venue_record(name) for name in venue_names], settings,
         lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
         lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
-    # Rungs of tracks raced only as Gem Cup legs (cup_only_podium_rungs, ruling of
-    # 2026-11-02).
+    # Rungs of cup leg tracks without a Trophy Race: no pad, or a pad without
+    # one (cup_only_podium_rungs, rulings of 2026-11-02).
     cup_only = bool(o.cup_only_podium_rungs.value)
     check_count += content_race_routes.count_cup_only_rungs(
         [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]], settings,
