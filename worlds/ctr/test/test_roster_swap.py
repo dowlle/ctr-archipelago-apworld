@@ -56,12 +56,20 @@ class TestSwapTriggers(unittest.TestCase):
         self.assertEqual(triggers[OXIDE], ((), "boss"))
         self.assertNotIn(OXIDE, hit_character.fallback_guests(set(table), hit_character.CONTENT_PLAN_FALLBACK_KEYS, triggers))
 
-    def test_oxide_disabled_keeps_his_keys(self):
-        # Nobody took his seat: there is no race to swap with. Conservative.
-        table = swapped(CRASH, PAPU, JOE, PINSTRIPE)
+    def test_oxide_disabled_races_from_the_start(self):
+        # Fixes 2026-11-02: his codes are raced nowhere, so they seat nobody
+        # and the fixed Key fallback goes, as for any original boss.
+        seats = swapped(CRASH, PAPU, JOE, PINSTRIPE, final=-1)
         created = {35011100, 35011101, 35011102, 35011103}
-        keys = hit_character.fallback_guests(created, hit_character.CONTENT_PLAN_FALLBACK_KEYS,
-                                             hit_character.unlock_triggers_for(table))
+        triggers = hit_character.unlock_triggers_for(seats)
+        self.assertEqual(triggers[OXIDE], ((), "boss"))
+        self.assertNotIn(OXIDE, hit_character.fallback_guests(created, hit_character.CONTENT_PLAN_FALLBACK_KEYS,
+                                                              triggers))
+
+    def test_oxide_disabled_without_random_bosses_keeps_his_keys(self):
+        keys = hit_character.fallback_guests({35011100, 35011101, 35011102, 35011103},
+                                             hit_character.CONTENT_PLAN_FALLBACK_KEYS,
+                                             hit_character.unlock_triggers_for(RETAIL))
         self.assertEqual(keys[OXIDE], 4)
 
     def test_bosses_off_keeps_the_key_table(self):
@@ -83,14 +91,15 @@ class TestReferenceDraw(unittest.TestCase):
         self.assertNotIn(CRASH, field)
         self.assertIn(ROO, field)
 
-    def test_the_field_never_runs_short(self):
-        # Five held defaults: two free, three extras, seven seats.
+    def test_a_short_field_runs_with_fewer_karts(self):
+        # Five held defaults: two free and three extras fill five of seven
+        # seats. No held racer takes a seat early (fixes 2026-11-02).
         held = (0, 1, 2, 3, 4)
         eligible = self.eligible(held=held, joined=(ROO, PAPU, JOE, PINSTRIPE, OXIDE))
         field, _ = hit_character.reference_draw(self.ORDER, 7, eligible, [False] * 16, 7, [15, 15, 15])
-        self.assertEqual(len(set(field)), 7)
+        self.assertEqual(len(set(field)), 5)
         self.assertEqual(sum(1 for i in field if i >= 8), 3)
-        self.assertEqual(len([i for i in field if i in held]), 2)
+        self.assertFalse(any(i in held for i in field))
 
     def test_nobody_held_is_todays_draw(self):
         eligible = self.eligible()
@@ -145,6 +154,30 @@ class TestSwapOnSeeds(unittest.TestCase):
                 self.assertFalse(location.can_reach(state))
                 return
         self.fail("no seed held a default racer behind a shut garage")
+
+    def test_oxide_disabled_races_from_the_start_on_seeds(self):
+        for seed in range(6):
+            world = swap_seed(seed, oxide_goal="disabled", gems_required_goal=2)
+            plan = world.ctr_content_plan
+            self.assertNotEqual(content_bosses.identity(plan), RETAIL)
+            if OXIDE in content_bosses.seats(plan).values():
+                continue  # drawn for a garage: he waits for it
+            entry = world.ctr_hit_character_encounters["unlock_triggers"][str(OXIDE)]
+            self.assertEqual(entry, dict(kind="boss", any_of=[]))
+            self.assertNotIn(OXIDE, world.ctr_hit_character_fallback)
+            # The wire's bosses table is unchanged: his codes still name him.
+            self.assertEqual(world.ctr_hit_character_encounters["bosses"]["35011105"], OXIDE)
+            state = CollectionState(world.multiworld)
+            location = world.multiworld.get_location(hit_character.HIT_CHARACTER_CLASS.location_name(OXIDE),
+                                                     world.player)
+            for item in world.multiworld.get_items():
+                if item.player == world.player and item.advancement and item.name != "Key":
+                    state.collect(item, prevent_sweep=True)
+            self.assertTrue(location.can_reach(state))
+
+    def test_seats_keep_the_retail_table_without_random_bosses(self):
+        plan = make_world(boss_options(oxide_goal="disabled", gems_required_goal=2)).ctr_content_plan
+        self.assertEqual(content_bosses.seats(plan), RETAIL)
 
     def test_the_block_round_trips_through_the_tracker_check(self):
         world = swap_seed(4)

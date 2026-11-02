@@ -2907,7 +2907,8 @@ def restore(world, slot_data):
     if global_checks.get("hit_character"):
         from . import hit_character
         hit_character.restore_from_wire(world, slot_data, hit_character.CONTENT_PLAN_FALLBACK_KEYS,
-                                        content_global_checks.cup_indices(plan), content_bosses.identity(plan))
+                                        content_global_checks.cup_indices(plan), content_bosses.identity(plan),
+                                        content_bosses.seats(plan))
     # Job J11: the five Wumpa options and adventure_structure from the plan.
     content_wumpa.restore_options(world, plan)
     world.options.adventure_structure.value = int(plan.get("adventure_structure") == CTR_FIRST)

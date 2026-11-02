@@ -1267,6 +1267,23 @@ def identity(plan):
     return out
 
 
+def seats(plan):
+    """`identity` for the unlock triggers: who a boss win code actually seats.
+
+    With random bosses (an identity that differs from the retail one) a code
+    the plan races nowhere seats nobody (-1), so N. Oxide with `oxide_goal:
+    disabled` swaps slots like any original boss raced nowhere and races from
+    the start (ruled 2026-10-30: the fixed Key fallback goes on seeds with
+    random bosses). Retail bosses keep the retail table and its Keys. The
+    wire's `bosses` table stays `identity`."""
+    from .hit_character import BOSS_WIN_OPPONENTS
+    out = identity(plan)
+    if out == dict(BOSS_WIN_OPPONENTS):
+        return out
+    raced = {enc["completion_location"] for enc in plan["encounters"]}
+    return {code: (cid if code in raced else -1) for code, cid in out.items()}
+
+
 def spoiler_lines(plan):
     """The drawn encounters for the spoiler, as the ordinary room writes them;
     () without drawn encounters."""

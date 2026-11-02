@@ -210,8 +210,10 @@ def plan_codes(plan):
 def fallback(plan):
     """{guest engine id: Key count} for the guests with no unlock win in the
     plan. The unlock wins follow the racers the plan's boss races seat (job
-    J11, decision 9): a retail boss raced nowhere falls back to Keys too."""
-    triggers = hit_character.unlock_triggers_for(content_bosses.identity(plan))
+    J11, decision 9). With random bosses an original boss raced nowhere,
+    N. Oxide with his races disabled included, races from the start with no
+    Keys (`content_bosses.seats`)."""
+    triggers = hit_character.unlock_triggers_for(content_bosses.seats(plan))
     return hit_character.fallback_guests(plan_codes(plan), hit_character.CONTENT_PLAN_FALLBACK_KEYS, triggers)
 
 
@@ -228,9 +230,10 @@ def encounter_block(world, plan):
     with the plan's fallback and one order per cup. The block's only draw,
     taken only with Hit Character on; the cup orders derive from the seed."""
     seed = int(world.random.getrandbits(32))
-    bosses = content_bosses.identity(plan)
-    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan), bosses)
-    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan), bosses)
+    bosses, seats = content_bosses.identity(plan), content_bosses.seats(plan)
+    block = hit_character.build_encounters(seed, fallback(plan), cup_indices(plan), bosses, seats)
+    hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan), bosses,
+                                  seats)
     world.ctr_hit_character_seed = seed
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_fallback = fallback(plan)
@@ -251,7 +254,7 @@ def check_encounter_block(plan, slot_data):
     block = slot_data.get("hit_character_encounters")
     block = hit_character._tuples_to_lists(block) if hit_character._has_tuple(block) else block
     hit_character._validate_block(block, hit_character.CONTENT_PLAN_FALLBACK_KEYS, cup_indices(plan),
-                                  content_bosses.identity(plan))
+                                  content_bosses.identity(plan), content_bosses.seats(plan))
     got = {int(g): e["fallback_keys"] for g, e in block["unlock_triggers"].items() if "fallback_keys" in e}
     if got != fallback(plan):
         error("hit_character_encounters fallback disagrees with the plan's unlock wins")
@@ -327,7 +330,8 @@ def install(world, check, location, route_tests):
     if fallback_keys is None:
         table = world.ctr_hit_character_encounters["bosses"]
         # The roster swap: a default racer drawn as a boss waits for that boss
-        # race like a guest does. An original boss raced nowhere has no term.
+        # race like a guest does. An original boss raced nowhere has no term,
+        # N. Oxide with his races disabled too: his codes are not in the plan.
         wins = (hit_character.boss_codes(table, target) if target in hit_character.DEFAULT_RACER_IDS
                 else hit_character.unlock_triggers_for(table)[target][0])
         if wins:

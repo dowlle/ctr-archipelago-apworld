@@ -272,7 +272,7 @@ def destination_order(seed: int, destination: int) -> List[int]:
     return order
 
 
-def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None) -> Dict[str, object]:
+def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None, seats=None) -> Dict[str, object]:
     """Build the `hit_character_encounters` block (schema 3) for a uint32 seed.
 
     `fallback` is the optional `{guest engine id: Key count}` mapping produced
@@ -284,10 +284,11 @@ def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None) -> 
     when nonempty the block gains `content_cups` with one order per cup.
 
     `bosses` is the {boss win code -> raced engine id} table (decision 9);
-    None is the retail table. The unlock triggers derive from it.
+    None is the retail table. The unlock triggers derive from `seats`
+    (`content_bosses.seats`: a code raced nowhere seats -1), `bosses` when None.
     """
     identity = dict(BOSS_WIN_OPPONENTS if bosses is None else bosses)
-    derived = unlock_triggers_for(identity)
+    derived = unlock_triggers_for(identity if seats is None else seats)
     locations = {
         str(cid): HIT_CHARACTER_CODE_BASE + cid
         for cid in sorted(characters.CHARACTER_ID_TO_NAME)
@@ -343,8 +344,8 @@ def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None) -> 
 #   G3  the seven stock ids of the player's pack take at least four seats per
 #       ordinary race and rotate, so each appears within two fresh races. A
 #       default racer drawn as a boss is out of that rotation until its garage
-#       is won or collected, and takes a seat early only when the field cannot
-#       fill without it (four or more held defaults, three extra models).
+#       is won or collected, and never takes a seat early: when the field
+#       cannot fill without it, the race runs with fewer karts.
 #   G4  the other non-stock ids (checked guests, and Pura when the player is a
 #       non-default racer) rotate through the remaining extra-model slots.
 #   G5  the sets above change only when a Hit is checked or a guest unlocks,
@@ -393,7 +394,8 @@ def reference_draw(order, player: int, eligible, unchecked, ai_seats: int,
     means the Hit location is in the seed and not yet checked). `cursors` is
     `[unhit guests, other non-stock, stock]`. Seat order is unhit guests, then
     other non-stock ids, then stock ids. Never the player, never a duplicate,
-    at most `MAX_GUESTS` non-stock ids, always exactly `ai_seats` opponents.
+    at most `MAX_GUESTS` non-stock ids, at most `ai_seats` opponents: fewer
+    only when racers held behind their garages leave the pool short.
     """
     st = set(stock(player))
     c_p, c_x, c_t = cursors
@@ -408,11 +410,10 @@ def reference_draw(order, player: int, eligible, unchecked, ai_seats: int,
         c_x, min(free, ai_seats - len(unhit)))
     fill, c_t = _take(order, lambda i: i in st and eligible[i], c_t,
                       ai_seats - len(unhit) - len(other))
-    # A default racer waiting behind its garage is only seated when the field
-    # would otherwise run short: three extra models cannot cover four or more.
-    short, c_t = _take(order, lambda i: i in st and i not in fill, c_t,
-                       ai_seats - len(unhit) - len(other) - len(fill))
-    return unhit + other + fill + short, [c_p, c_x, c_t]
+    # A default racer waiting behind its garage never takes a seat early: when
+    # three extra models cannot cover four or more of them, the race runs with
+    # fewer karts (ruled 2026-10-30, dispatcher 2026-11-02).
+    return unhit + other + fill, [c_p, c_x, c_t]
 
 
 def reference_opportunity(player: int, eligible, unchecked) -> int:
@@ -610,7 +611,7 @@ def _validate_order(entry, label: str) -> None:
                           expected_set=ALL_RACER_IDS, exact_length=16)
 
 
-def _validate_block(block, table=None, content_cups=(), bosses=None) -> None:
+def _validate_block(block, table=None, content_cups=(), bosses=None, seats=None) -> None:
     """Strictly validate a `hit_character_encounters` block.
 
     Every structural commitment of the schema-3 contract is enforced exactly:
@@ -635,9 +636,11 @@ def _validate_block(block, table=None, content_cups=(), bosses=None) -> None:
     `bosses` is the room's {boss win code -> raced engine id} table
     (decision 9); when given, the block's `bosses` must equal it exactly and
     the triggers must be `unlock_triggers_for` it. None keeps the retail
-    trigger sets and only range-checks `bosses` (content plans).
+    trigger sets and only range-checks `bosses` (content plans). `seats`, when
+    given, is the table the triggers derive from (`build_encounters`).
     """
-    expected_triggers = UNLOCK_TRIGGERS if bosses is None else unlock_triggers_for(bosses)
+    expected_triggers = (UNLOCK_TRIGGERS if bosses is None and seats is None
+                         else unlock_triggers_for(bosses if seats is None else seats))
     fallback_table = FALLBACK_KEYS if table is None else table
     expected_cups = {str(int(i)) for i in content_cups}
     if not isinstance(block, dict):
@@ -766,7 +769,7 @@ def _validate_block(block, table=None, content_cups=(), bosses=None) -> None:
 # ---------------------------------------------------------------------------
 
 def restore_from_wire(world, passthrough: Dict[str, object], table=None,
-                      content_cups=(), bosses=None) -> None:
+                      content_cups=(), bosses=None, seats=None) -> None:
     """Pin the connected seed's Hit Character block instead of re-drawing.
 
     The scalar, the global schema and the block must agree, and every malformed
@@ -800,7 +803,8 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     refused restore never leaves a stale valid seed active. A content plan
     passes `CONTENT_PLAN_FALLBACK_KEYS` as `table` and its cups' name indices
     as `content_cups` (#133 PR 5b), and the {boss win code -> raced engine
-    id} table its plan's encounters seat as `bosses` (job J11, decision 9).
+    id} table its plan's encounters seat as `bosses` (job J11, decision 9),
+    with `seats` for the triggers (`build_encounters`).
     """
     world.ctr_hit_character_encounters = None
     world.ctr_hit_character_seed = None
@@ -855,7 +859,7 @@ def restore_from_wire(world, passthrough: Dict[str, object], table=None,
     # A JSON block is kept as the same object (restore is verbatim).
     if _has_tuple(block):
         block = _tuples_to_lists(block)
-    _validate_block(block, table, content_cups, bosses=bosses)
+    _validate_block(block, table, content_cups, bosses=bosses, seats=seats)
     world.ctr_hit_character_encounters = block
     world.ctr_hit_character_seed = int(block["policy"]["seed"])
     # The fallback determination is part of the restored data, not something a
