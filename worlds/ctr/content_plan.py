@@ -1197,7 +1197,7 @@ def draw_plan(world, key_estimate=True):
         error('required_entries and crystal_challenge_count exceed the 27 normal pads.')
     optional = [t for t in candidates if t["id"] not in required]
     drawn = world.random.sample(optional, min(len(optional), 27 - len(chosen) - arena_count - cup_count))
-    chosen += content_wumpa.keep_income_track(world, chosen + drawn, drawn, optional)
+    chosen += content_wumpa.keep_income_track(world, chosen + drawn, drawn, optional, package_by_id)
     chosen += chosen_arenas
     cups = []
     if cup_count:
@@ -1294,8 +1294,9 @@ def draw_plan(world, key_estimate=True):
 
     def banks_fruit(item):
         # The shop opens with `Wumpa Income`, which needs the track's finish rank.
-        return (item.get("origin") == "retail" and item["retail_id"] <= content_wumpa.INCOME_RETAIL_MAX
-                and not (capability.get("boost_mode") and content_capability.finish_boost(item, capability)))
+        package = package_by_id.get(item.get("package_id"))
+        return (content_wumpa.earns_income(item, package_by_id)
+                and not (capability.get("boost_mode") and content_capability.finish_boost(item, capability, package)))
 
     def key_room(seated):
         by_physical = {seat[0]: seat for seat in all_seats}

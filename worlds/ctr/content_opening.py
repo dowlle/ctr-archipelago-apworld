@@ -257,7 +257,8 @@ class PlanReach:
                                                        for route in check["routes"]]))
         self.income = [dict(own_pad_id=pad_id, mode=mode, later=later(dict(own_pad_id=pad_id, mode=mode)),
                             boost=boost_of(dict(own_pad_id=pad_id)),
-                            need=content_capability.finish_boost(track, capability) if capability.get("boost_mode") else 0)
+                            need=content_capability.finish_boost(track, capability, content_wumpa.income_package(plan, track))
+                            if capability.get("boost_mode") else 0)
                        for _entry, pad_id, mode, track in content_wumpa.income_routes(plan)]
 
     def _met(self, requirement, held):
