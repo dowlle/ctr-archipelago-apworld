@@ -1592,13 +1592,14 @@ class PodiumRungs(OptionSet):
 
 
 class CupOnlyPodiumRungs(Toggle):
-    """Give a track that is raced only in cups the same podium rungs as a
-    track with a Trophy Race.
+    """Give a track that is raced in cups but has no Trophy Race the same
+    podium rungs as a track with a Trophy Race.
 
-    Such a track has no pad of its own, so it has no Trophy Race. With this
-    on, it gets the rungs Podium Rungs lists, earned in its races in the cups
-    on warp pads, as a pad track's rungs are, never in a boss race or a boss
-    cup. Does nothing when Podium Rungs is empty. Default: off."""
+    That is a track with no pad of its own, or a track whose pad has no Trophy
+    Race (Track Modes without trophy). With this on, it gets the rungs Podium
+    Rungs lists, earned in its races in the cups on warp pads, every cup
+    included, as a Trophy Race track's rungs are, never in a boss race or a
+    boss cup. Does nothing when Podium Rungs is empty. Default: off."""
     display_name = "Cup-Only Podium Rungs"
 
 

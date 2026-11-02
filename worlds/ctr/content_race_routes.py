@@ -13,10 +13,10 @@ Two per-track families are also earned outside the track's own pad:
     in the track's Trophy Race and in any Gem Cup race on that track, never in
     a boss race. Only a track with a Trophy Race in the seed has rungs, so a
     track raced only in cups gets none (row 10i reading of item 7), unless
-    `cup_only_podium_rungs` is on (ruling of 2026-11-02): then a track raced in
-    a cup leg with no pad of its own gets the same rungs, routed from its legs
-    in the cups on pads (Gem Cups and pool cups, as a pad track's rungs are),
-    never a boss cup.
+    `cup_only_podium_rungs` is on (rulings of 2026-11-02): then a track raced in
+    a cup leg with no rungs of its own, because it has no pad or its pad has no
+    Trophy Race, gets the same rungs, routed from its legs in the cups on pads
+    (Gem Cups and pool cups, as a pad track's rungs are), never a boss cup.
 
 Routes, after the check's own pad routes, in the plan's entry order, then leg
 order (the order content_laps uses):
@@ -89,7 +89,9 @@ def extend(checks, tracks, entries, pads, encounters, settings, fruit, location,
     `fruit(track)` whether the track can reach ten fruit, `location(track)`
     its Reach 10 Wumpa code and `titles` {track id: room title}. With
     `cup_only_podium_rungs` on, `rung(track, key)` is a cup-only track's rung
-    check of that rung key, without routes; None when the option is off."""
+    check of that rung key, without routes; None when the option is off. A
+    cup-only track is a cup leg track with no rungs of its own: no pad, or a
+    pad without a Trophy Race."""
     wumpa = settings.get("wumpa") == "per_track"
     rungs = bool(settings.get("podium_rungs"))
     if not (wumpa or rungs):
@@ -98,13 +100,11 @@ def extend(checks, tracks, entries, pads, encounters, settings, fruit, location,
     for check in checks:
         if check["kind"] in (WUMPA_KIND, PODIUM_KIND) and check["owner"] in tracks:
             by_owner.setdefault((check["kind"], check["owner"]), []).append(check)
-    pad_of = {pad["entry_id"] for pad in pads if pad["entry_id"] is not None}
-    standalone = {entry["track_id"] for entry in entries if entry["kind"] == "track" and entry["id"] in pad_of}
     award = {}
     added = []
     for track_id, entry_id, mode, pad_id, leg_id, encounter_id in race_uses(entries, pads, encounters, wumpa):
         if rungs and mode == content_cups.MODE:
-            if rung is not None and track_id not in standalone and (PODIUM_KIND, track_id) not in by_owner:
+            if rung is not None and (PODIUM_KIND, track_id) not in by_owner:
                 own = by_owner[(PODIUM_KIND, track_id)] = []
                 for key in settings["podium_rungs"]:
                     check = rung(tracks[track_id], key)
@@ -141,10 +141,11 @@ def count(standalone, legs, venues, settings, fruit, has_wumpa):
 
 def count_cup_only_rungs(standalone, legs, settings, on):
     """How many rung checks `extend` adds with `cup_only_podium_rungs`: the
-    seed's rungs for each distinct Gem Cup leg track with no pad of its own."""
+    seed's rungs for each distinct cup leg track with no rungs of its own: no
+    pad, or a pad without a Trophy Race (`standalone` holds the pad tracks)."""
     if not on or not settings.get("podium_rungs"):
         return 0
-    own = {t["id"] for t in standalone}
+    own = {t["id"] for t in standalone if "trophy" in t["modes"]}
     return len({leg["id"] for leg in legs} - own) * len(settings["podium_rungs"])
 
 
