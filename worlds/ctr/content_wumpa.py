@@ -20,12 +20,17 @@ envelope key: native builds its shop from the plan.
 
 LOGIC. A shop slot needs its hub's Key floor (`KEY_FLOORS`) and `Wumpa
 Income`. On a content plan `Wumpa Income` is reached by any route of a track
-entry on a normal pad whose track is a retail race track 0..15, in a Trophy
-Race or CTR Challenge the entry has, with that route's pad gates (entrance,
-stage 1, the mode's stage-2 gate, racer lock) and the track's finish rank (the
-rank a Finish (Any Position) rung carries there). Custom tracks, Cortex
-Vortex, cup legs, arenas and boss races bank natively but add no income
-route: stricter, never looser, as on the ordinary room. `excluded` keeps
+entry on a normal pad whose track banks fruit (`income_track`: a retail race
+track 0..15, or a custom track whose package has measured Wumpa capability,
+ruling of 2026-11-02), in a Trophy Race or CTR Challenge the entry has, with that
+route's pad gates (entrance, stage 1, the mode's stage-2 gate, racer lock) and
+the track's finish rank (the rank a Finish (Any Position) rung carries there).
+Custom tracks call the same `RB_Player_ModifyWumpa` in game. A custom track
+without measured Wumpa capability adds no route, also with owned Progressive
+Starting Wumpa (that item is useful, not progression, so logic cannot hold
+it). Cortex Vortex, cup legs, arenas and boss races bank natively but add no
+income route. `keep_income_track` is only the fallback for a draw with no
+income route at all. `excluded` keeps
 progression out of every shop slot with an item rule (useful, filler and
 traps may go there), and the plan refuses when its non-progression supply
 (filler and traps, and the always-useful pack items) is below 5 x N.
@@ -53,7 +58,8 @@ PRICES_MIN, PRICES_MAX = 25, 400
 KEY_FLOORS = {"N. Sanity Beach": 0, "Gem Stone Valley": 1, "Lost Ruins": 1,
               "Glacier Park": 2, "Citadel City": 3}
 KEY_ITEM = 35010014
-#: Retail race tracks (engine ids 0..15) bank fruit in logic.
+#: Retail race tracks (engine ids 0..15) bank fruit in logic, as do custom
+#: tracks with measured Wumpa capability (`income_track`).
 INCOME_RETAIL_MAX = 15
 INCOME_MODES = ("trophy", "ctr")
 INCOME = wumpa_shop.WUMPA_INCOME
@@ -220,34 +226,53 @@ def banking(plan):
     return bool(plan.get("wumpa_shop")) or goal_arm(plan["goal"]) is not None
 
 
+def income_track(track, package=None):
+    """Does a pad race on this track bank fruit in logic: a retail race track
+    0..15, or a custom track whose package has measured Wumpa capability
+    (ruling of 2026-11-02)."""
+    if track.get("origin") == "retail":
+        return 0 <= track.get("retail_id", -1) <= INCOME_RETAIL_MAX
+    return track.get("origin") == "custom" and bool(package and package["capabilities"].get("wumpa"))
+
+
+def income_package(plan, track):
+    """The package of an income route's track, or None for a retail track."""
+    return next((p for p in plan["packages"] if p["id"] == track.get("package_id")), None)
+
+
 def income_routes(plan):
     """[(entry id, pad id, mode, track)] of every route that banks fruit in
     logic: a Trophy Race or CTR Challenge of a track entry on a normal pad
-    whose track is a retail race track 0..15, in physical pad order, then mode
+    whose track banks fruit (`income_track`), in physical pad order, then mode
     order."""
     tracks = {t["id"]: t for t in plan["tracks"]}
+    packages = {p["id"]: p for p in plan["packages"]}
     pad_of = {p["entry_id"]: p for p in plan["pads"] if p["kind"] == "normal" and p["entry_id"] is not None}
     out = []
     for entry in plan["entries"]:
         if entry.get("kind") != "track" or entry["id"] not in pad_of:
             continue
         track = tracks.get(entry["track_id"])
-        if not track or track.get("origin") != "retail" or not 0 <= track.get("retail_id", -1) <= INCOME_RETAIL_MAX:
+        if not track or not income_track(track, packages.get(track.get("package_id"))):
             continue
         pad = pad_of[entry["id"]]
         out.extend((entry["id"], pad["id"], mode, track) for mode in INCOME_MODES if mode in entry["modes"])
     return sorted(out, key=lambda r: (int(r[1].split(":")[1]), INCOME_MODES.index(r[2])))
 
 
-def keep_income_track(world, chosen, drawn, optional):
+def keep_income_track(world, chosen, drawn, optional, packages=None):
     """The tracks drawn for the pads, with one swapped for a track that can bank
     fruit when the shop or the Wumpa goal needs one and the draw left none. A long
-    `custom_tracks` list leaves that to chance on a seed check_income then refuses,
-    so a seed that had one draws as before and no draw is ever refused for this."""
+    `custom_tracks` list of tracks without measured Wumpa capability leaves that to
+    chance on a seed check_income then refuses, so a seed that had one draws as
+    before and no draw is ever refused for this. Only the fallback: a custom track
+    with measured Wumpa capability is an income route itself (ruling of 2026-11-02).
+    `packages` maps package id to package."""
     o = world.options
-    if not (o.wumpa_shop_slots.value or goal_count(o)) or not drawn or any(_earns(t) for t in chosen):
+    packages = packages or {}
+    if not (o.wumpa_shop_slots.value or goal_count(o)) or not drawn or any(_earns(t, packages) for t in chosen):
         return drawn
-    spare = [t for t in optional if _earns(t) and t not in drawn]
+    spare = [t for t in optional if _earns(t, packages) and t not in drawn]
     if not spare:
         return drawn
     kept = list(drawn)
@@ -255,16 +280,17 @@ def keep_income_track(world, chosen, drawn, optional):
     return kept
 
 
-def _earns(track):
-    return (track.get("origin") == "retail" and 0 <= track.get("retail_id", -1) <= INCOME_RETAIL_MAX
-            and any(mode in track["modes"] for mode in INCOME_MODES))
+def _earns(track, packages):
+    return (income_track(track, packages.get(track.get("package_id")))
+            and any(mode in track.get("modes", ()) for mode in INCOME_MODES))
 
 
 def check_income(plan):
     if banking(plan) and not income_routes(plan):
-        error("the Wumpa Shop and the Wumpa goal need a Trophy Race or CTR Challenge on a retail race track "
-              "(engine ids 0 to 15) on a pad to bank fruit, and this plan has none. Select retail tracks with "
-              "the trophy or ctr mode, or turn the shop and the Wumpa goal off. No content was changed.")
+        error("the Wumpa Shop and the Wumpa goal need a Trophy Race or CTR Challenge on a pad to bank fruit, on a "
+              "retail race track (engine ids 0 to 15) or a custom track with measured Wumpa capability, and this "
+              "plan has none. Select such tracks with the trophy or ctr mode, or turn the shop and the Wumpa goal "
+              "off. No content was changed.")
 
 
 def income_term(world):
@@ -295,7 +321,7 @@ def install(world, plan, menu, stage_gate, stage_term):
         test = stage_gate(route)
         lock = pads[pad_id]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
-        need = finish_boost(track, capability) if capability.get("boost_mode") else 0
+        need = finish_boost(track, capability, income_package(plan, track)) if capability.get("boost_mode") else 0
         routes.append((entry_id, test, need, racer))
         terms = [logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
         stage = stage_term(route)
