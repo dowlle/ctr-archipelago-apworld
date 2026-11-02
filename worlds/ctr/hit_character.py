@@ -341,11 +341,15 @@ def build_encounters(seed: int, fallback=None, content_cups=(), bosses=None, sea
 #   G2  more than three: a window of three rotates through them; each is seated
 #       at least once in any ceil(n / 3) consecutive fresh races at one
 #       destination while that set is unchanged.
-#   G3  the seven stock ids of the player's pack take at least four seats per
-#       ordinary race and rotate, so each appears within two fresh races. A
-#       default racer drawn as a boss is out of that rotation until its garage
-#       is won or collected, and never takes a seat early: when the field
-#       cannot fill without it, the race runs with fewer karts.
+#   G3  the eligible stock ids of the player's pack take every seat the
+#       extras leave and rotate. With no default racer held that is at least
+#       four seats for seven ids, so each appears within two fresh races. A
+#       default racer drawn as a boss is not eligible until its garage is won
+#       or collected, and never takes a seat early: with k held, 7 - k stock
+#       ids fill at least 4 - k seats, every one of them seated in each race
+#       when fewer remain than seats, and the race runs with fewer karts when
+#       the extras cannot cover the rest. A held racer's Hit check follows its
+#       boss race, which the boss route already implies.
 #   G4  the other non-stock ids (checked guests, and Pura when the player is a
 #       non-default racer) rotate through the remaining extra-model slots.
 #   G5  the sets above change only when a Hit is checked or a guest unlocks,
