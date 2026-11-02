@@ -875,7 +875,7 @@ def _world_module(name: str):
     return importlib.import_module(f"{module.__package__ or module.__name__}.{name}")
 
 
-#: A room.json is small (room facts and at most 32 descriptors).
+#: A room.json is small (room facts and at most 132 descriptors).
 ROOM_META_MAX_BYTES = 4 * 1024 * 1024
 
 

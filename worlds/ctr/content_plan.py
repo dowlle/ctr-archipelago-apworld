@@ -1179,7 +1179,8 @@ def draw_plan(world, key_estimate=True):
     if len(chosen)+arena_count+cup_count>27:
         error('required_entries and crystal_challenge_count exceed the 27 normal pads.')
     optional = [t for t in candidates if t["id"] not in required]
-    chosen += world.random.sample(optional, min(len(optional), 27 - len(chosen) - arena_count - cup_count))
+    drawn = world.random.sample(optional, min(len(optional), 27 - len(chosen) - arena_count - cup_count))
+    chosen += content_wumpa.keep_income_track(world, chosen + drawn, drawn, optional)
     chosen += chosen_arenas
     cups = []
     if cup_count:
@@ -2555,7 +2556,7 @@ def validate(plan):
             package = packages[track["package_id"]]
             used_packages.add(package["id"])
             slot = track["custom_slot"]
-            require(1 <= slot <= 32 and slot not in slots, "unregistered or duplicate custom slot")
+            require(1 <= slot <= custom_packages.MAX_PACKAGES and slot not in slots, "unregistered or duplicate custom slot")
             slots.add(slot)
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
@@ -2600,7 +2601,7 @@ def validate(plan):
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
             slot = track["custom_slot"]
-            require(1 <= slot <= 32 and slot not in slots, "unregistered or duplicate custom slot")
+            require(1 <= slot <= custom_packages.MAX_PACKAGES and slot not in slots, "unregistered or duplicate custom slot")
             slots.add(slot)
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
