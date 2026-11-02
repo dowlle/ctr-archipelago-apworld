@@ -89,10 +89,32 @@ class TestContentWumpaShop(unittest.TestCase):
         self.assertTrue(income.can_reach(state))
         self.assertTrue(citadel.can_reach(state))
 
-    def test_income_routes_are_retail_race_tracks_only(self):
+    def test_income_routes_are_retail_race_tracks_and_custom_tracks_with_wumpa(self):
         routes = content_wumpa.income_routes(self.plan)
         self.assertTrue(routes)
-        self.assertTrue(all(t["origin"] == "retail" and t["retail_id"] <= 15 for _e, _p, _m, t in routes))
+        packages = {p["id"]: p for p in self.plan["packages"]}
+        self.assertTrue(all(t["retail_id"] <= 15 if t["origin"] == "retail"
+                            else t["origin"] == "custom" and packages[t["package_id"]]["capabilities"]["wumpa"]
+                            for _e, _p, _m, t in routes))
+
+    def test_income_track(self):
+        self.assertTrue(content_wumpa.income_track(dict(origin="retail", retail_id=15)))
+        self.assertFalse(content_wumpa.income_track(dict(origin="retail", retail_id=16)))
+        self.assertFalse(content_wumpa.income_track(dict(origin="cortex_vortex")))
+        custom = dict(origin="custom", package_id="p")
+        self.assertFalse(content_wumpa.income_track(custom))
+        self.assertFalse(content_wumpa.income_track(custom, dict(capabilities=dict(wumpa=False))))
+        self.assertTrue(content_wumpa.income_track(custom, dict(capabilities=dict(wumpa=True))))
+
+    def test_earns_income_needs_a_trophy_or_ctr_mode(self):
+        # The first Key capacity check (banks_fruit) reads this: a Relic-only
+        # entry banks nothing in logic, also on a track with measured Wumpa.
+        packages = {"p": dict(capabilities=dict(wumpa=True))}
+        custom = dict(origin="custom", package_id="p")
+        self.assertTrue(content_wumpa.earns_income(dict(custom, modes=["trophy"]), packages))
+        self.assertTrue(content_wumpa.earns_income(dict(custom, modes=["ctr", "relic"]), packages))
+        self.assertFalse(content_wumpa.earns_income(dict(custom, modes=["relic"]), packages))
+        self.assertFalse(content_wumpa.earns_income(dict(origin="retail", retail_id=3, modes=["relic"]), {}))
 
     def test_shop_slots_never_count_as_starting_checks(self):
         off = make_world(shop_options(slots=0), seed=20261029, stop_before="pre_fill")
@@ -207,9 +229,13 @@ class TestContentWumpaRules(unittest.TestCase):
             content_plan.validate(plan)
         self.assertIn("excluded", str(caught.exception))
 
-    def test_no_retail_race_refuses(self):
+    def test_no_income_track_refuses(self):
+        # The profile's custom tracks have measured Wumpa, so they are income
+        # routes (ruling of 2026-11-02): without them and retail 0..15 it refuses.
         options = shop_options(slots=5, progression="allowed", goal=0)
         options["content_pool"]["tracks"]["retail"] = [16, 17]
+        options["content_pool"]["tracks"]["custom"] = []
+        options["content_pool"]["required_entries"] = []
         with self.assertRaises(OptionError) as caught:
             make_world(options, seed=7)
         self.assertIn("bank fruit", str(caught.exception))

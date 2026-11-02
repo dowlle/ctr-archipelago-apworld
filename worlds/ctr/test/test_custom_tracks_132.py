@@ -118,3 +118,66 @@ class TestShopIncome(unittest.TestCase):
         self.assertEqual(content_wumpa.keep_income_track(World, [custom], [custom], [custom, retail]), [custom])
         World.options.wumpa_shop_slots.value = 10
         self.assertEqual(content_wumpa.keep_income_track(World, [custom], [custom], [custom, slide]), [custom])
+        # A custom track with measured Wumpa capability is an income track
+        # itself, so the draw keeps it (ruling of 2026-11-02).
+        packages = {"p/fruit": dict(capabilities=dict(wumpa=True)), "p/bare": dict(capabilities=dict(wumpa=False))}
+        fruit = dict(custom, id="custom/f/1", package_id="p/fruit")
+        bare = dict(custom, id="custom/b/1", package_id="p/bare")
+        self.assertEqual(content_wumpa.keep_income_track(World, [fruit], [fruit], [fruit, retail], packages), [fruit])
+
+        class Random:
+            @staticmethod
+            def randrange(n):
+                return 0
+
+            @staticmethod
+            def choice(seq):
+                return seq[0]
+        World.random = Random
+        self.assertEqual(content_wumpa.keep_income_track(World, [bare], [bare], [bare, fruit], packages), [fruit])
+
+
+def only_custom_income(wumpa, seed=7):
+    """A shop seed whose pads hold the two retail tracks that bank no fruit
+    (16 and 17) and two custom tracks, with or without measured Wumpa."""
+    custom = fixtures(2)
+    for descriptor in custom:
+        descriptor["capabilities"]["wumpa"] = wumpa
+    options = options_with(custom)
+    options["content_pool"]["tracks"]["retail"] = [16, 17]
+    options["wumpa_shop_slots"] = 5
+    options["wumpa_shop_progression"] = "allowed"
+    return make_world(options, seed=seed)
+
+
+class TestCustomIncome(unittest.TestCase):
+    """A pad race on a custom track with measured Wumpa capability is a Wumpa
+    Income route (ruling of 2026-11-02)."""
+
+    def test_a_custom_track_with_measured_wumpa_is_income(self):
+        world = only_custom_income(True)
+        plan = world.ctr_content_plan
+        self.assertTrue(content_plan.validate(plan))
+        routes = content_wumpa.income_routes(plan)
+        self.assertTrue(routes)
+        self.assertEqual({t["origin"] for _e, _p, _m, t in routes}, {"custom"})
+        from BaseClasses import CollectionState
+        state = CollectionState(world.multiworld)
+        for item in world.multiworld.itempool:
+            state.collect(item, True)
+        state.sweep_for_advancements()
+        self.assertTrue(state.has(content_wumpa.INCOME, world.player))
+        self.assertTrue(world.multiworld.get_location("N. Sanity Beach Shop: Slot 1", world.player).can_reach(state))
+
+    def test_a_custom_track_without_measured_wumpa_is_not(self):
+        with self.assertRaises(Exception) as caught:
+            only_custom_income(False)
+        self.assertIn("measured Wumpa capability", str(caught.exception))
+
+    def test_validate_refuses_a_plan_whose_only_income_loses_its_wumpa(self):
+        plan = copy.deepcopy(only_custom_income(True).ctr_content_plan)
+        for package in plan["packages"]:
+            package["capabilities"]["wumpa"] = False
+        self.assertFalse(content_wumpa.income_routes(plan))
+        with self.assertRaises(Exception):
+            content_wumpa.check_income(plan)
