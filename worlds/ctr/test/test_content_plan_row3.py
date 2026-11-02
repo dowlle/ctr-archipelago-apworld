@@ -266,7 +266,8 @@ class TestVanillaRequirements(unittest.TestCase):
             self.assertEqual(first[21], dict(op="count", item=KEY, count=1))
             self.assertEqual(first[18], dict(op="count", item=KEY, count=4))
             self.assertEqual(first[16], dict(op="count", item=35010001, count=10))
-            self.assertEqual(first[17], dict(op="sum", items=list(range(35010009, 35010014)), count=5))
+            # Turbo Track: all five Gems, one of each colour (row 10i).
+            self.assertEqual(first[17], dict(op="distinct", items=list(range(35010009, 35010014)), count=5))
             self.assertEqual(first[100], dict(op="count", item=35010004, count=4))
 
     def test_key_stage2_counts_from_the_physical_hub(self):

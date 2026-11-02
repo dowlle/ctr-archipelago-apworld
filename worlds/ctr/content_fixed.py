@@ -54,7 +54,7 @@ GEM_NAMES = tuple(f"{colour.title()} Gem" for colour in content_item_pool.COLOUR
 FILLER = "Wumpa Fruit"
 #: The physical pad that asks for all five Gems with vanilla requirements.
 GEM_PAD = next(physical for physical, kind in content_requirements.PHYSICAL_KIND.items()
-               if kind == "track" and content_requirements.vanilla_rule(physical) == ("AnyGem", 5))
+               if kind == "track" and content_requirements.vanilla_rule(physical) == ("EachGem", 5))
 GARAGE_REDRAWS = content_requirements.PLACEMENT_REDRAWS
 #: With vanilla requirements a fixed first Key sits behind 4 Trophies, and every
 #: multi-race pad's later races need that Key. Fill failures sit on seeds with

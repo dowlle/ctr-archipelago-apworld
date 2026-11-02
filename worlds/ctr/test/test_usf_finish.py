@@ -471,10 +471,19 @@ class TestPodiumRungs(unittest.TestCase):
             boost=0, regions=[mw.get_region("Papu's Pyramid", PLAYER)])))
 
     def test_cup_branches_are_ungated_when_the_pack_is_off(self):
+        # Row 10i: a cup leg is a route of its track's rungs (Rulebook
+        # "Placement rungs" item 6). With the pack off, reaching the cup is
+        # enough, while the track's own pad stays shut.
         mw = _build()
-        rule = mw.get_location(
-            location_name("Roo's Tubes", "finish_podium"), PLAYER).access_rule
-        self.assertTrue(rule(_FakeState([("Purple Gem Cup", "Region")])))
+        plan = mw.worlds[PLAYER].ctr_content_plan
+        rungs = {c["location"]: c for c in plan["checks"] if c["kind"] == "podium"}
+        cup_routes = [(code, r) for code, c in rungs.items() for r in c["routes"] if r["mode"] == "cup"]
+        self.assertTrue(cup_routes)
+        code, route = cup_routes[0]
+        rule = mw.get_location(next(n for n, c in mw.worlds[PLAYER].location_name_to_id.items() if c == code),
+                               PLAYER).access_rule
+        self.assertTrue(rule(_FakeState([(route["entry_id"], "Region")])))
+        self.assertFalse(rule(_FakeState()))
 
 
 class TestGemCupCompletion(unittest.TestCase):

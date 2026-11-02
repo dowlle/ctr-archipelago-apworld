@@ -51,9 +51,9 @@ garage pad, award `win`). Its `boost` with Progressive Boost on is the legacy
 boss win rule (Rules.add_boss_garage_rules, add_oxide_access_contract): the
 first rank, and the venue's finish rank (content_capability.finish_boost,
 USF on Hot Air Skyway, Cortex Castle, Cortex Vortex and Oxide Station unless
-Shortcut Knowledge is hard). No Reach 10 Wumpa, podium, letter or Item Box
-route comes from a boss race, the same as cup legs since PR 5: the logic is
-stricter than the runtime there, never looser.
+Shortcut Knowledge is hard). A boss race is a route of its venue's Reach 10
+Wumpa check (content_race_routes, row 10i) and of its Complete One Lap check
+(content_laps); no podium, letter or Item Box route comes from a boss race.
 
 REQUIREMENTS. The garage pad takes its hub's Key gate (`keys:<g>`, Ripper
 Roo's `free`; the Oxide garage `keys:4`, its fixed door) once it holds an
@@ -68,7 +68,9 @@ unchanged. The encounter's own requirement:
     `very_high`, `chaotic`) and the garage's depth (`garage_band`); a family
     an earlier garage took is rerolled once (variety bias). Keys ask more
     than the garage's own hub Key gate and at most three. Vanilla pad
-    requirements ask 4, 8, 12 and 16 Trophies instead (one generator row 3).
+    requirements ask 4, 8, 12 and 16 Trophies instead (one generator row 3),
+    as far as the seed has Trophies, and open free (`always`) in a seed with
+    none (row 10i).
     Native validates the shape and the base supply, it does not redraw
     (`check_garage_requirement`);
   * N. Oxide's Challenge: `free`, or `oxide:first` with the goal's companion
@@ -412,6 +414,10 @@ def garage_options(by_name, garage, level):
     return [(label, names, weight / size[kind], lo, hi) for label, names, weight, lo, hi, kind in out]
 
 
+#: A vanilla garage's requirement in a seed without base Trophies.
+FREE_GARAGE = dict(op="always")
+
+
 def _predicate(by_name, names, count):
     if len(names) == 1:
         return dict(op="count", item=by_name[names[0]].item, count=count)
@@ -425,10 +431,11 @@ def draw_requirements(world, record, rows, vanilla=False):
     ask the Trophy table instead, as far as the seed has Trophies."""
     by_name = {row.name: row for row in rows}
     if vanilla:
+        # The Trophies that exist; a seed with none opens the garages free
+        # (Rulebook "Entering a boss garage" item 3, ruled 2026-10-30).
         supply = by_name["Trophy"].requirement_ceiling
         if not supply:
-            error("vanilla pad requirements ask Trophies at the boss garages, but the item pool holds no base "
-                  "Trophies. No content was changed.")
+            return {g: dict(FREE_GARAGE) for g in range(4)}
         return {g: _predicate(by_name, ("Trophy",), min(count, supply)) for g, count in enumerate(VANILLA_TROPHIES)}
     out, used = {}, set()
     for g in range(4):
@@ -455,6 +462,10 @@ def check_garage_requirement(predicate, rows, garage, mode=None):
     from . import warp_pad_rules
     ceiling = _ceilings(rows)
     items = content_item_pool.ITEMS
+    if mode == "vanilla" and not ceiling.get(items["Trophy"], 0):
+        if predicate != FREE_GARAGE:
+            error(f"garage {garage}: vanilla pad requirements open the garages free in a seed without Trophies")
+        return
     if not isinstance(predicate, dict) or predicate.get("op") not in ("count", "sum"):
         error(f"garage {garage}: a boss garage requirement is one item count or one family sum")
     count = predicate.get("count")

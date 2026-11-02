@@ -219,6 +219,11 @@ class PlanReach:
                     need = max(need, content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks,
                                                                capability, packages))
                 return need
+            if route["leg_id"] is not None and check["kind"] in ("wumpa", "podium"):
+                # A cup leg route of a Wumpa check or rung (row 10i): the
+                # earlier legs' finish, with the check's own rank on top.
+                return max(check.get("boost", 0), content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"],
+                                                                           tracks, capability, packages))
             return check.get("boost", 0)
 
         def region(route):
