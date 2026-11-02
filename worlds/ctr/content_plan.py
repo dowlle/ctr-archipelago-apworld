@@ -198,8 +198,9 @@ STARTING_WUMPA_MAX = 10
 #: content plan's earlier fixed behaviour (#133 PR 4a): an explicit DeathLink
 #: send list, and the two warp-pad display settings. Native reads each one;
 #: absent keys mean the legacy send coupling, the one-pile glow and AP item
-#: type colours on, as before.
-ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors")
+#: type colours on, as before. `pad_approach_hints` (native #124) is present only
+#: when on; absent means no hints on pad approach.
+ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors", "pad_approach_hints")
 #: Character packs (#133 PR 4b). With Character Unlocks on, the plan's
 #: optional `racers` record names the starting racer (engine character id),
 #: whether Remove Playable Oxide is on and the requested racer-lock maximum.
@@ -549,6 +550,8 @@ def envelope_options(options):
         out["warp_pad_item_display"] = int(options.warp_pad_item_display.value)
     if not options.ap_item_type_colors.value:
         out["ap_item_type_colors"] = False
+    if options.pad_approach_hints.value:
+        out["pad_approach_hints"] = True
     return out
 
 
@@ -564,6 +567,8 @@ def check_envelope_options(co):
         error("ctr_options.warp_pad_item_display must be 0 or 1.")
     if "ap_item_type_colors" in co and type(co["ap_item_type_colors"]) is not bool:
         error("ctr_options.ap_item_type_colors must be true or false.")
+    if "pad_approach_hints" in co and co["pad_approach_hints"] is not True:
+        error("ctr_options.pad_approach_hints must be true when present.")
     if "starting_stat_class" in co and (type(co["starting_stat_class"]) is not int
                                         or not 1 <= co["starting_stat_class"] <= 4):
         error("ctr_options.starting_stat_class must be 1 to 4 when present.")
@@ -2988,6 +2993,7 @@ def restore(world, slot_data):
     world.options.spoiler_items.value = int("warp_pad_preview" in packs)
     world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
     world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
+    world.options.pad_approach_hints.value = int(co.get("pad_approach_hints", False))
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
     # room's encounter block verbatim (no redraw), its fallback checked against
     # the plan's unlock wins.
