@@ -236,6 +236,11 @@ def hub_static() -> Dict[str, List[Tuple[str, int]]]:
             for d in DESTINATIONS}
 
 
+#: The one shared {pad track -> static hub gate} table. The plan and the reference
+#: playthrough read the same object (moved from warp_pad_logic in row 12).
+HUB_STATIC = hub_static()
+
+
 def token_colours() -> Dict[str, str]:
     return {d.key: d.token_colour for d in DESTINATIONS if d.token_colour}
 
@@ -369,3 +374,68 @@ def cup_destination(region: str) -> Tuple[str, int]:
         if name == region:
             return name, lid
     raise KeyError(f"unknown gem cup region {region!r}")
+
+
+# ---------------------------------------------------------------------------
+# The two trial-track Trophy Races and CTR Token Challenges (#176), a frozen
+# location class. Moved from trial_trophy.py in one generator row 12.
+# TRIAL_TRACKS above is its stride order.
+# ---------------------------------------------------------------------------
+
+from .location_class import LocationClass  # noqa: E402  (no cycle: it imports nothing of ours)
+
+
+# Additive block for the two trial-track trophy races, stride 1.
+TRIAL_TROPHY_CODE_BASE = 35016200
+
+
+TRIAL_CTR_CODE_BASE = 35016210
+
+
+class TrialTrophyLocationClass(LocationClass):
+    """The two trial-track Trophy Races as a `LocationClass` (#176)."""
+
+    key = "trial_trophy"
+    display_name = "Trial Track Trophy Races"
+    code_blocks = (TRIAL_TROPHY_CODE_BASE, TRIAL_CTR_CODE_BASE)
+
+    def all_locations(self):
+        rows = []
+        for ti, track in enumerate(TRIAL_TRACKS):
+            rows.append((self.location_name(track),
+                         TRIAL_TROPHY_CODE_BASE + ti, track))
+            rows.append((self.ctr_location_name(track),
+                         TRIAL_CTR_CODE_BASE + ti, track))
+        return rows
+
+    def location_name(self, track: str) -> str:
+        """AP location name for a trial track's trophy race, e.g.
+        'Slide Coliseum: Trophy Race'. Matches the shipped suffix on the 16
+        static trophy races deliberately: it is the same event on a track that
+        did not previously host it."""
+        return f"{track}: Trophy Race"
+
+    def ctr_location_name(self, track: str) -> str:
+        return f"{track}: CTR Token Challenge"
+
+    def created_location_names(self, options):
+        from .cortex_vortex import dropped_track
+        names = []
+        option_names = ("slide_coliseum_races", "turbo_track_races")
+        # A trial the Cortex Vortex track dropped has no pad, so its races
+        # leave the seed whatever its own option says.
+        dropped = dropped_track(options) if options is not None else None
+        for track, option_name in zip(TRIAL_TRACKS, option_names):
+            if track == dropped:
+                continue
+            mode = int(getattr(getattr(options, option_name, 0), "value",
+                               getattr(options, option_name, 0)))
+            if mode >= 1:
+                names.append(self.location_name(track))
+            if mode >= 2:
+                names.append(self.ctr_location_name(track))
+        return names
+
+
+#: The registered trial-trophy class. `Locations.py` registers this instance.
+TRIAL_TROPHY_CLASS = TrialTrophyLocationClass()

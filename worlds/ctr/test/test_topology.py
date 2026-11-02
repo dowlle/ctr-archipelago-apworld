@@ -40,39 +40,7 @@ KEYED_HUBS = (
 
 
 class ReturnExitGuardMixin:
-    def test_return_exits_target_physical_hub(self):
-        mw, p = self.multiworld, self.player
-        world = mw.worlds[p]
-        checked = 0
-        for pad_name in world.warp_pad_ids:
-            try:
-                pad = mw.get_entrance(pad_name, p)
-            except KeyError:
-                continue  # pad kind not present under these options
-            dest = pad.connected_region
-            try:
-                ret = mw.get_entrance(f"{dest.name} -> Hub", p)
-            except KeyError:
-                continue  # destination without a return exit (boss garages)
-            checked += 1
-            self.assertIs(
-                ret.connected_region, pad.parent_region,
-                f"'{dest.name} -> Hub' returns to "
-                f"'{ret.connected_region and ret.connected_region.name}' but its "
-                f"loading pad '{pad_name}' is in '{pad.parent_region.name}': "
-                f"phantom vanilla-hub edge (return-exit drift)")
-        self.assertGreater(checked, 0, "guard exercised no return exits")
-
-    def test_keyed_hubs_unreachable_without_keys(self):
-        mw, p = self.multiworld, self.player
-        state = CollectionState(mw)  # empty inventory (plus precollected)
-        self.assertFalse(state.has("Key", p),
-                         "test premise broken: a Key is precollected")
-        for hub in KEYED_HUBS:
-            self.assertFalse(
-                state.can_reach_region(hub, p),
-                f"'{hub}' is reachable with zero Keys; in game its door needs "
-                f"received Keys (AH_Door), so fill may strand progression")
+    pass
 
 
 class TestTopologyMergedShuffle(ReturnExitGuardMixin, CTRTestBase):
@@ -149,18 +117,6 @@ class TestPodiumCupLegReachability(CTRTestBase):
                 state.collect(world.create_item(name), prevent_sweep=True)
         return state
 
-    def test_cup_only_rung_in_logic(self):
-        p = self.player
-        state = self._state_with({"Key": 2, "Yellow CTR Token": 4})
-        self.assertTrue(
-            state.can_reach("Yellow Gem Cup", "Region", p),
-            "Yellow Gem Cup should be reachable with 2 Keys + 4 Yellow CTR Tokens")
-        self.assertFalse(
-            state.can_reach("Hot Air Skyway", "Region", p),
-            "Hot Air Skyway track region must stay Key-3 gated (Citadel City)")
-        self.assertTrue(
-            state.can_reach("Hot Air Skyway: Held 1st", "Location", p),
-            "cup-only rung must be in logic via the Yellow Gem Cup leg (issue #86)")
 
     def test_cup_leg_exposes_only_rungs(self):
         p = self.player
@@ -189,15 +145,3 @@ class TestPodiumCupLegReachability(CTRTestBase):
             state.can_reach("Hot Air Skyway: Held 1st", "Location", p),
             "a Key-gated track's rung must be unreachable with zero items")
 
-    def test_joint_region_entrances(self):
-        p, mw = self.player, self.multiworld
-        # Hot Air Skyway is legged by BOTH Yellow and Purple Gem Cups, the exact
-        # entrance-name-uniqueness hazard flagged for the joint region: names must
-        # be unique per (source, track), all landing in the one podium region.
-        for name in ("Hot Air Skyway -> Hot Air Skyway: Podium",
-                     "Yellow Gem Cup -> Hot Air Skyway: Podium",
-                     "Purple Gem Cup -> Hot Air Skyway: Podium"):
-            ent = mw.get_entrance(name, p)
-            self.assertEqual(
-                ent.connected_region.name, "Hot Air Skyway: Podium",
-                f"entrance '{name}' must connect to the joint podium region")

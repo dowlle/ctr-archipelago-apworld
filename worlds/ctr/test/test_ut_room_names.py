@@ -21,7 +21,7 @@ from worlds.AutoWorld import call_all
 from .. import content_plan, ctrAPWorld, destinations
 from ..custom_check_namespace import custom_check_code
 from ..custom_track_datapackage import embed_track_names
-from ..custom_tracks import BABY_T_PARK_CURRENT
+from ..custom_packages import BABY_T_PARK_CURRENT
 from ..named_tracks import location_code
 from .test_content_plan import make_world, profile_options
 from .test_named_tracks import fixture_tracks
@@ -102,144 +102,16 @@ class TestLegacyPathTitles(unittest.TestCase):
         mw = setup_multiworld(ctrAPWorld, STEPS, seed=self.seed, options=legacy_options(**extra))
         return mw, mw.worlds[1].fill_slot_data()
 
-    def test_title_block_on_the_schema_18_wire(self):
-        _mw, wire = self.source()
-        self.assertEqual(wire["schema_version"], 18)
-        self.assertEqual(wire["custom_track_titles"],
-                         {"version": 1, "tracks": [{"slot": 1, "title": LEGACY_TITLE}]})
-        _mw, wire = self.source(title="Crash  Cove", author="Ana")
-        self.assertEqual(wire["custom_track_titles"]["tracks"][0]["title"], "Crash Cove (Custom)")
-        self.assertNotIn("title", wire["custom_tracks"]["tracks"][0])
 
     def test_no_custom_track_means_no_block(self):
         mw = setup_multiworld(ctrAPWorld, STEPS, seed=self.seed, options={})
         self.assertNotIn("custom_track_titles", mw.worlds[1].fill_slot_data())
 
-    def test_tracker_renames_and_logic_is_unchanged(self):
-        source, wire = self.source()
-        tracker = tracker_for(wire, self.seed)
-        world = tracker.worlds[1]
-        by_address = {loc.address: loc.name for loc in tracker.get_locations(1)}
-        self.assertEqual(by_address[35016300], f"{LEGACY_TITLE}: Trophy Race")
-        self.assertEqual(by_address[35016400], f"{LEGACY_TITLE}: Held 1st")
-        self.assertEqual(by_address[custom_check_code("ctr_location", 1)],
-                         f"{LEGACY_TITLE}: CTR Token Challenge")
-        self.assertEqual(world.location_id_to_alias, {})
-        self.assertNotIn("Custom Track 1: Trophy Race", tracker.regions.location_cache[1])
-        self.assertEqual(set(by_address), {loc.address for loc in source.get_locations(1)})
-        # Every rule evaluates by object after the rename, with the same answer
-        # the server's world gives for the same items.
-        pool = sorted(item.name for item in source.itempool if item.player == 1)
-        for cut in (0, len(pool) // 3, 2 * len(pool) // 3, len(pool)):
-            with self.subTest(items=cut):
-                self.assertEqual(reachable(tracker, pool[:cut]), reachable(source, pool[:cut]))
-        assert_tracker_resolves_every_address(self, tracker)
-
-    def test_tracker_without_title_block_uses_compiled_titles(self):
-        _source, wire = self.source(title="Neon Rush")
-        old = {k: v for k, v in wire.items() if k != "custom_track_titles"}
-        names = {loc.address: loc.name for loc in tracker_for(old, self.seed).get_locations(1)}
-        self.assertEqual(names[35016300], f"{LEGACY_TITLE}: Trophy Race")
-        names = {loc.address: loc.name for loc in tracker_for(wire, self.seed).get_locations(1)}
-        self.assertEqual(names[35016300], "Neon Rush: Trophy Race")
-
-    def test_real_generation_never_renames(self):
-        mw = setup_multiworld(ctrAPWorld, gen_steps, seed=self.seed, options=legacy_options())
-        self.assertIn("Custom Track 1: Trophy Race", mw.regions.location_cache[1])
-        self.assertIn(35016300, mw.worlds[1].location_id_to_alias)
-
-    def test_room_datapackage_renames_letter_items(self):
-        mw = setup_multiworld(ctrAPWorld, gen_steps, seed=self.seed, options=legacy_options())
-        distribute_items_restrictive(mw)
-        package = ctrAPWorld.get_data_package_data()
-        multidata = {"datapackage": {GAME: copy.deepcopy(package)}}
-        embed_track_names(mw, multidata, GAME)
-        room = multidata["datapackage"][GAME]
-        letters = [custom_check_code("letter_item", 1, i) for i in range(3)]
-        placed = {loc.item.code for loc in mw.get_locations() if loc.item}
-        self.assertTrue(placed & set(letters), "the seed pools a custom letter item")
-        for code, letter in zip(letters, "CTR"):
-            if code in placed:
-                self.assertEqual(room["item_name_to_id"][f"Letter {letter} ({LEGACY_TITLE})"], code)
-                self.assertNotIn(f"Letter {letter} (Custom Track 1)", room["item_name_to_id"])
-        self.assertEqual(room["location_name_to_id"][f"{LEGACY_TITLE}: Trophy Race"], 35016300)
-        self.assertEqual(set(room["item_name_to_id"].values()), set(package["item_name_to_id"].values()))
-        self.assertNotEqual(room["checksum"], package["checksum"])
-        self.assertEqual(package, ctrAPWorld.get_data_package_data(), "registered package mutated")
 
 
-class TestLegacyPathNamedBlock(unittest.TestCase):
-    """#133: a legacy entry whose track has a named block uses the block for
-    every check and item, so the room and Universal Tracker show the real name
-    with no alias, no rename and no checksum change."""
-    seed = 20261013
-    base = 35200000 + 200 * BABY_T_PARK_BLOCK
 
-    def source(self, steps=STEPS, **extra):
-        mw = setup_multiworld(ctrAPWorld, steps, seed=self.seed, options=legacy_options(**extra))
-        return mw, mw.worlds[1].fill_slot_data()
 
-    def test_wire_names_the_block_and_carries_its_codes(self):
-        _mw, wire = self.source()
-        entry = wire["custom_tracks"]["tracks"][0]
-        self.assertEqual(entry["named_block"], BABY_T_PARK_BLOCK)
-        self.assertEqual(entry["locations"]["trophy"], self.base)
-        self.assertEqual(entry["locations"]["ctr"], self.base + 9)
-        self.assertTrue(all(c == -1 or self.base + 1 <= c <= self.base + 5
-                            for c in entry["locations"]["podium"]))
-        letters = wire["custom_lettersanity_checks"]["tracks"][0]
-        self.assertTrue(all(c == -1 or self.base + 11 <= c <= self.base + 13 for c in letters["locations"]))
-        item_base = 35100000 + 5 * BABY_T_PARK_BLOCK
-        self.assertTrue(all(c == -1 or item_base <= c <= item_base + 2 for c in letters["items"]))
-        # The title block names the slot by the block's frozen stem; a YAML
-        # title cannot rename a named track.
-        self.assertEqual(wire["custom_track_titles"],
-                         {"version": 1, "tracks": [{"slot": 1, "title": "Baby T Park"}]})
-        _mw, wire = self.source(title="Neon Rush")
-        self.assertEqual(wire["custom_track_titles"]["tracks"][0]["title"], "Baby T Park")
 
-    def test_names_are_real_and_no_generic_check_is_created(self):
-        mw, _wire = self.source()
-        names = {loc.address: loc.name for loc in mw.get_locations(1) if loc.address is not None}
-        self.assertEqual(names[self.base], "Baby T Park: Trophy Race")
-        self.assertEqual(names[self.base + 9], "Baby T Park: CTR Token Challenge")
-        self.assertFalse([n for n in names.values() if n.startswith("Custom Track ")])
-        self.assertFalse([a for a in names if 35016300 <= a <= 35016559 or 35020000 <= a <= 35023131])
-        self.assertEqual(mw.worlds[1].location_id_to_alias, {})
-        pooled = {item.name for item in mw.itempool if item.player == 1}
-        self.assertFalse({n for n in pooled if n.endswith("(Custom Track 1)")})
-        self.assertTrue({n for n in pooled if n.endswith("(Baby T Park)")})
-
-    def test_tracker_restores_the_same_names_and_logic(self):
-        source, wire = self.source()
-        tracker = tracker_for(wire, self.seed)
-        self.assertEqual({loc.address: loc.name for loc in tracker.get_locations(1)},
-                         {loc.address: loc.name for loc in source.get_locations(1)})
-        pool = sorted(item.name for item in source.itempool if item.player == 1)
-        for cut in (0, len(pool) // 3, 2 * len(pool) // 3, len(pool)):
-            with self.subTest(items=cut):
-                self.assertEqual(reachable(tracker, pool[:cut]), reachable(source, pool[:cut]))
-
-    def test_tracker_refuses_a_forged_block(self):
-        from ..custom_tracks import reconstruct_custom_tracks_from_wire
-        _source, wire = self.source()
-        self.assertTrue(reconstruct_custom_tracks_from_wire(wire))
-        for forged in (0, None, True, 8.0):
-            bad = copy.deepcopy(wire)
-            if forged is None:
-                del bad["custom_tracks"]["tracks"][0]["named_block"]
-            else:
-                bad["custom_tracks"]["tracks"][0]["named_block"] = forged
-            with self.subTest(block=forged):
-                self.assertEqual(reconstruct_custom_tracks_from_wire(bad), {})
-
-    def test_room_datapackage_is_untouched(self):
-        mw, _wire = self.source(steps=gen_steps)
-        distribute_items_restrictive(mw)
-        package = ctrAPWorld.get_data_package_data()
-        multidata = {"datapackage": {GAME: copy.deepcopy(package)}}
-        embed_track_names(mw, multidata, GAME)
-        self.assertEqual(multidata["datapackage"][GAME], package)
 
 
 class TestSharedItemOwners(unittest.TestCase):

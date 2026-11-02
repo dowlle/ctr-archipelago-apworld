@@ -1,9 +1,5 @@
 """Seed-local display aliases; never change the registered AP namespace."""
 
-from .custom_track_locations import slot_region
-from .custom_tracks import TRACK_DISPLAY_NAMES, resolved_custom_tracks
-from .wumpa_checks import CUSTOM_DESTINATION_ROLES, custom_location_name
-
 
 def _escape_markup(text: str) -> str:
     # UT embeds aliases in Kivy markup. Creator titles are untrusted text.
@@ -13,45 +9,17 @@ def _escape_markup(text: str) -> str:
 def location_aliases(world, *, escape_markup: bool = True) -> dict[int, str]:
     """UT's supported per-world hook, restricted to this seed's real locations.
 
-    Prefixes are derived from resolved slot/role identities, not a catalogue's
-    order. Keep Location.name, address and both global datapackage maps intact.
-    Pinned package titles take precedence over the legacy compiled title table.
-    Server datapackages request plain text; UT requires escaped Kivy markup.
+    The plan's checks carry their display names. Keep Location.name, address
+    and both global datapackage maps intact. Server datapackages request
+    plain text; UT requires escaped Kivy markup.
     """
-    plan = getattr(world, "ctr_content_plan", None)
-    if plan is not None:
-        # A named block's check already carries its real name, so only
-        # generic-slot checks get an alias.
-        existing = {loc.address: loc.name for loc in world.multiworld.get_locations(world.player)}
-        return {check["location"]: (_escape_markup(check["display_name"]) if escape_markup else check["display_name"])
-                for check in plan["checks"]
-                if check["location"] in existing and existing[check["location"]] != check["display_name"]}
-    prefixes = {}
-    roles = {role: label for role, label, _region in CUSTOM_DESTINATION_ROLES}
-    titles = getattr(world, "custom_track_titles", None)
-    for track_id, entry in resolved_custom_tracks(world).items():
-        if entry.get("named_block") is not None:
-            continue  # its checks already carry the block's real names (#133)
-        if titles is not None:
-            title = titles.get(int(entry["slot"]))
-            if title is None:
-                continue
-        else:
-            title = entry.get("title", TRACK_DISPLAY_NAMES.get(track_id, track_id))
-        prefixes[f"{slot_region(entry['slot'])}: "] = title
-        if entry["replaces"] in roles:
-            role_name = custom_location_name(roles[entry["replaces"]])
-            prefixes[role_name.removesuffix("Reach 10 Wumpa")] = title
-    aliases = {}
-    for location in world.multiworld.get_locations(world.player):
-        if location.address is None:
-            continue
-        for prefix, title in prefixes.items():
-            if location.name.startswith(prefix):
-                text = f"{title}: {location.name[len(prefix):]}"
-                aliases[location.address] = _escape_markup(text) if escape_markup else text
-                break
-    return aliases
+    plan = world.ctr_content_plan
+    # A named block's check already carries its real name, so only
+    # generic-slot checks get an alias.
+    existing = {loc.address: loc.name for loc in world.multiworld.get_locations(world.player)}
+    return {check["location"]: (_escape_markup(check["display_name"]) if escape_markup else check["display_name"])
+            for check in plan["checks"]
+            if check["location"] in existing and existing[check["location"]] != check["display_name"]}
 
 
 def item_aliases(world) -> dict[int, str]:
@@ -62,30 +30,19 @@ def item_aliases(world) -> dict[int, str]:
     hook. Named blocks need none, their item names are already real.
     """
     from .custom_check_namespace import LETTERS, custom_check_code
-    plan = getattr(world, "ctr_content_plan", None)
-    if plan is not None:
-        # Content plans (#133 PR 3b): the generic-slot letter items the plan
-        # pools take their track's room title.
-        from .content_plan import plan_letter_items
-        pooled = plan_letter_items(plan)
-        aliases = {}
-        for track in plan["tracks"]:
-            if track["origin"] != "custom" or "named_block" in track:
-                continue
-            for variant, letter in enumerate(LETTERS):
-                code = custom_check_code("letter_item", track["custom_slot"], variant)
-                if code in pooled:
-                    aliases[code] = f"Letter {letter} ({track.get('room_title', track['display_name'])})"
-        return aliases
-    titles = getattr(world, "custom_track_titles", None) or {}
-    named = {int(entry["slot"]) for entry in (getattr(world, "custom_tracks", None) or {}).values()
-             if entry.get("named_block") is not None}
+    # Content plans (#133 PR 3b): the generic-slot letter items the plan
+    # pools take their track's room title.
+    from .content_plan import plan_letter_items
+    plan = world.ctr_content_plan
+    pooled = plan_letter_items(plan)
     aliases = {}
-    for slot, title in titles.items():
-        if slot in named:
+    for track in plan["tracks"]:
+        if track["origin"] != "custom" or "named_block" in track:
             continue
         for variant, letter in enumerate(LETTERS):
-            aliases[custom_check_code("letter_item", slot, variant)] = f"Letter {letter} ({title})"
+            code = custom_check_code("letter_item", track["custom_slot"], variant)
+            if code in pooled:
+                aliases[code] = f"Letter {letter} ({track.get('room_title', track['display_name'])})"
     return aliases
 
 

@@ -242,16 +242,6 @@ class TestMintedItems(unittest.TestCase):
         self.assertLessEqual(set(MINTED_TRAP_KEYS), set(ctrAPWorld.item_name_groups["Traps"]))
 
 
-class TestInert(unittest.TestCase):
-    def test_new_classes_create_nothing_in_a_default_seed(self):
-        mw = setup_multiworld(ctrAPWorld, gen_steps, seed=1503)
-        created = {loc.name for loc in mw.get_locations(1)}
-        for location_class in CTR_LOCATION_CLASSES:
-            if location_class.key in NEW_CLASSES:
-                with self.subTest(location_class.key):
-                    self.assertFalse(created & set(location_class.names()))
-        minted = {row["name"] for row in ITEM_DATA} - {"Clocked Out", "Reverse Camera", "Reserve Top-Up"}
-        self.assertFalse({item.name for item in mw.itempool} & minted)
 
 
 class TestBuildScript(unittest.TestCase):

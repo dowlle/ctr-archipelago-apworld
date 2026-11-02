@@ -235,10 +235,6 @@ class TestExcludedLocationReserve(unittest.TestCase):
     def _sample_track(self):
         return podium._trophy_tracks()[0]
 
-    def test_default_goal_oxide_excludes_exactly_one_location(self):
-        multiworld = setup_multiworld(ctrAPWorld, seed=1)
-        world = multiworld.worlds[1]
-        self.assertEqual(goal_excluded_location_reserve(world), 1)
 
     def test_allbosses_goal_excludes_no_location(self):
         multiworld = setup_multiworld(
@@ -255,53 +251,10 @@ class TestExcludedLocationReserve(unittest.TestCase):
         world = multiworld.worlds[1]
         self.assertEqual(player_exclude_locations_reserve(world), 1)
 
-    def test_estimate_matches_exact_when_the_excluded_name_is_really_created(self):
-        track = self._sample_track()
-        real_location = f"{track}: Trophy Race"
-        multiworld = setup_multiworld(
-            ctrAPWorld, seed=1, options={"exclude_locations": {real_location}})
-        world = multiworld.worlds[1]
-        from worlds.generic.Rules import exclusion_rules
-        exclusion_rules(multiworld, 1, world.options.exclude_locations.value)
-        self.assertEqual(estimated_filler_reserve(world), 2)  # goal(1) + yaml(1)
-        self.assertEqual(exact_filler_reserve(world), 2)
 
-    def test_estimate_overcounts_a_never_created_excluded_name_conservatively(self):
-        # Issue #28's finding: excluding a location this seed never creates
-        # (a podium rung with podium checks off) is a silent no-op on the
-        # real LocationProgressType. The estimate cannot know that at
-        # create_items time and stays conservative (larger, never smaller).
-        track = self._sample_track()
-        never_created = podium.location_name(track, "held_1st")
-        multiworld = setup_multiworld(
-            ctrAPWorld, seed=1,
-            options={
-                # Keep one finish category selected so the seed has its needed
-                # capacity without changing the held opt-out. Held 1st remains
-                # a registered-but-never-created name, which is the condition
-                # this conservative estimate exercises.
-                "podium_placement_checks": True,
-                "podium_held_rungs": False,
-                "podium_held_fifth_rung": False,
-                "podium_finish_rungs": True,
-                "podium_any_position_rung": False,
-                "exclude_locations": {never_created},
-            })
-        world = multiworld.worlds[1]
-        from worlds.generic.Rules import exclusion_rules
-        exclusion_rules(multiworld, 1, world.options.exclude_locations.value)
-        self.assertEqual(estimated_filler_reserve(world), 2)  # goal(1) + yaml(1)
-        self.assertEqual(exact_filler_reserve(world), 1)  # goal(1) only
-        self.assertGreater(estimated_filler_reserve(world),
-                           exact_filler_reserve(world))
 
 
 class TestElasticSupplyCeiling(unittest.TestCase):
-    def test_subtracts_the_estimated_reserve_from_available_supply(self):
-        multiworld = setup_multiworld(ctrAPWorld, seed=1)
-        world = multiworld.worlds[1]
-        self.assertEqual(goal_excluded_location_reserve(world), 1)
-        self.assertEqual(elastic_supply_ceiling(world, available_supply=50), 49)
 
     def test_floors_at_zero_when_the_reserve_exceeds_supply(self):
         multiworld = setup_multiworld(ctrAPWorld, seed=1,

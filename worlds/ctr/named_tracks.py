@@ -321,8 +321,9 @@ class NamedTrackLocationClass(LocationClass):
                 for track in self.tracks for name, code in track_locations(track)]
 
     def created_location_names(self, options) -> List[str]:
-        from .custom_track_ids import created_named_location_names
-        return created_named_location_names(options)
+        """None through this class: the content plan creates named-block checks
+        itself. One generator row 12 deleted the legacy `custom_tracks` path."""
+        return []
 
     def location_name(self, track_key: str, key: str = "trophy") -> str:
         for track in self.tracks:

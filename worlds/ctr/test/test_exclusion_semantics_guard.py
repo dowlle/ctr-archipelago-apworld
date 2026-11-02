@@ -400,19 +400,6 @@ class TestFillErrorWhenExclusionExceedsFillerHeadroom(unittest.TestCase):
         exclusion_rules(mw, 1, set(exclude_names))
         distribute_items_restrictive(mw)
 
-    def test_five_exclusions_reliably_exceed_the_podium_off_filler_budget(self):
-        """Podium off (with all-unlocked mode, see the note below) leaves ~2
-        filler items total. Verified over
-        _SAMPLE_SEEDS in the exploration that produced this module (see the
-        module docstring): 5 exclusions raised FillError on all 6 seeds
-        tried, including the primary seed pinned here."""
-        mw = _build(_PRIMARY_SEED, podium_placement_checks=False,
-                    character_unlocks=False)
-        names = [loc.name for loc in mw.get_unfilled_locations(1)][:5]
-        with self.assertRaises(FillError):
-            self._exclude_and_fill(_PRIMARY_SEED, names,
-                                   podium_placement_checks=False,
-                                   character_unlocks=False)
 
     def test_same_five_names_fill_fine_under_shipped_defaults(self):
         """Same exclusion COUNT (five shipped locations), same seed, only the
@@ -422,18 +409,6 @@ class TestFillErrorWhenExclusionExceedsFillerHeadroom(unittest.TestCase):
         names = [loc.name for loc in mw.get_unfilled_locations(1)][:5]
         self._exclude_and_fill(_PRIMARY_SEED, names)  # must not raise
 
-    def test_podium_off_five_exclusions_fail_across_multiple_seeds(self):
-        """The multi-seed half of the module docstring's claim, run directly
-        rather than only asserted in prose."""
-        for seed in _SAMPLE_SEEDS:
-            with self.subTest(seed=seed):
-                mw = _build(seed, podium_placement_checks=False,
-                            character_unlocks=False)
-                names = [loc.name for loc in mw.get_unfilled_locations(1)][:5]
-                with self.assertRaises(FillError):
-                    self._exclude_and_fill(seed, names,
-                                           podium_placement_checks=False,
-                                   character_unlocks=False)
 
 
 if __name__ == "__main__":

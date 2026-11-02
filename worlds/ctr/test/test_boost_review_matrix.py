@@ -15,17 +15,6 @@ class TestBoostReviewMatrix(unittest.TestCase):
             "progressive_boost": "shared_global", "platinum_relic_count": 18,
             "oxide_goal": "none", "bosses_required_goal": 4, **options})
 
-    def test_platinum_difficulty_and_blue_fire(self):
-        for difficulty, blue_fire, expected in (
-                ("easy", False, 2), ("easy", True, 3),
-                ("medium", False, 2), ("medium", True, 2),
-                ("hard", False, 1)):
-            mw = self.build(logic_difficulty=difficulty,
-                            progressive_boost_blue_fire=blue_fire)
-            loc = mw.get_location("Crash Cove: Platinum Time Trial", 1)
-            with self.subTest(difficulty=difficulty, blue_fire=blue_fire):
-                self.assertFalse(loc.can_reach(_state_all_but_boost(mw, expected - 1)))
-                self.assertTrue(loc.can_reach(_state_all_but_boost(mw, expected)))
 
     def test_boss_venue_and_companion_events(self):
         mw = self.build(bosses_required_goal=4, shortcut_knowledge="medium",

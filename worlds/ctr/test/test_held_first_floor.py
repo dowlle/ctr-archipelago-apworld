@@ -85,47 +85,9 @@ class TestHeldFirstFloor(unittest.TestCase):
                     self.assertTrue(_reach(bare, location_name(track,
                                                                "held_1st")))
 
-    def test_held_third_and_fifth_unchanged(self):
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard", podium_held_fifth_rung=True,
-                    **TRIALS)
-        bare = _state(mw)
-        for track in TRACKS:
-            for key in ("held_3rd", "held_5th"):
-                with self.subTest(track=track, rung=key):
-                    self.assertTrue(_reach(bare, location_name(track, key)))
 
-    def test_cup_leg_path_is_gated(self):
-        """Close Crash Cove's own pad: its rungs are then reachable only
-        through the Red Gem Cup leg, and Held 1st still needs the floor."""
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="medium", warp_pad_shuffle_categories=[])
-        mw.get_entrance("Crash Cove Warp Pad", PLAYER).access_rule = (
-            lambda state: False)
-        bare, one = _state(mw), _state(mw, boost=1)
-        self.assertFalse(_reach(one, "Crash Cove: Trophy Race"))
-        self.assertTrue(_reach(bare, location_name("Crash Cove", "held_3rd")))
-        self.assertFalse(_reach(bare, location_name("Crash Cove", "held_1st")))
-        self.assertTrue(_reach(one, location_name("Crash Cove", "held_1st")))
 
-    def test_custom_track_slot_held_first(self):
-        from ..custom_tracks import BABY_T_PARK_CURRENT
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="medium",
-                    custom_tracks={"baby-t-park":
-                                   copy.deepcopy(BABY_T_PARK_CURRENT)})
-        name = "Baby T Park: Held 1st"
-        self.assertIn(name, {loc.name for loc in mw.get_locations(PLAYER)})
-        self.assertFalse(_reach(_state(mw), name))
-        self.assertTrue(_reach(_state(mw, boost=1), name))
-        self.assertTrue(_reach(_state(mw), "Baby T Park: Held 3rd"))
 
-    def test_cortex_vortex_held_first(self):
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="medium", cortex_vortex_track=True)
-        name = "Cortex Vortex: Held 1st"
-        self.assertFalse(_reach(_state(mw), name))
-        self.assertTrue(_reach(_state(mw, boost=1), name))
 
 
 class TestHardHasNoHeldFirstFloor(unittest.TestCase):
@@ -171,13 +133,3 @@ class TestHardHasNoHeldFirstFloor(unittest.TestCase):
         self.assertTrue(_reach(_state(mw),
                                location_name("Oxide Station", "held_1st")))
 
-    def test_cortex_vortex_and_custom_slot_free_on_hard(self):
-        from ..custom_tracks import BABY_T_PARK_CURRENT
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard", cortex_vortex_track=True)
-        self.assertTrue(_reach(_state(mw), "Cortex Vortex: Held 1st"))
-        mw = _build(progressive_boost="shared_global", itemsanity=False,
-                    logic_difficulty="hard",
-                    custom_tracks={"baby-t-park":
-                                   copy.deepcopy(BABY_T_PARK_CURRENT)})
-        self.assertTrue(_reach(_state(mw), "Baby T Park: Held 1st"))

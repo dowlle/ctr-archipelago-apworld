@@ -8,7 +8,7 @@ from Fill import distribute_items_restrictive
 from Options import OptionError
 from worlds.AutoWorld import call_all
 
-from .. import content_bosses, content_plan, content_requirements as cr, warp_pad_logic
+from .. import content_bosses, content_plan, content_requirements as cr, content_playthrough
 from .test_content_plan import make_world, profile_pool
 
 SHAPE = dict(preset="mixed", tracks=dict(retail="all", modes=["trophy", "ctr", "relic"], custom=[]),
@@ -143,7 +143,7 @@ class TestRandomRequirements(unittest.TestCase):
                     self.assertNotIn(35010003, predicate.get("items", [predicate.get("item")]))
 
     def test_weights_are_the_one_table(self):
-        weights = dict(warp_pad_logic.DEFAULT_REQUIREMENT_WEIGHTS)
+        weights = dict(content_playthrough.DEFAULT_REQUIREMENT_WEIGHTS)
         weights.update({k: 0 for k in weights if k != "Trophy"})
         plan = make_world(options(requirement_weights=weights), seed=1).ctr_content_plan
         for table in (records(plan, "stage1:"), records(plan, "stage2:")):
@@ -158,7 +158,7 @@ class TestRandomRequirements(unittest.TestCase):
         self.assertGreaterEqual(len(seen), 2)
 
     def test_zero_trophy_weight_is_refused(self):
-        weights = dict(warp_pad_logic.DEFAULT_REQUIREMENT_WEIGHTS, Trophy=0)
+        weights = dict(content_playthrough.DEFAULT_REQUIREMENT_WEIGHTS, Trophy=0)
         with self.assertRaisesRegex(OptionError, "Trophy must stay above 0"):
             make_world(options(requirement_weights=weights))
 

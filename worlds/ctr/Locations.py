@@ -13,11 +13,11 @@ from .lettersanity import LETTERSANITY_CLASS
 from .location_class import LocationClassRegistry
 from .podium import PODIUM_CLASS
 from .relic_perfect import RELIC_PERFECT_CLASS
-from .trial_trophy import TRIAL_TROPHY_CLASS
+from .destinations import TRIAL_TROPHY_CLASS
 from .wumpa_checks import WUMPA_CLASS
 from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS, CUSTOM_CTR_CHALLENGE_CLASS
-from .cortex_vortex_track import CORTEX_VORTEX_TRACK_CLASS
+from .cortex_vortex import CORTEX_VORTEX_TRACK_CLASS
 from .hit_character import HIT_CHARACTER_CLASS
 
 # The registered optional location classes (#176), in registration order.

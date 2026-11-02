@@ -36,16 +36,7 @@ class TestColorBoxesByItemDefault(CTRTestBase):
     def test_default_is_on(self):
         self.assertTrue(self.world.options.color_boxes_by_item.value)
 
-    def test_wire_value_matches_the_option(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertIs(slot_data["ctr_options"][WIRE_KEY], True)
 
-    def test_ut_does_not_restore_it(self):
-        world = self.world
-        world.options.color_boxes_by_item.value = True
-        world._ut_restore_options({"ctr_options": {WIRE_KEY: False},
-                                   "warp_pad_unlock": {}, "podium_checks": {}})
-        self.assertTrue(world.options.color_boxes_by_item.value)
 
     def test_help_text_documents_the_colours_and_the_client_override(self):
         from ..Options import ColorBoxesByItem

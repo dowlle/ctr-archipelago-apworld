@@ -1,100 +1,33 @@
-"""Port of CTR-Standalone's get_random_warppad_unlocks for the Archipelago apworld.
+"""The reference playthrough behind random pad requirements (one generator plan,
+section 4 "What is merged", ruled 2026-10-30).
 
-Source of truth:
-  CTR-Standalone/src/seed_generation/randomize_warppad_requirements.rs
-  CTR-Standalone/src/seed_generation/item_randomization/player_inventory.rs
-  CTR-Standalone/src/seed_generation/game_world.rs  (WarpPad::new token colours)
+Moved verbatim from warp_pad_logic.py in row 12, which deleted the rest of that
+module with the original generator. It is a port of CTR-Standalone's
+get_random_warppad_unlocks (Icebound's design):
 
-Icebound's real algorithm (NOT "force the 4 starters vanilla"):
-  1) Pick a RANDOM FREE SUBSET of the 5 N. Sanity Beach pads
-     [Crash Cove, Roo's Tubes, Mystery Caves, Sewer Speedway, Skull Rock],
-     size weighted [(1,10),(2,30),(3,30),(4,15),(5,15)] -> those pads are FREE
-     (requirement None). Every OTHER pad -- including the non-chosen starters --
-     gets a real requirement.
-  2) SPHERE-SEARCH over the VANILLA location->reward map: seed inventory from the
-     free pads' rewards, then repeatedly pick a random reachable still-unassigned
-     pad, assign it a requirement whose item TYPE is currently in inventory (so it
-     is satisfiable the moment the pad is reached), and add that pad's vanilla
-     rewards to inventory. Solvable by construction.
-  3) Type weighting + "Any"-variant collapse + post-pass count reduction, all
-     ported verbatim from the Rust.
+  1) A random free subset of the five N. Sanity Beach pads.
+  2) A sphere search over a reward map: seed the inventory from the free pads'
+     rewards, then repeatedly pick a random reachable pad that has no
+     requirement yet, give it a requirement whose item type is held at that
+     moment, and add its rewards. Solvable by construction.
+  3) Type weighting, "Any" collapse and the count post-pass, as in the Rust.
 
-AP adaptation: AP decouples location<->item (real items are placed by
-fill_restrictive, not fixed to races). So we run the sphere-search over a SYNTHETIC
-vanilla reward map purely to produce a SOLVABLE requirement DAG, then install that
-DAG as AP access rules (Rules.add_warp_pad_unlock_rules). Free-subset guarantees
-sphere 0 is non-empty; fill_restrictive + reseed handles residual interleaving.
+On the plan the reward map is a reference placement: content_requirements gives
+each check a stand-in item and runs `_run_sphere_search_once` over it.
 
-Determinism: every draw uses world.random (AP's per-slot seeded RNG); every dict
-iteration that the Rust sorts is sorted here too, so the same YAML + seed
-reproduces identical output.
+Determinism: every draw uses world.random; every dict iteration the Rust sorts
+is sorted here too, so the same YAML and seed give the same output.
 """
 
 import heapq
 import json
-import logging
 import math
 import pkgutil
 import re
 
 from . import destinations, warp_pad_rules
-from .cortex_vortex_track import CORTEX_VORTEX
+from .destinations import CORTEX_VORTEX
 
-
-# ---------------------------------------------------------------------------
-# Stage-2 collapse reporting (issue #75, ruled 2026-08-07)
-# ---------------------------------------------------------------------------
-# A stage-2 collapse is a SANCTIONED mechanism -- the design rule is that a pad's
-# tier 2 may collapse if a seed needs it for generation -- but until 0.2.0 it
-# happened silently, so a YAML could ask for layered warp-pad gating, not get it,
-# and give no one a way to notice. Measured on the 0.1.5 apworld it is not rare:
-# 0 in 10,000 seeds at shipped defaults, but 15.8% with podium_placement_checks
-# off and 43.3% at the tightest measured content config.
-#
-# The two ways a seed can lose stage 2, both reported here with the same wording
-# so the line is greppable and stable:
-#   geography -- no free-pad subset opens sphere 0 wide enough (run_sphere_search)
-#   fill      -- the pre_fill dry run predicts this room would FillError (__init__)
-#
-# NOT reported: two_stage_density "off". That collapse is what the YAML asked for,
-# so it is neither silent nor a surprise.
-
-_STAGE2_COLLAPSE_REASONS = {
-    "geography": "the free starting pads open too little of the hub",
-}
-
-
-def warn_stage2_collapsed(world, reason, detail=""):
-    """Emit the single generation warning for a silent stage-2 collapse.
-
-    Wording is deliberately stable: players and maintainers grep for
-    "two-stage warp-pad gating was collapsed". Keep the prefix if you edit it.
-    """
-    try:
-        who = world.multiworld.player_name[world.player]
-    except Exception:
-        who = f"player {getattr(world, 'player', '?')}"
-    template = _STAGE2_COLLAPSE_REASONS.get(reason)
-    if template is None:  # unknown reason -> still warn, never swallow
-        template = "{detail}"
-    message = (
-        "[CTR] %s: two-stage warp-pad gating was collapsed for this seed because "
-        "%s; it is fully playable, re-roll for the layered version."
-        % (who, template.format(detail=detail)))
-    try:
-        from .notices import say_once
-        said = say_once(world, f"stage2_collapsed:{reason}", message,
-                        logging.getLogger())
-    except AttributeError:  # a world without options (test doubles)
-        logging.warning(message)
-        said = True
-    if said and detail and reason in _STAGE2_COLLAPSE_REASONS:
-        logging.debug("[CTR] %s: stage-2 collapse detail: %s", who, detail)
-
-
-# ---------------------------------------------------------------------------
-# Static data -- the vanilla world (track-name strings instead of the Rust enum)
-# ---------------------------------------------------------------------------
 
 # Hub-door static gate per shuffleable track, mirroring the AP exit-graph Key
 # gates (data/world.json). N. Sanity Beach pads ungated; Lost Ruins behind Key 1;
@@ -113,22 +46,27 @@ def warn_stage2_collapsed(world, reason, detail=""):
 # Benign: reachability always comes from the live-graph sweep
 # (_reachable_pads_and_collect); HUB_STATIC values feed only the unreachable-
 # fallback's cheapest-Key sort heuristic.
-HUB_STATIC = destinations.hub_static()
+HUB_STATIC = destinations.HUB_STATIC
+
 
 # The two Gem Stone Valley trial pads -- single-stage, randomized stage-1 only.
 TRIAL_TRACKS = set(destinations.TRIAL_TRACKS)
+
 
 # The five Gem Stone Valley gem-cup pads -- single-stage, randomized stage-1 only.
 # (Track keys, not region names: the region is '<Colour> Gem Cup'.)
 CUP_TRACKS = set(destinations.CUP_PAD_TRACKS)
 
+
 # Vanilla CTR-Token COLOUR per track. Transcribed VERBATIM from game_world.rs
 # WarpPad::new (lines 1211-1219): Red/Green/Blue explicit, Yellow = default branch.
 TRACK_TOKEN_COLOUR = destinations.token_colours()
 
+
 # Battle-arena crystal pads yield a Purple CTR Token (Rust BattleArenaRewards
 # single_reward = PurpleCtrToken).
 ARENA_TRACKS = set(destinations.ARENA_TRACKS)
+
 
 # The 16 trophy-race pads — the ONLY pads that carry a stage 2 (Icebound's
 # WarpPad.unlock_2; game_world.rs:1196-1231). Stage 2 gates that pad's CTR Token
@@ -139,6 +77,7 @@ ARENA_TRACKS = set(destinations.ARENA_TRACKS)
 # minus the arenas, the trials AND the cups.
 TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS - CUP_TRACKS
 
+
 # Every DESTINATION that carries a stage 2: the 16 trophy tracks plus the
 # Cortex Vortex pad track (2026-09-13 contract), which has no physical pad and
 # so is not in HUB_STATIC. Stage 2 is keyed by destination throughout the
@@ -147,24 +86,19 @@ TROPHY_TRACKS = set(HUB_STATIC) - ARENA_TRACKS - TRIAL_TRACKS - CUP_TRACKS
 # loop over this set behaves exactly as it did over TROPHY_TRACKS.
 STAGE2_DESTINATIONS = frozenset(TROPHY_TRACKS | {CORTEX_VORTEX})
 
-# NOTE: HUB_STATIC is defined above; TROPHY_TRACKS is finalised after it so the
-# set comprehension sees the full dict.
 
 # The 5 N. Sanity Beach candidates for the free subset, weighted sizes.
 FREE_CANDIDATES = list(destinations.require_all(["Crash Cove", "Roo's Tubes", "Mystery Caves",
                    "Sewer Speedway", "Skull Rock"]))
+
+
 FREE_SIZE_WEIGHTS = [(1, 10), (2, 30), (3, 30), (4, 15), (5, 15)]
+
+
 # Minimum number of FREE (open at spawn) bootstrap pads. See run_sphere_search
 # step 1 for the rationale (sphere-0 breadth vs AP fill capacity at ~98% density).
 _FREE_MIN = 3
-# Boss-race Key rewards enter the inventory naturally through the graph sweep
-# (boss garages open at Trophy 4/8/12/16 and their boss-race location yields a
-# Key in _vanilla_reward), so no separate boss->hub-pad table is needed.
 
-
-# ---------------------------------------------------------------------------
-# Inventory (port of player_inventory.rs)
-# ---------------------------------------------------------------------------
 
 class Inv:
     """Mirror of PlayerInventory: capped counts + Any* aggregate lookups."""
@@ -200,10 +134,6 @@ class Inv:
         """reqs is a list of (item_name, count); item names map 1:1 (incl Any*)."""
         return all(self.count(name) >= cnt for name, cnt in reqs)
 
-
-# ---------------------------------------------------------------------------
-# Vanilla reward map
-# ---------------------------------------------------------------------------
 
 def _token_colour(phys_track, dest_track):
     """CTR-Token colour for a token challenge on phys_track. Prefer the loaded
@@ -334,10 +264,6 @@ def _vanilla_reward(region_name, region_type, dest_track, suffix, include_gem_cu
     return _reward_for(track, dest_track, suffix)
 
 
-# ---------------------------------------------------------------------------
-# Requirement weighting + Any* collapse (ports lines 250-366)
-# ---------------------------------------------------------------------------
-
 # --- Requirement-weight PRESETS (YAML-tuneable, see Options.RequirementVariety) ---
 # trophy_heavy_legacy = the original CTR-apworld weights (Trophy 100, Token 15/10,
 # Relic 20, Key 25, Gem 2). icebound_beta5 = Icebound's rebalanced beta5 weights
@@ -350,6 +276,8 @@ _REQ_WEIGHTS_TROPHY_HEAVY_LEGACY = {
     "Sapphire Relic": 20, "Gold Relic": 20, "Platinum Relic": 20,
     "Red Gem": 2, "Green Gem": 2, "Blue Gem": 2, "Yellow Gem": 2, "Purple Gem": 2,
 }
+
+
 _REQ_WEIGHTS_ICEBOUND_BETA5 = {
     "Trophy": 90, "Key": 20,
     "Red CTR Token": 16, "Green CTR Token": 16, "Blue CTR Token": 16,
@@ -358,10 +286,12 @@ _REQ_WEIGHTS_ICEBOUND_BETA5 = {
     "Red Gem": 4, "Green Gem": 4, "Blue Gem": 4, "Yellow Gem": 4, "Purple Gem": 4,
 }
 
+
 # Public alias for Options.RequirementWeights: its pre-filled YAML default (and
 # the fallback for keys a custom YAML leaves out) is the icebound_beta5 table,
 # so players tweak from the real default numbers instead of an empty dict.
 DEFAULT_REQUIREMENT_WEIGHTS = _REQ_WEIGHTS_ICEBOUND_BETA5
+
 
 # Any* collapse parameters per preset. Tuple layout:
 #   (token_chance, token_scale, token_cap,
@@ -376,11 +306,14 @@ _ANY_COLLAPSE_PARAMS = {
     "custom":              (33, 0.6, None, 20, 0.3, None, 80, None),
 }
 
+
 # Active weight table + collapse params. Initialised to the LEGACY defaults so the
 # module is importable/usable before _load_requirement_preset(world) runs; the loader
 # overwrites these from the chosen preset at run_sphere_search() start. Default seed
 # generation uses icebound_beta5 (see Options.RequirementVariety.default = 0).
 REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
+
+
 # Any*-aggregate expression mode. True = any_of: a collapsed Any* requirement
 # stays a genuine "any N of type" aggregate (emitted as native type 6/7/8).
 # ALWAYS TRUE since the 2026-07-15 release polish: the former
@@ -389,18 +322,39 @@ REQ_WEIGHTS = dict(_REQ_WEIGHTS_TROPHY_HEAVY_LEGACY)
 # release build has. The False (specific_colour) flatten path via _resolve_any
 # is kept in code but is no longer reachable from options.
 _ANY_OF_MODE = True
+
+
 _TOKEN_COLLAPSE_CHANCE = 33
+
+
 _TOKEN_COLLAPSE_SCALE = 0.6
+
+
 _TOKEN_COLLAPSE_CAP = None
+
+
 _RELIC_COLLAPSE_CHANCE = 20
+
+
 _RELIC_COLLAPSE_SCALE = 0.3
+
+
 _RELIC_COLLAPSE_CAP = None
+
+
 _GEM_COLLAPSE_CHANCE = 80
+
+
 _GEM_COLLAPSE_CAP = None
+
 
 TOKEN_ITEMS = ("Red CTR Token", "Green CTR Token", "Blue CTR Token",
                "Yellow CTR Token", "Purple CTR Token")
+
+
 RELIC_ITEMS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
+
+
 GEM_ITEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
 
 
@@ -496,6 +450,7 @@ _TWO_STAGE_DENSITY_PARAMS = {
     "full":     (16, 0),
 }
 
+
 # Within-seed diminishing-repeat discount (T6, deep-dive 2026-07-11): each
 # requirement FAMILY's weight is divided by (1 + k * families_assigned_so_far).
 # Active ONLY at non-standard two_stage_density (T1 re-baseline: type shares are
@@ -504,6 +459,8 @@ _TWO_STAGE_DENSITY_PARAMS = {
 # internal, not a YAML knob. No new RNG draws: only the weights fed to the
 # existing rnd.choices call change, so determinism is preserved.
 _DIVERSITY_K = 0.0
+
+
 _DIVERSITY_COUNTS = {}
 
 
@@ -685,14 +642,6 @@ def _resolve_any(inv, req, allowed=None):
     best = max(sorted(pool), key=lambda c: inv.items[c])
     cnt = min(cnt, max(1, inv.items[best]))  # never exceed what is owned
     return (best, cnt)
-
-
-# ---------------------------------------------------------------------------
-# Sphere search (port of the `while !empty` loop)
-# ---------------------------------------------------------------------------
-
-def _max_key(reqs):
-    return max((c for n, c in reqs if n == "Key"), default=0)
 
 
 def _pad_exit_name(track):
@@ -940,20 +889,6 @@ def _assign_from_inv(rnd, inv, allowed=None):
     return (item, min(cnt, owned)) if owned > 0 else None
 
 
-# Stage-2 requirements draw from the SAME full item universe as stage 1
-# (Trophy / Key / every CTR-token colour / every relic tier / every gem) -- the
-# OPEN model: a pad's tier-2 requirement may be ANY CTR item, with the same
-# weighting + Any*-collapse discipline as tier 1. Reward PINNING is gone (relics +
-# tokens flow through the normal multiworld pool + the relic-tier sliders), so a
-# "3 Blue tokens" stage-2 req is satisfied by AP placing 3 Blue CTR Token
-# progression items anywhere reachable before that gate, not by a fixed challenge
-# reward. Solvability is preserved by construction: _assign_stage2_from_inv only
-# ever picks item TYPES currently owned in the synthetic sphere inventory (so the
-# req is satisfiable the instant that stage opens), and the per-pad relaxation
-# fallback (run_sphere_search) collapses a stage 2 to equal its stage 1 if the
-# inventory cannot yet back any requirement.
-_STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
-
 # Baseline per-pad chance that a trophy pad's tier 2 collapses to equal its tier 1
 # even when a real tier-2 requirement IS satisfiable. Two-stage stays the DEFAULT
 # experience (most pads keep a real, distinct tier-2 gate), but a minority collapse
@@ -968,6 +903,8 @@ _STAGE2_ITEMS = tuple(REQ_WEIGHTS.keys())  # Trophy, Key, tokens, relics, gems
 # preset); _load_two_stage_density overwrites both per run from the
 # two_stage_density YAML option.
 _STAGE2_COLLAPSE_CHANCE = 35
+
+
 # Deterministic cap on the number of REAL (non-collapsed) stage-2 gates per seed.
 # Bounds how many distinct second-stage requirements AP fill_restrictive must order,
 # which is the lever that actually closes the tight-seed FillError tail (CTR's pool
@@ -977,9 +914,12 @@ _STAGE2_COLLAPSE_CHANCE = 35
 # the impl A/B sweep.
 _STAGE2_REAL_CAP = 6
 
+
 # Hard ceiling on a tier-2 requirement count (non-Key items). See _post_process /
 # run_sphere_search step 3 for the rationale (gameplay + fill-capacity).
 _STAGE2_COUNT_CEILING = 4
+
+
 # Generous ceiling on a tier-1 entry count (non-Key items): only trims the extreme
 # Icebound outliers (e.g. "14 trophies to open one pad") that both play as a wall
 # and starve fill_restrictive of ordering freedom in maximally tight seeds; the
@@ -1437,7 +1377,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
 def _cortex_vortex_home(world):
     """(dropped pad exit name, dropped track key) when the Cortex Vortex pad
     track is on, else None."""
-    from .cortex_vortex_track import dropped_pad, track_key
+    from .cortex_vortex import dropped_pad, track_key
     pad = dropped_pad(world.options)
     return None if pad is None else (pad, track_key(pad))
 
@@ -1445,7 +1385,7 @@ def _cortex_vortex_home(world):
 def _home_level_ids(world):
     """{pad exit name: home destination LevelID} for the pads whose home is
     not their own LevelID. Empty with the Cortex Vortex pad track off."""
-    from .cortex_vortex_track import DESTINATION_ID
+    from .cortex_vortex import DESTINATION_ID
     home = _cortex_vortex_home(world)
     return {} if home is None else {home[0]: DESTINATION_ID}
 
@@ -1472,7 +1412,7 @@ def _stage2_destinations(world):
     Cortex Vortex when it is a pad track. Used where a loop would otherwise
     CREATE an entry (the stage-2 collapse), so an option-off seed builds the
     exact dict it always built."""
-    from .cortex_vortex_track import track_on
+    from .cortex_vortex import track_on
     if hasattr(world, "ctr_stage2_destinations"):
         return world.ctr_stage2_destinations
     if track_on(world.options):
@@ -1480,101 +1420,15 @@ def _stage2_destinations(world):
     return TROPHY_TRACKS
 
 
-# --------------------------------------------------------------------------
-# SPHERE-0 BREADTH REPAIR
-#
-# WHY THIS EXISTS
-# ---------------
-# CTR generation used to fail with AP's FillError on roughly 0.3% of seeds in a
-# multiworld. The DAG _run_sphere_search_once produces is always SOLVABLE by
-# construction (every requirement is drawn from an inventory owned strictly
-# before that gate opens), so the seed is never logically impossible. What fails
-# is fill_restrictive's greedy placement: CTR's item pool is ~98% progression in
-# every config, so when sphere 0 opens only a handful of locations there is
-# nowhere to seat the early progression that would open the next pads, and fill
-# runs out of reachable slots for the last progression items.
-#
-# The lever is how WIDE sphere 0 is -- how many locations are open at zero items
-# once the free-pad subset and the stage-1/stage-2 gates are decided. Measured
-# over 10,000 default-config + Empty-companion seeds, failures vs sphere-0
-# breadth (_sphere0_breadth above):
-#
-#     breadth   1      2       3        4      5      6+
-#     fails   0/25   4/169   27/230   0/15   0/43   0/9518
-#
-# Every failure sat at breadth 2 or 3. Breadth >= 4 produced ZERO failures over
-# ~19.5k samples. So instead of widening the floor for everyone, we simply
-# re-roll the sphere search on the seeds that landed narrow, and keep the first
-# roll that clears the threshold. Measured over seeds 0-9999: baseline 31
-# failures, this repair 3.
-#
-# WHY NOT JUST RAISE _FREE_MIN
-# ----------------------------
-# _FREE_MIN = 5 also drops to ~1 failure, but it destroys starting-pad variety:
-# 100% of seeds would open with 5 free pads, versus ~70% getting 3 today. The
-# re-roll preserves the distribution (68.8% of seeds still get 3 free pads) and
-# fires on only ~4.2% of seeds. _FREE_MIN stays at 3.
-#
-# THIS IS NOT A COMPLETE FIX -- DO NOT READ IT AS ONE
-# ---------------------------------------------------
-# The residual is ~3 failures per 10k, and that is ACCEPTED and documented as a
-# known issue. The seeds that still fail are GEOGRAPHY-CAPPED: on those, no
-# choice of free-pad subset can widen sphere 0 past the threshold, because the
-# locations behind the openable pads simply are not there. Re-rolling more times
-# does not help them -- hence the bounded attempt count and the last-resort
-# stage-2 collapse below (which measured 1 failure per 10k but changes the
-# played experience by dropping every second-stage gate, so it only fires when
-# the seed would otherwise be left narrow).
-#
-# Future maintainers: if you want to push this further, the remaining tail is
-# not a tuning problem in this function. It is either an AP fill ordering
-# concern or a question of adding sphere-0 location capacity to the geography.
-# --------------------------------------------------------------------------
-
 # Minimum sphere-0 breadth we re-roll toward. 4 is the measured zero-failure
 # floor (see the table above); it is not a round number, do not "tidy" it.
 _SPHERE0_MIN_BREADTH = 4
+
+
 # Bounded re-roll budget. ~4.2% of seeds enter the loop at all and nearly all of
 # those clear on the first or second retry; the cap exists so a geography-capped
 # seed cannot spin. Each attempt costs one extra build_graph.
 _SPHERE0_REPAIR_TRIES = 8
-
-
-def run_sphere_search(world, mode, reward_track_for=None,
-                      collapse_stage2=False, include_gem_cups=False):
-    """Sphere search with the sphere-0 breadth repair. Same signature and return
-    shape as _run_sphere_search_once; see the comment block above for why.
-
-    Deterministic on world.random: every attempt consumes RNG from the same
-    stream, and _sphere0_breadth consumes none, so a given seed always produces
-    the same result.
-    """
-    rtf = reward_track_for or (lambda t: t)
-    best, best_b = None, -1
-    for _ in range(_SPHERE0_REPAIR_TRIES):
-        out = _run_sphere_search_once(world, mode, reward_track_for,
-                                      collapse_stage2, include_gem_cups)
-        b = _sphere0_breadth(world, out, rtf, include_gem_cups)
-        if b > best_b:
-            best, best_b = out, b
-        if b >= _SPHERE0_MIN_BREADTH:
-            return out
-    if not collapse_stage2:
-        # Geography-capped seed: no free-pad subset widens sphere 0. Last resort
-        # -- drop every stage-2 gate for this seed, which frees the TT / token
-        # locations on every reachable trophy race into sphere 0. Costs this
-        # seed its two-stage experience, but it is the difference between a
-        # playable seed and a FillError. Assigning _ctr_two_stage_active here is
-        # safe: Regions.create_regions sets it BEFORE calling us, so this False
-        # sticks.
-        world._ctr_two_stage_active = False
-        warn_stage2_collapsed(
-            world, "geography",
-            f"best breadth over {_SPHERE0_REPAIR_TRIES} attempts was {best_b}, "
-            f"and {_SPHERE0_MIN_BREADTH} is required")
-        return _run_sphere_search_once(world, mode, reward_track_for,
-                                       True, include_gem_cups)
-    return best
 
 
 def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
@@ -1828,166 +1682,6 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
             pad_reqs[track] = (item, count_ceiling)
 
 
-# ---------------------------------------------------------------------------
-# Map sphere output -> slot_data {type,count,colour} contract
-# ---------------------------------------------------------------------------
-
-_COLOURS = ["Red", "Green", "Blue", "Yellow", "Purple"]
-# Relic tiers ride the SAME colour field as token/gem colours (design ruling
-# 2026-07-08): 0 = Sapphire, 1 = Gold, 2 = Platinum. Tiers are INDEPENDENT items
-# (a Gold req is met ONLY by Gold Relic -- no downward hierarchy), so the concrete
-# tier must survive the wire; dropping it to colour -1 silently rewrote every
-# stage-1 relic gate to Sapphire (the pre-schema-4 bug).
-_RELIC_TIERS = ["Sapphire", "Gold", "Platinum"]
-
-
-def to_slot_req(req):
-    """(item, count) | None -> {type,count,colour}.
-
-    type: 0 none / 1 trophies / 2 keys / 3 tokens / 4 relic / 5 gems /
-          6 AnyToken / 7 AnyRelic / 8 AnyGem (colour -1, native sums the whole type).
-    colour 0..4 = R,G,B,Y,P for token/gem; 0..2 = Sapphire,Gold,Platinum for the
-    type-4 relic tier (schema_version 4); -1 otherwise. Under requirement_specificity
-    = specific_colour, Any* are flattened to a concrete colour upstream (_resolve_any)
-    so only type 1-5 reach here. Under any_of (default) the Any* aggregates survive
-    and emit type 6/7/8 with colour -1.
-
-    A free bootstrap pad (req None) is emitted as an EXPLICIT "0 trophies"
-    requirement (type 1, count 0) rather than type 0. type 0 makes native fall
-    back to the pad's VANILLA numTrophiesToOpen floor (ap_hooks.c), which would
-    re-inject the deterministic vanilla trophy spine; "0 trophies" is always
-    satisfied, so the bootstrap pad is genuinely open at spawn and the randomizer
-    owns every entry requirement. (Vanilla unlock mode never calls this, so it
-    keeps its real floors.)"""
-    if req is None:
-        return {"type": 1, "count": 0, "colour": -1}
-    item, cnt = req
-    cnt = int(cnt)
-    if item == "AnyCtrToken":
-        return {"type": 6, "count": cnt, "colour": -1}
-    if item == "AnyRelic":
-        return {"type": 7, "count": cnt, "colour": -1}
-    if item == "AnyGem":
-        return {"type": 8, "count": cnt, "colour": -1}
-    if item == "Trophy":
-        return {"type": 1, "count": cnt, "colour": -1}
-    if item == "Key":
-        return {"type": 2, "count": cnt, "colour": -1}
-    if item.endswith("CTR Token"):
-        return {"type": 3, "count": cnt, "colour": _COLOURS.index(item.split()[0])}
-    if item.endswith("Relic"):
-        return {"type": 4, "count": cnt, "colour": _RELIC_TIERS.index(item.split()[0])}
-    if item.endswith("Gem"):
-        return {"type": 5, "count": cnt, "colour": _COLOURS.index(item.split()[0])}
-    raise ValueError(f"unmappable warp-pad requirement item: {item!r}")
-
-
-# ---------------------------------------------------------------------------
-# Destination shuffle -- non-identity warp_pad_map
-# ---------------------------------------------------------------------------
-
-# Destination-shuffle CATEGORY POOLS (slot_data v3). A category
-# is a set of physical pad LevelIDs whose destinations may be permuted. Which
-# categories participate is chosen by warp_pad_shuffle_categories, whether they
-# cross-shuffle by warp_pad_shuffle_grouping, and cups/crystals additionally need
-# their include_* content option (see resolve_shuffle_pools). LevelIDs from
-# warp_pad_ids.json.
-#   tracks   = the 16 trophy-race pads + the 2 trials (16 Slide Coliseum, 17 Turbo
-#              Track). Trials ride in tracks (they carry race-track-style content,
-#              so they shuffle with the races); native dispatch handles a trophy race on a
-#              trial pad and vice versa under the v3 build.
-#   crystals = the 4 battle-arena pads.
-#   cups     = the 5 gem-cup pads (LevelIDs 100-104).
-CATEGORY_POOLS = {
-    "tracks": [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13, 16, 17],
-    "crystals": [21, 19, 23, 18],
-    "cups": [100, 101, 102, 103, 104],
-}
-
-# The vanilla-unlock collapse's 'races only' subset of tracks: the 16 trophy-race
-# pads WITHOUT the two trials (legacy same-category behaviour, matching the old
-# SHUFFLE_GROUPS['race']). Used only when warppad_unlock_requirements == vanilla.
-_LEGACY_RACE_IDS = [3, 6, 9, 8, 14, 4, 5, 0, 2, 1, 12, 15, 7, 10, 11, 13]
-
-
-def resolve_shuffle_pools(world):
-    """Resolve which pad-ID pools take part in destination shuffle, and how, from
-    warp_pad_shuffle_categories × warp_pad_shuffle_grouping × the include_* content
-    filters × the vanilla-unlock collapse (design §1).
-
-    Returns (pools, grouping) where `pools` is a list of ID-lists to permute
-    independently (one list under merged; one per category under per_category) and
-    `grouping` is the effective grouping string. An empty `pools` means no shuffle
-    (identity map).
-
-    Participation: a category participates iff selected AND its content is in the
-    seed -- `cups` needs include_gem_cups, `crystals` needs include_battle_arenas,
-    `tracks` is always in the seed.
-
-    Vanilla-unlock collapse: when warppad_unlock_requirements == vanilla (0), the
-    grouping is forced to per_category, cups/trials are excluded, and `tracks`
-    degrades to races-only (_LEGACY_RACE_IDS) -- regardless of the yaml. Native
-    vanilla gate enforcement + the entrance-keyed vanilla trophy floor
-    (Rules.add_vanilla_floor_rules, issue #80) are only defined for the race<->race
-    matrix, so cross-category / cup / trial shuffle require a randomized unlock mode.
-    Category SELECTION is still honoured (an unselected category never shuffles, even
-    in the collapse)."""
-    opts = world.options
-    cats = set(getattr(opts, "warp_pad_shuffle_categories").value)
-    grouping = getattr(opts, "warp_pad_shuffle_grouping").current_key  # merged/per_category
-    unlock_mode = opts.warppad_unlock_requirements.value
-    inc_arenas = bool(opts.include_battle_arenas.value)
-    inc_cups = bool(opts.include_gem_cups.value)
-
-    if unlock_mode == 0:
-        # LEGACY collapse: races-only + crystals, per_category, no cups/trials.
-        pools = []
-        if "tracks" in cats:
-            pools.append(list(_LEGACY_RACE_IDS))
-        if "crystals" in cats and inc_arenas:
-            pools.append(list(CATEGORY_POOLS["crystals"]))
-        return pools, "per_category"
-
-    # Randomized unlock modes: full category machinery.
-    participating = []
-    if "tracks" in cats:
-        participating.append(list(CATEGORY_POOLS["tracks"]))
-    if "crystals" in cats and inc_arenas:
-        participating.append(list(CATEGORY_POOLS["crystals"]))
-    if "cups" in cats and inc_cups:
-        participating.append(list(CATEGORY_POOLS["cups"]))
-
-    if grouping == "merged":
-        union = [lid for pool in participating for lid in pool]
-        return ([union] if union else []), "merged"
-    return participating, "per_category"
-
-
-# ---------------------------------------------------------------------------
-# Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation fix)
-# ---------------------------------------------------------------------------
-#
-# Under `merged` destination shuffle with `shuffle_keys: false`, the shuffle can
-# drop too many ZERO-capacity destinations (gem cups whose Gem is lock-placed when
-# gems are not shuffled) onto the pads reachable before a boss floor, leaving fewer
-# trophy-CAPABLE (reachable, non-pre-placed) locations than that boss's fixed trophy
-# gate (4/8/12/16) needs -> fill_restrictive dead-ends (FillError). Keys-off is the
-# trigger because the first Key only drops after Ripper Roo (4 Trophies), so those
-# 4 Trophies MUST be seatable in the pre-first-key sphere; keys-on floods that
-# frontier with an early Key and never starves. The counting rule below was
-# validated on repro seed 509876816.
-#
-# We enforce a per-boss-floor capacity floor by a bounded re-roll of the destination
-# permutation (same world.random stream as the existing 8x identity re-roll; RNG is
-# consumed ONLY when a floor is breached, so a map that already satisfies every floor
-# generates byte-identically). The count is a STAGE-2-INDEPENDENT lower bound on the
-# real trophy-capable capacity: a race destination contributes only its Trophy Race
-# (+ podium rungs) because its Time Trial / CTR-token slots sit behind a stage-2 gate
-# that may hold them back pre-key (B1: "race TTs/tokens = 0 capacity pre-key"). The
-# bound is SOUND -- real capacity >= this count -- so a map that PASSES is genuinely
-# fillable at those floors and is never re-rolled; only maps at or below the bound
-# (which include every genuine starvation map) are repaired.
-
 # (trophy floor, boss keys already earned). Keys come only from bosses when
 # shuffle_keys is off: 0 before Ripper Roo, 1 before Papu, etc. A physical pad is
 # reachable at a floor iff its hub Key gate <= that floor's key count. Mirrors
@@ -1995,13 +1689,9 @@ def resolve_shuffle_pools(world):
 # 4 pads @0 keys, 11 @1, 21 @2, 26 @3).
 _BOSS_CAP_FLOORS = ((4, 0), (8, 1), (12, 2), (16, 3))
 
-# Bounded re-roll budget before the constructive fallback. Only 5 of 27 merged-pool
-# destinations are ever zero-capacity (the gem cups), so a satisfying permutation is
-# dense in the sample space and a breach is cleared in far fewer draws in practice;
-# the budget is generous insurance, not an expected cost.
-_CAPACITY_MAX_REROLLS = 16
 
 _KEYGATE_CACHE = {}
+
 
 # The 4 crystal/battle-arena pad exits whose vanilla "+1 Key" gate is stripped
 # to the hub floor in randomized mode with include_battle_arenas ON
@@ -2079,264 +1769,6 @@ def _pad_keygate_table(crystals_at_hub_floor=False):
     return table
 
 
-def _capacity_context(world):
-    """Per-seed inputs to the trophy-capacity count that do not depend on the map:
-    podium rung count, per-trial-pad guaranteed-unpinned relic capacity, and
-    whether gem-cup Gem locations are lock-placed (0 capacity)."""
-    o = world.options
-    # Podium rungs created per trophy race (0 when the feature is off); the new
-    # 5-rung superset count comes straight from the shared creation-subset helper.
-    from .podium import created_rung_keys_from_options
-    podium = len(created_rung_keys_from_options(o))
-    # Issue #28 R2: a relic Time Trial location is a guaranteed fillable slot
-    # whenever it was CREATED this seed -- issue #171/R1 made removal (not
-    # pinning) the below-count mechanism, so every surviving location is fully
-    # unpinned/free regardless of how many of its tier's 18 exist (there is no
-    # more "present but pinned" state to distinguish from "guaranteed free").
-    # What is NOT guaranteed at a partial count is which of the two TRIAL
-    # tracks (Slide Coliseum / Turbo Track) specifically kept a given tier's
-    # Time Trial: draw_relic_tier_keep samples per-tier across all 18 tracks
-    # uniformly, so at a partial count a trial pad's own slot can easily have
-    # been one of the ones removed even though the tier's aggregate count is
-    # > 0 elsewhere. The old `s >= 18` aggregate-per-tier count was sound only
-    # because at full count every track (including both trial tracks)
-    # necessarily kept it; that premise breaks the moment eligibility widens
-    # below 18 (this order), so capacity must be checked per PHYSICAL trial
-    # pad against its own track's actual keep-set membership, not against the
-    # tier's seed-wide aggregate count.
-    _keep = getattr(world, "_ctr_relic_keep", {})
-    trial_capacity = {}
-    for pad_name, meta in world.warp_pad_ids.items():
-        if meta.get("kind") != "trial":
-            continue
-        track = pad_name[:-len(" Warp Pad")] if pad_name.endswith(" Warp Pad") else pad_name
-        cnt = sum(
-            1 for relic_item in RELIC_ITEMS
-            if f"{track}: {relic_item.split()[0]} Time Trial" in _keep.get(relic_item, ())
-        )
-        trial_capacity[meta["level_id"]] = cnt
-    # Issue #152 C5/C6: gem-cup Gem is lock-placed exactly when gems are not
-    # shuffled -- NOT "always for the goal" (that legacy `goal == 4` disjunct
-    # was already wrong as of the 2026-07-15 ruling; see the matching fix and
-    # its rationale in _run_sphere_search_once's pinned_items block above).
-    # Locked -> 0 trophy capacity.
-    gem_locked = not bool(o.shuffle_gems.value)
-    return {"podium": podium, "trial_capacity": trial_capacity, "gem_locked": gem_locked}
-
-
-def _dest_trophy_capacity(dest_lid, id_kind, ctx):
-    """Stage-2-independent lower bound on the trophy-CAPABLE fillable locations a
-    destination LevelID exposes once its (physical) pad is reached:
-      race    -> 1 Trophy Race + podium rungs (TTs/token excluded: stage-2-gated)
-      crystal -> 1 Crystal Challenge
-      trial   -> guaranteed-unpinned relic Time Trials actually kept for THIS
-                 destination track (single-stage, no stage-2 gate; issue #28 R2 --
-                 per-pad, not a seed-wide tier aggregate, see _capacity_context)
-      cup     -> 1, or 0 when its Gem is lock-placed (gems-off / all-gem-cups goal)."""
-    kind = id_kind.get(dest_lid)
-    if kind == "race":
-        return 1 + ctx["podium"]
-    if kind == "crystal":
-        return 1
-    if kind == "trial":
-        return ctx["trial_capacity"].get(dest_lid, 0)
-    if kind == "cup":
-        return 0 if ctx["gem_locked"] else 1
-    return 0
-
-
-def _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
-    """True iff every boss floor's reachable pads expose >= that floor's trophy count
-    of trophy-capable slots. `out` = {pad_exit_name -> dest_levelID} (partial; an
-    unshuffled pad loads its HOME destination, `own_lid`)."""
-    for floor, keys in _BOSS_CAP_FLOORS:
-        cap = 0
-        for pad_name, lid in own_lid.items():
-            if keygate.get(pad_name, 0) > keys:
-                continue
-            cap += _dest_trophy_capacity(out.get(pad_name, lid), id_kind, ctx)
-        if cap < floor:
-            return False
-    return True
-
-
-def _capacity_gate_open(world, grouping):
-    """Cheap keys-off + `merged` gate. The invariant is enforced ONLY here: per_category
-    keeps every category on its own pads (cups never reach the always-open race pads),
-    and keys-on floods the frontier with an early Key -- both are provably unaffected.
-    Kept deliberately allocation-free so those (default) paths stay byte-identical to
-    pre-fix generation; the heavier capacity work happens only past this gate.
-
-    VANILLA-FLOOR SOUNDNESS (issue #80): the vanilla trophy floors installed by
-    Rules.add_vanilla_floor_rules gate each race pad by trophies, which this count
-    does NOT model. That is sound today because vanilla mode forces grouping ==
-    per_category (resolve_shuffle_pools), so this gate is CLOSED in vanilla mode and
-    the re-roll never runs. If vanilla-mode shuffle is ever widened to `merged`
-    (past the current race<->race per_category collapse), this counter must also
-    account for the per-pad trophy floor before it can be trusted with floors present."""
-    return grouping == "merged" and not bool(world.options.shuffle_keys.value)
-
-
-def _pool_destinations(ids, home):
-    """The destinations a pool of physical pad LevelIDs holds before shuffle:
-    each pad's home destination (its own LevelID, except the Cortex Vortex pad
-    track's 110 on the dropped destination's pad)."""
-    return [home.get(lid, lid) for lid in ids]
-
-
-def _permute_pools(world, pools, id_to_name, home=None):
-    """Permute destinations within each resolved pool (the historical body of
-    build_warp_pad_map): re-roll up to 8x if a pool's whole permutation is identity.
-    Returns {pad_exit_name -> destination LevelID}. Uses world.random.
-
-    `home` ({pad LevelID: destination}) substitutes the Cortex Vortex pad track
-    for its dropped destination BEFORE the shuffle (2026-09-13 contract), so the
-    permutation runs over the survivors plus 110. None or empty keeps the
-    historical lists and draws exactly."""
-    rnd = world.random
-    out = {}
-    for ids in pools:
-        if len(ids) < 2:
-            continue  # nothing to permute
-        dests = _pool_destinations(ids, home or {})
-        perm = dests[:]
-        for _ in range(8):
-            rnd.shuffle(perm)
-            if perm != dests:
-                break
-        for phys, dest in zip(ids, perm):
-            name = id_to_name.get(phys)
-            if name is not None:
-                out[name] = dest  # pad_exit_name -> destination track LevelID
-    return out
-
-
-# ---------------------------------------------------------------------------
-# Gem-cup placement floor (issue #149)
-# ---------------------------------------------------------------------------
-#
-# Under `merged` destination shuffle a Gem Cup LevelID can be dealt to ANY physical
-# pad, including the 3-5 N. Sanity Beach pads the sphere search leaves requirement-free
-# at spawn -- so half of default seeds opened a cup at zero items (measured: 507/1000).
-# The cup then pays out far more than its own Gem: add_podium_placement_rules puts a
-# trophy track's podium rungs in logic when a Gem Cup that runs it as a leg is
-# reachable (Rules.py, the reachability OR), so one early cup is 1 Gem + 4 leg tracks
-# x the rung count, up to 17 locations on four trophy tracks whose own pads are shut.
-#
-# The cup's OWN unlock requirement cannot fix this. warp_pad_unlock is keyed to the
-# PHYSICAL pad and the exit rewire keeps it that way on purpose (Regions.create_regions),
-# so an early cup is reached through somebody else's pad and no weighting on the cup
-# pads' requirements ever touches it. The lever is placement, not requirement.
-#
-# So: a Gem Cup destination is never dealt to a physical pad whose hub Key floor is
-# below the Cups Room's own Key-2 door. That is the floor the gate taxonomy already
-# assigns gem cups, which is why the constant is 2 and not "sphere 1" -- a literal
-# sphere rule is not even computable here, because build_warp_pad_map runs at the TOP
-# of create_regions and the sphere search that picks the free pads runs at the END,
-# on the finished region graph this map helps build. The Key floor is static
-# world.json geometry, available before either, and is a conservative superset: a pad
-# needing 2 boss Keys to reach cannot be free at spawn.
-#
-# Enforced as a bounded repair on the rolled permutation rather than a re-roll: each
-# offending cup is swapped with a non-cup destination sitting on an eligible pad in
-# the SAME pool. In-pool keeps per_category per-category, and the swap is capacity-
-# monotone, so it composes with the trophy-capacity invariant below in the improving
-# direction (it moves a 0-or-1 capacity destination off a low-floor pad and a
-# higher-capacity one onto it; pads at or above the floor are counted at every tier
-# that counts the cup's new home, so no floor's count can drop).
-#
-# ALWAYS ON, no YAML knob, on the `comfort_guards` precedent in this same file (that
-# toggle was removed in the 2026-07-15 release polish because it only ever bought its
-# user a worse seed). Players who want cups back on the opening pads still have three
-# opt-outs that predate this rule: per_category grouping, dropping `cups` from
-# warp_pad_shuffle_categories, or include_gem_cups off -- each of which already
-# produced zero early cups before this change. Tests patch the constant to 0 to
-# reproduce pre-#149 behaviour.
-_GEM_CUP_KEY_FLOOR = 2
-
-_CUP_LEVEL_IDS = frozenset(CATEGORY_POOLS["cups"])
-
-
-def _enforce_gem_cup_floor(world, out, pools, id_to_name, keygate, floor):
-    """Swap every Gem Cup destination off a physical pad below `floor` boss Keys.
-
-    `out` = {pad_exit_name -> dest LevelID}, mutated in place and returned. Consumes
-    world.random ONLY when a cup actually sits below the floor, so every seed that
-    already satisfies it (per_category, cups not participating, or a lucky merged
-    roll) generates byte-identically to pre-#149. A swap partner is any pad in the
-    same pool at or above the floor that is not itself holding a cup; with 5 cups
-    against 13-15 eligible pads one always exists, and if geometry ever said
-    otherwise the map is left as rolled rather than failing generation."""
-    if floor <= 0:
-        return out
-    rnd = world.random
-    for ids in pools:
-        names = [n for n in (id_to_name.get(lid) for lid in ids)
-                 if n is not None and n in out]
-        below = [n for n in names
-                 if out[n] in _CUP_LEVEL_IDS and keygate.get(n, 0) < floor]
-        for name in below:
-            # Recomputed per swap: an earlier swap may have just filled a pad.
-            eligible = [n for n in names
-                        if keygate.get(n, 0) >= floor and out[n] not in _CUP_LEVEL_IDS]
-            if not eligible:
-                break
-            target = eligible[rnd.randrange(len(eligible))]
-            out[name], out[target] = out[target], out[name]
-    return out
-
-
-def _constructive_capacity_pin(world, pools, id_to_name, keygate, id_kind, own_lid, ctx,
-                               home=None):
-    """Deterministic fallback when the bounded re-roll cannot land a satisfying map
-    (astronomically unlikely -- a valid arrangement always exists since only the 5
-    cups are zero-capacity). Under `merged` there is exactly one pool; pin race
-    destinations onto the always-open (0-key) pads to guarantee the Ripper Roo floor,
-    then re-permute the remaining destinations, re-rolling that remainder to satisfy
-    the higher floors' wide slack. RNG = world.random."""
-    rnd = world.random
-    ids = pools[0]  # merged == single pool of LevelIDs
-    dests = _pool_destinations(ids, home or {})
-    lid_to_name = {lid: id_to_name.get(lid) for lid in ids}
-    open_pos = [i for i, lid in enumerate(ids)
-                if keygate.get(lid_to_name.get(lid), 0) == 0]
-    race_dests = [lid for lid in dests if id_kind.get(lid) == "race"]
-
-    def _assemble(perm):
-        out = {}
-        for phys, dest in zip(ids, perm):
-            name = id_to_name.get(phys)
-            if name is not None:
-                out[name] = dest
-        return out
-
-    best = None
-    for _ in range(_CAPACITY_MAX_REROLLS):
-        pinned = list(race_dests)
-        rnd.shuffle(pinned)
-        perm = [None] * len(ids)
-        used = set()
-        for pos in open_pos:
-            if not pinned:
-                break
-            d = pinned.pop()
-            perm[pos] = d
-            used.add(d)
-        rest = [lid for lid in dests if lid not in used]
-        rnd.shuffle(rest)
-        ri = 0
-        for pos in range(len(ids)):
-            if perm[pos] is None:
-                perm[pos] = rest[ri]
-                ri += 1
-        out = _assemble(perm)
-        if best is None:
-            best = out  # Ripper Roo floor guaranteed by the race pins above
-        if _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
-            return out
-    return best
-
-
 def _crystals_open(world):
     """True when this seed strips the crystal pads' vanilla "+1 Key" gates to the
     hub floor (randomized unlock modes + include_battle_arenas ON; the exact gate
@@ -2344,112 +1776,3 @@ def _crystals_open(world):
     o = world.options
     return (int(o.warppad_unlock_requirements.value) in (1, 2)
             and bool(o.include_battle_arenas.value))
-
-
-def build_warp_pad_map(world):
-    """{pad_exit_name -> target_track_levelID}. Permutes destinations within each
-    resolved pool (resolve_shuffle_pools); re-rolls (up to 8x) if a pool's whole
-    permutation is identity. Returns an empty map (identity) when no pool
-    participates. Values span the full ID space {0..27, 100..104}: under merged a
-    track slot may load a cup/crystal and vice versa.
-
-    Whenever the cups pool participates, the gem-cup placement floor (issue #149) is
-    applied to every permutation this function produces: no Gem Cup destination is
-    left on a physical pad below _GEM_CUP_KEY_FLOOR boss Keys, so a cup can never be
-    one of the free pads the sphere search opens at spawn.
-
-    Under `merged` + `shuffle_keys: false`, additionally enforces the per-boss-floor
-    trophy-capacity invariant (see the block above): a bounded re-roll of the whole
-    permutation until every floor has enough trophy-capable slots, else a constructive
-    pin. This fires only when a zero-capacity destination participates, and consumes
-    NO extra RNG on a map that already satisfies the floors (byte-identical seeds).
-    The cup floor is applied INSIDE that loop, before each capacity check, so the
-    invariant always validates the map that is actually returned."""
-    from .cortex_vortex_track import DESTINATION_ID, home_destinations
-    id_to_name = {meta["level_id"]: name
-                  for name, meta in world.warp_pad_ids.items()}
-    pools, grouping = resolve_shuffle_pools(world)
-    # Cortex Vortex pad track (2026-09-13 contract): the dropped destination's
-    # pad holds 110 before the shuffle. Empty with the option off, which keeps
-    # every list, draw and check below exactly as it was.
-    home = home_destinations(world.options)
-
-    # Gem-cup placement floor (#149). Resolved once: 0 (inert) unless the cups pool
-    # actually participates, so every other configuration keeps its old RNG stream
-    # and allocates nothing new here. _pad_keygate_table is cached and shared with
-    # the capacity invariant below, which needs the same table under the same seed.
-    cup_floor = (_GEM_CUP_KEY_FLOOR
-                 if any(lid in _CUP_LEVEL_IDS for pool in pools for lid in pool)
-                 else 0)
-    keygate = (_pad_keygate_table(crystals_at_hub_floor=_crystals_open(world))
-               if cup_floor > 0 else None)
-
-    out = _enforce_gem_cup_floor(
-        world, _permute_pools(world, pools, id_to_name, home),
-        pools, id_to_name, keygate, cup_floor)
-
-    # Per-tier trophy-capacity invariant (merged + gem-cups + keys-off starvation).
-    # Guarded by the cheap keys-off + merged gate FIRST so the default keys-on and
-    # per_category paths allocate nothing new below and stay byte-identical to pre-fix.
-    if _capacity_gate_open(world, grouping):
-        id_kind = {meta["level_id"]: meta["kind"]
-                   for meta in world.warp_pad_ids.values()}
-        if home:
-            # The pad track counts like a race destination: a Trophy Race
-            # plus its podium rungs.
-            id_kind[DESTINATION_ID] = "race"
-        ctx = _capacity_context(world)
-        # Only a zero-capacity destination (a lock-placed gem cup, or a fully-pinned
-        # trial) can starve a floor; nothing to enforce when none participates.
-        if any(_dest_trophy_capacity(lid, id_kind, ctx) == 0
-               for pool in pools for lid in _pool_destinations(pool, home)):
-            if keygate is None:
-                keygate = _pad_keygate_table(
-                    crystals_at_hub_floor=_crystals_open(world))
-            own_lid = {name: home.get(meta["level_id"], meta["level_id"])
-                       for name, meta in world.warp_pad_ids.items()}
-            attempts = 0
-            while (not _floors_satisfied(out, keygate, id_kind, own_lid, ctx)
-                   and attempts < _CAPACITY_MAX_REROLLS):
-                out = _enforce_gem_cup_floor(
-                    world, _permute_pools(world, pools, id_to_name, home),
-                    pools, id_to_name, keygate, cup_floor)
-                attempts += 1
-            if not _floors_satisfied(out, keygate, id_kind, own_lid, ctx):
-                # The pin's own guarantee survives the floor pass: it pins RACE
-                # destinations onto the 0-key pads, and a cup swap never sources
-                # from a non-cup pad nor targets one below the floor.
-                out = _enforce_gem_cup_floor(
-                    world,
-                    _constructive_capacity_pin(
-                        world, pools, id_to_name, keygate, id_kind, own_lid, ctx,
-                        home),
-                    pools, id_to_name, keygate, cup_floor)
-
-    # Comfort guard (Icebound force_vanilla_turbotrack + limit_arena_gemcup_shuffle):
-    # when warp-pad unlock requirements are vanilla and gems are not shuffled, the
-    # Turbo Track pad keeps its vanilla 5-gem gate, so a Gem Cup / trial destination
-    # landing in a trophy pad (or a Gem Cup landing in Turbo Track) would force the
-    # tedious tokens -> gem cups -> 5 gems chain. The vanilla-unlock collapse in
-    # resolve_shuffle_pools already restricts the pools to races-only + crystals
-    # (no trials, no cups) whenever this guard can be active (unlock == vanilla), so
-    # the trial/cup pads are never remapped above; this strips any such remap to
-    # enforce that invariant explicitly (a no-op under the collapse, defensive). The
-    # guard is set in create_regions only for unlock=vanilla + gems-not-shuffled;
-    # OFF leaves the map untouched.
-    if getattr(world, "_ctr_force_vanilla_turbotrack", False):
-        _GUARDED_PADS = (
-            "Turbo Track Warp Pad", "Slide Coliseum Warp Pad",
-            "Red Cup Warp Pad", "Green Cup Warp Pad", "Blue Cup Warp Pad",
-            "Yellow Cup Warp Pad", "Purple Cup Warp Pad",
-        )
-        for _pad in _GUARDED_PADS:
-            out.pop(_pad, None)
-    # A dropped destination whose pad took part in no shuffle pool (or whose
-    # remap the comfort guard just stripped) still loads the pad track: 110
-    # sits on its own physical pad, the no-shuffle case of the contract.
-    for _lid, _dest in home.items():
-        _pad = id_to_name.get(_lid)
-        if _pad is not None and _pad not in out:
-            out[_pad] = _dest
-    return out

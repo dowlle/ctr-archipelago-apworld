@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from Options import OptionError
 
-from .. import content_bosses, content_cups, content_item_pool, content_plan, cup_checks, gem_cup_legs
+from .. import content_bosses, content_cups, content_item_pool, content_plan, cup_checks
 from ..Options import CupCount, CupCustomLegs, CupTracks
 from .test_content_plan import make_world, profile_options
 from .test_track_modes import mode_pool
@@ -139,7 +139,7 @@ class TestCupTracks(unittest.TestCase):
         return [names[leg["track_id"]] for leg in cup["legs"]]
 
     def test_off_races_the_original_tracks_and_a_sixth_cup_draws(self):
-        table = gem_cup_legs.load_vanilla_cup_legs()
+        table = content_cups.load_vanilla_cup_legs()
         for seed in range(6):
             plan = make_world(plan_options(dict(count=7, tracks="off")), seed=seed).ctr_content_plan
             for cup in gems_of(plan):

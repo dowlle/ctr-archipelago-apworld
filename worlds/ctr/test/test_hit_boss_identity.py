@@ -14,7 +14,7 @@ import unittest
 from test.general import setup_multiworld
 
 from .. import ctrAPWorld
-from ..hit_character import HIT_CHARACTER_CLASS, _build_boss_routes
+from ..hit_character import HIT_CHARACTER_CLASS
 
 PLAYER = 1
 ITEMS_STEPS = ("generate_early", "create_regions", "create_items")
@@ -61,36 +61,6 @@ class TestSharedBossIdentityFixture(unittest.TestCase):
                 self.world.location_name_to_id[
                     HIT_CHARACTER_CLASS.location_name(int(cid))],
                 code)
-
-    def test_each_boss_win_routes_to_its_expected_hit(self):
-        """Every boss race location yields a boss route for the fixture's
-        identity, and that identity's Hit code is the expected one."""
-        for boss_code, engine_id in self.fixture["retail_bosses"].items():
-            with self.subTest(boss_code=boss_code):
-                expected_hit = self.fixture["expected_hit_codes"][boss_code]
-                self.assertEqual(self.fixture["locations"][str(engine_id)],
-                                 expected_hit)
-                region = _boss_location(self.world, boss_code).parent_region
-                routes = _build_boss_routes(self.world, PLAYER, engine_id,
-                                            self.block)
-                self.assertTrue(any(r.boss_region is region for r in routes))
-
-    def test_substituted_identity_moves_the_route(self):
-        case = self.fixture["substituted_case"]
-        boss_code = str(case["boss_key"])
-        retail_id = self.fixture["retail_bosses"][boss_code]
-        new_id = case["engine_id"]
-        self.assertEqual(self.fixture["locations"][str(new_id)], case["hit_code"])
-
-        block = dict(self.block)
-        block["bosses"] = dict(self.block["bosses"])
-        block["bosses"][boss_code] = new_id
-        region = _boss_location(self.world, boss_code).parent_region
-
-        new_routes = _build_boss_routes(self.world, PLAYER, new_id, block)
-        old_routes = _build_boss_routes(self.world, PLAYER, retail_id, block)
-        self.assertTrue(any(r.boss_region is region for r in new_routes))
-        self.assertFalse(any(r.boss_region is region for r in old_routes))
 
 
 if __name__ == "__main__":

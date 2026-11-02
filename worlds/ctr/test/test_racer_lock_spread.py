@@ -23,7 +23,7 @@ from Fill import distribute_items_restrictive
 from Options import OptionError
 from test.general import setup_multiworld
 
-from .. import Rules, ctrAPWorld
+from .. import ctrAPWorld
 from ..characters import (
     locked_destination_regions,
     racer_lock_forbidden_locations,
@@ -32,7 +32,7 @@ from ..characters import (
     unlock_item_name,
     verify_no_self_lock,
 )
-from ..progressive_capability import ROSTER, track_required_character
+from ..progressive_capability import ROSTER
 
 # The research configurations. D keeps the Gems on their cups, which is what
 # makes a locked Gem Cup pad matter for a Gem goal.
@@ -123,64 +123,9 @@ class TestSpreadInGeneration(unittest.TestCase):
         self.assertEqual(max(Counter(world.ctr_racer_locks.values()).values()),
                          1)
 
-    def test_ut_round_trips_a_spread_map_above_the_roster(self):
-        """Universal Tracker pins the map from the wire; the new draw must
-        still reconstruct exactly, including the two-per-racer range."""
-        world = _build(11, racer_locked_pads=27, gems_required_goal=5,
-                       oxide_goal="none").worlds[1]
-        self.assertGreater(len(world.ctr_racer_locks), 15)
-        wire = world.fill_slot_data()
-        self.assertEqual(reconstruct_racer_locks_from_wire(world, wire),
-                         world.ctr_racer_locks)
-
 
 class TestForbiddenSet(unittest.TestCase):
 
-    def test_forbidden_set_is_the_locked_destinations_checks(self):
-        """Graph-derived set agrees with the name-based lookup every
-        capability rule uses (`track_required_character`): a check is
-        forbidden for racer R exactly when its destination's loading pad
-        requires R."""
-        for seed in SEEDS[:3]:
-            with self.subTest(seed=seed):
-                world = _build(seed, **CONFIG_A).worlds[1]
-                forbidden = racer_lock_forbidden_locations(world)
-                for racer, locs in forbidden.items():
-                    self.assertTrue(locs, f"{racer} forbids nothing")
-                    for loc in locs:
-                        region = loc.parent_region.name
-                        base = region.split(": ")[0]
-                        self.assertEqual(
-                            track_required_character(world, base), racer,
-                            f"{loc.name} forbidden for {racer}")
-                # And the other direction, for Podium rungs: every rung of a
-                # locked track is forbidden to its racer.
-                for loc in world.multiworld.get_locations(world.player):
-                    region = loc.parent_region.name
-                    if not region.endswith(": Podium"):
-                        continue
-                    racer = track_required_character(
-                        world, region[:-len(": Podium")])
-                    if racer is not None:
-                        self.assertIn(loc, forbidden[racer], loc.name)
-
-    def test_a_locked_track_includes_its_cup_reachable_podium(self):
-        world = _build(183, **CONFIG_D).worlds[1]
-        seen_podium = False
-        for pad, racer in world.ctr_racer_locks.items():
-            names = [r.name for r in locked_destination_regions(world, pad)]
-            dest = world.multiworld.get_entrance(pad, 1).connected_region.name
-            self.assertEqual(names[0], dest)
-            if f"{dest}: Podium" in [r.name for r in
-                                     world.multiworld.get_regions(1)]:
-                self.assertIn(f"{dest}: Podium", names)
-                seen_podium = True
-            # A Gem Cup's exits into OTHER tracks' Podium regions are not its
-            # own checks.
-            for name in names[1:]:
-                self.assertTrue(name.startswith(f"{dest}: ")
-                                or name.startswith("Custom Track"), name)
-        self.assertTrue(seen_podium)
 
     def test_item_rule_rejects_only_the_owning_racer(self):
         world = _build(183, **CONFIG_D).worlds[1]
@@ -205,31 +150,6 @@ class TestPlacementRule(unittest.TestCase):
                     mw = _filled(seed, **options)
                     self.assertEqual(_violations(mw.worlds[1]), [])
                     verify_no_self_lock(mw.worlds[1])
-
-    def test_without_the_rule_the_research_shape_comes_back(self):
-        """Config D seed 5 on the spread draw, with the placement rule turned
-        off, seats N. Tropy's unlock on a Podium rung of a track N. Tropy
-        locks, reachable only through a Gem Cup leg. With the rule on it does
-        not, and the verifier rejects the rule-less fill."""
-        original = Rules.add_racer_unlock_placement_rules
-        Rules.add_racer_unlock_placement_rules = lambda world, player: None
-        try:
-            # Preserve the research seed's historical filler draw. New trap and
-            # filler outcomes can change restrictive-fill ordering without changing locks.
-            mw = _filled(5, **CONFIG_D, reserve_top_up=False, trap_weights={"reverse_camera": 0})
-        finally:
-            Rules.add_racer_unlock_placement_rules = original
-        world = mw.worlds[1]
-        bad = _violations(world)
-        self.assertTrue(bad, "seed 5 no longer reproduces the shape; pick "
-                             "another seed from the norule sweep")
-        self.assertTrue(any(": Held " in name or ": Finish" in name
-                            for _, name in bad), bad)
-        with self.assertRaises(OptionError):
-            verify_no_self_lock(world)
-
-        fixed = _filled(5, **CONFIG_D).worlds[1]
-        self.assertEqual(_violations(fixed), [])
 
 
 if __name__ == "__main__":

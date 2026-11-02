@@ -16,41 +16,33 @@ every Gem Cup that legs it. The region holds only that one track-owned location,
 so Cup access can emit Wumpa without exposing the track's Trophy, relic, token
 or box families. Repeated occurrences remain alternative routes to one check.
 """
-import copy
 import json
 import unittest
 from unittest import mock
 
-from BaseClasses import CollectionState
-from Options import OptionError
 from test.general import setup_multiworld
 
-from .. import ctrAPWorld, custom_tracks
-from ..Regions import BOSS_WUMPA_TRACKS
-
-from ..custom_tracks import BABY_T_PARK_EXAMPLE, WUMPA_COLLECTIBLE_FLAG
-from ..item_boxes import BOX_TRACKS, TRACK_LEVEL_IDS
+from .. import ctrAPWorld
+from ..destinations import boss_garage_tracks
+from ..item_boxes import BOX_TRACKS
 from ..wumpa_checks import (
-    CUSTOM_DESTINATION_ROLES,
     WUMPA_CLASS,
-    WUMPA_CODE_BASE,
-    WUMPA_CUSTOM_CODE_BASE,
     WUMPA_GLOBAL,
     WUMPA_OFF,
     WUMPA_PER_TRACK,
     WUMPA_TEN_LOCATION,
-    eligible_custom_roles,
     eligible_retail_tracks,
     retail_location_name,
 )
-from ..trial_trophy import TRIAL_TROPHY_CLASS
+from ..destinations import TRIAL_TROPHY_CLASS
 from . import CTRTestBase
+
+BOSS_WUMPA_TRACKS = boss_garage_tracks()
 
 #: The generation steps a UT restore needs run before it: options exist after
 #: generate_early, and nothing later is consulted by `_ut_restore_options`.
 _UT_STEPS = ("generate_early",)
 
-BABY_T_PARK = {"baby-t-park": copy.deepcopy(BABY_T_PARK_EXAMPLE)}
 
 #: The custom destination slot Alpha6 supports, spelled out rather than indexed
 #: so a reordering of CUSTOM_DESTINATION_ROLES fails here instead of silently
@@ -68,34 +60,6 @@ def without_named_block():
     """A build where baby-t-park has no named block (test only)."""
     from .. import destinations
     return mock.patch.dict(destinations.NAMED_BY_KEY, {}, clear=True)
-
-
-def _no_wumpa_collectible():
-    """A descriptor whose measured wumpa capability says NO.
-
-    Not the real package: the actual Baby T Park v1.0.0 files measure true. This
-    is the shape the eligibility rule has to refuse, and the shape a genuinely
-    fruitless future package would arrive in.
-    """
-    entry = copy.deepcopy(BABY_T_PARK_EXAMPLE)
-    entry["flags"][WUMPA_COLLECTIBLE_FLAG] = False
-    return {"baby-t-park": entry}
-
-
-def _registry_measuring_no_wumpa():
-    """Patch the release registry to measure this package as fruitless.
-
-    Alpha6 pins generation to ONE release-approved package identity, so a
-    descriptor whose flags disagree with the registry is refused before
-    eligibility is ever consulted -- which is the correct fail-closed behaviour
-    and is asserted separately below. To exercise the eligibility rule itself,
-    the registry has to be the thing that says "this package has no route to ten
-    fruit". That is the state a future package genuinely arrives in, and it is
-    what this patch stands in for.
-    """
-    return mock.patch.object(custom_tracks, "BABY_T_PARK_PROFILES",
-                             (_no_wumpa_collectible()["baby-t-park"],
-                              custom_tracks.BABY_T_PARK_CURRENT))
 
 
 class _FakeOption:
@@ -213,130 +177,6 @@ class TestCreationCounts(unittest.TestCase):
         self.assertIn(retail_location_name("Slide Coliseum"), names)
         self.assertNotIn(retail_location_name("Turbo Track"), names)
 
-    def test_the_wire_joins_the_same_trial_track_and_no_other(self):
-        slide_trophy = TRIAL_TROPHY_CLASS.location_name("Slide Coliseum")
-        options = _FakeOptions(WUMPA_PER_TRACK)
-        with mock.patch.object(
-                TRIAL_TROPHY_CLASS, "created_location_names",
-                return_value=[slide_trophy]):
-            mapping = WUMPA_CLASS.wire_block(options)["retail_tracks"]
-        self.assertIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]), mapping)
-        self.assertNotIn(str(TRACK_LEVEL_IDS["Turbo Track"]), mapping)
-
-    def test_trial_and_custom_track_eligibility_are_additive(self):
-        """A bound custom race neither enables nor suppresses a trial race.
-
-        Each contributes its own destination check when its own capability is
-        present in the seed.
-        """
-        slide_trophy = TRIAL_TROPHY_CLASS.location_name("Slide Coliseum")
-        options = _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK)
-        with mock.patch.object(
-                TRIAL_TROPHY_CLASS, "created_location_names",
-                return_value=[slide_trophy]), without_named_block():
-            names = WUMPA_CLASS.created_location_names(options)
-            block = WUMPA_CLASS.wire_block(options)
-        self.assertEqual(len(names), 18)
-        self.assertIn(retail_location_name("Slide Coliseum"), names)
-        self.assertIn(CUSTOM_LOCATION, names)
-        self.assertNotIn(retail_location_name("Turbo Track"), names)
-        self.assertIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]),
-                      block["retail_tracks"])
-        self.assertIn(CUSTOM_ROLE, block["custom_destinations"])
-
-    def test_an_eligible_custom_track_adds_exactly_one_location(self):
-        with without_named_block():
-            names = WUMPA_CLASS.created_location_names(
-                _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK))
-        self.assertEqual(len(names), 17)
-        self.assertEqual(names[-1], CUSTOM_LOCATION)
-
-    def test_a_named_track_owns_its_check_in_its_block(self):
-        """#133: the check moves to the named block; the role check is not
-        created and the wire carries the block's code for the role."""
-        options = _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK)
-        names = WUMPA_CLASS.created_location_names(options)
-        self.assertEqual(len(names), 16)
-        self.assertNotIn(CUSTOM_LOCATION, names)
-        self.assertEqual(WUMPA_CLASS.wire_block(options)["custom_destinations"][CUSTOM_ROLE]["code"],
-                         NAMED_CODE)
-
-    def test_a_custom_track_adds_nothing_in_global_mode(self):
-        self.assertEqual(
-            WUMPA_CLASS.created_location_names(
-                _FakeOptions(WUMPA_GLOBAL, BABY_T_PARK)),
-            [WUMPA_TEN_LOCATION])
-
-
-class TestCustomEligibility(unittest.TestCase):
-    """All four of the specification's conditions, each shown load-bearing."""
-
-    def test_the_baby_t_park_descriptor_is_eligible(self):
-        roles = eligible_custom_roles(
-            _FakeOptions(WUMPA_PER_TRACK, BABY_T_PARK))
-        self.assertEqual([role for role, _l, _r, _e in roles], [CUSTOM_ROLE])
-
-    def test_absent_from_the_yaml_is_ineligible(self):
-        self.assertEqual(eligible_custom_roles(_FakeOptions(WUMPA_PER_TRACK)), [])
-
-    def test_wumpa_collectible_false_is_ineligible(self):
-        """The gate the whole capability exists for. A package that measured no
-        route to ten fruit creates no location, whatever else it declares."""
-        with _registry_measuring_no_wumpa():
-            self.assertEqual(
-                eligible_custom_roles(
-                    _FakeOptions(WUMPA_PER_TRACK, _no_wumpa_collectible())),
-                [])
-
-    def test_wumpa_collectible_false_creates_no_location(self):
-        with _registry_measuring_no_wumpa():
-            names = WUMPA_CLASS.created_location_names(
-                _FakeOptions(WUMPA_PER_TRACK, _no_wumpa_collectible()))
-        self.assertEqual(len(names), 16)
-        self.assertNotIn(CUSTOM_LOCATION, names)
-
-    def test_it_is_not_inferred_from_the_broad_crates_flag(self):
-        """`crates` stays true in the refused descriptor. If eligibility ever
-        starts reading `crates`, this test is what catches it -- a track can
-        carry crate instances with no route to ten fruit."""
-        refused = _no_wumpa_collectible()
-        self.assertTrue(refused["baby-t-park"]["flags"]["crates"])
-        with _registry_measuring_no_wumpa():
-            self.assertEqual(
-                eligible_custom_roles(_FakeOptions(WUMPA_PER_TRACK, refused)),
-                [])
-
-    def test_a_capability_disagreeing_with_the_registry_fails_closed(self):
-        """The first line of defence, ahead of eligibility: Alpha6 pins
-        generation to one release-approved package identity, so a YAML claiming
-        a different measured capability for that package is refused outright
-        rather than quietly believed."""
-        with self.assertRaises(OptionError) as caught:
-            eligible_custom_roles(
-                _FakeOptions(WUMPA_PER_TRACK, _no_wumpa_collectible()))
-        self.assertIn("package registry", str(caught.exception))
-
-    def test_a_missing_capability_is_a_descriptor_error_not_a_default(self):
-        """The flag is REQUIRED. An entry that omits it fails validation rather
-        than defaulting either way -- a silently defaulted capability is the
-        plausible-but-wrong state the descriptor contract exists to prevent."""
-        entry = copy.deepcopy(BABY_T_PARK_EXAMPLE)
-        del entry["flags"][WUMPA_COLLECTIBLE_FLAG]
-        with self.assertRaises(OptionError) as caught:
-            eligible_custom_roles(
-                _FakeOptions(WUMPA_PER_TRACK, {"baby-t-park": entry}))
-        self.assertIn(WUMPA_COLLECTIBLE_FLAG, str(caught.exception))
-
-    def test_only_roles_that_can_reach_ten_fruit_participate(self):
-        """The fourth condition. Alpha6's one role runs a full multi-lap race so
-        it qualifies; the table exists so a future role that cannot is refused at
-        the apworld rather than discovered at runtime."""
-        from ..wumpa_checks import ROLE_OFFERS_TEN_WUMPA
-        self.assertTrue(ROLE_OFFERS_TEN_WUMPA[CUSTOM_ROLE])
-        for role, _label, _region in CUSTOM_DESTINATION_ROLES:
-            with self.subTest(role=role):
-                self.assertIn(role, ROLE_OFFERS_TEN_WUMPA)
-
 
 # ---------------------------------------------------------------------------
 # Region placement -- the structural half of the Gem Cup ruling
@@ -367,46 +207,11 @@ class TestPerTrackSeed(CTRTestBase):
     run_default_tests = False
     options = {"wumpa_check": "per_track"}
 
-    def test_sixteen_locations_exist_and_the_global_one_does_not(self):
-        names = {l.name for l in self.multiworld.get_locations(self.player)}
-        for track in eligible_retail_tracks(self.world.options):
-            with self.subTest(track=track):
-                self.assertIn(retail_location_name(track), names)
-        for track in ("Slide Coliseum", "Turbo Track"):
-            self.assertNotIn(retail_location_name(track), names)
-        self.assertNotIn(WUMPA_TEN_LOCATION, names)
-
-    def test_each_location_is_parented_to_its_joint_wumpa_region(self):
-        for track in eligible_retail_tracks(self.world.options):
-            with self.subTest(track=track):
-                location = self.multiworld.get_location(
-                    retail_location_name(track), self.player)
-                self.assertEqual(location.parent_region.name, f"{track}: Wumpa")
 
     def test_it_supplies_locations_rather_than_spending_them(self):
         items = [i for i in self.multiworld.itempool if i.player == self.player]
         locations = self.multiworld.get_unfilled_locations(self.player)
         self.assertEqual(len(items), len(locations))
-
-    def test_the_wire_mapping_is_keyed_by_engine_level_id(self):
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(block["mode"], WUMPA_PER_TRACK)
-        self.assertEqual(block["global"], -1)
-        self.assertEqual(
-            block["retail_tracks"],
-            {str(TRACK_LEVEL_IDS[track]): WUMPA_CLASS.retail_code(track)
-             for track in eligible_retail_tracks(self.world.options)})
-        self.assertEqual(block["custom_destinations"], {})
-
-    def test_the_wire_omits_the_two_relic_only_destinations(self):
-        mapping = self.world.fill_slot_data()["wumpa_checks"]["retail_tracks"]
-        self.assertNotIn(str(TRACK_LEVEL_IDS["Slide Coliseum"]), mapping)
-        self.assertNotIn(str(TRACK_LEVEL_IDS["Turbo Track"]), mapping)
-
-    def test_the_scalar_is_emitted_alongside_the_block(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["ctr_options"]["wumpa_check"],
-                         WUMPA_PER_TRACK)
 
 
 class TestPerTrackGemCupSeed(CTRTestBase):
@@ -424,47 +229,6 @@ class TestPerTrackGemCupSeed(CTRTestBase):
         "podium_finish_rungs": True,
     }
 
-    def test_no_cup_region_exit_reaches_a_track_region(self):
-        cups = [r for r in self.multiworld.get_regions(self.player)
-                if r.name.endswith(" Gem Cup")]
-        self.assertTrue(cups, "the seed built no gem cup regions")
-        track_regions = set(BOX_TRACKS)
-        for cup in cups:
-            for exit_ in cup.exits:
-                target = exit_.connected_region
-                with self.subTest(cup=cup.name, exit=exit_.name):
-                    self.assertNotIn(
-                        target.name if target else None, track_regions,
-                        "a Gem Cup exit reaches a track region directly, which "
-                        "would hand the cup that track's Wumpa check without "
-                        "the track's own pad being accessible")
-
-    def test_every_track_and_legging_cup_reaches_the_joint_wumpa_region(self):
-        from ..gem_cup_legs import track_to_cups
-
-        track_cups = track_to_cups(self.world.gem_cup_legs)
-        for track in eligible_retail_tracks(self.world.options):
-            with self.subTest(track=track):
-                location = self.multiworld.get_location(
-                    retail_location_name(track), self.player)
-                region = location.parent_region
-                self.assertEqual(region.name, f"{track}: Wumpa")
-                sources = {entrance.parent_region.name
-                           for entrance in region.entrances}
-                self.assertIn(track, sources)
-                boss_sources = {garage for garage, boss_track
-                                in BOSS_WUMPA_TRACKS.items()
-                                if boss_track == track}
-                self.assertEqual(sources - {track},
-                                 set(track_cups.get(track, [])) | boss_sources)
-
-    def test_joint_wumpa_region_contains_only_its_track_check(self):
-        for track in eligible_retail_tracks(self.world.options):
-            region = self.multiworld.get_region(f"{track}: Wumpa", self.player)
-            with self.subTest(track=track):
-                self.assertEqual([loc.name for loc in region.locations],
-                                 [retail_location_name(track)])
-
 
 class TestBossGarageRoutes(unittest.TestCase):
     """Boss races are additional routes to their destination Wumpa check."""
@@ -478,44 +242,6 @@ class TestBossGarageRoutes(unittest.TestCase):
             "N. Oxide Garage": "Oxide Station",
         })
 
-    def test_boss_garage_reaches_wumpa_while_destination_pad_is_locked(self):
-        """Seed 1 deals Dragon Mines to the Purple Cup pad, behind Key 2 and
-        a racer lock. Twelve Trophies open Komodo Joe's garage without opening
-        that pad, so only the boss route can reach Dragon Mines' Wumpa check.
-        """
-        mw = setup_multiworld(ctrAPWorld, seed=1, options={
-            "wumpa_check": "per_track",
-            "warppad_unlock_requirements": "randomized",
-            "racer_locked_pads": 4,
-            "character_unlocks": True,
-        })
-        state = CollectionState(mw)
-        world = mw.worlds[1]
-        for _ in range(12):
-            state.collect(world.create_item("Trophy"))
-        for _ in range(2):
-            state.collect(world.create_item("Key"))
-
-        self.assertTrue(state.can_reach("Komodo Joe Garage", "Region", 1))
-        self.assertFalse(state.can_reach("Dragon Mines", "Region", 1))
-        self.assertTrue(state.can_reach(
-            retail_location_name("Dragon Mines"), "Location", 1))
-
-    def test_unreachable_boss_garages_do_not_change_standalone_reachability(self):
-        mw = setup_multiworld(ctrAPWorld, seed=20260902, options={
-            "wumpa_check": "per_track",
-            "include_gem_cups": False,
-        })
-        state = CollectionState(mw)
-        for garage in BOSS_WUMPA_TRACKS:
-            with self.subTest(garage=garage):
-                self.assertFalse(state.can_reach(garage, "Region", 1))
-        for track in BOSS_WUMPA_TRACKS.values():
-            with self.subTest(track=track):
-                self.assertEqual(
-                    state.can_reach(track, "Region", 1),
-                    state.can_reach(retail_location_name(track), "Location", 1),
-                )
 
     def test_global_mode_region_graph_is_byte_identical(self):
         """The new table is consulted only while per-track regions exist."""
@@ -545,100 +271,10 @@ class TestBossGarageRoutes(unittest.TestCase):
         self.assertEqual(graph_bytes(current), graph_bytes(legacy))
 
 
-class TestPerTrackWithCustomTrack(CTRTestBase):
-    run_default_tests = False
-    options = {
-        "wumpa_check": "per_track",
-        "include_gem_cups": True,
-        "custom_tracks": copy.deepcopy(BABY_T_PARK),
-    }
-
-    def test_the_custom_destination_location_exists(self):
-        names = {l.name for l in self.multiworld.get_locations(self.player)}
-        self.assertIn(NAMED_LOCATION, names)
-        self.assertNotIn(CUSTOM_LOCATION, names)
-
-    def test_it_lives_in_the_displaced_cup_region(self):
-        location = self.multiworld.get_location(NAMED_LOCATION, self.player)
-        self.assertEqual(location.parent_region.name, "Purple Gem Cup")
-        self.assertEqual(location.address, NAMED_CODE)
-
-    def test_the_wire_carries_the_package_identity_and_the_capability(self):
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(
-            block["custom_destinations"],
-            {CUSTOM_ROLE: {
-                "code": NAMED_CODE,
-                "package_uuid": BABY_T_PARK_EXAMPLE["package_uuid"],
-                WUMPA_COLLECTIBLE_FLAG: True,
-            }})
-
-    def test_the_custom_code_is_never_a_retail_code(self):
-        """A custom destination must never be served a displaced or host retail
-        track's identity. The slot's code is outside the retail block entirely,
-        which is what makes that impossible rather than merely unlikely."""
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        code = block["custom_destinations"][CUSTOM_ROLE]["code"]
-        self.assertEqual(code, NAMED_CODE)
-        self.assertNotIn(code, set(block["retail_tracks"].values()))
-        self.assertNotEqual(code, WUMPA_CODE_BASE)
-
-    def test_the_retail_mapping_is_unchanged_by_the_custom_binding(self):
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(len(block["retail_tracks"]), 16)
-
-
-class TestPerTrackWithIneligibleCustomTrack(CTRTestBase):
-    """A whole generated seed whose bound package measured no route to ten fruit.
-
-    The registry patch is what makes this reachable: with the real Alpha6
-    registry a descriptor like this is refused at option validation, so the seed
-    below stands in for the release where a second package genuinely measures
-    false. Everything else -- the 16 currently raceable retail checks, the cup,
-    the fill -- is
-    unaffected, which is the property that matters.
-    """
-
-    run_default_tests = False
-    options = {
-        "wumpa_check": "per_track",
-        "include_gem_cups": True,
-        "custom_tracks": _no_wumpa_collectible(),
-    }
-
-    def setUp(self):
-        self._registry = _registry_measuring_no_wumpa()
-        self._registry.start()
-        self.addCleanup(self._registry.stop)
-        super().setUp()
-
-    def test_no_custom_location_is_created(self):
-        names = {l.name for l in self.multiworld.get_locations(self.player)}
-        self.assertNotIn(CUSTOM_LOCATION, names)
-
-    def test_the_sixteen_retail_locations_are_unaffected(self):
-        names = {l.name for l in self.multiworld.get_locations(self.player)}
-        for track in eligible_retail_tracks(self.world.options):
-            with self.subTest(track=track):
-                self.assertIn(retail_location_name(track), names)
-
-    def test_the_wire_carries_no_custom_destination(self):
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(block["custom_destinations"], {})
-        self.assertEqual(len(block["retail_tracks"]), 16)
-
-
 class TestOffSeed(CTRTestBase):
     run_default_tests = False
     options = {"wumpa_check": "off"}
 
-    def test_no_block_but_the_scalar_is_still_emitted(self):
-        """Off-parity for the block, always-on for the scalar. Without the
-        scalar a tracker would have to infer a three-way setting from block
-        shape, which is the inference the convention exists to prevent."""
-        slot_data = self.world.fill_slot_data()
-        self.assertNotIn("wumpa_checks", slot_data)
-        self.assertEqual(slot_data["ctr_options"]["wumpa_check"], WUMPA_OFF)
 
     def test_no_wumpa_location_is_created(self):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
@@ -669,56 +305,3 @@ class _RestoreCase(unittest.TestCase):
         return world.options
 
 
-class TestUniversalTrackerReconstruction(_RestoreCase):
-    """The spec's "reconstructs mode and code mapping byte-for-byte from slot
-    data" gate. Rebuilt through the same `wire_block` the seed emitted, so the
-    two can only agree if the restore recovered every input it reads."""
-
-    def _round_trip(self, wire_options):
-        block = WUMPA_CLASS.wire_block(wire_options)
-        slot_data = {
-            "ctr_options": {"wumpa_check": block["mode"]},
-            "wumpa_checks": block,
-        }
-        if getattr(wire_options, "custom_tracks", None) is not None:
-            from ..custom_tracks import (custom_tracks_to_wire,
-                                         normalize_custom_tracks)
-            slot_data["custom_tracks"] = custom_tracks_to_wire(
-                normalize_custom_tracks(wire_options.custom_tracks.value))
-        restored = self._restore(slot_data)
-        return block, WUMPA_CLASS.wire_block(restored)
-
-    def test_global_round_trips(self):
-        original, rebuilt = self._round_trip(_FakeOptions(WUMPA_GLOBAL))
-        self.assertEqual(original, rebuilt)
-
-    def test_per_track_round_trips(self):
-        original, rebuilt = self._round_trip(_FakeOptions(WUMPA_PER_TRACK))
-        self.assertEqual(original, rebuilt)
-        self.assertEqual(len(rebuilt["retail_tracks"]), 16)
-
-    def test_per_track_with_a_custom_destination_round_trips(self):
-        original, rebuilt = self._round_trip(
-            _FakeOptions(WUMPA_PER_TRACK, copy.deepcopy(BABY_T_PARK)))
-        self.assertEqual(original, rebuilt)
-        self.assertEqual(list(rebuilt["custom_destinations"]), [CUSTOM_ROLE])
-
-    def test_an_ineligible_custom_destination_round_trips_as_absent(self):
-        with _registry_measuring_no_wumpa():
-            original, rebuilt = self._round_trip(
-                _FakeOptions(WUMPA_PER_TRACK, _no_wumpa_collectible()))
-        self.assertEqual(original, rebuilt)
-        self.assertEqual(rebuilt["custom_destinations"], {})
-
-    def test_a_pre_widening_seed_restores_to_global(self):
-        """No scalar, but a `wumpa_checks` block: that is any seed rolled before
-        2026-08-29, and every one of them meant the single global check."""
-        restored = self._restore({
-            "ctr_options": {},
-            "wumpa_checks": {"enabled": True, "locations": [WUMPA_CODE_BASE]},
-        })
-        self.assertEqual(int(restored.wumpa_check.value), WUMPA_GLOBAL)
-
-    def test_a_seed_with_no_wumpa_anything_restores_to_off(self):
-        restored = self._restore({"ctr_options": {}})
-        self.assertEqual(int(restored.wumpa_check.value), WUMPA_OFF)

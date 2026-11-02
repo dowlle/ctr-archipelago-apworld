@@ -426,12 +426,6 @@ class TestStartBootstrap(unittest.TestCase):
         self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world), sphere0_guard.BOOTSTRAP_START_CHECKS)
         self.fills(world)
 
-    def test_start_of_five_seed_5632_fills(self):
-        """Dead-ended before: a start of 5 took no early item (fuzz seed 5632,
-        moved as above)."""
-        world = make_world(self.fixture("content_plan_boost_start5_5632.yaml"), seed=0)
-        self.assertTrue(world._ctr_start_bootstrap)
-        self.fills(world)
 
     def test_two_copies_open_when_one_does_not(self):
         """Fuzz seed 4088: no single item opens a check, two Red CTR Tokens do.

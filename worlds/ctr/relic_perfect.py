@@ -99,7 +99,7 @@ class RelicPerfectLocationClass(LocationClass):
         opt = getattr(options, "relic_perfect_checks", None)
         if options is None or opt is None or not bool(opt.value):
             return []
-        from .cortex_vortex_track import dropped_track
+        from .cortex_vortex import dropped_track
         dropped = dropped_track(options)
         return [self.location_name(track) for track in RELIC_TRACKS
                 if track != dropped]

@@ -38,7 +38,7 @@ FROZEN-NAME WARNING: once released these names and codes are permanent.
 from typing import List
 
 from . import destinations
-from .cortex_vortex_track import RELIC_PERFECT_RESERVED_CODE
+from .cortex_vortex import RELIC_PERFECT_RESERVED_CODE
 from .custom_check_namespace import (CUSTOM_SLOT_COUNT, RELIC_TIERS, custom_check_code,
                                      custom_check_name)
 from .location_class import LocationClass

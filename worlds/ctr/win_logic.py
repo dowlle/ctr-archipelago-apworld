@@ -343,14 +343,12 @@ def win_locations(world):
     """[(location, kind)] for this slot's win checks, ordered by id. A content
     plan names its own wins: a custom track or cup keeps no retail suffix."""
     out = []
-    plan = getattr(world, "ctr_content_plan", None)
-    if plan is not None:
-        from .content_plan import win_kinds
-        kinds = win_kinds(plan)
+    from .content_plan import win_kinds
+    kinds = win_kinds(world.ctr_content_plan)
     for loc in world.multiworld.get_locations(world.player):
         if loc.address is None:
             continue
-        kind = kinds.get(loc.address) if plan is not None else win_kind(loc.name)
+        kind = kinds.get(loc.address)
         if kind is not None:
             out.append((loc, kind))
     return sorted(out, key=lambda pair: int(pair[0].address))
