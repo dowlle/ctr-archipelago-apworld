@@ -1591,6 +1591,17 @@ class PodiumRungs(OptionSet):
     default = frozenset({"held_1st", "held_3rd", "finish_on_podium", "finish_any"})
 
 
+class CupOnlyPodiumRungs(Toggle):
+    """Give a track that is raced only in cups the same podium rungs as a
+    track with a Trophy Race.
+
+    Such a track has no pad of its own, so it has no Trophy Race. With this
+    on, it gets the rungs Podium Rungs lists, earned in its races in the cups
+    on warp pads, as a pad track's rungs are, never in a boss race or a boss
+    cup. Does nothing when Podium Rungs is empty. Default: off."""
+    display_name = "Cup-Only Podium Rungs"
+
+
 @dataclass
 class ctrAPOptions(PerGameCommonOptions):
 
@@ -1646,6 +1657,7 @@ class ctrAPOptions(PerGameCommonOptions):
     shuffle_gems: ShuffleGems
     # checks
     podium_rungs: PodiumRungs
+    cup_only_podium_rungs: CupOnlyPodiumRungs
     relic_perfect_checks: RelicPerfectChecks
     lettersanity: Lettersanity
     letters_per_track: LettersPerTrack
@@ -1711,8 +1723,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks, LapCompletionChecks,
-               BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
+    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
+               LapCompletionChecks, BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper],

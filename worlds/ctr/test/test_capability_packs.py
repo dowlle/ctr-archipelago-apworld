@@ -411,12 +411,14 @@ class TestStartBootstrap(unittest.TestCase):
         """Dead-ended before: two early Pura boosts filled a start of 2. Fuzz
         seed 2601 of this YAML, moved when relic checks came to follow the item
         counts and when pads came to draw a stage 1; the YAML drops its stat
-        chains and letter items to fit."""
+        chains and letter items to fit. Since cup legs became routes of their
+        tracks' rungs (row 10i), this YAML's start holds enough checks for one
+        boost (none of seeds 0 to 119 seat two), so the test fills the
+        one-boost bootstrap it still draws."""
         from .. import sphere0_guard
         options = self.fixture("content_plan_bosses_fuzz505_2601.yaml")
         worlds = (make_world(copy.deepcopy(options), seed=seed) for seed in range(40))
-        world = next(w for w in worlds if len(getattr(w, "_ctr_start_bootstrap", ())) > 1
-                     and w._ctr_start_bootstrap[0][0] == w._ctr_start_bootstrap[1][0])
+        world = next(w for w in worlds if getattr(w, "_ctr_start_bootstrap", ()))
         placed = world._ctr_start_bootstrap
         self.assertTrue(placed[0][0].startswith("Progressive Boost"))
         self.assertEqual(world.multiworld.local_early_items[1], {})

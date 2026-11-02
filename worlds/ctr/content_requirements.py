@@ -37,6 +37,9 @@ PLACEMENT_REDRAWS = 8
 FIRST_KEY_REDRAWS = 512
 SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
                 "AnyGem": warp_pad_rules.GEMS}
+#: A rule over one copy of each item: Turbo Track's vanilla five Gems, one of
+#: each colour (Rulebook "Vanilla requirements" item 4; row 10i).
+DISTINCT_FAMILIES = {"EachGem": warp_pad_rules.GEMS}
 PADS = json.loads(pkgutil.get_data(__package__, "data/warp_pad_ids.json"))["pads"]
 KEY_BY_PHYSICAL = {d.level_id: d.key for d in destinations.DESTINATIONS}
 PHYSICAL_KIND = {row["level_id"]: ("track" if row["kind"] in ("race", "trial") else
@@ -64,7 +67,7 @@ def vanilla_rule(physical):
     if kind == "crystal":
         return ("Key", vanilla_stage2_keys(physical))
     if kind == "trial":
-        return ("Sapphire Relic", SAPPHIRE_PAD_COUNT) if title == "Slide Coliseum" else ("AnyGem", 5)
+        return ("Sapphire Relic", SAPPHIRE_PAD_COUNT) if title == "Slide Coliseum" else ("EachGem", 5)
     return (title.split()[0] + " CTR Token", CUP_TOKENS)
 
 
@@ -84,11 +87,13 @@ def rule_predicate(rule, by_name):
     """The plan's predicate of (item, count), over the base items. None when the
     seed has none of the item: the pad then asks for nothing."""
     item, count = rule
-    names = [n for n in SUM_FAMILIES.get(item, (item,)) if by_name[n].requirement_ceiling > 0]
-    supply = sum(by_name[n].requirement_ceiling for n in names)
+    names = [n for n in SUM_FAMILIES.get(item, DISTINCT_FAMILIES.get(item, (item,))) if by_name[n].requirement_ceiling > 0]
+    supply = len(names) if item in DISTINCT_FAMILIES else sum(by_name[n].requirement_ceiling for n in names)
     count = min(count, supply)
     if not count:
         return None
+    if item in DISTINCT_FAMILIES:
+        return dict(op="distinct", items=[by_name[n].item for n in names], count=count)
     if item in SUM_FAMILIES:
         return dict(op="sum", items=[by_name[n].item for n in names], count=count)
     return dict(op="count", item=by_name[item].item, count=count)

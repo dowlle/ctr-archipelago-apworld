@@ -38,7 +38,7 @@ from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_tracks import BABY_T_PARK_PROFILES
 from . import (arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
-               content_item_boxes, content_laps, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
+               content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
                turbo_grant)
 from .Locations import CTR_LOCATION_IDS
 from . import warp_pad_logic
@@ -328,10 +328,16 @@ def starting_counts(options):
     return held
 
 
-def rule_met(rule, held):
+def rule_met(rule, held, base=None):
+    """Does `held` meet a pad rule (item, count)? A distinct rule counts one
+    copy of each item and, with `base` (the item pool's base counts), asks only
+    for the items the seed has, as content_requirements.rule_predicate does."""
     if rule is None:
         return True
     item, count = rule
+    if item in content_requirements.DISTINCT_FAMILIES:
+        members = [m for m in content_requirements.DISTINCT_FAMILIES[item] if base is None or base.get(m, 0) > 0]
+        return sum(bool(held.get(m, 0)) for m in members) >= min(count, len(members))
     members = SUM_FAMILIES.get(item)
     return (sum(held.get(m, 0) for m in members) if members else held.get(item, 0)) >= count
 
@@ -827,6 +833,18 @@ def wumpa_modes(track, package=None):
     return [m for m in MODES if m in WUMPA_MODES and m in track["modes"]]
 
 
+def fruit_track(track, package=None):
+    """Can a race on this track reach ten fruit at all: a retail track,
+    Cortex Vortex, or a custom package with its measured `wumpa` capability.
+    A cup leg and a boss race are Trophy-style races (row 10i)."""
+    return bool(wumpa_modes(dict(track, modes=["trophy"]), package))
+
+
+def wumpa_location(track):
+    """A track's `Reach 10 Wumpa` code."""
+    return track_location(track, "wumpa", WUMPA_SUFFIX)[1]
+
+
 def letter_layout(track, settings, location_letters=()):
     """(location letters, item letters) of a track's CTR Challenge, as letter
     indices. Lettersanity mode 1 has letter checks only, mode 2 checks and
@@ -964,6 +982,18 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
         if stats:
             box["stats"] = True
         out.append(box)
+    return out
+
+
+def cup_rung_check(track, key, package=None, capability=None):
+    """A cup-only track's podium rung of rung key `key`, without routes
+    (`cup_only_podium_rungs`, content_race_routes.extend): the rung a Trophy
+    Race of that track would carry, with the same boost rank."""
+    out = dict(location=track_location(track, key, RUNG_SUFFIX[key])[1], owner=track["id"], kind="podium",
+               display_name=f"{room_title(track)}: {RUNG_SUFFIX[key]}", routes=[])
+    need = content_capability.check_boost(track, "podium", key, capability, package) if capability else 0
+    if need:
+        out["boost"] = need
     return out
 
 
@@ -1218,6 +1248,8 @@ def draw_plan(world, key_estimate=True):
     settings = family_settings(o)
     capability = content_capability.settings(o)
     held = starting_counts(o)
+    # Base counts, for the colours Turbo Track's vanilla rule asks (row 10i).
+    start_base = content_item_pool.normalize(o.item_pool.value)[0]
     # Items fixed to their check (one generator row 4). Nothing is drawn.
     fixed = content_fixed.settings(o, boss_record, [cup["gem_cup"] for cup in cups if cup.get("gem_cup") is not None])
 
@@ -1226,7 +1258,7 @@ def draw_plan(world, key_estimate=True):
         # by the real start. Random pads are settled by the free subset below.
         physical, _hub, keys = seat
         rule = (content_requirements.vanilla_rule(physical) if unlock_mode == 0 else manual.get(physical))
-        return keys == 0 and rule_met(rule, held)
+        return keys == 0 and rule_met(rule, held, start_base)
 
     def seat_reach(seat):
         # 2: opens at the start. 1: a vanilla pad a few Trophies behind it.
@@ -1411,6 +1443,19 @@ def draw_plan(world, key_estimate=True):
                                                             {t["id"]: t for t in candidates if t.get("origin") == "custom"})
     if laps:
         check_count += content_laps.count(chosen, is_track, [venue_record(name)["id"] for name in venue_names])
+    # Reach 10 Wumpa through cup legs and boss races (row 10i): one per track
+    # that only those races reach.
+    check_count += content_race_routes.count(
+        [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
+        [venue_record(name) for name in venue_names], settings,
+        lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
+        lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
+    # Rungs of tracks raced only as Gem Cup legs (cup_only_podium_rungs, ruling of
+    # 2026-11-02).
+    cup_only = bool(o.cup_only_podium_rungs.value)
+    check_count += content_race_routes.count_cup_only_rungs(
+        [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]], settings,
+        cup_only)
     # The Wumpa Shop (job J11): five hubs of slots, after every other family.
     shop = content_wumpa.settings(o)
     check_count += content_wumpa.check_count(shop)
@@ -1672,6 +1717,13 @@ def draw_plan(world, key_estimate=True):
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
+    # Cup leg and boss race routes of the per-track checks (row 10i).
+    checks.extend(content_race_routes.extend(
+        checks, {t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters, settings,
+        lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))), wumpa_location,
+        {t["id"]: room_title(t) for t in plan_tracks},
+        (lambda t, key: cup_rung_check(t, key, package_by_id.get(t.get("package_id")), capability))
+        if cup_only else None))
     if laps:
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
@@ -1820,7 +1872,10 @@ def hint_text(plan):
             label[pad["id"]] = f"the {content_requirements.KEY_BY_PHYSICAL[pad_physical(pad)]} pad"
     out = {}
     for check in plan["checks"]:
-        own = {route["own_pad_id"] for route in check["routes"]}
+        # A check's cup leg and boss race routes (row 10i) do not move its
+        # hint off its own pad.
+        routes = [r for r in check["routes"] if not content_race_routes.is_race_route(r)] or check["routes"]
+        own = {route["own_pad_id"] for route in routes}
         if len(own) == 1 and next(iter(own)) in label:
             out[check["location"]] = label[next(iter(own))]
     return out
@@ -2069,9 +2124,14 @@ def create_regions(world):
     shared = []
     legs = []
     laps = []
+    races = []
     checks_by_code = {check["location"]: check for check in plan["checks"]}
     for check in plan['checks']:
         if check["kind"] in content_bosses.KINDS + (content_wumpa.KIND,):
+            continue
+        if any(map(content_race_routes.is_race_route, check["routes"])) and check["kind"] in (
+                content_race_routes.WUMPA_KIND, content_race_routes.PODIUM_KIND):
+            races.append(check)  # row 10i: Wumpa and rungs with cup leg or boss race routes
             continue
         if check["kind"] == content_cups.LEG_KIND:
             legs.append(check)  # Cup Leg Victory (#133 PR 5), one route per leg occurrence
@@ -2184,6 +2244,28 @@ def create_regions(world):
                        and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
                        for entry, gate, need, racer in tests)
         location.access_rule = any_lap
+        menu.locations.append(location)
+    # Reach 10 Wumpa and podium rungs with cup leg or boss race routes (row
+    # 10i, content_race_routes): any route. A pad route keeps its pad's gates;
+    # a Cup route needs the Cup pad and the finish of every earlier leg; a boss
+    # route its encounter. The check's own rank is on top, bound to the route
+    # pad's racer lock.
+    for check in races:
+        location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
+        tests = []
+        for r in check["routes"]:
+            need = check.get("boost", 0)
+            if r["leg_id"] is not None:
+                need = max(need, content_cups.prefix_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id,
+                                                           capability, package_by_id))
+            rank = with_boost(None, dict(check, boost=need, routes=[r]))
+            tests.append((r["entry_id"], None if content_race_routes.is_race_route(r) else stage_gate(r),
+                          None if rank is None else rank.compile()))
+
+        def any_race(state, tests=tuple(tests)):
+            return any(state.can_reach(entry, "Region", player) and (gate is None or gate(state))
+                       and (rank is None or rank(state)) for entry, gate, rank in tests)
+        location.access_rule = any_race
         menu.locations.append(location)
     # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
     content_wumpa.install(world, plan, menu, stage_gate, stage_term)
@@ -2645,6 +2727,15 @@ def validate(plan):
     for check in boss_checks:
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
+    # Cup leg and boss race routes of the per-track checks (row 10i).
+    for check in content_race_routes.extend(
+            list(expected_checks.values()), tracks, plan["entries"], plan["pads"], boss_encounters, settings,
+            lambda t: fruit_track(t, packages.get(t.get("package_id"))), wumpa_location,
+            {t["id"]: room_title(t) for t in plan["tracks"]},
+            (lambda t, key: cup_rung_check(t, key, packages.get(t.get("package_id")), capability))
+            if content_race_routes.cup_only_on(plan["checks"]) else None):
+        require(check["location"] not in expected_checks, "duplicate check identity")
+        expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
@@ -2754,6 +2845,12 @@ def validate(plan):
             require(item in rows and ITEM_BY_CODE.get(item) in content_item_pool.COUNTED_NAMES
                     and 1 <= predicate_["count"] <= rows[item]["requirement_ceiling"],
                     f"{rid}: count rule item or count outside the base supply")
+        elif predicate_["op"] == "distinct":
+            # Turbo Track's vanilla five Gems, one of each colour (row 10i).
+            colours = [rows[content_item_pool.ITEMS[n]]["item"] for n in warp_pad_rules.GEMS
+                       if rows[content_item_pool.ITEMS[n]]["requirement_ceiling"] > 0]
+            require(predicate_["items"] == colours and 1 <= predicate_["count"] <= len(colours),
+                    f"{rid}: distinct rule items are not the base Gem colours, or the count is outside them")
         else:
             require(predicate_["op"] == "sum", f"{rid}: unsupported manual predicate")
             family = next((names for names in SUM_FAMILIES.values()
@@ -2872,6 +2969,7 @@ def restore(world, slot_data):
     # Cups (#133 PR 5): the sweep checks and the shortened legs follow the plan.
     world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
     world.options.lap_completion_checks.value = int(any(c["kind"] == content_laps.KIND for c in plan["checks"]))
+    world.options.cup_only_podium_rungs.value = int(content_race_routes.cup_only_on(plan["checks"]))
     shortened = None
     tracks_by_id = {t["id"]: t for t in plan["tracks"]}
     for entry in plan["entries"]:
