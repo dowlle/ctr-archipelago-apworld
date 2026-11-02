@@ -14,8 +14,9 @@ Two per-track families are also earned outside the track's own pad:
     a boss race. Only a track with a Trophy Race in the seed has rungs, so a
     track raced only in cups gets none (row 10i reading of item 7), unless
     `cup_only_podium_rungs` is on (ruling of 2026-11-02): then a track raced in
-    a Gem Cup leg with no pad of its own gets the same rungs, routed from its
-    Gem Cup legs only.
+    a cup leg with no pad of its own gets the same rungs, routed from its legs
+    in the cups on pads (Gem Cups and pool cups, as a pad track's rungs are),
+    never a boss cup.
 
 Routes, after the check's own pad routes, in the plan's entry order, then leg
 order (the order content_laps uses):
