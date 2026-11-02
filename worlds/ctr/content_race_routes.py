@@ -12,7 +12,10 @@ Two per-track families are also earned outside the track's own pad:
   * Podium rungs (Rulebook "Placement rungs" items 6 and 7): a rung is earned
     in the track's Trophy Race and in any Gem Cup race on that track, never in
     a boss race. Only a track with a Trophy Race in the seed has rungs, so a
-    track raced only in cups gets none (row 10i reading of item 7).
+    track raced only in cups gets none (row 10i reading of item 7), unless
+    `cup_only_podium_rungs` is on (ruling of 2026-11-02): then a track raced in
+    a Gem Cup leg with no pad of its own gets the same rungs, routed from its
+    Gem Cup legs only.
 
 Routes, after the check's own pad routes, in the plan's entry order, then leg
 order (the order content_laps uses):
@@ -24,8 +27,11 @@ order (the order content_laps uses):
 
 A Wumpa check that only cup legs or boss races reach is a new check of its
 track (kind `wumpa`, owner the track id, the frozen `<title>: Reach 10 Wumpa`
-code), listed after the boss checks. No new location id: every code is the
-track's existing one.
+code), listed after the boss checks. So are a cup-only track's rungs (kind
+`podium`, its frozen rung codes, in `podium_rungs` order, before its Wumpa
+check). No new location id: every code is the track's existing one. The plan
+carries no flag for the option: a podium check with only cup routes is the
+option on (cup_only_on).
 
 LOGIC (content_plan.create_regions, recomputed from the plan, never on the
 wire): a cup route needs the Cup pad region and the finish of every earlier
@@ -65,14 +71,24 @@ def race_uses(entries, pads, encounters, bosses=True):
     return out
 
 
-def extend(checks, tracks, entries, pads, encounters, settings, fruit, location, titles):
+def cup_only_on(checks):
+    """Whether a plan's checks have `cup_only_podium_rungs` on: a podium rung
+    whose routes are all cup leg routes."""
+    return any(check["kind"] == PODIUM_KIND and check["routes"] and all(map(is_race_route, check["routes"]))
+               for check in checks)
+
+
+def extend(checks, tracks, entries, pads, encounters, settings, fruit, location, titles, rung=None):
     """Adds the cup leg and boss race routes to the plan's per-track Wumpa
-    checks and podium rungs, in place. Returns the new Wumpa checks of tracks
-    that only cups or boss races reach, in order of first use.
+    checks and podium rungs, in place. Returns the new checks of tracks that
+    only cups or boss races reach, in order of first use: a cup-only track's
+    rungs, then its Wumpa check.
 
     `checks` are the checks built so far, `tracks` {track id: record},
     `fruit(track)` whether the track can reach ten fruit, `location(track)`
-    its Reach 10 Wumpa code and `titles` {track id: room title}."""
+    its Reach 10 Wumpa code and `titles` {track id: room title}. With
+    `cup_only_podium_rungs` on, `rung(track, key)` is a cup-only track's rung
+    check of that rung key, without routes; None when the option is off."""
     wumpa = settings.get("wumpa") == "per_track"
     rungs = bool(settings.get("podium_rungs"))
     if not (wumpa or rungs):
@@ -81,11 +97,22 @@ def extend(checks, tracks, entries, pads, encounters, settings, fruit, location,
     for check in checks:
         if check["kind"] in (WUMPA_KIND, PODIUM_KIND) and check["owner"] in tracks:
             by_owner.setdefault((check["kind"], check["owner"]), []).append(check)
+    pad_of = {pad["entry_id"] for pad in pads if pad["entry_id"] is not None}
+    standalone = {entry["track_id"] for entry in entries if entry["kind"] == "track" and entry["id"] in pad_of}
+    award = {}
     added = []
     for track_id, entry_id, mode, pad_id, leg_id, encounter_id in race_uses(entries, pads, encounters, wumpa):
         if rungs and mode == content_cups.MODE:
+            if rung is not None and track_id not in standalone and (PODIUM_KIND, track_id) not in by_owner:
+                own = by_owner[(PODIUM_KIND, track_id)] = []
+                for key in settings["podium_rungs"]:
+                    check = rung(tracks[track_id], key)
+                    award[check["location"]] = key
+                    own.append(check)
+                added.extend(own)
             for check in by_owner.get((PODIUM_KIND, track_id), ()):
-                check["routes"].append(_route(entry_id, mode, pad_id, check["routes"][0]["award"], leg_id))
+                key = check["routes"][0]["award"] if check["routes"] else award[check["location"]]
+                check["routes"].append(_route(entry_id, mode, pad_id, key, leg_id))
         if not wumpa or not fruit(tracks[track_id]):
             continue
         if (WUMPA_KIND, track_id) not in by_owner:
@@ -109,6 +136,15 @@ def count(standalone, legs, venues, settings, fruit, has_wumpa):
     for track in list(legs) + list(venues):
         seen.setdefault(track["id"], track)
     return sum(1 for track_id, track in seen.items() if track_id not in own and fruit(track))
+
+
+def count_cup_only_rungs(standalone, legs, settings, on):
+    """How many rung checks `extend` adds with `cup_only_podium_rungs`: the
+    seed's rungs for each distinct Gem Cup leg track with no pad of its own."""
+    if not on or not settings.get("podium_rungs"):
+        return 0
+    own = {t["id"] for t in standalone}
+    return len({leg["id"] for leg in legs} - own) * len(settings["podium_rungs"])
 
 
 def is_race_route(route):

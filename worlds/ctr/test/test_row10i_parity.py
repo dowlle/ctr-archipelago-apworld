@@ -4,6 +4,7 @@ Reach 10 Wumpa from cup legs and boss races, podium rungs from cup legs, vanilla
 garages that open free without Trophies, and Turbo Track's five Gems of five
 colours (content_race_routes, content_bosses, content_requirements)."""
 import copy
+import json
 import unittest
 
 from BaseClasses import CollectionState
@@ -11,7 +12,7 @@ from Fill import distribute_items_restrictive
 
 from .test_content_plan import make_world
 from .test_content_plan_row3 import options as shape_options, records
-from .. import content_bosses, content_plan, content_race_routes, content_requirements
+from .. import content_bosses, content_capability, content_plan, content_race_routes, content_requirements
 
 TURBO_TRACK = 17
 GEMS = list(range(35010009, 35010014))
@@ -141,6 +142,121 @@ class TestRungRoutes(unittest.TestCase):
     def test_no_rung_route_comes_from_a_boss_race(self):
         plan = make_world(per_track(wumpa_check="off"), seed=3).ctr_content_plan
         self.assertFalse(any(r["encounter_id"] for c in plan["checks"] if c["kind"] == "podium" for r in c["routes"]))
+
+
+def cup_only(**extra):
+    # Eight cups leave some tracks raced only as Gem Cup legs.
+    return per_track(wumpa_check="off", cup_only_podium_rungs=True, **extra)
+
+
+def gem_cup_legs(plan):
+    """{track id: [(entry id, leg id)]} of every leg of a cup on a pad."""
+    pads = {p["entry_id"]: p["id"] for p in plan["pads"] if p["entry_id"]}
+    legs = {}
+    for entry in plan["entries"]:
+        if entry["kind"] == "cup" and entry["id"] in pads:
+            for leg in entry["legs"]:
+                legs.setdefault(leg["track_id"], []).append((entry["id"], leg["id"]))
+    return legs
+
+
+class TestCupOnlyRungs(unittest.TestCase):
+    """cup_only_podium_rungs (ruling of 2026-11-02): a track raced only as a Gem
+    Cup leg gets the rungs podium_rungs lists, earned in its cup legs only."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.world = make_world(cup_only(), seed=1)
+        cls.plan = cls.world.ctr_content_plan
+
+    def test_a_cup_only_track_has_the_rungs_of_a_pad_track(self):
+        plan = self.plan
+        own = standalone_tracks(plan)
+        legs = gem_cup_legs(plan)
+        tracks = {t["id"]: t for t in plan["tracks"]}
+        keys = plan["track_checks"]["podium_rungs"]
+        rungs = {}
+        for check in plan["checks"]:
+            if check["kind"] == "podium":
+                rungs.setdefault(check["owner"], []).append(check)
+        cup_only_tracks = set(legs) - set(own)
+        self.assertTrue(cup_only_tracks)
+        self.assertEqual(set(rungs), set(own) | cup_only_tracks)
+        for track_id in cup_only_tracks:
+            track = tracks[track_id]
+            self.assertEqual([c["location"] for c in rungs[track_id]],
+                             [content_plan.track_location(track, key, content_plan.RUNG_SUFFIX[key])[1] for key in keys])
+            for key, check in zip(keys, rungs[track_id]):
+                self.assertEqual(check["display_name"],
+                                 f"{content_plan.room_title(track)}: {content_plan.RUNG_SUFFIX[key]}")
+                self.assertEqual([(r["entry_id"], r["leg_id"]) for r in check["routes"]], legs[track_id])
+                self.assertTrue(all(r["mode"] == "cup" and r["award"] == key and r["encounter_id"] is None
+                                    for r in check["routes"]))
+        self.assertTrue(content_race_routes.cup_only_on(plan["checks"]))
+        self.assertTrue(content_plan.validate(plan))
+
+    def test_no_new_location_id(self):
+        # Every rung code of every track kind exists in the datapackage.
+        for track in self.plan["tracks"]:
+            if "arena_id" in track:
+                continue
+            for key in content_plan.RUNG_SUFFIX:
+                name, code = content_plan.track_location(track, key, content_plan.RUNG_SUFFIX[key])
+                self.assertEqual(content_plan.LOCATION_BY_CODE[code], name)
+
+    def test_off_and_empty_rungs_add_nothing(self):
+        off = make_world(per_track(wumpa_check="off"), seed=1).ctr_content_plan
+        own = standalone_tracks(off)
+        self.assertFalse({c["owner"] for c in off["checks"] if c["kind"] == "podium"} - set(own))
+        self.assertFalse(content_race_routes.cup_only_on(off["checks"]))
+        empty_on = make_world(cup_only(podium_rungs=[]), seed=1).ctr_content_plan
+        empty_off = make_world(per_track(wumpa_check="off", podium_rungs=[]), seed=1).ctr_content_plan
+        self.assertEqual(json.dumps(empty_on, sort_keys=True), json.dumps(empty_off, sort_keys=True))
+
+    def test_the_seed_fills_with_every_location_reachable(self):
+        for options in (cup_only(), cup_only(progressive_boost="shared_global")):
+            world = make_world(options, seed=2)
+            mw = world.multiworld
+            distribute_items_restrictive(mw)
+            self.assertTrue(mw.can_beat_game())
+            state = CollectionState(mw)
+            state.sweep_for_advancements()
+            self.assertTrue(all(loc.can_reach(state) for loc in mw.get_locations(1)))
+
+    def test_a_rung_keeps_the_boost_rank_of_a_trophy_race_rung(self):
+        plan = make_world(cup_only(progressive_boost="shared_global"), seed=1).ctr_content_plan
+        own = standalone_tracks(plan)
+        tracks = {t["id"]: t for t in plan["tracks"]}
+        rungs = [c for c in plan["checks"] if c["kind"] == "podium" and c["owner"] not in own]
+        self.assertTrue(rungs)
+        for check in rungs:
+            need = content_capability.check_boost(tracks[check["owner"]], "podium", check["routes"][0]["award"],
+                                                  plan["capability"])
+            self.assertEqual(check.get("boost", 0), need)
+        self.assertTrue(any("boost" in c for c in rungs))
+        self.assertTrue(content_plan.validate(plan))
+
+    def test_forged_rungs_are_refused(self):
+        own = standalone_tracks(self.plan)
+        extra = [c for c in self.plan["checks"] if c["kind"] == "podium" and c["owner"] not in own]
+        # One cup-only track without its rungs while another keeps them.
+        plan = copy.deepcopy(self.plan)
+        plan["checks"] = [c for c in plan["checks"] if c["location"] != extra[0]["location"]]
+        with self.assertRaises(Exception):
+            content_plan.validate(plan)
+        # A rung earned in a boss race or with a leg dropped.
+        plan = copy.deepcopy(self.plan)
+        check = next(c for c in plan["checks"] if c["location"] == extra[0]["location"])
+        check["routes"] = check["routes"][1:] or [dict(check["routes"][0], mode="boss_cup")]
+        with self.assertRaises(Exception):
+            content_plan.validate(plan)
+
+    def test_tracker_restores_the_option_from_the_plan(self):
+        wire = json.loads(json.dumps(self.world.fill_slot_data()))
+        other = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(other.ctr_content_plan, self.plan)
+        self.assertEqual(other.options.cup_only_podium_rungs.value, 1)
+        self.assertEqual(other.fill_slot_data(), wire)
 
 
 class TestGarages(unittest.TestCase):

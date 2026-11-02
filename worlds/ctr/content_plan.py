@@ -984,6 +984,18 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
     return out
 
 
+def cup_rung_check(track, key, package=None, capability=None):
+    """A cup-only track's podium rung of rung key `key`, without routes
+    (`cup_only_podium_rungs`, content_race_routes.extend): the rung a Trophy
+    Race of that track would carry, with the same boost rank."""
+    out = dict(location=track_location(track, key, RUNG_SUFFIX[key])[1], owner=track["id"], kind="podium",
+               display_name=f"{room_title(track)}: {RUNG_SUFFIX[key]}", routes=[])
+    need = content_capability.check_boost(track, "podium", key, capability, package) if capability else 0
+    if need:
+        out["boost"] = need
+    return out
+
+
 def global_wumpa_check(routes):
     """The one `Wumpa: Reach 10 Wumpa` check of `wumpa: global`, with a route
     for every Trophy Race and CTR Challenge that can reach ten fruit, in
@@ -1437,6 +1449,12 @@ def draw_plan(world, key_estimate=True):
         [venue_record(name) for name in venue_names], settings,
         lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
         lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
+    # Rungs of tracks raced only as Gem Cup legs (cup_only_podium_rungs, ruling of
+    # 2026-11-02).
+    cup_only = bool(o.cup_only_podium_rungs.value)
+    check_count += content_race_routes.count_cup_only_rungs(
+        [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]], settings,
+        cup_only)
     # The Wumpa Shop (job J11): five hubs of slots, after every other family.
     shop = content_wumpa.settings(o)
     check_count += content_wumpa.check_count(shop)
@@ -1702,7 +1720,9 @@ def draw_plan(world, key_estimate=True):
     checks.extend(content_race_routes.extend(
         checks, {t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters, settings,
         lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))), wumpa_location,
-        {t["id"]: room_title(t) for t in plan_tracks}))
+        {t["id"]: room_title(t) for t in plan_tracks},
+        (lambda t, key: cup_rung_check(t, key, package_by_id.get(t.get("package_id")), capability))
+        if cup_only else None))
     if laps:
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
@@ -2710,7 +2730,9 @@ def validate(plan):
     for check in content_race_routes.extend(
             list(expected_checks.values()), tracks, plan["entries"], plan["pads"], boss_encounters, settings,
             lambda t: fruit_track(t, packages.get(t.get("package_id"))), wumpa_location,
-            {t["id"]: room_title(t) for t in plan["tracks"]}):
+            {t["id"]: room_title(t) for t in plan["tracks"]},
+            (lambda t, key: cup_rung_check(t, key, packages.get(t.get("package_id")), capability))
+            if content_race_routes.cup_only_on(plan["checks"]) else None):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
@@ -2946,6 +2968,7 @@ def restore(world, slot_data):
     # Cups (#133 PR 5): the sweep checks and the shortened legs follow the plan.
     world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
     world.options.lap_completion_checks.value = int(any(c["kind"] == content_laps.KIND for c in plan["checks"]))
+    world.options.cup_only_podium_rungs.value = int(content_race_routes.cup_only_on(plan["checks"]))
     shortened = None
     tracks_by_id = {t["id"]: t for t in plan["tracks"]}
     for entry in plan["entries"]:
