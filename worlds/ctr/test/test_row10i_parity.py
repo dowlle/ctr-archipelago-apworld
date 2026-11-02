@@ -184,6 +184,15 @@ class TestTurboTrack(unittest.TestCase):
         self.assertIsNone(content_requirements.rule_predicate(("EachGem", 5), none))
 
 
+    def test_the_start_check_asks_the_colours_that_exist(self):
+        rule = content_requirements.vanilla_rule(TURBO_TRACK)
+        held = {"Red Gem": 1, "Green Gem": 1, "Blue Gem": 1}
+        base = {"Red Gem": 1, "Green Gem": 1, "Blue Gem": 1, "Yellow Gem": 0, "Purple Gem": 0}
+        self.assertTrue(content_plan.rule_met(rule, held, base))
+        self.assertFalse(content_plan.rule_met(rule, held))
+        self.assertFalse(content_plan.rule_met(rule, {"Red Gem": 5}, base))
+
+
 class TestRouteHelper(unittest.TestCase):
     def test_nothing_changes_without_the_families(self):
         checks = [dict(location=1, owner="retail:0", kind="podium", routes=[dict(award="held_1st")])]

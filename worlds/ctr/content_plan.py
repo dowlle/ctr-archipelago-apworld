@@ -328,12 +328,16 @@ def starting_counts(options):
     return held
 
 
-def rule_met(rule, held):
+def rule_met(rule, held, base=None):
+    """Does `held` meet a pad rule (item, count)? A distinct rule counts one
+    copy of each item and, with `base` (the item pool's base counts), asks only
+    for the items the seed has, as content_requirements.rule_predicate does."""
     if rule is None:
         return True
     item, count = rule
     if item in content_requirements.DISTINCT_FAMILIES:
-        return sum(bool(held.get(m, 0)) for m in content_requirements.DISTINCT_FAMILIES[item]) >= count
+        members = [m for m in content_requirements.DISTINCT_FAMILIES[item] if base is None or base.get(m, 0) > 0]
+        return sum(bool(held.get(m, 0)) for m in members) >= min(count, len(members))
     members = SUM_FAMILIES.get(item)
     return (sum(held.get(m, 0) for m in members) if members else held.get(item, 0)) >= count
 
@@ -1231,6 +1235,8 @@ def draw_plan(world, key_estimate=True):
     settings = family_settings(o)
     capability = content_capability.settings(o)
     held = starting_counts(o)
+    # Base counts, for the colours Turbo Track's vanilla rule asks (row 10i).
+    start_base = content_item_pool.normalize(o.item_pool.value)[0]
     # Items fixed to their check (one generator row 4). Nothing is drawn.
     fixed = content_fixed.settings(o, boss_record, [cup["gem_cup"] for cup in cups if cup.get("gem_cup") is not None])
 
@@ -1239,7 +1245,7 @@ def draw_plan(world, key_estimate=True):
         # by the real start. Random pads are settled by the free subset below.
         physical, _hub, keys = seat
         rule = (content_requirements.vanilla_rule(physical) if unlock_mode == 0 else manual.get(physical))
-        return keys == 0 and rule_met(rule, held)
+        return keys == 0 and rule_met(rule, held, start_base)
 
     def seat_reach(seat):
         # 2: opens at the start. 1: a vanilla pad a few Trophies behind it.
