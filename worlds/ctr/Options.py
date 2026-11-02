@@ -1258,6 +1258,10 @@ class EditableStats(Choice):
     - **global**: one custom setup shared by every racer.
     - **per_character**: a separate setup for each of the 16 racers.
 
+    Per stat you pick one of the rank values (VERY LOW, LOW, MEDIUM, HIGH or
+    VERY HIGH), the same values Progressive Stats climbs. There are no free
+    values.
+
     Progressive Stats wins if you enable both: the panel goes read-only and
     no edit controls appear."""
     display_name = "Editable Stats"
