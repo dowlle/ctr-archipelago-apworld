@@ -61,6 +61,28 @@ class TestSearch(unittest.TestCase):
         content_opening.search({f"Item {n}": 3 for n in range(14)}, room, 9, probes=300)
         self.assertLess(len(set(calls)), 340)
 
+    def test_copies_of_one_kind_come_before_pairs_of_many_kinds(self):
+        # Row 13: a boost per racer gives some thirty kinds the pool cannot do
+        # without; their pairs spent the probes before three of one kind.
+        pool = {f"Boost {n}": 2 for n in range(30)}
+        pool["Token"] = 4
+        gates = [(dict(Token=3), 12)] + [({f"Boost {n}": 2}, 1) for n in range(30)]
+        names, room = content_opening.search(pool, spots(5, gates), 6)
+        self.assertEqual(names, ["Token"] * 3)
+        self.assertEqual(room, 14)
+
+    def test_a_bundle_is_taken_whole(self):
+        # Row 13: one track's letters open its letter checks and Token together.
+        gates = [(dict(LetterC=1), 1), (dict(LetterT=1), 1), (dict(LetterC=1, LetterT=1), 1)]
+        pool = dict(Trophy=4, LetterC=1, LetterT=1)
+        self.assertEqual(content_opening.search(pool, spots(2, gates), 5, bundles=[("LetterC", "LetterT")]),
+                         (["LetterC", "LetterT"], 3))
+
+    def test_bundle_names_are_no_step_of_their_own(self):
+        gates = [(dict(LetterC=1, LetterT=1), 6)]
+        self.assertEqual(content_opening.search(dict(LetterC=1, LetterT=1), spots(2, gates), 5,
+                                                bundles=[("LetterC", "LetterT", "LetterR")]), ([], 2))
+
     def test_the_search_stops_at_its_target(self):
         names, room = content_opening.search(dict(Key=4), spots(1, [(dict(Key=1), 6), (dict(Key=2), 90)]), 5)
         self.assertEqual((names, room), (["Key"], 6))
@@ -128,6 +150,18 @@ class TestFirstKeyCapacity(unittest.TestCase):
             near = sum(c["kind"] == "ctr" for c in world.ctr_content_plan["checks"]) >= 9
             paths += near and bool(world.ctr_first_key_path)
         self.assertGreater(paths, 0)
+
+    def test_each_tracks_letters_are_one_bundle(self):
+        world = make_world(dict(LETTERS), seed=0, stop_before="pre_fill")
+        plan = world.ctr_content_plan
+        pool = {row.name: row.remaining for row in world.ctr_content_items.rows}
+        bundles = content_opening.letter_bundles(plan, pool)
+        tokens = {names for names in content_plan.letter_requirements(plan).values() if len(names) > 1}
+        self.assertTrue(bundles)
+        self.assertTrue(set(bundles) <= {names for names in content_plan.letter_requirements(plan).values()})
+        self.assertTrue(tokens <= set(bundles))
+        self.assertEqual(content_opening.letter_bundles(make_world(dict(TIGHT), seed=0, stop_before="pre_fill")
+                                                        .ctr_content_plan, pool), [])
 
     def test_the_tight_opening_fits(self):
         for seed in range(6):

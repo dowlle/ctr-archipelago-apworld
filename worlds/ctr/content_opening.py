@@ -29,16 +29,18 @@ MIXED_GROUP = 4
 PROBES = 300
 
 
-def search(pool, room, target, reached=None, probes=PROBES):
+def search(pool, room, target, reached=None, probes=PROBES, bundles=()):
     """(names to seat in order, spots they leave open). `pool` is {name: copies},
     `room(held)` counts the spots open with the sorted tuple `held`, and an item
     takes one of them. A step needs its spots open before it, so a gate that needs
     several items is taken as one group, and one that does not fit is no step.
     Stops at `target` spots left; else the best opening found stands. With
     `reached(held)`, an opening also has to reach what it tests, and one that does
-    beats one that does not."""
+    beats one that does not. `bundles` are groups taken only whole: one track's
+    letter items (letter_bundles). Their names are in `pool` but in no other step."""
     memo = {}
     spent = [0]
+    loose = {name for bundle in bundles for name in bundle}
 
     def free(held):
         key = tuple(sorted(held))
@@ -53,9 +55,10 @@ def search(pool, room, target, reached=None, probes=PROBES):
     if start >= target and done(()):
         return [], start
     # A gate's items: what the whole pool cannot do without. Groups use only those.
-    rich = tuple(name for name in sorted(pool) for _ in range(pool[name]))
+    names = [name for name in sorted(pool) if name not in loose]
+    rich = tuple(name for name in names for _ in range(pool[name]))
     full = free(rich) + len(rich)
-    needed = [name for name in sorted(pool)
+    needed = [name for name in names
               if free(tuple(n for n in rich if n != name)) + len(rich) - pool[name] < full]
 
     def left(held, name):
@@ -74,16 +77,25 @@ def search(pool, room, target, reached=None, probes=PROBES):
         return all(left(held, name) >= group.count(name) for name in set(group))
 
     def moves(held, spots):
-        spent[0] += len(pool)
-        singles = sorted(((free(held + (name,)), name) for name in sorted(pool) if left(held, name)), reverse=True)
+        spent[0] += len(names)
+        singles = sorted(((free(held + (name,)), name) for name in names if left(held, name)), reverse=True)
         found = [(name,) for after, name in singles if after + 1 > spots]
         if found:
             return found
-        # One or two kinds first: a garage asks that, at any count. Then any mix.
+        # A track's letters open its letter checks and its CTR Token only together.
+        if bundles:
+            found = opening(held, spots, [bundle for bundle in bundles if len(bundle) <= spots and fits(held, bundle)])
+            if found or spent[0] >= probes:
+                return found
+        # One kind first, then two: a garage asks that, at any count. Then any mix.
+        # Copies of one kind come at every count before any pair, or the pairs of
+        # many kinds (a boost per racer) spend the probes before three of a kind.
+        found = opening(held, spots, [(name,) * size for size in range(2, spots + 1) for name in needed
+                                      if fits(held, (name,) * size)])
+        if found or spent[0] >= probes:
+            return found
         for size in range(2, spots + 1):
-            groups = [(name,) * size for name in needed] + [(a,) * n + (b,) * (size - n)
-                                                            for a, b in itertools.combinations(needed, 2)
-                                                            for n in range(1, size)]
+            groups = [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2) for n in range(1, size)]
             found = opening(held, spots, [group for group in groups if fits(held, group)])
             if found or spent[0] >= probes:
                 return found
@@ -158,6 +170,18 @@ def gate_names(plan, by_code, boost_item):
     if plan.get("capability", {}).get("boost_mode") == 2:
         names.update(boost_item_name(racer) for racer in racers)
     return names
+
+
+def letter_bundles(plan, pool):
+    """Each track's letter items that gate its CTR Token, as one group, when every
+    one of them is in `pool`. Lettersanity with letter items only: () otherwise.
+    A letter opens little alone, but a track's letters open its letter checks and
+    its Token, which on a `ctr_first` pad can be the most the start has."""
+    from .content_plan import letter_requirements
+    groups = {names for names in letter_requirements(plan).values()}
+    return sorted(group for group in groups
+                  if not any(set(group) < set(other) for other in groups)
+                  and all(pool.get(name, 0) > 0 for name in group))
 
 
 class PlanReach:
@@ -376,10 +400,12 @@ def fit(world, plan):
     checks = sum(check["kind"] != content_wumpa.KIND for check in plan["checks"])
     need = min(FIT_ROOM, BOOTSTRAP_START_CHECKS, checks // 4)
     gates = gate_names(plan, ITEM_BY_CODE, boost)
-    pool = {name: count for name, count in reach.pool.items()
-            if name in gates and name not in world.options.non_local_items.value}
+    non_local = world.options.non_local_items.value
+    pool = {name: count for name, count in reach.pool.items() if name in gates and name not in non_local}
+    bundles = letter_bundles(plan, {name: count for name, count in reach.pool.items() if name not in non_local})
+    pool.update((name, reach.pool[name]) for bundle in bundles for name in bundle)
     first_key = (lambda held: reach.holds(held, "Key")) if plan.get("fixed_items", {}).get("keys") else None
-    names, room = search(pool, reach.room, need, first_key)
+    names, room = search(pool, reach.room, need, first_key, bundles=bundles)
     if first_key is None:
         return (min(room, need), KEY_SLACK), (need, KEY_SLACK)
     room = room if first_key(tuple(sorted(names))) else 0

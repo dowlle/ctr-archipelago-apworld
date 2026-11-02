@@ -589,11 +589,12 @@ def plan_opening(world, state, target, non_local, reach=None):
     plan = world.ctr_content_plan
     gates = content_opening.gate_names(plan, ITEM_BY_CODE, starting_boost_item(world)
                                        if plan.get("capability", {}).get("boost_mode") else None)
-    pool = {}
+    pool, spare = {}, {}
     for item in mw.itempool:
-        if (_own_item(world, item) and item.advancement and item.location is None and item.name in gates
-                and item.name not in non_local):
-            pool.setdefault(item.name, []).append(item)
+        if _own_item(world, item) and item.advancement and item.location is None and item.name not in non_local:
+            (pool if item.name in gates else spare).setdefault(item.name, []).append(item)
+    bundles = content_opening.letter_bundles(plan, {name: len(copies) for name, copies in spare.items()})
+    pool.update((name, spare[name]) for bundle in bundles for name in bundle)
 
     def held_items(held):
         taken = {}
@@ -612,7 +613,8 @@ def plan_opening(world, state, target, non_local, reach=None):
 
     names, room = content_opening.search({name: len(copies) for name, copies in pool.items()},
                                          lambda held: len(_room(world, after(held))), target,
-                                         (lambda held: after(held).has(reach, player)) if reach else None)
+                                         (lambda held: after(held).has(reach, player)) if reach else None,
+                                         bundles=bundles)
     return held_items(names), room
 
 
