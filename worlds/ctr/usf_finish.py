@@ -263,8 +263,8 @@ def track_finish_term(track, world, bind_racer=True):
 
 def oxide_final_track_name(world):
     """The track Oxide's Final Challenge is raced on this seed."""
-    return ("Cortex Vortex" if int(world.options.oxide_final_track.value) == 0
-            else "Oxide Station")
+    from .Options import final_on_cortex
+    return "Cortex Vortex" if final_on_cortex(world.options.oxide_final_track) else "Oxide Station"
 
 
 def usf_finish_cups(cup_legs: Dict[str, List[str]]) -> frozenset:

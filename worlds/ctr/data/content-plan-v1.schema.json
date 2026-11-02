@@ -94,6 +94,7 @@
           "fixed_items_v1",
           "ctr_first_v1",
           "boss_opponents_v1",
+          "final_chaos_v1",
           "wumpa_shop_v1",
           "wumpa_goal_v1",
           "pad_client_v1",
@@ -1943,6 +1944,10 @@
             "character_home_track",
             "independent_track"
           ]
+        },
+        "final_chaos": {
+          "description": "Present only on a chaos Final Challenge: the five bosses race at once on the final encounter's attack schedule.",
+          "const": true
         }
       },
       "required": [

@@ -231,7 +231,8 @@ def cortex_vortex_venue_active(options) -> bool:
     content is present -- the venue route onto the Cortex Vortex Wumpa check."""
     oxide_final = getattr(options, "oxide_final_track", None)
     oxide_goal = getattr(options, "oxide_goal", None)
-    return (oxide_final is not None and int(oxide_final.value) == 0 and
+    from .Options import final_on_cortex
+    return (oxide_final is not None and final_on_cortex(oxide_final) and
             (oxide_goal is None or int(oxide_goal.value) != 3))
 
 

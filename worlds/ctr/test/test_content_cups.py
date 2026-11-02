@@ -329,7 +329,7 @@ class TestCupHitCharacter(unittest.TestCase):
                     packages=[dict(id="p", content_id="probe", capabilities=dict(weapon_crates=0, super_turbo_pads=True))],
                     capability=dict(boost_mode=2, shortcut_knowledge=0))
         world = NS(player=1, ctr_content_plan=plan, ctr_starting_character="Coco Bandicoot",
-                   ctr_hit_character_fallback={},
+                   ctr_hit_character_fallback={}, ctr_hit_character_encounters=dict(bosses={}),
                    options=NS(progressive_boost=NS(value=2), progressive_stats=NS(value=0),
                               character_unlocks=NS(value=0)))
         route = dict(own_pad_id="pad:0", entry_id="entry/cup:0", leg_id="leg:1", mode="cup")

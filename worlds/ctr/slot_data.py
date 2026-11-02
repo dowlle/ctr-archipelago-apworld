@@ -18,7 +18,7 @@ from .item_boxes import ITEM_BOX_CLASS
 from .itemsanity import ITEMSANITY_CLASS
 from .lettersanity import LETTERSANITY_CLASS
 from .Locations import get_total_locations
-from .Options import OxideGoal
+from .Options import OxideGoal, final_on_cortex
 from .relic_perfect import RELIC_PERFECT_CLASS
 from .relic_tiers import (RELIC_TIERS, SLIDE_COLISEUM_LEVEL_ID,
                           slide_coliseum_stage1_wire)
@@ -350,7 +350,8 @@ def fill_slot_data(world) -> Dict[str, object]:
             # the shared 1-18 count. 0 (sapphire) stays frozen = the old 0.
             "oxide_final_unlock": o.oxide_final_challenge_unlock.value,
             "oxide_final_count": o.oxide_final_challenge_relic_count.value,
-            "oxide_final_track": int(o.oxide_final_track.value),
+            # The venue only: chaos is the plan's `bosses.final_chaos`.
+            "oxide_final_track": 0 if final_on_cortex(o.oxide_final_track) else 1,
             "shuffle_warp_pads": derived_shuffle,
             "warp_pad_shuffle_categories": sorted(o.warp_pad_shuffle_categories.value),
             "warp_pad_shuffle_grouping": o.warp_pad_shuffle_grouping.current_key,
@@ -563,8 +564,7 @@ def fill_slot_data(world) -> Dict[str, object]:
         "racer_locks": characters.racer_lock_slot_data(world),
         "oxide_final_venue": {
             "version": 1,
-            "track": ("cortex_vortex" if int(o.oxide_final_track.value) == 0
-                      else "oxide_station"),
+            "track": "cortex_vortex" if final_on_cortex(o.oxide_final_track) else "oxide_station",
             "opponent": "nitros_oxide",
             "location": 35011105,
             # Widened 2026-09-13: the code exists whenever per-track

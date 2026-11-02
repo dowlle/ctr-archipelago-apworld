@@ -99,6 +99,7 @@ from Options import OptionError
 from . import boss_track_shuffle, content_item_pool, destinations, logic_terms
 from .content_capability import finish_boost
 from .Locations import CTR_LOCATION_IDS
+from .Options import final_chaos
 from .content_cups import LEG_RETAIL_IDS
 from .usf_finish import FIRST_BOOST_COUNT
 
@@ -213,14 +214,21 @@ def settings(world):
                   oxide_final_count=int(o.oxide_final_challenge_relic_count.value) if oxide else SINGLE_TIER_MAX,
                   track_shuffle=shuffle, repeats=False)
     record.update(encounter_settings(world, oxide))
+    # The chaos Final Challenge needs the race it changes; off is no key, so
+    # every other plan keeps its wire.
+    if oxide and final_chaos(o.oxide_final_track):
+        record[CHAOS_KEY] = True
     return record
 
 
 def check_settings(record):
     """Shape and values of a plan's `bosses` record."""
-    if not isinstance(record, dict) or set(record) not in (set(RECORD_KEYS), set(RECORD_KEYS + ENCOUNTER_KEYS)):
+    if not isinstance(record, dict) or set(record) - {CHAOS_KEY} not in (set(RECORD_KEYS), set(RECORD_KEYS + ENCOUNTER_KEYS)):
         error("bosses must be a mapping of exactly " + ", ".join(RECORD_KEYS) + ", plus "
-              + ", ".join(ENCOUNTER_KEYS) + " together when an opponent, kit or N. Oxide profile is drawn.")
+              + ", ".join(ENCOUNTER_KEYS) + " together when an opponent, kit or N. Oxide profile is drawn, plus "
+              + CHAOS_KEY + " on a chaos Final Challenge.")
+    if CHAOS_KEY in record and (record[CHAOS_KEY] is not True or record["oxide_goal"] == GOAL_DISABLED):
+        error("bosses.final_chaos is true when present, and needs N. Oxide's races (oxide_goal not disabled).")
     goal, bosses = record["oxide_goal"], record["bosses_required"]
     unlock, count = record["oxide_final_unlock"], record["oxide_final_count"]
     if type(goal) is not int or goal not in (GOAL_NONE, GOAL_ANY, GOAL_FINAL, GOAL_DISABLED):
@@ -815,7 +823,12 @@ def restore_options(world, plan):
     venues, final, _cups = plan_venues(plan)
     o._boss_track_venues = {_venue_key(g): name for g, name in venues.items()}
     if final is not None:
-        o.oxide_final_track.value = 0 if final == destinations.CORTEX_VORTEX else 1
+        cortex = final == destinations.CORTEX_VORTEX
+        if record.get(CHAOS_KEY):
+            o.oxide_final_track.value = o.oxide_final_track.option_vortex_chaos if cortex \
+                else o.oxide_final_track.option_vanilla_chaos
+        else:
+            o.oxide_final_track.value = 0 if cortex else 1
 
 
 def expected(plan, retail, cortex):
@@ -893,6 +906,14 @@ def expected(plan, retail, cortex):
 # retail race track certified for that garage carries no attack.
 
 OPPONENT_FEATURE = "boss_opponents_v1"
+#: The chaos Final Challenge (ruled 2026-10-30): `oxide_final_track`
+#: vanilla_chaos or vortex_chaos. The record gains `final_chaos: true` and
+#: nothing else: native seats the four garage racers and the final racer in one
+#: race on the final encounter's own attack schedule, so the check, the goal,
+#: the Hit identities and the draws stay as they are. N. Oxide's Challenge is
+#: not touched.
+CHAOS_FEATURE = "final_chaos_v1"
+CHAOS_KEY = "final_chaos"
 ENCOUNTER_KEYS = ("opponent_shuffle", "oxide_in_pool", "kit_shuffle", "gauntlet", "kit", "oxide_attack_profile",
                   "track_assignment")
 ATTACK_COMPOSED = "composed"
@@ -1246,14 +1267,33 @@ def identity(plan):
     return out
 
 
+def seats(plan):
+    """`identity` for the unlock triggers: who a boss win code actually seats.
+
+    With random bosses (an identity that differs from the retail one) a code
+    the plan races nowhere seats nobody (-1), so N. Oxide with `oxide_goal:
+    disabled` swaps slots like any original boss raced nowhere and races from
+    the start (ruled 2026-10-30: the fixed Key fallback goes on seeds with
+    random bosses). Retail bosses keep the retail table and its Keys. The
+    wire's `bosses` table stays `identity`."""
+    from .hit_character import BOSS_WIN_OPPONENTS
+    out = identity(plan)
+    if out == dict(BOSS_WIN_OPPONENTS):
+        return out
+    raced = {enc["completion_location"] for enc in plan["encounters"]}
+    return {code: (cid if code in raced else -1) for code, cid in out.items()}
+
+
 def spoiler_lines(plan):
     """The drawn encounters for the spoiler, as the ordinary room writes them;
     () without drawn encounters."""
     record = plan.get("bosses")
-    if not drawn(record):
-        return ()
+    chaos = chaos_lineup(plan)
     be = _be()
     by_id = _pool_by_id()
+    chaos_line = ("Final Challenge: chaos race against " + ", ".join(by_id[cid] for cid in chaos),) if chaos else ()
+    if not drawn(record):
+        return chaos_line
     entries = {e["id"]: e for e in plan["entries"]}
     tracks = {t["id"]: t for t in plan["tracks"]}
     lines = []
@@ -1274,7 +1314,18 @@ def spoiler_lines(plan):
     if record["gauntlet"]:
         racers = [by_id[entries[enc["entry_id"]]["opponent"]["character_id"]] for enc in plan["encounters"][:4]]
         lines.append(f"{be.PURPLE_CUP}: boss gauntlet, leg attackers " + ", ".join(racers))
-    return tuple(lines)
+    return tuple(lines) + chaos_line
+
+
+def chaos_lineup(plan):
+    """The chaos Final Challenge's five rivals as engine ids, the final racer
+    first (native seats it where a boss race seats its opponent), then the
+    four garages in order; () without the chaos record."""
+    record = plan.get("bosses")
+    if not record or not record.get(CHAOS_KEY):
+        return ()
+    table = identity(plan)
+    return (table[OXIDE_FINAL],) + tuple(table[code] for code in BOSS_CODES)
 
 
 def restore_encounter_options(o, record):
