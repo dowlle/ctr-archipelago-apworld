@@ -106,6 +106,16 @@ class TestContentWumpaShop(unittest.TestCase):
         self.assertFalse(content_wumpa.income_track(custom, dict(capabilities=dict(wumpa=False))))
         self.assertTrue(content_wumpa.income_track(custom, dict(capabilities=dict(wumpa=True))))
 
+    def test_earns_income_needs_a_trophy_or_ctr_mode(self):
+        # The first Key capacity check (banks_fruit) reads this: a Relic-only
+        # entry banks nothing in logic, also on a track with measured Wumpa.
+        packages = {"p": dict(capabilities=dict(wumpa=True))}
+        custom = dict(origin="custom", package_id="p")
+        self.assertTrue(content_wumpa.earns_income(dict(custom, modes=["trophy"]), packages))
+        self.assertTrue(content_wumpa.earns_income(dict(custom, modes=["ctr", "relic"]), packages))
+        self.assertFalse(content_wumpa.earns_income(dict(custom, modes=["relic"]), packages))
+        self.assertFalse(content_wumpa.earns_income(dict(origin="retail", retail_id=3, modes=["relic"]), {}))
+
     def test_shop_slots_never_count_as_starting_checks(self):
         off = make_world(shop_options(slots=0), seed=20261029, stop_before="pre_fill")
         on = make_world(shop_options(slots=25, progression="allowed"), seed=20261029, stop_before="pre_fill")

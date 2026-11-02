@@ -270,9 +270,9 @@ def keep_income_track(world, chosen, drawn, optional, packages=None):
     `packages` maps package id to package."""
     o = world.options
     packages = packages or {}
-    if not (o.wumpa_shop_slots.value or goal_count(o)) or not drawn or any(_earns(t, packages) for t in chosen):
+    if not (o.wumpa_shop_slots.value or goal_count(o)) or not drawn or any(earns_income(t, packages) for t in chosen):
         return drawn
-    spare = [t for t in optional if _earns(t, packages) and t not in drawn]
+    spare = [t for t in optional if earns_income(t, packages) and t not in drawn]
     if not spare:
         return drawn
     kept = list(drawn)
@@ -280,7 +280,10 @@ def keep_income_track(world, chosen, drawn, optional, packages=None):
     return kept
 
 
-def _earns(track, packages):
+def earns_income(track, packages):
+    """Does a drawn track give an income route: `income_track` with a Trophy
+    Race or CTR Challenge among its modes. `packages` maps package id to
+    package."""
     return (income_track(track, packages.get(track.get("package_id")))
             and any(mode in track.get("modes", ()) for mode in INCOME_MODES))
 

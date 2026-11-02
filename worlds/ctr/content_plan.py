@@ -1275,7 +1275,7 @@ def draw_plan(world, key_estimate=True):
     def banks_fruit(item):
         # The shop opens with `Wumpa Income`, which needs the track's finish rank.
         package = package_by_id.get(item.get("package_id"))
-        return (content_wumpa.income_track(item, package)
+        return (content_wumpa.earns_income(item, package_by_id)
                 and not (capability.get("boost_mode") and content_capability.finish_boost(item, capability, package)))
 
     def key_room(seated):
