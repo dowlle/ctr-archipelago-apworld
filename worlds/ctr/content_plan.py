@@ -1850,7 +1850,10 @@ def hint_text(plan):
             label[pad["id"]] = f"the {content_requirements.KEY_BY_PHYSICAL[pad_physical(pad)]} pad"
     out = {}
     for check in plan["checks"]:
-        own = {route["own_pad_id"] for route in check["routes"]}
+        # A check's cup leg and boss race routes (row 10i) do not move its
+        # hint off its own pad.
+        routes = [r for r in check["routes"] if not content_race_routes.is_race_route(r)] or check["routes"]
+        own = {route["own_pad_id"] for route in routes}
         if len(own) == 1 and next(iter(own)) in label:
             out[check["location"]] = label[next(iter(own))]
     return out
