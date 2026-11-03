@@ -63,7 +63,7 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
               if free(tuple(n for n in rich if n != name)) + len(rich) - pool[name] < full]
 
     def left(held, name):
-        return pool[name] - held.count(name)
+        return pool.get(name, 0) - held.count(name)
 
     def opening(held, spots, groups):
         """The groups that open something, within the probe budget."""
@@ -76,6 +76,17 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
 
     def fits(held, group):
         return all(left(held, name) >= group.count(name) for name in set(group))
+
+    def bundle_seats(held, group):
+        # A letter can open its own check before the next letter is seated.
+        # Pay every prefix; a jointly gated bundle still needs all its slots.
+        for n in range(len(group)):
+            if spent[0] >= probes:
+                return False
+            spent[0] += 1
+            if free(held + group[:n]) <= 0:
+                return False
+        return True
 
     def moves(held, spots):
         spent[0] += len(names)
@@ -91,9 +102,9 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
                 found.append(remaining)
         if found:
             return found
-        # A track's letters open its letter checks and its CTR Token only together.
+        # A track's letters are one search move, with each seat proved in order.
         if bundles:
-            found = opening(held, spots, [bundle for bundle in bundles if len(bundle) <= spots and fits(held, bundle)])
+            found = opening(held, spots, [bundle for bundle in bundles if fits(held, bundle) and bundle_seats(held, bundle)])
             if found or spent[0] >= probes:
                 return found
         # One kind first, then two: a garage asks that, at any count. Then any mix.

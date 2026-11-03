@@ -99,6 +99,26 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(content_opening.search(dict(LetterC=1, LetterT=1), spots(2, gates), 5,
                                                 bundles=[("LetterC", "LetterT", "LetterR")]), ([], 2))
 
+    def test_bundle_can_seat_each_letter_in_the_check_the_previous_letter_opens(self):
+        bundle = ("LetterC", "LetterT", "LetterR")
+        gates = [({name: 1}, 1) for name in bundle] + [(dict.fromkeys(bundle, 1), 1)]
+        held, free = content_opening.search(dict.fromkeys(bundle, 1), spots(1, gates), 2,
+                                            bundles=[bundle])
+        self.assertEqual(tuple(held), bundle)
+        self.assertEqual(free, 2)  # Five checks, all three copies paid.
+
+    def test_bundle_cannot_spend_a_later_check_before_it_opens(self):
+        bundle = ("LetterC", "LetterT", "LetterR")
+        gates = [(dict.fromkeys(bundle, 1), 5)]
+        self.assertEqual(content_opening.search(dict.fromkeys(bundle, 1), spots(1, gates), 2,
+                                                bundles=[bundle]), ([], 1))
+
+    def test_bundle_prefixes_obey_the_existing_probe_budget(self):
+        bundle = ("LetterC", "LetterT", "LetterR")
+        gates = [({name: 1}, 1) for name in bundle] + [(dict.fromkeys(bundle, 1), 1)]
+        self.assertEqual(content_opening.search(dict.fromkeys(bundle, 1), spots(1, gates), 2,
+                                                probes=1, bundles=[bundle]), ([], 1))
+
     def test_the_search_stops_at_its_target(self):
         names, room = content_opening.search(dict(Key=4), spots(1, [(dict(Key=1), 6), (dict(Key=2), 90)]), 5)
         self.assertEqual((names, room), (["Key"], 6))
@@ -214,6 +234,19 @@ class TestFirstKeyCapacity(unittest.TestCase):
 
 
 class TestCostedFixedKeyCapacity(unittest.TestCase):
+    def test_actual_vanilla_letter_prefix_failure_fills_and_reaches_all_checks(self):
+        path = Path(__file__).parent / "fixtures" / "row13_vanilla_sequential_letters.yaml"
+        options = yaml.safe_load(path.read_text())["Crash Team Racing"]
+        world = make_world(options, seed=264, stop_before="fill")
+        self.assertEqual(world.ctr_content_plan["pad_requirements"]["mode"], "vanilla")
+        self.assertTrue(world.ctr_content_plan["fixed_items"]["keys"])
+        distribute_items_restrictive(world.multiworld)
+        state = CollectionState(world.multiworld)
+        state.sweep_for_advancements(locations=world.multiworld.get_locations(world.player))
+        self.assertTrue(world.multiworld.can_beat_game())
+        self.assertTrue(all(location.can_reach(state) for location in world.multiworld.get_locations(world.player)
+                            if location.address is not None))
+
     cases = (("letters", 169, 53), ("racers", 83, 48))
 
     def options(self, name):
