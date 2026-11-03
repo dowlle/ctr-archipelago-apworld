@@ -1,0 +1,4792 @@
+{
+  "seed": 915505721,
+  "original_yaml_sha256": "28349c0390eaee17c74c0ba22fa7518d9e9bc68438325806d345bb3a261f2c2f",
+  "options": {
+    "progression_balancing": 60,
+    "accessibility": 0,
+    "local_items": [],
+    "non_local_items": [],
+    "start_inventory": {},
+    "start_hints": [],
+    "start_location_hints": [],
+    "exclude_locations": [],
+    "priority_locations": [],
+    "item_links": [],
+    "plando_items": [],
+    "retail_tracks": [
+      "all"
+    ],
+    "track_modes": {
+      "default": [
+        "trophy",
+        "ctr",
+        "relic"
+      ]
+    },
+    "custom_tracks": [
+      {
+        "id": "package/baby-t-park/1.0.2",
+        "content_id": "baby-t-park",
+        "uuid": "2c7c7846-2ead-5b8f-a218-beca5792106e",
+        "revision": "1.0.2",
+        "display_name": "Baby T Park",
+        "author": "Lockheart",
+        "laps": 7,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true,
+          "super_turbo_pads": true,
+          "weapon_crates": 8,
+          "checkpoints": 35,
+          "ai_nav": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8",
+            "bytes": 2558168,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-fixture-loop/1.0",
+        "content_id": "fuzz-fixture-loop",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-0504030201ff",
+        "revision": "1.0",
+        "display_name": "Fuzz Fixture Loop",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": false,
+          "super_turbo_pads": true,
+          "weapon_crates": 12
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-001/1.0",
+        "content_id": "fuzz-001",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000001",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 001",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a001",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b001",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-002/1.0",
+        "content_id": "fuzz-002",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000002",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 002",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a002",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b002",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-003/1.0",
+        "content_id": "fuzz-003",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000003",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 003",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a003",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b003",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-004/1.0",
+        "content_id": "fuzz-004",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000004",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 004",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a004",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b004",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-005/1.0",
+        "content_id": "fuzz-005",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000005",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 005",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a005",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b005",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-006/1.0",
+        "content_id": "fuzz-006",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000006",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 006",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b006",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-007/1.0",
+        "content_id": "fuzz-007",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000007",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 007",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a007",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b007",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-008/1.0",
+        "content_id": "fuzz-008",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000008",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 008",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b008",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-009/1.0",
+        "content_id": "fuzz-009",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000009",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 009",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a009",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b009",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-010/1.0",
+        "content_id": "fuzz-010",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 010",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-011/1.0",
+        "content_id": "fuzz-011",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 011",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-012/1.0",
+        "content_id": "fuzz-012",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 012",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-013/1.0",
+        "content_id": "fuzz-013",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 013",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-014/1.0",
+        "content_id": "fuzz-014",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 014",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-015/1.0",
+        "content_id": "fuzz-015",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000000f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 015",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a00f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b00f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-016/1.0",
+        "content_id": "fuzz-016",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000010",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 016",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a010",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b010",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-017/1.0",
+        "content_id": "fuzz-017",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000011",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 017",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a011",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b011",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-018/1.0",
+        "content_id": "fuzz-018",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000012",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 018",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a012",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b012",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-019/1.0",
+        "content_id": "fuzz-019",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000013",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 019",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a013",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b013",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-020/1.0",
+        "content_id": "fuzz-020",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000014",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 020",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a014",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b014",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-021/1.0",
+        "content_id": "fuzz-021",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000015",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 021",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a015",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b015",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-022/1.0",
+        "content_id": "fuzz-022",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000016",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 022",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a016",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b016",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-023/1.0",
+        "content_id": "fuzz-023",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000017",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 023",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a017",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b017",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-024/1.0",
+        "content_id": "fuzz-024",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000018",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 024",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a018",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b018",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-025/1.0",
+        "content_id": "fuzz-025",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000019",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 025",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a019",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b019",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-026/1.0",
+        "content_id": "fuzz-026",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 026",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-027/1.0",
+        "content_id": "fuzz-027",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 027",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-028/1.0",
+        "content_id": "fuzz-028",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 028",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-029/1.0",
+        "content_id": "fuzz-029",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 029",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-030/1.0",
+        "content_id": "fuzz-030",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 030",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-031/1.0",
+        "content_id": "fuzz-031",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000001f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 031",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a01f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b01f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-032/1.0",
+        "content_id": "fuzz-032",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000020",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 032",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a020",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b020",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-033/1.0",
+        "content_id": "fuzz-033",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000021",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 033",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a021",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b021",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-034/1.0",
+        "content_id": "fuzz-034",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000022",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 034",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a022",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b022",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-035/1.0",
+        "content_id": "fuzz-035",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000023",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 035",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a023",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b023",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-036/1.0",
+        "content_id": "fuzz-036",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000024",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 036",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a024",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b024",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-037/1.0",
+        "content_id": "fuzz-037",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000025",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 037",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a025",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b025",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-038/1.0",
+        "content_id": "fuzz-038",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000026",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 038",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a026",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b026",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-039/1.0",
+        "content_id": "fuzz-039",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000027",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 039",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a027",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b027",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-040/1.0",
+        "content_id": "fuzz-040",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000028",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 040",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a028",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b028",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-041/1.0",
+        "content_id": "fuzz-041",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000029",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 041",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a029",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b029",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-042/1.0",
+        "content_id": "fuzz-042",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 042",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-043/1.0",
+        "content_id": "fuzz-043",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 043",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-044/1.0",
+        "content_id": "fuzz-044",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 044",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-045/1.0",
+        "content_id": "fuzz-045",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 045",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-046/1.0",
+        "content_id": "fuzz-046",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 046",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-047/1.0",
+        "content_id": "fuzz-047",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000002f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 047",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a02f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b02f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-048/1.0",
+        "content_id": "fuzz-048",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000030",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 048",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a030",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b030",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-049/1.0",
+        "content_id": "fuzz-049",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000031",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 049",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a031",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b031",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-050/1.0",
+        "content_id": "fuzz-050",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000032",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 050",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a032",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b032",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-051/1.0",
+        "content_id": "fuzz-051",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000033",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 051",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a033",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b033",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-052/1.0",
+        "content_id": "fuzz-052",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000034",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 052",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a034",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b034",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-053/1.0",
+        "content_id": "fuzz-053",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000035",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 053",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a035",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b035",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-054/1.0",
+        "content_id": "fuzz-054",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000036",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 054",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a036",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b036",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-055/1.0",
+        "content_id": "fuzz-055",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000037",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 055",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a037",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b037",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-056/1.0",
+        "content_id": "fuzz-056",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000038",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 056",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a038",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b038",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-057/1.0",
+        "content_id": "fuzz-057",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000039",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 057",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a039",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b039",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-058/1.0",
+        "content_id": "fuzz-058",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 058",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-059/1.0",
+        "content_id": "fuzz-059",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 059",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-060/1.0",
+        "content_id": "fuzz-060",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 060",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-061/1.0",
+        "content_id": "fuzz-061",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 061",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-062/1.0",
+        "content_id": "fuzz-062",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 062",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-063/1.0",
+        "content_id": "fuzz-063",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000003f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 063",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a03f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b03f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-064/1.0",
+        "content_id": "fuzz-064",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000040",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 064",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a040",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b040",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-065/1.0",
+        "content_id": "fuzz-065",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000041",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 065",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a041",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b041",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-066/1.0",
+        "content_id": "fuzz-066",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000042",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 066",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a042",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b042",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-067/1.0",
+        "content_id": "fuzz-067",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000043",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 067",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a043",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b043",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-068/1.0",
+        "content_id": "fuzz-068",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000044",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 068",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a044",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b044",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-069/1.0",
+        "content_id": "fuzz-069",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000045",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 069",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a045",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b045",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-070/1.0",
+        "content_id": "fuzz-070",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000046",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 070",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a046",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b046",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-071/1.0",
+        "content_id": "fuzz-071",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000047",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 071",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a047",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b047",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-072/1.0",
+        "content_id": "fuzz-072",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000048",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 072",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a048",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b048",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-073/1.0",
+        "content_id": "fuzz-073",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000049",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 073",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a049",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b049",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-074/1.0",
+        "content_id": "fuzz-074",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 074",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-075/1.0",
+        "content_id": "fuzz-075",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 075",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-076/1.0",
+        "content_id": "fuzz-076",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 076",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-077/1.0",
+        "content_id": "fuzz-077",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 077",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-078/1.0",
+        "content_id": "fuzz-078",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 078",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-079/1.0",
+        "content_id": "fuzz-079",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000004f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 079",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a04f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b04f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-080/1.0",
+        "content_id": "fuzz-080",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000050",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 080",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a050",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b050",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-081/1.0",
+        "content_id": "fuzz-081",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000051",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 081",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a051",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b051",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-082/1.0",
+        "content_id": "fuzz-082",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000052",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 082",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a052",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b052",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-083/1.0",
+        "content_id": "fuzz-083",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000053",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 083",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a053",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b053",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-084/1.0",
+        "content_id": "fuzz-084",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000054",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 084",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a054",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b054",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-085/1.0",
+        "content_id": "fuzz-085",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000055",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 085",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a055",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b055",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-086/1.0",
+        "content_id": "fuzz-086",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000056",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 086",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a056",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b056",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-087/1.0",
+        "content_id": "fuzz-087",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000057",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 087",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a057",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b057",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-088/1.0",
+        "content_id": "fuzz-088",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000058",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 088",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a058",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b058",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-089/1.0",
+        "content_id": "fuzz-089",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000059",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 089",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a059",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b059",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-090/1.0",
+        "content_id": "fuzz-090",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 090",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-091/1.0",
+        "content_id": "fuzz-091",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 091",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-092/1.0",
+        "content_id": "fuzz-092",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 092",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-093/1.0",
+        "content_id": "fuzz-093",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 093",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-094/1.0",
+        "content_id": "fuzz-094",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 094",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-095/1.0",
+        "content_id": "fuzz-095",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000005f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 095",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a05f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b05f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-096/1.0",
+        "content_id": "fuzz-096",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000060",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 096",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a060",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b060",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-097/1.0",
+        "content_id": "fuzz-097",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000061",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 097",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a061",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b061",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-098/1.0",
+        "content_id": "fuzz-098",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000062",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 098",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a062",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b062",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-099/1.0",
+        "content_id": "fuzz-099",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000063",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 099",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a063",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b063",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-100/1.0",
+        "content_id": "fuzz-100",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000064",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 100",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a064",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b064",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-101/1.0",
+        "content_id": "fuzz-101",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000065",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 101",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a065",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b065",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-102/1.0",
+        "content_id": "fuzz-102",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000066",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 102",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a066",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b066",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-103/1.0",
+        "content_id": "fuzz-103",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000067",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 103",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a067",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b067",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-104/1.0",
+        "content_id": "fuzz-104",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000068",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 104",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a068",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b068",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-105/1.0",
+        "content_id": "fuzz-105",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000069",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 105",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a069",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b069",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-106/1.0",
+        "content_id": "fuzz-106",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 106",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-107/1.0",
+        "content_id": "fuzz-107",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 107",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-108/1.0",
+        "content_id": "fuzz-108",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 108",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-109/1.0",
+        "content_id": "fuzz-109",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 109",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-110/1.0",
+        "content_id": "fuzz-110",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 110",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-111/1.0",
+        "content_id": "fuzz-111",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000006f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 111",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a06f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b06f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-112/1.0",
+        "content_id": "fuzz-112",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000070",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 112",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a070",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b070",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-113/1.0",
+        "content_id": "fuzz-113",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000071",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 113",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a071",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b071",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-114/1.0",
+        "content_id": "fuzz-114",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000072",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 114",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a072",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b072",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-115/1.0",
+        "content_id": "fuzz-115",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000073",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 115",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a073",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b073",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-116/1.0",
+        "content_id": "fuzz-116",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000074",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 116",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a074",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b074",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-117/1.0",
+        "content_id": "fuzz-117",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000075",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 117",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a075",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b075",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-118/1.0",
+        "content_id": "fuzz-118",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000076",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 118",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a076",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b076",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-119/1.0",
+        "content_id": "fuzz-119",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000077",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 119",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a077",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b077",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-120/1.0",
+        "content_id": "fuzz-120",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000078",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 120",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a078",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b078",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-121/1.0",
+        "content_id": "fuzz-121",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000079",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 121",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a079",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b079",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-122/1.0",
+        "content_id": "fuzz-122",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007a",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 122",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07a",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07a",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-123/1.0",
+        "content_id": "fuzz-123",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007b",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 123",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07b",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07b",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-124/1.0",
+        "content_id": "fuzz-124",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007c",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 124",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07c",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07c",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-125/1.0",
+        "content_id": "fuzz-125",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007d",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 125",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07d",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07d",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-126/1.0",
+        "content_id": "fuzz-126",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007e",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 126",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07e",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07e",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-127/1.0",
+        "content_id": "fuzz-127",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-00000000007f",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 127",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a07f",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b07f",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-128/1.0",
+        "content_id": "fuzz-128",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000080",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 128",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": true
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a080",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b080",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-129/1.0",
+        "content_id": "fuzz-129",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000081",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 129",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": true,
+          "ctr_tokens": true,
+          "wumpa": true
+        },
+        "relic_targets": {
+          "sapphire": 96000,
+          "gold": 86400,
+          "platinum": 76800
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a081",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b081",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "package/fuzz-130/1.0",
+        "content_id": "fuzz-130",
+        "uuid": "0f0e0d0c-0b0a-4908-8706-000000000082",
+        "revision": "1.0",
+        "display_name": "Fuzz Track 130",
+        "author": "Fixture Author",
+        "laps": 3,
+        "capabilities": {
+          "time_trial": true,
+          "arcade": true,
+          "relic": false,
+          "ctr_tokens": false,
+          "wumpa": false
+        },
+        "files": [
+          {
+            "role": "lev",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000a082",
+            "bytes": 1234567,
+            "format": "ctr-lev",
+            "format_version": 1
+          },
+          {
+            "role": "vrm",
+            "sha256": "000000000000000000000000000000000000000000000000000000000000b082",
+            "bytes": 458808,
+            "format": "ctr-vrm",
+            "format_version": 1
+          }
+        ],
+        "evidence": []
+      }
+    ],
+    "cortex_vortex_track": 0,
+    "required_entries": [
+      "baby-t-park",
+      "fuzz-040",
+      "fuzz-090",
+      "fuzz-130"
+    ],
+    "cup_count": 5,
+    "cup_tracks": 1,
+    "cup_custom_legs": 3,
+    "one_lap_cups": 1,
+    "crystal_challenge_count": 4,
+    "crystal_arenas": [
+      "Nitro Court",
+      "Rampage Ruins",
+      "Rocky Road",
+      "Skull Rock"
+    ],
+    "boss_garages": 1,
+    "boss_cups": 0,
+    "garage_requirement_level": 3,
+    "boss_track_shuffle": 1,
+    "boss_track_pool": [],
+    "boss_opponent_shuffle": 1,
+    "boss_character_pool": [
+      "Coco Bandicoot",
+      "Crash Bandicoot",
+      "Dingodile",
+      "Fake Crash",
+      "Komodo Joe",
+      "N. Gin",
+      "N. Tropy",
+      "Neo Cortex",
+      "Papu Papu",
+      "Penta Penguin",
+      "Pinstripe",
+      "Polar",
+      "Pura",
+      "Ripper Roo",
+      "Tiny Tiger"
+    ],
+    "boss_track_assignment": 1,
+    "boss_kit_shuffle": 1,
+    "boss_attack_assignment": 1,
+    "boss_attack_intensity": 3,
+    "boss_loss_easing": 1,
+    "boss_weapon_pool": [
+      "bomb",
+      "clock",
+      "invisibility",
+      "mask",
+      "missile",
+      "potion",
+      "shield",
+      "tnt",
+      "turbo",
+      "warp_orb"
+    ],
+    "oxide_attack_profile": 1,
+    "oxide_weapon_pool": [
+      "bomb",
+      "clock",
+      "invisibility",
+      "mask",
+      "missile",
+      "potion",
+      "shield",
+      "super_engine",
+      "tnt",
+      "turbo",
+      "warp_orb"
+    ],
+    "purple_cup_boss_gauntlet": 0,
+    "oxide_goal": 0,
+    "oxide_1_optional": 0,
+    "bosses_required_goal": 1,
+    "gems_required_goal": 3,
+    "goal_wumpa": 456,
+    "oxide_final_challenge_unlock": 0,
+    "oxide_final_challenge_relic_count": 30,
+    "oxide_final_track": 0,
+    "pad_placement": 2,
+    "race_mode_order": 0,
+    "adventure_structure": 1,
+    "warppad_unlock_requirements": 1,
+    "requirement_weights": {
+      "Trophy": 90,
+      "Key": 20,
+      "Red CTR Token": 16,
+      "Green CTR Token": 16,
+      "Blue CTR Token": 16,
+      "Yellow CTR Token": 16,
+      "Purple CTR Token": 12,
+      "Sapphire Relic": 18,
+      "Gold Relic": 18,
+      "Platinum Relic": 18,
+      "Red Gem": 4,
+      "Green Gem": 4,
+      "Blue Gem": 4,
+      "Yellow Gem": 4,
+      "Purple Gem": 4
+    },
+    "two_stage_density": 4,
+    "warp_pad_rules": {},
+    "racer_locked_pads": 27,
+    "shuffle_keys": 1,
+    "shuffle_gems": 1,
+    "podium_rungs": [
+      "finish_on_podium",
+      "held_3rd",
+      "held_5th"
+    ],
+    "cup_only_podium_rungs": 1,
+    "relic_perfect_checks": 1,
+    "lettersanity": 2,
+    "letters_per_track": 2,
+    "cup_sweep_checks": 0,
+    "lap_completion_checks": 0,
+    "box_locations": 0,
+    "itemsanity": 0,
+    "crystalsanity": 0,
+    "wumpa_check": 2,
+    "hit_character": 1,
+    "wumpa_shop_slots": 5,
+    "wumpa_shop_prices": 324,
+    "wumpa_shop_progression": 1,
+    "wumpa_shop_hints": 1,
+    "item_pool": {},
+    "start_inventory_from_pool": {},
+    "trap_fill_percentage": 43,
+    "trap_weights": {
+      "icy_road": 5,
+      "low_gravity": 5,
+      "forced_usf": 2,
+      "forced_boost": 4,
+      "first_person": 3,
+      "wumpa_wipeout": 4,
+      "flatten": 6,
+      "item_reroll": 5,
+      "forced_use": 4,
+      "empty_crates": 3,
+      "weakened_kart": 3,
+      "boost_blocker": 3,
+      "wireframe": 2,
+      "nitro": 5,
+      "reverse_steering": 4,
+      "red_potion": 3,
+      "upside_down": 0,
+      "mirror_mode": 3,
+      "warpball_ambush": 3,
+      "demo_camera": 3,
+      "clocked_out": 3,
+      "reverse_camera": 2
+    },
+    "wumpa_bundles": 0,
+    "reserve_top_up": 0,
+    "progressive_starting_wumpa": 1,
+    "turbo_grant": 1,
+    "tizi_helper": 0,
+    "starting_character": 4,
+    "character_unlocks": 1,
+    "remove_playable_oxide": 0,
+    "starting_stat_class": 4,
+    "penta_stats": 0,
+    "editable_stats": 0,
+    "progressive_stats": 1,
+    "progressive_boost": 1,
+    "progressive_boost_blue_fire": 0,
+    "logic_difficulty": 0,
+    "shortcut_knowledge": 0,
+    "death_link": 0,
+    "death_link_send": [
+      "weapon_hit"
+    ],
+    "deathlink_amnesty": 13,
+    "warp_pad_item_display": 0,
+    "ap_item_type_colors": 1,
+    "color_boxes_by_item": 1,
+    "spoiler_items": 0,
+    "race_type_selector": 0,
+    "tracker_pad_launch": 0
+  }
+}

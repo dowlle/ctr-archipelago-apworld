@@ -30,7 +30,7 @@ MIXED_GROUP = 4
 PROBES = 300
 
 
-def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()):
+def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=(), groups_with_singles=False):
     """(names to seat in order, spots they leave open). `pool` is {name: copies},
     `room(held)` counts the spots open with the sorted tuple `held`, and an item
     takes one of them. A step needs its spots open before it, so a gate that needs
@@ -38,7 +38,9 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
     Stops at `target` spots left; else the best opening found stands. With
     `reached(held)`, an opening also has to reach what it tests, and one that does
     beats one that does not. `bundles` are groups taken only whole: one track's
-    letter items (letter_bundles). Their names are in `pool` but in no other step."""
+    letter items (letter_bundles). Their names are in `pool` but in no other step.
+    `groups_with_singles` lets an unmet explicit goal search costed groups beside
+    auxiliary single-copy gains; the default keeps the existing greedy branching."""
     memo = {}
     spent = [0]
     loose = {name for bundle in bundles for name in bundle}
@@ -100,31 +102,35 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
                               for _ in range(max(0, count - held.count(name))))
             if remaining and len(remaining) <= spots and fits(held, remaining):
                 found.append(remaining)
-        if found:
+        if found and (not groups_with_singles or reached is None or any(done(held + group) for group in found)):
             return found
+        # Auxiliary single-copy gains must not hide a support bundle when
+        # none of those moves reaches the requested goal. Keep the gains as
+        # alternatives, alongside the existing bounded group search.
+        auxiliary = found
         # A track's letters are one search move, with each seat proved in order.
         if bundles:
             found = opening(held, spots, [bundle for bundle in bundles if fits(held, bundle) and bundle_seats(held, bundle)])
             if found or spent[0] >= probes:
-                return found
+                return auxiliary + found
         # One kind first, then two: a garage asks that, at any count. Then any mix.
         # Copies of one kind come at every count before any pair, or the pairs of
         # many kinds (a boost per racer) spend the probes before three of a kind.
         found = opening(held, spots, [(name,) * size for size in range(2, spots + 1) for name in needed
                                       if fits(held, (name,) * size)])
         if found or spent[0] >= probes:
-            return found
+            return auxiliary + found
         for size in range(2, spots + 1):
             groups = [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2) for n in range(1, size)]
             found = opening(held, spots, [group for group in groups if fits(held, group)])
             if found or spent[0] >= probes:
-                return found
+                return auxiliary + found
         for size in range(3, min(spots, MIXED_GROUP) + 1):
             found = opening(held, spots, (group for group in itertools.combinations_with_replacement(needed, size)
                                           if len(set(group)) > 2 and fits(held, group)))
             if found or spent[0] >= probes:
-                return found
-        return []
+                return auxiliary + found
+        return auxiliary
 
     best = (done(()), start, ())
     todo = [(not best[0], -start, 0, ())]

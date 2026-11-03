@@ -531,6 +531,41 @@ def _seat_first_key(world, state):
     return _collect(world, state, [])
 
 
+def _seat_first_win(world, state):
+    """An auxiliary-only wide start still needs a paid route to a real win.
+
+    Held-position, Hit and Wumpa checks can fill the opening without making
+    a win reachable. Reserve a bounded, actually seatable winning prefix only
+    when it preserves the opening's free room after paying every copy.
+    """
+    from .content_plan import win_kinds
+    plan = world.ctr_content_plan
+    if not plan.get("checks"):
+        return state
+    kinds = win_kinds(plan)
+    wins = [loc for loc in world.multiworld.get_locations(world.player) if loc.address in kinds]
+    reached = lambda probe: any(loc.can_reach(probe) for loc in wins)
+    if not wins or reached(state):
+        return state
+    initial = len(_room(world, state))
+    if not initial:
+        return state
+    target = max(initial, bootstrap_target(world))
+    items, room = plan_opening(world, state, target, set(world.options.non_local_items.value),
+                               condition=reached)
+    if not items or room < target or not reached(_collect(world, state, items)):
+        return state
+    draw = world.random.getstate()
+    chosen = _reserve(world, state, items)
+    if chosen is None:
+        world.random.setstate(draw)
+        return state
+    _lock(world, chosen)
+    world._ctr_start_bootstrap = list(getattr(world, "_ctr_start_bootstrap", None) or ()) + [
+        (item.name, location.name) for item, location in chosen]
+    return _collect(world, state, [])
+
+
 def _place_openers(world, state, base, target, queue, non_local):
     """The greedy bootstrap: one opener after another, each item measured alone,
     until `target` checks are open and empty. Returns (name, location name) pairs."""
@@ -602,9 +637,10 @@ def _unlock(world, placed):
         item.location = None
 
 
-def plan_opening(world, state, target, non_local, reach=None):
+def plan_opening(world, state, target, non_local, reach=None, condition=None):
     """(items to seat, spots they leave) of the best opening on the real rules. With
-    `reach`, an item name, the opening has to hold it, on a fixed check or in `held`."""
+    `reach`, an item name, the opening has to hold it, on a fixed check or in `held`.
+    `condition`, when supplied, must hold on the same resulting real-rule state."""
     from .content_plan import ITEM_BY_CODE
     mw, player = world.multiworld, world.player
     plan = world.ctr_content_plan
@@ -632,11 +668,18 @@ def plan_opening(world, state, target, non_local, reach=None):
             states[held] = _collect(world, state, held_items(held))
         return states[held]
 
+    reached = None
+    if reach or condition is not None:
+        def reached(held):
+            probe = after(held)
+            return (not reach or probe.has(reach, player)) and (condition is None or condition(probe))
+
     names, room = content_opening.search({name: len(copies) for name, copies in pool.items()},
                                          lambda held: len(_room(world, after(held))), target,
-                                         (lambda held: after(held).has(reach, player)) if reach else None,
+                                         reached,
                                          bundles=bundles,
-                                         goals=(("Key",),) if reach == "Key" and pool.get("Key") else ())
+                                         goals=(("Key",),) if reach == "Key" and pool.get("Key") else (),
+                                         groups_with_singles=condition is not None)
     return held_items(names), room
 
 
@@ -655,6 +698,7 @@ def bootstrap_start(world) -> None:
         locations=[loc for loc in mw.get_locations(player)
                    if loc.item is not None and loc.address is None])
     if len(_open_empty(world, state)) >= target:
+        _seat_first_win(world, state)
         return
     # A player's non_local_items stay out of their own start.
     non_local = set(world.options.non_local_items.value)

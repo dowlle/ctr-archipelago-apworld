@@ -1,6 +1,7 @@
 """The opening of a content plan (one generator row 8b): the search, the plan's
 reach model against the real rules, the redraw, and the seating."""
 import unittest
+import json
 from pathlib import Path
 from unittest import mock
 import yaml
@@ -25,6 +26,19 @@ def spots(start, gates):
 
 
 class TestSearch(unittest.TestCase):
+    def test_auxiliary_single_gains_do_not_starve_a_requested_goal(self):
+        calls = []
+
+        def room(held):
+            calls.append(tuple(held))
+            return 15 + held.count("Auxiliary") + (20 if held.count("Boost") >= 2 else 0)
+
+        names, free = content_opening.search(dict(Auxiliary=20, Boost=2), room, 15,
+            reached=lambda held: held.count("Boost") >= 2, probes=20, groups_with_singles=True)
+        self.assertEqual(names, ["Boost", "Boost"])
+        self.assertEqual(free, 33)
+        self.assertLessEqual(len(calls), 20)
+
     def test_garage_demand_pays_for_its_support_items(self):
         room = spots(5, [(dict(Boost=2), 8)])
         held, free = content_opening.search(dict(Boost=2, Relic=3), room, 12,
@@ -491,3 +505,116 @@ class TestSeating(unittest.TestCase):
     def test_the_failing_shapes_fill(self):
         self.assert_fills(TIGHT, range(8))
         self.assert_fills(LETTERS, range(8))
+
+
+class TestAuxiliaryOnlyOpening(unittest.TestCase):
+    def world(self):
+        path = Path(__file__).parent / "fixtures" / "row13_auxiliary_start_132.json"
+        fixture = json.loads(path.read_text())
+        return make_world(fixture["options"], seed=fixture["seed"], stop_before="pre_fill")
+
+    def wins(self, world):
+        kinds = content_plan.win_kinds(world.ctr_content_plan)
+        return [loc for loc in world.multiworld.get_locations(world.player) if loc.address in kinds]
+
+    def snapshot(self, world):
+        mw = world.multiworld
+        return (world.random.getstate(), [id(item) for item in mw.itempool],
+                [(id(loc), id(loc.item), loc.locked) for loc in mw.get_filled_locations()],
+                [id(item) for item in mw.precollected_items[world.player]])
+
+    def test_real_wide_auxiliary_start_pays_two_actual_boost_copies_then_fills(self):
+        world = self.world()
+        mw, player = world.multiworld, world.player
+        state = sphere0_guard._base_state(world)
+        self.assertEqual(len(sphere0_guard._room(world, state)), 15)
+        self.assertFalse(any(loc.can_reach(state) for loc in self.wins(world)))
+        pool = list(mw.itempool)
+        starts = list(mw.precollected_items[player])
+        self.assertEqual(sum(item.name == "Progressive Boost" for item in pool), 2)
+        call_all(mw, "pre_fill")
+        placed = world._ctr_start_bootstrap
+        self.assertEqual([name for name, _loc in placed], ["Progressive Boost"] * 2)
+        self.assertEqual(len(pool)-len(mw.itempool), 2)
+        self.assertEqual([id(item) for item in pool if item.location is None],
+                         [id(item) for item in mw.itempool])
+        self.assertEqual(mw.precollected_items[player], starts)
+        events = [loc for loc in mw.get_locations(player) if loc.address is None and loc.item is not None]
+        prefix = CollectionState(mw)
+        prefix.sweep_for_advancements(locations=events)
+        seated = []
+        for index, (_name, name) in enumerate(placed):
+            location = mw.get_location(name, player)
+            self.assertTrue(location.locked)
+            self.assertTrue(location.can_reach(prefix))
+            self.assertTrue(any(location.item is item for item in pool))
+            seated.append(location)
+            prefix.sweep_for_advancements(locations=events+seated)
+            self.assertEqual(prefix.count("Progressive Boost", player), index+1)
+            if index == 0:
+                self.assertFalse(any(loc.can_reach(prefix) for loc in self.wins(world)))
+        actual = sphere0_guard._base_state(world)
+        self.assertTrue(any(loc.can_reach(actual) for loc in self.wins(world)))
+        self.assertGreaterEqual(len(sphere0_guard._room(world, actual)), 15)
+        self.assertFalse(actual.has("Key", player))
+        distribute_items_restrictive(mw)
+        self.assertFalse(mw.get_unfilled_locations())
+        self.assertTrue(mw.can_beat_game())
+
+    def test_productive_wide_start_keeps_pool_placements_and_rng(self):
+        world = make_world(dict(box_locations=True, progressive_boost="off", racer_locked_pads=0),
+                           seed=1, stop_before="pre_fill")
+        state = sphere0_guard._base_state(world)
+        self.assertGreater(len(sphere0_guard._room(world, state)), 30)
+        self.assertTrue(any(loc.can_reach(state) for loc in self.wins(world)))
+        before = self.snapshot(world)
+        self.assertIs(sphere0_guard._seat_first_win(world, state), state)
+        self.assertEqual(self.snapshot(world), before)
+
+    def test_capacity_only_fallback_is_not_a_winning_witness(self):
+        world = self.world()
+        state = sphere0_guard._base_state(world)
+        key = next(item for item in world.multiworld.itempool if item.name == "Key")
+        held = sphere0_guard._collect(world, state, [key])
+        room = len(sphere0_guard._room(world, held))-1
+        self.assertEqual(room, 15)
+        self.assertFalse(any(loc.can_reach(held) for loc in self.wins(world)))
+        before = self.snapshot(world)
+        with mock.patch.object(sphere0_guard, "plan_opening", return_value=([key], room)):
+            self.assertIs(sphere0_guard._seat_first_win(world, state), state)
+        self.assertEqual(self.snapshot(world), before)
+
+    def test_nonlocal_required_boost_is_not_reserved_or_granted(self):
+        from worlds.generic.Rules import add_rule
+        world = self.world()
+        player = world.player
+        world.options.non_local_items.value.add("Progressive Boost")
+        for location in self.wins(world):
+            add_rule(location, lambda state: state.has("Progressive Boost", player, 2))
+        state = sphere0_guard._base_state(world)
+        before = self.snapshot(world)
+        self.assertIs(sphere0_guard._seat_first_win(world, state), state)
+        self.assertEqual(self.snapshot(world), before)
+        self.assertFalse(state.has("Progressive Boost", player))
+
+    def test_later_copy_refusal_restores_rng_and_seats_nothing(self):
+        world = self.world()
+        copies = [item for item in world.multiworld.itempool if item.name == "Progressive Boost"]
+        self.assertEqual(len(copies), 2)
+        for location in world.multiworld.get_locations(world.player):
+            old = location.item_rule
+            location.item_rule = lambda item, old=old: old(item) and item is not copies[1]
+        state = sphere0_guard._base_state(world)
+        before = self.snapshot(world)
+        reserve = sphere0_guard._reserve
+        seen = []
+
+        def observed(*args):
+            chosen = reserve(*args)
+            seen.append((chosen, world.random.getstate() != before[0]))
+            return chosen
+
+        with mock.patch.object(sphere0_guard, "_reserve", observed):
+            self.assertIs(sphere0_guard._seat_first_win(world, state), state)
+        self.assertEqual(seen, [(None, True)])
+        self.assertEqual(self.snapshot(world), before)
