@@ -98,13 +98,16 @@ receive that would take you past 10 is banked too, even outside a race.
 Quitting or restarting a race banks nothing you hold, and neither does a race
 lost to a DeathLink. Race fruit banks only in Adventure races; Arcade, Time
 Trial and Battle bank nothing. While racing, the HUD shows only this race's
-fruit. In a hub, a line below the relic, key and trophy counters shows your
-spendable fruit and the total banked over the whole seed, and the tracker's
+fruit. In a hub, a line below the relic, key and trophy counters reads
+`WUMPA <spendable fruit>  COLLECTED <total banked over the whole seed>`, and the tracker's
 hub map shows how many shop slots that hub has left, how many are on sale and
 how many you can afford.
 
-Each hub's save screen has a WUMPA SHOP row. The shop lists that hub's slots
-with their item, its owner and the price. Buying spends banked fruit and sends
+Each hub's save screen has a WUMPA SHOP row, the first in its menu. The shop
+lists that hub's slots with their item, its owner and the price; its header
+shows the same two numbers as `BALANCE` and `COLLECTED`. Every slot's price is
+drawn from its hub's range the same way, so the price says nothing about the
+item. Buying spends banked fruit and sends
 the check. Later slots go on sale once enough fruit has been banked over the
 whole seed; spending never takes that back. A slot that the server checks for
 you, for example after a Collect, shows SOLD and costs nothing. Buying needs a

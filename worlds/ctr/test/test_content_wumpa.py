@@ -255,22 +255,27 @@ class TestContentWumpaRules(unittest.TestCase):
             bare.collect(world.create_item("Key"), True)
         self.assertFalse(entrance.access_rule(bare))
 
-    def test_progression_slot_price_is_the_band_bottom(self):
+    def test_progression_slot_price_is_its_drawn_price(self):
+        """Ruling of 2026-11-02: a slot's price does not depend on what the fill
+        put there, so progression is priced across the whole band."""
         options = shop_options(slots=10, progression="allowed", goal=0, accessibility="full")
+        above_bottom = False
         for seed in range(1, 8):
+            drawn = {c["location"]: c["price"]
+                     for c in shop_checks(make_world(options, seed=seed, stop_before="pre_fill").ctr_content_plan)}
             world, wire = full_generation(options, seed)
             assert_complete(self, world)
             plan = wire["content_plan"]
             self.assertTrue(content_plan.validate(plan))
             mw = world.multiworld
-            progression = [c for c in shop_checks(plan)
-                           if mw.get_location(c["display_name"], 1).item.advancement]
-            for c in progression:
-                hub = c["display_name"].split(" Shop: ")[0]
-                self.assertEqual(c["price"], wumpa_shop.price_band(hub, 150)[0])
-            if progression:
+            self.assertEqual({c["location"]: c["price"] for c in shop_checks(plan)}, drawn)
+            for c in shop_checks(plan):
+                if mw.get_location(c["display_name"], 1).item.advancement:
+                    hub = c["display_name"].split(" Shop: ")[0]
+                    above_bottom |= c["price"] > wumpa_shop.price_band(hub, 150)[0]
+            if above_bottom:
                 return
-        self.fail("no seed placed progression in a shop slot")
+        self.fail("no seed priced a progression slot above its hub's lowest price")
 
     def test_full_generation_excluded(self):
         for seed in (1, 2, 3):
