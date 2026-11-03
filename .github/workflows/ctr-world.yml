@@ -2,9 +2,9 @@ name: CTR world
 
 # The CTR world's own checks. The inherited upstream Archipelago workflows stay
 # disabled on this fork; this one runs only what the world needs: its pytest
-# suite, and the same eleven-arm fuzz matrix the Archipelago-index runs at
-# publication time, against a .apworld packed from this commit, plus a forced
-# content-plan arm (#133 PR 2) that the index does not run.
+# suite and the content-plan fuzz matrix against a .apworld packed from this
+# commit. The inherited quality hooks retain their run counts; all metas now
+# use the single content-plan generator, including default and tracker arms.
 
 on:
   pull_request:
