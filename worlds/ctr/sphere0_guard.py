@@ -495,15 +495,36 @@ def _seat_first_key(world, state):
     and the last items the garage asks for have nowhere to go, with vanilla or
     random requirements. So when few checks are to spare, the opening that reaches
     the Key is seated here, on the hub's Wumpa Shop when the pads run out. All of
-    it or nothing: it is reserved before any of it locks. Returns the state after."""
+    it or nothing: it is reserved before any of it locks. A pooled Key also pays
+    for its support path; reserve it when those copies crowd the initial cut,
+    only with a witness that leaves at least the initial room. Returns the state after."""
     mw, player = world.multiworld, world.player
-    if not world.ctr_content_plan.get("fixed_items", {}).get("keys"):
+    fixed = world.ctr_content_plan.get("fixed_items", {}).get("keys")
+    non_local = set(world.options.non_local_items.value)
+    if fixed:
+        items, _spots = plan_opening(world, state, 1, non_local, "Key")
+        tight = bool(items) and _first_key_tight(world, state, items)
+    else:
+        if state.has("Key", player):
+            return state
+        if "Key" in non_local or not any(_own_item(world, item) and item.name == "Key"
+                                         and item.location is None for item in mw.itempool):
+            return state
+        initial = len(_room(world, state))
+        target = bootstrap_target(world)
+        # A pooled Key can open no check alone. Pay for its real support path
+        # and leave at least the initial room, rather than consuming the cut.
+        items, _spots = plan_opening(world, state, max(target, initial), non_local, "Key")
+        if _spots < max(target, initial):
+            return state
+        tight = initial - len(items) < target
+    if not items or not _collect(world, state, items).has("Key", player) or not tight:
         return state
-    items, _spots = plan_opening(world, state, 1, set(world.options.non_local_items.value), "Key")
-    if not items or not _collect(world, state, items).has("Key", player) or not _first_key_tight(world, state, items):
-        return state
+    draw = world.random.getstate() if not fixed else None
     chosen = _reserve(world, state, items)
     if chosen is None:
+        if draw is not None:
+            world.random.setstate(draw)
         return state
     _lock(world, chosen)
     world._ctr_start_bootstrap = [(item.name, location.name) for item, location in chosen]
@@ -614,7 +635,8 @@ def plan_opening(world, state, target, non_local, reach=None):
     names, room = content_opening.search({name: len(copies) for name, copies in pool.items()},
                                          lambda held: len(_room(world, after(held))), target,
                                          (lambda held: after(held).has(reach, player)) if reach else None,
-                                         bundles=bundles)
+                                         bundles=bundles,
+                                         goals=(("Key",),) if reach == "Key" and pool.get("Key") else ())
     return held_items(names), room
 
 

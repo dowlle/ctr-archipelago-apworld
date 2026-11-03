@@ -305,6 +305,99 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
                                     if location.address is not None))
 
 
+class TestPooledKeyOpening(unittest.TestCase):
+    def world(self):
+        path = Path(__file__).parent / "fixtures" / "row13_shuffled_key_support.yaml"
+        return make_world(yaml.safe_load(path.read_text())["Crash Team Racing"], seed=985,
+                          stop_before="pre_fill")
+
+    def test_actual_key_and_support_are_paid_and_acquired_from_reachable_placements(self):
+        world = self.world()
+        mw = world.multiworld
+        state = sphere0_guard._base_state(world)
+        initial = len(sphere0_guard._room(world, state))
+        pool = list(mw.itempool)
+        starts = list(mw.precollected_items[world.player])
+        self.assertEqual(initial, 13)
+        self.assertFalse(state.has("Key", world.player))
+        after = sphere0_guard._seat_first_key(world, state)
+        self.assertTrue(after.has("Key", world.player))
+        self.assertGreaterEqual(len(sphere0_guard._room(world, after)), initial)
+        self.assertEqual(mw.precollected_items[world.player], starts)
+        seated = [item for item in pool if item.location is not None]
+        self.assertCountEqual([item.name for item in seated], ["Key", "Progressive Boost"])
+        self.assertEqual(len(pool) - len(mw.itempool), len(seated))
+        self.assertTrue(all(item.location.address is not None and item.location.locked for item in seated))
+        self.assertTrue(all(item.location.can_reach(after) for item in seated))
+        distribute_items_restrictive(mw)
+        completed = CollectionState(mw)
+        completed.sweep_for_advancements(locations=mw.get_locations(world.player))
+        self.assertTrue(mw.can_beat_game())
+        self.assertTrue(all(loc.can_reach(completed) for loc in mw.get_locations(world.player)
+                            if loc.address is not None))
+
+    def test_nonlocal_key_is_not_reserved_or_granted(self):
+        world = self.world()
+        world.options.non_local_items.value.add("Key")
+        state = sphere0_guard._base_state(world)
+        pool = list(world.multiworld.itempool)
+        draw = world.random.getstate()
+        self.assertIs(sphere0_guard._seat_first_key(world, state), state)
+        self.assertEqual(world.multiworld.itempool, pool)
+        self.assertEqual(world.random.getstate(), draw)
+        self.assertFalse(state.has("Key", world.player))
+
+    def test_reachable_plando_key_needs_no_second_reservation(self):
+        world = self.world()
+        state = sphere0_guard._base_state(world)
+        key = next(item for item in world.multiworld.itempool if item.name == "Key")
+        location = next(loc for loc in sphere0_guard._open_empty(world, state) if loc.can_fill(state, key, True))
+        sphere0_guard._lock(world, [(key, location)])
+        state = sphere0_guard._base_state(world)
+        self.assertTrue(state.has("Key", world.player))
+        pool = list(world.multiworld.itempool)
+        draw = world.random.getstate()
+        self.assertIs(sphere0_guard._seat_first_key(world, state), state)
+        self.assertEqual(world.multiworld.itempool, pool)
+        self.assertEqual(world.random.getstate(), draw)
+
+    def test_later_reservation_failure_restores_rng_and_locks_nothing(self):
+        world = self.world()
+        for location in world.multiworld.get_locations(world.player):
+            location.item_rule = lambda item: item.name != "Progressive Boost"
+        state = sphere0_guard._base_state(world)
+        pool = list(world.multiworld.itempool)
+        draw = world.random.getstate()
+        filled = list(world.multiworld.get_filled_locations(world.player))
+        reserve = sphere0_guard._reserve
+        seen = []
+
+        def observed(*args):
+            chosen = reserve(*args)
+            seen.append((chosen, world.random.getstate() != draw))
+            return chosen
+
+        with mock.patch.object(sphere0_guard, "_reserve", observed):
+            self.assertIs(sphere0_guard._seat_first_key(world, state), state)
+        self.assertEqual(seen, [(None, True)])
+        self.assertEqual(world.random.getstate(), draw)
+        self.assertEqual(world.multiworld.itempool, pool)
+        self.assertEqual(world.multiworld.get_filled_locations(world.player), filled)
+
+    def test_a_wide_start_keeps_pool_placements_and_rng_unchanged(self):
+        world = make_world(dict(box_locations=True, podium_rungs=["held_3rd", "held_5th", "finish_any"]),
+                           seed=1, stop_before="pre_fill")
+        state = sphere0_guard._base_state(world)
+        self.assertGreater(len(sphere0_guard._room(world, state)), 30)
+        pool = list(world.multiworld.itempool)
+        draw = world.random.getstate()
+        filled = list(world.multiworld.get_filled_locations(world.player))
+        self.assertIs(sphere0_guard._seat_first_key(world, state), state)
+        self.assertEqual(world.random.getstate(), draw)
+        self.assertEqual(world.multiworld.itempool, pool)
+        self.assertEqual(world.multiworld.get_filled_locations(world.player), filled)
+
+
 class TestRedraw(unittest.TestCase):
     def test_a_plan_that_fits_takes_no_further_draw(self):
         calls = []
