@@ -2069,7 +2069,8 @@ def create_regions(world):
         arm = (content_capability.weapon_arm(track, check["kind"], check["routes"][0]["award"], plan["capability"],
                                              package_by_id.get(track.get("package_id")))
                if weapons and track is not None and need == 1 else None)
-        gate = (logic_terms.Cap(world, need, racer) if not stat_mins else logic_terms.Local(
+        gate = (logic_terms.Cap(world, need, racer) if not stat_mins else logic_terms.StatCap(world, need, racer)
+                if world.options.pad_approach_hints.value else logic_terms.Local(
             lambda state, need=need, racer=racer, stat_mins=stat_mins: gate_satisfied(
                 world, state, player, boost_min=need, stat_mins=stat_mins, required_character=racer),
             "a stat term"))
@@ -2175,7 +2176,7 @@ def create_regions(world):
             if all(test is not None for test in tests):
                 term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
             term = with_boost(with_letters(term, check), check)
-            if term is not None or check["location"] in wins:
+            if term is not None or check["location"] in wins or world.options.pad_approach_hints.value:
                 logic_terms.set_term(location, term or logic_terms.TRUE)
             region.locations.append(location)
         # ctr_first: first place pays the Trophy Race check, and first place
@@ -2193,13 +2194,19 @@ def create_regions(world):
         for r in check["routes"]:
             opens.append((r["entry_id"], stage_gate(r)))
         if check["kind"] in ("itemsanity", "hit"):
-            world.ctr_global_routes.append((check, location, [(entry, test, r) for (entry, test), r
+            world.ctr_global_routes.append((check, location, [(entry, stage_term(r), r) for (entry, _test), r
                                                               in zip(opens, check["routes"])]))
 
         def any_route(state, opens=tuple(opens)):
             return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
                        for entry, test in opens)
         location.access_rule = with_boost(with_letters(any_route, check), check)
+        if world.options.pad_approach_hints.value:
+            route_term = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, r["entry_id"]),
+                                                            stage_term(r) or logic_terms.TRUE)
+                                         for r in check["routes"]))
+            export = with_boost(with_letters(route_term, check), check)
+            logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, export))
         menu.locations.append(location)
     # Cup Leg Victory (#133 PR 5): any occurrence, each needing its cup's pad,
     # the finish of every earlier leg and its own leg's Trophy rank, bound to
@@ -2221,6 +2228,11 @@ def create_regions(world):
                        and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
                        for entry, need, racer in tests)
         location.access_rule = any_leg
+        if world.options.pad_approach_hints.value:
+            export = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, entry),
+                                                          logic_terms.Cap(world, need, racer) if need else logic_terms.TRUE)
+                                       for entry, need, racer in tests))
+            logic_terms.set_term(location, logic_terms.SerializedRule(any_leg, export))
         menu.locations.append(location)
     # Complete One Lap (#344, content_laps): any route. A standalone route
     # needs its pad, its mode's second-stage gate and the track's finish rank;
@@ -2249,6 +2261,12 @@ def create_regions(world):
                        and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
                        for entry, gate, need, racer in tests)
         location.access_rule = any_lap
+        if world.options.pad_approach_hints.value:
+            export = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, entry),
+                                                          stage_term(route) or logic_terms.TRUE if gate is not None else logic_terms.TRUE,
+                                                          logic_terms.Cap(world, need, racer) if need else logic_terms.TRUE)
+                                       for (entry, gate, need, racer), route in zip(tests, check["routes"])))
+            logic_terms.set_term(location, logic_terms.SerializedRule(any_lap, export))
         menu.locations.append(location)
     # Reach 10 Wumpa and podium rungs with cup leg or boss race routes (row
     # 10i, content_race_routes): any route. A pad route keeps its pad's gates;
@@ -2258,12 +2276,17 @@ def create_regions(world):
     for check in races:
         location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
         tests = []
+        exports = []
         for r in check["routes"]:
             need = check.get("boost", 0)
             if r["leg_id"] is not None:
                 need = max(need, content_cups.prefix_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id,
                                                            capability, package_by_id))
             rank = with_boost(None, dict(check, boost=need, routes=[r]))
+            if world.options.pad_approach_hints.value:
+                exports.append(logic_terms.all_of(logic_terms.ReachRegion(world, r["entry_id"]),
+                                                    logic_terms.TRUE if content_race_routes.is_race_route(r) else stage_term(r) or logic_terms.TRUE,
+                                                    rank or logic_terms.TRUE))
             tests.append((r["entry_id"], None if content_race_routes.is_race_route(r) else stage_gate(r),
                           None if rank is None else rank.compile()))
 
@@ -2271,6 +2294,8 @@ def create_regions(world):
             return any(state.can_reach(entry, "Region", player) and (gate is None or gate(state))
                        and (rank is None or rank(state)) for entry, gate, rank in tests)
         location.access_rule = any_race
+        if world.options.pad_approach_hints.value:
+            logic_terms.set_term(location, logic_terms.SerializedRule(any_race, logic_terms.any_of(*exports)))
         menu.locations.append(location)
     # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
     content_wumpa.install(world, plan, menu, stage_gate, stage_term)
