@@ -3,7 +3,7 @@
 The option is a client setting: off by default, display and hint only. It
 rides the content-plan envelope as `pad_approach_hints: true` only when on,
 so an option-off room's slot_data is unchanged. The draw never reads it. The
-paired native reader is ap/ap_pad_hints.h (tools/test-pad-approach-hints.cpp).
+paired native reader is ap/ap_pad_hints_logic.h (tools/test-pad-approach-hints.cpp).
 """
 import copy
 import json
