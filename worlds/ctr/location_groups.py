@@ -54,6 +54,7 @@ ITEM_BOX_SUFFIX = re.compile(r"Item Box \d+")
 def track_names() -> Set[str]:
     """Every track that gets a group of its own."""
     return ({d.region_name for d in destinations.DESTINATIONS}
+            | set(ARENAS.values())
             | {destinations.CORTEX_VORTEX}
             | {t.ap_name for t in NAMED_TRACK_CLASS.tracks})
 

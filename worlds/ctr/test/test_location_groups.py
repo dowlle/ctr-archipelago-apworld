@@ -31,6 +31,7 @@ OTHER_TRACKS = (
     "Skull Rock", "Rampage Ruins", "Rocky Road", "Nitro Court",
     "Slide Coliseum", "Turbo Track", "Red Gem Cup", "Green Gem Cup",
     "Blue Gem Cup", "Yellow Gem Cup", "Purple Gem Cup", "Cortex Vortex",
+    "Parking Lot", "The North Bowl", "Lab Basement",
 )
 GEM_CUPS = ("Red Gem Cup", "Green Gem Cup", "Blue Gem Cup", "Yellow Gem Cup",
             "Purple Gem Cup")
@@ -73,9 +74,9 @@ class TestLocationGroups(CTRTestBase):
                     members, {n for n in self.names if n.startswith(f"{group}: ")})
 
     def test_group_counts(self) -> None:
-        # 28 retail and special tracks + 86 named blocks + 13 kind groups
+        # 31 retail and special tracks + 86 named blocks + 13 kind groups
         # + Itemsanity Checks + Everywhere.
-        self.assertEqual(len(self.groups), 28 + 86 + 13 + 1 + 1)
+        self.assertEqual(len(self.groups), 31 + 86 + 13 + 1 + 1)
         self.assertEqual(len(self.groups["Crash Cove"]), 34)
         self.assertEqual(len(self.groups["Cortex Vortex"]), 17)
 
