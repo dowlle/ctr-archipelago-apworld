@@ -1,7 +1,8 @@
 """Item names minted in the 0.3.0 id step. Feature modules own their creation.
 
-  * `Reserve Top-Up` (#451), filler: adds 983 raw reserve units and may cross
-    into Saffi fire (ruled 2026-10-13 21:19 CEST).
+  * `Reserve Top-Up` (#451), filler: adds 8192 raw reserve units (about 25% of
+    the positive reserve range) and may cross into Saffi fire (ruled
+    2026-10-13 21:19 CEST).
   * `Warp Pad Preview` and `AP Box Colours` (#459), useful: each restores one
     display hidden by `spoiler_items` (answer 3, option A).
   * `Clocked Out` (#455) and `Reverse Camera` (#248), traps with the stable

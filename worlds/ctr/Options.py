@@ -570,8 +570,9 @@ class ReserveTopUp(DefaultOnToggle):
     """Let non-trap filler include Reserve Top-Up at relative weight 1
     beside Wumpa Fruit at weight 6 (bundles retain weights 3 and 1).
 
-    One copy adds 983 raw reserve units to active positive reserves in a live
-    race. It waits in the hub or without a boost, preserves the fire cap and
+    One copy adds 8192 raw reserve units (about 25% of the positive signed
+    reserve range) to active positive reserves in a live race.
+    It waits in the hub or without a boost, preserves the fire cap and
     can cross into purple Saffi fire, including with Progressive Boost.
     It gives no weapon. Off preserves the existing filler draw."""
     display_name = "Reserve Top-Up"
