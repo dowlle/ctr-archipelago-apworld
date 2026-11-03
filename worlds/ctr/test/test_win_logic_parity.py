@@ -22,7 +22,7 @@ from test.general import setup_multiworld
 from .. import ctrAPWorld
 from ..characters import ROSTER_CHARACTER_ID, unlock_item_name
 from ..progressive_capability import BOOST_CHAIN, boost_item_name
-from ..win_logic import win_kind, wire_size
+from ..win_logic import wire_size
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
@@ -256,75 +256,3 @@ def _states(mw, rng, n):
                     [name for name in events if rng.random() < 0.5])
 
 
-def check_seed(mw, rng, states_per_seed=STATES_PER_SEED, tally=None):
-    """Compare the block with can_reach on one generated multiworld. Returns
-    a list of disagreement descriptions (empty = parity)."""
-    world = mw.worlds[PLAYER]
-    slot_data = world.fill_slot_data()
-    block = slot_data["win_logic"]
-    assert json.loads(json.dumps(block)) == block
-    assert wire_size(block) < 32 * 1024, wire_size(block)
-    wins = {int(loc.address): loc for loc in mw.get_locations(PLAYER)
-            if loc.address is not None and win_kind(loc.name)}
-    assert set(map(int, block["checks"])) == set(wins), "entry set != win checks"
-    item_ids = world.item_name_to_id
-    bad = []
-    for state, received in _states(mw, rng, states_per_seed):
-        bosses = sum(1 for f in BOSS_FLAGS if state.has(f, PLAYER))
-        ev = WireEvaluator(block, slot_data["ctr_options"], received, bosses, item_ids)
-        for loc_id, loc in wins.items():
-            entry = block["checks"][str(loc_id)]
-            region_want = loc.parent_region.can_reach(state)
-            region_got = ev.eval(block["regions"][entry["region"]])
-            want = loc.can_reach(state)
-            got = ev.in_logic(loc_id)
-            if tally is not None:
-                tally["evaluations"] += 1
-                tally["kind:" + entry["kind"]] += 1
-            if want != got or region_want != region_got:
-                bad.append({"loc": loc.name, "can_reach": want, "wire": got,
-                            "region_can_reach": region_want, "region_wire": region_got,
-                            "rule": entry["rule"],
-                            "region": block["regions"][entry["region"]]})
-        if tally is not None:
-            tally.update({"op:" + k: v for k, v in ev.used.items()})
-    return bad
-
-
-def run(n_seeds, rng_seed, tally=None, sizes=None):
-    """Generate `n_seeds` valid random-option seeds and check each one."""
-    rng = random.Random(rng_seed)
-    done = attempts = 0
-    failures = []
-    while done < n_seeds:
-        attempts += 1
-        assert attempts <= n_seeds * 10, f"only {done} valid seeds in {attempts} attempts"
-        seed = rng.randrange(1 << 30)
-        options = _random_options(rng)
-        try:
-            mw = setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
-        except OptionError:
-            continue
-        done += 1
-        bad = check_seed(mw, rng, tally=tally)
-        for b in bad[:1]:
-            b["seed"], b["options"] = seed, {k: str(v) for k, v in options.items()}
-        if sizes is not None:
-            sizes.append(wire_size(mw.worlds[PLAYER].fill_slot_data()["win_logic"]))
-        if tally is not None:
-            tally["seeds"] += 1
-            o = mw.worlds[PLAYER].options
-            for name in ("progressive_boost", "warppad_unlock_requirements",
-                         "include_battle_arenas", "itemsanity", "logic_difficulty",
-                         "lettersanity", "oxide_goal", "shortcut_knowledge",
-                         "cortex_vortex_track", "character_unlocks"):
-                tally[f"opt:{name}={int(getattr(o, name).value)}"] += 1
-            tally["opt:racer_locks_drawn"] += bool(getattr(mw.worlds[PLAYER], "ctr_racer_locks", None))
-            tally["opt:custom_track"] += "custom_tracks" in options
-            tally["checks"] += len([1 for loc in mw.get_locations(PLAYER)
-                                    if loc.address is not None and win_kind(loc.name)])
-        if bad:
-            failures.append((seed, bad[:3], len(bad)))
-    if tally is not None:
-        tally["attempts"] += attempts
-    return failures

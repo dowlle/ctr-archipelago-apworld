@@ -261,12 +261,3 @@ def created_rung_keys_from_options(options):
     return PODIUM_CLASS.created_rung_keys(options)
 
 
-def podium_slot_codes(track: str, created_keys) -> list:
-    """The schema-6 5-slot code array for a track. See
-    PodiumLocationClass.slot_codes."""
-    return PODIUM_CLASS.slot_codes(track, created_keys)
-
-
-def all_podium_locations():
-    """The frozen podium superset. See PodiumLocationClass.all_locations."""
-    return PODIUM_CLASS.all_locations()

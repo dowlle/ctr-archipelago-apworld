@@ -1,6 +1,5 @@
 import json
 import pkgutil
-from BaseClasses import Location
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -127,11 +126,6 @@ def get_location_id(name: str):
     return CTR_LOCATION_IDS.get(name)
 
 
-def get_region_for_location(name: str):
-    """Return the region name associated with a given location."""
-    return CTR_LOCATION_TO_REGION.get(name)
-
-
 def get_location_names() -> dict:
     """
     Return a dictionary of all locations and their numeric IDs.
@@ -139,21 +133,3 @@ def get_location_names() -> dict:
     return CTR_LOCATION_IDS.copy()
 
 
-def get_total_locations(world) -> int:
-    """
-    Return the number of locations THIS seed actually created (incl. events, to
-    preserve the historical value for non-podium seeds). Counting created
-    locations -- rather than len(CTR_LOCATION_IDS), the full static datapackage --
-    keeps TotalLocations accurate now that the datapackage always carries the 112
-    podium rungs while a seed may create 0-80 of them per option (up to 5 rungs
-    across 16 tracks).
-    """
-    return len(world.multiworld.get_locations(world.player))
-
-
-def create_location(player: int, name: str, region):
-    """
-    Factory to create Location objects linked to CTR location codes.
-    """
-    addr = get_location_id(name)
-    return Location(player, name, addr, region)

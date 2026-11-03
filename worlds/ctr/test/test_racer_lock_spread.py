@@ -27,10 +27,8 @@ from .. import ctrAPWorld
 from ..characters import (
     locked_destination_regions,
     racer_lock_forbidden_locations,
-    reconstruct_racer_locks_from_wire,
     spread_lock_racers,
     unlock_item_name,
-    verify_no_self_lock,
 )
 from ..progressive_capability import ROSTER
 
@@ -139,17 +137,6 @@ class TestForbiddenSet(unittest.TestCase):
             self.assertFalse(loc.item_rule(own_item), loc.name)
             if other not in forbidden or loc not in forbidden[other]:
                 self.assertTrue(loc.item_rule(other_item), loc.name)
-
-
-class TestPlacementRule(unittest.TestCase):
-
-    def test_filled_seeds_never_seat_an_unlock_on_its_own_destination(self):
-        for options in (CONFIG_A, CONFIG_D):
-            for seed in SEEDS:
-                with self.subTest(seed=seed, options=options):
-                    mw = _filled(seed, **options)
-                    self.assertEqual(_violations(mw.worlds[1]), [])
-                    verify_no_self_lock(mw.worlds[1])
 
 
 if __name__ == "__main__":

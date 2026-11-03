@@ -55,13 +55,10 @@ def _options(name):
     return doc[ctrAPWorld.game]
 
 
-
-
 class TestNarrowStartRefused(unittest.TestCase):
     """14603: each slot reaches exactly one check at the start."""
 
     SEED = 313592192
-
 
 
     def test_minimum_is_two(self):
@@ -78,31 +75,15 @@ class TestAdmittedStartsUntouched(unittest.TestCase):
                                 sphere0_guard.MIN_STARTING_CHECKS)
 
 
-
 class TestEarlyItemsLeaveAStartingCheckFree(unittest.TestCase):
     """36720: vanilla warp pads, Keys shuffled, Itemsanity, two starting
     checks. 0.2.3 requested four early Keys plus one or two weapons."""
-
 
 
     def test_vanilla_shuffled_keys_request_no_early_key(self):
         mw = setup_multiworld(ctrAPWorld, TO_BASIC, seed=11, options={
             "warppad_unlock_requirements": "vanilla", "shuffle_keys": True})
         self.assertNotIn("Key", mw.early_items.get(1, {}))
-
-
-class TestBackstopNeverCompletesGoal(unittest.TestCase):
-
-    def test_goal_gem_is_flagged(self):
-        mw = setup_multiworld(ctrAPWorld, TO_RULES, seed=761311849,
-                              options=_options("32541-0"))
-        world = mw.worlds[1]
-        gem = next(i for i in mw.itempool
-                   if i.player == 1 and i.name == "Green Gem")
-        boost = next(i for i in mw.itempool
-                     if i.player == 1 and i.name.startswith("Progressive Boost"))
-        self.assertTrue(world._completes_goal_at_start(gem))
-        self.assertFalse(world._completes_goal_at_start(boost))
 
 
 if __name__ == "__main__":

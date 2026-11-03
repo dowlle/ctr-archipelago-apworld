@@ -41,10 +41,15 @@ from worlds.AutoWorld import AutoWorldRegister
 from . import CTRTestBase
 from ..location_class import LocationClass, LocationClassRegistry
 from ..Locations import CTR_LOCATION_CLASSES, CTR_LOCATION_IDS
-from ..podium import (NEW_RUNGS, PODIUM_CLASS, SHIPPED_RUNGS, SLOT_ORDER,
-                      TROPHY_TRACKS, all_podium_locations,
-                      created_rung_keys_from_options, location_name,
-                      podium_slot_codes)
+from ..podium import (
+    NEW_RUNGS,
+    PODIUM_CLASS,
+    SHIPPED_RUNGS,
+    SLOT_ORDER,
+    TROPHY_TRACKS,
+    created_rung_keys_from_options,
+    location_name,
+)
 from ..itemsanity import ITEMSANITY_CLASS
 
 FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
@@ -237,11 +242,6 @@ class TestDeterministicOrdering(unittest.TestCase):
         reversed_names = [name for name, _c, _r in entries][::-1]
         klass = _FakeClass("shuffled", entries, created=reversed_names)
         self.assertEqual(klass.created_locations(None), entries)
-
-
-
-
-
 
 
 class TestDuplicatesAndCollisions(unittest.TestCase):
@@ -484,9 +484,13 @@ class _CreatedMatchesGenerationMixin:
     """
 
     def test_created_locations_match_the_generated_world(self) -> None:
-        predicted = {name for name, _c, _r
-                     in PODIUM_CLASS.created_locations(self.world.options)}
         class_names = {name for name, _c, _r in PODIUM_CLASS.all_locations()}
+        # A content plan owns the generated subset, including trial-track
+        # rungs. The retired normal-generator option projection cannot do so.
+        predicted = {self.world.location_id_to_name[check["location"]]
+                     for check in self.world.ctr_content_plan["checks"]
+                     if check["kind"] == "podium"
+                     and self.world.location_id_to_name[check["location"]] in class_names}
         actual = {loc.name for loc
                   in self.multiworld.get_locations(self.player)
                   if loc.name in class_names}
@@ -496,7 +500,6 @@ class _CreatedMatchesGenerationMixin:
         active = CTR_LOCATION_CLASSES.active(self.world.options)
         expected = (PODIUM_CLASS,) if self.expected_rungs else ()
         self.assertEqual(active, expected)
-
 
 
 class TestGeneratedDefaults(_CreatedMatchesGenerationMixin, CTRTestBase):

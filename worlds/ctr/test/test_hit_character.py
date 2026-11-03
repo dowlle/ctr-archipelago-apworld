@@ -231,11 +231,6 @@ class TestTriggersAndBosses(unittest.TestCase):
 
 
 class TestUTRestore(unittest.TestCase):
-    def _restore(self, passthrough, **overrides):
-        mw = _build(steps=(), **overrides)
-        world = mw.worlds[1]
-        world._ut_restore_options(passthrough)
-        return world
 
     def _world(self):
         return _build(steps=()).worlds[1]

@@ -288,20 +288,3 @@ class TestOffSeed(CTRTestBase):
 # Universal Tracker
 
 
-class _RestoreCase(unittest.TestCase):
-    """Shared helper: run the world's own UT restore over a wire and rebuild.
-
-    Uses the real `_ut_restore_options` on a real generated world, the same way
-    the lettersanity and composable-goal UT gates do, so what is under test is
-    the shipped restore path rather than a transcription of it.
-    """
-
-    def _restore(self, slot_data):
-        world = setup_multiworld(ctrAPWorld, _UT_STEPS, seed=20260829,
-                                 options={}).worlds[1]
-        passthrough = {"warp_pad_unlock": {}, "podium_checks": {}}
-        passthrough.update(slot_data)
-        world._ut_restore_options(passthrough)
-        return world.options
-
-

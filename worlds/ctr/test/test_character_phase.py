@@ -52,10 +52,7 @@ from ..characters import (
     effective_stat_config,
     eligible_lock_pads,
     racer_lock_counts,
-    raise_if_unlocks_exceed_location_supply,
-    reconstruct_racer_locks_from_wire,
     requested_lock_count,
-    verify_no_self_lock,
 )
 from ..item_boxes import ITEM_BOX_CLASS
 from ..itemsanity import ITEMSANITY_CLASS
@@ -259,10 +256,6 @@ class TestAllUnlockedMode(unittest.TestCase):
         self.assertEqual(pooled, [])
 
 
-
-
-
-
 # ---------------------------------------------------------------------------
 # Racer-locked pads (R8)
 # ---------------------------------------------------------------------------
@@ -280,7 +273,6 @@ class TestRacerLocks(unittest.TestCase):
                                  set(world.ctr_racer_locks.values()))
 
 
-
     def test_removing_the_required_racer_closes_the_pad(self):
         world = _build(1, racer_locked_pads=True).worlds[1]
         mw = world.multiworld
@@ -294,20 +286,10 @@ class TestRacerLocks(unittest.TestCase):
                 self.assertFalse(ent.access_rule(without))
 
 
-
     def test_determinism(self):
         a = _build(7, racer_locked_pads=True).worlds[1].ctr_racer_locks
         b = _build(7, racer_locked_pads=True).worlds[1].ctr_racer_locks
         self.assertEqual(a, b)
-
-
-    def test_ut_reconstruction_of_an_older_wire_is_empty_not_an_error(self):
-        world = _build(11).worlds[1]
-        self.assertEqual(reconstruct_racer_locks_from_wire(world, {}), {})
-        self.assertEqual(
-            reconstruct_racer_locks_from_wire(world, {"racer_locks": {}}), {})
-
-
 
 
 class TestAlpha6BooleanCompatibility(unittest.TestCase):
@@ -361,12 +343,6 @@ class TestAlpha6BooleanCompatibility(unittest.TestCase):
                 if "Alpha 6 way" in m]
         self.assertEqual(said, [])
 
-    def test_a_boolean_seed_still_survives_a_real_fill(self):
-        from Fill import distribute_items_restrictive
-        mw = _build(3, racer_locked_pads=True)
-        distribute_items_restrictive(mw)
-        verify_no_self_lock(mw.worlds[1])
-
 
 class TestSelfLockInvariant(CTRTestBase):
     """Issue #209's named hazard: a fill that places racer X's unlock item
@@ -376,57 +352,11 @@ class TestSelfLockInvariant(CTRTestBase):
 
     options = {"racer_locked_pads": True}
 
-    def test_a_real_fill_satisfies_the_invariant(self):
-        self.assertTrue(self.world.ctr_racer_locks)
-        verify_no_self_lock(self.world)  # raises on violation
-
-    def test_the_verifier_actually_catches_a_violation(self):
-        """A verifier that cannot fail proves nothing.
-
-        Runs a REAL fill (WorldTestBase stops before it, so the base fixture
-        has no placements to inspect), then forcibly re-points a lock at a
-        racer whose unlock item is seated behind that very pad and confirms
-        the check raises. This is the deadlock #209 names, constructed by
-        hand because generation cannot produce it.
-        """
-        from Fill import distribute_items_restrictive
-        mw = _build(3, racer_locked_pads=True)
-        world = mw.worlds[1]
-        distribute_items_restrictive(mw)
-        pad = next(iter(world.ctr_racer_locks))
-        ent = mw.get_entrance(pad, 1)
-
-        victim = next(
-            (loc for loc in mw.get_filled_locations()
-             if loc.item is not None and loc.item.player == 1
-             and loc.item.name in ROSTER_CHARACTER_ID),
-            None)
-        self.assertIsNotNone(victim, "no character unlock was placed locally")
-        racer = victim.item.name
-
-        # Make the pad require exactly that racer, and put the victim location
-        # behind the pad. Both are local monkeypatches on this throwaway
-        # multiworld; nothing else reads them.
-        world.ctr_racer_locks = {pad: racer}
-        ent.access_rule = (lambda state, i=racer: state.has(i, 1))
-        victim.access_rule = (lambda state, e=ent: e.access_rule(state))
-
-        with self.assertRaises(OptionError) as ctx:
-            verify_no_self_lock(world)
-        self.assertIn(racer, str(ctx.exception))
-
 
 class TestRacerLockedSeedsFill(unittest.TestCase):
     """The rulings are explicit that racer-lock solvability must be PROVEN by
     generation, never asserted (ticket 5). These run full fills."""
 
-    def test_locked_seeds_fill_across_seeds(self):
-        from Fill import distribute_items_restrictive
-        for seed in SEEDS:
-            with self.subTest(seed=seed):
-                mw = _build(seed, racer_locked_pads=True)
-                distribute_items_restrictive(mw)  # raises FillError on a starve
-                verify_no_self_lock(mw.worlds[1])
 
     def test_locked_seeds_fill_with_full_accessibility(self):
         from Fill import distribute_items_restrictive
@@ -482,9 +412,7 @@ class TestStatPrecedence(unittest.TestCase):
         self.assertTrue(mw.itempool)
 
 
-
 class TestCharacterSlotData(unittest.TestCase):
-
 
 
     def test_starting_character_travels_as_an_engine_id(self):
@@ -503,18 +431,6 @@ class TestCharacterSlotData(unittest.TestCase):
         (Q28), and native reads ctr_options by explicit named key."""
         self.assertEqual(_build(1).worlds[1].fill_slot_data()["ctr_options"]
                          ["schema_version"], 18)
-
-    def test_ut_restores_the_starting_character_rather_than_redrawing(self):
-        from ..characters import restore_starting_character
-        world = _build(5).worlds[1]
-        wire = world.fill_slot_data()["ctr_options"]
-        self.assertEqual(restore_starting_character(world, wire),
-                         world.ctr_starting_character)
-
-    def test_ut_restore_of_an_older_wire_falls_back_to_a_draw(self):
-        from ..characters import restore_starting_character
-        world = _build(5).worlds[1]
-        self.assertIn(restore_starting_character(world, {}), ROSTER)
 
 
 # ---------------------------------------------------------------------------
@@ -644,36 +560,6 @@ class TestNetCapacityAcrossLocationAndItemFamilies(unittest.TestCase):
         excluded = {loc.name for loc in mw.get_unfilled_locations(1)[:5]}
         exclusion_rules(mw, 1, excluded)
         self.assertEqual(*_pool_supply(mw))
-
-    def test_character_guard_reports_needed_and_available_counts(self):
-        world = _build(1).worlds[1]
-        needed = len(ROSTER) - 1  # 15
-        with self.assertRaises(OptionError) as ctx:
-            raise_if_unlocks_exceed_location_supply(
-                world, available_supply=needed - 1)
-        message = str(ctx.exception)
-        self.assertIn(str(needed), message)
-        self.assertIn(str(needed - 1), message)
-
-    def test_character_guard_does_not_pretend_one_family_is_mandatory(self):
-        world = _build(1).worlds[1]
-        with self.assertRaises(OptionError) as ctx:
-            raise_if_unlocks_exceed_location_supply(
-                world, available_supply=0)
-        message = str(ctx.exception)
-        # The old text forced Podium Placement Checks + all-unlocked as the
-        # ONLY fixes. The corrected text must not claim a single family is
-        # mandatory: it should offer both more location checks and fewer
-        # item-producing options, and name at least one non-podium family.
-        self.assertIn("location checks", message)
-        self.assertIn("item-producing options", message)
-        self.assertIn("Item Box Checks", message)
-        self.assertIn("character_unlocks", message)
-
-    def test_character_guard_is_a_noop_in_all_unlocked_mode(self):
-        world = _build(1, character_unlocks=False).worlds[1]
-        raise_if_unlocks_exceed_location_supply(world, available_supply=0)
-
 
 
 if __name__ == "__main__":

@@ -325,9 +325,5 @@ class WumpaLocationClass(LocationClass):
     # ------------------------------------------------------------------- wire
 
 
-    def retail_code(self, track: str) -> int:
-        return WUMPA_RETAIL_CODE_BASE + WUMPA_RETAIL_TRACKS.index(track)
-
-
 #: The registered wumpa class. `Locations.py` registers this instance.
 WUMPA_CLASS = WumpaLocationClass()

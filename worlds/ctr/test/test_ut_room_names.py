@@ -133,6 +133,9 @@ class TestSharedItemOwners(unittest.TestCase):
                     l for l in locations if player is None or l.player == player])
         multidata = {"datapackage": {GAME: package}}
         with patch("worlds.ctr.custom_track_datapackage.location_aliases", return_value={}), \
+                patch("worlds.ctr.custom_track_datapackage.item_aliases", side_effect=lambda world: {
+                    self.CODE: f"Letter C ({world.custom_track_titles[1]})"
+                } if 1 in world.custom_track_titles else {}), \
                 patch("worlds.ctr.custom_track_datapackage.data_package_checksum", return_value="x"):
             embed_track_names(mw, multidata, GAME)
         return multidata["datapackage"][GAME]["item_name_to_id"]

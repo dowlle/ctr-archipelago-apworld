@@ -90,12 +90,6 @@ def created_item_counts(world) -> Dict[str, int]:
     return counts
 
 
-def created_item_total(world) -> int:
-    """Total supply this family spends on this seed. One number so the capacity
-    check does not have to re-sum the dict at its own call site."""
-    return sum(created_item_counts(world).values())
-
-
 def reserve_top_up_enabled(world) -> bool:
     """Read the seed's value on Tracker restore, including the content-plan path.
 
@@ -168,14 +162,3 @@ def fill_slot_data(world) -> Dict[str, object]:
     }
 
 
-def restore_slot_data(options, ctr_options) -> None:
-    """Universal Tracker restore for the two scalars above.
-
-    An absent key is a pre-activation seed and restores to off / zero, which is
-    the honest answer: such a seed created none of these items.
-    """
-    options.wumpa_bundles.value = int(bool(ctr_options.get("wumpa_bundles", 0)))
-    options.reserve_top_up.value = int(bool(ctr_options.get("reserve_top_up", 0)))
-    options.progressive_starting_wumpa.value = min(
-        PROGRESSIVE_WUMPA_MAX,
-        max(0, int(ctr_options.get("progressive_starting_wumpa", 0) or 0)))

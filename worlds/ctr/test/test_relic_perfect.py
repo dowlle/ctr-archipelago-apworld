@@ -143,8 +143,6 @@ class TestOptionOn(unittest.TestCase):
         self.assertEqual(_names(self.off) - _names(self.on), set())
 
 
-
-
 class TestRule(unittest.TestCase):
     """The perfect check has the Relic Race's entry rule: exactly what the
     Sapphire Time Trial gets, plus the USF crate term on every track
@@ -266,11 +264,6 @@ class TestUsfRuling20260929(unittest.TestCase):
             mw, character_boosts=((racer, USF_BOOST_COUNT),))))
 
 
-
-
-
-
-
 class TestCustomTrackHooks(unittest.TestCase):
     def _tracks(self, relic_crates):
         entry = dict(BABY_T_PARK_CURRENT, slot=4,
@@ -278,23 +271,4 @@ class TestCustomTrackHooks(unittest.TestCase):
                                 relic_crates=relic_crates))
         return {"baby-t-park": entry}
 
-    def test_capability_enumeration_reads_relic_crates(self):
-        self.assertEqual(rp.relic_capable_custom_slots(self._tracks(True)), [4])
-        self.assertEqual(rp.relic_capable_custom_slots(self._tracks(False)), [])
-        self.assertEqual(rp.relic_capable_custom_slots({}), [])
-
-    def test_creation_stays_disabled(self):
-        self.assertFalse(rp.CUSTOM_PERFECT_CREATION_ENABLED)
-        self.assertEqual(rp.created_custom_perfect_slots(self._tracks(True)), [])
-
-    def test_minted_codes_are_registered_but_never_created(self):
-        """The 0.3.0 id step minted the custom and Cortex Vortex perfects;
-        creation stays off until the #453 feature PR."""
-        self.assertEqual(rp.custom_perfect_reserved_code(1), 35024000)
-        self.assertEqual(rp.custom_perfect_reserved_code(132), 35024131)
-        for slot in (1, 4, 132):
-            self.assertEqual(CTR_LOCATION_IDS[f"Custom Track {slot}: Relic Race Perfect"],
-                             rp.custom_perfect_reserved_code(slot))
-        self.assertEqual(CTR_LOCATION_IDS["Cortex Vortex: Relic Race Perfect"], 35026005)
-        self.assertFalse(rp.CUSTOM_PERFECT_CREATION_ENABLED)
 

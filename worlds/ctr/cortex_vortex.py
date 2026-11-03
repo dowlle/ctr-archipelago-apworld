@@ -24,7 +24,7 @@ datapackage unfreeze of 2026-09-13. They are permanent; their ids never move.
 import json
 import pkgutil
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from BaseClasses import ItemClassification
 
@@ -199,10 +199,6 @@ class CortexVortexTrackLocationClass(LocationClass):
             names += [letter_location_name(letter) for letter in LETTERS
                       if letter in chosen]
         return names
-
-    def created_letter_names(self, options) -> List[str]:
-        return [name for name in self.created_location_names(options)
-                if ": Letter " in name]
 
 
 CORTEX_VORTEX_TRACK_CLASS = CortexVortexTrackLocationClass()

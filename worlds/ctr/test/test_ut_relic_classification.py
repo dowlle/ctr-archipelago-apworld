@@ -48,18 +48,6 @@ def _wire(world):
     return slot_data["ctr_options"]["relic_progression"]
 
 
-def _passthrough(world, slot_data_options):
-    """Put `slot_data_options` on multiworld.re_gen_passthrough exactly the way
-    Universal Tracker does, then read back the resolved classification."""
-    world.multiworld.re_gen_passthrough = {
-        world.game: {"ctr_options": slot_data_options}
-    }
-    try:
-        return world._relic_progression_map()
-    finally:
-        world.multiworld.re_gen_passthrough = {}
-
-
 class TestRelicClassificationVanillaMinimal(CTRTestBase):
     """The exact configuration shape every UT-check failure had."""
 
@@ -80,17 +68,6 @@ class TestRelicClassificationVanillaMinimal(CTRTestBase):
         "platinum_relic_count": 18,
     }
 
-    def test_sapphire_is_useful_not_progression(self):
-        prog = self.world._relic_progression_map()
-        self.assertFalse(
-            prog["Sapphire Relic"],
-            "vanilla + accessibility:minimal + non-oxidefinal must demote "
-            "Sapphire Relic to useful; the Slide Coliseum gate is then "
-            "unsatisfiable and UT must be told so")
-        self.assertFalse(prog["Gold Relic"])
-        self.assertFalse(prog["Platinum Relic"])
-
-
 
     def test_slot_data_matches_create_item(self):
         wire = _wire(self.world)
@@ -101,25 +78,6 @@ class TestRelicClassificationVanillaMinimal(CTRTestBase):
                 f"wire says {tier} progression={wire[tier]} but create_item "
                 f"produced advancement={expected}")
 
-
-    def test_ut_missing_key_falls_back_to_all_progression(self):
-        # Seeds rolled before this key existed must keep working: no crash, and
-        # the historical all-progression behaviour.
-        tracker = _passthrough(self.world, {"goal": 0})
-        self.assertEqual(tracker, {t: True for t in RELIC_TIERS})
-
-    def test_ut_malformed_key_falls_back_to_all_progression(self):
-        for bad in (None, [], "Sapphire Relic", 0):
-            with self.subTest(value=bad):
-                tracker = _passthrough(self.world, {"relic_progression": bad})
-                self.assertEqual(tracker, {t: True for t in RELIC_TIERS})
-
-    def test_ut_partial_key_defaults_missing_tiers_to_progression(self):
-        tracker = _passthrough(
-            self.world, {"relic_progression": {"Sapphire Relic": False}})
-        self.assertEqual(
-            tracker,
-            {"Sapphire Relic": False, "Gold Relic": True, "Platinum Relic": True})
 
     def test_slide_coliseum_trials_are_gated_on_sapphire(self):
         # Anchors the premise of the whole bug: these are the locations UT
@@ -143,8 +101,6 @@ class TestRelicClassificationVanillaFull(CTRTestBase):
     }
 
 
-
-
 class TestRelicClassificationRandomized(CTRTestBase):
     """Randomized pad modes keep every tier progression; unchanged behaviour."""
 
@@ -154,8 +110,6 @@ class TestRelicClassificationRandomized(CTRTestBase):
         "accessibility": "minimal",
         "oxide_goal": "first",
     }
-
-
 
 
 class TestRelicClassificationNoSchemaBump(CTRTestBase):

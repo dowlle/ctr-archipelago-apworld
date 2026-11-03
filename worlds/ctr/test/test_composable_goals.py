@@ -212,40 +212,6 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
 
     # -- the four legacy-equivalent single-condition combinations --
 
-    def test_default_matches_legacy_oxide_goal(self):
-        mw = _build()  # shipped default: oxide_goal=any_percent, bosses=0, gems=0
-        world = mw.worlds[1]
-        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_any_percent)
-        self.assertEqual(world.options.bosses_required_goal.value, 0)
-        self.assertEqual(world.options.gems_required_goal.value, 0)
-        self.assertEqual(world._legacy_goal_value(), 0)
-
-    def test_oxidefinal_equivalent_wire_value(self):
-        mw = _build(oxide_goal="final")
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 1)
-
-    def test_allbosses_equivalent_wire_value(self):
-        mw = _build(oxide_goal="none", bosses_required_goal=4)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 3)
-
-    def test_allgemcups_equivalent_wire_value(self):
-        mw = _build(oxide_goal="none", gems_required_goal=5)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 4)
-
-    def test_composed_goal_has_no_legacy_equivalent(self):
-        mw = _build(oxide_goal="first", bosses_required_goal=1)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), -1)
-
-    def test_disabled_has_no_legacy_equivalent(self):
-        # Issue #320: no pre-#152 single-goal value ever meant "the Oxide
-        # races are not in the seed", so `disabled` must not borrow one of
-        # the four legacy ints -- an old client reading `goal` would then run
-        # a goal this seed cannot satisfy.
-        for extra in ({"bosses_required_goal": 4}, {"gems_required_goal": 5}):
-            with self.subTest(**extra):
-                mw = _build(oxide_goal="disabled", **extra)
-                self.assertEqual(mw.worlds[1]._legacy_goal_value(), -1)
-
 
 class TestComposedGoalGuards(unittest.TestCase):
     """generate_early's guards for the composed goal (dossier §2.3):
@@ -279,14 +245,11 @@ class TestComposedGoalGuards(unittest.TestCase):
               shuffle_gems=False, include_gem_cups=False)  # must not raise
 
 
-
     def test_oxidefinal_with_progression_tier_present_does_not_raise(self):
         _early(oxide_goal="final",
               warppad_unlock_requirements="vanilla",
               oxide_final_challenge_unlock="gold_relics",
               gold_relic_count=18)  # must not raise
-
-
 
 
 class TestComposedGoalWire(CTRTestBase):

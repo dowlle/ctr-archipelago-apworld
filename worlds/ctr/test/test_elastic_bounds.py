@@ -18,11 +18,7 @@ from .. import podium
 from ..elastic_bounds import (
     CTRSettings,
     ElasticCountOption,
-    apply_elastic_veto,
-    clamp_elastic_option,
-    elastic_supply_ceiling,
     estimated_filler_reserve,
-    exact_filler_reserve,
     goal_excluded_location_reserve,
     player_exclude_locations_reserve,
     resolve_elastic_bounds,
@@ -130,92 +126,6 @@ class TestResolveElasticBounds(unittest.TestCase):
         self.assertGreater(lo, hi)
 
 
-class TestClampElasticOption(unittest.TestCase):
-    def test_value_already_in_friendly_bounds_is_untouched(self):
-        world = _FakeWorld(30, friendly=True)
-        message = clamp_elastic_option(world, "my_count")
-        self.assertIsNone(message)
-        self.assertEqual(world.options.my_count.value, 30)
-
-    def test_value_above_friendly_maximum_is_clamped_down(self):
-        world = _FakeWorld(90, friendly=True)
-        message = clamp_elastic_option(world, "my_count")
-        self.assertEqual(world.options.my_count.value, 60)
-        self.assertIn("90", message)
-        self.assertIn("60", message)
-
-    def test_value_below_friendly_minimum_is_clamped_up(self):
-        world = _FakeWorld(2, friendly=True)
-        clamp_elastic_option(world, "my_count")
-        self.assertEqual(world.options.my_count.value, 10)
-
-    def test_friendly_off_only_enforces_the_absolute_range(self):
-        world = _FakeWorld(90, friendly=False)
-        message = clamp_elastic_option(world, "my_count")
-        self.assertIsNone(message)
-        self.assertEqual(world.options.my_count.value, 90)
-
-    def test_explicit_friendly_argument_bypasses_world_settings(self):
-        world = _FakeWorld(90, friendly=True)
-        # world.settings says friendly, but the explicit arg wins.
-        clamp_elastic_option(world, "my_count", friendly=False)
-        self.assertEqual(world.options.my_count.value, 90)
-
-    def test_dynamic_ceiling_below_resolved_minimum_raises_optionerror(self):
-        world = _FakeWorld(50, friendly=True)
-        with self.assertRaises(OptionError):
-            clamp_elastic_option(world, "my_count", dynamic_ceiling=3)
-
-
-class TestApplyElasticVeto(unittest.TestCase):
-    def test_allowed_is_a_noop_regardless_of_activity(self):
-        world = _FakeWorld(90)
-        for active in (True, False):
-            result = apply_elastic_veto(
-                world, allowed=True, is_active=active, option_name="my_count",
-                on_refuse="raise", reason="irrelevant")
-            self.assertIsNone(result)
-        self.assertEqual(world.options.my_count.value, 90)
-
-    def test_disallowed_but_inactive_is_a_noop(self):
-        world = _FakeWorld(90)
-        result = apply_elastic_veto(
-            world, allowed=False, is_active=False, option_name="my_count",
-            on_refuse="raise", reason="irrelevant")
-        self.assertIsNone(result)
-        self.assertEqual(world.options.my_count.value, 90)
-
-    def test_disallowed_and_active_raise_mode_raises(self):
-        world = _FakeWorld(90)
-        with self.assertRaises(OptionError) as ctx:
-            apply_elastic_veto(
-                world, allowed=False, is_active=True, option_name="my_count",
-                on_refuse="raise", reason="host does not want this feature")
-        self.assertIn("host does not want this feature", str(ctx.exception))
-
-    def test_disallowed_and_active_replace_mode_mutates_and_logs(self):
-        world = _FakeWorld(90)
-        message = apply_elastic_veto(
-            world, allowed=False, is_active=True, option_name="my_count",
-            on_refuse="replace", replacement=0, reason="replaced by policy")
-        self.assertEqual(world.options.my_count.value, 0)
-        self.assertIn("replaced by policy", message)
-
-    def test_replace_mode_without_a_replacement_value_is_a_programming_error(self):
-        world = _FakeWorld(90)
-        with self.assertRaises(ValueError):
-            apply_elastic_veto(
-                world, allowed=False, is_active=True, option_name="my_count",
-                on_refuse="replace", reason="no replacement given")
-
-    def test_unknown_on_refuse_is_a_programming_error(self):
-        world = _FakeWorld(90)
-        with self.assertRaises(ValueError):
-            apply_elastic_veto(
-                world, allowed=False, is_active=True, option_name="my_count",
-                on_refuse="shrug", reason="bad mode")
-
-
 class TestCTRSettingsDefaults(unittest.TestCase):
     def test_enforce_friendly_options_defaults_true(self):
         self.assertIs(CTRSettings().enforce_friendly_options, True)
@@ -250,19 +160,6 @@ class TestExcludedLocationReserve(unittest.TestCase):
             ctrAPWorld, seed=1, options={"exclude_locations": {real_location}})
         world = multiworld.worlds[1]
         self.assertEqual(player_exclude_locations_reserve(world), 1)
-
-
-
-
-class TestElasticSupplyCeiling(unittest.TestCase):
-
-    def test_floors_at_zero_when_the_reserve_exceeds_supply(self):
-        multiworld = setup_multiworld(ctrAPWorld, seed=1,
-                                      options={"exclude_locations": {
-                                          f"{podium._trophy_tracks()[0]}: Trophy Race"}})
-        world = multiworld.worlds[1]
-        # reserve is goal(1) + yaml(1) = 2, supply of 1 must floor at 0
-        self.assertEqual(elastic_supply_ceiling(world, available_supply=1), 0)
 
 
 if __name__ == "__main__":

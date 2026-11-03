@@ -97,14 +97,6 @@ def _unexportable(world, spot, message: str) -> WinLogicExportError:
     return WinLogicExportError(message)
 
 
-def win_kind(location_name: str) -> Optional[str]:
-    """The `win_logic` kind of a location name, or None for a non-win."""
-    for suffix, kind in _KIND_SUFFIXES:
-        if location_name.endswith(suffix):
-            return kind
-    return None
-
-
 def weapon_families():
     from .itemsanity import USEFUL_WEAPON_FAMILIES
     return tuple(tuple(f) for f in USEFUL_WEAPON_FAMILIES)
