@@ -389,10 +389,6 @@ class TestOxideEncounterMutations(unittest.TestCase):
     and the mutant gets wrong, so the truth table above is sensitive to that
     term rather than merely consistent with it."""
 
-    def _rules(self):
-        from .. import Rules
-        return Rules
-
 
 
 
