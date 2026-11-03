@@ -114,6 +114,11 @@ class Or(Term):
         return ["any"] + [c.wire(enc) for c in self.children]
 
 
+def any_of(*terms: Term) -> Term:
+    """OR with explicit empty and singleton semantics."""
+    return FALSE if not terms else terms[0] if len(terms) == 1 else Or(*terms)
+
+
 class Has(Term):
     """`state.has(item, player, count)`."""
 
@@ -255,6 +260,47 @@ def boost_cap(world, racer: Optional[str], boost: int) -> Term:
     if not bool(world.options.progressive_boost.value):
         return TRUE
     return Cap(world, boost, racer)
+
+
+class StatCap(Cap):
+    """Item Box capability: boost and one of each stat on the same racer."""
+
+    def _build(self):
+        from .progressive_capability import gate_satisfied, STAT_CHAINS
+        return (lambda state, w=self.world, p=self.world.player, b=self.boost,
+                r=self.racer, gate=gate_satisfied, stats={chain: 1 for chain in STAT_CHAINS}:
+                gate(w, state, p, boost_min=b, stat_mins=stats, required_character=r))
+
+    def wire(self, enc):
+        term = enc.cap(self.boost, self.racer)
+        mode = int(self.world.options.progressive_stats.value)
+        return term + [mode] if mode else term
+
+
+class ReachRegion(Term):
+    """Live region reachability; serialize its actual entrance graph."""
+
+    def __init__(self, world, region: str):
+        self.world, self.region = world, region
+
+    def _build(self):
+        return lambda state, region=self.region, player=self.world.player: state.can_reach(region, "Region", player)
+
+    def wire(self, enc):
+        return enc.region(self.region)
+
+
+class SerializedRule(Term):
+    """Keep an existing callable while supplying its equivalent wire term."""
+
+    def __init__(self, rule: Callable, term: Term):
+        self.rule, self.term = rule, term
+
+    def _build(self):
+        return self.rule
+
+    def wire(self, enc):
+        return self.term.wire(enc)
 
 
 class BossWins(Term):

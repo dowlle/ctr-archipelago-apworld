@@ -821,6 +821,22 @@ class SpoilerItems(Toggle):
     display_name = "Spoiler Items"
 
 
+class PadApproachHints(Toggle):
+    """Hint a warp pad's open checks when you drive up to it.
+
+    Off (default): nothing happens when you approach a pad.
+
+    On: when a pad shows its name as you drive up to it, the game asks the
+    server to hint every location behind that pad that is open for you now
+    and not checked yet. A closed pad, or one that needs a racer you do not
+    have, hints nothing. Each location is hinted at most once, also after a
+    reconnect.
+
+    Hints cannot be undone. They stay in the room for everyone, and one walk
+    through a hub can hint many locations at once."""
+    display_name = "Pad Approach Hints"
+
+
 class RaceTypeSelector(Choice):
     """When a warp pad asks which race to run.
 
@@ -1705,6 +1721,7 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     color_boxes_by_item: ColorBoxesByItem
     spoiler_items: SpoilerItems
+    pad_approach_hints: PadApproachHints
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
 
@@ -1733,7 +1750,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                              EditableStats, ProgressiveStatsMode],
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
-    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, RaceTypeSelector,
+    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, PadApproachHints,
+                RaceTypeSelector,
                 TrackerPadLaunch],
 }
 

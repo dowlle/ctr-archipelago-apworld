@@ -279,6 +279,13 @@ def check_income(plan):
 def income_term(world):
     """What `Wumpa Income` stands for, for the `win_logic` export: any income
     route, with its pad's gate, as `install` built them."""
+    if bool(world.options.pad_approach_hints.value):
+        event = world.ctr_income_event
+        term = logic_terms.term_of(event)
+        if term is None:
+            from .win_logic import _unexportable
+            raise _unexportable(world, event, "CTR win_logic: Wumpa Income has no term-backed rule")
+        return term
     return world.ctr_income_term
 
 
@@ -295,6 +302,7 @@ def install(world, plan, menu, stage_gate, stage_term):
     from . import characters
     from .progressive_capability import gate_satisfied
     player = world.player
+    hints = bool(world.options.pad_approach_hints.value)
     capability = plan.get("capability", {})
     pads = {p["id"]: p for p in plan["pads"]}
     routes = []
@@ -306,7 +314,8 @@ def install(world, plan, menu, stage_gate, stage_term):
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         need = finish_boost(track, capability, income_package(plan, track)) if capability.get("boost_mode") else 0
         routes.append((entry_id, test, need, racer))
-        terms = [logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
+        terms = [logic_terms.ReachRegion(world, entry_id) if hints else
+                 logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
         stage = stage_term(route)
         if stage is not None:
             terms.append(stage)
@@ -322,6 +331,9 @@ def install(world, plan, menu, stage_gate, stage_term):
                    for entry, test, need, racer in routes)
     event = Location(player, INCOME, None, menu)
     event.access_rule = income
+    if hints:
+        logic_terms.set_term(event, logic_terms.SerializedRule(income, world.ctr_income_term))
+        world.ctr_income_event = event
     event.place_locked_item(world.create_event(INCOME))
     menu.locations.append(event)
     record = plan.get("wumpa_shop")
@@ -336,6 +348,11 @@ def install(world, plan, menu, stage_gate, stage_term):
         floor = KEY_FLOORS[hub]
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
+        if hints:
+            term = logic_terms.EventTerm(INCOME, player, lambda: income_term(world))
+            if floor:
+                term = logic_terms.And(term, logic_terms.Has(key, floor, player))
+            logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, term))
         if excluded:
             location.item_rule = lambda item: not item.advancement
         menu.locations.append(location)

@@ -113,7 +113,7 @@ class WireEvaluator:
     def __init__(self, block, ctr_options, received: Dict[int, int],
                  bosses_won: int, item_ids: Dict[str, int]):
         """`received`: native's tally, `_received` of the server's entries."""
-        assert block["version"] == 1
+        assert block["version"] in (1, 2)
         self.block = block
         self.received = received
         self.start_table = {}
@@ -122,7 +122,7 @@ class WireEvaluator:
                 raise MalformedBlock(f"start {key!r}: {n!r}")
             self.start_table[int(key)] = n
         self.bosses_won = bosses_won
-        self.boost_mode = int(ctr_options["boost_mode"])
+        self.boost_mode = int(ctr_options.get("boost_mode", ctr_options.get("progressive_boost", 0)))
         self.start = int(ctr_options["starting_character"])
         self.unlocks = bool(ctr_options["character_unlocks"])
         by_id = {cid: name for name, cid in ROSTER_CHARACTER_ID.items()}
@@ -173,7 +173,14 @@ class WireEvaluator:
             assert mode == "distinct"
             return sum(1 for i in ids if self.count(i) >= 1) >= count
         if tag == "cap":
-            _, boost, racer = t
+            _, boost, racer, *extension = t
+            if extension:
+                assert len(extension) == 1 and type(extension[0]) is int and 0 <= extension[0] <= 2
+                if extension[0]:
+                    return any(self._driveable(c) and self._boost_ok(c, boost)
+                               and all(self.count((35010027 if extension[0] == 1 else self.boost_id[c]) + n) >= 1
+                                       for n in (1, 2, 3))
+                               for c in ([racer] if racer >= 0 else range(16)))
             if racer >= 0:
                 return self._driveable(racer) and self._boost_ok(racer, boost)
             if boost == 0 or self.boost_mode == 0:

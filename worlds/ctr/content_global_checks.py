@@ -277,10 +277,22 @@ def _appearance(target, lock):
 
 def install(world, check, location, route_tests):
     """Set the access rule of one global check. `route_tests` is
-    [(entry region name, stage-2 test or None, route)] for the check's routes."""
+    [(entry region name, stage-2 Term or None, route)] for the check's routes."""
     player = world.player
     kind = check["kind"]
+    route_terms = tuple(route_tests)
+    route_tests = tuple((entry, None if term is None else term.compile(), route)
+                        for entry, term, route in route_terms)
+    hints = bool(world.options.pad_approach_hints.value)
     opens = tuple((entry, test) for entry, test, _route in route_tests)
+
+    def alternatives(terms):
+        terms = tuple(terms)
+        return logic_terms.FALSE if not terms else terms[0] if len(terms) == 1 else logic_terms.Or(*terms)
+
+    def route_term(entry, stage):
+        region = logic_terms.ReachRegion(world, entry)
+        return region if stage is None else logic_terms.And(region, stage)
 
     def any_route(state):
         return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
@@ -295,6 +307,12 @@ def install(world, check, location, route_tests):
                     and (not boost or progressive_capability.gate_satisfied(world, state, player, boost_min=1))
                     and any_route(state))
         location.access_rule = rule
+        if hints:
+            terms = [logic_terms.Has(weapon, 1, player),
+                     alternatives(route_term(entry, stage) for entry, stage, _route in route_terms)]
+            if boost:
+                terms.append(logic_terms.Cap(world, 1, None))
+            logic_terms.set_term(location, logic_terms.SerializedRule(rule, logic_terms.all_of(*terms)))
         return
     target = check["location"] - hit_character.HIT_CHARACTER_CODE_BASE
     plan = world.ctr_content_plan
@@ -304,6 +322,7 @@ def install(world, check, location, route_tests):
     packages = {package["id"]: package for package in plan["packages"]}
     capability = plan.get("capability", {})
     legs = []
+    leg_terms = []
     # Boss races (#133 PR 6): the boss can be hit in its own boss race once
     # that race is in logic, whether or not it joined the draw
     # (hit_character._boss_predicate on the legacy path).
@@ -311,7 +330,7 @@ def install(world, check, location, route_tests):
     encounters = {enc["id"]: enc for enc in plan.get("encounters", ())}
     boss = tuple(world.multiworld.get_location(by_code[encounters[route["encounter_id"]]["completion_location"]], player)
                  for _entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
-    for entry, test, route in route_tests:
+    for (entry, test, route), (_entry, stage, _route) in zip(route_tests, route_terms):
         if route["mode"] in content_bosses.MODES:
             continue
         lock = pads[route["own_pad_id"]]["racer_lock"]
@@ -324,6 +343,14 @@ def install(world, check, location, route_tests):
                 if route["mode"] == content_cups.MODE else 0)
         if players:
             legs.append((entry, test, players, need))
+            if hints:
+                racers = []
+                for name in players:
+                    selected = (logic_terms.TRUE if not characters.unlocks_enabled(world)
+                                or name == world.ctr_starting_character else
+                                logic_terms.Has(characters.unlock_item_name(name), 1, player))
+                    racers.append(selected if not need else logic_terms.And(selected, logic_terms.Cap(world, need, name)))
+                leg_terms.append(logic_terms.And(route_term(entry, stage), alternatives(racers)))
     legs = tuple(legs)
     fallback_keys = world.ctr_hit_character_fallback.get(target)
     triggers = ()
@@ -362,6 +389,16 @@ def install(world, check, location, route_tests):
                            for name in players)
                    for entry, test, players, need in legs)
     location.access_rule = rule
+    if hints:
+        guest = (logic_terms.Has(hit_character.KEY_ITEM, fallback_keys, player) if fallback_keys is not None
+                 else alternatives(logic_terms.Ref(trigger, player) for trigger in triggers) if triggers
+                 else logic_terms.TRUE)
+        ordinary = logic_terms.And(guest, alternatives(leg_terms))
+        paths = [ordinary] + [logic_terms.Ref(completion, player) for completion in boss]
+        term = alternatives(paths)
+        if weapons:
+            term = logic_terms.And(logic_terms.HasAny(hit_character.HIT_METHOD_ITEMS, player), term)
+        logic_terms.set_term(location, logic_terms.SerializedRule(rule, term))
 
 
 def tiger_temple_door(world):

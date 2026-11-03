@@ -331,7 +331,7 @@ class TestCupHitCharacter(unittest.TestCase):
         world = NS(player=1, ctr_content_plan=plan, ctr_starting_character="Coco Bandicoot",
                    ctr_hit_character_fallback={}, ctr_hit_character_encounters=dict(bosses={}),
                    options=NS(progressive_boost=NS(value=2), progressive_stats=NS(value=0),
-                              character_unlocks=NS(value=0)))
+                              character_unlocks=NS(value=0), pad_approach_hints=NS(value=0)))
         route = dict(own_pad_id="pad:0", entry_id="entry/cup:0", leg_id="leg:1", mode="cup")
         self.assertEqual(content_cups.prefix_boost(cup, "leg:1", {t["id"]: t for t in plan["tracks"]},
                                                    plan["capability"], {"p": plan["packages"][0]}), 2)
