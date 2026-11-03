@@ -371,10 +371,14 @@ class TestEarlyBoost(unittest.TestCase):
         self.assertEqual(mw.local_early_items[1], {"Progressive Boost (Tiny Tiger)": 2})
         self.assertEqual(world._ctr_early_second, "Progressive Boost (Tiny Tiger)")
         self.assertFalse(mw.precollected_items[1])
-        # pre_fill places both early copies in the start (bootstrap_start).
+        # Both early copies are seated, including when a paid pooled-Key
+        # path first reserves the Key before the boosts that support it.
         call_all(mw, "pre_fill")
         self.assertEqual(mw.local_early_items[1], {})
-        self.assertEqual([name for name, _ in world._ctr_start_bootstrap][:2], ["Progressive Boost (Tiny Tiger)"] * 2)
+        self.assertEqual([name for name, _ in world._ctr_start_bootstrap].count(
+            "Progressive Boost (Tiny Tiger)"), 2)
+        reached = sphere0_guard._base_state(world)
+        self.assertEqual(reached.count("Progressive Boost (Tiny Tiger)", 1), 2)
         distribute_items_restrictive(mw)
         self.assertTrue(mw.can_beat_game())
 
@@ -548,17 +552,43 @@ class TestStartBootstrap(unittest.TestCase):
                 if loc.item is not None and loc.item.name in kept:
                     self.assertTrue(loc.can_reach(CollectionState(mw)), (seed, loc.name))
 
+    def test_a_marginal_wide_start_pays_for_its_key_support(self):
+        from .. import sphere0_guard
+        before = make_world(cap_options(boost="off", stats="shared_global"), seed=1,
+                            stop_before="pre_fill")
+        mw = before.multiworld
+        self.assertEqual(sphere0_guard.sphere0_breadth(before), 13)
+        self.assertEqual(sphere0_guard.bootstrap_target(before), 12)
+        call_all(mw, "pre_fill")
+        placed = before._ctr_start_bootstrap
+        self.assertEqual([name for name, _ in placed], ["Key", "Trophy"])
+        # Actual placed rewards are reachable in order, without a free Key
+        # or borrowing a future check to pay for the Trophy.
+        state = CollectionState(mw)
+        for _name, location_name in placed:
+            location = mw.get_location(location_name, 1)
+            self.assertTrue(location.can_reach(state), location_name)
+            state.collect(location.item, True)
+        self.assertEqual(state.count("Key", 1), 1)
+        self.assertEqual(len(sphere0_guard._room(before, state)), 17)
+        self.assertEqual(len(placed), 2)
+        self.assertLess(13 - len(placed), 12)
+
     def test_a_wide_start_is_unchanged(self):
         from .. import sphere0_guard
         seen = 0
         for seed in range(12):
             try:
-                before = make_world(cap_options(boost="off", stats="shared_global"), seed=seed,
+                # A marginal thirteen-check start can need a paid Key path:
+                # two copies would leave eleven, below the twelve-check cut.
+                # Boxes give this unchanged-start control ample spare checks.
+                before = make_world(cap_options(boost="off", stats="shared_global", box_locations=True), seed=seed,
                                     stop_before="pre_fill")
             except OptionError:
                 continue
             if sphere0_guard.sphere0_breadth(before) < sphere0_guard.bootstrap_target(before):
                 continue
+            self.assertGreater(sphere0_guard.sphere0_breadth(before), 30)
             seen += 1
             state = before.multiworld.random.getstate()
             pool = list(before.multiworld.itempool)
