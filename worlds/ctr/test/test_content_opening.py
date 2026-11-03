@@ -1,7 +1,9 @@
 """The opening of a content plan (one generator row 8b): the search, the plan's
 reach model against the real rules, the redraw, and the seating."""
 import unittest
+from pathlib import Path
 from unittest import mock
+import yaml
 
 from BaseClasses import CollectionState
 from worlds.AutoWorld import call_all
@@ -23,6 +25,20 @@ def spots(start, gates):
 
 
 class TestSearch(unittest.TestCase):
+    def test_garage_demand_pays_for_its_support_items(self):
+        room = spots(5, [(dict(Boost=2), 8)])
+        held, free = content_opening.search(dict(Boost=2, Relic=3), room, 12,
+                                            reached=lambda items: items.count("Relic") >= 3,
+                                            goals=[("Relic",) * 3])
+        self.assertEqual(sorted(held), ["Boost", "Boost", "Relic", "Relic", "Relic"])
+        self.assertEqual(free, 8)  # 13 reachable slots minus all five items.
+
+    def test_a_garage_demand_larger_than_the_opening_is_not_seated(self):
+        held, free = content_opening.search(dict(Relic=4), spots(3, []), 12,
+                                            reached=lambda items: items.count("Relic") >= 4,
+                                            goals=[("Relic",) * 4])
+        self.assertEqual((held, free), ([], 3))
+
     def test_a_wide_start_needs_nothing(self):
         self.assertEqual(content_opening.search(dict(Key=4), spots(5, []), 5), ([], 5))
 
@@ -89,6 +105,33 @@ class TestSearch(unittest.TestCase):
 
     def test_a_useless_item_is_not_seated(self):
         self.assertEqual(content_opening.search(dict(Relic=9), spots(3, []), 5), ([], 3))
+
+
+class TestGarageDemands(unittest.TestCase):
+    names = {1: "Sapphire", 2: "Gold", 3: "Red"}
+
+    def test_summed_relics_keep_every_available_distribution(self):
+        node = dict(op="sum", count=3, items=[1, 2])
+        self.assertEqual(set(content_opening.garage_demands(node, dict(Sapphire=2, Gold=2), {}, self.names)),
+                         {("Sapphire", "Gold", "Gold"), ("Sapphire", "Sapphire", "Gold")})
+
+    def test_precollected_copies_need_no_slot(self):
+        node = dict(op="count", count=3, item=1)
+        self.assertEqual(content_opening.garage_demands(node, dict(Sapphire=2), {1: 1}, self.names),
+                         [("Sapphire", "Sapphire")])
+
+    def test_fixed_items_are_not_invented(self):
+        self.assertEqual(content_opening.garage_demands(dict(op="count", count=1, item=3), {}, {}, self.names), [])
+
+    def test_overlapping_all_terms_share_the_same_copies(self):
+        node = dict(op="all", terms=[dict(op="count", count=2, item=1), dict(op="count", count=1, item=1)])
+        self.assertEqual(content_opening.garage_demands(node, dict(Sapphire=2), {}, self.names),
+                         [("Sapphire", "Sapphire")])
+
+    def test_distinct_does_not_count_an_already_held_kind_twice(self):
+        node = dict(op="distinct", count=2, items=[1, 2, 3])
+        self.assertEqual(set(content_opening.garage_demands(node, dict(Sapphire=4, Gold=1, Red=1), {1: 1}, self.names)),
+                         {("Gold",), ("Red",)})
 
 
 class TestPlanReach(unittest.TestCase):
@@ -168,6 +211,65 @@ class TestFirstKeyCapacity(unittest.TestCase):
             world = make_world(dict(LETTERS), seed=seed, stop_before="pre_fill")
             room, need = content_opening.fit(world, world.ctr_content_plan)
             self.assertGreaterEqual(room, need)
+
+
+class TestCostedFixedKeyCapacity(unittest.TestCase):
+    cases = (("letters", 169, 53), ("racers", 83, 48))
+
+    def options(self, name):
+        path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"
+        return yaml.safe_load(path.read_text())["Crash Team Racing"]
+
+    def reach(self, world):
+        boost = sphere0_guard.starting_boost_item(world)
+        return content_opening.PlanReach(world.ctr_content_plan, world.ctr_content_items.rows, set(), boost)
+
+    def test_actual_first_draws_do_not_get_their_support_items_for_free(self):
+        for name, seed, advertised in self.cases:
+            with self.subTest(name=name), mock.patch.object(content_opening.PlanReach, "key_slack", return_value=12):
+                world = make_world(self.options(name), seed=seed, stop_before="pre_fill")
+            reach = self.reach(world)
+            key = reach.code["Key"]
+            held = tuple(item for item, count in reach.pool.items() if item != "Key" for _ in range(count))
+            counts = reach._held(held)
+            counts[key] = 1
+            fixed = {code: item for code, item in reach.pins.items() if item != key}
+            opened = reach._sweep(counts, fixed)
+            self.assertEqual(sum(spot and code in opened for code, spot, _floor, _routes in reach.checks), advertised)
+            base, pins = reach.base, reach.pins
+            self.assertLess(reach.key_slack(), content_opening.KEY_SLACK)
+            self.assertIs(reach.base, base)
+            self.assertIs(reach.pins, pins)
+            # Nonlocal support cannot be budgeted as a local placement.
+            self.assertLess(reach.key_slack(non_local=set(reach.pool)), content_opening.KEY_SLACK)
+
+    def test_meeting_a_garage_demand_does_not_grant_its_boss_boost(self):
+        world = make_world(self.options("letters"), seed=169, stop_before="pre_fill")
+        reach = self.reach(world)
+        checks = {check["location"]: check for check in world.ctr_content_plan["checks"]}
+        encounter = next(encounter for encounter in reach.encounters.values()
+                         if checks[encounter["completion_location"]].get("boost", 0))
+        reach.base = dict(reach.base)
+        reach.base[reach.code["Key"]] = 4
+        all_items = tuple(name for name, count in reach.pool.items() for _ in range(count))
+        no_boost = tuple(name for name in all_items if not name.startswith("Progressive Boost"))
+        counts = reach._held(no_boost)
+        reach._sweep(counts)
+        self.assertTrue(reach._met(encounter["requirement_id"], counts))
+        self.assertFalse(reach.encounter_reached(encounter, no_boost))
+        self.assertTrue(reach.encounter_reached(encounter, all_items))
+
+    def test_both_actual_failures_fill_and_reach_every_addressed_location(self):
+        for name, seed, _advertised in self.cases:
+            with self.subTest(name=name):
+                world = make_world(self.options(name), seed=seed, stop_before="fill")
+                mw = world.multiworld
+                distribute_items_restrictive(mw)
+                state = CollectionState(mw)
+                state.sweep_for_advancements(locations=mw.get_locations(world.player))
+                self.assertTrue(mw.can_beat_game())
+                self.assertTrue(all(location.can_reach(state) for location in mw.get_locations(world.player)
+                                    if location.address is not None))
 
 
 class TestRedraw(unittest.TestCase):
