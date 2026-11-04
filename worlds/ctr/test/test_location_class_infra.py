@@ -333,20 +333,17 @@ class TestLocationNameGroups(unittest.TestCase):
         self.assertEqual(klass.location_name_groups(), {})
 
     def test_podium_declares_no_groups(self) -> None:
-        """Podium's frozen surface remains group-free."""
+        """Podium's frozen surface remains group-free; the registry itself
+        declares only the class groups (#536 adds the registry-built ones in
+        location_groups.py, tested in test_location_groups)."""
         self.assertEqual(PODIUM_CLASS.location_name_groups(), {})
         self.assertEqual(
             CTR_LOCATION_CLASSES.location_name_groups(),
             {"Itemsanity Checks": set(ITEMSANITY_CLASS.names())},
         )
-        # AP injects "Everywhere" itself (AutoWorld.py:70-72).
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        declared = {name: group for name, group
-                    in world_type.location_name_groups.items()
-                    if name != "Everywhere"}
-        self.assertEqual(declared, {
-            "Itemsanity Checks": set(ITEMSANITY_CLASS.names()),
-        })
+        self.assertEqual(world_type.location_name_groups["Itemsanity Checks"],
+                         set(ITEMSANITY_CLASS.names()))
 
     def test_declared_groups_merge_into_the_registry(self) -> None:
         registry = LocationClassRegistry()
