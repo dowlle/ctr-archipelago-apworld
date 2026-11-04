@@ -24,7 +24,7 @@ from typing import Dict, Iterable, Mapping, Set
 from BaseClasses import ItemClassification
 
 from . import characters, lettersanity, progressive_capability as pc
-from .cortex_vortex_track import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
+from .cortex_vortex import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
 from .named_tracks import NAMED_TRACK_ITEM_DATA
 
