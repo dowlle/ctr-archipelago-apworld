@@ -97,14 +97,6 @@ def _unexportable(world, spot, message: str) -> WinLogicExportError:
     return WinLogicExportError(message)
 
 
-def win_kind(location_name: str) -> Optional[str]:
-    """The `win_logic` kind of a location name, or None for a non-win."""
-    for suffix, kind in _KIND_SUFFIXES:
-        if location_name.endswith(suffix):
-            return kind
-    return None
-
-
 def weapon_families():
     from .itemsanity import USEFUL_WEAPON_FAMILIES
     return tuple(tuple(f) for f in USEFUL_WEAPON_FAMILIES)
@@ -352,14 +344,12 @@ def win_locations(world):
     """
     out = []
     include_hints = bool(getattr(getattr(world.options, "pad_approach_hints", None), "value", 0))
-    plan = getattr(world, "ctr_content_plan", None)
-    if plan is not None:
-        from .content_plan import win_kinds
-        kinds = win_kinds(plan)
+    from .content_plan import win_kinds
+    kinds = win_kinds(world.ctr_content_plan)
     for loc in world.multiworld.get_locations(world.player):
         if loc.address is None:
             continue
-        kind = kinds.get(loc.address) if plan is not None else win_kind(loc.name)
+        kind = kinds.get(loc.address)
         if kind is None and include_hints:
             kind = "hint"
         if kind is not None:

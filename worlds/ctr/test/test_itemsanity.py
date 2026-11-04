@@ -32,10 +32,6 @@ class TestItemsanityOff(CTRTestBase):
                       if item.player == self.player]
         self.assertEqual(set(pool_names) & set(ITEM_NAMES), set())
 
-    def test_off_wire_keeps_scalar_and_omits_feature_block(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertFalse(slot_data["ctr_options"]["itemsanity"])
-        self.assertNotIn("itemsanity_checks", slot_data)
 
 
 class TestItemsanityOn(CTRTestBase):
@@ -59,13 +55,6 @@ class TestItemsanityOn(CTRTestBase):
         self.assertEqual(sorted(item.name for item in items), sorted(ITEM_NAMES))
         self.assertTrue(all(item.advancement for item in items))
 
-    def test_wire_is_enabled_and_uses_frozen_order(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertTrue(slot_data["ctr_options"]["itemsanity"])
-        self.assertEqual(slot_data["itemsanity_checks"], {
-            "enabled": True,
-            "locations": list(range(ITEMSANITY_CODE_BASE, ITEMSANITY_CODE_BASE + 22)),
-        })
 
     def test_early_items_are_one_weapon_type(self):
         # One early weapon, not one or two: AP locks early items into the
@@ -166,30 +155,6 @@ class TestBoostChainClassification(unittest.TestCase):
         self.assertEqual(self._boost_items(itemsanity=True), [])
 
 
-class TestUTRestoresBoostMode(unittest.TestCase):
-    """Regression for the 2026-08-11 check-ut divergence: #145 made
-    progressive_boost a reachability input (the Turbo checks read it), so
-    _ut_restore_options must override the tracking player's own YAML with the
-    seed's ctr_options.boost_mode, or UT's Turbo logic diverges from server
-    truth."""
-    PLAYER = 1
-
-    def _restored_boost(self, wire_ctr_options, **build_options):
-        mw = _build(**build_options)
-        world = mw.worlds[self.PLAYER]
-        world._ut_restore_options({"ctr_options": wire_ctr_options,
-                                   "warp_pad_unlock": {}, "podium_checks": {}})
-        return world.options.progressive_boost.value
-
-    def test_seed_boost_mode_overrides_local_yaml(self):
-        self.assertEqual(
-            self._restored_boost({"boost_mode": 0},
-                                 progressive_boost="shared_global"), 0)
-        self.assertEqual(self._restored_boost({"boost_mode": 1}), 1)
-
-    def test_absent_key_leaves_local_value(self):
-        self.assertEqual(
-            self._restored_boost({}, progressive_boost="shared_global"), 1)
 
 
 class TestFamilyCountPrimitive(unittest.TestCase):

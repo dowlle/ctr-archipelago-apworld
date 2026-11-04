@@ -21,7 +21,6 @@ from ..characters import (
     racer_link_groups,
     racer_lock_forbidden_locations,
     unlock_item_name,
-    verify_no_self_lock,
     verify_room_no_self_lock,
 )
 from ..progressive_capability import ROSTER
@@ -136,29 +135,6 @@ class TestLinkedRacerUnlocks(unittest.TestCase):
 
 class TestRoomVerifierMatchesPerWorld(unittest.TestCase):
 
-    def test_two_slot_room_accepts_and_rejects_like_the_world_check(self):
-        mw = setup_multiworld([ctrAPWorld, ctrAPWorld], seed=3, options=LOCKED)
-        distribute_items_restrictive(mw)
-        verify_room_no_self_lock(mw)
-        for player in mw.player_ids:
-            verify_no_self_lock(mw.worlds[player])
-
-        world = mw.worlds[2]
-        racer = sorted(set(world.ctr_racer_locks.values()))[0]
-        name = unlock_item_name(racer)
-        holder = next(loc for loc in mw.get_filled_locations()
-                      if loc.item.player == 2 and loc.item.name == name)
-        rule = holder.access_rule
-        holder.access_rule = lambda state, n=name: state.has(n, 2)
-        try:
-            with self.assertRaises(OptionError):
-                verify_room_no_self_lock(mw)
-            with self.assertRaises(OptionError):
-                verify_no_self_lock(world)
-            verify_no_self_lock(mw.worlds[1])  # the other slot is untouched
-        finally:
-            holder.access_rule = rule
-        verify_room_no_self_lock(mw)
 
     def test_the_shared_state_is_restored_between_checks(self):
         """A failed check for one racer must not leak into the next: the

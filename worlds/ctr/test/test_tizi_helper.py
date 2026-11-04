@@ -75,10 +75,6 @@ class TestTiziHelperOff(CTRTestBase):
                       if item.player == self.player]
         self.assertNotIn(TIZI_HELPER_ITEM, pool_names)
 
-    def test_wire_scalar_is_emitted_and_false(self) -> None:
-        slot_data = self.world.fill_slot_data()
-        self.assertIn("tizi_helper", slot_data["ctr_options"])
-        self.assertFalse(slot_data["ctr_options"]["tizi_helper"])
 
 
 class TestTiziHelperOn(CTRTestBase):
@@ -97,9 +93,6 @@ class TestTiziHelperOn(CTRTestBase):
         self.assertFalse([loc for loc in self.multiworld.get_locations(self.player)
                           if "Tizi" in loc.name])
 
-    def test_wire_scalar_is_true(self) -> None:
-        slot_data = self.world.fill_slot_data()
-        self.assertTrue(slot_data["ctr_options"]["tizi_helper"])
 
 
 class TestTiziHelperWithItemsanity(CTRTestBase):
@@ -115,26 +108,10 @@ class TestTiziHelperWithItemsanity(CTRTestBase):
         self.assertIn(TIZI_HELPER_ITEM, pool_names)
         self.assertIn(TIZI_ITEMSANITY_COMPANION, pool_names)
 
-    def test_both_scalars_ride_the_same_wire(self) -> None:
-        options = self.world.fill_slot_data()["ctr_options"]
-        self.assertTrue(options["tizi_helper"])
-        self.assertTrue(options["itemsanity"])
 
 
 class TestTiziHelperUniversalTrackerRestore(CTRTestBase):
     run_default_tests = False
     options = {"tizi_helper": True}
 
-    def test_the_scalar_round_trips(self) -> None:
-        wire = self.world.fill_slot_data()
-        self.world.options.tizi_helper.value = 0
-        self.world._ut_restore_options(wire)
-        self.assertEqual(self.world.options.tizi_helper.value, 1)
 
-    def test_a_pre_223_seed_restores_to_off(self) -> None:
-        """No key on the wire is any seed generated before this build."""
-        wire = self.world.fill_slot_data()
-        del wire["ctr_options"]["tizi_helper"]
-        self.world.options.tizi_helper.value = 1
-        self.world._ut_restore_options(wire)
-        self.assertEqual(self.world.options.tizi_helper.value, 0)

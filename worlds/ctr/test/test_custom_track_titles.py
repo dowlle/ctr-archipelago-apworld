@@ -65,21 +65,5 @@ class TestClashSuffixes(unittest.TestCase):
             self.assertEqual(ct.seed_titles(entries)[1], "Neon Rush (Custom, Ana)")
 
 
-class TestTitlesWire(unittest.TestCase):
-    def test_round_trip_and_refusals(self):
-        titles = {1: "Baby T Park", 2: "Crash Cove (Custom)"}
-        block = ct.titles_to_wire(titles)
-        self.assertEqual(block, {"version": 1, "tracks": [
-            {"slot": 1, "title": "Baby T Park"}, {"slot": 2, "title": "Crash Cove (Custom)"}]})
-        self.assertEqual(ct.titles_from_wire(block, [1, 2]), titles)
-        bad = [
-            None, {"version": True, "tracks": []}, {"version": 1.0, "tracks": []}, {"version": "1", "tracks": []},
-            {"version": 2, "tracks": []}, {"version": 1, "tracks": {}},
-            {"version": 1, "tracks": [{"slot": 3, "title": "X"}]},
-            {"version": 1, "tracks": [{"slot": 1, "title": "[X]"}]},
-            {"version": 1, "tracks": [{"slot": True, "title": "X"}]},
-            {"version": 1, "tracks": [{"slot": 1, "title": "X"}, {"slot": 1, "title": "Y"}]},
-        ]
-        for block in bad:
-            with self.subTest(block=block):
-                self.assertIsNone(ct.titles_from_wire(block, [1, 2]))
+# The legacy custom_track_titles wire reader/writer was deleted in row 12.
+# Content-plan title validation and restoration are tested with the plan.

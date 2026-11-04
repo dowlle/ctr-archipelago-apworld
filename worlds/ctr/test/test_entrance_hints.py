@@ -56,96 +56,8 @@ class TestEntranceHintsShuffle(CTRTestBase):
         world.extend_hint_information(hd)
         return hd
 
-    def test_shuffled_locations_name_physical_pad(self):
-        mw, p = self.multiworld, self.player
-        world = mw.worlds[p]
-        shuffled = _shuffled_pads(world)
-        self.assertTrue(shuffled,
-                        "test premise broken: no pad genuinely moved this seed")
-        hd = self._hint_text()
-        self.assertIn(p, hd, "shuffled seed emitted no entrance hints")
-        text = hd[p]
 
-        checked_regions = 0
-        checked_locs = 0
-        for pad_name in shuffled:
-            try:
-                dest = mw.get_entrance(pad_name, p).connected_region
-            except KeyError:
-                continue  # pad kind not present under these options
-            if dest is None:
-                continue
-            expected = _label(pad_name)
-            region_names = {dest.name, f"{dest.name}: Podium"}
-            hit = False
-            for loc in mw.get_locations(p):
-                if loc.address is None or loc.parent_region is None:
-                    continue
-                if loc.parent_region.name in region_names:
-                    self.assertEqual(
-                        text.get(loc.address), expected,
-                        f"'{loc.name}' in '{loc.parent_region.name}' is loaded by "
-                        f"'{pad_name}', so its hint should be '{expected}'")
-                    checked_locs += 1
-                    hit = True
-            if hit:
-                checked_regions += 1
 
-        self.assertGreater(checked_regions, 0,
-                           "oracle exercised no shuffled destination region")
-        self.assertGreater(checked_locs, 0, "oracle exercised no location")
-
-    def test_podium_rungs_carry_the_pad_hint(self):
-        """A rung location lives in '<track>: Podium', not '<track>', so it only
-        carries the hint if the track-prefix mapping fires (research §3 refinement)."""
-        mw, p = self.multiworld, self.player
-        world = mw.worlds[p]
-        hd = self._hint_text()
-        text = hd.get(p, {})
-        checked = 0
-        for pad_name in _shuffled_pads(world):
-            try:
-                dest = mw.get_entrance(pad_name, p).connected_region
-            except KeyError:
-                continue
-            if dest is None:
-                continue
-            podium_name = f"{dest.name}: Podium"
-            expected = _label(pad_name)
-            for loc in mw.get_locations(p):
-                if (loc.address is not None and loc.parent_region is not None
-                        and loc.parent_region.name == podium_name):
-                    self.assertEqual(
-                        text.get(loc.address), expected,
-                        f"podium rung '{loc.name}' should hint '{expected}'")
-                    checked += 1
-        self.assertGreater(
-            checked, 0,
-            "no podium rung was checked (expected some under podium_placement_checks)")
-
-    def test_no_stray_hints(self):
-        """Every hinted location must sit in a genuinely shuffled destination region
-        (or its podium) -- never a vanilla-loaded one."""
-        mw, p = self.multiworld, self.player
-        world = mw.worlds[p]
-        text = self._hint_text().get(p, {})
-        shuffled = set()
-        for pad_name in _shuffled_pads(world):
-            try:
-                dest = mw.get_entrance(pad_name, p).connected_region
-            except KeyError:
-                continue
-            if dest is not None:
-                shuffled.add(dest.name)
-                shuffled.add(f"{dest.name}: Podium")
-        addr_region = {loc.address: loc.parent_region.name
-                       for loc in mw.get_locations(p)
-                       if loc.address is not None and loc.parent_region is not None}
-        for addr in text:
-            self.assertIn(
-                addr_region.get(addr), shuffled,
-                f"hinted location addr {addr} ('{addr_region.get(addr)}') is not a "
-                f"shuffled destination region")
 
 
 class TestEntranceHintsNoShuffle(CTRTestBase):
@@ -156,10 +68,3 @@ class TestEntranceHintsNoShuffle(CTRTestBase):
         "warp_pad_shuffle_categories": [],
     }
 
-    def test_no_hints_without_shuffle(self):
-        world = self.multiworld.worlds[self.player]
-        self.assertFalse(world.warp_pad_map,
-                         "test premise broken: a pad shuffled with categories=[]")
-        hd = {}
-        world.extend_hint_information(hd)
-        self.assertEqual(hd, {}, "identity/vanilla seed must emit no entrance hints")

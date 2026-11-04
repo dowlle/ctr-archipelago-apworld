@@ -64,7 +64,7 @@ class CrystalLocationClass(LocationClass):
         if not (getattr(getattr(options, "crystalsanity", None), "value", 0)
                 and options.include_battle_arenas.value):
             return []
-        from .cortex_vortex_track import dropped_region
+        from .cortex_vortex import dropped_region
         dropped = dropped_region(options)
         return [name for name, _code, arena in self.all_locations() if arena != dropped]
 
@@ -76,18 +76,3 @@ CRYSTAL_CLASS = CrystalLocationClass()
 ARENA_LEVELS = (21, 19, 23, 18)
 INSTANCE_BASES = ((8, 8, 8, 0), (28, 28, 28, 19),
                   (25, 25, 25, 25), (45, 45, 45, 41))
-
-
-def wire_block(world):
-    """Only actual seed locations travel, in authored-position order."""
-    names = {loc.name for loc in world.multiworld.get_locations(world.player)}
-    arenas = {}
-    for ai, arena in enumerate(CRYSTAL_ARENAS):
-        codes = [CRYSTAL_CLASS.code_for(arena, n) for n in range(1, 21)
-                 if crystal_name(arena, n) in names]
-        if codes:
-            if len(codes) != 20:
-                raise ValueError(f"{arena}: crystalsanity needs exactly 20 positions")
-            arenas[str(ARENA_LEVELS[ai])] = {
-                "instance_bases": list(INSTANCE_BASES[ai]), "locations": codes}
-    return {"version": 1, "arenas": arenas}

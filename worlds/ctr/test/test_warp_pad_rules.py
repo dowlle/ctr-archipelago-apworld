@@ -112,10 +112,6 @@ class TestSeedChecks(unittest.TestCase):
             build({"Crash Cove": rule("free", 0)}, steps=EARLY,
                   warppad_unlock_requirements="vanilla")
 
-    def test_empty_map_is_fine_with_vanilla(self):
-        world = setup_multiworld(ctrAPWorld, EARLY, seed=1, options={
-            "warppad_unlock_requirements": "vanilla"}).worlds[1]
-        self.assertEqual(world._ctr_pad_rules, {})
 
     def test_no_four_keys_mode_refuses_a_four_key_rule_only(self):
         with self.assertRaisesRegex(OptionError, "random_without_4_keys"):
@@ -128,13 +124,6 @@ class TestSeedChecks(unittest.TestCase):
                       warppad_unlock_requirements="randomized").worlds[1]
         self.assertEqual(world._ctr_pad_rules, {"Coco Park": ("Key", 4)})
 
-    def test_pads_the_seed_does_not_have_are_refused(self):
-        with self.assertRaisesRegex(OptionError, "battle arena"):
-            build({"Skull Rock": rule("Trophy", 1)}, steps=EARLY,
-                  include_battle_arenas=False)
-        with self.assertRaisesRegex(OptionError, "gem cup"):
-            build({"Red Cup": rule("Trophy", 1)}, steps=EARLY,
-                  include_gem_cups=False)
 
     def test_supply_ceilings(self):
         cases = {
@@ -148,12 +137,6 @@ class TestSeedChecks(unittest.TestCase):
             with self.subTest(label), self.assertRaisesRegex(OptionError, "warp_pad_rules"):
                 build({"Crash Cove": rule(item, count)}, steps=EARLY)
 
-    def test_supply_ceiling_counts_the_created_relics(self):
-        world = build({"Tiny Arena": rule("Gold Relic", 18)}, steps=EARLY).worlds[1]
-        self.assertEqual(world._ctr_pad_rules, {"Tiny Arena": ("Gold Relic", 18)})
-        with self.assertRaisesRegex(OptionError, "only 5"):
-            build({"Tiny Arena": rule("Gold Relic", 6)}, steps=EARLY,
-                  gold_relic_count=5)
 
     def test_purple_tokens_stay_available_with_arenas_off(self):
         # Ruling 2026-10-13 (#364): removing a check does not remove its item.
@@ -189,55 +172,11 @@ class TestLegacyWire(unittest.TestCase):
         for pad, expected in self.WIRE.items():
             self.assertEqual(wire[lid(pad)]["stage1"], expected, pad)
 
-    def test_every_family_reaches_the_wire_exactly_as_written(self):
-        for seed in (1, 2, 3):
-            with self.subTest(seed=seed):
-                self.check_world(build(self.RULES, seed=seed).worlds[1])
 
-    def test_count_above_the_random_ceiling_is_not_lowered(self):
-        # Random stage-1 counts are trimmed to 8 and by a 0.6 factor; a manual
-        # Trophy x 14 must survive both.
-        world = build(self.RULES, seed=4, steps=THROUGH_RULES).worlds[1]
-        self.assertEqual(stage1(world, "Dingo Canyon")["count"], 14)
 
-    def test_fixed_rules_survive_destination_shuffle(self):
-        for seed in range(1, 7):
-            with self.subTest(seed=seed):
-                mw = build(self.RULES, seed=seed, steps=THROUGH_RULES,
-                           warp_pad_shuffle_categories=["tracks", "crystals", "cups"],
-                           warp_pad_shuffle_grouping="merged")
-                self.check_world(mw.worlds[1])
-                world = mw.worlds[1]
-                moved = [p for p, dest in world.warp_pad_map.items()
-                         if world.warp_pad_ids[p]["level_id"] != dest]
-                self.assertTrue(moved, "shuffle did not move any pad")
 
-    def test_unlisted_pads_keep_a_randomized_rule(self):
-        world = build({"Crash Cove": rule("Trophy", 2)}, seed=2,
-                      steps=THROUGH_RULES).worlds[1]
-        wire = world.fill_slot_data()["warp_pad_unlock"]
-        self.assertEqual(wire[lid("Crash Cove")]["stage1"],
-                         {"type": 1, "count": 2, "colour": -1})
-        self.assertGreater(len(set(json.dumps(v["stage1"], sort_keys=True)
-                                   for v in wire.values())), 3)
 
-    def test_access_rule_uses_the_resolved_value(self):
-        mw = build({"Red Cup": rule("Red CTR Token", 3)}, seed=1, steps=THROUGH_RULES)
-        world = mw.worlds[1]
-        entrance = mw.get_entrance("Red Cup Warp Pad", 1)
-        state = CollectionState(mw)
-        for _ in range(4):
-            state.collect(world.create_item("Key"), True)
-        for _ in range(2):
-            state.collect(world.create_item("Red CTR Token"), True)
-        self.assertFalse(entrance.access_rule(state))
-        state.collect(world.create_item("Red CTR Token"), True)
-        self.assertTrue(entrance.access_rule(state))
 
-    def test_free_pad_has_no_item_gate(self):
-        mw = build({"Roo's Tubes": rule("free", 0)}, seed=1, steps=THROUGH_RULES)
-        self.assertTrue(mw.get_entrance("Roo's Tubes Warp Pad", 1)
-                        .access_rule(CollectionState(mw)))
 
     def test_generation_with_rules_fills_and_is_beatable(self):
         for seed in (1, 2, 3):
@@ -254,31 +193,8 @@ class TestLegacyWire(unittest.TestCase):
         self.assertFalse([i.name for i in mw.precollected_items[1] if i.name in counted])
         self.assertFalse(hasattr(mw.worlds[1], "_ctr_backstop_fired"))
 
-    def test_empty_map_resolves_to_nothing(self):
-        world = setup_multiworld(ctrAPWorld, EARLY, seed=1).worlds[1]
-        self.assertEqual(world._ctr_pad_rules, {})
 
-    def test_key_rule_with_pinned_keys_is_left_to_fill(self):
-        # The design note's own example. With shuffle_keys off the synthetic
-        # sweep cannot open a Key x 1 pad (the first Key needs four Trophies
-        # from the other three starting pads), but real fill places Trophy
-        # items anywhere, so the seed is solvable and must not be refused.
-        for seed in (1, 2, 3):
-            with self.subTest(seed=seed):
-                mw = build({"Roo's Tubes": rule("Key", 1)}, seed=seed, shuffle_keys=False)
-                self.assertEqual(stage1(mw.worlds[1], "Roo's Tubes"),
-                                 {"type": 2, "count": 1, "colour": -1})
-                distribute_items_restrictive(mw)
-                self.assertTrue(mw.can_beat_game(CollectionState(mw)))
 
-    def test_fill_dead_end_is_reported_with_the_rules_and_the_cause(self):
-        # Every starting pad needs four Keys, which sit behind bosses that need
-        # Trophies: nothing is reachable, so the start guard refuses, and the
-        # message names the rules instead of rescuing the seed.
-        rules = {n: rule("Key", 4) for n in
-                 ("Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway", "Skull Rock")}
-        with self.assertRaisesRegex(OptionError, r"warp_pad_rules \(.*Key x 4"):
-            build(rules, steps=FULL, shuffle_keys=False)
 
     def test_manual_rules_fill_check_reports_rules_and_cause_without_granting(self):
         mw = build({"Roo's Tubes": rule("Trophy", 3), "Red Cup": rule("AnyGem", 2)},

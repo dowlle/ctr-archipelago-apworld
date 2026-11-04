@@ -223,7 +223,7 @@ class ItemBoxLocationClass(LocationClass):
         if toggle is None or not bool(toggle.value):
             return []
         tier = int(getattr(options, "shortcut_knowledge").value)
-        from .cortex_vortex_track import dropped_track
+        from .cortex_vortex import dropped_track
         # A destination the Cortex Vortex track dropped takes its boxes with
         # it (Cortex Vortex itself has none).
         dropped = dropped_track(options)

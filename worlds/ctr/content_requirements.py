@@ -7,7 +7,7 @@ Requirements come in two forms:
   lands behind it, and every pad with several races takes a Key stage 2 counted
   from the physical pad's hub.
 - Random: a **reference placement** gives each check of the plan a stand-in
-  item, and the v0.2.x simulated playthrough (warp_pad_logic) runs over it, so
+  item, and the v0.2.x simulated playthrough (content_playthrough) runs over it, so
   a pad only asks for items held when the simulated player reaches it. The
   simulation is not rewritten: ReferenceWorld shows it the plan as the region
   graph it already reads. Regions are keyed by physical pad, because the plan
@@ -22,7 +22,7 @@ import json
 import pkgutil
 
 from . import (arena_content, content_bosses, content_cups, content_item_pool, destinations, sphere0_guard,
-               warp_pad_logic, warp_pad_rules)
+               content_playthrough, warp_pad_rules)
 
 FEATURE = "pad_requirements_v1"
 #: `warppad_unlock_requirements` values and their names on the plan.
@@ -171,11 +171,11 @@ def own_content(seated):
 
 
 def capacity_met(seated, seats, rungs):
-    """The trophy-capable slots of each boss floor (warp_pad_logic._BOSS_CAP_FLOORS):
+    """The trophy-capable slots of each boss floor (content_playthrough._BOSS_CAP_FLOORS):
     a track holds its race and rungs, an arena one check, a cup counts none, so
     too many cups on early pads fail the floor (Rulebook, destinations rule 5)."""
     keys_of = {seat[0]: seat[2] for seat in seats}
-    for floor, keys in warp_pad_logic._BOSS_CAP_FLOORS:
+    for floor, keys in content_playthrough._BOSS_CAP_FLOORS:
         capacity = sum(0 if content_kind(item) == "cup" else 1 if content_kind(item) == "arena" else 1 + rungs
                        for physical, item in seated.items() if keys_of[physical] <= keys)
         if capacity < floor:
@@ -380,7 +380,7 @@ class _Multiworld:
 
 
 class ReferenceWorld:
-    """What warp_pad_logic reads of a world, for the plan's reference placement.
+    """What content_playthrough reads of a world, for the plan's reference placement.
 
     Each occupied pad is a region named for its physical pad, behind an exit
     with the pad's hub Key floor. The first race's first check is the region's
@@ -456,7 +456,7 @@ class ReferenceWorld:
     def breadth(self, out, held=()):
         """Checks a finished draw opens at the start, `held` counted as owned."""
         self.measuring = True
-        reach = warp_pad_logic._sphere0_breadth(self, out, lambda t: t, True, held)
+        reach = content_playthrough._sphere0_breadth(self, out, lambda t: t, True, held)
         self.measuring = False
         return reach
 
@@ -479,23 +479,23 @@ def draw(view, mode, collapse):
     the early item takes it (sphere0_guard.mark_early_opener). Only a start no
     item widens loses them, silently."""
     def attempts(best, width, without_stage2):
-        for _ in range(warp_pad_logic._SPHERE0_REPAIR_TRIES):
-            out = warp_pad_logic._run_sphere_search_once(view, mode, None, without_stage2, True)
+        for _ in range(content_playthrough._SPHERE0_REPAIR_TRIES):
+            out = content_playthrough._run_sphere_search_once(view, mode, None, without_stage2, True)
             reach = view.breadth(out)
             if reach > width:
                 best, width = out, reach
-            if reach >= warp_pad_logic._SPHERE0_MIN_BREADTH:
+            if reach >= content_playthrough._SPHERE0_MIN_BREADTH:
                 break
         return best, width
 
     best, width = attempts(None, -1, collapse)
-    if width < warp_pad_logic._SPHERE0_MIN_BREADTH:
+    if width < content_playthrough._SPHERE0_MIN_BREADTH:
         if width < sphere0_guard.MIN_STARTING_CHECKS:
             # Every open pad goes free, the top of the 3 to 5 free pads, before
             # a seed is refused for its start.
             view.free_every_open_pad()
             best, width = attempts(best, width, collapse)
-        if not collapse and not any(view.breadth(best, (name,)) > width for name in warp_pad_logic.Inv.CAPS):
+        if not collapse and not any(view.breadth(best, (name,)) > width for name in content_playthrough.Inv.CAPS):
             best, width = attempts(best, width - 1, True)
     return {title: (stages[1], stages[2]) for title, stages in best.items() if title in view.ctr_sim_pads}
 
@@ -522,11 +522,11 @@ def check_record(plan, stage1, stage2, manual, rows, require):
     first = {int(rid.split(":")[1]): row["predicate"] for rid, row in {**stage1, **manual}.items()}
     for row in stage1.values():
         predicate = row["predicate"]
-        require(predicate.get("item") == key or predicate["count"] <= warp_pad_logic._STAGE1_COUNT_CEILING,
+        require(predicate.get("item") == key or predicate["count"] <= content_playthrough._STAGE1_COUNT_CEILING,
                 "a drawn stage 1 asks above its count ceiling")
     for rid, row in stage2.items():
         predicate = row["predicate"]
-        require(predicate.get("item") == key or predicate["count"] <= warp_pad_logic._STAGE2_COUNT_CEILING,
+        require(predicate.get("item") == key or predicate["count"] <= content_playthrough._STAGE2_COUNT_CEILING,
                 "a drawn stage 2 asks above its count ceiling")
         before = first.get(int(rid.split(":")[1]))
         require(before is None or predicate["count"] > before["count"]

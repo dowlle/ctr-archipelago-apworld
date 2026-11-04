@@ -68,6 +68,12 @@ def cups_of(plan):
 
 
 class TestCupDraw(unittest.TestCase):
+    def test_profile_without_cups_is_unchanged(self):
+        opts=profile_options()
+        baseline=make_world(opts).fill_slot_data()
+        opts['cup_sweep_checks']=True
+        self.assertEqual(make_world(opts).fill_slot_data(),baseline)
+
     def test_varied_profiles_generate_validate_and_restore(self):
         generated = 0
         for seed in range(24):

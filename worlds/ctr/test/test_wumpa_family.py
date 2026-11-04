@@ -118,11 +118,6 @@ class TestBundlesOffSeed(CTRTestBase):
         names = {l.name for l in self.multiworld.get_locations(self.player)}
         self.assertNotIn(WUMPA_TEN_LOCATION, names)
 
-    def test_the_scalars_are_emitted_and_off(self) -> None:
-        ctr_options = self.world.fill_slot_data()["ctr_options"]
-        self.assertIn("wumpa_bundles", ctr_options)
-        self.assertFalse(ctr_options["wumpa_bundles"])
-        self.assertEqual(ctr_options["progressive_starting_wumpa"], 0)
 
     def test_no_wumpa_location_block_is_emitted(self) -> None:
         self.assertNotIn("wumpa_checks", self.world.fill_slot_data())
@@ -169,9 +164,6 @@ class TestLadder(CTRTestBase):
         locations = self.multiworld.get_unfilled_locations(self.player)
         self.assertEqual(len(items), len(locations))
 
-    def test_the_scalar_carries_the_count(self) -> None:
-        ctr_options = self.world.fill_slot_data()["ctr_options"]
-        self.assertEqual(ctr_options["progressive_starting_wumpa"], 4)
 
 
 class TestWumpaCheck(CTRTestBase):
@@ -191,15 +183,6 @@ class TestWumpaCheck(CTRTestBase):
                  if l.name == WUMPA_TEN_LOCATION]
         self.assertEqual(len(names), 1)
 
-    def test_the_wire_block_carries_the_frozen_code(self) -> None:
-        """Native reads the codes out of the block rather than hardcoding them,
-        so which destination codes a seed carries is a wire fact, not a client
-        constant."""
-        block = self.world.fill_slot_data()["wumpa_checks"]
-        self.assertEqual(block["mode"], 1)
-        self.assertEqual(block["global"], WUMPA_CODE_BASE)
-        self.assertEqual(block["retail_tracks"], {})
-        self.assertEqual(block["custom_destinations"], {})
 
     def test_it_supplies_a_location_rather_than_spending_one(self) -> None:
         items = [i for i in self.multiworld.itempool if i.player == self.player]

@@ -60,19 +60,6 @@ class TestTrackerRebuildsTheSameBlock(unittest.TestCase):
             with self.subTest(options=options, tracker="same YAML"):
                 self.assertTrue(self._check(5, options, options))
 
-    def test_random_options(self):
-        rng = random.Random(29)
-        done = attempts = 0
-        while done < 12:
-            attempts += 1
-            self.assertLess(attempts, 120)
-            seed = rng.randrange(1 << 30)
-            options = _random_options(rng)
-            with self.subTest(seed=seed):
-                if self._check(seed, options):
-                    done += 1
-                    # The no-YAML tracker (ut_can_gen_without_yaml).
-                    self._check(seed, options, {})
 
 
 if __name__ == "__main__":

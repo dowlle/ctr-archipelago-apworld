@@ -173,24 +173,6 @@ def resolve_starting_character(world) -> str:
     return name
 
 
-def restore_starting_character(world, ctr_options: Dict[str, object]) -> str:
-    """Universal Tracker: take the connected seed's starting racer off the wire.
-
-    `ctr_options.starting_character` carries the ENGINE character id. A wire
-    from before this feature has no such key, in which case there is nothing to
-    restore and the normal draw runs -- that older seed had no character items
-    and no racer locks, so whichever racer we pick changes nothing about its
-    graph.
-    """
-    raw = ctr_options.get("starting_character")
-    if raw is None:
-        return resolve_starting_character(world)
-    name = CHARACTER_ID_TO_NAME.get(int(raw))
-    if name is None:
-        return resolve_starting_character(world)
-    return name
-
-
 def _option_key(character: str) -> str:
     """Roster name -> the snake_case key its Choice option uses.
 
@@ -236,25 +218,6 @@ def _excluded_racer(world, name: str) -> bool:
     """A racer this seed never lets you play: never a start draw, never an
     unlock item, never a racer lock."""
     return name == OXIDE and oxide_removed(world)
-
-
-def racer_locks_requested(world) -> bool:
-    """Whether this seed ASKED for racer locks, after the all-unlocked AND.
-
-    Requesting is not the same as getting: the request is a maximum, and a seed
-    whose eligible pad set is empty carries no lock at all. Ask
-    `racer_locks_effective` for what the seed actually has -- this predicate is
-    for the option-level warnings only.
-
-    With all-unlocked mode on there is no item that could gate a pad, so a lock
-    would either be unsatisfiable or trivially free. `forced_options` logs the
-    downgrade; this is the single place that resolves it, so nothing else in
-    the world re-derives the pair.
-    """
-    if not unlocks_enabled(world):
-        return False
-    return legacy_boolean_request(world) or bool(
-        world.options.racer_locked_pads.value)
 
 
 def racer_locks_effective(world) -> bool:
@@ -331,44 +294,6 @@ def created_unlock_names(world) -> List[str]:
     start = world.ctr_starting_character
     return [name for name in ROSTER
             if name != start and not _excluded_racer(world, name)]
-
-
-def raise_if_unlocks_exceed_location_supply(world, *, available_supply: int) -> None:
-    """RAISE guard: the 15 unlock items must fit in THIS seed's real location
-    supply (#178 convention, and the same shape as
-    `progressive_capability.raise_if_capability_items_exceed_location_supply`).
-
-    The unlock items bring ZERO locations of their own, so on a deliberately
-    reduced seed (Podium Placement Checks off, heavy `exclude_locations`) they
-    genuinely do not fit -- the AP invariant the 2026-07-23 wayfarer restated
-    as "items == locations, in EVERY mode". Raise rather than dropping items:
-    silently shipping 9 of 15 racers would be exactly the kind of unannounced
-    cap this project forbids, and it would also strand any racer lock pointing
-    at a racer that never got created.
-
-    `available_supply` is the caller's LIVE net-capacity figure (the seed's
-    final post-creation unfilled count minus every non-unlock item in the
-    COMPLETE current pool -- character unlocks, the comfort pack, itemsanity
-    weapons and the progressive packs all included), never a predicted
-    constant. The message reports needed vs available and tells the player to
-    enable more location checks (ANY enabled location class can supply
-    capacity: podium rungs, item boxes, itemsanity checks, ...) or reduce
-    item-producing options, without pretending one family is mandatory.
-    """
-    needed = len(created_unlock_names(world))
-    if needed <= 0:
-        return
-    if available_supply >= needed:
-        return
-    raise OptionError(
-        f"CTR: the character phase adds {needed} character unlock item(s) to "
-        f"the pool, but this seed has only {available_supply} unfilled "
-        f"location(s) left for them. Character unlocks add no locations of "
-        f"their own. Enable more location checks (e.g. Podium Placement "
-        f"Checks, Item Box Checks, Itemsanity, or another location family) or "
-        f"reduce item-producing options (e.g. set 'character_unlocks' to "
-        f"false for all-unlocked mode, which makes every racer available "
-        f"from the start and creates no unlock items at all).")
 
 
 # ---------------------------------------------------------------------------
@@ -480,41 +405,6 @@ def eligible_lock_pads(world) -> List[str]:
     return out
 
 
-def resolve_racer_locks(world) -> Dict[str, str]:
-    """{pad exit name -> roster name required to enter it}.
-
-    Resolved ONCE per seed, in `Regions.create_regions` right after the sphere
-    search has produced `world.warp_pad_unlock`, and stashed on the world. This
-    is the same "draw once, store on the world, never recompute" rule
-    `gem_cup_legs` and the #109 active box slots follow, and for the same
-    reason: Rules.py, `fill_slot_data` and the spoiler must not be able to
-    disagree about which pads are locked.
-
-    The required racer is never the starting character. A lock on the racer you
-    already have would be satisfied at spawn and would spend an eligible pad on
-    nothing. It is also never Oxide when Remove Playable Oxide is on (#426):
-    his unlock item does not exist, so such a lock could never open.
-
-    The player's `racer_locked_pads` count is a MAXIMUM: the seed takes
-    `min(requested, eligible)`, so an ambitious request on a seed with few
-    randomized pads quietly produces fewer locks rather than failing. Both
-    counts are stored on the world here (`ctr_racer_lock_counts`) under the
-    same draw-once rule as the map itself, because slot data reports them and
-    must not recompute an eligible set that has since been overwritten.
-    """
-    pads = eligible_lock_pads(world) if unlocks_enabled(world) else []
-    requested = requested_lock_count(world, len(pads))
-    world.ctr_racer_lock_counts = {
-        "requested": requested, "eligible": len(pads)}
-    n = min(requested, len(pads))
-    if n <= 0:
-        return {}
-    chosen_pads = world.random.sample(pads, n)
-    candidates = [c for c in ROSTER if c != world.ctr_starting_character
-                  and not _excluded_racer(world, c)]
-    return dict(zip(sorted(chosen_pads), spread_lock_racers(world, candidates, n)))
-
-
 def spread_lock_racers(world, candidates: List[str], n: int) -> List[str]:
     """`n` required racers, spread as evenly as the roster allows.
 
@@ -551,81 +441,6 @@ def racer_lock_counts(world) -> Tuple[int, int]:
     rather than re-deriving, so support logs and the wire cannot disagree."""
     counts = getattr(world, "ctr_racer_lock_counts", None) or {}
     return int(counts.get("requested", 0)), int(counts.get("eligible", 0))
-
-
-def reconstruct_racer_locks_from_wire(world, passthrough: Dict[str, object]
-                                      ) -> Dict[str, str]:
-    """Universal Tracker: pin the connected seed's locks instead of re-drawing.
-
-    `resolve_racer_locks` samples `world.random`, and a passthrough carries no
-    RNG replay, so a re-draw would produce a DIFFERENT set of locked pads and
-    UT would report a graph the server does not have. Read the wire block back
-    instead. An absent or malformed block falls back to "no locks", which is
-    the correct reading of a pre-character-phase seed.
-    """
-    block = (passthrough or {}).get("racer_locks") or {}
-    pads = block.get("pads") or {}
-    if not isinstance(pads, dict) or not pads:
-        world.ctr_racer_lock_counts = {"requested": 0, "eligible": 0}
-        return {}
-    pad_ids = getattr(world, "warp_pad_ids", {}) or {}
-    by_level_id = {str(meta["level_id"]): name
-                   for name, meta in pad_ids.items()}
-    out: Dict[str, str] = {}
-    for lid, character_id in pads.items():
-        pad_name = by_level_id.get(str(lid))
-        name = CHARACTER_ID_TO_NAME.get(int(character_id))
-        if pad_name is not None and name is not None:
-            out[pad_name] = name
-    # The counts ride the wire too, so UT reports the connected seed's numbers
-    # instead of the tracking player's YAML. A seed generated before the count
-    # metadata existed carries neither key; fall back to what the restored pad
-    # data can prove -- the locks that are actually on the wire, and this
-    # seed's own eligible set -- rather than to a default the seed never had.
-    world.ctr_racer_lock_counts = {
-        "requested": int(block.get("requested_count", len(out))),
-        "eligible": int(block.get("eligible_count",
-                                  len(eligible_lock_pads(world)))),
-    }
-    return out
-
-
-def racer_lock_slot_data(world) -> Dict[str, object]:
-    """The `racer_locks` wire block (slot_data Contract Sec.7h).
-
-    Shape: {"enabled": bool, "pads": {"<physical pad LevelID>": <engine
-    characterID 0..15>}}. Keys are physical pad LevelIDs as JSON strings, the
-    same keying `warp_pad_unlock` uses, so native reads them through the parser
-    it already has. Values are ENGINE character ids, not roster slots, so
-    native's gate needs no second mapping table.
-
-    `enabled` is emitted even when the option is off (with an empty `pads`), so
-    a tracker can tell "locks off" from "old seed" without inferring from block
-    absence -- the same reason `itemsanity` and `shortcut_knowledge` are always
-    emitted as raw scalars. It reports the EFFECTIVE feature: a request that
-    found no eligible pad is off, which is the same reading `unlock_
-    classification` takes.
-
-    `requested_count` and `eligible_count` are diagnostics for trackers and
-    support logs -- "you asked for 8, this seed only had 5 pads that could take
-    one". Native reads neither; it enforces the resolved `pads` map and nothing
-    else, so it never re-derives a selection.
-    """
-    pad_ids = getattr(world, "warp_pad_ids", {}) or {}
-    locks = getattr(world, "ctr_racer_locks", {}) or {}
-    pads: Dict[str, int] = {}
-    for pad_name, character in locks.items():
-        meta = pad_ids.get(pad_name)
-        if meta is None:
-            continue
-        pads[str(meta["level_id"])] = ROSTER_CHARACTER_ID[character]
-    requested, eligible = racer_lock_counts(world)
-    return {
-        "enabled": bool(pads),
-        "requested_count": requested,
-        "eligible_count": eligible,
-        "pads": pads,
-    }
 
 
 def locked_destination_regions(world, pad_name: str) -> list:
@@ -694,15 +509,6 @@ def racer_link_groups(multiworld, player: int, item_name: str) -> Tuple[int, ...
     item that actually unlocks the racer."""
     return tuple(gid for gid, group in getattr(multiworld, "groups", {}).items()
                  if player in group["players"] and item_name in group["item_pool"])
-
-
-def verify_no_self_lock(world) -> None:
-    """Post-fill proof that no racer's unlock item sits behind that racer's own
-    lock (issue #209, "character-locked-pad solvability logic gets built and
-    proven ... so a fill can never place a character's own unlock item behind a
-    pad that requires that same character"). One world; generation runs
-    `verify_room_no_self_lock` once for every CTR slot instead."""
-    verify_room_no_self_lock(world.multiworld, [world])
 
 
 def verify_room_no_self_lock(multiworld, worlds=None) -> None:

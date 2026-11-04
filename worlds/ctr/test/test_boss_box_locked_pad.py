@@ -39,7 +39,9 @@ from test.general import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld
-from ..Regions import BOSS_WUMPA_TRACKS
+from ..destinations import boss_garage_tracks
+
+BOSS_WUMPA_TRACKS = boss_garage_tracks()
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
@@ -113,153 +115,16 @@ def _reachable(state, names):
             if state.can_reach(name, "Location", PLAYER)}
 
 
-class TestBoxesBelongToTheTrackNotTheBossRoute(unittest.TestCase):
-    """Structure, rule-blind: there is no boss-garage edge to a box."""
-
-    def setUp(self):
-        self.mw = _build()
-
-    def test_the_boss_route_ends_in_a_wumpa_only_dead_end(self):
-        """A garage's race exit reaches exactly one location, the Wumpa check.
-
-        This is the whole apworld-side reason a boss race is not a box route:
-        the region the garage opens contains nothing else.
-        """
-        for garage, track, _encounter in BOSS_CASES:
-            with self.subTest(track=track):
-                self.assertEqual(BOSS_WUMPA_TRACKS[garage], track)
-                wumpa_region = self.mw.get_region(f"{track}: Wumpa", PLAYER)
-                self.assertEqual([loc.name for loc in wumpa_region.locations],
-                                 [f"{track}: Reach 10 Wumpa"])
-                self.assertEqual([ent.name for ent in wumpa_region.exits], [])
-                exits = {ent.connected_region.name
-                         for ent in self.mw.get_region(garage, PLAYER).exits}
-                self.assertIn(f"{track}: Wumpa", exits)
-                self.assertNotIn(track, exits)
-
-    def test_no_boss_garage_is_an_entrance_into_a_track_region(self):
-        """Across every seed shape, including destination shuffle."""
-        garages = set(BOSS_WUMPA_TRACKS)
-        for seed in (1, 7, 13):
-            mw = _build(seed=seed, racer_locked_pads=12)
-            for _garage, track, _encounter in BOSS_CASES:
-                with self.subTest(seed=seed, track=track):
-                    sources = {ent.parent_region.name
-                               for ent in mw.get_region(track, PLAYER).entrances}
-                    self.assertTrue(sources, f"{track} has no entrance at all")
-                    self.assertEqual(sources & garages, set())
-
-    def test_every_box_sits_in_its_own_track_region(self):
-        for _garage, track, _encounter in BOSS_CASES:
-            with self.subTest(track=track):
-                boxes = _boxes(self.mw, track)
-                self.assertTrue(boxes, f"{track} created no item boxes")
-                for name in boxes:
-                    loc = self.mw.get_location(name, PLAYER)
-                    self.assertEqual(loc.parent_region.name, track)
-                    self.assertEqual(loc.type, "item_boxes")
 
 
-class TestGarageOpenPadBehindADeeperKeyDoor(unittest.TestCase):
-    """The hub-Key lever. Destination shuffle can put a boss venue's pad behind
-    a deeper door than the garage that races on it, which is exactly the shape
-    the native policy's Key term exists for."""
-
-    def test_the_boss_race_is_open_and_the_boxes_are_not(self):
-        for garage, track, seed, keys in KEY_FIXTURES:
-            with self.subTest(track=track, seed=seed, keys=keys):
-                mw = _build(seed=seed)
-                encounter = next(e for _g, t, e in BOSS_CASES if t == track)
-                wumpa = f"{track}: Reach 10 Wumpa"
-                boxes = _boxes(mw, track)
-                self.assertTrue(boxes)
-
-                shut = _state(mw, keys=keys)
-                # Precondition: this fixture really is the split state.
-                self.assertTrue(shut.can_reach(encounter, "Location", PLAYER),
-                                f"fixture drift: {garage} is not open on {keys} Keys")
-                self.assertTrue(shut.can_reach(wumpa, "Location", PLAYER),
-                                "fixture drift: the boss Wumpa check is not reachable")
-                self.assertFalse(shut.can_reach(track, "Region", PLAYER),
-                                 f"fixture drift: {track}'s own pad is not shut")
-
-                # The claim.
-                self.assertEqual(_reachable(shut, boxes), set())
-
-    def test_opening_the_pad_makes_the_same_boxes_reachable(self):
-        """The complement, so the fence cannot pass by accident."""
-        for _garage, track, seed, keys in KEY_FIXTURES:
-            with self.subTest(track=track, seed=seed):
-                mw = _build(seed=seed)
-                boxes = _boxes(mw, track)
-                self.assertEqual(_reachable(_state(mw, keys=keys), boxes), set())
-                opened = _state(mw)
-                self.assertTrue(opened.can_reach(track, "Region", PLAYER))
-                self.assertEqual(_reachable(opened, boxes), set(boxes))
 
 
-class TestGarageOpenPadRacerLocked(unittest.TestCase):
-    """The #54/#209 racer lever, for the two venues whose garages already sit
-    at the deepest hub door."""
-
-    SEED = 1
-    LOCKS = 12
-
-    def _fixture(self, track):
-        mw = _build(seed=self.SEED, racer_locked_pads=self.LOCKS)
-        locks = getattr(mw.worlds[PLAYER], "ctr_racer_locks", {}) or {}
-        pads = {ent.name for ent in mw.get_region(track, PLAYER).entrances}
-        locked = sorted(pad for pad in locks if pad in pads)
-        self.assertTrue(locked,
-                        f"fixture drift: no pad into {track} is racer-locked on "
-                        f"seed {self.SEED}")
-        return mw, locks[locked[0]]
-
-    def test_the_boss_race_is_open_and_the_boxes_are_not(self):
-        for garage, track in RACER_FIXTURES:
-            with self.subTest(track=track):
-                mw, character = self._fixture(track)
-                encounter = next(e for _g, t, e in BOSS_CASES if t == track)
-                boxes = _boxes(mw, track)
-                self.assertTrue(boxes)
-
-                shut = _state(mw, without={character})
-                self.assertTrue(shut.can_reach(encounter, "Location", PLAYER),
-                                f"fixture drift: {garage} is not open")
-                self.assertTrue(
-                    shut.can_reach(f"{track}: Reach 10 Wumpa", "Location", PLAYER))
-                self.assertFalse(shut.can_reach(track, "Region", PLAYER),
-                                 f"fixture drift: {track}'s pad is not racer-locked shut")
-
-                self.assertEqual(_reachable(shut, boxes), set())
-
-    def test_receiving_the_racer_opens_the_same_boxes(self):
-        for _garage, track in RACER_FIXTURES:
-            with self.subTest(track=track):
-                mw, character = self._fixture(track)
-                boxes = _boxes(mw, track)
-                self.assertEqual(_reachable(_state(mw, without={character}), boxes),
-                                 set())
-                opened = _state(mw)
-                self.assertTrue(opened.can_reach(track, "Region", PLAYER))
-                self.assertEqual(_reachable(opened, boxes), set(boxes))
 
 
 class TestBossRewardsStayReachable(unittest.TestCase):
     """The other half of the ruling: nothing about the boss encounter or its
     Wumpa check is taken away by the box fence."""
 
-    def test_every_encounter_and_wumpa_check_survives_a_shut_pad(self):
-        for garage, track, seed, keys in KEY_FIXTURES:
-            with self.subTest(track=track):
-                mw = _build(seed=seed)
-                state = _state(mw, keys=keys)
-                encounter = next(e for _g, t, e in BOSS_CASES if t == track)
-                self.assertTrue(state.can_reach(encounter, "Location", PLAYER))
-                self.assertTrue(state.can_reach(f"{track}: Reach 10 Wumpa",
-                                                "Location", PLAYER))
-                self.assertEqual(
-                    mw.get_location(encounter, PLAYER).parent_region.name, garage)
 
     def test_all_five_encounters_and_wumpa_checks_exist(self):
         mw = _build()

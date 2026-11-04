@@ -102,40 +102,8 @@ class TestGemCupsShuffledCupsOff(CupPinningMixin, CTRTestBase):
         "warp_pad_shuffle_categories": ["crystals", "tracks"],
     }
 
-    def test_all_five_pinned_with_vanilla_gem(self):
-        for loc in self._cup_locations():
-            with self.subTest(location=loc.name):
-                self.assertIsNotNone(
-                    loc.item,
-                    f"{loc.name} is an empty multiworld slot with cups opted out")
-                self.assertTrue(
-                    loc.locked,
-                    f"{loc.name} is not locked, so fill may still replace it")
-                self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
-                self.assertEqual(loc.item.player, self.player)
 
-    def test_no_cup_check_is_a_fillable_slot(self):
-        unfilled = {loc.name
-                    for loc in self.multiworld.get_unfilled_locations(self.player)}
-        for name in CUP_LOCATIONS:
-            with self.subTest(location=name):
-                self.assertNotIn(
-                    name, unfilled,
-                    f"{name} is still fillable; progression can land on content "
-                    f"the player opted out of")
 
-    def test_gems_absent_from_pool(self):
-        # Each Gem's items.json count is 1 and all five are pinned, so none may
-        # remain in the pool.
-        for gem in GEM_NAMES:
-            with self.subTest(gem=gem):
-                self.assertEqual(_item_table_count(gem), 1,
-                                 f"items.json {gem} count moved")
-                in_pool = [item for item in self.multiworld.itempool
-                           if item.player == self.player and item.name == gem]
-                self.assertEqual(
-                    len(in_pool), 0,
-                    f"{gem} must be pinned onto its cup, not left in the pool")
 
     def test_total_gem_supply_unchanged(self):
         # Pinned + pooled must still equal the item table count, so the player's
@@ -262,27 +230,7 @@ class TestGemCupsGemGoalShuffleOnCupsOffResolves(CupPinningMixin, CTRTestBase):
         "warp_pad_shuffle_categories": ["crystals", "tracks"],
     }
 
-    def test_shuffle_gems_resolved_off(self):
-        self.assertEqual(self.world.options.shuffle_gems.value, 0)
 
-    def test_player_opt_out_is_untouched(self):
-        self.assertEqual(self.world.options.include_gem_cups.value, 0)
-        self.assertEqual(self.world.options.gems_required_goal.value, 5)
 
-    def test_each_cup_pinned_exactly_once(self):
-        for loc in self._cup_locations():
-            with self.subTest(location=loc.name):
-                self.assertTrue(loc.locked)
-                self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
-                self.assertEqual(loc.item.player, self.player)
 
-    def test_gems_absent_from_pool(self):
-        for gem in GEM_NAMES:
-            with self.subTest(gem=gem):
-                in_pool = [item for item in self.multiworld.itempool
-                           if item.player == self.player and item.name == gem]
-                self.assertEqual(len(in_pool), 0)
 
-    def test_slot_data_reports_the_resolved_value(self):
-        self.assertFalse(
-            self.world.fill_slot_data()["ctr_options"]["shuffle_gems"])

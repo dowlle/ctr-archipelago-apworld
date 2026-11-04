@@ -74,12 +74,10 @@ context, both apply to every elastic option that plugs in here):
    caller-supplied live number, so when #141 lands and shrinks it, no
    change is needed here.
 """
-from typing import ClassVar, List, Literal, Optional, Tuple
+from typing import ClassVar, List, Optional, Tuple
 
 import settings as ap_settings
-from Options import OptionError, Range
-
-from .Options import OxideGoal
+from Options import Range
 
 import logging
 
@@ -171,108 +169,6 @@ def resolve_elastic_bounds(
     return lo, hi
 
 
-def clamp_elastic_option(
-    world,
-    option_name: str,
-    *,
-    friendly: Optional[bool] = None,
-    dynamic_ceiling: Optional[int] = None,
-) -> Optional[str]:
-    """Clamp `world.options.<option_name>` into its resolved friendly bounds,
-    mutating the stored value in place (CLAMP, per this module's docstring
-    point 3 -- distinct from #178's mutation-free DOWNGRADE-WITH-WARNING).
-
-    `friendly` defaults to `world.settings.enforce_friendly_options` (the
-    host.yaml toggle); pass it explicitly to bypass the host lookup (unit
-    tests do this so they do not depend on process-global host settings
-    state). Returns a log message describing what changed (already logged
-    at WARNING), or `None` if the stored value was already in bounds.
-    """
-    option = getattr(world.options, option_name)
-    option_cls = type(option)
-    if friendly is None:
-        friendly = bool(world.settings.enforce_friendly_options)
-    lo, hi = resolve_elastic_bounds(option_cls, friendly=friendly, dynamic_ceiling=dynamic_ceiling)
-    old = option.value
-    if lo > hi:
-        # Genuine per-seed infeasibility at the resolved bounds (see
-        # resolve_elastic_bounds) -- surface it rather than silently picking
-        # a number outside the range the caller asked for.
-        raise OptionError(
-            f"CTR '{option_name}' has no value that satisfies both its "
-            f"friendly bounds and this seed's available supply "
-            f"({lo} > {hi}). This is a per-seed capacity conflict, not a "
-            f"bad YAML value; lower another option that consumes the same "
-            f"supply, or disable friendly-bound enforcement in host.yaml.")
-    if old < lo:
-        option.value = lo
-    elif old > hi:
-        option.value = hi
-    else:
-        return None
-    message = (
-        f"CTR '{option_name}' for player {world.player} "
-        f"({world.multiworld.player_name[world.player]}) was {old}, clamped "
-        f"to {option.value} (friendly bounds {'on' if friendly else 'off'}, "
-        f"resolved range {lo}-{hi}).")
-    from .notices import say_once
-    say_once(world, f"elastic_clamp:{option_name}", message, logger)
-    return message
-
-
-def apply_elastic_veto(
-    world,
-    *,
-    allowed: bool,
-    is_active: bool,
-    option_name: str,
-    on_refuse: Literal["raise", "replace"],
-    reason: str,
-    replacement=None,
-) -> Optional[str]:
-    """Enforce a host veto over one elastic option, Stardew-style
-    (`force_change_options_if_banned`). `allowed` is the host.yaml switch
-    (e.g. `world.settings.allow_box_activation`); `is_active` is whatever
-    the OWNING option defines as "this seed is using the feature at all"
-    (left to the caller -- #179 does not decide what "active" means for a
-    box count or a letter knob). A no-op when `allowed` is true or the
-    option is not active.
-
-    `on_refuse` has no default, on purpose: issue #179 explicitly leaves
-    "raise vs. replace" as a per-veto choice ("which of those two CTR picks
-    per veto matters less than picking one and saying so where the host can
-    read it") -- the owning option's session must choose, and document the
-    choice on the setting itself (the `EnforceFriendlyOptions`-style
-    docstring convention above).
-
-    "raise" aborts generation with `reason`. "replace" sets the option to
-    `replacement` (required for that mode) and logs a warning built from
-    `reason`.
-    """
-    if allowed or not is_active:
-        return None
-    if on_refuse == "raise":
-        raise OptionError(
-            f"CTR '{option_name}' for player {world.player} "
-            f"({world.multiworld.player_name[world.player]}) is disallowed "
-            f"from host.yaml. {reason}")
-    if on_refuse == "replace":
-        if replacement is None:
-            raise ValueError(
-                "apply_elastic_veto(on_refuse='replace') requires a "
-                "replacement value")
-        option = getattr(world.options, option_name)
-        option.value = replacement
-        message = (
-            f"CTR '{option_name}' for player {world.player} "
-            f"({world.multiworld.player_name[world.player]}) disallowed "
-            f"from host.yaml, replaced with {replacement!r}. {reason}")
-        from .notices import say_once
-        say_once(world, f"elastic_veto:{option_name}", message, logger)
-        return message
-    raise ValueError(f"apply_elastic_veto: unknown on_refuse={on_refuse!r}")
-
-
 def goal_excluded_location_reserve(world) -> int:
     """How many of THIS seed's locations `_exclude_goal_location` (issue #27)
     has excluded so far. 0 until `_install_goal` runs (partway through
@@ -283,22 +179,6 @@ def goal_excluded_location_reserve(world) -> int:
     note's "the single excluded location" is the default-goal case, not a
     universal one -- verified against `_install_goal`'s four branches)."""
     return len(getattr(world, "_goal_excluded_location_names", ()))
-
-
-def predicted_goal_excluded_reserve(options) -> int:
-    """Goal-location filler reserve available during ``generate_early``.
-
-    ``goal_excluded_location_reserve`` intentionally reads the actual exclusion
-    list and is therefore correct only after ``_install_goal``. The rung sizer
-    runs before regions and items exist, so it needs this pure-options twin.
-    The composed goal model excludes exactly one real location when Oxide is
-    this seed's finale (``oxide_is_goal``: ``any_percent``/``101_percent``)
-    and none otherwise -- ``none`` never excluded one, and ``disabled`` (#320)
-    removes both Oxide locations outright rather than excluding one, so it
-    must predict zero here too or the rung sizer overestimates category
-    demand by one and can spuriously reject a seed that actually fits.
-    """
-    return int(OxideGoal.oxide_is_goal(options.oxide_goal.value))
 
 
 def player_exclude_locations_reserve(world) -> int:
@@ -321,26 +201,3 @@ def estimated_filler_reserve(world) -> int:
     return goal_excluded_location_reserve(world) + player_exclude_locations_reserve(world)
 
 
-def exact_filler_reserve(world) -> int:
-    """The EXACT number of this player's locations carrying
-    `LocationProgressType.EXCLUDED`, counted directly. Only correct from
-    `pre_fill` onward: AP core applies `exclude_locations` as location
-    progress state in `Main.py` (`exclusion_rules`, right after `set_rules`)
-    -- AFTER every world's `create_items`, so an elastic sizer computing its
-    OWN ceiling during `create_items` cannot see this number yet and must
-    use `estimated_filler_reserve` instead. This exact count exists for
-    tests and for any logic that legitimately runs post-fill-prep."""
-    from BaseClasses import LocationProgressType
-    return sum(
-        1 for loc in world.multiworld.get_locations(world.player)
-        if loc.progress_type == LocationProgressType.EXCLUDED)
-
-
-def elastic_supply_ceiling(world, *, available_supply: int) -> int:
-    """`available_supply`, minus this seed's estimated filler reserve, floored
-    at 0. `available_supply` is always a live, caller-supplied number (e.g.
-    the #71 ceiling formula's `82 + 16*C + L_other`, recomputed for whatever
-    the seed's actual supply is) -- never a constant restated here, so #141
-    (the only ruled item that subtracts location supply) composes for free
-    whenever it lands: nothing in this module needs to change."""
-    return max(0, available_supply - estimated_filler_reserve(world))

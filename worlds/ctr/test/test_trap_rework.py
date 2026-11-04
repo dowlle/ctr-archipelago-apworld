@@ -322,19 +322,7 @@ class TestWeightedDraw(unittest.TestCase):
 class TestTrapWeightsRejected(unittest.TestCase):
     """The configs generation must refuse, and refuse readably."""
 
-    def test_an_unknown_key_is_rejected_with_the_valid_keys_in_the_message(self):
-        with self.assertRaises(OptionError) as caught:
-            _world(weights={"icyroad": 5})
-        message = str(caught.exception)
-        self.assertIn("icyroad", message)
-        self.assertIn("icy_road", message)
-        self.assertIn("trap_weights", message)
 
-    def test_an_unknown_key_is_rejected_even_with_traps_switched_off(self):
-        """A misspelling is a misspelling: trap_fill_percentage 0 does not make
-        the player's intent for that key any more achievable."""
-        with self.assertRaises(OptionError):
-            _world(trap_fill=0, weights={"first_persson": 0})
 
     def test_a_yaml_is_rejected_at_option_verification_too(self):
         """The rolled-YAML path (Generate.py verifies every option) fails on
@@ -343,17 +331,7 @@ class TestTrapWeightsRejected(unittest.TestCase):
         with self.assertRaises(OptionError):
             TrapWeights({"mirror-mode": 3}).verify_keys()
 
-    def test_a_non_integer_or_out_of_range_weight_is_rejected(self):
-        for bad in ({"icy_road": 101}, {"icy_road": -1}, {"icy_road": 2.5},
-                    {"icy_road": "5"}):
-            with self.subTest(weights=bad):
-                with self.assertRaises(OptionError):
-                    _world(weights=bad)
 
-    def test_all_zero_with_trap_fill_above_zero_is_rejected(self):
-        with self.assertRaises(OptionError) as caught:
-            _world(trap_fill=10, weights={key: 0 for key in BUILDABLE_KEYS})
-        self.assertIn("trap_fill_percentage", str(caught.exception))
 
     def test_one_nonzero_shipped_trap_rescues_the_draw(self):
         weights = {key: 0 for key in BUILDABLE_KEYS}

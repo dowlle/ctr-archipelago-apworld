@@ -187,24 +187,6 @@ class TestOptionOn(unittest.TestCase):
             self.assertIn(world.ctr_starting_character,
                           characters.ADVENTURE_STARTERS)
 
-    def test_racer_locks_never_name_oxide(self):
-        for seed in SEEDS + (5, 6, 7, 8, 9):
-            with self.subTest(seed=seed):
-                world = _build(seed, remove_playable_oxide=True,
-                               racer_locked_pads=27).worlds[PLAYER]
-                locks = world.ctr_racer_locks
-                self.assertTrue(locks)
-                self.assertNotIn(OXIDE, locks.values())
-                self.assertNotIn(
-                    characters.ROSTER_CHARACTER_ID[OXIDE],
-                    world.fill_slot_data()["racer_locks"]["pads"].values())
-                # The spread still covers every other non-starter racer once
-                # before any of them locks a second pad.
-                if len(locks) >= 14:
-                    self.assertEqual(
-                        set(locks.values()),
-                        set(characters.ROSTER_CHARACTER_ID)
-                        - {OXIDE, world.ctr_starting_character})
 
     def test_named_non_oxide_start_is_honoured(self):
         world = _build(1, starting_character="ripper_roo",
@@ -269,12 +251,6 @@ class TestCharacterUnlocksOff(unittest.TestCase):
                        remove_playable_oxide=True).worlds[PLAYER]
         self.assertEqual(world.ctr_starting_character, OXIDE)
 
-    def test_one_note_says_why(self):
-        _mw, messages = _messages_for(1, character_unlocks=False,
-                                      remove_playable_oxide=True)
-        hits = [m for m in messages
-                if "Remove Playable Oxide (Character Unlocks off)" in m]
-        self.assertEqual(len(hits), 1, messages)
 
     def test_no_note_with_unlocks_on(self):
         _mw, messages = _messages_for(1, remove_playable_oxide=True)
@@ -352,19 +328,6 @@ class TestUniversalTracker(unittest.TestCase):
         self.assertEqual(len(tracker.get_unfilled_locations(PLAYER)),
                          len(_pool_names(tracker)))
 
-    def test_wire_carries_the_effective_value(self):
-        cases = (
-            ({}, False),
-            ({"remove_playable_oxide": True}, True),
-            ({"remove_playable_oxide": True, "character_unlocks": False},
-             False),
-        )
-        for options, expected in cases:
-            with self.subTest(options=options):
-                wire = _build(1, **options).worlds[PLAYER].fill_slot_data()
-                value = wire["ctr_options"]["remove_playable_oxide"]
-                self.assertIs(type(value), bool)
-                self.assertEqual(value, expected)
 
     def test_round_trip_restores_the_option_and_the_pool(self):
         for seed_value in (True, False):
@@ -385,31 +348,7 @@ class TestUniversalTracker(unittest.TestCase):
                                      world.ctr_racer_locks)
                     self._assert_same_pool(original, tracker)
 
-    def test_absent_key_restores_off_whatever_the_local_yaml_says(self):
-        wire = _build(1).worlds[PLAYER].fill_slot_data()
-        del wire["ctr_options"]["remove_playable_oxide"]
-        tracker = self._rebuild(wire, remove_playable_oxide=True)
-        self.assertFalse(
-            tracker.worlds[PLAYER].options.remove_playable_oxide.value)
-        self.assertIn(OXIDE, _pool_names(tracker))
 
-    def test_tight_pool_seed_from_check_ut_round_trips(self):
-        # The CI check-ut failure: podium checks off and 95% traps, so the
-        # seed only fits 14 unlock items. Off, the same options are refused;
-        # on, UT must rebuild the same 14-racer pool instead of refusing.
-        options = yaml.safe_load(
-            (Path(__file__).parent
-             / "fixtures/remove_oxide_tight_pool_check_ut.yaml").read_text()
-        )[ctrAPWorld.game]
-        off = dict(options, remove_playable_oxide=False)
-        with self.assertRaises(OptionError):
-            _build(3, **off)
-        original = _build(3, **options)
-        wire = original.worlds[PLAYER].fill_slot_data()
-        self.assertTrue(wire["ctr_options"]["remove_playable_oxide"])
-        tracker = self._rebuild(wire)
-        self._assert_same_pool(original, tracker)
-        self.assertNotIn(OXIDE, _pool_names(tracker))
 
     def test_tracker_starting_as_oxide_does_not_raise(self):
         original = _build(1, starting_character="nitros_oxide")

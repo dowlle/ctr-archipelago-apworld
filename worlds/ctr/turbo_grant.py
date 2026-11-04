@@ -75,10 +75,3 @@ TURBO_ITEMSANITY_COMPANION = "Turbo"
 RULED_MASK_SIBLING = "Invincibility Mask"
 
 
-def created_item_count(world) -> int:
-    """How many `Turbo Grant` items this seed's options create: 1 or 0.
-
-    A single copy, and only when the option is on. Kept as a function so the
-    pool loop, the tests and any future supply accounting all read one answer.
-    """
-    return 1 if world.options.turbo_grant.value else 0

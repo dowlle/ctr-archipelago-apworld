@@ -7,7 +7,7 @@ from Options import OptionError
 
 from .. import content_fixed, content_requirements
 from ..Options import ctrAPOptions, CustomTracks, CupTracks, CortexVortexTrack, ap_ctr_option_groups
-from ..custom_tracks import BABY_T_PARK_CURRENT
+from ..custom_packages import BABY_T_PARK_CURRENT
 from .test_content_plan import make_world
 from .test_content_plan_row3 import SHAPE  # noqa: F401, the module's inputs stay importable
 

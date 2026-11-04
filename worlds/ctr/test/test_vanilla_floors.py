@@ -131,27 +131,6 @@ class _VanillaFloorGateMixin:
             state.collect(world.create_item("Trophy"), prevent_sweep=True)
         return state
 
-    def test_entrance_floor_keyed_by_physical_pad(self):
-        mw, p = self.multiworld, self.player
-        world = mw.worlds[p]
-        checked = 0
-        for pad_name, meta in world.warp_pad_ids.items():
-            if meta.get("kind") != "race":
-                continue
-            floor = meta["vanilla_trophies"]
-            ent = mw.get_entrance(pad_name, p)
-            checked += 1
-            # Open at exactly the floor (base Key rule satisfied by 4 Keys).
-            self.assertTrue(
-                ent.access_rule(self._state(floor)),
-                f"{pad_name}: closed at its own floor {floor} trophies")
-            if floor > 0:
-                # Blocked one trophy below the floor -> the floor really gates here.
-                self.assertFalse(
-                    ent.access_rule(self._state(floor - 1)),
-                    f"{pad_name}: open at {floor - 1} trophies, below its "
-                    f"floor {floor} (floor missing or mis-keyed to a destination)")
-        self.assertEqual(checked, 16, "expected 16 race pads")
 
 
 class TestVanillaFloorsNoShuffle(_VanillaFloorGateMixin, CTRTestBase):

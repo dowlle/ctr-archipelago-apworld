@@ -32,19 +32,18 @@ from Options import OptionError
 
 from .Options import DL_SEND_BITS, final_on_cortex
 
-from . import (content_item_pool, characters, cortex_vortex_track, destinations, named_tracks, podium,
-               relic_tiers, sphere0_guard, traps, warp_pad_rules, wumpa_family)
+from . import (content_item_pool, characters, cortex_vortex, destinations, named_tracks, podium,
+               content_playthrough, sphere0_guard, traps, warp_pad_rules, wumpa_family)
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
-from .custom_tracks import BABY_T_PARK_PROFILES
+from .custom_packages import BABY_T_PARK_PROFILES
 from . import (arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
                turbo_grant)
 from .Locations import CTR_LOCATION_IDS
-from . import warp_pad_logic
-from .warp_pad_logic import HUB_STATIC
+from .destinations import HUB_STATIC
 
-#: Equal to slot_data.SLOT_DATA_SCHEMA: both room shapes share the 0.3.0 step
+#: Equal to slot_data.SLOT_DATA_SCHEMA: the 0.3.0 step
 #: (test_content_plan checks it).
 SCHEMA = 18
 MANUAL_FEATURE = "manual_pad_requirements_v1"
@@ -795,10 +794,11 @@ def draw_relic_checks(world, tracks, totals):
     """{track id: tiers it holds a check for}. Each tier takes as many of the
     seed's Relic Races as `totals` holds copies of it, drawn at random, capped
     by the Relic Races in the seed. Items beyond that land on other checks. A
-    tier with a copy for every race takes no draw."""
+    tier with a copy for every race takes no draw. The draw is v0.2.x's relic
+    tier draw (relic_tiers.draw_tier, deleted in row 12), inlined."""
     out = {track: set() for track in tracks}
     for tier, total in totals.items():
-        for track in tracks if total >= len(tracks) else relic_tiers.draw_tier(world, tracks, total):
+        for track in tracks if total >= len(tracks) else frozenset(world.random.sample(tracks, total)):
             out[track].add(tier)
     return out
 
@@ -823,8 +823,8 @@ def letter_item(track, index):
         return (custom_check_name("letter_item", track["custom_slot"], index),
                 custom_check_code("letter_item", track["custom_slot"], index))
     if track["origin"] == CORTEX_ORIGIN:
-        return (cortex_vortex_track.letter_item_name(LETTERS[index]),
-                cortex_vortex_track.LETTER_ITEM_CODES[index])
+        return (cortex_vortex.letter_item_name(LETTERS[index]),
+                cortex_vortex.LETTER_ITEM_CODES[index])
     name = f"Letter {LETTERS[index]} ({track['display_name']})"
     return name, content_item_pool.ITEMS[name]
 
@@ -1241,7 +1241,7 @@ def draw_plan(world, key_estimate=True):
               "boss_kit_shuffle and keep five Gem Cups, or turn off purple_cup_boss_gauntlet.")
     manual = manual_rules(o)
     unlock_mode = int(o.warppad_unlock_requirements.value)
-    if unlock_mode and not warp_pad_logic.effective_custom_weights(world)["Trophy"]:
+    if unlock_mode and not content_playthrough.effective_custom_weights(world)["Trophy"]:
         error("requirement_weights Trophy must stay above 0: at the start the simulated player only holds Trophies.")
     # Reserve every named physical seat for selected content, then keep the
     # other seats in their shuffled order. A rule never disappears because its

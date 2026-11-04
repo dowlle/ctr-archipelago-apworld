@@ -27,7 +27,8 @@ class TestRoomNames(unittest.TestCase):
                              get_locations=lambda p: [SimpleNamespace(address=c) for c in aliases[p]])
         data = {"datapackage": {self.game: package}}
         with patch("worlds.ctr.custom_track_datapackage.location_aliases",
-                   side_effect=lambda w, **kwargs: w.aliases):
+                   side_effect=lambda w, **kwargs: w.aliases), \
+                patch("worlds.ctr.custom_track_datapackage.item_aliases", return_value={}):
             embed_track_names(mw, data, self.game)
         self.assertEqual(package, original, "registered package mutated")
         result = data["datapackage"][self.game]

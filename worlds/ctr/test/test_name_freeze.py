@@ -37,9 +37,9 @@ from .. import (
     itemsanity,
     lettersanity,
     relic_perfect,
-    trial_trophy,
     wumpa_checks,
 )
+from ..destinations import TRIAL_TRACKS
 from ..Items import load_item_table
 from ..Locations import CTR_LOCATION_CLASSES
 from ..tizi_helper import TIZI_HELPER_CODE, TIZI_HELPER_ITEM
@@ -310,7 +310,7 @@ class TestNameFreezeCrossSideConsistency(unittest.TestCase):
         self.assertEqual(item_boxes.BOX_TRACKS, relic_perfect.RELIC_TRACKS)
         self.assertEqual(len(item_boxes.BOX_TRACKS), 18)
         self.assertEqual(item_boxes.BOX_TRACKS[-2:],
-                         list(trial_trophy.TRIAL_TRACKS))
+                         list(TRIAL_TRACKS))
 
     def test_lettersanity_covers_exactly_the_token_challenge_tracks(self) -> None:
         self.assertEqual(len(lettersanity.LETTER_TRACKS), 16)
