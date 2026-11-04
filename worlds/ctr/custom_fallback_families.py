@@ -1,5 +1,5 @@
 """Generic custom-track families and Cortex Vortex's Relic Race Perfect, minted
-in the 0.3.0 id step. Names only; no seed creates them yet.
+in the 0.3.0 id step. Content plans select checks from these reserved names.
 
 WHY THESE EXIST. The generic `Custom Track N` path (B+) was ruled to
 work in 0.3.0 for tracks the apworld does not know (#306 Q3). Its letters and
@@ -23,12 +23,11 @@ FAMILIES, all `Custom Track N` with N the generic slot:
     answer 4).
   * Reach 10 Wumpa, slot owned, `35016600 + N - 1` (approved 2026-09-02).
   * AP boxes, `Item Box M` for M 1..15, `35017000 + 15 * (N - 1) + M - 1`
-    (reservation approved 2026-09-02). The box delivery model for custom
-    tracks is still open; the names do not depend on it.
+    (reservation approved 2026-09-02).
 
 WHO OWNS THE SEMANTICS. The apworld owns names, codes and the per-seed subset;
-native owns the sends. Every class here returns an empty per-seed subset, so no
-seed changes. relic_perfect.CUSTOM_PERFECT_CREATION_ENABLED stays False.
+native owns the sends. These classes register names; content plans select
+their checks. relic_perfect.CUSTOM_PERFECT_CREATION_ENABLED stays False.
 
 DATAPACKAGE STABILITY. Every name registers unconditionally. Approved in the
 0.3.0 minting register (ruled 2026-10-13 22:02 CEST).
@@ -136,9 +135,13 @@ class CustomItemBoxLocationClass(LocationClass):
     display_name = "Custom Track Item Box Checks"
     code_blocks = (35017000, 35018000)
 
+    @staticmethod
+    def slot_code(slot: int, box: int) -> int:
+        return CUSTOM_BOX_CODE_BASE + CUSTOM_BOXES_PER_SLOT * (slot - 1) + box - 1
+
     def all_locations(self):
         return [(f"{_slot(slot)}: Item Box {box}",
-                 CUSTOM_BOX_CODE_BASE + CUSTOM_BOXES_PER_SLOT * (slot - 1) + box - 1, _slot(slot))
+                 self.slot_code(slot, box), _slot(slot))
                 for slot in _slots() for box in range(1, CUSTOM_BOXES_PER_SLOT + 1)]
 
     def created_location_names(self, options) -> List[str]:
