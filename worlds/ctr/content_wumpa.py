@@ -12,11 +12,11 @@ Sanity Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, slot
 order 1..N. Each is the frozen `<Hub> Shop: Slot <n>` location
 (wumpa_shop.shop_code), owned by `hub:<level id>`, kind `wumpa_shop`, no
 route (no pad pays it), with its final `price` and its `unlock_banked`
-(wumpa_shop.unlock_banked). The price is the ordinary one: a band price
-drawn at generation and scaled by `prices`, or the band bottom when the slot
-holds progression after fill; it is written when slot_data is built
-(`final_prices`). There is no top-level `wumpa_shop` block and no new
-envelope key: native builds its shop from the plan.
+(wumpa_shop.unlock_banked). The price is a band price drawn at generation and
+scaled by `prices`, the same way whatever the slot holds, so the price says
+nothing about the item (ruling of 2026-11-02; progression no longer costs the
+band bottom). There is no top-level `wumpa_shop` block and no new envelope
+key: native builds its shop from the plan.
 
 LOGIC. A shop slot needs its hub's Key floor (`KEY_FLOORS`) and `Wumpa
 Income`. On a content plan `Wumpa Income` is reached by any route of a track
@@ -123,31 +123,11 @@ def draw_prices(world, record):
 
 
 def checks(record, base_prices):
-    """The shop checks with their prices before fill (the drawn price scaled)."""
+    """The shop checks, each with its drawn price scaled."""
     if not record:
         return []
     return [check(record, hub, n, wumpa_shop._scale(base_prices[name], record["prices"]))
             for hub, n, _code, name in slots(record)]
-
-
-def final_prices(world, plan):
-    """Write each shop check's final price once the fill has placed its item:
-    the band bottom for progression, else the drawn price scaled
-    (wumpa_shop.slot_price)."""
-    record = plan.get("wumpa_shop")
-    if not record:
-        return
-    by_code = {c["location"]: c for c in plan["checks"]}
-    base = getattr(world, "ctr_wumpa_shop_base_prices", None) or {}
-    for hub, _n, code, name in slots(record):
-        if name not in base:
-            continue  # Universal Tracker: the room's prices stand.
-        location = world.multiworld.get_location(name, world.player)
-        if location.item is not None and location.item.advancement:
-            price = wumpa_shop.price_band(hub, record["prices"])[0]
-        else:
-            price = wumpa_shop._scale(base[name], record["prices"])
-        by_code[code]["price"] = price
 
 
 def expected_checks(plan, record):
@@ -166,8 +146,8 @@ def expected_checks(plan, record):
 
 def attainable_prices(hub, percent):
     """Every price the draw can give a slot of `hub`: each whole band price
-    scaled by `wumpa_shop_prices` (the band bottom, the progression price,
-    included). Native recomputes the same set (J11 review round 1)."""
+    scaled by `wumpa_shop_prices`. Native recomputes the same set (J11 review
+    round 1)."""
     low, high = wumpa_shop.PRICE_BANDS[hub]
     return {wumpa_shop._scale(value, percent) for value in range(low, high + 1)}
 
@@ -299,6 +279,13 @@ def check_income(plan):
 def income_term(world):
     """What `Wumpa Income` stands for, for the `win_logic` export: any income
     route, with its pad's gate, as `install` built them."""
+    if bool(world.options.pad_approach_hints.value):
+        event = world.ctr_income_event
+        term = logic_terms.term_of(event)
+        if term is None:
+            from .win_logic import _unexportable
+            raise _unexportable(world, event, "CTR win_logic: Wumpa Income has no term-backed rule")
+        return term
     return world.ctr_income_term
 
 
@@ -315,6 +302,7 @@ def install(world, plan, menu, stage_gate, stage_term):
     from . import characters
     from .progressive_capability import gate_satisfied
     player = world.player
+    hints = bool(world.options.pad_approach_hints.value)
     capability = plan.get("capability", {})
     pads = {p["id"]: p for p in plan["pads"]}
     routes = []
@@ -326,7 +314,8 @@ def install(world, plan, menu, stage_gate, stage_term):
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         need = finish_boost(track, capability, income_package(plan, track)) if capability.get("boost_mode") else 0
         routes.append((entry_id, test, need, racer))
-        terms = [logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
+        terms = [logic_terms.ReachRegion(world, entry_id) if hints else
+                 logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
         stage = stage_term(route)
         if stage is not None:
             terms.append(stage)
@@ -342,6 +331,9 @@ def install(world, plan, menu, stage_gate, stage_term):
                    for entry, test, need, racer in routes)
     event = Location(player, INCOME, None, menu)
     event.access_rule = income
+    if hints:
+        logic_terms.set_term(event, logic_terms.SerializedRule(income, world.ctr_income_term))
+        world.ctr_income_event = event
     event.place_locked_item(world.create_event(INCOME))
     menu.locations.append(event)
     record = plan.get("wumpa_shop")
@@ -356,6 +348,11 @@ def install(world, plan, menu, stage_gate, stage_term):
         floor = KEY_FLOORS[hub]
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
+        if hints:
+            term = logic_terms.EventTerm(INCOME, player, lambda: income_term(world))
+            if floor:
+                term = logic_terms.And(term, logic_terms.Has(key, floor, player))
+            logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, term))
         if excluded:
             location.item_rule = lambda item: not item.advancement
         menu.locations.append(location)
@@ -371,4 +368,3 @@ def restore_options(world, plan):
     o.wumpa_shop_progression.value = PROGRESSION.index(record["progression"]) if record else 0
     o.wumpa_shop_hints.value = int(record["hints"]) if record else 1
     o.goal_wumpa.value = arm["count"] if arm else 0
-    world.ctr_wumpa_shop_base_prices = {}

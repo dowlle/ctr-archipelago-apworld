@@ -15,6 +15,7 @@ no rule exists yet. A plan that leaves less than FIT_ROOM spots draws again
 """
 import heapq
 import itertools
+from collections import Counter
 
 from . import content_bosses, content_capability, content_cups, content_fixed, content_laps, content_wumpa
 
@@ -29,16 +30,20 @@ MIXED_GROUP = 4
 PROBES = 300
 
 
-def search(pool, room, target, reached=None, probes=PROBES):
+def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=(), groups_with_singles=False):
     """(names to seat in order, spots they leave open). `pool` is {name: copies},
     `room(held)` counts the spots open with the sorted tuple `held`, and an item
     takes one of them. A step needs its spots open before it, so a gate that needs
     several items is taken as one group, and one that does not fit is no step.
     Stops at `target` spots left; else the best opening found stands. With
     `reached(held)`, an opening also has to reach what it tests, and one that does
-    beats one that does not."""
+    beats one that does not. `bundles` are groups taken only whole: one track's
+    letter items (letter_bundles). Their names are in `pool` but in no other step.
+    `groups_with_singles` lets an unmet explicit goal search costed groups beside
+    auxiliary single-copy gains; the default keeps the existing greedy branching."""
     memo = {}
     spent = [0]
+    loose = {name for bundle in bundles for name in bundle}
 
     def free(held):
         key = tuple(sorted(held))
@@ -53,13 +58,14 @@ def search(pool, room, target, reached=None, probes=PROBES):
     if start >= target and done(()):
         return [], start
     # A gate's items: what the whole pool cannot do without. Groups use only those.
-    rich = tuple(name for name in sorted(pool) for _ in range(pool[name]))
+    names = [name for name in sorted(pool) if name not in loose]
+    rich = tuple(name for name in names for _ in range(pool[name]))
     full = free(rich) + len(rich)
-    needed = [name for name in sorted(pool)
+    needed = [name for name in names
               if free(tuple(n for n in rich if n != name)) + len(rich) - pool[name] < full]
 
     def left(held, name):
-        return pool[name] - held.count(name)
+        return pool.get(name, 0) - held.count(name)
 
     def opening(held, spots, groups):
         """The groups that open something, within the probe budget."""
@@ -73,26 +79,58 @@ def search(pool, room, target, reached=None, probes=PROBES):
     def fits(held, group):
         return all(left(held, name) >= group.count(name) for name in set(group))
 
+    def bundle_seats(held, group):
+        # A letter can open its own check before the next letter is seated.
+        # Pay every prefix; a jointly gated bundle still needs all its slots.
+        for n in range(len(group)):
+            if spent[0] >= probes:
+                return False
+            spent[0] += 1
+            if free(held + group[:n]) <= 0:
+                return False
+        return True
+
     def moves(held, spots):
-        spent[0] += len(pool)
-        singles = sorted(((free(held + (name,)), name) for name in sorted(pool) if left(held, name)), reverse=True)
+        spent[0] += len(names)
+        singles = sorted(((free(held + (name,)), name) for name in names if left(held, name)), reverse=True)
         found = [(name,) for after, name in singles if after + 1 > spots]
-        if found:
+        # A fixed-Key garage can need many copies that open nothing until
+        # its whole demand is held. Seat those together when they fit, paying
+        # for every copy, alongside the ordinary capacity-opening moves.
+        for goal in goals:
+            remaining = tuple(name for name, count in Counter(goal).items()
+                              for _ in range(max(0, count - held.count(name))))
+            if remaining and len(remaining) <= spots and fits(held, remaining):
+                found.append(remaining)
+        if found and (not groups_with_singles or reached is None or any(done(held + group) for group in found)):
             return found
-        # One or two kinds first: a garage asks that, at any count. Then any mix.
+        # Auxiliary single-copy gains must not hide a support bundle when
+        # none of those moves reaches the requested goal. Keep the gains as
+        # alternatives, alongside the existing bounded group search.
+        auxiliary = found
+        # A track's letters are one search move, with each seat proved in order.
+        if bundles:
+            found = opening(held, spots, [bundle for bundle in bundles if fits(held, bundle) and bundle_seats(held, bundle)])
+            if found or spent[0] >= probes:
+                return auxiliary + found
+        # One kind first, then two: a garage asks that, at any count. Then any mix.
+        # Copies of one kind come at every count before any pair, or the pairs of
+        # many kinds (a boost per racer) spend the probes before three of a kind.
+        found = opening(held, spots, [(name,) * size for size in range(2, spots + 1) for name in needed
+                                      if fits(held, (name,) * size)])
+        if found or spent[0] >= probes:
+            return auxiliary + found
         for size in range(2, spots + 1):
-            groups = [(name,) * size for name in needed] + [(a,) * n + (b,) * (size - n)
-                                                            for a, b in itertools.combinations(needed, 2)
-                                                            for n in range(1, size)]
+            groups = [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2) for n in range(1, size)]
             found = opening(held, spots, [group for group in groups if fits(held, group)])
             if found or spent[0] >= probes:
-                return found
+                return auxiliary + found
         for size in range(3, min(spots, MIXED_GROUP) + 1):
             found = opening(held, spots, (group for group in itertools.combinations_with_replacement(needed, size)
                                           if len(set(group)) > 2 and fits(held, group)))
             if found or spent[0] >= probes:
-                return found
-        return []
+                return auxiliary + found
+        return auxiliary
 
     best = (done(()), start, ())
     todo = [(not best[0], -start, 0, ())]
@@ -113,6 +151,16 @@ def search(pool, room, target, reached=None, probes=PROBES):
                     seen.add(key)
                     heapq.heappush(todo, (not done(after), -free(after), len(after), after))
     return list(best[2]), best[1]
+
+
+def key_goal_room(pool, room, reached, bundles, goals):
+    """Score the fixed-Key route without lowering the ordinary search's result."""
+    held, free = search(pool, room, KEY_SLACK, reached, bundles=bundles, goals=goals)
+    if reached(held):
+        return free
+    held, free = search(pool, room, KEY_SLACK, reached, bundles=bundles, goals=goals,
+                        groups_with_singles=True)
+    return free if reached(held) else -1
 
 
 def term_met(node, held):
@@ -160,6 +208,62 @@ def gate_names(plan, by_code, boost_item):
     return names
 
 
+def letter_bundles(plan, pool):
+    """Each track's letter items that gate its CTR Token, as one group, when every
+    one of them is in `pool`. Lettersanity with letter items only: () otherwise.
+    A letter opens little alone, but a track's letters open its letter checks and
+    its Token, which on a `ctr_first` pad can be the most the start has."""
+    from .content_plan import letter_requirements
+    groups = {names for names in letter_requirements(plan).values()}
+    return sorted(group for group in groups
+                  if not any(set(group) < set(other) for other in groups)
+                  and all(pool.get(name, 0) > 0 for name in group))
+
+
+def garage_demands(node, pool, base, names_by_code):
+    """Whole item multisets that satisfy a garage's exported predicate.
+
+    Precollected copies need no spot. Fixed rewards that are not in the pool
+    are reached through the normal opening search, never invented here.
+    """
+    op = node["op"]
+    if op == "always":
+        return [()]
+    if op == "count":
+        name = names_by_code[node["item"]]
+        count = max(0, node["count"] - base.get(node["item"], 0))
+        return [(name,) * count] if pool.get(name, 0) >= count else []
+    if op in ("sum", "distinct"):
+        need = max(0, node["count"] - sum(bool(base.get(code, 0)) if op == "distinct" else base.get(code, 0)
+                                          for code in node["items"]))
+        names = [(names_by_code[code], min(pool.get(names_by_code[code], 0), 1) if op == "distinct"
+                  else pool.get(names_by_code[code], 0)) for code in node["items"]
+                 if op != "distinct" or not base.get(code, 0)]
+
+        def ways(index, left):
+            if left == 0:
+                yield ()
+            elif index < len(names):
+                name, count = names[index]
+                for taken in range(min(count, left) + 1):
+                    for tail in ways(index + 1, left - taken):
+                        yield (name,) * taken + tail
+
+        return list(ways(0, need))
+    children = [garage_demands(term, pool, base, names_by_code) for term in node.get("terms", [])]
+    if op == "any":
+        return [group for child in children for group in child]
+    if op == "all":
+        out = []
+        for choice in itertools.product(*children):
+            counts = Counter()
+            for group in choice:
+                counts |= Counter(group)
+            out.append(tuple(name for name, count in sorted(counts.items()) for _ in range(count)))
+        return out
+    return []
+
+
 class PlanReach:
     """The checks open with some items held, read from a finished plan. It follows
     create_regions: hub Keys, a pad's stage 1, a later race's stage 2 and first
@@ -169,6 +273,7 @@ class PlanReach:
     Itemsanity and Hit checks, whose rules ask for a weapon or a kart."""
 
     def __init__(self, plan, rows, excluded, boost_item):
+        self.plan = plan
         from .characters import CHARACTER_ID_TO_NAME
         from .content_plan import first_race_checks, letter_requirements, merged_race
         from .progressive_capability import boost_item_name
@@ -336,25 +441,47 @@ class PlanReach:
         opened = self._sweep(self._held(held))
         return sum(spot and code in opened for code, spot, _floor, _routes in self.checks)
 
-    def key_slack(self):
-        """Fewest spots to spare in front of a fixed Key: the spots open with all else
-        held and only the Keys its garage needs, less what its garage asks for. The
-        fill has to fit that many items there among everything else it places."""
+    def encounter_reached(self, encounter, held):
+        """The garage can actually be won, including its check capability."""
+        return encounter["completion_location"] in self._sweep(self._held(held))
+
+    def key_slack(self, non_local=()):
+        """Best costed opening before each fixed Key, capped by the search target.
+
+        Earlier Keys are granted for the probe, but every other pooled item
+        spends a slot before opening checks. In particular, letters, racer
+        unlocks and boosts cannot contribute free capacity. This is a bounded
+        layout estimate used only for redraws; the best draw still stands.
+        """
+        from .content_plan import ITEM_BY_CODE
         key = self.code.get("Key")
-        fixed = {code: item for code, item in self.pins.items() if item != key}
-        rich = {name: count for name, count in self.pool.items() if name != "Key"}
+        saved_base, saved_pins = self.base, self.pins
+        gates = gate_names(self.plan, ITEM_BY_CODE, ITEM_BY_CODE.get(self.boost))
+        eligible = {name: count for name, count in self.pool.items() if name not in non_local}
+        bundles = letter_bundles(self.plan, eligible)
+        names = gates | {name for bundle in bundles for name in bundle}
+        pool = {name: count for name, count in eligible.items() if name in names and name != "Key"}
         out = None
-        for encounter in self.encounters.values():
-            if self.pins.get(encounter["completion_location"]) != key:
-                continue
-            counts = self._held(tuple(name for name, count in rich.items() for _ in range(count)))
-            need = self.pads[encounter["pad_id"]]["entrance_req"]
-            counts[key] = int(need.removeprefix("keys:")) if need != "free" else 0
-            opened = self._sweep(counts, fixed)
-            spots = sum(spot and code in opened for code, spot, _floor, _routes in self.checks)
-            asked = self.req[encounter["requirement_id"]].get("count", 0)
-            out = spots - asked if out is None else min(out, spots - asked)
-        return out
+        try:
+            self.pins = {code: item for code, item in saved_pins.items() if item != key}
+            for encounter in self.encounters.values():
+                if saved_pins.get(encounter["completion_location"]) != key:
+                    continue
+                self.base = dict(saved_base)
+                requirement = self.pads[encounter["pad_id"]]["entrance_req"]
+                self.base[key] = int(requirement.removeprefix("keys:")) if requirement != "free" else 0
+
+                def reached(held):
+                    # Winning the target garage also needs its venue's
+                    # capability rule, beyond its displayed item demand.
+                    return self.encounter_reached(encounter, held)
+
+                goals = garage_demands(self.req[encounter["requirement_id"]], pool, self.base, ITEM_BY_CODE)
+                score = key_goal_room(pool, self.room, reached, bundles, goals)
+                out = score if out is None else min(out, score)
+            return out
+        finally:
+            self.base, self.pins = saved_base, saved_pins
 
     def holds(self, held, name):
         """With `held`, does the slot hold `name`, on a fixed check or in `held`?"""
@@ -376,13 +503,15 @@ def fit(world, plan):
     checks = sum(check["kind"] != content_wumpa.KIND for check in plan["checks"])
     need = min(FIT_ROOM, BOOTSTRAP_START_CHECKS, checks // 4)
     gates = gate_names(plan, ITEM_BY_CODE, boost)
-    pool = {name: count for name, count in reach.pool.items()
-            if name in gates and name not in world.options.non_local_items.value}
+    non_local = world.options.non_local_items.value
+    pool = {name: count for name, count in reach.pool.items() if name in gates and name not in non_local}
+    bundles = letter_bundles(plan, {name: count for name, count in reach.pool.items() if name not in non_local})
+    pool.update((name, reach.pool[name]) for bundle in bundles for name in bundle)
     first_key = (lambda held: reach.holds(held, "Key")) if plan.get("fixed_items", {}).get("keys") else None
-    names, room = search(pool, reach.room, need, first_key)
+    names, room = search(pool, reach.room, need, first_key, bundles=bundles)
     if first_key is None:
         return (min(room, need), KEY_SLACK), (need, KEY_SLACK)
     room = room if first_key(tuple(sorted(names))) else 0
     # Vanilla garages ask a fixed table: a redraw could not change what they ask.
-    slack = None if plan["pad_requirements"]["mode"] == "vanilla" else reach.key_slack()
+    slack = None if plan["pad_requirements"]["mode"] == "vanilla" else reach.key_slack(non_local)
     return (min(room, need), KEY_SLACK if slack is None else min(slack, KEY_SLACK)), (need, KEY_SLACK)

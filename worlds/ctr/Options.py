@@ -570,8 +570,9 @@ class ReserveTopUp(DefaultOnToggle):
     """Let non-trap filler include Reserve Top-Up at relative weight 1
     beside Wumpa Fruit at weight 6 (bundles retain weights 3 and 1).
 
-    One copy adds 983 raw reserve units to active positive reserves in a live
-    race. It waits in the hub or without a boost, preserves the fire cap and
+    One copy adds 8192 raw reserve units (about 25% of the positive signed
+    reserve range) to active positive reserves in a live race.
+    It waits in the hub or without a boost, preserves the fire cap and
     can cross into purple Saffi fire, including with Progressive Boost.
     It gives no weapon. Off preserves the existing filler draw."""
     display_name = "Reserve Top-Up"
@@ -655,8 +656,8 @@ class WumpaShopPrices(Range):
     """Scales every Wumpa Shop price and every shelf unlock, in percent.
 
     100 (default) keeps the normal prices: 10 to 30 fruit in N. Sanity Beach up
-    to 40 to 80 in Citadel City. A slot that holds progression always costs
-    the lowest price of its hub."""
+    to 40 to 80 in Citadel City. Every slot draws its price from its hub's
+    range the same way, whatever it holds."""
     display_name = "Wumpa Shop Prices"
     range_start = 25
     range_end = 400
@@ -666,8 +667,8 @@ class WumpaShopPrices(Range):
 class WumpaShopProgression(Choice):
     """Whether Wumpa Shop slots may hold progression items.
 
-    - **allowed** (default): any shop slot may hold progression, priced at
-      its hub's lowest price.
+    - **allowed** (default): any shop slot may hold progression, priced like
+      any other slot.
     - **excluded**: no shop slot holds progression; useful items, filler
       and traps only."""
     display_name = "Wumpa Shop Progression"
@@ -819,6 +820,22 @@ class SpoilerItems(Toggle):
     would otherwise hold filler. Pads still open, close and count their checks
     as usual; only the previews wait for the items."""
     display_name = "Spoiler Items"
+
+
+class PadApproachHints(Toggle):
+    """Hint a warp pad's open checks when you drive up to it.
+
+    Off (default): nothing happens when you approach a pad.
+
+    On: when a pad shows its name as you drive up to it, the game asks the
+    server to hint every location behind that pad that is open for you now
+    and not checked yet. A closed pad, or one that needs a racer you do not
+    have, hints nothing. Each location is hinted at most once, also after a
+    reconnect.
+
+    Hints cannot be undone. They stay in the room for everyone, and one walk
+    through a hub can hint many locations at once."""
+    display_name = "Pad Approach Hints"
 
 
 class RaceTypeSelector(Choice):
@@ -1705,6 +1722,7 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     color_boxes_by_item: ColorBoxesByItem
     spoiler_items: SpoilerItems
+    pad_approach_hints: PadApproachHints
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
 
@@ -1733,7 +1751,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                              EditableStats, ProgressiveStatsMode],
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
-    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, RaceTypeSelector,
+    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, PadApproachHints,
+                RaceTypeSelector,
                 TrackerPadLaunch],
 }
 

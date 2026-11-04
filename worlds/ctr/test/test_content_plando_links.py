@@ -174,7 +174,14 @@ class TestItemLinks(unittest.TestCase):
         mw = self.mw
         self.assertEqual(len(mw.groups), 1)
         group = next(iter(mw.groups))
-        self.assertEqual(sorted(i.name for i in mw.itempool if i.player == group).count("Key"), 4)
+        # The bootstrap removes paid group copies from the pool when it locks
+        # them. Ordinary filled copies remain in itempool, so only locked
+        # placements are added here to count the shared supply exactly once.
+        supply = [i for i in mw.itempool if i.player == group]
+        supply += [loc.item for loc in mw.get_filled_locations()
+                   if loc.locked and loc.item.player == group]
+        supply = {id(item): item for item in supply}
+        self.assertEqual(sum(i.name == "Key" for i in supply.values()), 4)
         state = mw.get_all_state(False)
         for player in (1, 2):
             self.assertEqual(state.count("Key", player), 4)

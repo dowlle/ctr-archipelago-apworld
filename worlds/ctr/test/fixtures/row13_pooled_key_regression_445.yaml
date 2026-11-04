@@ -1,0 +1,304 @@
+description: Crash Team Racing Template, generated with https://github.com/Eijebong/Archipelago-fuzzer/tree/0.2.1
+game: Crash Team Racing
+requires:
+  version: 0.6.7
+Crash Team Racing:
+  progression_balancing: 26
+  accessibility: full
+  retail_tracks:
+  - all
+  track_modes:
+    default:
+    - trophy
+    - ctr
+    - relic
+  custom_tracks:
+  - id: package/baby-t-park/1.0.2
+    content_id: baby-t-park
+    uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+    revision: 1.0.2
+    display_name: Baby T Park
+    author: Lockheart
+    laps: 7
+    capabilities:
+      time_trial: true
+      arcade: true
+      relic: false
+      ctr_tokens: true
+      wumpa: true
+      super_turbo_pads: true
+      weapon_crates: 8
+      checkpoints: 35
+      ai_nav: true
+    files:
+    - role: lev
+      sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8
+      bytes: 2558168
+      format: ctr-lev
+      format_version: 1
+    - role: vrm
+      sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692
+      bytes: 458808
+      format: ctr-vrm
+      format_version: 1
+    evidence: []
+  - id: package/fuzz-fixture-loop/1.0
+    content_id: fuzz-fixture-loop
+    uuid: 0f0e0d0c-0b0a-4908-8706-0504030201ff
+    revision: '1.0'
+    display_name: Fuzz Fixture Loop
+    author: Fixture Author
+    laps: 3
+    capabilities:
+      time_trial: true
+      arcade: true
+      relic: true
+      ctr_tokens: false
+      wumpa: false
+      super_turbo_pads: true
+      weapon_crates: 12
+    relic_targets:
+      sapphire: 96000
+      gold: 86400
+      platinum: 76800
+    files:
+    - role: lev
+      sha256: a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
+      bytes: 1234567
+      format: ctr-lev
+      format_version: 1
+    - role: vrm
+      sha256: b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+      bytes: 458808
+      format: ctr-vrm
+      format_version: 1
+    evidence: []
+  cortex_vortex_track: in_pool
+  required_entries:
+  - baby-t-park
+  - fuzz-fixture-loop
+  cup_count: 5
+  cup_tracks: random_repeats
+  cup_custom_legs: 4
+  one_lap_cups: 'false'
+  crystal_challenge_count: 4
+  crystal_arenas:
+  - Skull Rock
+  - Rampage Ruins
+  - Rocky Road
+  - Nitro Court
+  boss_garages: true
+  boss_cups:
+    0: 1
+    1: 1
+    2: 1
+  garage_requirement_level: chaotic
+  boss_track_shuffle:
+    true: 1
+    false: 1
+  boss_track_pool: []
+  boss_opponent_shuffle: 'false'
+  boss_character_pool:
+  - Crash Bandicoot
+  - Coco Bandicoot
+  - Polar
+  - Pura
+  - Neo Cortex
+  - N. Tropy
+  - Ripper Roo
+  - Papu Papu
+  - Komodo Joe
+  - Pinstripe
+  - Dingodile
+  - Tiny Tiger
+  - N. Gin
+  - Fake Crash
+  - Penta Penguin
+  boss_track_assignment: independent_track
+  boss_kit_shuffle: 'true'
+  boss_attack_assignment: mixed_loadouts
+  boss_attack_intensity: intense
+  boss_loss_easing: 'true'
+  boss_weapon_pool:
+  - tnt
+  - potion
+  - bomb
+  - missile
+  - turbo
+  - shield
+  - mask
+  - clock
+  - warp_orb
+  - invisibility
+  oxide_attack_profile: all_compatible
+  oxide_weapon_pool:
+  - tnt
+  - potion
+  - bomb
+  - missile
+  - turbo
+  - shield
+  - mask
+  - clock
+  - warp_orb
+  - invisibility
+  - super_engine
+  purple_cup_boss_gauntlet: false
+  oxide_goal:
+    any_percent: 3
+    101_percent: 3
+    none: 1
+    disabled: 1
+  oxide_1_optional:
+    mandatory: 1
+    optional: 1
+  bosses_required_goal:
+    0: 2
+    1: 1
+    2: 1
+    3: 1
+    4: 1
+  gems_required_goal:
+    0: 1
+    1: 1
+    3: 1
+    5: 1
+  goal_wumpa: 1787
+  oxide_final_challenge_unlock:
+    sapphire_relics: 2
+    gold_relics: 1
+    any_relic_type: 1
+    total_relics: 1
+  oxide_final_challenge_relic_count:
+    1: 1
+    4: 1
+    12: 1
+    18: 1
+    30: 1
+  oxide_final_track:
+    cortex_vortex: 1
+    oxide_station: 1
+  pad_placement: shuffle
+  race_mode_order: per_pad
+  adventure_structure: classic
+  warppad_unlock_requirements: randomized
+  requirement_weights:
+    Trophy: 90
+    Key: 20
+    Red CTR Token: 16
+    Green CTR Token: 16
+    Blue CTR Token: 16
+    Yellow CTR Token: 16
+    Purple CTR Token: 12
+    Sapphire Relic: 18
+    Gold Relic: 18
+    Platinum Relic: 18
+    Red Gem: 4
+    Green Gem: 4
+    Blue Gem: 4
+    Yellow Gem: 4
+    Purple Gem: 4
+  two_stage_density: light
+  warp_pad_rules: {}
+  racer_locked_pads: 25
+  shuffle_keys: true
+  shuffle_gems: 'false'
+  podium_rungs:
+  - held_3rd
+  - held_1st
+  relic_perfect_checks: true
+  lettersanity:
+    'off': 2
+    locations_only: 3
+    locations_and_items: 1
+  letters_per_track:
+    1: 1
+    2: 1
+    3: 1
+  cup_sweep_checks: 'true'
+  lap_completion_checks: 'false'
+  box_locations: 'false'
+  itemsanity: 'false'
+  crystalsanity: 'false'
+  wumpa_check:
+    global: 1
+    per_track: 7
+  hit_character: 'false'
+  wumpa_shop_slots:
+    0: 1
+    5: 1
+    10: 2
+  wumpa_shop_prices: 264
+  wumpa_shop_progression: excluded
+  wumpa_shop_hints: 'false'
+  item_pool: {}
+  trap_fill_percentage: 38
+  trap_weights:
+    icy_road: 5
+    low_gravity: 5
+    forced_usf: 2
+    forced_boost: 4
+    first_person: 3
+    wumpa_wipeout: 4
+    flatten: 6
+    item_reroll: 5
+    forced_use: 4
+    empty_crates: 3
+    weakened_kart: 3
+    boost_blocker: 3
+    wireframe: 2
+    nitro: 5
+    reverse_steering: 4
+    red_potion: 3
+    upside_down: 0
+    mirror_mode: 3
+    warpball_ambush: 3
+    demo_camera: 3
+    clocked_out: 3
+    reverse_camera: 2
+  wumpa_bundles: 'false'
+  reserve_top_up: 'true'
+  progressive_starting_wumpa: 9
+  turbo_grant: 'true'
+  tizi_helper: 'true'
+  starting_character: ripper_roo
+  character_unlocks: 'true'
+  remove_playable_oxide:
+    false: 3
+    true: 1
+  starting_stat_class: vanilla
+  penta_stats: pal
+  editable_stats: 'off'
+  progressive_stats:
+    'off': 1
+    shared_global: 1
+  progressive_boost:
+    'off': 2
+    shared_global: 2
+    per_character: 1
+  progressive_boost_blue_fire: 'false'
+  logic_difficulty: hard
+  shortcut_knowledge: hard
+  death_link: mask_reset
+  death_link_send:
+  - race_loss
+  - mask_grab
+  - follow_death_link
+  - weapon_hit
+  deathlink_amnesty: 11
+  warp_pad_item_display: one_pile
+  ap_item_type_colors: 'false'
+  color_boxes_by_item: 'true'
+  spoiler_items: 'true'
+  race_type_selector: productive
+  tracker_pad_launch: 'true'
+  local_items: []
+  non_local_items: []
+  start_inventory: {}
+  start_inventory_from_pool: {}
+  start_hints: []
+  start_location_hints: []
+  exclude_locations: []
+  priority_locations: []
+  item_links: []
+  plando_items: []
