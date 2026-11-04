@@ -33,8 +33,40 @@ class TestContentWumpaShop(unittest.TestCase):
 
     def test_record_features_and_goal(self):
         plan = self.plan
-        self.assertEqual(plan["wumpa_shop"], dict(slots=3, prices=150, progression="excluded", hints=True))
-        self.assertEqual(plan["required_features"][-3:], ["wumpa_shop_v1", "wumpa_goal_v1", "pad_client_v1"])
+        self.assertEqual(plan["wumpa_shop"], dict(slots=3, prices=150, progression="excluded", hints=True, logic_scale=100))
+        self.assertEqual(plan["required_features"][-4:], ["wumpa_shop_v1", "wumpa_shop_key_tiers_v1", "wumpa_goal_v1", "pad_client_v1"])
+
+    def test_key_budget_boundaries_and_scaling(self):
+        for amount, keys in ((0, 0), (100, 0), (101, 1), (300, 1), (301, 2),
+                             (600, 2), (601, 3), (900, 3), (901, 4), (1200, 4), (5000, 4)):
+            with self.subTest(amount=amount):
+                self.assertEqual(wumpa_shop.logic_key_floor(amount, 0), keys)
+                self.assertEqual(wumpa_shop.logic_key_floor(0, amount), keys)
+                self.assertEqual(wumpa_shop.logic_key_floor(amount * 2, 0, 200), keys)
+        self.assertEqual(wumpa_shop.logic_key_floor(26, 0, 25), 1)
+
+    def test_expensive_shelves_need_later_keys(self):
+        world = make_world(shop_options(slots=25, progression="allowed", wumpa_shop_prices=200),
+                           stop_before="pre_fill")
+        state = CollectionState(world.multiworld)
+        state.collect(world.create_event(content_wumpa.INCOME), True)
+        for keys in range(5):
+            for slot, floor in ((1, 0), (19, 2), (22, 3), (25, 4)):
+                loc = world.multiworld.get_location(f"N. Sanity Beach Shop: Slot {slot}", 1)
+                self.assertEqual(loc.access_rule(state), keys >= floor, (keys, slot))
+            state.collect(world.create_item("Key"), True)
+
+    def test_legacy_room_keeps_original_shop_logic(self):
+        world = make_world(shop_options(slots=25, wumpa_shop_prices=200), stop_before="pre_fill")
+        wire = copy.deepcopy(world.fill_slot_data())
+        plan = wire["content_plan"]
+        del plan["wumpa_shop"]["logic_scale"]
+        plan["required_features"].remove(content_wumpa.LOGIC_FEATURE)
+        tracker = make_world({}, passthrough=wire, stop_before="pre_fill")
+        state = CollectionState(tracker.multiworld)
+        state.collect(tracker.create_event(content_wumpa.INCOME), True)
+        self.assertTrue(tracker.multiworld.get_location("N. Sanity Beach Shop: Slot 25", 1).access_rule(state))
+        self.assertEqual(tracker.fill_slot_data(), wire)
         self.assertEqual(plan["goal"]["op"], "all")
         self.assertEqual(plan["goal"]["terms"][-1], dict(op="wumpa_banked", count=750))
         self.assertEqual(plan["goal"]["terms"][0]["op"], "distinct")
@@ -132,6 +164,20 @@ class TestContentWumpaShop(unittest.TestCase):
                           o.wumpa_shop_hints.value, o.goal_wumpa.value), (3, 150, 1, 1, 750))
         self.assertEqual(tracker.fill_slot_data(), wire)
 
+    def test_tracker_restores_custom_logic_scale(self):
+        world = make_world(shop_options(wumpa_shop_logic_scale=50), stop_before="pre_fill")
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        tracker = make_world(dict(wumpa_shop_logic_scale=400), passthrough=wire, stop_before="pre_fill")
+        self.assertEqual(tracker.options.wumpa_shop_logic_scale.value, 50)
+        self.assertEqual(tracker.fill_slot_data(), wire)
+        state = CollectionState(tracker.multiworld)
+        state.collect(tracker.create_event(content_wumpa.INCOME), True)
+        # Slot 3's 75-fruit shelf exceeds the scaled starting budget of 50.
+        location = tracker.multiworld.get_location("N. Sanity Beach Shop: Slot 3", 1)
+        self.assertFalse(location.access_rule(state))
+        state.collect(tracker.create_item("Key"), True)
+        self.assertTrue(location.access_rule(state))
+
     def test_forged_plans_refuse(self):
         def mutate(change):
             plan = copy.deepcopy(self.plan)
@@ -156,6 +202,9 @@ class TestContentWumpaShop(unittest.TestCase):
             prices=lambda p: p["wumpa_shop"].update(prices=100),
             progression=lambda p: p["wumpa_shop"].update(progression="sometimes"),
             hints=lambda p: p["wumpa_shop"].update(hints=1),
+            scale_low=lambda p: p["wumpa_shop"].update(logic_scale=24),
+            scale_bool=lambda p: p["wumpa_shop"].update(logic_scale=True),
+            no_logic_feature=lambda p: p["required_features"].remove(content_wumpa.LOGIC_FEATURE),
             no_record=lambda p: p.pop("wumpa_shop"),
             no_feature=lambda p: p["required_features"].remove("wumpa_shop_v1"),
             no_goal_feature=lambda p: p["required_features"].remove("wumpa_goal_v1"),

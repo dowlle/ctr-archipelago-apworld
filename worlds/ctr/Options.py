@@ -663,6 +663,22 @@ class WumpaShopPrices(Range):
     default = 100
 
 
+class WumpaShopLogicScale(Range):
+    """Scales the Wumpa amounts considered reasonable at each Key count.
+
+    At 100 percent, up to 100 fruit needs 0 Keys, 300 needs 1, 600 needs 2,
+    900 needs 3, and above 900 (including 1200 and more) needs all 4.
+    Uses the higher of a slot's price
+    and lifetime shelf unlock. Higher percentages allow more farming earlier;
+    lower percentages put expensive shelves later. The hub's Key gate still
+    applies. Changes item placement and tracker logic, not prices or buying:
+    you can always farm and buy early."""
+    display_name = "Wumpa Shop Logic Scale"
+    range_start = 25
+    range_end = 400
+    default = 100
+
+
 class WumpaShopProgression(Choice):
     """Whether Wumpa Shop slots may hold progression items.
 
@@ -1687,6 +1703,7 @@ class ctrAPOptions(PerGameCommonOptions):
     hit_character: HitCharacter
     wumpa_shop_slots: WumpaShopSlots
     wumpa_shop_prices: WumpaShopPrices
+    wumpa_shop_logic_scale: WumpaShopLogicScale
     wumpa_shop_progression: WumpaShopProgression
     wumpa_shop_hints: WumpaShopHints
     # items and traps
@@ -1743,7 +1760,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                               ShuffleGems],
     "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
-    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints],
+    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,

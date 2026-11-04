@@ -126,3 +126,16 @@ def unlock_banked(slot: int, slots: int, percent: int) -> int:
     return 0 if later <= 0 else _scale(UNLOCK_STEP * later, percent)
 
 
+def logic_key_floor(price: int, unlock: int, scale: int = 100) -> int:
+    """Progression budget for one purchase, separate from native affordability.
+
+    Repeatable income proves eventual affordability, not reasonable early
+    pacing. Higher absolute amounts need later Key progression even when the
+    physical shop is in an early hub. Early purchases remain possible in game.
+    Keep the native content verifier's SHOP budget in sync.
+    """
+    amount = max(price, unlock)
+    for keys, budget in enumerate((100, 300, 600, 900)):
+        if amount * 100 <= budget * scale:
+            return keys
+    return 4
