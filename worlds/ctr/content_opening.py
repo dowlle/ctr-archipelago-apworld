@@ -153,6 +153,16 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
     return list(best[2]), best[1]
 
 
+def key_goal_room(pool, room, reached, bundles, goals):
+    """Score the fixed-Key route without lowering the ordinary search's result."""
+    held, free = search(pool, room, KEY_SLACK, reached, bundles=bundles, goals=goals)
+    if reached(held):
+        return free
+    held, free = search(pool, room, KEY_SLACK, reached, bundles=bundles, goals=goals,
+                        groups_with_singles=True)
+    return free if reached(held) else -1
+
+
 def term_met(node, held):
     """A plan predicate against {item code: count}. Boss wins and the Wumpa goal arm
     stand far behind an opening, and count as shut."""
@@ -467,8 +477,7 @@ class PlanReach:
                     return self.encounter_reached(encounter, held)
 
                 goals = garage_demands(self.req[encounter["requirement_id"]], pool, self.base, ITEM_BY_CODE)
-                held, room = search(pool, self.room, KEY_SLACK, reached, bundles=bundles, goals=goals)
-                score = room if reached(held) else -1
+                score = key_goal_room(pool, self.room, reached, bundles, goals)
                 out = score if out is None else min(out, score)
             return out
         finally:

@@ -2,6 +2,7 @@
 reach model against the real rules, the redraw, and the seating."""
 import unittest
 import json
+import random
 from pathlib import Path
 from unittest import mock
 import yaml
@@ -10,7 +11,8 @@ from BaseClasses import CollectionState
 from worlds.AutoWorld import call_all
 from Fill import distribute_items_restrictive
 
-from .. import content_opening, content_plan, sphere0_guard
+from .. import ctrAPWorld, content_opening, content_plan, sphere0_guard
+from .plan_options import plan_options
 from .test_content_plan import make_world
 
 VANILLA = dict(warppad_unlock_requirements="vanilla")
@@ -26,6 +28,33 @@ def spots(start, gates):
 
 
 class TestSearch(unittest.TestCase):
+    def test_key_goal_grouped_fallback_reaches_goal_after_default_fails(self):
+        pool = {"Aux": 1, "Boost": 2}
+        room = spots(2, [(dict(Boost=2), 8)])
+        reached = lambda held: held.count("Boost") == 2
+        goals = [("Aux",)]
+        default, _ = content_opening.search(pool, room, content_opening.KEY_SLACK,
+                                             reached, goals=goals)
+        grouped, grouped_room = content_opening.search(
+            pool, room, content_opening.KEY_SLACK, reached, goals=goals, groups_with_singles=True)
+        self.assertFalse(reached(default))
+        self.assertTrue(reached(grouped))
+        self.assertEqual(content_opening.key_goal_room(pool, room, reached, (), goals), grouped_room)
+
+    def test_key_slack_never_drops_below_default_search_on_bounded_groups(self):
+        pool = {"Aux": 1, "Relic": 3, **{f"X{i:02}": 1 for i in range(28)}}
+        room = spots(2, [(dict(Aux=1), 12), (dict(Relic=3), 3)] +
+                     [(dict(**{f"X{i:02}": 1}), 1) for i in range(28)])
+        reached = lambda held: held.count("Relic") >= 3
+        goals = [("Relic",) * 3]
+        default_held, default_room = content_opening.search(pool, room, content_opening.KEY_SLACK,
+                                                             reached, goals=goals)
+        grouped_held, _ = content_opening.search(pool, room, content_opening.KEY_SLACK,
+                                                  reached, goals=goals, groups_with_singles=True)
+        self.assertTrue(reached(default_held))
+        self.assertFalse(reached(grouped_held))
+        self.assertEqual(content_opening.key_goal_room(pool, room, reached, (), goals), default_room)
+
     def test_auxiliary_single_gains_do_not_starve_a_requested_goal(self):
         calls = []
 
@@ -350,6 +379,28 @@ class TestPooledKeyOpening(unittest.TestCase):
         self.assertTrue(all(loc.can_reach(completed) for loc in mw.get_locations(world.player)
                             if loc.address is not None))
 
+    def test_narrow_start_still_reserves_key_and_support_when_path_has_more_room(self):
+        world = self.world()
+        state = sphere0_guard._base_state(world)
+        for loc in sorted(sphere0_guard._room(world, state), key=lambda loc: loc.name)[:8]:
+            prior = loc.access_rule
+            loc.access_rule = lambda probe, prior=prior: (prior(probe) and
+                probe.has("Key", world.player) and probe.has("Progressive Boost", world.player))
+        initial = len(sphere0_guard._room(world, state))
+        target = sphere0_guard.bootstrap_target(world)
+        self.assertEqual((initial, target), (5, 12))
+        ordinary, ordinary_room = sphere0_guard.plan_opening(world, state, target, set())
+        key_items, key_room = sphere0_guard.plan_opening(world, state, target, set(), "Key")
+        self.assertEqual([item.name for item in ordinary], ["Progressive Boost"])
+        self.assertEqual(sorted(item.name for item in key_items), ["Key", "Progressive Boost"])
+        self.assertGreater(key_room, ordinary_room)
+        after = sphere0_guard._seat_first_key(world, state)
+        self.assertTrue(after.has("Key", world.player))
+        self.assertCountEqual([name for name, _ in world._ctr_start_bootstrap],
+                              ["Key", "Progressive Boost"])
+        self.assertTrue(all(world.multiworld.get_location(name, world.player).locked
+                            for _, name in world._ctr_start_bootstrap))
+
     def test_nonlocal_key_is_not_reserved_or_granted(self):
         world = self.world()
         world.options.non_local_items.value.add("Key")
@@ -505,6 +556,84 @@ class TestSeating(unittest.TestCase):
     def test_the_failing_shapes_fill(self):
         self.assert_fills(TIGHT, range(8))
         self.assert_fills(LETTERS, range(8))
+
+
+class TestFillRegression(unittest.TestCase):
+    def test_seed_445_narrow_start_keeps_key_and_seats_boost_past_target(self):
+        world = self.fixture_world("row13_pooled_key_regression_445.yaml", 445, "pre_fill")
+        state = sphere0_guard._base_state(world)
+        target = sphere0_guard.bootstrap_target(world)
+        self.assertEqual((len(sphere0_guard._room(world, state)), target), (10, 12))
+        ordinary, ordinary_room = sphere0_guard.plan_opening(world, state, target, set())
+        key_items, key_room = sphere0_guard.plan_opening(world, state, target, set(), "Key")
+        self.assertEqual([item.name for item in ordinary], ["Trophy"])
+        self.assertEqual(sorted(item.name for item in key_items), ["Key", "Trophy"])
+        self.assertEqual((ordinary_room, key_room), (13, 12))
+        sphere0_guard.bootstrap_start(world)
+        self.assertEqual([name for name, _ in world._ctr_start_bootstrap],
+                         ["Key", "Trophy", "Progressive Boost"])
+        self.assertTrue(all(world.multiworld.get_location(name, world.player).locked
+                            for _, name in world._ctr_start_bootstrap))
+        after = sphere0_guard._base_state(world)
+        self.assertGreaterEqual(len(sphere0_guard._open_empty(world, after)), target + 1)
+
+    def test_narrow_key_path_below_ordinary_room_still_reserves_key(self):
+        world = self.fixture_world("row13_pooled_key_regression_445.yaml", 445, "pre_fill")
+        state = sphere0_guard._base_state(world)
+        target = sphere0_guard.bootstrap_target(world)
+        self.assertEqual(len(sphere0_guard._room(world, state)), 10)
+        self.assertTrue(any(pad["entrance_req"].startswith("keys:")
+                            for pad in world.ctr_content_plan["pads"]))
+        original = sphere0_guard.plan_opening
+
+        def with_extra_later_check(*args, **kwargs):
+            # Model one further check opened by either Trophy route, while
+            # retaining the real pooled Key, support items, and Key-gated pads.
+            items, room = original(*args, **kwargs)
+            return items, room + 1
+
+        with mock.patch.object(sphere0_guard, "plan_opening", side_effect=with_extra_later_check):
+            ordinary, ordinary_room = sphere0_guard.plan_opening(world, state, target, set())
+            key_items, key_room = sphere0_guard.plan_opening(world, state, target, set(), "Key")
+            self.assertEqual([item.name for item in ordinary], ["Trophy"])
+            self.assertCountEqual([item.name for item in key_items], ["Key", "Trophy"])
+            self.assertEqual((ordinary_room, key_room, target), (14, 13, 12))
+            after = sphere0_guard._seat_first_key(world, state)
+        self.assertTrue(after.has("Key", world.player))
+        self.assertCountEqual([name for name, _ in world._ctr_start_bootstrap], ["Key", "Trophy"])
+
+    def fixture_world(self, fixture, seed, stop_before):
+        path = Path(__file__).parent / "fixtures" / fixture
+        base = plan_options(yaml.safe_load(path.read_text())["Crash Team Racing"])
+        if base.get("custom_tracks") == {}:
+            base.pop("custom_tracks")
+        keep = {"track_modes", "item_pool", "trap_weights", "requirement_weights", "warp_pad_rules",
+                "start_inventory_from_pool", "start_inventory"}
+        rng = random.Random(seed)
+        options = {name: (rng.choice([value for value, weight in setting.items()
+                                      for _ in range(weight)])
+                          if isinstance(setting, dict) and name not in keep and setting
+                          and all(type(weight) is int for weight in setting.values()) else setting)
+                   for name, setting in base.items() if name in ctrAPWorld.options_dataclass.type_hints}
+        return make_world(options, seed=seed, stop_before=stop_before)
+
+    def test_fill_regression_seeds(self):
+        cases = (("row13_fill_regression_4697.yaml", (137, 1668)),
+                 ("row13_pooled_key_regression_445.yaml", (445,)))
+        for fixture, seeds in cases:
+            for seed in seeds:
+                with self.subTest(fixture=fixture, seed=seed):
+                    self.assert_fills_seed(fixture, seed)
+
+    def assert_fills_seed(self, fixture, seed):
+        world = self.fixture_world(fixture, seed, "fill")
+        mw = world.multiworld
+        distribute_items_restrictive(mw)
+        state = CollectionState(mw)
+        state.sweep_for_advancements(locations=mw.get_locations(world.player))
+        self.assertTrue(mw.can_beat_game())
+        self.assertTrue(all(loc.can_reach(state) for loc in mw.get_locations(world.player)
+                            if loc.address is not None))
 
 
 class TestAuxiliaryOnlyOpening(unittest.TestCase):

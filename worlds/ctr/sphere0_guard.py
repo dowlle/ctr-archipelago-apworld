@@ -517,6 +517,11 @@ def _seat_first_key(world, state):
         items, _spots = plan_opening(world, state, max(target, initial), non_local, "Key")
         if _spots < max(target, initial):
             return state
+        # A Key path may use one more opening check than the ordinary route.
+        # Keep the Key reserved: otherwise reverse fill can spend its support
+        # checks before placing it. If that cost leaves exactly the target,
+        # let the ordinary bootstrap seek one spare check after this path.
+        needs_margin = initial < target and _spots < plan_opening(world, state, target, non_local)[1]
         tight = initial - len(items) < target
     if not items or not _collect(world, state, items).has("Key", player) or not tight:
         return state
@@ -528,6 +533,8 @@ def _seat_first_key(world, state):
         return state
     _lock(world, chosen)
     world._ctr_start_bootstrap = [(item.name, location.name) for item, location in chosen]
+    if not fixed and needs_margin:
+        world._ctr_pooled_key_needs_margin = True
     return _collect(world, state, [])
 
 
@@ -691,6 +698,11 @@ def bootstrap_start(world) -> None:
     mw, player = world.multiworld, world.player
     target = bootstrap_target(world)
     state = _seat_first_key(world, _base_state(world))
+    # A narrow paid Key path may land exactly on the stop threshold. Seed 445
+    # then leaves Boost to reverse fill, where the remaining checks cannot
+    # take it. One more productive opener restores a spare non-shop check.
+    if getattr(world, "_ctr_pooled_key_needs_margin", False) and len(_open_empty(world, state)) <= target:
+        target += 1
     # The start as AP's early pass sees it: only event items (no address) are
     # swept, placed items never are.
     base = CollectionState(mw)
