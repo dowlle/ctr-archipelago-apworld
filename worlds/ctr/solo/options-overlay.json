@@ -6,11 +6,11 @@
     {"id": "bosses", "label": "Bosses", "options": ["boss_garages", "boss_cups", "garage_requirement_level", "boss_track_shuffle", "boss_opponent_shuffle", "boss_track_assignment", "boss_kit_shuffle", "boss_attack_assignment", "boss_attack_intensity", "boss_loss_easing", "oxide_attack_profile", "purple_cup_boss_gauntlet"]},
     {"id": "pads", "label": "Pads and Locks", "options": ["pad_placement", "race_mode_order", "adventure_structure", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "shuffle_keys", "shuffle_gems"]},
     {"id": "checks", "label": "Checks", "options": ["cup_only_podium_rungs", "relic_perfect_checks", "lettersanity", "letters_per_track", "cup_sweep_checks", "lap_completion_checks", "box_locations", "itemsanity", "crystalsanity", "wumpa_check", "hit_character"]},
-    {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_progression", "wumpa_shop_hints"]},
+    {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_progression", "wumpa_shop_hints", "shop_hints_progression_only"]},
     {"id": "items", "label": "Items and Traps", "options": ["trap_fill_percentage", "wumpa_bundles", "reserve_top_up", "progressive_starting_wumpa", "turbo_grant", "tizi_helper"]},
     {"id": "racers", "label": "Racers and Stats", "options": ["starting_character", "character_unlocks", "remove_playable_oxide", "starting_stat_class", "penta_stats", "editable_stats", "progressive_stats"]},
     {"id": "boost", "label": "Boost", "options": ["progressive_boost", "progressive_boost_blue_fire", "logic_difficulty", "shortcut_knowledge"]},
-    {"id": "display", "label": "Display", "options": ["warp_pad_item_display", "ap_item_type_colors", "color_boxes_by_item", "spoiler_items", "pad_approach_hints", "race_type_selector", "tracker_pad_launch"]}
+    {"id": "display", "label": "Display", "options": ["warp_pad_item_display", "ap_item_type_colors", "color_boxes_by_item", "spoiler_items", "pad_approach_hints", "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "race_type_selector", "tracker_pad_launch"]}
   ],
   "rules": [
     {"option": "oxide_1_optional", "visible_when": {"oxide_goal": ["101_percent"]}},

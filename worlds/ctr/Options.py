@@ -682,6 +682,17 @@ class WumpaShopHints(DefaultOnToggle):
     display_name = "Wumpa Shop Hints"
 
 
+class ShopHintsProgressionOnly(Toggle):
+    """Wumpa Shop Hints only hint progression items.
+
+    Off (default): opening a shop page hints every unsold item on it.
+
+    On: opening a shop page hints only the unsold slots that hold a progression
+    item. Useful items, filler and traps are not hinted. Without Wumpa Shop
+    Hints this option does nothing."""
+    display_name = "Shop Hints Progression Only"
+
+
 class GoalWumpa(Range):
     """Bank this many Wumpa Fruit over the whole seed for the goal.
 
@@ -835,6 +846,31 @@ class PadApproachHints(Toggle):
     Hints cannot be undone. They stay in the room for everyone, and one walk
     through a hub can hint many locations at once."""
     display_name = "Pad Approach Hints"
+
+
+class PadHintsWaitForSpoiler(Toggle):
+    """Pad Approach Hints wait for Warp Pad Preview.
+
+    Off (default): Pad Approach Hints work as before.
+
+    On: with Spoiler Items and Pad Approach Hints both on, a pad hints nothing
+    until you receive Warp Pad Preview, the item that also reveals the pad's
+    items. The hints you skipped are not lost: the next time you drive up to
+    the pad after the preview arrives, it hints them. Without Spoiler Items or
+    Pad Approach Hints this option does nothing."""
+    display_name = "Pad Hints Wait for Spoiler"
+
+
+class PadHintsProgressionOnly(Toggle):
+    """Pad Approach Hints only hint progression items.
+
+    Off (default): a pad hints every open check behind it.
+
+    On: a pad hints only the checks that hold a progression item, which keeps
+    the hint list short. Checks with useful items, filler and traps are not
+    hinted, and a later approach does not hint them either. Without Pad
+    Approach Hints this option does nothing."""
+    display_name = "Pad Hints Progression Only"
 
 
 class RaceTypeSelector(Choice):
@@ -1722,6 +1758,9 @@ class ctrAPOptions(PerGameCommonOptions):
     color_boxes_by_item: ColorBoxesByItem
     spoiler_items: SpoilerItems
     pad_approach_hints: PadApproachHints
+    pad_hints_wait_for_spoiler: PadHintsWaitForSpoiler
+    pad_hints_progression_only: PadHintsProgressionOnly
+    shop_hints_progression_only: ShopHintsProgressionOnly
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
 
@@ -1743,7 +1782,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                               ShuffleGems],
     "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
-    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints],
+    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints,
+                    ShopHintsProgressionOnly],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,
@@ -1751,6 +1791,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
     "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, PadApproachHints,
+                PadHintsWaitForSpoiler, PadHintsProgressionOnly,
                 RaceTypeSelector,
                 TrackerPadLaunch],
 }
