@@ -155,6 +155,10 @@ class _Encoder:
                 "USEFUL_WEAPON_FAMILIES")
         return ["families", int(count)]
 
+    def region(self, name):
+        region = self.world.multiworld.get_region(name, self.world.player)
+        return _region_wire(self.world, self, region, frozenset(), {})
+
     def ref(self, location):
         loc = (self.world.multiworld.get_location(location, self.world.player)
                if isinstance(location, str) else location)
@@ -180,7 +184,7 @@ def _mono(term):
     if tag == "items":
         return ("items", term[1], tuple(term[3])), term[2]
     if tag == "cap":
-        return ("cap", term[2]), term[1]
+        return ("cap", term[2], *term[3:]), term[1]
     return None
 
 
@@ -214,7 +218,7 @@ def _implies(x, y) -> bool:
         if mx[0] == my[0]:
             return mx[1] >= my[1]
         # A bound racer meeting the boost means some racer meets it.
-        if (mx[0][0] == "cap" == my[0][0] and my[0][1] == -1
+        if (mx[0][0] == "cap" == my[0][0] and my[0][1] == -1 and mx[0][2:] == my[0][2:]
                 and mx[1] >= my[1]):
             return True
         # Four colours summed never exceed all five summed.
@@ -234,7 +238,7 @@ def simplify(term):
         mono = _mono(term)
         if mono is not None and mono[1] <= 0 and tag != "cap":
             return True
-        if tag == "cap" and term[1] <= 0 and term[2] == -1:
+        if tag == "cap" and term[1] <= 0 and term[2] == -1 and (len(term) == 3 or term[3] == 0):
             return True
         return term
     is_all = tag == "all"
@@ -332,15 +336,22 @@ def _region_wire(world, enc, region, stack, memo):
 # --- the block ---------------------------------------------------------------
 
 def win_locations(world):
-    """[(location, kind)] for this slot's win checks, ordered by id. A content
-    plan names its own wins: a custom track or cup keeps no retail suffix."""
+    """Exported checks, ordered by id. Actual wins keep their win kind.
+
+    Pad Approach Hints additionally exports every addressed non-win with
+    kind `hint`, so native can evaluate all families without guessing gates.
+    With the option off, this remains the unchanged win-only graph.
+    """
     out = []
+    include_hints = bool(getattr(getattr(world.options, "pad_approach_hints", None), "value", 0))
     from .content_plan import win_kinds
     kinds = win_kinds(world.ctr_content_plan)
     for loc in world.multiworld.get_locations(world.player):
         if loc.address is None:
             continue
         kind = kinds.get(loc.address)
+        if kind is None and include_hints:
+            kind = "hint"
         if kind is not None:
             out.append((loc, kind))
     return sorted(out, key=lambda pair: int(pair[0].address))
@@ -406,7 +417,7 @@ def wire_block(world) -> Dict[str, object]:
             raise WinLogicExportError(
                 f"CTR win_logic: check {key} nests {d} levels (limit {MAX_DEPTH})")
     return {
-        "version": WIN_LOGIC_VERSION,
+        "version": 2 if world.options.pad_approach_hints.value else WIN_LOGIC_VERSION,
         "families": [sorted(int(world.item_name_to_id[n]) for n in fam)
                      for fam in weapon_families()],
         "regions": regions,
