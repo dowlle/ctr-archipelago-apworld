@@ -109,6 +109,9 @@ PERFECT_SUFFIX = "Relic Race Perfect"
 CORTEX_ORIGIN = "cortex_vortex"
 CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
+#: The track key of Cortex Vortex. A downloaded Cortex Vortex package (the Saphi
+#: release) carries it too: it is the same track, so a seed takes one or the other.
+CORTEX_TRACK_KEY = "cortex-vortex"
 CORTEX_LAPS = 3
 #: `cortex_vortex_track: own_pad`.
 CORTEX_OWN_PAD = 2
@@ -1148,6 +1151,11 @@ def draw_plan(world, key_estimate=True):
     forced_options.raise_if_starting_as_removed_oxide(world)
     forced_options.warn_racer_locked_pads_boolean_normalized(world)
     packages = resolve_packages(list(o.custom_tracks.value))
+    twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
+    if twin is not None:
+        error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
+              "Cortex Vortex that comes with CTR AP. A seed has one Cortex Vortex: remove it from custom_tracks, "
+              "or set cortex_vortex_track to off to race the listed version.")
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so

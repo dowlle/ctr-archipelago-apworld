@@ -495,6 +495,35 @@ class TestCustomTracks(SoloTestCase):
             self.assertEqual(code, 0, events)
             self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
 
+    def test_a_downloaded_cortex_vortex_is_the_same_row_as_the_bundled_one(self):
+        # A tester report (alpha2, 2026-11-04): Play Solo offered the bundled Cortex
+        # Vortex and a downloaded copy as two rows, and the seed got both.
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
+        folder = os.path.join(self.assets, "tracks", "cortex-vortex")
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x")
+        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", loop["id"]])
+        source = write_yaml(self.work, "both.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[saphi, loop], required_entries=["cortex-vortex"])}))
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]}, {"cortex-vortex": 2, loop["id"]: 1})
+        events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "3",
+                                 "--tracks-page", "--track", "cortex-vortex", "--guarantee", "cortex-vortex",
+                                 "--track", loop["id"])
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop])
+        self.assertNotIn("required_entries", section)
+        self.assertEqual(section["cortex_vortex_track"], "own_pad")
+        events, code = self.call("validate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
+                                 "--track", "cortex-vortex", "--track", saphi["id"])
+        self.assertNotEqual(code, 0, events)
+        self.assertEqual((last(events)["kind"], last(events)["track"]), ("track", saphi["id"]))
+
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")

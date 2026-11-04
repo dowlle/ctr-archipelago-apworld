@@ -125,18 +125,28 @@ class TestCortexVortexTrack(unittest.TestCase):
                     for s in range(12))
         self.assertGreater(drawn, 0)
 
-    def test_saphi_cortex_vortex_package_keeps_its_own_identity(self):
+    @staticmethod
+    def saphi_cortex_vortex():
         saphi = copy.deepcopy(UNKNOWN)
         saphi.update(id="package/cortex-vortex/1.1.2", content_id="cortex-vortex", revision="1.1.2",
                      uuid="f1a619f0-9176-5e75-ad96-00db77d8cf2b", display_name="Cortex Vortex", author="Lockheart")
         saphi["files"] = [dict(f, sha256=h * 32) for f, h in zip(saphi["files"], ("aa", "bb"))]
-        plan = make_world(cv_options(custom=[saphi]), seed=6).ctr_content_plan
-        custom = track_of(plan, "custom/cortex-vortex/1.1.2")
-        self.assertEqual(custom["room_title"], "Cortex Vortex (Custom)")
-        names = [c["display_name"] for c in plan["checks"]]
-        self.assertEqual(len(names), len(set(names)))
-        self.assertIn("Cortex Vortex: Trophy Race", names)
-        self.assertIn("Cortex Vortex (Custom): Trophy Race", names)
+        return saphi
+
+    def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):
+        # A tester report (alpha2, 2026-11-04): a seed had two Cortex Vortex pads,
+        # the bundled track and a downloaded copy listed in custom_tracks.
+        for required in (True, False):
+            with self.subTest(own_pad=required), self.assertRaises(OptionError) as caught:
+                make_world(cv_options(custom=[self.saphi_cortex_vortex()], required=required), seed=6)
+            message = str(caught.exception)
+            self.assertIn("package/cortex-vortex/1.1.2", message)
+            self.assertIn("one Cortex Vortex", message)
+
+    def test_a_downloaded_cortex_vortex_alone_keeps_its_own_identity(self):
+        plan = make_world(cv_options(cortex=False, custom=[self.saphi_cortex_vortex()]), seed=6).ctr_content_plan
+        self.assertNotIn(CV, {t["id"] for t in plan["tracks"]})
+        self.assertEqual(track_of(plan, "custom/cortex-vortex/1.1.2")["room_title"], "Cortex Vortex (Custom)")
 
 
 class TestRelicRacePerfect(unittest.TestCase):

@@ -1120,6 +1120,11 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
             for t in tracks]
     cortex = _cortex_pick(section)
     if cortex or _cortex_installed(assets):
+        # A downloaded Cortex Vortex is the same track as the bundled one: the page
+        # shows one Cortex Vortex row, which starts as the YAML has either copy.
+        copies = [row for row in rows if row["content_id"] == CORTEX_ID]
+        rows = [row for row in rows if row["content_id"] != CORTEX_ID]
+        cortex = max([cortex] + [row["start"] for row in copies])
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
                         "modes": ["trophy", "ctr", "relic"], "race_modes": ["trophy", "ctr", "relic", "time_trial"],
                         "time_trial": True, "seed_usable": True, "source": "built-in", "start": cortex})
@@ -1177,6 +1182,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     if unusable:
         raise SoloError("track", f"{by_id[unusable]['display_name']} supports Time Trial only and cannot use an Adventure pad.", track=unusable)
     keys = [by_id[p]["content_id"] for p in packages]
+    if CORTEX_ID in keys and CORTEX_ID in picked:
+        raise SoloError("track", "Pick one Cortex Vortex: the one that comes with CTR AP is already picked.",
+                        track=packages[keys.index(CORTEX_ID)])
     twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
     if twice:
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
