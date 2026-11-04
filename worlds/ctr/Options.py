@@ -582,8 +582,11 @@ class WumpaBundles(Toggle):
 
     Small bundles give 3 fruit and big bundles fill your kart to 10. Plain
     single-fruit filler remains the most common result. This adds variety to
-    existing filler slots; it does not add items or locations."""
+    existing filler slots; it does not add items or locations. On by default
+    since 0.3.0-alpha2; turn it off to keep every Wumpa filler item a single
+    fruit."""
     display_name = "Wumpa Bundles"
+    default = 1
 
 
 class ProgressiveStartingWumpa(Range):
