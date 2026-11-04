@@ -44,6 +44,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 
 # The runtime folder is read-only to the runtime: never write .pyc files.
@@ -866,6 +867,13 @@ def list_all(paths: Paths) -> dict:
 #: may drop one in too (for example a descriptor exported from AP-Pie).
 DESCRIPTOR_MAX_BYTES = 64 * 1024
 TRACK_FILE_SUFFIX = {"lev": ".lev", "vrm": ".vrm"}
+PACKAGE_RESERVED_NAMES = {"con", "prn", "aux", "nul"} | {f"com{i}" for i in range(1, 10)} | {f"lpt{i}" for i in range(1, 10)}
+# Keep these schema-1 limits in step with native_custom_package.cpp. The
+# accepted/rejected cases in test/fixtures/package-manifests.json exercise both.
+PACKAGE_ROLE_LIMITS = {"lev": 16*1024*1024, "vrm": 4*1024*1024,
+                       "navigation": 16*1024*1024, "ap_boxes": 4*1024*1024,
+                       "ctr_letters": 1024*1024, "relic_targets": 1024*1024,
+                       "presentation": 4*1024*1024, "race_settings": 4096, "sca": 1024*1024}
 
 
 def _world_module(name: str):
@@ -879,7 +887,7 @@ def _world_module(name: str):
 ROOM_META_MAX_BYTES = 4 * 1024 * 1024
 
 
-def _small_json(path: str, limit: int, inside: str):
+def _small_json(path: str, limit: int, inside: str, unique_keys: bool = False):
     """A plain JSON file inside `inside`, at most `limit` bytes, or None. The
     files are player-writable: a link, a huge file or bad bytes is skipped."""
     try:
@@ -894,7 +902,14 @@ def _small_json(path: str, limit: int, inside: str):
             data = handle.read(limit + 1)
         if len(data) > limit:
             return None
-        return json.loads(data.decode("utf-8"))
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate JSON key")
+                result[key] = value
+            return result
+        return json.loads(data.decode("utf-8"), object_pairs_hook=unique if unique_keys else None)
     except (OSError, ValueError, RecursionError):  # UnicodeDecodeError is a ValueError
         return None
 
@@ -938,9 +953,126 @@ def _pinned_file(folders: list, pin: dict) -> str | None:
     return None
 
 
+def _manifest_schema_valid(manifest: object, pin: str) -> bool:
+    """Mirror CustomPackage_ParseManifest's schema-1 admission and pin rule."""
+    def fields(value, names):
+        return isinstance(value, dict) and value.keys() == names
+
+    def text(value, limit):
+        return isinstance(value, str) and 0 < len(value.encode("utf-8")) <= limit and all(
+            ord(c) >= 32 and ord(c) != 127 for c in value)
+
+    def integer(value, limit):
+        return type(value) is int and 1 <= value <= limit
+
+    try:
+        if not fields(manifest, {"schema_version", "package_uuid", "version", "title", "files", "compatibility"}):
+            return False
+        if not integer(manifest["schema_version"], 65535) or manifest["schema_version"] != 1:
+            return False
+        uuid, version, title = manifest["package_uuid"], manifest["version"], manifest["title"]
+        if not text(uuid, 36) or not re.fullmatch(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", uuid) or uuid == "00000000-0000-0000-0000-000000000000":
+            return False
+        if not text(version, 64) or not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?", version):
+            return False
+        # SemVer numeric prerelease identifiers cannot have leading zeroes.
+        prerelease = version.split("+", 1)[0].partition("-")[2]
+        if any(not part or (part.isascii() and part.isdigit() and len(part) > 1 and part[0] == "0")
+               for part in prerelease.split(".")) if prerelease else False:
+            return False
+        if "+" in version and any(not part for part in version.split("+", 1)[1].split(".")):
+            return False
+        if (not text(title, 640) or len(title) > 160 or unicodedata.normalize("NFC", title) != title or
+                any(unicodedata.category(c).startswith("C") for c in title) or title[0].isspace() or title[-1].isspace()):
+            return False
+        compatibility = manifest["compatibility"]
+        if not fields(compatibility, {"native_contract", "apworld_contract"}) or any(
+                not integer(compatibility[k], 65535) or compatibility[k] != 1 for k in compatibility):
+            return False
+        files = manifest["files"]
+        if not isinstance(files, list) or not 2 <= len(files) <= 32:
+            return False
+        roles, paths = set(), set()
+        for entry in files:
+            if not fields(entry, {"role", "path", "sha256", "bytes"}):
+                return False
+            role, path, sha, size = (entry[k] for k in ("role", "path", "sha256", "bytes"))
+            if not text(role, 23) or role not in PACKAGE_ROLE_LIMITS or role in roles or not integer(size, PACKAGE_ROLE_LIMITS[role]):
+                return False
+            if not text(path, 240) or path.lower() == "manifest.json" or path.lower().startswith("manifest.json/"):
+                return False
+            parts = path.split("/")
+            if any(not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,95}", part) or part.endswith(".") or
+                   part.split(".")[0].lower() in PACKAGE_RESERVED_NAMES for part in parts):
+                return False
+            folded = path.lower()
+            if any(folded == other or folded.startswith(other + "/") or other.startswith(folded + "/") for other in paths):
+                return False
+            if not text(sha, 64) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+                return False
+            roles.add(role)
+            paths.add(folded)
+        if not {"lev", "vrm"} <= roles:
+            return False
+        canonical = dict(manifest)
+        canonical["files"] = sorted(files, key=lambda f: (f["role"], f["path"]))
+        digest = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":"),
+                                           ensure_ascii=False).encode("utf-8")).hexdigest()
+        return digest == pin
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        return False
+
+
+def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
+    """Find one installed revision whose manifest and every named file match."""
+    store = os.path.join(tracks_root, "packages")
+    try:
+        names = sorted(os.listdir(store))
+    except OSError:
+        return None
+    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
+    for name in names[:1024]:
+        if len(name) != 64 or any(c not in "0123456789abcdef" for c in name):
+            continue
+        folder = os.path.join(store, name)
+        if os.path.islink(folder):
+            continue
+        manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, store, unique_keys=True)
+        if not isinstance(manifest, dict) or manifest.get("version") != descriptor["revision"]:
+            continue
+        if not _manifest_schema_valid(manifest, name):
+            continue
+        files = manifest.get("files")
+        pinned = {(f.get("role"), f.get("sha256"), f.get("bytes")): f.get("path")
+                  for f in files if isinstance(f, dict) and isinstance(f.get("role"), str)
+                  and isinstance(f.get("sha256"), str) and type(f.get("bytes")) is int}
+        if not wanted <= pinned.keys():
+            continue
+        try:
+            for entry in files:
+                if not isinstance(entry, dict) or not isinstance(entry.get("path"), str) or not isinstance(entry.get("sha256"), str) or type(entry.get("bytes")) is not int:
+                    raise ValueError("invalid manifest file")
+                path = entry["path"]
+                parts = path.split("/")
+                if len(path) > 240 or path.lower() == "manifest.json" or path.lower().startswith("manifest.json/") or any(
+                        not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,95}", part) or part.endswith(".") or
+                        part.split(".")[0].lower() in PACKAGE_RESERVED_NAMES for part in parts):
+                    raise ValueError("unsafe manifest path")
+                current = folder
+                for part in parts:
+                    current = os.path.join(current, part)
+                    if os.path.islink(current):
+                        raise ValueError("linked manifest path")
+                if not os.path.isfile(current) or os.path.getsize(current) != entry["bytes"] or sha256_file(current) != entry["sha256"]:
+                    raise ValueError("manifest file mismatch")
+            return folder
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def installed_tracks(paths: Paths, assets: str) -> list:
-    """Admitted descriptors whose LEV and VRM are in assets/tracks/<track key>/original
-    (or the folder the client keeps a built-in package in), one per package id."""
+    """Admitted revisions resolved from the shared store or legacy room folders."""
     admit = _world_module("custom_packages").admit
     supported = _world_module("content_plan").supported_modes
     tracks_root = os.path.join(assets, "tracks")
@@ -955,13 +1087,17 @@ def installed_tracks(paths: Paths, assets: str) -> list:
         key, revision = descriptor["content_id"], descriptor["revision"]
         folders = [os.path.join(tracks_root, key, "original"),
                    os.path.join(tracks_root, f"{key}-{revision}", "original")]
-        if not all(_pinned_file(folders, pin) for pin in descriptor["files"]):
+        shared = _shared_package_folder(tracks_root, descriptor)
+        if shared is None and not all(_pinned_file(folders, pin) for pin in descriptor["files"]):
             continue
         seen.add(descriptor["id"])
+        modes = supported("custom", descriptor)
         result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
                        "revision": revision, "display_name": descriptor["display_name"],
                        "author": descriptor["author"], "laps": descriptor["laps"],
-                       "modes": supported("custom", descriptor), "source": source, "descriptor": descriptor})
+                       "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
+                       "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
+                       "source": source, "descriptor": descriptor})
     result.sort(key=lambda t: (t["display_name"].lower(), t["revision"]))
     return result
 
@@ -985,7 +1121,8 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
     cortex = _cortex_pick(section)
     if cortex or _cortex_installed(assets):
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
-                        "modes": ["trophy", "ctr", "relic"], "source": "built-in", "start": cortex})
+                        "modes": ["trophy", "ctr", "relic"], "race_modes": ["trophy", "ctr", "relic", "time_trial"],
+                        "time_trial": True, "seed_usable": True, "source": "built-in", "start": cortex})
     return {"tracks": rows, "tracks_path": paths.tracks}
 
 
@@ -1036,6 +1173,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     missing = [p for p in packages if p not in by_id]
     if missing:
         raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
+    unusable = next((p for p in packages if not by_id[p]["seed_usable"]), None)
+    if unusable:
+        raise SoloError("track", f"{by_id[unusable]['display_name']} supports Time Trial only and cannot use an Adventure pad.", track=unusable)
     keys = [by_id[p]["content_id"] for p in packages]
     twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
     if twice:
