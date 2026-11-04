@@ -13,6 +13,8 @@ from .custom_tracks import (effective_custom_destinations,
                             replacement_trophy_location,
                             resolved_custom_tracks)
 from .Locations import CTR_LOCATION_CLASSES, get_location_names
+from .item_groups import build_item_name_groups, merge_item_groups
+from .location_groups import build_location_name_groups
 from .Items import load_item_table
 from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
@@ -154,7 +156,10 @@ class ctrAPWorld(World):
         {n: c for n, c in item_name_to_id.items()
          if n not in {row["name"] for row in NAMED_TRACK_ITEM_DATA}})
     location_name_to_id = get_location_names()
-    location_name_groups = CTR_LOCATION_CLASSES.location_name_groups()
+    # Location groups (#536): the class-declared ones plus the track and
+    # check-kind groups built from the registries; see location_groups.py.
+    location_name_groups = build_location_name_groups(
+        location_name_to_id, CTR_LOCATION_CLASSES, item_name_to_id)
 
     # Item groups (issue #167). Group names live in the SAME namespace as item
     # names (AutoWorld.AutoWorldRegister builds all_item_and_group_names from the
@@ -177,6 +182,10 @@ class ctrAPWorld(World):
         "Traps": set(ALL_TRAP_ITEM_NAMES) | set(MINTED_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
     }
+    # Issue #536: Characters, Stats (+ one per racer), CTR Letters, Filler,
+    # Ignore Ground Types. Built from the registries; see item_groups.py.
+    item_name_groups = merge_item_groups(
+        item_name_groups, build_item_name_groups(_item_data_by_name))
 
     def __init__(self, multiworld: "MultiWorld", player: int):
         super().__init__(multiworld, player)
