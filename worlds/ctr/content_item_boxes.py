@@ -12,15 +12,14 @@ WHICH TRACKS HAVE BOX CHECKS.
     slots 1 to its placed count, minus the slots its Shortcut Knowledge tier
     removes (SK_REQUIRED_TIER), named `<Track>: Item Box N`.
   * A custom track on a named block uses the block's Item Box 1 to 15 offsets
-    (20 to 34, named_tracks.py). The seats are the track's own weapon crates:
+    (20 to 34, named_tracks.py); a generic-slot track uses its reserved
+    Custom Track N box codes. The seats are the track's own weapon crates:
     the package states how many weapon crates its LEV holds
     (`capabilities.weapon_crates`, measured and checked by native on load) and
     the track gets Item Box 1 to min(weapon_crates, 15). A package that does
     not state the count gets none, because nothing then says the seats exist.
     Native picks the seats with the same spread rule (`seat_indices`).
-  * A generic-slot (B+) custom track has no box ids yet, so it has no box
-    checks, and native stands no AP box on it. Its weapon crates stay ordinary
-    weapon crates. Cortex Vortex has none either, as on the legacy pad track.
+  * Cortex Vortex has none, as on the legacy pad track.
 
 ROUTES. A box sits at a place, not at a race type (the 2026-08-06 positioning
 ruling), so each box check has one route per mode of its track's entry, in the
@@ -48,6 +47,7 @@ boost rank, it reads `stats` as given (range checks only).
 from Options import OptionError
 
 from . import named_tracks
+from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
 FEATURE = "item_boxes_v1"
@@ -112,12 +112,15 @@ def track_boxes(track, record, package=None):
         name = track["display_name"]
         return [(slot, ITEM_BOX_CLASS.slot_code(name, slot), f"Item Box {slot}")
                 for slot in retail_slots(name, record["shortcut_knowledge"])]
-    if track["origin"] == "custom" and "named_block" in track:
+    if track["origin"] == "custom":
         crates = crate_count(package)
         if not crates:
             return []
-        return [(slot, named_tracks.location_code(track["named_block"], f"item_box_{slot}"), f"Item Box {slot}")
-                for slot in range(1, len(seat_indices(crates)) + 1)]
+        if "named_block" in track:
+            code = lambda slot: named_tracks.location_code(track["named_block"], f"item_box_{slot}")
+        else:
+            code = lambda slot: CUSTOM_ITEM_BOX_CLASS.slot_code(track["custom_slot"], slot)
+        return [(slot, code(slot), f"Item Box {slot}") for slot in range(1, len(seat_indices(crates)) + 1)]
     return []
 
 
