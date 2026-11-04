@@ -41,10 +41,15 @@ from worlds.AutoWorld import AutoWorldRegister
 from . import CTRTestBase
 from ..location_class import LocationClass, LocationClassRegistry
 from ..Locations import CTR_LOCATION_CLASSES, CTR_LOCATION_IDS
-from ..podium import (NEW_RUNGS, PODIUM_CLASS, SHIPPED_RUNGS, SLOT_ORDER,
-                      TROPHY_TRACKS, all_podium_locations,
-                      created_rung_keys_from_options, location_name,
-                      podium_slot_codes)
+from ..podium import (
+    NEW_RUNGS,
+    PODIUM_CLASS,
+    SHIPPED_RUNGS,
+    SLOT_ORDER,
+    TROPHY_TRACKS,
+    created_rung_keys_from_options,
+    location_name,
+)
 from ..itemsanity import ITEMSANITY_CLASS
 
 FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures"
@@ -180,18 +185,6 @@ class TestPodiumClassIdentity(unittest.TestCase):
         self.assertEqual(len(entries), 16 * (len(SHIPPED_RUNGS) + len(NEW_RUNGS)) + 10 + 5)
         self.assertEqual(len(entries), 127)
 
-    def test_module_facade_delegates_to_the_class(self) -> None:
-        """Regions.py and Rules.py still call the module functions; they must be
-        the class, not a second implementation of it."""
-        self.assertEqual(all_podium_locations(), PODIUM_CLASS.all_locations())
-        track = TROPHY_TRACKS[0]
-        self.assertEqual(location_name(track, "held_1st"),
-                         PODIUM_CLASS.location_name(track, "held_1st"))
-        opts = _StubOptions(podium_placement_checks=True, podium_held_rungs=True)
-        self.assertEqual(created_rung_keys_from_options(opts),
-                         PODIUM_CLASS.created_rung_keys(opts))
-        self.assertEqual(podium_slot_codes(track, ["held_1st"]),
-                         PODIUM_CLASS.slot_codes(track, ["held_1st"]))
 
     def test_finish_any_reuses_the_shipped_name_and_code(self) -> None:
         """finish_any IS the shipped 'Finish (Any Position)' entry -- the class's
@@ -249,91 +242,6 @@ class TestDeterministicOrdering(unittest.TestCase):
         reversed_names = [name for name, _c, _r in entries][::-1]
         klass = _FakeClass("shuffled", entries, created=reversed_names)
         self.assertEqual(klass.created_locations(None), entries)
-
-    def test_created_locations_are_deterministic_for_the_same_options(self) -> None:
-        opts = _StubOptions(podium_placement_checks=True, podium_held_rungs=True,
-                            podium_finish_rungs=True)
-        self.assertEqual(PODIUM_CLASS.created_locations(opts),
-                         PODIUM_CLASS.created_locations(opts))
-
-
-class TestActiveAndInactiveClasses(unittest.TestCase):
-
-    def test_master_gate_off_creates_nothing(self) -> None:
-        opts = _StubOptions(podium_held_rungs=True, podium_finish_rungs=True)
-        self.assertEqual(PODIUM_CLASS.created_rung_keys(opts), [])
-        self.assertFalse(PODIUM_CLASS.is_enabled(opts))
-        self.assertEqual(PODIUM_CLASS.created_locations(opts), [])
-        self.assertEqual(CTR_LOCATION_CLASSES.active(opts), ())
-
-    def test_master_gate_on_with_no_sub_toggles_is_not_active(self) -> None:
-        """The option is on but the seed gets no locations, so the class is not
-        active. Callers that key off the master toggle alone would be wrong."""
-        opts = _StubOptions(podium_placement_checks=True)
-        self.assertFalse(PODIUM_CLASS.is_enabled(opts))
-        self.assertEqual(CTR_LOCATION_CLASSES.active(opts), ())
-
-    def test_active_when_any_rung_is_created(self) -> None:
-        opts = _StubOptions(podium_placement_checks=True, podium_held_rungs=True)
-        self.assertTrue(PODIUM_CLASS.is_enabled(opts))
-        self.assertEqual(CTR_LOCATION_CLASSES.active(opts), (PODIUM_CLASS,))
-
-    def test_inactive_class_contributes_to_the_datapackage_anyway(self) -> None:
-        """The whole point of the frozen superset: names stay registered even
-        for a seed that creates none of them."""
-        opts = _StubOptions()
-        self.assertEqual(PODIUM_CLASS.created_locations(opts), [])
-        self.assertEqual(len(PODIUM_CLASS.all_locations()), 127)
-        for name, _code, _region in PODIUM_CLASS.all_locations():
-            self.assertIn(name, CTR_LOCATION_IDS)
-
-
-class TestOptionCombinations(unittest.TestCase):
-
-    def test_created_rung_keys_per_arm(self) -> None:
-        for arm, (flags, expected) in ARMS.items():
-            with self.subTest(arm=arm):
-                self.assertEqual(
-                    PODIUM_CLASS.created_rung_keys(_StubOptions(**flags)),
-                    expected,
-                )
-
-    def test_created_location_count_per_arm(self) -> None:
-        for arm, (flags, expected) in ARMS.items():
-            with self.subTest(arm=arm):
-                created = PODIUM_CLASS.created_locations(_StubOptions(**flags))
-                self.assertEqual(len(created), 16 * len(expected))
-                self.assertEqual({name for name, _c, _r in created},
-                                 {PODIUM_CLASS.location_name(t, k)
-                                  for t in TROPHY_TRACKS for k in expected})
-
-    def test_slot_codes_place_minus_one_exactly_where_a_rung_is_absent(self) -> None:
-        for arm, (flags, expected) in ARMS.items():
-            with self.subTest(arm=arm):
-                keys = PODIUM_CLASS.created_rung_keys(_StubOptions(**flags))
-                for track in TROPHY_TRACKS:
-                    arr = PODIUM_CLASS.slot_codes(track, keys)
-                    self.assertEqual(len(arr), len(SLOT_ORDER))
-                    for slot, code in zip(SLOT_ORDER, arr):
-                        if slot in expected:
-                            self.assertNotEqual(code, -1)
-                            self.assertEqual(
-                                code,
-                                CTR_LOCATION_IDS[
-                                    PODIUM_CLASS.location_name(track, slot)],
-                            )
-                        else:
-                            self.assertEqual(code, -1)
-
-    def test_every_emitted_slot_code_exists_in_the_datapackage(self) -> None:
-        valid = set(CTR_LOCATION_IDS.values())
-        for arm, (flags, _expected) in ARMS.items():
-            keys = PODIUM_CLASS.created_rung_keys(_StubOptions(**flags))
-            for track in TROPHY_TRACKS:
-                for code in PODIUM_CLASS.slot_codes(track, keys):
-                    if code != -1:
-                        with self.subTest(arm=arm, track=track, code=code):
-                            self.assertIn(code, valid)
 
 
 class TestDuplicatesAndCollisions(unittest.TestCase):
@@ -425,20 +333,17 @@ class TestLocationNameGroups(unittest.TestCase):
         self.assertEqual(klass.location_name_groups(), {})
 
     def test_podium_declares_no_groups(self) -> None:
-        """Podium's frozen surface remains group-free."""
+        """Podium's frozen surface remains group-free; the registry itself
+        declares only the class groups (#536 adds the registry-built ones in
+        location_groups.py, tested in test_location_groups)."""
         self.assertEqual(PODIUM_CLASS.location_name_groups(), {})
         self.assertEqual(
             CTR_LOCATION_CLASSES.location_name_groups(),
             {"Itemsanity Checks": set(ITEMSANITY_CLASS.names())},
         )
-        # AP injects "Everywhere" itself (AutoWorld.py:70-72).
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
-        declared = {name: group for name, group
-                    in world_type.location_name_groups.items()
-                    if name != "Everywhere"}
-        self.assertEqual(declared, {
-            "Itemsanity Checks": set(ITEMSANITY_CLASS.names()),
-        })
+        self.assertEqual(world_type.location_name_groups["Itemsanity Checks"],
+                         set(ITEMSANITY_CLASS.names()))
 
     def test_declared_groups_merge_into_the_registry(self) -> None:
         registry = LocationClassRegistry()
@@ -576,9 +481,13 @@ class _CreatedMatchesGenerationMixin:
     """
 
     def test_created_locations_match_the_generated_world(self) -> None:
-        predicted = {name for name, _c, _r
-                     in PODIUM_CLASS.created_locations(self.world.options)}
         class_names = {name for name, _c, _r in PODIUM_CLASS.all_locations()}
+        # A content plan owns the generated subset, including trial-track
+        # rungs. The retired normal-generator option projection cannot do so.
+        predicted = {self.world.location_id_to_name[check["location"]]
+                     for check in self.world.ctr_content_plan["checks"]
+                     if check["kind"] == "podium"
+                     and self.world.location_id_to_name[check["location"]] in class_names}
         actual = {loc.name for loc
                   in self.multiworld.get_locations(self.player)
                   if loc.name in class_names}
@@ -588,19 +497,6 @@ class _CreatedMatchesGenerationMixin:
         active = CTR_LOCATION_CLASSES.active(self.world.options)
         expected = (PODIUM_CLASS,) if self.expected_rungs else ()
         self.assertEqual(active, expected)
-
-    def test_slot_data_codes_come_from_the_class(self) -> None:
-        block = self.world.fill_slot_data()["podium_checks"]
-        keys = PODIUM_CLASS.created_rung_keys(self.world.options)
-        lid_to_track = {
-            str(meta["level_id"]): pad_name[: -len(" Warp Pad")]
-            for pad_name, meta in getattr(self.world, "warp_pad_ids", {}).items()
-            if pad_name.endswith(" Warp Pad")
-        }
-        for lid, arr in block["locations"].items():
-            with self.subTest(level_id=lid):
-                self.assertEqual(
-                    arr, PODIUM_CLASS.slot_codes(lid_to_track[lid], keys))
 
 
 class TestGeneratedDefaults(_CreatedMatchesGenerationMixin, CTRTestBase):

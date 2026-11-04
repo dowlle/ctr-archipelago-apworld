@@ -6,16 +6,14 @@ name Purple, and the seed must stay beatable without the removed locations.
 """
 
 import math
-import unittest
 
 from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from worlds.AutoWorld import call_all
 
 from . import CTRTestBase
-from .. import warp_pad_logic
-from ..warp_pad_logic import Inv, TOKEN_ITEMS, _choose_requirement
-from ..Rules import _scoped_agg_names, _AGG_TOKENS, _AGG_RELICS, _AGG_GEMS
+from .. import content_playthrough
+from ..content_playthrough import Inv, TOKEN_ITEMS, _choose_requirement
 
 
 class _ScriptedRandom:
@@ -30,39 +28,6 @@ class _ScriptedRandom:
 
     def randrange(self, n):
         return 0  # always < every collapse chance
-
-
-class _StubOption:
-    def __init__(self, value):
-        self.value = value
-
-
-class _StubOptions:
-    def __init__(self, arenas_on):
-        self.include_battle_arenas = _StubOption(arenas_on)
-
-
-class _StubWorld:
-    """Just enough of a world for Rules._scoped_agg_names -- no generation."""
-    def __init__(self, arenas_on):
-        self.options = _StubOptions(arenas_on)
-
-
-class TestAggTokenScoping(unittest.TestCase):
-    """Rules._scoped_agg_names no longer drops Purple with arenas off."""
-
-    def test_token_aggregate_keeps_purple_either_way(self):
-        for arenas_on in (True, False):
-            names = _scoped_agg_names(_StubWorld(arenas_on), _AGG_TOKENS)
-            self.assertIn("Purple CTR Token", names)
-            self.assertEqual(names, _AGG_TOKENS)
-
-    def test_relic_and_gem_aggregates_never_scoped(self):
-        for arenas_on in (True, False):
-            self.assertEqual(
-                _scoped_agg_names(_StubWorld(arenas_on), _AGG_RELICS), _AGG_RELICS)
-            self.assertEqual(
-                _scoped_agg_names(_StubWorld(arenas_on), _AGG_GEMS), _AGG_GEMS)
 
 
 class TestAnyTokenCollapseScoping(CTRTestBase):
@@ -82,9 +47,9 @@ class TestAnyTokenCollapseScoping(CTRTestBase):
     def _expected_collapse_count(total):
         # Derived from the live module globals so the test holds under any
         # requirement_variety preset a sibling test left loaded.
-        cnt = max(1, math.ceil(total * warp_pad_logic._TOKEN_COLLAPSE_SCALE))
-        if warp_pad_logic._TOKEN_COLLAPSE_CAP is not None:
-            cnt = min(cnt, warp_pad_logic._TOKEN_COLLAPSE_CAP)
+        cnt = max(1, math.ceil(total * content_playthrough._TOKEN_COLLAPSE_SCALE))
+        if content_playthrough._TOKEN_COLLAPSE_CAP is not None:
+            cnt = min(cnt, content_playthrough._TOKEN_COLLAPSE_CAP)
         return cnt
 
     def test_collapse_total_spans_all_colours_when_all_allowed(self):
@@ -94,7 +59,7 @@ class TestAnyTokenCollapseScoping(CTRTestBase):
         self.assertEqual(item, "AnyCtrToken")
         self.assertEqual(cnt, self._expected_collapse_count(20))
         item, cnt = _choose_requirement(
-            _ScriptedRandom(), inv, set(warp_pad_logic.REQ_WEIGHTS))
+            _ScriptedRandom(), inv, set(content_playthrough.REQ_WEIGHTS))
         self.assertEqual(item, "AnyCtrToken")
         self.assertEqual(cnt, self._expected_collapse_count(20))
 

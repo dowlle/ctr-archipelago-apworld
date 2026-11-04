@@ -11,8 +11,7 @@ from typing import Mapping
 
 from Options import OptionError
 
-from .Items import load_item_table
-from .item_creation import SURFACE_ITEM_NAMES
+from .Items import SURFACE_ITEM_NAMES, load_item_table
 
 COLOURS = ("red", "green", "blue", "yellow", "purple")
 TIERS = ("sapphire", "gold", "platinum")

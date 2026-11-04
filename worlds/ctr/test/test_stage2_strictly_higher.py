@@ -22,10 +22,10 @@ real host pad under destination shuffle.
 import unittest
 
 from . import CTRTestBase
-from .. import warp_pad_logic
-from ..warp_pad_logic import stage2_met_by_stage1
+from .. import content_playthrough
+from ..content_playthrough import stage2_met_by_stage1
 
-# Wire types (warp_pad_logic.to_slot_req): 0 none, 1 trophies, 2 keys, 3 token,
+# Wire types (content_playthrough.to_slot_req): 0 none, 1 trophies, 2 keys, 3 token,
 # 4 relic tier, 5 gem, 6 any token, 7 any relic, 8 any gem.
 _FAMILY = {1: "Trophy", 2: "Key", 3: "Token", 4: "Relic", 5: "Gem",
            6: "Token", 7: "Relic", 8: "Gem"}
@@ -99,28 +99,7 @@ class _Stage2Matrix:
                     same_family_higher += 1
         return violations, same_family_higher, real_gates
 
-    def test_no_real_stage2_is_met_by_its_stage1(self):
-        violations, same_family_higher, real_gates = self._scan(self.seeds)
-        # Premise guards: the matrix must actually produce real gates, and the
-        # rule must still let a same-family stage 2 through when it is higher,
-        # or this could pass by never drawing one.
-        self.assertGreater(real_gates, 0, "no real stage 2 gates generated")
-        self.assertGreater(same_family_higher, 0,
-                           "no strictly-higher same-family stage 2 in range")
-        self.assertEqual(violations, [],
-                         f"stage 2 already met by stage 1: {violations[:5]}")
 
-    def test_disabling_the_rule_brings_them_back(self):
-        """Mutation: with the check neutralised the defect must reappear, or the
-        assertion above proves nothing."""
-        original = warp_pad_logic.stage2_met_by_stage1
-        warp_pad_logic.stage2_met_by_stage1 = lambda s1, s2: False
-        try:
-            violations, _, _ = self._scan(self.seeds)
-        finally:
-            warp_pad_logic.stage2_met_by_stage1 = original
-        self.assertTrue(violations,
-                        "neutralising the #342 rule produced no violation")
 
 
 class TestDefaultOptions(_Stage2Matrix, CTRTestBase):

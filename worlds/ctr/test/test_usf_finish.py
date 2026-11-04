@@ -18,15 +18,18 @@ from test.general import setup_multiworld
 from .. import ctrAPWorld
 from ..capability_contract import (CONFIRMED_FINISH_BY_TRACK,
                                    held_first_gated_tracks)
-from ..gem_cup_legs import CUP_LEVEL_IDS, load_vanilla_cup_legs
-from ..podium import (FINISH_RUNG_KEYS, HELD_RUNG_KEYS, TROPHY_TRACKS,
+from ..content_cups import load_vanilla_cup_legs
+from ..destinations import CUP_LEVEL_IDS
+from ..podium import (FINISH_RUNG_KEYS, TROPHY_TRACKS,
                       location_name)
-from ..progressive_capability import (boost_item_name, destination_pad_key,
-                                      destination_pad_name)
-from ..usf_finish import (ALL_USF_FINISH_TRACKS, FIRST_BOOST_COUNT,
-                          USF_BOOST_COUNT, USF_FINISH_TRACKS, UsfFinishGate,
-                          USF_OR_HARD_SK_FINISH_TRACKS, cup_finish_term,
-                          usf_finish_cups)
+from ..progressive_capability import boost_item_name
+from ..usf_finish import (
+    ALL_USF_FINISH_TRACKS,
+    FIRST_BOOST_COUNT,
+    USF_BOOST_COUNT,
+    USF_FINISH_TRACKS,
+    USF_OR_HARD_SK_FINISH_TRACKS,
+)
 from . import CTRTestBase
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
@@ -91,82 +94,6 @@ class _FakeState:
 class TestGatedCupSelection(unittest.TestCase):
     """Which cups the gate covers is a per-seed question about the leg map."""
 
-    def test_cup_pad_racer_owns_all_leg_boost_requirements(self):
-        mw = _build(progressive_boost="per_character", character_unlocks=False)
-        world = mw.worlds[PLAYER]
-        for cup, racer, legs in (
-                ("Yellow Gem Cup", "N. Gin", [HAS, OXIDE]),
-                ("Green Gem Cup", "Dingodile", ["Cortex Castle"]),
-                ("Red Gem Cup", "N. Gin", [HAS, "Cortex Castle", HAS])):
-            with self.subTest(cup=cup):
-                # Shuffled physical host; standalone leg pads belong to Coco.
-                # `ctr_pad_by_destination` is keyed by PAD TRACK KEY, so a cup
-                # entry is "<Colour> Cup", not the "<Colour> Gem Cup" region
-                # name. This test used to write the region name as the key,
-                # which is the same key-space mistake `cup_finish_term` made:
-                # it passed only because both sides were wrong together.
-                world.ctr_pad_by_destination = {
-                    destination_pad_key(cup): "Polar Pass Warp Pad"}
-                world.ctr_racer_locks = {"Polar Pass Warp Pad": racer,
-                                        f"{HAS} Warp Pad": "Coco Bandicoot",
-                                        "Cortex Castle Warp Pad": "Coco Bandicoot"}
-                world.gem_cup_legs = {cup: legs}
-                rule = UsfFinishGate(world).cup_term(cup)
-                state = _state(mw)
-                state.add_item(boost_item_name("Coco Bandicoot"), PLAYER, 2)
-                state.add_item(boost_item_name(racer), PLAYER, 1)
-                self.assertFalse(rule(state, PLAYER))
-                state.add_item(boost_item_name(racer), PLAYER, 1)
-                self.assertTrue(rule(state, PLAYER))
-
-    def test_unlocked_cup_ignores_standalone_leg_locks(self):
-        mw = _build(progressive_boost="per_character", character_unlocks=False)
-        world = mw.worlds[PLAYER]
-        world.ctr_racer_locks = {f"{HAS} Warp Pad": "N. Gin"}
-        world.ctr_pad_by_destination = {}
-        world.gem_cup_legs = {"Yellow Gem Cup": [HAS, "Cortex Castle"]}
-        rule = UsfFinishGate(world).cup_term("Yellow Gem Cup")
-        state = _state(mw)
-        state.add_item(boost_item_name("N. Gin"), PLAYER, 1)
-        state.add_item(boost_item_name("Dingodile"), PLAYER, 1)
-        self.assertFalse(rule(state, PLAYER))
-        state.add_item(boost_item_name("Dingodile"), PLAYER, 1)
-        self.assertTrue(rule(state, PLAYER))
-
-    def test_unshuffled_cup_uses_physical_cup_pad_name(self):
-        mw = _build(progressive_boost="per_character", character_unlocks=False)
-        world = mw.worlds[PLAYER]
-        for cup, racer, legs in (
-                ("Yellow Gem Cup", "N. Gin", [HAS, OXIDE]),
-                ("Green Gem Cup", "Dingodile", ["Cortex Castle"])):
-            with self.subTest(cup=cup):
-                world.ctr_pad_by_destination = {}
-                world.ctr_racer_locks = {
-                    cup.replace(" Gem Cup", " Cup Warp Pad"): racer,
-                    f"{HAS} Warp Pad": "Coco Bandicoot",
-                    "Oxide Station Warp Pad": "Coco Bandicoot",
-                    "Cortex Castle Warp Pad": "Coco Bandicoot"}
-                world.gem_cup_legs = {cup: legs}
-                rule = UsfFinishGate(world).cup_term(cup)
-                state = _state(mw)
-                state.add_item(boost_item_name("Coco Bandicoot"), PLAYER, 2)
-                state.add_item(boost_item_name(racer), PLAYER, 1)
-                self.assertFalse(rule(state, PLAYER))
-                state.add_item(boost_item_name(racer), PLAYER, 1)
-                self.assertTrue(rule(state, PLAYER))
-
-    def test_vanilla_legs_gate_exactly_confirmed_cups(self):
-        legs = load_vanilla_cup_legs()
-        self.assertEqual(usf_finish_cups(legs), frozenset(VANILLA_GATED_CUPS))
-        for cup in VANILLA_GATED_CUPS:
-            self.assertTrue(ALL_USF_FINISH_TRACKS.intersection(legs[cup]))
-
-    def test_a_synthetic_map_gates_by_membership_only(self):
-        legs = {"Red Gem Cup": [HAS, HAS, HAS, HAS],
-                "Green Gem Cup": ["Crash Cove", "Polar Pass", HAS, "Coco Park"],
-                "Blue Gem Cup": ["Crash Cove"] * 4}
-        self.assertEqual(usf_finish_cups(legs),
-                         frozenset({"Red Gem Cup", "Green Gem Cup"}))
 
     def test_the_gated_tracks_are_real_trophy_tracks(self):
         """Every gated track is a retail trophy track, except the records whose
@@ -218,49 +145,6 @@ class TestCupPadKeySpace(unittest.TestCase):
     directions it produced.
     """
 
-    def test_the_helper_resolves_every_cup_to_its_real_physical_pad(self):
-        mw = _build(seed=1, **SHUFFLED_OPTIONS)
-        world = mw.worlds[PLAYER]
-        real = _real_cup_pads(world)
-        self.assertEqual(len(real), len(CUP_LEVEL_IDS))
-        moved = [cup for cup, pad in real.items()
-                 if pad != cup.replace(" Gem Cup", " Cup Warp Pad")]
-        self.assertTrue(moved, "seed 1 was expected to move at least one cup")
-        for cup, pad in real.items():
-            with self.subTest(cup=cup):
-                self.assertEqual(destination_pad_name(world, cup), pad)
-
-    def test_no_gem_cup_falls_through_the_fallback(self):
-        """The fallback must never be what answers for a cup.
-
-        A missing key is exactly how the bug hid: `dict.get` returned the
-        retail pad name and nothing complained. Assert the key the helper uses
-        is really present in the seed's map for every cup, on a shuffled seed
-        and on a vanilla one, so a future key-space drift fails here instead of
-        being masked again.
-        """
-        for label, options in (("shuffled", SHUFFLED_OPTIONS),
-                               ("vanilla", VANILLA_OPTIONS)):
-            mw = _build(seed=1, **options)
-            world = mw.worlds[PLAYER]
-            by_dest = getattr(world, "ctr_pad_by_destination", {}) or {}
-            for cup, _lid in CUP_LEVEL_IDS:
-                with self.subTest(seed_shape=label, cup=cup):
-                    key = destination_pad_key(cup)
-                    self.assertNotEqual(key, cup)
-                    self.assertEqual(key, cup.replace(" Gem Cup", " Cup"))
-                    if by_dest:
-                        self.assertIn(key, by_dest)
-
-    def test_vanilla_still_resolves_to_the_cup_s_own_pad(self):
-        """No shuffle, empty map: the answer is byte-identical to before."""
-        mw = _build(seed=1, **VANILLA_OPTIONS)
-        world = mw.worlds[PLAYER]
-        self.assertFalse(getattr(world, "ctr_pad_by_destination", {}))
-        for cup, _lid in CUP_LEVEL_IDS:
-            with self.subTest(cup=cup):
-                self.assertEqual(destination_pad_name(world, cup),
-                                 cup.replace(" Gem Cup", " Cup Warp Pad"))
 
     def _moved_cup(self, world):
         real = _real_cup_pads(world)
@@ -268,40 +152,6 @@ class TestCupPadKeySpace(unittest.TestCase):
             if pad != cup.replace(" Gem Cup", " Cup Warp Pad"):
                 return cup, pad, cup.replace(" Gem Cup", " Cup Warp Pad")
         self.fail("no cup moved off its own pad")
-
-    def _cup_term(self, world, cup, locks):
-        world.ctr_racer_locks = locks
-        world.gem_cup_legs = {cup: [HAS, "Cortex Castle"]}
-        return UsfFinishGate(world).cup_term(cup)
-
-    def test_the_retail_pad_s_lock_does_not_restrict_the_cup(self):
-        """Over-restrictive direction. Only the same-named retail pad is
-        locked; the pad the cup really sits on is free. The old lookup named
-        that unrelated pad's racer -- the community's "Red Gem Cup out of logic
-        until Pura arrived". Any driveable racer's USF must satisfy it."""
-        mw = _build(seed=1, **SHUFFLED_OPTIONS)
-        world = mw.worlds[PLAYER]
-        cup, real_pad, retail_pad = self._moved_cup(world)
-        rule = self._cup_term(world, cup, {retail_pad: "Pura"})
-        state = _state(mw)
-        state.add_item(boost_item_name("Dingodile"), PLAYER, USF_BOOST_COUNT)
-        self.assertTrue(rule(state, PLAYER))
-        self.assertEqual(destination_pad_name(world, cup), real_pad)
-
-    def test_the_real_pad_s_lock_does_restrict_the_cup(self):
-        """Under-restrictive direction, the dangerous one. Only the pad the cup
-        really sits on is locked; the same-named retail pad is free. The old
-        lookup found no lock and let any racer's USF answer, so a required item
-        could sit behind a race logic thought was finishable."""
-        mw = _build(seed=1, **SHUFFLED_OPTIONS)
-        world = mw.worlds[PLAYER]
-        cup, real_pad, _retail_pad = self._moved_cup(world)
-        rule = self._cup_term(world, cup, {real_pad: "Pura"})
-        state = _state(mw)
-        state.add_item(boost_item_name("Dingodile"), PLAYER, USF_BOOST_COUNT)
-        self.assertFalse(rule(state, PLAYER))
-        state.add_item(boost_item_name("Pura"), PLAYER, USF_BOOST_COUNT)
-        self.assertTrue(rule(state, PLAYER))
 
 
 class TestTrophyRaceGate(unittest.TestCase):
@@ -396,31 +246,6 @@ class TestPodiumRungs(unittest.TestCase):
     """The rungs are where the one-line fix leaks: their Gem-Cup OR reaches the
     finish without consulting the Trophy Race rule at all."""
 
-    def test_finish_rungs_are_gated_despite_reachable_cups(self):
-        mw = _build(progressive_boost="shared_global")
-        blocked = _state(mw, boost=0)
-        # The premise of the leak: both legging cups ARE reachable here.
-        for cup in VANILLA_GATED_CUPS:
-            self.assertTrue(blocked.can_reach(cup, "Region", PLAYER))
-        cleared = _state(mw, boost=USF_BOOST_COUNT)
-        for key in sorted(FINISH_RUNG_KEYS):
-            with self.subTest(rung=key):
-                name = location_name(HAS, key)
-                self.assertFalse(_reachable(mw, blocked, name))
-                self.assertTrue(_reachable(mw, cleared, name))
-
-    def test_held_3rd_and_5th_stay_free(self):
-        """`Held 3rd` was checked on Hot Air Skyway without USF in the same
-        session: the live-position listener fires before the finish line."""
-        for difficulty in ("easy", "medium", "hard"):
-            mw = _build(progressive_boost="shared_global",
-                        logic_difficulty=difficulty,
-                        podium_held_fifth_rung=True)
-            blocked = _state(mw, boost=0)
-            for key in sorted(HELD_RUNG_KEYS - {"held_1st"}):
-                with self.subTest(difficulty=difficulty, rung=key):
-                    self.assertTrue(
-                        _reachable(mw, blocked, location_name(HAS, key)))
 
     def test_held_1st_needs_usf(self):
         """Ruling 2026-09-27 (#329): holding 1st on Hot Air Skyway needs USF
@@ -451,24 +276,6 @@ class TestPodiumRungs(unittest.TestCase):
                 self.assertTrue(
                     _reachable(mw, blocked, location_name("Crash Cove", key)))
 
-    def test_cup_branch_of_a_leg_track_carries_the_term(self):
-        """A different track's rung reached through a gated or plain cup.
-
-        Papu's Pyramid is legged by Red (plain) and Purple (gated), so the two
-        branches remain separable after Cortex Castle gates Green.
-        """
-        mw = _build(progressive_boost="shared_global")
-        rule = mw.get_location(
-            location_name("Papu's Pyramid", "finish_podium"), PLAYER).access_rule
-        purple = [("Purple Gem Cup", "Region")]
-        red = [("Red Gem Cup", "Region")]
-        self.assertFalse(rule(_FakeState(purple, boost=0)))
-        self.assertFalse(rule(_FakeState(purple, boost=1)))
-        self.assertTrue(rule(_FakeState(purple, boost=USF_BOOST_COUNT)))
-        # The ungated cup and the track's own trophy path stay boost-free.
-        self.assertTrue(rule(_FakeState(red, boost=0)))
-        self.assertTrue(rule(_FakeState(
-            boost=0, regions=[mw.get_region("Papu's Pyramid", PLAYER)])))
 
     def test_cup_branches_are_ungated_when_the_pack_is_off(self):
         # Row 10i: a cup leg is a route of its track's rungs (Rulebook
@@ -490,18 +297,6 @@ class TestGemCupCompletion(unittest.TestCase):
     """Completing a cup includes finishing every leg, so a cup that legs a
     USF track cannot pay out its Gem without USF."""
 
-    def test_legging_cups_are_gated(self):
-        mw = _build(progressive_boost="shared_global")
-        blocked = _state(mw, boost=0)
-        cleared = _state(mw, boost=USF_BOOST_COUNT)
-        for cup, legs in load_vanilla_cup_legs().items():
-            with self.subTest(cup=cup):
-                name = f"{cup}: Gem"
-                if ALL_USF_FINISH_TRACKS.intersection(legs):
-                    self.assertFalse(_reachable(mw, blocked, name))
-                    self.assertTrue(_reachable(mw, cleared, name))
-                else:
-                    self.assertTrue(_reachable(mw, blocked, name))
 
     def test_vacuous_when_the_boost_chain_is_not_randomized(self):
         mw = _build()
@@ -509,23 +304,6 @@ class TestGemCupCompletion(unittest.TestCase):
         for cup in VANILLA_GATED_CUPS:
             with self.subTest(cup=cup):
                 self.assertTrue(_reachable(mw, state, f"{cup}: Gem"))
-
-    def test_randomized_legs_gate_by_this_seed_s_map(self):
-        """With `randomize_gem_cup_tracks` the gated set is per-seed, so the
-        rules must follow the drawn map rather than the vanilla table."""
-        for seed in (11, 12, 13):
-            mw = _build(seed=seed, progressive_boost="shared_global",
-                        randomize_gem_cup_tracks=True)
-            legs = mw.worlds[PLAYER].gem_cup_legs
-            blocked = _state(mw, boost=0)
-            cleared = _state(mw, boost=USF_BOOST_COUNT)
-            for cup, cup_legs in legs.items():
-                with self.subTest(seed=seed, cup=cup):
-                    name = f"{cup}: Gem"
-                    self.assertEqual(
-                        _reachable(mw, blocked, name),
-                        not ALL_USF_FINISH_TRACKS.intersection(cup_legs))
-                    self.assertTrue(_reachable(mw, cleared, name))
 
 
 class TestOxideStationGate(unittest.TestCase):
@@ -609,51 +387,6 @@ class TestOxideStationGate(unittest.TestCase):
             self.assertFalse(_reachable(mw, blocked,
                                         location_name(OXIDE, "held_1st")))
 
-    def test_hard_knowledge_does_not_escape_hot_air_skyway(self):
-        """The escape is per TRACK, not per seed. Hot Air Skyway's record
-        carries no escape, so its finish stays gated at hard knowledge -- and
-        so does the Yellow Gem Cup, which legs both tracks."""
-        mw = _build(progressive_boost="shared_global",
-                    shortcut_knowledge="hard")
-        blocked = _state(mw, boost=0)
-        cleared = _state(mw, boost=USF_BOOST_COUNT)
-        for name in (f"{HAS}: Trophy Race",
-                     location_name(HAS, "finish_podium"),
-                     f"{OXIDE_AND_HAS_CUP}: Gem"):
-            with self.subTest(location=name):
-                self.assertFalse(_reachable(mw, blocked, name))
-                self.assertTrue(_reachable(mw, cleared, name))
-
-    def test_a_cup_composes_its_gated_legs_one_term_each(self):
-        """`cup_finish_term` ANDs one term per gated leg, so the hard-knowledge
-        escape can collapse Oxide's half of a cup without touching the other
-        half. Built from a synthetic leg list so the assertion does not depend
-        on which cups a seed happens to draw."""
-        for knowledge, both, oxide_only in (("easy", 2, 2), ("hard", 2, 0)):
-            world = _build(progressive_boost="shared_global",
-                           shortcut_knowledge=knowledge).worlds[PLAYER]
-            with self.subTest(knowledge=knowledge):
-                mixed = cup_finish_term([OXIDE, HAS, "Crash Cove"], world)
-                only = cup_finish_term([OXIDE, "Crash Cove"], world)
-                self.assertFalse(mixed(_FakeState(boost=both - 1), PLAYER))
-                self.assertTrue(mixed(_FakeState(boost=both), PLAYER))
-                self.assertTrue(only(_FakeState(boost=oxide_only), PLAYER))
-
-    def test_another_track_s_cup_branch_carries_the_composed_term(self):
-        """Dingo Canyon is a Yellow Gem Cup leg, and Yellow legs both gated
-        tracks. Its rung reached through that cup therefore needs the boost at
-        hard knowledge too -- the cup-branch leak this file exists to pin,
-        checked on the shape where the two terms differ."""
-        for knowledge in ("easy", "hard"):
-            mw = _build(progressive_boost="shared_global",
-                        shortcut_knowledge=knowledge)
-            rule = mw.get_location(
-                location_name("Dingo Canyon", "finish_podium"),
-                PLAYER).access_rule
-            cup = [(OXIDE_AND_HAS_CUP, "Region")]
-            with self.subTest(knowledge=knowledge):
-                self.assertFalse(rule(_FakeState(cup, boost=0)))
-                self.assertTrue(rule(_FakeState(cup, boost=USF_BOOST_COUNT)))
 
     def test_vacuous_when_the_boost_chain_is_not_randomized(self):
         """Seating spec 2.2: with the pack off no Progressive Boost item

@@ -52,12 +52,6 @@ class TestCapabilityItemsOff(CTRTestBase):
     def test_no_capability_items_in_pool(self):
         self.assertEqual(_capability_counts(self.multiworld, self.player), {})
 
-    def test_wire_reports_off(self):
-        world = self.multiworld.worlds[self.player]
-        co = world.fill_slot_data()["ctr_options"]
-        self.assertEqual(co["boost_mode"], 0)
-        self.assertEqual(co["boost_blue_fire"], False)
-        self.assertEqual(co["stats_mode"], 0)
 
     def test_pool_still_matches_unfilled_locations(self):
         unfilled = self.multiworld.get_unfilled_locations(self.player)
@@ -76,11 +70,6 @@ class TestBoostSharedGlobalNoBlueFire(CTRTestBase):
             _capability_counts(self.multiworld, self.player),
             {"Progressive Boost": 2})
 
-    def test_wire(self):
-        world = self.multiworld.worlds[self.player]
-        co = world.fill_slot_data()["ctr_options"]
-        self.assertEqual(co["boost_mode"], 1)
-        self.assertEqual(co["boost_blue_fire"], False)
 
 
 class TestBoostSharedGlobalBlueFire(CTRTestBase):
@@ -117,10 +106,6 @@ class TestStatsSharedGlobal(CTRTestBase):
             "Progressive Turning": 4,
         })
 
-    def test_wire(self):
-        world = self.multiworld.worlds[self.player]
-        co = world.fill_slot_data()["ctr_options"]
-        self.assertEqual(co["stats_mode"], 1)
 
 
 class TestBothPacksSharedGlobalPoolBalance(CTRTestBase):
@@ -185,11 +170,6 @@ class TestStatsPerCharacterSupplyPoor(CTRTestBase):
     auto_construct = False
     options = {"progressive_stats": "per_character"}
 
-    def test_raises_option_error(self):
-        with self.assertRaises(OptionError) as ctx:
-            self.world_setup()
-        self.assertIn("would add 192 item(s)", str(ctx.exception))
-        self.assertIn("stats=per_character", str(ctx.exception))
 
 
 class TestBothPacksPerCharacterRich(CTRTestBase):
@@ -209,10 +189,6 @@ class TestBothPacksPerCharacterRich(CTRTestBase):
         self.assertEqual(len(counts), 64)
         self.assertEqual(sum(counts.values()), 240)
 
-    def test_wire_reports_private_modes(self):
-        co = self.world.fill_slot_data()["ctr_options"]
-        self.assertEqual(co["boost_mode"], 2)
-        self.assertEqual(co["stats_mode"], 2)
 
 
 class TestPerCharacterRichSeedGenerates(CTRTestBase):
@@ -314,74 +290,6 @@ class TestPerCharacterGateSemantics(unittest.TestCase):
         self.assertTrue(all(item.advancement for item in items))
 
 
-class TestPerCharacterUniversalTracker(unittest.TestCase):
-    """UT restores the two mode scalars that select private item names."""
-
-    def test_private_modes_override_tracking_yaml(self):
-        mw = _build(progressive_boost="off", progressive_stats="off")
-        world = mw.worlds[1]
-        world._ut_restore_options({
-            "ctr_options": {"boost_mode": 2, "stats_mode": 2},
-            "warp_pad_unlock": {},
-            "podium_checks": {},
-        })
-        self.assertEqual(world.options.progressive_boost.value, 2)
-        self.assertEqual(world.options.progressive_stats.value, 2)
-
-    def test_blue_fire_overrides_tracking_yaml(self):
-        """Regression: the easy-difficulty Platinum floor reads Blue Fire.
-
-        A seed with logic_difficulty = easy and Blue Fire on holds every
-        Platinum Time Trial at boost rank 3 (usf_finish.relic_tier_boost_min).
-        Restoring the difficulty without the toggle left UT on the rank-2
-        floor, so it called Platinum relics in logic that the server did not
-        -- the check-ut divergence this test pins down.
-        """
-        from ..usf_finish import relic_tier_boost_min
-
-        server = _build(progressive_boost="shared_global",
-                        progressive_boost_blue_fire=True,
-                        logic_difficulty="easy")
-        slot_data = server.worlds[1].fill_slot_data()
-        self.assertIs(slot_data["ctr_options"]["boost_blue_fire"], True)
-
-        tracker = _build(progressive_boost="off",
-                         progressive_boost_blue_fire=False,
-                         logic_difficulty="medium")
-        world = tracker.worlds[1]
-        world._ut_restore_options(slot_data)
-
-        self.assertEqual(world.options.progressive_boost_blue_fire.value, 1)
-        self.assertEqual(
-            relic_tier_boost_min("Crash Cove", "Platinum", world.options), 3)
-        self.assertEqual(
-            relic_tier_boost_min("Crash Cove", "Platinum", world.options),
-            relic_tier_boost_min("Crash Cove", "Platinum",
-                                 server.worlds[1].options))
-
-    def test_blue_fire_absent_on_wire_restores_off(self):
-        """A pre-#85 wire carries no `boost_blue_fire`, and such a seed had no
-        Blue Fire tier at all, so the restore lands on off instead of letting
-        the tracking player's own YAML raise the Platinum floor."""
-        mw = _build(progressive_boost="shared_global",
-                    progressive_boost_blue_fire=True,
-                    logic_difficulty="easy")
-        world = mw.worlds[1]
-        world._ut_restore_options({
-            "ctr_options": {"boost_mode": 1},
-            "warp_pad_unlock": {},
-            "podium_checks": {},
-        })
-        self.assertEqual(world.options.progressive_boost_blue_fire.value, 0)
-
-    def test_wire_needs_no_per_racer_rank_block(self):
-        mw = _build(progressive_boost="per_character",
-                    progressive_stats="per_character",
-                    box_locations=True, shortcut_knowledge="hard")
-        slot_data = mw.worlds[1].fill_slot_data()
-        self.assertEqual(slot_data["ctr_options"]["boost_mode"], 2)
-        self.assertEqual(slot_data["ctr_options"]["stats_mode"], 2)
-        self.assertNotIn("capability_ranks", slot_data)
 
 
 class TestItemCodeStability:

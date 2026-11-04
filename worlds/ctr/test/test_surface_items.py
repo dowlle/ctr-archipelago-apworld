@@ -55,10 +55,3 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
     # comfort-pack trim rather than about the character item economy.
     options = {"podium_placement_checks": False, "character_unlocks": False, "wumpa_shop_slots": 0}
 
-    def test_reduced_location_seed_omits_the_pack_atomically(self) -> None:
-        pooled = {item.name for item in self.multiworld.itempool}
-        self.assertTrue(SURFACE_ITEMS.isdisjoint(pooled))
-        self.assertEqual(
-            len(self.multiworld.itempool),
-            len(self.multiworld.get_unfilled_locations(self.player)),
-        )

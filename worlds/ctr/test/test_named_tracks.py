@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from .. import ctrAPWorld, destinations, named_tracks as nt
-from ..cortex_vortex_track import CORTEX_VORTEX, letter_item_name, letter_location_name, relic_name
+from ..cortex_vortex import CORTEX_VORTEX, letter_item_name, letter_location_name, relic_name
 from ..destinations import NamedTrack, parse_named_tracks
 from ..Locations import CTR_LOCATION_CLASSES
 from ..podium import PODIUM_CLASS, SLOT_ORDER

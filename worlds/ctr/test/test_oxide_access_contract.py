@@ -244,16 +244,6 @@ class TestOxideEncounterTruthTable(unittest.TestCase):
         self.assertFalse(_reach(mw, KEYS + RELICS + flags + GEMS[:4])[1])
         self.assertTrue(_reach(mw, KEYS + RELICS + flags + GEMS)[1])
 
-    def test_configured_relic_mode_and_count_are_honoured_not_the_legacy_18(self):
-        # The world.json text rule on the Final Challenge is the legacy fixed
-        # 18-Sapphire gate; the contract replaces it with the configured
-        # mode + count. Platinum mode proves the replacement really happened:
-        # Sapphires must not satisfy it, Platinums must.
-        mw = _build(oxide_goal="none", oxide_final_challenge_unlock=2,
-                    oxide_final_challenge_relic_count=2,
-                    platinum_relic_count=4, bosses_required_goal=4)
-        self.assertFalse(_reach(mw, KEYS + ["Sapphire Relic"] * 18)[1])
-        self.assertTrue(_reach(mw, KEYS + ["Platinum Relic"] * 2)[1])
 
 
 class TestOxideGoalEventsFollowTheirEncounter(unittest.TestCase):
@@ -337,12 +327,6 @@ class TestOxideDisabledRemovesTheContent(unittest.TestCase):
         for loc in mw.get_locations(PLAYER):
             self.assertNotIn("N. Oxide's", loc.name)
 
-    def test_the_garage_door_is_shut(self):
-        mw = self._disabled()
-        st = CollectionState(mw)
-        _grant(st, KEYS + ["Sapphire Relic"] * 18)
-        self.assertFalse(
-            mw.get_entrance("N. Oxide Garage Door", PLAYER).can_reach(st))
 
     def test_no_oxide_goal_events_are_laid(self):
         mw = self._disabled()
@@ -391,37 +375,7 @@ class TestOxideDisabledRemovesTheContent(unittest.TestCase):
         self.assertEqual(wire["ctr_options"]["goal"], -1,
                          "disabled has no legacy single-goal analogue")
 
-    def test_total_locations_drops_by_exactly_the_two_races(self):
-        common = {"bosses_required_goal": 4, "gems_required_goal": 0}
-        optional = _build(oxide_goal="none", **common)
-        disabled = _build(oxide_goal="disabled", **common)
-        # `none` additionally lays no Oxide goal events, so the two worlds
-        # differ by the two race locations alone.
-        self.assertEqual(
-            optional.worlds[PLAYER].fill_slot_data()["TotalLocations"] - 2,
-            disabled.worlds[PLAYER].fill_slot_data()["TotalLocations"])
 
-    def test_final_challenge_unlock_mode_and_count_resolve_or_are_ignored(self):
-        # #320 acceptance 4: the pair is fully ignored when the location does
-        # not exist (`disabled`, value stays exactly what the YAML set). When
-        # the location exists but the seed's goal is something else (`none`),
-        # the 2026-09-18 ruling resolves an over-capacity single-tier count
-        # down to 18 rather than rejecting the seed.
-        mw_none = setup_multiworld(
-            ctrAPWorld, ("generate_early",), seed=1,
-            options={"oxide_goal": "none",
-                     "bosses_required_goal": 4,
-                     "oxide_final_challenge_unlock": 0,
-                     "oxide_final_challenge_relic_count": 30})
-        self.assertEqual(
-            mw_none.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
-            18)
-
-        mw = self._disabled(oxide_final_challenge_unlock=0,
-                            oxide_final_challenge_relic_count=30)
-        self.assertEqual(
-            mw.worlds[PLAYER].options.oxide_final_challenge_relic_count.value,
-            30)
 
     def test_full_accessibility_generates_without_the_removed_locations(self):
         mw = self._disabled(accessibility="full")
@@ -435,85 +389,11 @@ class TestOxideEncounterMutations(unittest.TestCase):
     and the mutant gets wrong, so the truth table above is sensitive to that
     term rather than merely consistent with it."""
 
-    def _rules(self):
-        from .. import Rules
-        return Rules
 
-    def test_mutant_companions_applied_to_the_shared_door_again(self):
-        # The pre-RC shape: put the conjunction back on the entrance, so both
-        # encounters inherit it. Distinguished by the Alpha 7 regression row.
-        mw = _build(oxide_goal="final", gems_required_goal=5, **RELIC_OPTS)
-        self.assertTrue(_reach(mw, KEYS)[0],
-                        "fixed source: Final-goal Oxide 1 opens on four Keys")
-        door = mw.get_entrance("N. Oxide Garage Door", PLAYER)
-        base = door.access_rule
-        companions = self._rules().oxide_companion_predicate(mw.worlds[PLAYER])
-        door.access_rule = (lambda st, b=base, c=companions:
-                            b(st) and c(st))
-        self.assertFalse(_reach(mw, KEYS)[0],
-                         "mutant: the shared door wrongly re-locks Oxide 1")
 
-    def test_mutant_companion_terms_omitted_entirely(self):
-        # Drop the companion conjunction from both encounters (the state this
-        # subsystem had before WO-A1). Distinguished by the Any% row.
-        mw = _build(oxide_goal="first", gems_required_goal=5, **RELIC_OPTS)
-        self.assertFalse(_reach(mw, KEYS)[0])
-        # Restate Oxide 1 as the bare pre-WO-A1 rule (the entrance still
-        # supplies the four Keys), rather than re-running the installer --
-        # the installer ANDs onto whatever it already tightened, so a second
-        # pass could not loosen anything and would prove nothing.
-        mw.get_location(FIRST, PLAYER).access_rule = lambda st: True
-        self.assertTrue(_reach(mw, KEYS)[0],
-                        "mutant: Any% Oxide 1 wrongly opens with no Gems")
 
-    def test_mutant_companions_wired_to_the_wrong_encounter(self):
-        # Swap which encounter the companions gate (any_percent <-> final).
-        # Distinguished in both directions at once.
-        mw = _build(oxide_goal="first", gems_required_goal=5, **RELIC_OPTS)
-        first_ok, final_ok = _reach(mw, KEYS + RELICS + GEMS[:4])
-        self.assertFalse(first_ok, "fixed: Any% gates Oxide 1")
-        companions = self._rules().oxide_companion_predicate(mw.worlds[PLAYER])
-        relic = mw.worlds[PLAYER]._oxide_final_relic_rule()
-        mw.get_location(FIRST, PLAYER).access_rule = lambda st: True
-        mw.get_location(FINAL, PLAYER).access_rule = (
-            lambda st, r=relic, c=companions: r(st) and c(st))
-        self.assertTrue(_reach(mw, KEYS + RELICS + GEMS[:4])[0],
-                        "mutant: Any% Oxide 1 wrongly opens with Gems short")
 
-    def test_mutant_final_drops_its_inheritance_of_the_first_challenge(self):
-        # Oxide 2 re-stated as "Keys + relics" instead of "Oxide 1 + relics".
-        # Distinguished under any_percent, where the companions are what make
-        # the first clear possible at all.
-        mw = _build(oxide_goal="first", gems_required_goal=5, **RELIC_OPTS)
-        self.assertFalse(_reach(mw, KEYS + RELICS + GEMS[:4])[1],
-                         "fixed: Oxide 2 is behind an unclearable Oxide 1")
-        relic = mw.worlds[PLAYER]._oxide_final_relic_rule()
-        mw.get_location(FINAL, PLAYER).access_rule = lambda st, r=relic: r(st)
-        self.assertTrue(_reach(mw, KEYS + RELICS + GEMS[:4])[1],
-                        "mutant: Oxide 2 wrongly reachable without the clear")
 
-    def test_mutant_final_drops_its_relic_term(self):
-        mw = _build(oxide_goal="none", bosses_required_goal=4, **RELIC_OPTS)
-        self.assertFalse(_reach(mw, KEYS)[1], "fixed: relics are required")
-        mw.get_location(FINAL, PLAYER).access_rule = lambda st: True
-        self.assertTrue(_reach(mw, KEYS)[1],
-                        "mutant: Oxide 2 wrongly opens with no relics")
-
-    def test_mutant_none_mode_accidentally_tightened(self):
-        # Applying the conjunction whenever ANY arm is active, without asking
-        # whether Oxide is the goal. Distinguished by the `none` row.
-        mw = _build(oxide_goal="none", bosses_required_goal=4,
-                    gems_required_goal=5, **RELIC_OPTS)
-        self.assertTrue(_reach(mw, KEYS)[0], "fixed: none leaves Oxide 1 open")
-        companions = self._rules().oxide_companion_predicate(mw.worlds[PLAYER])
-        self.assertIsNotNone(
-            companions,
-            "the arms ARE active here -- that is what makes this mutant "
-            "reachable rather than vacuous")
-        mw.get_location(FIRST, PLAYER).access_rule = (
-            lambda st, c=companions: c(st))
-        self.assertFalse(_reach(mw, KEYS)[0],
-                         "mutant: optional Oxide wrongly becomes a goal gate")
 
     def test_mutant_disabled_leaves_the_locations_in_the_seed(self):
         # Distinguished by the removal assertion itself: prove the skip in

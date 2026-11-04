@@ -56,6 +56,7 @@ Native (`ap/ap_content_plan_impl.hpp`) applies the same rules; the parity tool
 """
 import copy
 import re
+from typing import Dict
 
 CAPABILITIES = ("time_trial", "arcade", "relic", "ctr_tokens", "wumpa")
 #: Optional measured flags (#133 PR 4c). `super_turbo_pads`: the LEV has at
@@ -264,3 +265,64 @@ def admit_all(raw, where="tracks.custom"):
             seen[label, value] = i
         result.append(package)
     return sorted(result, key=lambda p: p["id"])
+
+
+# The two measured Baby T Park releases the content plan ships as known
+# packages (content_plan.PACKAGES). Moved from custom_tracks.py in one
+# generator row 12.
+#: The measured and release-approved Baby T Park descriptor (evidence note
+#: 2026-08-27, the actual downloaded v1.0.0 files). Alpha6 validates every
+#: generation-affecting field against this registry entry. This keeps the
+#: apworld and native acceptance sets identical.
+BABY_T_PARK_EXAMPLE: Dict[str, object] = {
+    "package_uuid": "60d5a8a8-b69a-4f6a-a0d8-9a43d91e3f2e",
+    "package_version": "1.0.0",
+    "minimum_client_version": "0.2.0-alpha6",
+    "minimum_apworld_version": "0.2.0-alpha6",
+    "lev_sha256":
+        "96ad9f74f51a02eafcc207cd02c97052d674c950e0f24b6440a227494a705fe8",
+    "vrm_sha256":
+        "2dcaa0fe93359c7ae00fb93842a581210e0dcc2db73f4de43508375834092e83",
+    "navigation": {
+        "uuid": "898a9315-693f-4ed3-b6a0-fbe50db8bc40",
+        "revision": 1,
+    },
+    "laps": 7,
+    "replaces": "purple_gem_cup",
+    "flags": {
+        "crates": True,
+        "ctr_letters": True,
+        "relic_crates": True,
+        "ai_nav": True,
+        "minimap": False,
+        "ghosts": False,
+        # MEASURED against the v1.0.0 LEV whose digest is above (2026-08-29):
+        # its instance table carries 8 instances of modelID 7 (PU_FRUIT_CRATE)
+        # and 0 loose PU_WUMPA_FRUIT. RB_Crate.c pays a fruit crate 5..8 fruit,
+        # so the guaranteed floor is 40 in one lap of a 7-lap race -- far above
+        # the 10 this capability asks about. Manager-light derives the same
+        # answer from the same bytes; see native_custom_track_manager.c.
+        "wumpa_collectible": True,
+        "spawns": 8,
+        "checkpoints": 35,
+    },
+    "boxes": False,
+}
+
+
+BABY_T_PARK_CURRENT = {
+    **BABY_T_PARK_EXAMPLE,
+    "package_uuid": "2c7c7846-2ead-5b8f-a218-beca5792106e",
+    "package_version": "1.0.2",
+    "minimum_client_version": "0.3.0-letters1",
+    "minimum_apworld_version": "0.3.0-letters1",
+    "lev_sha256": "be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8",
+    "vrm_sha256": "1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692",
+    # UUID5(importer UUID, "embedded-navigation:" + exact LEV SHA-256).
+    # A new asset-bound identity, not reuse of the old revision's evidence.
+    "navigation": {"uuid": "07395277-d2c2-5544-9cde-5ad9976c06fd", "revision": 1},
+    "flags": dict(BABY_T_PARK_EXAMPLE["flags"]),
+}
+
+
+BABY_T_PARK_PROFILES = (BABY_T_PARK_EXAMPLE, BABY_T_PARK_CURRENT)

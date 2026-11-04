@@ -201,15 +201,14 @@ class TestShopLedger(unittest.TestCase):
         fill(world)
         self.assertTrue(world.multiworld.can_beat_game())
 
-    def test_shop_slots_hold_a_progression_price_after_fill(self):
+    def test_shop_slot_prices_do_not_change_with_the_fill(self):
+        # Ruling of 2026-11-02: progression no longer costs the band bottom.
         world = make_world(options(wumpa_shop_slots=25), seed=5)
+        drawn = {c["location"]: c["price"] for c in world.ctr_content_plan["checks"]
+                 if c["kind"] == content_wumpa.KIND}
         wire = fill(world)
-        for check in wire["content_plan"]["checks"]:
-            if check["kind"] == content_wumpa.KIND:
-                location = world.multiworld.get_location(check["display_name"], world.player)
-                if location.item.advancement:
-                    hub = check["display_name"].split(" Shop:")[0]
-                    self.assertEqual(check["price"], content_wumpa.wumpa_shop.price_band(hub, 100)[0])
+        self.assertEqual({c["location"]: c["price"] for c in wire["content_plan"]["checks"]
+                          if c["kind"] == content_wumpa.KIND}, drawn)
 
 
 class TestSpoilerItems(unittest.TestCase):

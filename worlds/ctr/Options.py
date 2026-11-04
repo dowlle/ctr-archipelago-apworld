@@ -1,13 +1,12 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
-                     Toggle, NamedRange, Range, PerGameCommonOptions, Visibility, StartInventoryPool)
+                     Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool)
 
 from . import characters
-from .warp_pad_logic import DEFAULT_REQUIREMENT_WEIGHTS
+from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
-from .custom_tracks import KNOWN_TRACK_IDS, validate_custom_tracks
 from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
 from .boss_encounters import (OPPONENT_NAMES as BOSS_GARAGE_OPPONENTS, POOL_NAMES as BOSS_OPPONENT_NAMES,
                               GARAGE_FAMILIES as BOSS_ATTACK_FAMILIES, FAMILIES as OXIDE_ATTACK_FAMILIES)
@@ -570,8 +569,9 @@ class ReserveTopUp(DefaultOnToggle):
     """Let non-trap filler include Reserve Top-Up at relative weight 1
     beside Wumpa Fruit at weight 6 (bundles retain weights 3 and 1).
 
-    One copy adds 983 raw reserve units to active positive reserves in a live
-    race. It waits in the hub or without a boost, preserves the fire cap and
+    One copy adds 8192 raw reserve units (about 25% of the positive signed
+    reserve range) to active positive reserves in a live race.
+    It waits in the hub or without a boost, preserves the fire cap and
     can cross into purple Saffi fire, including with Progressive Boost.
     It gives no weapon. Off preserves the existing filler draw."""
     display_name = "Reserve Top-Up"
@@ -655,8 +655,8 @@ class WumpaShopPrices(Range):
     """Scales every Wumpa Shop price and every shelf unlock, in percent.
 
     100 (default) keeps the normal prices: 10 to 30 fruit in N. Sanity Beach up
-    to 40 to 80 in Citadel City. A slot that holds progression always costs
-    the lowest price of its hub."""
+    to 40 to 80 in Citadel City. Every slot draws its price from its hub's
+    range the same way, whatever it holds."""
     display_name = "Wumpa Shop Prices"
     range_start = 25
     range_end = 400
@@ -666,8 +666,8 @@ class WumpaShopPrices(Range):
 class WumpaShopProgression(Choice):
     """Whether Wumpa Shop slots may hold progression items.
 
-    - **allowed** (default): any shop slot may hold progression, priced at
-      its hub's lowest price.
+    - **allowed** (default): any shop slot may hold progression, priced like
+      any other slot.
     - **excluded**: no shop slot holds progression; useful items, filler
       and traps only."""
     display_name = "Wumpa Shop Progression"
@@ -821,6 +821,22 @@ class SpoilerItems(Toggle):
     display_name = "Spoiler Items"
 
 
+class PadApproachHints(Toggle):
+    """Hint a warp pad's open checks when you drive up to it.
+
+    Off (default): nothing happens when you approach a pad.
+
+    On: when a pad shows its name as you drive up to it, the game asks the
+    server to hint every location behind that pad that is open for you now
+    and not checked yet. A closed pad, or one that needs a racer you do not
+    have, hints nothing. Each location is hinted at most once, also after a
+    reconnect.
+
+    Hints cannot be undone. They stay in the room for everyone, and one walk
+    through a hub can hint many locations at once."""
+    display_name = "Pad Approach Hints"
+
+
 class RaceTypeSelector(Choice):
     """When a warp pad asks which race to run.
 
@@ -937,7 +953,7 @@ class RequirementWeights(OptionDict):
     # requirements. Unlisted items fall back to their icebound_beta5 weight.
     display_name = "Requirement Weights"
     supports_weighting = False
-    # Pre-filled with the icebound_beta5 table (single source: warp_pad_logic)
+    # Pre-filled with the icebound_beta5 table (single source: content_playthrough)
     # so the YAML template and options page show real numbers to tweak from
     # instead of an empty dict.
     default = dict(DEFAULT_REQUIREMENT_WEIGHTS)
@@ -1705,6 +1721,7 @@ class ctrAPOptions(PerGameCommonOptions):
     ap_item_type_colors: ApItemTypeColors
     color_boxes_by_item: ColorBoxesByItem
     spoiler_items: SpoilerItems
+    pad_approach_hints: PadApproachHints
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
 
@@ -1733,7 +1750,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                              EditableStats, ProgressiveStatsMode],
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],
     "DeathLink": [DeathLink, DeathLinkSend, DeathLinkAmnesty],
-    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, RaceTypeSelector,
+    "Display": [WarpPadItemDisplay, ApItemTypeColors, ColorBoxesByItem, SpoilerItems, PadApproachHints,
+                RaceTypeSelector,
                 TrackerPadLaunch],
 }
 
@@ -1743,456 +1761,3 @@ def create_option_groups() -> List[OptionGroup]:
         OptionGroup(name=x, options=y)
         for x, y in ap_ctr_option_groups.items()
     ]
-
-
-# Retired options (one generator row 7). They are in no option list, so a YAML that
-# still names them has that name ignored silently (ruled 2026-10-30). The original
-# generator's code still names some of them; row 12 deletes both.
-
-class BossTrackAllowlist(OptionSet):
-    """With Boss Track Shuffle on, draw boss tracks only from these tracks.
-    Leave empty to allow every track. Ignored when Boss Track Shuffle is
-    off."""
-    display_name = "Boss Track Allowlist"
-    valid_keys = sorted(BOSS_VENUE_TRACKS)
-    default = frozenset()
-
-
-class BossTrackBlocklist(OptionSet):
-    """With Boss Track Shuffle on, never draw these tracks for a boss race.
-    Applied after the allowlist. Ignored when Boss Track Shuffle is off."""
-    display_name = "Boss Track Blocklist"
-    valid_keys = sorted(BOSS_VENUE_TRACKS)
-    default = frozenset()
-
-
-class BossEncounterRepeats(Choice):
-    """Whether two boss garages may use the same drawn track.
-
-    - **disallow** (default): the four bosses race on four different tracks.
-    - **allow**: each garage draws on its own, so tracks can repeat.
-
-    A track that is also an ordinary race or a Gem Cup leg never counts as a
-    repeat."""
-    display_name = "Boss Encounter Repeats"
-    option_disallow = 0
-    option_allow = 1
-    default = 0
-
-
-class BossOxideInPool(Toggle):
-    """With Boss Opponent Shuffle on, N. Oxide can be drawn as the racer of
-    one of the four boss garages, and N. Oxide's own garage then races a
-    randomly drawn racer instead of N. Oxide (both of its races). All five
-    bosses are different racers. N. Oxide's garage keeps its door, its
-    checks and the goal. Ignored when Boss Opponent Shuffle is off."""
-    # Decision 7 of 2026-10-28. Wire: the plan's bosses record. See content_bosses.py.
-    display_name = "Boss Pool Includes N. Oxide"
-
-
-class BossCharacterAllowlist(OptionSet):
-    """With Boss Opponent Shuffle on, draw boss opponents only from these
-    racers. Leave empty to allow every racer. Ignored when Boss Opponent
-    Shuffle is off."""
-    display_name = "Boss Character Allowlist"
-    valid_keys = sorted(BOSS_OPPONENT_NAMES)
-    default = frozenset()
-
-
-class BossCharacterBlocklist(OptionSet):
-    """With Boss Opponent Shuffle on, never draw these racers as a boss.
-    Applied after the allowlist. Ignored when Boss Opponent Shuffle is off."""
-    display_name = "Boss Character Blocklist"
-    valid_keys = sorted(BOSS_OPPONENT_NAMES)
-    default = frozenset()
-
-
-class BossPowerupBlocklist(OptionSet):
-    """With Boss Kit Shuffle on, weapon types a boss never uses. Ignored when
-    Boss Kit Shuffle is off."""
-    display_name = "Boss Powerup Blocklist"
-    valid_keys = sorted(BOSS_ATTACK_FAMILIES)
-    default = frozenset()
-
-
-class OxidePowerupBlocklist(OptionSet):
-    """With N. Oxide Attack Profile all_compatible, weapon types N. Oxide's
-    garage never uses. Separate from Boss Powerup Blocklist. Ignored with
-    the retail profile."""
-    display_name = "N. Oxide Powerup Blocklist"
-    valid_keys = sorted(OXIDE_ATTACK_FAMILIES)
-    default = frozenset()
-
-
-class ShuffleWarpPadsGemCups(DefaultOnToggle):
-    """Include the 5 Gem Cups and their races in the seed.
-
-    - **on** (default): the cup checks are normal locations and, with
-      randomized unlocks, their warp pads get a randomized requirement.
-    - **off**: the cups stay as in the retail game and each Gem stays on its
-      own cup.
-
-    Shuffle Gems moves the Gem items; this option decides whether the cup
-    races are part of the seed."""
-    # The Key-2 Cups Room hub gate is always kept on top of a randomized cup
-    # requirement. This option is also the participation gate for the `cups`
-    # destination-shuffle category. Off + Shuffle Gems on pins each Gem back onto
-    # its own vanilla cup check (out of the pool) so opted-out cups never hold
-    # another world's progression; a Gems Required goal + Shuffle Gems on +
-    # this off resolves Shuffle Gems to off with a warning (2026-09-21 ruling,
-    # forced_options.resolve_shuffle_gems_off_when_gem_goal_excludes_cups)
-    # rather than stranding the goal or failing the whole multiworld.
-    display_name = "Include Gem Cup Warp Pads"
-
-
-class RandomizeGemCupTracks(Toggle):
-    """Shuffle which four tracks each Gem Cup runs.
-
-    The retail Gem Cups always run the same four tracks. Turn this on and
-    every leg is drawn independently from the 16 trophy tracks. A track may
-    appear more than once, while Slide Coliseum and Turbo Track are not drawn.
-
-    The cup still awards its Gem. Only the tracks change."""
-    # Ruled 2026-08-07 (issue #166): exactly two states, vanilla or
-    # completely random over the 16-trophy-track pool, repeats allowed; the
-    # reporter's intermediate "shuffled" permutation mode was dropped. Wire:
-    # top-level `gem_cup_legs` block, emitted only when on.
-    display_name = "Randomize Gem Cup Tracks"
-
-
-class LegacyCustomTracks(OptionDict):
-    """Race a community custom track in place of a Gem Cup.
-
-    The cup keeps its warp pad, but behind it is one race on the custom track
-    instead of four retail tracks. Leave this empty (the default) for a
-    normal seed.
-
-    You also need the track's files and a client that can load them. Use the
-    track's exact entry rather than writing your own: generation refuses an
-    entry this version does not know, and the game refuses files that do not
-    match it.
-
-    The only known track is baby-t-park, and only purple_gem_cup can be
-    replaced.
-
-    A track this version knows by name keeps that name for its checks
-    everywhere (for example "Baby T Park: Trophy Race"). For any other
-    track, an entry may carry a `title` and an `author`. They only change the
-    name the room and Universal Tracker show for the track's checks; a title
-    that matches a retail track gets "(Custom)" added."""
-    # Ruled 2026-08-28 (Wayfinder): an early instance of the self-describing
-    # `custom_tracks` descriptor rather than a throwaway toggle, and full
-    # DISPLACEMENT of the replaced cup's destination. Shape, validation,
-    # displacement and wire block all live in custom_tracks.py.
-    #
-    # default is {} rather than a rendered example, unlike TrapWeights: an
-    # example default would put digests a player has not verified into every
-    # generated template, and this option is off unless someone means it.
-    display_name = "Custom Tracks"
-    supports_weighting = False
-    default = {}
-    valid_keys = list(KNOWN_TRACK_IDS)
-
-    def verify_keys(self) -> None:
-        # Core's VerifyKeys would only reject an unknown top-level id, with a
-        # message that lists the allowed set and says nothing about the body.
-        # This is the same function generate_early calls, so a rolled YAML and
-        # a programmatically built world fail identically (the TrapWeights
-        # precedent).
-        validate_custom_tracks(self.value)
-
-
-class IncludeArcadeArenas(Toggle):
-    """Permit Parking Lot, The North Bowl and Lab Basement in the Crystal pool.
-
-    Uses the explicit content_pool profile and ordinary physical pad seats.
-    Does nothing when battle arenas are off. Each arena has twenty authored
-    crystals, a separate completion check and no Purple Token grant.
-    """
-    display_name = "Include Arcade Arenas"
-
-
-class ShuffleWarpPadsBattleArenas(DefaultOnToggle):
-    """Include the 4 Battle Arenas and their Crystal Challenges in the seed.
-
-    - **on** (default): their checks are normal locations and, with
-      randomized unlocks, their warp pads get a randomized requirement.
-    - **off**: the four Crystal Challenge locations leave the seed and the
-      four arena warp pads stay closed. Purple CTR Tokens remain in the item
-      pool and can be found anywhere, and the Purple Gem Cup still asks for
-      them."""
-    display_name = "Include Battle Arena Warp Pads"
-
-
-class WarpPadShuffleCategories(OptionSet):
-    """Which destinations take part in destination shuffle. Anything left
-    out always loads its own content.
-
-    - **tracks**: the 16 trophy races plus Slide Coliseum and Turbo Track.
-    - **cups**: the 5 Gem Cups (needs Include Gem Cup Warp Pads on).
-    - **crystals**: the 4 Battle Arenas (needs Include Battle Arena Warp Pads
-      on).
-
-    Default: all three. An empty set turns destination shuffle off. With
-    vanilla unlock requirements, tracks and crystals shuffle only among
-    themselves and cups stay fixed."""
-    # Composed with `Warp Pad Shuffle Grouping`. The vanilla-unlock collapse in
-    # full: tracks = races only (no trials), grouping forced per_category,
-    # cup/trial destination shuffle requires a randomized unlock mode.
-    display_name = "Warp Pad Shuffle Categories"
-    valid_keys = {"tracks", "cups", "crystals"}
-    default = frozenset({"tracks", "cups", "crystals"})
-
-
-class WarpPadShuffleGrouping(Choice):
-    """How warp-pad destinations are shuffled among each other.
-
-    - **per_category**: tracks swap with tracks, cups with cups,
-      arenas with arenas. Each pad still leads to the same kind of thing.
-    - **merged** (default): everything shuffles together, so a track pad can lead to a
-      Gem Cup and back again.
-
-    Only matters when Warp Pad Shuffle Categories has something in it."""
-    display_name = "Warp Pad Shuffle Grouping"
-    option_per_category = 0
-    option_merged = 1
-    default = 1
-
-
-class TrialTrackRaces(Choice):
-    """Standalone Adventure race family for one trial track.
-
-    Trophy Race also restores that track's per-track Reach 10 Wumpa route.
-    CTR Challenge includes Trophy Race by construction, so a CTR-only seed
-    cannot be expressed.
-    """
-    display_name = "Trial Track Races"
-    option_off = 0
-    option_trophy_race = 1
-    option_trophy_and_ctr_challenge = 2
-    default = 0
-
-
-class SlideColiseumRaces(TrialTrackRaces):
-    """Add race checks to Slide Coliseum's warp pad, which normally runs
-    only relic races.
-
-    - **off** (default): relic races only, as in the retail game.
-    - **trophy_race**: adds a Trophy Race check.
-    - **trophy_and_ctr_challenge**: adds a Trophy Race and a CTR Token
-      Challenge check."""
-    display_name = "Slide Coliseum Races"
-
-
-class TurboTrackRaces(TrialTrackRaces):
-    """Add race checks to Turbo Track's warp pad, which normally runs only
-    relic races.
-
-    - **off** (default): relic races only, as in the retail game.
-    - **trophy_race**: adds a Trophy Race check.
-    - **trophy_and_ctr_challenge**: adds a Trophy Race and a CTR Token
-      Challenge check."""
-    display_name = "Turbo Track Races"
-
-
-class LegacyCortexVortexTrack(Toggle):
-    """Add Cortex Vortex as a regular track: a Trophy Race, three Time Trials
-    and a CTR Token Challenge.
-
-    It takes the warp pad of one other destination, chosen per seed, and
-    that destination's checks leave the seed. A boss race on that track
-    still runs. Crossing the finish line needs Ultimate Sacred Fire.
-    Cortex Vortex has no item boxes."""
-    # Default off until a runtime pass proves an 8-kart race, relic mode and
-    # the AI on this LEV (frozen contract, 2026-09-13).
-    display_name = "Cortex Vortex Track"
-
-
-class RequirementVariety(Choice):
-    """Which mix of items randomized warp pads ask for. Only used with
-    randomized unlock requirements.
-
-    - **icebound_beta5** (default): Icebound's rebalanced mix. Trophies are
-      the most common, with plenty of CTR Tokens, Relics and Keys and a few
-      Gems.
-    - **trophy_heavy_legacy**: the older mix, with more Trophies.
-    - **custom**: use the weights from Requirement Weights."""
-    # The exact tables: icebound_beta5 = Trophy 90, each CTR Token 16 (Purple
-    # 12), each Relic tier 18, Key 20, each Gem 4; Any* collapse Token x0.8
-    # (cap 16), Relic x0.5 (cap 27), Gem capped at 5 (no -1 reduction).
-    # trophy_heavy_legacy = Trophy 100, Token 15 (Purple 10), Relic 20, Key 25,
-    # Gem 2; Any* collapse Token x0.6, Relic x0.3, Gem -1 (no caps). custom
-    # falls back to icebound_beta5 weights for unlisted items and uses the
-    # legacy Any* collapse.
-    display_name = "Requirement Variety"
-    option_icebound_beta5 = 0
-    option_trophy_heavy_legacy = 1
-    option_custom = 2
-    default = 0
-
-
-class BossGarageRequirements(Choice):
-    """Boss garages unlock on trophy counts: Roo, Papu, Joe and Pinstripe open
-    with 4, 8, 12, 16 trophies respectively."""
-    # HIDDEN from the YAML template and options page: `trophies` is currently
-    # the only implemented mode, so there is nothing to choose. The option (and
-    # its slot_data key `bossgarage_mode`) stays wired for when the track-based
-    # modes return.
-    display_name = "Boss Garage Requirements"
-    visibility = Visibility.none
-    # BUG-D: modes 0/1 are a cross-layer
-    # paradigm mismatch. The apworld logic gates ALL modes on a flat trophy count
-    # (Rules.add_boss_garage_rules 4/8/12/16), but native enforces a per-track WIN
-    # for modes 0/1 (ap_hooks.c AP_BossReqMet / AH_Garage.c). Orthogonal criteria =>
-    # a 16-trophy player who did NOT win the four required tracks is softlocked, and
-    # winning four tracks under-count opens a garage early. These two
-    # modes are not shippable until reconciled, so they are removed from the
-    # selectable set here (default 2 = Trophies is unaffected and fully implemented).
-    #
-    # NOT deleted, only disabled: the per-boss vanilla/destination track lists are
-    # still resolved + emitted in slot_data (Regions._resolve_boss_reqs, kept intact),
-    # and re-enabling is a one-line uncomment once the reconciliation lands. That
-    # reconciliation is the SAME machinery as the goal-rework Goal-3 fix: the 4 code-
-    # null per-boss "personally won" companion events (paired with the Boss Race
-    # locations) are exactly the per-track win flags modes 0/1 need to gate on instead
-    # of a flat trophy count. Build those there, then tighten add_boss_garage_rules
-    # (or the native gate) to can_reach the four required Trophy Races and restore
-    # these two options.
-    # option_original_4_tracks = 0  # disabled -- see BUG-D above
-    # option_same_hub_tracks = 1    # disabled -- see BUG-D above
-    option_trophies = 2
-    default = 2
-
-
-class PodiumPlacementChecks(DefaultOnToggle):
-    """Turn race placements into checks.
-
-    Each track can pay out for finishing, for finishing on the podium, and
-    for holding a position during the race. The four options below choose
-    which of those count.
-
-    A generous source of checks that does not ask you to win everything."""
-    # Up to five rungs per race across the two families. The pool room is what
-    # traps live in today; future item packs lean on these harder.
-    display_name = "Podium Placement Checks"
-
-
-class PodiumFinishRungs(DefaultOnToggle):
-    """Include the finish-line rungs on each trophy race (needs Podium
-    Placement Checks on): "Finish on Podium" (top 3) and "Finish (Any
-    Position)". Toggle the any-position half with Podium: Any-Position
-    Rung."""
-    display_name = "Podium Finish Rungs"
-
-
-class PodiumAnyPositionRung(DefaultOnToggle):
-    """Also include the "Finish (Any Position)" rung on each trophy race, earned
-    by simply crossing the finish line. Off keeps only "Finish on Podium". Needs
-    Podium Finish Rungs on."""
-    display_name = "Podium: Any-Position Rung"
-
-
-class PodiumHeldRungs(DefaultOnToggle):
-    """Include the live-position "held" rungs on each trophy race (needs Podium
-    Placement Checks on): "Held 1st" and "Held 3rd", earned the moment you hold
-    that position on track. Add "Held 5th" with Podium: Held 5th Rung.
-
-    With Progressive Boost on, on easy and medium Logic Difficulty, logic
-    expects "Held 1st" only once you have your first Progressive Boost, or one
-    useful weapon when Itemsanity is on. On Cortex Castle and Hot Air Skyway it needs
-    Ultimate Sacred Fire, and on Oxide Station too unless Shortcut Knowledge
-    is hard. "Held 3rd" and "Held 5th" need nothing extra."""
-    display_name = "Held-Position Rungs"
-
-
-class PodiumHeldFifthRung(Toggle):
-    """Also add a "Held 5th" rung to each trophy race, earned by holding 5th
-    place or better at any point. Needs Held-Position Rungs on. Off by
-    default; turn it on for 16 extra early checks."""
-    # The widest, easiest held rung -- kept off by default to hold the
-    # item/location pool in balance.
-    display_name = "Podium: Held 5th Rung"
-
-
-class SapphireRelicCount(Range):
-    """How many Sapphire Relics exist in the seed.
-
-    Relics come from relic races. This sets how many of the sapphire tier are
-    in the item pool, which is also the most you can be asked to collect.
-
-    Lower it for a shorter seed. Set it to 0 to remove Sapphire checks and
-    items. Gold or Platinum checks on the same relic races can still exist."""
-    display_name = "Sapphire Relic Count"
-    range_start = 0
-    range_end = 18
-    default = 18
-
-
-class GoldRelicCount(Range):
-    """How many Gold Relics exist in the seed.
-
-    Same idea as Sapphire, one tier up. Set it to 0 to remove the tier and
-    its checks entirely."""
-    display_name = "Gold Relic Count"
-    range_start = 0
-    range_end = 18
-    default = 18
-
-
-class PlatinumRelicCount(Range):
-    """How many Platinum Relics exist in the seed.
-
-    The hardest relic tier. Set it to 0 to remove it and its checks entirely,
-    which is a reasonable choice if you do not intend to chase platinum
-    times."""
-    display_name = "Platinum Relic Count"
-    range_start = 0
-    range_end = 18
-    default = 0
-
-
-class ContentPool(OptionDict):
-    """Experimental independent content selection. Empty keeps the legacy generator.
-
-    The development profile builds standalone track entries and Crystal
-    Challenges. `tracks.modes` selects Trophy Race, CTR Challenge and Relic Race
-    (default all three); each track gets the selected modes it can run, and
-    `tracks.overrides` can narrow them per track. Custom tracks are complete
-    package descriptors (track key, file pins, authored laps, measured capability
-    flags): any track is accepted, and the game checks the files against the pins
-    when it loads them. Trophy needs arcade, CTR needs arcade and ctr_tokens,
-    Relic needs relic and time_trial. A track key with a named id block uses that
-    block's checks; any other track uses a generic Custom Track slot under its
-    own title. `tracks.cortex_vortex: true` adds Cortex Vortex as a track with
-    all three modes, from the Cortex Vortex files bundled with the game.
-    `bosses.enabled: true` puts the boss races back in the five garages: each
-    boss on its home track, or on its Boss Track Shuffle track, and N. Oxide's
-    two challenges, with Oxide Goal and Bosses Required Goal; false leaves the
-    garages empty. `cups.count` sets how many cups the seed has. The first five
-    are the original Gem Cups, Red first, and a sixth cup onward takes a name
-    from the cup name pool. `cups.tracks` is off, random or random_no_repeats
-    (the default): off races a Gem Cup's original four tracks, and a sixth cup
-    onward draws four different tracks; random draws every race with repeats
-    allowed; random_no_repeats draws four different tracks per cup. It wins over
-    `cups.composition.repeats.within_cup`. Slide Coliseum and Turbo Track are
-    never cup races. Unsupported selected content fails clearly.
-    """
-    display_name = "Content Pool (Experimental)"
-    default = {}
-
-
-class ContentPadLayout(OptionDict):
-    """Physical pad placement and mode stages for content_pool.
-
-    `stages`: two (default) or single. With two, a pad's first mode opens with
-    the pad and its other modes share one second requirement, as
-    two_stage_density sets; single is two_stage_density off. Later modes count
-    once the pad's first race is won. `mode_order`: fixed (Trophy, CTR, Relic),
-    per_seed (one random order for the seed) or per_pad. `placement`: shuffle
-    (default, any content on any pad), shuffle_within_kind (tracks on track
-    pads, cups on cup pads, arenas on arena pads) or vanilla (original content
-    on its original pad). Content that does not fit takes any free pad.
-    `merge_trophy_ctr` must stay false for now.
-    """
-    display_name = "Content Pad Layout (Experimental)"
-    default = {}

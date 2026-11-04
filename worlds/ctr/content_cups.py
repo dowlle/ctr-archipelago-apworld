@@ -58,9 +58,12 @@ CHECKS.
 
 A plan without cups draws nothing here and keeps its wire exactly.
 """
+import json
+import pkgutil
+
 from Options import OptionError
 
-from . import cup_checks, gem_cup_legs, named_tracks
+from . import cup_checks, named_tracks
 from .content_capability import check_boost, finish_boost
 from .Locations import CTR_LOCATION_IDS
 
@@ -85,6 +88,15 @@ DEFAULT_REPEATS = {"within_cup": False, "across_cups": True}
 CUP_TRACKS = ("off", "random", "random_no_repeats")
 GEM_CUPS = cup_checks.GEM_CUPS
 GEM_ENTRY_PREFIX = "entry/gem_cup:"
+
+
+def load_vanilla_cup_legs():
+    """cup region name -> its 4 vanilla leg track names, from
+    data/gem_cup_legs.json (the verbatim advCupTrackIDs transcription).
+    Moved from gem_cup_legs.py in one generator row 12."""
+    return json.loads(
+        pkgutil.get_data(__package__, "data/gem_cup_legs.json").decode("utf-8")
+    )["cup_legs"]
 
 
 def error(message):
@@ -121,7 +133,7 @@ def fixed_legs(spec, candidates):
     if spec["tracks"] != "off":
         return None
     records = {t["display_name"]: t for t in candidates if t.get("origin") == "retail"}
-    table = gem_cup_legs.load_vanilla_cup_legs()
+    table = load_vanilla_cup_legs()
     out = []
     for cup in GEM_CUPS:
         if any(name not in records for name in table[cup]):

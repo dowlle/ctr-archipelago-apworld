@@ -139,8 +139,10 @@ class TestItemsanity(unittest.TestCase):
                                            logic_difficulty="medium", podium_held_rungs=True), seed=3)
         mw = world.multiworld
         weapons = set(itemsanity.ITEM_NAMES)
-        others = [i.name for i in mw.itempool if i.advancement and i.name not in weapons
-                  and i.name != "Progressive Boost"]
+        # Rule-isolation inventory includes copies already seated by the
+        # bootstrap, while still excluding every boost and weapon under test.
+        others = [i.name for i in world.ctr_created_items if i.advancement and i.name not in weapons
+                  and not i.name.startswith("Progressive Boost")]
         loc = lambda name: mw.get_location(name, 1)
         bare = state_with(world, *others)
         self.assertFalse(loc("Crash Cove: Trophy Race").can_reach(bare))

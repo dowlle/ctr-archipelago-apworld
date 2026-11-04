@@ -7,7 +7,7 @@ from Options import OptionError
 
 from .. import content_fixed, content_requirements
 from ..Options import ctrAPOptions, CustomTracks, CupTracks, CortexVortexTrack, ap_ctr_option_groups
-from ..custom_tracks import BABY_T_PARK_CURRENT
+from ..custom_packages import BABY_T_PARK_CURRENT
 from .test_content_plan import make_world
 from .test_content_plan_row3 import SHAPE  # noqa: F401, the module's inputs stay importable
 
@@ -31,7 +31,8 @@ starting_character character_unlocks remove_playable_oxide starting_stat_class p
 progressive_stats
 progressive_boost progressive_boost_blue_fire logic_difficulty shortcut_knowledge
 death_link death_link_send deathlink_amnesty
-warp_pad_item_display ap_item_type_colors color_boxes_by_item spoiler_items race_type_selector tracker_pad_launch
+warp_pad_item_display ap_item_type_colors color_boxes_by_item spoiler_items pad_approach_hints race_type_selector
+tracker_pad_launch
 """.split()
 #: Plan section 2, what happens to every current option: the names that go.
 RETIRED = """
@@ -57,7 +58,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2), 90)
+        self.assertEqual(len(SECTION_2), 91)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))

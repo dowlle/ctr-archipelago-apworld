@@ -49,8 +49,8 @@ slot_data block stay HERE, because they are podium's, not the family's.
 """
 
 from . import destinations
-from .cortex_vortex_track import CORTEX_VORTEX
-from .cortex_vortex_track import PODIUM_CODE_BASE as CORTEX_VORTEX_PODIUM_CODE_BASE
+from .cortex_vortex import CORTEX_VORTEX
+from .cortex_vortex import PODIUM_CODE_BASE as CORTEX_VORTEX_PODIUM_CODE_BASE
 from .location_class import LocationClass
 
 # v0.1.x block (retired-but-registered names + the still-created finish_any).
@@ -112,7 +112,7 @@ def enabled_trophy_tracks(options):
     tracks, the trial tracks whose Trophy Race is on, and Cortex Vortex when
     it is a pad track -- minus the destination the Cortex Vortex track
     dropped, whose checks leave the seed."""
-    from .cortex_vortex_track import dropped_track, track_on
+    from .cortex_vortex import dropped_track, track_on
     pinned = getattr(options, "_trial_podium_wire", None)
     tracks = TROPHY_TRACKS + [track for track, name in zip(
         TRIAL_TRACKS, ("slide_coliseum_races", "turbo_track_races"))
@@ -261,12 +261,3 @@ def created_rung_keys_from_options(options):
     return PODIUM_CLASS.created_rung_keys(options)
 
 
-def podium_slot_codes(track: str, created_keys) -> list:
-    """The schema-6 5-slot code array for a track. See
-    PodiumLocationClass.slot_codes."""
-    return PODIUM_CLASS.slot_codes(track, created_keys)
-
-
-def all_podium_locations():
-    """The frozen podium superset. See PodiumLocationClass.all_locations."""
-    return PODIUM_CLASS.all_locations()

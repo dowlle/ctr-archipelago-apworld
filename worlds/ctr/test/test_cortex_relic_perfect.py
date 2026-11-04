@@ -16,7 +16,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 
-from .. import content_plan, cortex_vortex_track, named_tracks, relic_perfect
+from .. import content_plan, cortex_vortex, named_tracks, relic_perfect
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, named_fixture
 from .test_track_checks import check_options, checks_of, track_of
@@ -101,17 +101,17 @@ class TestCortexVortexTrack(unittest.TestCase):
             world = make_world(cv_options(lettersanity=mode, letters_per_track=2), seed=5)
             plan = world.ctr_content_plan
             letters = {c["location"] for c in checks_of(plan, "letter", CV)}
-            items = set(content_plan.plan_letter_items(plan)) & set(cortex_vortex_track.LETTER_ITEM_CODES)
+            items = set(content_plan.plan_letter_items(plan)) & set(cortex_vortex.LETTER_ITEM_CODES)
             with self.subTest(mode=mode):
                 if mode == 3:
-                    self.assertEqual(items, set(cortex_vortex_track.LETTER_ITEM_CODES))
+                    self.assertEqual(items, set(cortex_vortex.LETTER_ITEM_CODES))
                     self.assertFalse(letters)
                 else:
                     self.assertEqual(len(letters), 2)
                     self.assertEqual({35010200 + code - 35026006 for code in letters}, items)
                 pooled = [i.name for i in world.multiworld.itempool if i.code in items]
-                self.assertEqual(sorted(pooled), sorted(cortex_vortex_track.letter_item_name(l)
-                                                        for l, c in zip("CTR", cortex_vortex_track.LETTER_ITEM_CODES)
+                self.assertEqual(sorted(pooled), sorted(cortex_vortex.letter_item_name(l)
+                                                        for l, c in zip("CTR", cortex_vortex.LETTER_ITEM_CODES)
                                                         if c in items))
 
     def test_overrides_and_optional_draw(self):

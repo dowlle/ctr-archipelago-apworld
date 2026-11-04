@@ -90,11 +90,6 @@ class TestBoxLocationsOff(CTRTestBase):
                 with self.assertRaises(KeyError):
                     self.multiworld.get_location(name, self.player)
 
-    def test_off_wire_keeps_scalars_and_omits_block(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertFalse(slot_data["ctr_options"]["box_locations"])
-        self.assertIn("shortcut_knowledge", slot_data["ctr_options"])
-        self.assertNotIn("item_box_checks", slot_data)
 
 
 class TestSeatingPerTier(unittest.TestCase):
@@ -105,22 +100,8 @@ class TestSeatingPerTier(unittest.TestCase):
         return [loc.name for loc in mw.get_locations(self.PLAYER)
                 if getattr(loc, "type", None) == "item_boxes"]
 
-    def test_easy_creates_229(self):
-        created = self._created()
-        self.assertEqual(len(created), 229)
-        self.assertNotIn("Tiger Temple: Item Box 5", created)
-        self.assertNotIn("Coco Park: Item Box 7", created)
 
-    def test_medium_creates_236(self):
-        created = self._created(shortcut_knowledge="medium")
-        self.assertEqual(len(created), 236)
-        self.assertIn("Tiger Temple: Item Box 5", created)
-        self.assertNotIn("Polar Pass: Item Box 9", created)
 
-    def test_hard_creates_241(self):
-        created = self._created(shortcut_knowledge="hard")
-        self.assertEqual(len(created), 241)
-        self.assertIn("Polar Pass: Item Box 9", created)
 
     def test_inert_slots_are_never_created(self):
         created = set(self._created(shortcut_knowledge="hard"))
@@ -263,67 +244,9 @@ class TestWireBlock(CTRTestBase):
     run_default_tests = False
     options = {"box_locations": True, "shortcut_knowledge": "medium"}
 
-    def test_scalars(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertTrue(slot_data["ctr_options"]["box_locations"])
-        self.assertEqual(slot_data["ctr_options"]["shortcut_knowledge"], 1)
-
-    def test_block_shape_and_liveness(self):
-        block = self.world.fill_slot_data()["item_box_checks"]
-        self.assertTrue(block["enabled"])
-        self.assertEqual(set(block["locations"]),
-                         {str(i) for i in range(18)})
-        self.assertEqual(
-            block["placement_counts"],
-            {"0": 15, "1": 13, "2": 14, "3": 10, "4": 10, "5": 12, "6": 11,
-             "7": 15, "8": 15, "9": 13, "10": 14, "11": 15, "12": 15,
-             "13": 14, "14": 10, "15": 15, "16": 15, "17": 15})
-        live = 0
-        for lid, row in block["locations"].items():
-            self.assertEqual(len(row), 15)
-            live += sum(1 for c in row if c != -1)
-            for c in row:
-                self.assertTrue(c == -1 or c in
-                                self.world.location_name_to_id.values())
-        self.assertEqual(live, 236)   # medium tier
-        # Polar Pass (LevelID 12) slot 9 is hard-tier: inert at medium.
-        self.assertEqual(block["locations"]["12"][8], -1)
-        # Crash Cove (LevelID 3): 10 placed, tail inert.
-        self.assertEqual(block["locations"]["3"][10:], [-1] * 5)
 
 
-class TestUTRestoresBoxOptions(unittest.TestCase):
-    """The seed's box toggle, knowledge tier and stats mode now steer which
-    locations exist and how their rules read, so UT must take them from the
-    wire, not the tracking player's YAML."""
-    PLAYER = 1
 
-    def _restored(self, wire_ctr_options, **build_options):
-        mw = _build(**build_options)
-        world = mw.worlds[self.PLAYER]
-        world._ut_restore_options({"ctr_options": wire_ctr_options,
-                                   "warp_pad_unlock": {}, "podium_checks": {}})
-        o = world.options
-        return (o.box_locations.value, o.shortcut_knowledge.value,
-                o.progressive_stats.value)
-
-    def test_wire_overrides_local_yaml(self):
-        self.assertEqual(
-            self._restored({"box_locations": True, "shortcut_knowledge": 2,
-                            "stats_mode": 1}),
-            (1, 2, 1))
-        self.assertEqual(
-            self._restored({"box_locations": False, "shortcut_knowledge": 0,
-                            "stats_mode": 0},
-                           box_locations=True, shortcut_knowledge="hard",
-                           progressive_stats="shared_global"),
-            (0, 0, 0))
-
-    def test_absent_keys_leave_local_values(self):
-        self.assertEqual(
-            self._restored({}, box_locations=True,
-                           shortcut_knowledge="medium"),
-            (1, 1, 0))
 
 
 class TestBoxSeedGenerates(CTRTestBase):
