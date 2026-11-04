@@ -27,6 +27,27 @@ GAME = "Crash Team Racing"
 
 sys.path.insert(0, SOLO)
 import trim_core  # noqa: E402
+import ctr_solo  # noqa: E402
+
+MANIFEST_FIXTURE = os.path.join(HERE, "fixtures", "package-manifests.json")
+
+
+def manifest_cases():
+    with open(MANIFEST_FIXTURE, encoding="utf-8") as handle:
+        fixture = json.load(handle)
+    for case in fixture["cases"]:
+        manifest = json.loads(json.dumps(fixture["base"]))
+        for pointer, value in case.get("set", {}).items():
+            current = manifest
+            parts = pointer.strip("/").split("/")
+            for part in parts[:-1]:
+                current = current[int(part)] if isinstance(current, list) else current[part]
+            current[int(parts[-1]) if isinstance(current, list) else parts[-1]] = value
+        for pointer in case.get("erase", []):
+            manifest.pop(pointer.strip("/"))
+        manifest["files"].sort(key=lambda entry: (entry["role"], entry["path"]))
+        blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        yield case, manifest, blob, hashlib.sha256(blob).hexdigest()
 
 _CLIENT: str | None = None
 
@@ -510,8 +531,8 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual([t["id"] for t in self.tracks()], ["package/fixture-loop/2.1"])
 
     def test_shared_store_lists_each_revision_without_room_copies(self):
-        first = self.install("fixture-loop", "2.1", "Fixture Loop")
-        second = self.install("fixture-loop", "2.2", "Fixture Loop")
+        first = self.install("fixture-loop", "2.1.0", "Fixture Loop")
+        second = self.install("fixture-loop", "2.2.0", "Fixture Loop")
         for descriptor in (first, second):
             source = os.path.join(self.assets, "tracks", "fixture-loop", "original")
             store = os.path.join(self.assets, "tracks", "packages")
@@ -545,12 +566,46 @@ class TestCustomTracks(SoloTestCase):
             if descriptor is second:
                 second_settings = os.path.join(folder, "metadata", "race.json")
         shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-loop"))
-        self.assertEqual([t["revision"] for t in self.tracks()], ["2.1", "2.2"])
+        self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0", "2.2.0"])
         for damaged in (b'{"laps":4}', b'bad'):
             with self.subTest(damaged=damaged):
                 with open(second_settings, "wb") as handle:
                     handle.write(damaged)
-                self.assertEqual([t["revision"] for t in self.tracks()], ["2.1"])
+                self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0"])
+
+    def test_shared_manifest_admission_fixture(self):
+        for case, manifest, _, pin in manifest_cases():
+            with self.subTest(case=case["name"]):
+                self.assertEqual(ctr_solo._manifest_schema_valid(manifest, pin), case["accept"])
+
+    def test_shared_store_accepts_data_paths_and_rejects_unknown_role(self):
+        descriptor = self.install("fixture-track", "1.0.0", "Fixture Track")
+        fixture = next(manifest for case, manifest, _, _ in manifest_cases() if case["name"] == "original paths")
+        for pin in descriptor["files"]:
+            source = next(entry for entry in fixture["files"] if entry["role"] == pin["role"])
+            pin.update(sha256=source["sha256"], bytes=source["bytes"])
+        with open(os.path.join(self.descriptors, "fixture-track__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(descriptor, handle)
+        shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-track"))
+        store = os.path.join(self.assets, "tracks", "packages")
+        for case, manifest, _, _ in manifest_cases():
+            if case["name"] not in ("safe data paths", "unknown role"):
+                continue
+            manifest["package_uuid"] = descriptor["uuid"]
+            blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            folder = os.path.join(store, hashlib.sha256(blob).hexdigest())
+            for entry in manifest["files"]:
+                target = os.path.join(folder, entry["path"])
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                data = {"lev": b"L" * 3000, "vrm": b"V" * 2000,
+                        "race_settings": b"{}", "unknown": b"{}"}[entry["role"]]
+                with open(target, "wb") as handle:
+                    handle.write(data)
+            with open(os.path.join(folder, "manifest.json"), "wb") as handle:
+                handle.write(blob)
+            with self.subTest(case=case["name"]):
+                self.assertEqual(bool(self.tracks()), case["accept"])
+            shutil.rmtree(folder)
 
     def test_time_trial_only_revision_is_visible_but_cannot_be_picked(self):
         track = self.install("fixture-trial", "1.0", "Fixture Trial")
