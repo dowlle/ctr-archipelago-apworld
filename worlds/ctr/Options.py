@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool)
 
-from . import characters
+from . import characters, legacy_yaml
 from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
@@ -1333,6 +1333,13 @@ class RetailTracks(OptionSet):
     display_name = "Original Tracks"
     valid_keys = ["all"] + sorted(BOSS_VENUE_TRACKS)
     default = frozenset({"all"})
+
+    @classmethod
+    def from_any(cls, data: Any) -> "RetailTracks":
+        # First option rolled: refuse a whole 0.2.x YAML here, once, naming
+        # every old option (legacy_yaml.py).
+        legacy_yaml.check_caller()
+        return super().from_any(data)
 
 
 class TrackModes(OptionDict):
