@@ -420,7 +420,10 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(last(events)["kind"], "option")
         self.assertIn("required_entries", last(events)["message"])
 
-    def test_removed_options_are_ignored_silently(self):
+    def test_removed_options_are_refused_with_one_message(self):
+        # Ruled 2026-11-04: a 0.2.x YAML does not work in 0.3.0. It used to be
+        # skipped silently here; now it gets the one readable refusal
+        # (legacy_yaml.py), with and without a picked track.
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         section = dict(include_battle_arenas=False, include_gem_cups=False, randomize_gem_cup_tracks=True,
@@ -431,9 +434,12 @@ class TestCustomTracks(SoloTestCase):
         source = write_yaml(self.work, "old.yaml", yaml.safe_dump({"name": "Old", "game": GAME, GAME: section}))
         for extra in ([], ["--track", loop["id"]]):
             events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "6", *extra)
-            self.assertEqual(code, 0, events)
-            self.assertEqual([e for e in events if e["event"] == "error"], [])
-            self.assertEqual(last(events)["custom_tracks"], [loop] if extra else [])
+            self.assertNotEqual(code, 0, events)
+            self.assertEqual(last(events)["kind"], "option")
+            message = last(events)["message"]
+            self.assertIn("from 0.2.x", message)
+            self.assertIn("include_battle_arenas", message)
+            self.assertIn("0.3.0 release notes", message)
 
     def test_a_yaml_sets_the_starting_picks(self):
         import yaml
