@@ -2,9 +2,9 @@
 
 Retail tracks keep their frozen box ids, Shortcut Knowledge seating and box
 rules; a custom track on a named block uses its Item Box 1 to 15 offsets, one
-per seat on its own weapon crates (min(weapon_crates, 15)); generic slots and
-Cortex Vortex have none. The paired native parser reads the same records
-(native tools/test-content-plan-parity.py).
+per seat on its own weapon crates (min(weapon_crates, 15)); generic slots use
+their reserved box codes. Cortex Vortex has none. The paired native parser
+reads the same records (native tools/test-content-plan-parity.py).
 """
 import copy
 import json
@@ -15,6 +15,7 @@ from Fill import distribute_items_restrictive
 from Options import OptionError
 
 from .. import content_item_boxes, content_plan, custom_packages, named_tracks
+from ..custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS
 from ..Locations import CTR_LOCATION_IDS
 from .test_content_plan import make_world
@@ -23,6 +24,7 @@ from .test_track_checks import check_options
 
 BTP_ID = "custom/baby-t-park/1.0.2"
 ACID_ID = "custom/acid-lake/1.0"
+LOOP_ID = "custom/fixture-loop/2.1"
 TIERS = {"easy": 0, "medium": 1, "hard": 2}
 
 
@@ -158,14 +160,42 @@ class TestCustomBoxes(unittest.TestCase):
             plan = make_world(box_options(custom=[btp(crates)]), seed=4).ctr_content_plan
             self.assertFalse(boxes(plan, BTP_ID))
 
-    def test_generic_slot_and_cortex_vortex_have_none(self):
+    def test_generic_slot_uses_reserved_codes_and_routes(self):
+        for crates in (1, 12, 40):
+            loop = copy.deepcopy(UNKNOWN)
+            loop["capabilities"]["weapon_crates"] = crates
+            plan = make_world(box_options(custom=[btp(), loop]), seed=6).ctr_content_plan
+            track = next(t for t in plan["tracks"] if t["id"] == LOOP_ID)
+            own = boxes(plan, LOOP_ID)
+            count = min(crates, 15)
+            self.assertEqual([c["location"] for c in own],
+                             [CUSTOM_ITEM_BOX_CLASS.slot_code(track["custom_slot"], n) for n in range(1, count + 1)])
+            self.assertEqual([CTR_LOCATION_IDS[f"Custom Track {track['custom_slot']}: Item Box {n}"]
+                              for n in range(1, count + 1)], [c["location"] for c in own])
+            self.assertEqual([c["display_name"] for c in own],
+                             [f"Fixture Loop: Item Box {n}" for n in range(1, count + 1)])
+            pad = next(p["id"] for p in plan["pads"] if p["entry_id"] == "entry/" + LOOP_ID)
+            entry = next(e for e in plan["entries"] if e["id"] == "entry/" + LOOP_ID)
+            for check in own:
+                self.assertEqual([(r["mode"], r["award"], r["own_pad_id"]) for r in check["routes"]],
+                                 [(mode, "box", pad) for mode in entry["modes"]])
+
+    def test_generic_slot_without_crates_or_boxes_option_has_none(self):
+        for crates, enabled in ((None, True), (0, True), (12, False)):
+            loop = copy.deepcopy(UNKNOWN)
+            if crates is not None:
+                loop["capabilities"]["weapon_crates"] = crates
+            plan = make_world(box_options(custom=[loop], box_locations=enabled), seed=6).ctr_content_plan
+            self.assertFalse(boxes(plan, LOOP_ID))
+
+    def test_cortex_vortex_has_none(self):
         loop = copy.deepcopy(UNKNOWN)
         loop["capabilities"]["weapon_crates"] = 12
         options = box_options(custom=[btp(), loop])
         options["content_pool"]["tracks"]["cortex_vortex"] = True
         plan = make_world(options, seed=6).ctr_content_plan
         owners = {c["owner"] for c in boxes(plan)}
-        self.assertNotIn("custom/fixture-loop/2.1", owners)
+        self.assertIn(LOOP_ID, owners)
         self.assertNotIn(content_plan.CORTEX_TRACK_ID, owners)
         self.assertIn(BTP_ID, owners)
 
@@ -214,10 +244,12 @@ class TestLogic(unittest.TestCase):
         self.assertTrue(location.access_rule(state_with(world)))
 
     def test_filled_seeds_are_beatable_with_every_location_reachable(self):
+        loop = copy.deepcopy(UNKNOWN)
+        loop["capabilities"]["weapon_crates"] = 12
         for seed, extra in enumerate(({}, dict(progressive_boost="per_character", tier="hard"),
                                       dict(progressive_stats="shared_global", itemsanity=True),
                                       dict(character_unlocks=True, racer_locked_pads=4, tier="easy"))):
-            options = box_options(custom=[btp(), unruled(), copy.deepcopy(UNKNOWN)], **extra)
+            options = box_options(custom=[btp(), unruled(), copy.deepcopy(loop)], **extra)
             world = first_world(options, seed=seed * 7)
             distribute_items_restrictive(world.multiworld)
             state = CollectionState(world.multiworld)
