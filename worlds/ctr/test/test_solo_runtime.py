@@ -160,8 +160,10 @@ class TestDescribe(SoloTestCase):
         for rule in overlay["rules"]:
             self.assertIn(rule["option"], names)
         self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure"])
-        deathlink = next(r for r in overlay["rules"] if r["option"] == "death_link")
-        self.assertEqual(deathlink["forced"], "off")
+        # Solo forces DeathLink off (SOLO_FORCED), so the options screen has no
+        # DeathLink row (ruling of 2026-11-02).
+        self.assertNotIn("death_link", overlay_names)
+        self.assertNotIn("death_link", [r["option"] for r in overlay["rules"]])
         self.assertEqual(set(result["values"]), set(overlay_names))
 
     def test_describe_reports_preset_values(self):
