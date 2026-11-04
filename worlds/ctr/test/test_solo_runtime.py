@@ -509,6 +509,64 @@ class TestCustomTracks(SoloTestCase):
         self.install("fixture-loop", "2.1", "Fixture Loop", folder="fixture-loop-2.1", lev_name="track.lev")
         self.assertEqual([t["id"] for t in self.tracks()], ["package/fixture-loop/2.1"])
 
+    def test_shared_store_lists_each_revision_without_room_copies(self):
+        first = self.install("fixture-loop", "2.1", "Fixture Loop")
+        second = self.install("fixture-loop", "2.2", "Fixture Loop")
+        for descriptor in (first, second):
+            source = os.path.join(self.assets, "tracks", "fixture-loop", "original")
+            store = os.path.join(self.assets, "tracks", "packages")
+            files = []
+            for pin in descriptor["files"]:
+                name = "track." + pin["role"]
+                data = next(data for n in os.listdir(source)
+                            if n.lower().endswith("." + pin["role"])
+                            for data in [open(os.path.join(source, n), "rb").read()]
+                            if hashlib.sha256(data).hexdigest() == pin["sha256"])
+                files.append((name, data, pin))
+            settings = b'{"laps":3}'
+            manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"],
+                        "version": descriptor["revision"], "title": descriptor["display_name"],
+                        "compatibility": {"native_contract": 1, "apworld_contract": 1}, "files": [
+                {"role": pin["role"], "path": "original/" + name, "sha256": pin["sha256"], "bytes": pin["bytes"]}
+                for name, _, pin in files] + [{"role": "race_settings", "path": "metadata/race.json",
+                                                 "sha256": hashlib.sha256(settings).hexdigest(), "bytes": len(settings)}]}
+            manifest["files"].sort(key=lambda item: (item["role"], item["path"]))
+            blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            folder = os.path.join(store, hashlib.sha256(blob).hexdigest())
+            os.makedirs(os.path.join(folder, "original"))
+            with open(os.path.join(folder, "manifest.json"), "wb") as handle:
+                handle.write(blob)
+            for name, data, _ in files:
+                with open(os.path.join(folder, "original", name), "wb") as handle:
+                    handle.write(data)
+            os.makedirs(os.path.join(folder, "metadata"))
+            with open(os.path.join(folder, "metadata", "race.json"), "wb") as handle:
+                handle.write(settings)
+            if descriptor is second:
+                second_settings = os.path.join(folder, "metadata", "race.json")
+        shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-loop"))
+        self.assertEqual([t["revision"] for t in self.tracks()], ["2.1", "2.2"])
+        for damaged in (b'{"laps":4}', b'bad'):
+            with self.subTest(damaged=damaged):
+                with open(second_settings, "wb") as handle:
+                    handle.write(damaged)
+                self.assertEqual([t["revision"] for t in self.tracks()], ["2.1"])
+
+    def test_time_trial_only_revision_is_visible_but_cannot_be_picked(self):
+        track = self.install("fixture-trial", "1.0", "Fixture Trial")
+        track["capabilities"].update(arcade=False, relic=False, ctr_tokens=False)
+        track.pop("relic_targets")
+        with open(os.path.join(self.descriptors, "fixture-trial__1.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(track, handle)
+        row = self.tracks()[0]
+        self.assertEqual(row["modes"], [])
+        self.assertEqual(row["race_modes"], ["time_trial"])
+        self.assertFalse(row["seed_usable"])
+        events, code = self.call("validate", "--yaml", self.preset("quick.yaml"), "--assets", self.assets,
+                                 "--track", track["id"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("Time Trial only", last(events)["message"])
+
     def test_picked_tracks_go_into_the_options(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
