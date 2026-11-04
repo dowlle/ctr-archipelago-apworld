@@ -103,8 +103,8 @@
     {"name": "N. Gin Labs: CTR Token Challenge", "region": "N. Gin Labs", "code": 35012314},
     {"name": "Oxide Station: CTR Token Challenge", "region": "Oxide Station", "code": 35012315},
 
-    {"name": "Skull Rock: Crystal Bonus Round", "region": "Skull Rock", "code": 35013000},
-    {"name": "Rampage Ruins: Crystal Bonus Round", "region": "Rampage Ruins", "code": 35013001},
-    {"name": "Rocky Road: Crystal Bonus Round", "region": "Rocky Road", "code": 35013002},
-    {"name": "Nitro Court: Crystal Bonus Round", "region": "Nitro Court", "code": 35013003}
+    {"name": "Skull Rock: Crystal Challenge", "region": "Skull Rock", "code": 35013000},
+    {"name": "Rampage Ruins: Crystal Challenge", "region": "Rampage Ruins", "code": 35013001},
+    {"name": "Rocky Road: Crystal Challenge", "region": "Rocky Road", "code": 35013002},
+    {"name": "Nitro Court: Crystal Challenge", "region": "Nitro Court", "code": 35013003}
 ]

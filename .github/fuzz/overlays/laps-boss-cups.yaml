@@ -1,0 +1,9 @@
+# Row 8: lap checks with boss cups, whose legs are lap routes.
+  boss_cups: {1: 1, 2: 1, 3: 1, 4: 1}
+  boss_track_shuffle: {true: 1, false: 1}
+  boss_opponent_shuffle: true
+  boss_kit_shuffle: true
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Nitros Oxide, Penta Penguin]
+  oxide_attack_profile: {retail: 1, all_compatible: 1}
+  boss_track_assignment: {character_home_track: 1, independent_track: 1}
+  lap_completion_checks: true

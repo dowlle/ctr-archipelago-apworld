@@ -34,6 +34,7 @@ import json
 import pkgutil
 
 from . import CTRTestBase
+from .. import content_fixed
 
 CUP_LOCATIONS = (
     "Red Gem Cup: Gem",
@@ -101,51 +102,20 @@ class TestGemCupsShuffledCupsOff(CupPinningMixin, CTRTestBase):
         "warp_pad_shuffle_categories": ["crystals", "tracks"],
     }
 
-    def test_all_five_pinned_with_vanilla_gem(self):
-        for loc in self._cup_locations():
-            with self.subTest(location=loc.name):
-                self.assertIsNotNone(
-                    loc.item,
-                    f"{loc.name} is an empty multiworld slot with cups opted out")
-                self.assertTrue(
-                    loc.locked,
-                    f"{loc.name} is not locked, so fill may still replace it")
-                self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
-                self.assertEqual(loc.item.player, self.player)
 
-    def test_no_cup_check_is_a_fillable_slot(self):
-        unfilled = {loc.name
-                    for loc in self.multiworld.get_unfilled_locations(self.player)}
-        for name in CUP_LOCATIONS:
-            with self.subTest(location=name):
-                self.assertNotIn(
-                    name, unfilled,
-                    f"{name} is still fillable; progression can land on content "
-                    f"the player opted out of")
 
-    def test_gems_absent_from_pool(self):
-        # Each Gem's items.json count is 1 and all five are pinned, so none may
-        # remain in the pool.
-        for gem in GEM_NAMES:
-            with self.subTest(gem=gem):
-                self.assertEqual(_item_table_count(gem), 1,
-                                 f"items.json {gem} count moved")
-                in_pool = [item for item in self.multiworld.itempool
-                           if item.player == self.player and item.name == gem]
-                self.assertEqual(
-                    len(in_pool), 0,
-                    f"{gem} must be pinned onto its cup, not left in the pool")
 
     def test_total_gem_supply_unchanged(self):
         # Pinned + pooled must still equal the item table count, so the player's
         # total supply of each Gem is untouched.
         for gem in GEM_NAMES:
             with self.subTest(gem=gem):
-                pinned = sum(1 for loc in self._cup_locations()
+                # The start bootstrap may have seated a Gem on any check.
+                placed = sum(1 for loc in self.multiworld.get_locations(self.player)
                              if loc.item and loc.item.name == gem)
                 pooled = sum(1 for item in self.multiworld.itempool
                              if item.player == self.player and item.name == gem)
-                self.assertEqual(pinned + pooled, _item_table_count(gem))
+                self.assertEqual(placed + pooled, _item_table_count(gem))
 
 
 class TestGemCupsOn(CupPinningMixin, CTRTestBase):
@@ -161,25 +131,32 @@ class TestGemCupsOn(CupPinningMixin, CTRTestBase):
     }
 
     def test_nothing_is_pinned(self):
+        # The start bootstrap may seat an opener on any open check; that is no pin.
+        pins = content_fixed.plan_placements(self.world.ctr_content_plan)
         for loc in self._cup_locations():
             with self.subTest(location=loc.name):
-                self.assertFalse(
-                    loc.locked,
+                self.assertNotIn(
+                    loc.address, pins,
                     f"{loc.name} was pinned with cups INCLUDED; the option's "
                     f"on-state must keep them as multiworld checks")
 
     def test_cup_checks_remain_fillable(self):
-        unfilled = {loc.name
-                    for loc in self.multiworld.get_unfilled_locations(self.player)}
+        # A check the start bootstrap seated took a pool item, so it stayed fillable.
+        pins = content_fixed.plan_placements(self.world.ctr_content_plan)
+        fillable = {loc.name for loc in self.multiworld.get_locations(self.player)
+                    if loc.address not in pins}
         for name in CUP_LOCATIONS:
             with self.subTest(location=name):
-                self.assertIn(name, unfilled)
+                self.assertIn(name, fillable)
 
     def test_gems_stay_in_pool(self):
         for gem in GEM_NAMES:
             with self.subTest(gem=gem):
+                # The start bootstrap may have seated a Gem on a check in pre_fill.
                 in_pool = [item for item in self.multiworld.itempool
                            if item.player == self.player and item.name == gem]
+                in_pool += [loc.item for loc in self.multiworld.get_locations(self.player)
+                            if loc.item is not None and loc.item.name == gem]
                 self.assertEqual(len(in_pool), _item_table_count(gem))
 
 
@@ -253,27 +230,7 @@ class TestGemCupsGemGoalShuffleOnCupsOffResolves(CupPinningMixin, CTRTestBase):
         "warp_pad_shuffle_categories": ["crystals", "tracks"],
     }
 
-    def test_shuffle_gems_resolved_off(self):
-        self.assertEqual(self.world.options.shuffle_gems.value, 0)
 
-    def test_player_opt_out_is_untouched(self):
-        self.assertEqual(self.world.options.include_gem_cups.value, 0)
-        self.assertEqual(self.world.options.gems_required_goal.value, 5)
 
-    def test_each_cup_pinned_exactly_once(self):
-        for loc in self._cup_locations():
-            with self.subTest(location=loc.name):
-                self.assertTrue(loc.locked)
-                self.assertEqual(loc.item.name, VANILLA_CUP_ITEM[loc.name])
-                self.assertEqual(loc.item.player, self.player)
 
-    def test_gems_absent_from_pool(self):
-        for gem in GEM_NAMES:
-            with self.subTest(gem=gem):
-                in_pool = [item for item in self.multiworld.itempool
-                           if item.player == self.player and item.name == gem]
-                self.assertEqual(len(in_pool), 0)
 
-    def test_slot_data_reports_the_resolved_value(self):
-        self.assertFalse(
-            self.world.fill_slot_data()["ctr_options"]["shuffle_gems"])

@@ -1,6 +1,5 @@
 import json
 import pkgutil
-from BaseClasses import Location
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,11 +12,11 @@ from .lettersanity import LETTERSANITY_CLASS
 from .location_class import LocationClassRegistry
 from .podium import PODIUM_CLASS
 from .relic_perfect import RELIC_PERFECT_CLASS
-from .trial_trophy import TRIAL_TROPHY_CLASS
+from .destinations import TRIAL_TROPHY_CLASS
 from .wumpa_checks import WUMPA_CLASS
 from .custom_track_locations import CUSTOM_TRACK_LOCATION_CLASS
 from .custom_lettersanity import CUSTOM_LETTERSANITY_CLASS, CUSTOM_CTR_CHALLENGE_CLASS
-from .cortex_vortex_track import CORTEX_VORTEX_TRACK_CLASS
+from .cortex_vortex import CORTEX_VORTEX_TRACK_CLASS
 from .hit_character import HIT_CHARACTER_CLASS
 
 # The registered optional location classes (#176), in registration order.
@@ -65,6 +64,30 @@ CTR_LOCATION_CLASSES.register(CORTEX_VORTEX_TRACK_CLASS)
 # Cortex Vortex pad track, so every earlier class keeps its datapackage order.
 # Global Menu checks like itemsanity.
 CTR_LOCATION_CLASSES.register(HIT_CHARACTER_CLASS)
+# Named custom-track blocks (#306), filled by the 0.3.0 id step from the pinned
+# registry commit in data/named_tracks.json.
+from .named_tracks import NAMED_TRACK_CLASS
+CTR_LOCATION_CLASSES.register(NAMED_TRACK_CLASS)
+# The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST): every approved
+# 0.3.0 name, appended after the named blocks. All INERT: each class creates
+# nothing until its feature PR builds the option, the logic and the native send.
+from .cup_checks import CUP_LEG_VICTORY_CLASS, CUP_SWEEP_CLASS, CUP_WIN_CLASS
+from .lap_checks import LAP_COMPLETION_CLASS
+from .crystal_checks import CRYSTAL_CLASS
+from .custom_fallback_families import (CUSTOM_ITEM_BOX_CLASS, CUSTOM_RACE_V2_CLASS,
+                                       CUSTOM_RELIC_CLASS, CUSTOM_WUMPA_CLASS)
+for _minted_030 in (CUP_WIN_CLASS, CUP_SWEEP_CLASS, CUP_LEG_VICTORY_CLASS, LAP_COMPLETION_CLASS,
+                    CRYSTAL_CLASS, CUSTOM_RELIC_CLASS, CUSTOM_RACE_V2_CLASS, CUSTOM_WUMPA_CLASS,
+                    CUSTOM_ITEM_BOX_CLASS):
+    CTR_LOCATION_CLASSES.register(_minted_030)
+
+# #259 second mint: sixty authored anchors and three independent completions.
+from .arena_content import ARCADE_ARENA_CLASS
+CTR_LOCATION_CLASSES.register(ARCADE_ARENA_CLASS)
+
+# 0.3.0 second id step: the 125 Wumpa Shop slots (#249), appended last. Inert.
+from .wumpa_shop import WUMPA_SHOP_CLASS
+CTR_LOCATION_CLASSES.register(WUMPA_SHOP_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
@@ -90,15 +113,17 @@ for _cls_name, _cls_code, _cls_region in CTR_LOCATION_CLASSES.all_locations():
     CTR_LOCATION_IDS[_cls_name] = _cls_code
     CTR_LOCATION_TO_REGION[_cls_name] = _cls_region
 
+# Named blocks must not collide with any other CTR name or id, and no other id
+# may sit inside a named range (#306).
+from .named_tracks import validate_tracks as _validate_named_tracks
+_validate_named_tracks(
+    NAMED_TRACK_CLASS.tracks,
+    {n: c for n, c in CTR_LOCATION_IDS.items() if n not in set(NAMED_TRACK_CLASS.names())})
+
 
 def get_location_id(name: str):
     """Return the numeric ID for a given location name."""
     return CTR_LOCATION_IDS.get(name)
-
-
-def get_region_for_location(name: str):
-    """Return the region name associated with a given location."""
-    return CTR_LOCATION_TO_REGION.get(name)
 
 
 def get_location_names() -> dict:
@@ -108,21 +133,3 @@ def get_location_names() -> dict:
     return CTR_LOCATION_IDS.copy()
 
 
-def get_total_locations(world) -> int:
-    """
-    Return the number of locations THIS seed actually created (incl. events, to
-    preserve the historical value for non-podium seeds). Counting created
-    locations -- rather than len(CTR_LOCATION_IDS), the full static datapackage --
-    keeps TotalLocations accurate now that the datapackage always carries the 112
-    podium rungs while a seed may create 0-80 of them per option (up to 5 rungs
-    across 16 tracks).
-    """
-    return len(world.multiworld.get_locations(world.player))
-
-
-def create_location(player: int, name: str, region):
-    """
-    Factory to create Location objects linked to CTR location codes.
-    """
-    addr = get_location_id(name)
-    return Location(player, name, addr, region)

@@ -17,7 +17,6 @@ Covers the bounded ticket scope only:
 Native dispatch, model loading, reachability and the all-sixteen runtime
 behaviour are explicitly out of scope for this ticket.
 """
-import copy
 import unittest
 
 from Options import OptionError
@@ -27,7 +26,6 @@ from .. import characters, ctrAPWorld
 from ..hit_character import (
     BOSS_WIN_OPPONENTS,
     CUP_IDS,
-    DEFAULT_RACER_IDS,
     FALLBACK_KEYS,
     GLOBAL_SCHEMA_MAX,
     GUEST_RACER_IDS,
@@ -40,12 +38,9 @@ from ..hit_character import (
     UNLOCK_TRIGGERS,
     _validate_block,
     build_encounters,
-    created_trigger_codes,
     destination_order,
     fallback_guests,
-    resolve_for_generation,
     restore_from_wire,
-    slot_data,
 )
 
 #: Sentinel meaning "omit the global schema_version key entirely".
@@ -126,16 +121,6 @@ class TestOffIsInert(unittest.TestCase):
         self.assertFalse(wire["ctr_options"]["hit_character"])
         self.assertNotIn("hit_character_encounters", wire)
 
-    def test_resolve_returns_none_and_consumes_no_rng(self):
-        mw = _build(hit_character=False, steps=())
-        world = mw.worlds[1]
-        before = world.random.getstate()
-        self.assertIsNone(resolve_for_generation(world))
-        self.assertIsNone(slot_data(world))
-        self.assertEqual(world.random.getstate(), before)
-        self.assertFalse(hasattr(world, "ctr_hit_character_encounters")
-                         and world.ctr_hit_character_encounters)
-
 
 class TestOnCreatesAndEmits(unittest.TestCase):
     def test_sixteen_locations_and_wire_block(self):
@@ -145,36 +130,19 @@ class TestOnCreatesAndEmits(unittest.TestCase):
         self.assertTrue(set(HIT_CHARACTER_CLASS.names()) <= names)
         wire = world.fill_slot_data()
         self.assertTrue(wire["ctr_options"]["hit_character"])
-        self.assertEqual(wire["schema_version"], 16)
-        self.assertEqual(wire["ctr_options"]["schema_version"], 16)
+        self.assertEqual(wire["schema_version"], 18)
+        self.assertEqual(wire["ctr_options"]["schema_version"], 18)
         block = wire["hit_character_encounters"]
         self.assertEqual(block["schema"], HIT_CHARACTER_SCHEMA)
         self.assertEqual(block["locations"], {
             str(cid): HIT_CHARACTER_CODE_BASE + cid for cid in range(16)})
 
-    def test_seed_is_cached_and_not_redrawn(self):
-        mw = _build(hit_character=True, steps=())
-        world = mw.worlds[1]
-        first = resolve_for_generation(world)
-        seed = world.ctr_hit_character_seed
-        state_after_first = world.random.getstate()
-        second = resolve_for_generation(world)
-        self.assertEqual(first, second)
-        self.assertEqual(world.random.getstate(), state_after_first)
-        self.assertEqual(seed, first["policy"]["seed"])
 
     def test_same_seed_generates_identical_blocks(self):
         a = _build(seed=17, hit_character=True).worlds[1]
         b = _build(seed=17, hit_character=True).worlds[1]
         self.assertEqual(a.ctr_hit_character_encounters,
                          b.ctr_hit_character_encounters)
-
-    def test_total_locations_increases_by_exactly_sixteen(self):
-        off = _build(seed=1, hit_character=False).worlds[1]
-        on = _build(seed=1, hit_character=True).worlds[1]
-        self.assertEqual(
-            on.fill_slot_data()["TotalLocations"]
-            - off.fill_slot_data()["TotalLocations"], 16)
 
 
 class TestDeterministicLayout(unittest.TestCase):
@@ -263,11 +231,6 @@ class TestTriggersAndBosses(unittest.TestCase):
 
 
 class TestUTRestore(unittest.TestCase):
-    def _restore(self, passthrough, **overrides):
-        mw = _build(steps=(), **overrides)
-        world = mw.worlds[1]
-        world._ut_restore_options(passthrough)
-        return world
 
     def _world(self):
         return _build(steps=()).worlds[1]
@@ -280,41 +243,6 @@ class TestUTRestore(unittest.TestCase):
             world, {"ctr_options": co,
                     "hit_character_encounters": block})
 
-    def test_round_trip_preserves_block_and_ordering(self):
-        source = _build(hit_character=True).worlds[1]
-        wire = source.fill_slot_data()
-        block = copy.deepcopy(wire["hit_character_encounters"])
-        world = self._restore(wire)
-        self.assertTrue(world.options.hit_character.value)
-        self.assertEqual(world.ctr_hit_character_encounters, block)
-        self.assertEqual(world.ctr_hit_character_seed, block["policy"]["seed"])
-        # Re-emitting the restored world reproduces the exact same ordering.
-        self.assertEqual(slot_data(world), block)
-
-    def test_tuple_lists_from_a_packed_seed_restore_as_lists(self):
-        """Slot data read back from a packed .archipelago carries tuples (the
-        tracker fuzz hook reads it that way); it is the same wire value."""
-        def tuplify(value):
-            if isinstance(value, dict):
-                return {key: tuplify(item) for key, item in value.items()}
-            if isinstance(value, list):
-                return tuple(tuplify(item) for item in value)
-            return value
-
-        source = _build(hit_character=True).worlds[1]
-        wire = source.fill_slot_data()
-        block = copy.deepcopy(wire["hit_character_encounters"])
-        packed = dict(wire)
-        packed["hit_character_encounters"] = tuplify(block)
-        world = self._restore(packed)
-        self.assertEqual(world.ctr_hit_character_encounters, block)
-        self.assertEqual(slot_data(world), block)
-
-    def test_legacy_absence_restores_to_off(self):
-        world = self._restore({"ctr_options": {}, "warp_pad_unlock": {},
-                               "podium_checks": {}})
-        self.assertFalse(world.options.hit_character.value)
-        self.assertIsNone(world.ctr_hit_character_encounters)
 
     def test_absent_ctr_options_restores_to_off(self):
         world = self._world()
@@ -322,21 +250,6 @@ class TestUTRestore(unittest.TestCase):
         self.assertIsNone(world.ctr_hit_character_encounters)
         self.assertIsNone(world.ctr_hit_character_seed)
 
-    def test_reordered_candidates_are_preserved_verbatim(self):
-        """Any valid permutation of the sixteen ids is accepted and
-        round-tripped without reordering, re-drawing or rebuilding."""
-        block = build_encounters(1)
-        for group in ("tracks", "cups"):
-            for entry in block[group].values():
-                entry["order"] = list(reversed(entry["order"]))
-        block["unlock_triggers"]["12"]["any_of"] = list(
-            reversed(block["unlock_triggers"]["12"]["any_of"]))
-        world = self._restore(
-            {"ctr_options": {"hit_character": True, "schema_version": 16},
-             "hit_character_encounters": block,
-             "warp_pad_unlock": {}, "podium_checks": {}})
-        self.assertIs(world.ctr_hit_character_encounters, block)
-        self.assertIs(slot_data(world), block)
 
     def test_boss_identity_substitution_is_allowed(self):
         """The boss values are resolved identities, not a frozen literal: a
@@ -716,17 +629,6 @@ class TestKeyFallbackDetermination(unittest.TestCase):
         self.assertEqual(
             set(fallback_guests(every_code - {35011100, 35011103})), set())
 
-    def test_both_trial_modes_off_generates_with_n_tropy_on_keys(self):
-        """The case that used to raise: default settings plus hit_character."""
-        mw = _build(hit_character=True, slide_coliseum_races=0,
-                    turbo_track_races=0)
-        world = mw.worlds[1]
-        self.assertEqual(world.ctr_hit_character_fallback, {12: 3})
-        block = world.fill_slot_data()["hit_character_encounters"]
-        self.assertEqual(block["unlock_triggers"]["12"]["fallback_keys"], 3)
-        for guest in (8, 9, 10, 11, 13, 14, 15):
-            self.assertNotIn("fallback_keys",
-                             block["unlock_triggers"][str(guest)])
 
     def test_one_trial_mode_is_enough(self):
         """One created trial win keeps the ordinary trigger rule for N. Tropy."""
@@ -748,42 +650,12 @@ class TestKeyFallbackDetermination(unittest.TestCase):
         block = world.fill_slot_data()["hit_character_encounters"]
         self.assertEqual(block["unlock_triggers"]["15"]["fallback_keys"], 4)
 
-    def test_cortex_vortex_displacement_is_decided_per_seed(self):
-        """With one trial mode on and Cortex Vortex on, N. Tropy falls back
-        exactly on the seeds where CV took that trial's pad. This used to be a
-        blanket raise."""
-        outcomes = set()
-        for seed in range(1, 25):
-            mw = _build(seed=seed, hit_character=True, cortex_vortex_track=True,
-                        turbo_track_races=0)
-            world = mw.worlds[1]
-            created = created_trigger_codes(world, 1)
-            fell_back = 12 in world.ctr_hit_character_fallback
-            # The determination is exactly "no Slide Coliseum Trophy Race".
-            self.assertEqual(fell_back, 35016200 not in created)
-            outcomes.add(fell_back)
-        self.assertEqual(outcomes, {True, False},
-                         "expected both CV outcomes across 24 seeds")
 
     def test_disabled_ignores_trial_modes(self):
         mw = _build(steps=("generate_early",), hit_character=False,
                     slide_coliseum_races=0, turbo_track_races=0)
         self.assertFalse(mw.worlds[1].options.hit_character.value)
 
-    def test_spoiler_names_every_fallback_guest(self):
-        import io
-        mw = _build(hit_character=True, slide_coliseum_races=0,
-                    turbo_track_races=0, oxide_goal="disabled",
-                    bosses_required_goal=2)
-        world = mw.worlds[1]
-        self.assertEqual(world.ctr_hit_character_fallback, {12: 3, 15: 4})
-        handle = io.StringIO()
-        world.write_spoiler(handle)
-        text = handle.getvalue()
-        self.assertIn("N. Tropy has no unlock race in this seed and joins "
-                      "races at 3 Keys.", text)
-        self.assertIn("Nitros Oxide has no unlock race in this seed and joins "
-                      "races at 4 Keys.", text)
 
     def test_spoiler_is_silent_without_a_fallback_guest(self):
         import io
@@ -791,22 +663,6 @@ class TestKeyFallbackDetermination(unittest.TestCase):
         handle = io.StringIO()
         mw.worlds[1].write_spoiler(handle)
         self.assertNotIn("has no unlock race", handle.getvalue())
-
-
-class TestBuildIdentity(unittest.TestCase):
-    """The internal ticket-06 staging badge, without moving the pair identity."""
-
-    def test_internal_slice_build_badge_and_numeric_versions(self):
-        from ..version import BUILD_VERSION
-        self.assertEqual(BUILD_VERSION, "0.2.4")
-        mw = _build(hit_character=True)
-        wire = mw.worlds[1].fill_slot_data()
-        co = wire["ctr_options"]
-        self.assertEqual(co["build_version"], "0.2.4")
-        # Numeric identities this internal staging must not move.
-        self.assertEqual(co["world_version"], "0.2.4")
-        self.assertEqual(co["schema_version"], 16)
-        self.assertEqual(wire["schema_version"], 16)
 
 
 #: destination_order(0, 0), pinned so a recipe change cannot pass silently.

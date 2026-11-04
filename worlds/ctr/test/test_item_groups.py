@@ -15,10 +15,14 @@ strings it holds, and a typo becomes an unresolvable item downstream instead of
 an error here.
 """
 
+import re
+
+from BaseClasses import ItemClassification
 from worlds.AutoWorld import AutoWorldRegister
 
 from . import CTRTestBase
 from ..Items import load_item_table
+from ..minted_items_030 import MINTED_TRAP_KEYS
 from ..itemsanity import ITEM_NAMES
 
 # The four groups exactly as issue #167 specifies them, with "Traps" extended by
@@ -37,6 +41,17 @@ from ..itemsanity import ITEM_NAMES
 # The names are written out rather than imported from the trap registry on
 # purpose: an assertion that reads the same constant the code reads proves
 # nothing about the names actually registered.
+RACERS = (
+    "Crash Bandicoot", "Coco Bandicoot", "Polar", "Pura", "Neo Cortex",
+    "N. Tropy", "Ripper Roo", "Papu Papu", "Komodo Joe", "Pinstripe",
+    "Dingodile", "Tiny Tiger", "N. Gin", "Fake Crash", "Nitros Oxide",
+    "Penta Penguin",
+)
+CHAINS = ("Progressive Top Speed", "Progressive Acceleration",
+          "Progressive Turning")
+STAT_ITEMS = (*CHAINS, *(f"{chain} ({racer})" for racer in RACERS
+                         for chain in CHAINS))
+
 EXPECTED_GROUPS = {
     "Relics": {"Sapphire Relic", "Gold Relic", "Platinum Relic"},
     "CTR Tokens": {"Red CTR Token", "Green CTR Token", "Blue CTR Token",
@@ -51,8 +66,20 @@ EXPECTED_GROUPS = {
         "Reverse Steering", "Red Potion",
         # minted by #280, now buildable
         "Upside Down", "Mirror Mode", "Warpball Ambush", "Demo Camera",
+        # minted by the 0.3.0 id step, not buildable until #455 and #248
+        "Clocked Out", "Reverse Camera",
     },
     "Itemsanity Weapons": set(ITEM_NAMES),
+    # --- #536. Written out, not imported: the registries build these.
+    "Characters": set(RACERS),
+    "Stats": set(STAT_ITEMS),
+    "CTR Letters": set(),  # membership: test_ctr_letters_is_every_letter_item
+    "Filler": {"Wumpa Fruit", "Small Wumpa Bundle", "Big Wumpa Bundle",
+               "Reserve Top-Up"},
+    "Ignore Ground Types": {"Ignore Grass", "Ignore Dirt", "Ignore Snow",
+                            "Ignore Water", "Ignore Ice", "Ignore Sand"},
+    **{f"{racer} Stats": {f"{chain} ({racer})" for chain in CHAINS}
+       for racer in RACERS},
 }
 
 
@@ -61,9 +88,45 @@ class TestItemGroups(CTRTestBase):
         """Each declared group holds exactly the members issue #167 names."""
         groups = self.world.item_name_groups
         for group_name, members in EXPECTED_GROUPS.items():
+            if group_name == "CTR Letters":
+                continue
             with self.subTest(group=group_name):
                 self.assertIn(group_name, groups)
                 self.assertEqual(set(groups[group_name]), members)
+
+    def test_ctr_letters_is_every_letter_item(self) -> None:
+        """Retail, trial, custom slot, Cortex Vortex and named-track letters:
+        every item named "Letter <C|T|R> (<track>)", and nothing else."""
+        letters = {name for name in self.world.item_name_to_id
+                   if re.fullmatch(r"Letter [CTR] \(.+\)", name)}
+        self.assertEqual(len(letters), 711)
+        self.assertEqual(set(self.world.item_name_groups["CTR Letters"]),
+                         letters)
+        for sample in ("Letter C (Crash Cove)", "Letter R (Tizi Challenge)",
+                       "Letter T (Custom Track 1)",
+                       "Letter C (Cortex Vortex)", "Letter T (Acid Lake)"):
+            self.assertIn(sample, letters)
+
+    def test_group_sizes(self) -> None:
+        groups = self.world.item_name_groups
+        self.assertEqual(len(groups["Characters"]), 16)
+        self.assertEqual(len(groups["Stats"]), 51)
+        self.assertEqual(len(groups["Ignore Ground Types"]), 6)
+        for racer in RACERS:
+            self.assertEqual(len(groups[f"{racer} Stats"]), 3)
+
+    def test_filler_group_is_the_filler_classified_items(self) -> None:
+        """Filler is every filler-classified item except the Ignore pack."""
+        data = self.world._item_data_by_name
+        filler = {n for n, row in data.items()
+                  if row["classification"] == ItemClassification.filler
+                  and not n.startswith("Ignore ")}
+        self.assertEqual(set(self.world.item_name_groups["Filler"]), filler)
+
+    def test_no_stat_group_holds_boost(self) -> None:
+        for name, members in self.world.item_name_groups.items():
+            if name == "Stats" or name.endswith(" Stats"):
+                self.assertFalse(any("Boost" in m for m in members), name)
 
     def test_declared_groups_are_only_the_spec_plus_everything(self) -> None:
         """AutoWorld injects "Everything"; nothing else should appear unnoticed."""
@@ -71,16 +134,19 @@ class TestItemGroups(CTRTestBase):
         self.assertEqual(declared, set(EXPECTED_GROUPS) | {"Everything"})
 
     def test_members_are_real_item_names(self) -> None:
-        """Every member resolves to an entry in data/items.json."""
-        item_names = {item["name"] for item in load_item_table()}
-        for group_name, members in EXPECTED_GROUPS.items():
+        """Every member resolves to a registered item: data/items.json, or the
+        0.3.0 minted items kept outside that closed table."""
+        item_names = set(self.world.item_name_to_id)
+        for group_name, members in self.world.item_name_groups.items():
+            if group_name == "Everything":
+                continue
             for member in sorted(members):
                 with self.subTest(group=group_name, item=member):
                     self.assertIn(member, item_names)
 
     def test_group_names_do_not_collide_with_item_names(self) -> None:
         """Group names share a namespace with item names -- no shadowing."""
-        item_names = {item["name"] for item in load_item_table()}
+        item_names = set(self.world.item_name_to_id)
         for group_name in self.world.item_name_groups:
             with self.subTest(group=group_name):
                 self.assertNotIn(group_name, item_names)
@@ -89,7 +155,9 @@ class TestItemGroups(CTRTestBase):
         """The datapackage carries the groups, which is what serves group hints."""
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         package = world_type.get_data_package_data()
-        for group_name, members in EXPECTED_GROUPS.items():
+        for group_name, members in self.world.item_name_groups.items():
+            if group_name == "Everything":
+                continue
             with self.subTest(group=group_name):
                 self.assertEqual(sorted(members),
                                  package["item_name_groups"][group_name])

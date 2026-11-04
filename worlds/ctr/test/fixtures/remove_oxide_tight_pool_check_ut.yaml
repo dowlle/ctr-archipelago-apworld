@@ -1,3 +1,4 @@
+# include_battle_arenas flipped to true for #364: arenas off now removes four locations but no items, so this tight pool no longer fits with it off.
 description: Crash Team Racing Template, generated with https://github.com/Eijebong/Archipelago-fuzzer/tree/0.2.1
 game: Crash Team Racing
 requires:
@@ -35,7 +36,7 @@ Crash Team Racing:
   - tracks
   - crystals
   warp_pad_shuffle_grouping: merged
-  include_battle_arenas: 'false'
+  include_battle_arenas: 'true'
   include_gem_cups: 'false'
   randomize_gem_cup_tracks: 'true'
   custom_tracks: {}

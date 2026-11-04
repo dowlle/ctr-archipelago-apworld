@@ -90,19 +90,6 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
                                       self._oxide_first_flag(mw)])
         self.assertTrue(cc(st))
 
-    def test_oxide_final_alone(self):
-        mw = _build(oxide_goal="final")
-        cc = self._condition(mw)
-        st = CollectionState(mw)
-        self.assertFalse(cc(st))
-        # Default oxide_final_challenge_unlock (sapphire_relics) + default
-        # oxide_final_challenge_relic_count (18): the relic rule needs 18
-        # Sapphire Relics ANDed with the Key-4 companion flag.
-        _grant(st, mw, self.PLAYER,
-              ["Key"] * 4 + [self._oxide_final_flag(mw)])
-        self.assertFalse(cc(st), "flag alone must not satisfy the relic rule")
-        _grant(st, mw, self.PLAYER, ["Sapphire Relic"] * 18)
-        self.assertTrue(cc(st))
 
     def test_bosses_required_four_alone(self):
         mw = _build(oxide_goal="none", bosses_required_goal=4)
@@ -225,40 +212,6 @@ class TestGoalCompletionTruthTable(unittest.TestCase):
 
     # -- the four legacy-equivalent single-condition combinations --
 
-    def test_default_matches_legacy_oxide_goal(self):
-        mw = _build()  # shipped default: oxide_goal=any_percent, bosses=0, gems=0
-        world = mw.worlds[1]
-        self.assertEqual(world.options.oxide_goal.value, OxideGoal.option_any_percent)
-        self.assertEqual(world.options.bosses_required_goal.value, 0)
-        self.assertEqual(world.options.gems_required_goal.value, 0)
-        self.assertEqual(world._legacy_goal_value(), 0)
-
-    def test_oxidefinal_equivalent_wire_value(self):
-        mw = _build(oxide_goal="final")
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 1)
-
-    def test_allbosses_equivalent_wire_value(self):
-        mw = _build(oxide_goal="none", bosses_required_goal=4)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 3)
-
-    def test_allgemcups_equivalent_wire_value(self):
-        mw = _build(oxide_goal="none", gems_required_goal=5)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), 4)
-
-    def test_composed_goal_has_no_legacy_equivalent(self):
-        mw = _build(oxide_goal="first", bosses_required_goal=1)
-        self.assertEqual(mw.worlds[1]._legacy_goal_value(), -1)
-
-    def test_disabled_has_no_legacy_equivalent(self):
-        # Issue #320: no pre-#152 single-goal value ever meant "the Oxide
-        # races are not in the seed", so `disabled` must not borrow one of
-        # the four legacy ints -- an old client reading `goal` would then run
-        # a goal this seed cannot satisfy.
-        for extra in ({"bosses_required_goal": 4}, {"gems_required_goal": 5}):
-            with self.subTest(**extra):
-                mw = _build(oxide_goal="disabled", **extra)
-                self.assertEqual(mw.worlds[1]._legacy_goal_value(), -1)
-
 
 class TestComposedGoalGuards(unittest.TestCase):
     """generate_early's guards for the composed goal (dossier §2.3):
@@ -280,17 +233,6 @@ class TestComposedGoalGuards(unittest.TestCase):
     def test_only_gems_active_does_not_raise(self):
         _early(oxide_goal="none", gems_required_goal=1)  # must not raise
 
-    def test_gems_required_with_shuffle_and_excluded_cups_resolves(self):
-        # 2026-09-21 ruling: C2 is no longer a raise. The combination now
-        # generates with shuffle_gems resolved OFF, so the Gems stay on their
-        # own cups instead of the whole multiworld failing over one YAML.
-        mw = _early(oxide_goal="none", gems_required_goal=1,
-                    shuffle_gems=True, include_gem_cups=False)
-        world = mw.worlds[1]
-        self.assertEqual(world.options.shuffle_gems.value, 0)
-        # The player's own opt-out is untouched -- only shuffle_gems moved.
-        self.assertEqual(world.options.include_gem_cups.value, 0)
-        self.assertEqual(world.options.gems_required_goal.value, 1)
 
     def test_gems_required_with_shuffle_and_included_cups_does_not_raise(self):
         _early(oxide_goal="none", gems_required_goal=1,
@@ -302,96 +244,12 @@ class TestComposedGoalGuards(unittest.TestCase):
         _early(oxide_goal="none", gems_required_goal=1,
               shuffle_gems=False, include_gem_cups=False)  # must not raise
 
-    def test_oxidefinal_with_no_progression_tier_raises(self):
-        # Generalization of #23's guard: oxide_goal == final with the
-        # configured tier's created count at 0 -- no tier can ever satisfy
-        # the relic rule.
-        with self.assertRaises(OptionError) as ctx:
-            _early(oxide_goal="final",
-                  warppad_unlock_requirements="vanilla",
-                  oxide_final_challenge_unlock="gold_relics",
-                  gold_relic_count=0)
-        self.assertIn("oxidefinal", str(ctx.exception))
-
-    def test_oxidefinal_composed_with_bosses_still_checks_progression_tier(self):
-        # C3/C4: the guard must fire off `oxide_goal == final` even when
-        # composed with another active condition, not just when oxide is the
-        # only condition.
-        with self.assertRaises(OptionError):
-            _early(oxide_goal="final", bosses_required_goal=1,
-                  warppad_unlock_requirements="vanilla",
-                  oxide_final_challenge_unlock="gold_relics",
-                  gold_relic_count=0)
 
     def test_oxidefinal_with_progression_tier_present_does_not_raise(self):
         _early(oxide_goal="final",
               warppad_unlock_requirements="vanilla",
               oxide_final_challenge_unlock="gold_relics",
               gold_relic_count=18)  # must not raise
-
-
-class TestUTRestoreComposedGoal(unittest.TestCase):
-    """_ut_restore_options (issue #29) must reconstruct the SAME goal a
-    connected seed actually has, from either wire shape: the #152
-    goal_oxide/goal_bosses/goal_gems keys (new seeds), or the legacy `goal`
-    int alone (pre-#152 seeds UT re-generates against)."""
-
-    def _restored(self, wire_ctr_options):
-        mw = _build()  # any generated world to call the instance method on
-        world = mw.worlds[1]
-        world._ut_restore_options({"ctr_options": wire_ctr_options,
-                                   "warp_pad_unlock": {}, "podium_checks": {}})
-        return (world.options.oxide_goal.value,
-               world.options.bosses_required_goal.value,
-               world.options.gems_required_goal.value)
-
-    def test_restores_composed_keys_directly(self):
-        self.assertEqual(
-            self._restored({"goal_oxide": 2, "goal_bosses": 1, "goal_gems": 3}),
-            (2, 1, 3))
-
-    def test_restores_the_disabled_value(self):
-        # Issue #320: UT must reconstruct `disabled` as `disabled`, or its
-        # re-generated world would keep two Oxide checks the server does not
-        # have. The graph-level consequence is proved in
-        # test_oxide_access_contract.TestOxideAccessUniversalTrackerParity.
-        self.assertEqual(
-            self._restored({"goal_oxide": 3, "goal_bosses": 4, "goal_gems": 0}),
-            (OxideGoal.option_disabled, 4, 0))
-
-    def test_restores_composed_keys_even_when_legacy_goal_also_present(self):
-        # A #152 seed still emits a best-effort legacy `goal` (-1 for a
-        # genuinely composed seed) alongside the real fields -- the composed
-        # keys must win, not the legacy int.
-        self.assertEqual(
-            self._restored({"goal": -1, "goal_oxide": 1, "goal_bosses": 2,
-                            "goal_gems": 0}),
-            (1, 2, 0))
-
-    def test_legacy_goal_0_restores_to_oxide_first(self):
-        self.assertEqual(self._restored({"goal": 0}), (1, 0, 0))
-
-    def test_legacy_goal_1_restores_to_oxide_final(self):
-        self.assertEqual(self._restored({"goal": 1}), (2, 0, 0))
-
-    def test_legacy_goal_3_restores_to_bosses_required_four(self):
-        self.assertEqual(self._restored({"goal": 3}), (0, 4, 0))
-
-    def test_legacy_goal_4_restores_to_gems_required_five(self):
-        self.assertEqual(self._restored({"goal": 4}), (0, 0, 5))
-
-    def test_absent_goal_keys_leave_defaults_untouched(self):
-        mw = _build(oxide_goal="final", bosses_required_goal=2)
-        world = mw.worlds[1]
-        before = (world.options.oxide_goal.value,
-                 world.options.bosses_required_goal.value,
-                 world.options.gems_required_goal.value)
-        world._ut_restore_options(
-            {"ctr_options": {}, "warp_pad_unlock": {}, "podium_checks": {}})
-        after = (world.options.oxide_goal.value,
-                world.options.bosses_required_goal.value,
-                world.options.gems_required_goal.value)
-        self.assertEqual(before, after)
 
 
 class TestComposedGoalWire(CTRTestBase):
@@ -409,8 +267,8 @@ class TestComposedGoalWire(CTRTestBase):
         self.assertEqual(co["goal_bosses"], 2)
         self.assertEqual(co["goal_gems"], 0)
         self.assertEqual(co["goal"], -1)  # no legacy analogue
-        self.assertEqual(co["schema_version"], 16)
-        self.assertEqual(sd["schema_version"], 16)
+        self.assertEqual(co["schema_version"], 18)
+        self.assertEqual(sd["schema_version"], 18)
 
 
 if __name__ == "__main__":

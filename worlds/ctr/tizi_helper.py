@@ -52,10 +52,3 @@ TIZI_HELPER_CODE = 35010188
 TIZI_ITEMSANITY_COMPANION = "Mask"
 
 
-def created_item_count(world) -> int:
-    """How many `Tizi Helper` items this seed's options create: 1 or 0.
-
-    A single copy, and only when the option is on. Kept as a function so the
-    pool loop, the tests and any future supply accounting all read one answer.
-    """
-    return 1 if world.options.tizi_helper.value else 0

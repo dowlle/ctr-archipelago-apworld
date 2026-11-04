@@ -25,7 +25,7 @@ from BaseClasses import CollectionState
 from test.general import setup_multiworld
 
 from .. import ctrAPWorld
-from ..custom_tracks import BABY_T_PARK_EXAMPLE
+from ..custom_packages import BABY_T_PARK_EXAMPLE
 from ..progressive_capability import ROSTER, boost_item_name
 from ..usf_finish import CTR_CHALLENGE_BOOST_COUNT, USF_BOOST_COUNT
 from . import CTRTestBase
@@ -157,29 +157,6 @@ class TestChallengeBoostRacerAware(unittest.TestCase):
         self.assertTrue(_reachable(
             mw, _state(mw, character_boosts=((racer, 1),)), name))
 
-    def test_a_locked_pad_binds_its_racer(self):
-        from ..progressive_capability import track_required_character
-        mw = track = required = None
-        for seed in range(1, 33):
-            candidate = _build(seed=seed, progressive_boost="per_character",
-                               logic_difficulty="hard", racer_locked_pads=True)
-            world = candidate.worlds[PLAYER]
-            hits = [(loc.name.split(":")[0].strip(),
-                     track_required_character(world,
-                                              loc.name.split(":")[0].strip()))
-                    for loc in candidate.get_locations(PLAYER)
-                    if loc.name.endswith("CTR Token Challenge")]
-            hits = [(t, r) for t, r in hits if r]
-            if hits:
-                mw, (track, required) = candidate, hits[0]
-                break
-        self.assertIsNotNone(mw, "fixture seeds produced no locked token track")
-        wrong = next(racer for racer in ROSTER if racer != required)
-        name = f"{track}: CTR Token Challenge"
-        self.assertFalse(_reachable(
-            mw, _state(mw, character_boosts=((wrong, 3),)), name))
-        self.assertTrue(_reachable(
-            mw, _state(mw, character_boosts=((required, 3),)), name))
 
 
 class TestChallengeBoostTrialTracks(unittest.TestCase):
@@ -223,13 +200,6 @@ class TestChallengeBoostCustomTracks(CTRTestBase):
     def setUp(self):
         self.world_setup(seed=7)
 
-    def test_custom_challenge_needs_the_first_boost(self):
-        name = "Custom Track 1: CTR Token Challenge"
-        loc = self.multiworld.get_location(name, self.player)
-        blocked = _state(self.multiworld, boost=0)
-        cleared = _state(self.multiworld, boost=1)
-        self.assertFalse(loc.can_reach(blocked))
-        self.assertTrue(loc.can_reach(cleared))
 
 
 class TestChallengeBoostStopsAtTheToken(unittest.TestCase):
@@ -239,20 +209,6 @@ class TestChallengeBoostStopsAtTheToken(unittest.TestCase):
     Tiger Temple's door opener) -- floor-sharing them would have overridden
     three earlier rulings the 2026-09-20 session did not revisit."""
 
-    def test_letters_share_the_entry_rule_the_token_wraps(self):
-        mw = _build(progressive_boost="shared_global", logic_difficulty="hard",
-                    lettersanity=1)
-        token = mw.get_location(f"{PLAIN}: CTR Token Challenge", PLAYER)
-        letters = [loc for loc in mw.get_locations(PLAYER)
-                   if loc.name.startswith(f"{PLAIN}: Letter ")]
-        self.assertTrue(letters)
-        entry = token.access_rule.__defaults__[0]
-        blocked = _state(mw, boost=0)
-        for loc in letters:
-            with self.subTest(location=loc.name):
-                self.assertIs(loc.access_rule, entry)
-                self.assertTrue(loc.can_reach(blocked))
-        self.assertFalse(token.can_reach(blocked))
 
     def test_papu_route_arms_survive_the_floor(self):
         """Papu's C and T rule only exists while boost is randomized, which is

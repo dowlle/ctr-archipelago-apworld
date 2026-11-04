@@ -35,13 +35,13 @@ family, and the podium 35015000 / 35015100 blocks. Nothing shipped is renumbered
 name and no id.
 
 CORTEX VORTEX AND CUSTOM TRACKS. `Cortex Vortex: Relic Race Perfect`
-(35026005) is reserved but not minted, and the custom-track perfect family
-(`Custom Track N: Relic Race Perfect`, 35024000 + N - 1) is reserved in
-custom_check_namespace but not registered. Neither is created here. The
+(35026005) and the custom-track perfect family (`Custom Track N: Relic Race
+Perfect`, 35024000 + N - 1) were minted by the 0.3.0 id step and are
+registered by custom_fallback_families.py. Neither is created here. The
 custom-track side is prepared by `relic_capable_custom_slots` below, which
 enumerates the packages whose measured capability says they carry relic time
-crates; creation stays off (`CUSTOM_PERFECT_CREATION_ENABLED`) until the
-identity is minted and a custom Relic Race mode is admitted.
+crates; creation stays off (`CUSTOM_PERFECT_CREATION_ENABLED`) until the #453
+feature PR admits a custom Relic Race mode.
 """
 
 from . import destinations
@@ -99,7 +99,7 @@ class RelicPerfectLocationClass(LocationClass):
         opt = getattr(options, "relic_perfect_checks", None)
         if options is None or opt is None or not bool(opt.value):
             return []
-        from .cortex_vortex_track import dropped_track
+        from .cortex_vortex import dropped_track
         dropped = dropped_track(options)
         return [self.location_name(track) for track in RELIC_TRACKS
                 if track != dropped]
@@ -187,44 +187,12 @@ def _as_lists(value):
 # ---------------------------------------------------------------------------
 
 #: Creation switch for custom-track perfect checks. Off, and must stay off,
-#: until (1) the reserved family `perfect_location` (35024000 + slot - 1,
-#: "Custom Track N: Relic Race Perfect") is minted into the datapackage by an
-#: approved unfreeze, and (2) a custom Relic Race mode is admitted in the
+#: until (1) the family `perfect_location` (35024000 + slot - 1,
+#: "Custom Track N: Relic Race Perfect", minted by the 0.3.0 id step) has its
+#: feature build, and (2) a custom Relic Race mode is admitted in the
 #: custom_tracks descriptor (today `modes` admits only `ctr_challenge`), with
 #: its own Time Trial family (`relic_location`, 35022000) minted alongside.
 #: TODO(#49, custom tracks): flip only together with both of those.
 CUSTOM_PERFECT_CREATION_ENABLED = False
 
 
-def relic_capable_custom_slots(custom_tracks):
-    """Seed slots whose package can host a perfect check once enabled.
-
-    A package qualifies when its measured `flags.relic_crates` is true: the LEV
-    carries relic time crates, which is what native's `timeCratesInLEV` counts.
-    Capability alone never activates a mode (the custom-track specification:
-    Relic additionally needs target times and an admitted mode), so this is an
-    enumeration for design and tests, not a creation list. Sorted by slot."""
-    out = []
-    for entry in (custom_tracks or {}).values():
-        flags = entry.get("flags") or {}
-        if flags.get("relic_crates") is True:
-            out.append(int(entry["slot"]))
-    return sorted(out)
-
-
-def custom_perfect_reserved_code(slot: int) -> int:
-    """The RESERVED (unminted) code a custom slot's perfect check would use.
-    Reservation only: this id is not in the datapackage and must never be
-    sent or created while CUSTOM_PERFECT_CREATION_ENABLED is False."""
-    from .custom_check_namespace import custom_check_code
-    return custom_check_code("perfect_location", slot)
-
-
-def created_custom_perfect_slots(custom_tracks):
-    """Custom slots that get a perfect check THIS seed. Always empty today;
-    see CUSTOM_PERFECT_CREATION_ENABLED."""
-    if not CUSTOM_PERFECT_CREATION_ENABLED:
-        return []
-    raise NotImplementedError(
-        "custom-track perfect checks need a minted identity and an admitted "
-        "custom Relic Race mode")

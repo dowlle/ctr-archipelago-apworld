@@ -1,0 +1,32 @@
+# Universal Tracker arm with a custom track (check-ut-custom-tracks in
+# .github/workflows/ctr-world.yml). Every seed gives Baby T Park a pad, with the
+# package descriptor of the published files. Everything else is randomized by the
+# fuzzer, as in the check-ut arm. accessibility: full makes a tracker
+# divergence show up as checks the server reached and the tracker did not.
+Crash Team Racing:
+  accessibility: full
+  custom_tracks:
+    - id: package/baby-t-park/1.0.2
+      content_id: baby-t-park
+      uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
+      revision: "1.0.2"
+      display_name: Baby T Park
+      author: Lockheart
+      laps: 7
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 8, checkpoints: 35, ai_nav: true}
+      files:
+        - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [baby-t-park]
+  # Random sets and switches here refuse most seeds, and a refused seed tests
+  # nothing: Crystal Challenge Count above the listed arenas, cups the listed
+  # tracks cannot fill, a boss pool too small, a gauntlet without its parts, and
+  # empty garages under an Oxide goal. The other arms cover what these leave out.
+  retail_tracks: [all]
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
+  boss_garages: true
+  purple_cup_boss_gauntlet: false
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
+  boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
+  oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]

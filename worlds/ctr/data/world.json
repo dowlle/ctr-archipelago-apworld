@@ -263,7 +263,7 @@
             "type": "crystal",
             "locations": [
                 {
-                    "name": "Skull Rock: Crystal Bonus Round",
+                    "name": "Skull Rock: Crystal Challenge",
                     "type": "challenge"
                 }
             ],
@@ -761,7 +761,7 @@
             "type": "crystal",
             "locations": [
                 {
-                    "name": "Rampage Ruins: Crystal Bonus Round",
+                    "name": "Rampage Ruins: Crystal Challenge",
                     "type": "challenge"
                 }
             ],
@@ -1009,7 +1009,7 @@
             "type": "crystal",
             "locations": [
                 {
-                    "name": "Rocky Road: Crystal Bonus Round",
+                    "name": "Rocky Road: Crystal Challenge",
                     "type": "challenge"
                 }
             ],
@@ -1250,7 +1250,7 @@
             "type": "crystal",
             "locations": [
                 {
-                    "name": "Nitro Court: Crystal Bonus Round",
+                    "name": "Nitro Court: Crystal Challenge",
                     "type": "challenge"
                 }
             ],

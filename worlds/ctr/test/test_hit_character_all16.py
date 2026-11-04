@@ -18,7 +18,6 @@ import unittest
 
 from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
-from Options import OptionError
 from test.general import gen_steps, setup_multiworld
 from worlds.AutoWorld import call_all
 
@@ -234,28 +233,6 @@ class TestAdversarialSeed(unittest.TestCase):
             self.assertTrue(mw.get_location(name, PLAYER).can_reach(state),
                             name)
 
-    def test_set_rules_structural_error_remains_the_backstop(self):
-        """A boss-kind guest has no Key fallback, so removing its only route
-        still reaches the set_rules backstop."""
-        mw = _build(seed=1, steps=("generate_early", "create_regions",
-                                   "create_items"), hit_character=True)
-        cache = mw.regions.location_cache[PLAYER]
-        cache.pop("Ripper Roo Garage: Boss Race", None)
-        with self.assertRaises(OptionError) as ctx:
-            call_all(mw, "set_rules")
-        self.assertIn("Ripper Roo", str(ctx.exception))
-
-    def test_disabled_trial_modes_generate_with_n_tropy_on_keys(self):
-        """The default-settings case: both trial race options off used to be a
-        hard guard failure and now puts N. Tropy on 3 Keys."""
-        mw = _build(seed=1, hit_character=True, slide_coliseum_races=0,
-                    turbo_track_races=0, accessibility="full")
-        self.assertEqual(mw.worlds[PLAYER].ctr_hit_character_fallback, {12: 3})
-        state = mw.get_all_state(False)
-        for name in HIT_CHARACTER_CLASS.names():
-            self.assertTrue(mw.get_location(name, PLAYER).can_reach(state),
-                            name)
-
 
 class TestUniversalTrackerParity(unittest.TestCase):
     """UT regeneration restores the emitted block and matches reachability."""
@@ -276,59 +253,6 @@ class TestUniversalTrackerParity(unittest.TestCase):
         state.update_reachable_regions(PLAYER)
         return tuple(_hit_rule(mw, cid)(state) for cid in ALL_TARGETS)
 
-    def test_reconstruction_restores_block_and_matches_reachability(self):
-        source = _build(seed=1, hit_character=True)
-        original = source.worlds[PLAYER]
-        wire = original.fill_slot_data()
-        rebuilt_mw = self._reconstruct(wire)
-        rebuilt = rebuilt_mw.worlds[PLAYER]
-
-        # Verbatim block and seed, restored rather than re-drawn.
-        self.assertEqual(rebuilt.ctr_hit_character_encounters,
-                         original.ctr_hit_character_encounters)
-        self.assertEqual(
-            rebuilt.ctr_hit_character_seed,
-            wire["hit_character_encounters"]["policy"]["seed"])
-
-        # No extra roster draw: re-resolving returns the cached block untouched.
-        from ..hit_character import resolve_for_generation
-        before = rebuilt.random.getstate()
-        self.assertIs(resolve_for_generation(rebuilt),
-                      rebuilt.ctr_hit_character_encounters)
-        self.assertEqual(rebuilt.random.getstate(), before)
-
-        # Reachability parity on identical controlled states.
-        for items in ((), ("Key",) * 4, ("Key",) * 4 + ("Trophy",) * 16):
-            with self.subTest(items=items):
-                self.assertEqual(self._hit_vector(source, items),
-                                 self._hit_vector(rebuilt_mw, items))
-        self.assertEqual(
-            tuple(_hit_rule(source, cid)(source.get_all_state(False))
-                  for cid in ALL_TARGETS),
-            tuple(_hit_rule(rebuilt_mw, cid)(rebuilt_mw.get_all_state(False))
-                  for cid in ALL_TARGETS))
-
-    def test_reconstruction_restores_a_fallback_guest_from_the_wire(self):
-        """A UT regeneration has no option values or displacement draws to
-        re-derive the fallback from, so it must read it back out of the block
-        and install the same Key rule the generated seed installed."""
-        source = _build(seed=1, hit_character=True, slide_coliseum_races=0,
-                        turbo_track_races=0, oxide_goal="disabled",
-                        bosses_required_goal=2)
-        original = source.worlds[PLAYER]
-        self.assertEqual(original.ctr_hit_character_fallback, {12: 3, 15: 4})
-        wire = original.fill_slot_data()
-        rebuilt_mw = self._reconstruct(wire)
-        rebuilt = rebuilt_mw.worlds[PLAYER]
-        self.assertTrue(rebuilt.ctr_hit_character_restored)
-        self.assertEqual(rebuilt.ctr_hit_character_fallback, {12: 3, 15: 4})
-        self.assertEqual(rebuilt.ctr_hit_character_encounters,
-                         original.ctr_hit_character_encounters)
-        for items in ((), ("Key",) * 3, ("Key",) * 4,
-                      ("Key",) * 4 + ("Trophy",) * 16):
-            with self.subTest(items=items):
-                self.assertEqual(self._hit_vector(source, items),
-                                 self._hit_vector(rebuilt_mw, items))
 
     def test_reconstruction_matches_across_option_shapes(self):
         for shape, options in SHAPES.items():

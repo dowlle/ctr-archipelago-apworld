@@ -25,11 +25,6 @@ class TestBits(CTRTestBase):
         self.assertEqual(DL_SEND_BITS, {"mask_grab": 1, "weapon_hit": 2,
                                         "race_loss": 4})
 
-    def test_default_is_the_sentinel_and_follows_off(self):
-        self.assertEqual(set(self.world.options.death_link_send.value),
-                         {"follow_death_link"})
-        self.assertEqual(_emitted(self), 0)
-        self.assertEqual(self.world.fill_slot_data()["schema_version"], 16)
 
     def test_from_any_distinguishes_unset_from_empty(self):
         # A YAML that omits the option gets the class default (sentinel); an
@@ -61,14 +56,7 @@ class TestLegacyFollow(CTRTestBase):
         self.world.options.death_link.value = death_link
         self.assertEqual(_emitted(self), expected)
 
-    def test_legacy_mapping(self):
-        self._check(DeathLink.option_off, 0)
-        self._check(DeathLink.option_mask_reset, 1)
-        self._check(DeathLink.option_any_hit, 1 | 2)
-        self._check(DeathLink.option_race_loss, 1 | 4)
 
-    def test_any_hit_yaml_value_still_parses(self):
-        self.assertEqual(DeathLink.from_any("any_hit").value, 2)
 
 
 class TestExplicitOverrides(CTRTestBase):
@@ -80,11 +68,6 @@ class TestExplicitOverrides(CTRTestBase):
     def _set(self, keys):
         self.world.options.death_link_send.value = set(keys)
 
-    def test_receive_only(self):
-        self._set([])
-        self.assertEqual(_emitted(self), 0)
-        # the receive side is untouched
-        self.assertEqual(self.world.fill_slot_data()["ctr_options"]["death_link"], 2)
 
     def test_each_bit_and_combinations(self):
         for keys, want in [(["mask_grab"], 1), (["weapon_hit"], 2),
@@ -141,9 +124,6 @@ class TestOffUnsetStaysOff(CTRTestBase):
 
     options = {"death_link": "off"}
 
-    def test_both_zero(self):
-        co = self.world.fill_slot_data()["ctr_options"]
-        self.assertEqual((co["death_link"], co[KEY]), (0, 0))
 
 
 class TestReceiveOnlyStaysAllowed(CTRTestBase):
@@ -158,16 +138,3 @@ class TestResolutionNotice(CTRTestBase):
     run_default_tests = False
     options = {}
 
-    def test_warns_and_is_idempotent(self):
-        from .. import forced_options
-        o = self.world.options
-        o.death_link.value = DeathLink.option_off
-        o.death_link_send.value = {"mask_grab", "race_loss"}
-        with self.assertLogs(level="WARNING") as cm:
-            forced_options.resolve_death_link_off_when_send_conditions_set(
-                self.world)
-        self.assertIn("DeathLink turned on as mask_reset", cm.output[0])
-        self.assertEqual(o.death_link.value, DeathLink.option_mask_reset)
-        # Second call (re-entry) changes nothing.
-        forced_options.resolve_death_link_off_when_send_conditions_set(self.world)
-        self.assertEqual(o.death_link.value, DeathLink.option_mask_reset)

@@ -1,55 +1,28 @@
-"""Parity: the `win_logic` slot_data block equals Archipelago's logic.
+"""Helpers for the `win_logic` parity tests (test_content_plan_row6,
+test_win_logic_ut): `WireEvaluator`, a reference evaluator of the slot_data
+block written from the wire schema with native's inputs only (received counts
+by AP item id, three `ctr_options` scalars and the bosses-won tally), and the
+seed and state builders.
 
-Race-loss DeathLink stakes (Contract 7m, `SCHEMA.md`). Native decides a
-race's stakes by evaluating the block; the block is serialised from the term
-objects the rules are compiled from (`logic_terms`). This test closes the
-loop from the other side: it evaluates the emitted JSON with
-`WireEvaluator`, a reference evaluator written from the wire schema with
-native's inputs only (received counts by AP item id, three `ctr_options`
-scalars and the bosses-won tally), and asserts
-
-    eval(regions[entry.region]) and eval(entry.rule) == location.can_reach(state)
-
-for every win check, on random-option seeds and random item sets. The region
-half is also compared on its own against `Region.can_reach`.
-
-The evaluator receives items the way the server sends them: start inventory
-(every precollected item) as `NetworkItem(id, -2, 0)`, flags 0 whatever its
-classification (MultiServer), and every other item with its own flags. Its
-counts are the progression-flagged entries off location -2 plus the block's
-`start` table, as SCHEMA.md "Received count" specifies.
-`TestWinLogicStartInventory` covers seeds with a YAML start inventory, the
-`start_inventory_from_pool` mechanism and the tight-fill backstop's
-precollect.
-
-The states need not be reachable ones: the two sides must agree everywhere.
-A plain lambda ANDed onto a win check later makes the exporter raise
-(`WinLogicExportError`), so the guard is the generation itself.
-
-Seeds: `CTR_WIN_LOGIC_SEEDS` (default 150), split into chunks so xdist runs
-them in parallel. `python -m worlds.ctr.test.test_win_logic_parity N` prints
-the coverage tally.
+Race-loss DeathLink stakes (Contract 7m, `SCHEMA.md`). The original random
+option parity run over normal seeds went with the original generator in one
+generator row 12; the plan's parity runs in test_content_plan_row6.
 """
 import collections
 import copy
 import json
 import os
 import random
-import sys
-import unittest
 from typing import Dict
-
-from unittest import mock
 
 from BaseClasses import CollectionState
 from Options import OptionError
 from test.general import setup_multiworld
-from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld
 from ..characters import ROSTER_CHARACTER_ID, unlock_item_name
 from ..progressive_capability import BOOST_CHAIN, boost_item_name
-from ..win_logic import win_kind, wire_size
+from ..win_logic import wire_size
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
 PLAYER = 1
@@ -113,7 +86,7 @@ class WireEvaluator:
     def __init__(self, block, ctr_options, received: Dict[int, int],
                  bosses_won: int, item_ids: Dict[str, int]):
         """`received`: native's tally, `_received` of the server's entries."""
-        assert block["version"] == 1
+        assert block["version"] in (1, 2)
         self.block = block
         self.received = received
         self.start_table = {}
@@ -122,7 +95,7 @@ class WireEvaluator:
                 raise MalformedBlock(f"start {key!r}: {n!r}")
             self.start_table[int(key)] = n
         self.bosses_won = bosses_won
-        self.boost_mode = int(ctr_options["boost_mode"])
+        self.boost_mode = int(ctr_options.get("boost_mode", ctr_options.get("progressive_boost", 0)))
         self.start = int(ctr_options["starting_character"])
         self.unlocks = bool(ctr_options["character_unlocks"])
         by_id = {cid: name for name, cid in ROSTER_CHARACTER_ID.items()}
@@ -173,7 +146,14 @@ class WireEvaluator:
             assert mode == "distinct"
             return sum(1 for i in ids if self.count(i) >= 1) >= count
         if tag == "cap":
-            _, boost, racer = t
+            _, boost, racer, *extension = t
+            if extension:
+                assert len(extension) == 1 and type(extension[0]) is int and 0 <= extension[0] <= 2
+                if extension[0]:
+                    return any(self._driveable(c) and self._boost_ok(c, boost)
+                               and all(self.count((35010027 if extension[0] == 1 else self.boost_id[c]) + n) >= 1
+                                       for n in (1, 2, 3))
+                               for c in ([racer] if racer >= 0 else range(16)))
             if racer >= 0:
                 return self._driveable(racer) and self._boost_ok(racer, boost)
             if boost == 0 or self.boost_mode == 0:
@@ -211,7 +191,7 @@ def _random_options(rng):
     opts = {k: _pick(rng, hints[k]) for k in RANDOM_OPTS}
     opts["accessibility"] = "minimal"  # rules do not read it; raises the valid rate
     if rng.random() < 0.25:
-        from ..custom_tracks import BABY_T_PARK_CURRENT
+        from ..custom_packages import BABY_T_PARK_CURRENT
         entry = copy.deepcopy(BABY_T_PARK_CURRENT)
         entry["modes"] = {"ctr_challenge": rng.random() < 0.7}
         opts["custom_tracks"] = {"baby-t-park": entry}
@@ -283,283 +263,3 @@ def _states(mw, rng, n):
                     [name for name in events if rng.random() < 0.5])
 
 
-def check_seed(mw, rng, states_per_seed=STATES_PER_SEED, tally=None):
-    """Compare the block with can_reach on one generated multiworld. Returns
-    a list of disagreement descriptions (empty = parity)."""
-    world = mw.worlds[PLAYER]
-    slot_data = world.fill_slot_data()
-    block = slot_data["win_logic"]
-    assert json.loads(json.dumps(block)) == block
-    assert wire_size(block) < 32 * 1024, wire_size(block)
-    wins = {int(loc.address): loc for loc in mw.get_locations(PLAYER)
-            if loc.address is not None and win_kind(loc.name)}
-    assert set(map(int, block["checks"])) == set(wins), "entry set != win checks"
-    item_ids = world.item_name_to_id
-    bad = []
-    for state, received in _states(mw, rng, states_per_seed):
-        bosses = sum(1 for f in BOSS_FLAGS if state.has(f, PLAYER))
-        ev = WireEvaluator(block, slot_data["ctr_options"], received, bosses, item_ids)
-        for loc_id, loc in wins.items():
-            entry = block["checks"][str(loc_id)]
-            region_want = loc.parent_region.can_reach(state)
-            region_got = ev.eval(block["regions"][entry["region"]])
-            want = loc.can_reach(state)
-            got = ev.in_logic(loc_id)
-            if tally is not None:
-                tally["evaluations"] += 1
-                tally["kind:" + entry["kind"]] += 1
-            if want != got or region_want != region_got:
-                bad.append({"loc": loc.name, "can_reach": want, "wire": got,
-                            "region_can_reach": region_want, "region_wire": region_got,
-                            "rule": entry["rule"],
-                            "region": block["regions"][entry["region"]]})
-        if tally is not None:
-            tally.update({"op:" + k: v for k, v in ev.used.items()})
-    return bad
-
-
-def run(n_seeds, rng_seed, tally=None, sizes=None):
-    """Generate `n_seeds` valid random-option seeds and check each one."""
-    rng = random.Random(rng_seed)
-    done = attempts = 0
-    failures = []
-    while done < n_seeds:
-        attempts += 1
-        assert attempts <= n_seeds * 10, f"only {done} valid seeds in {attempts} attempts"
-        seed = rng.randrange(1 << 30)
-        options = _random_options(rng)
-        try:
-            mw = setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
-        except OptionError:
-            continue
-        done += 1
-        bad = check_seed(mw, rng, tally=tally)
-        for b in bad[:1]:
-            b["seed"], b["options"] = seed, {k: str(v) for k, v in options.items()}
-        if sizes is not None:
-            sizes.append(wire_size(mw.worlds[PLAYER].fill_slot_data()["win_logic"]))
-        if tally is not None:
-            tally["seeds"] += 1
-            o = mw.worlds[PLAYER].options
-            for name in ("progressive_boost", "warppad_unlock_requirements",
-                         "include_battle_arenas", "itemsanity", "logic_difficulty",
-                         "lettersanity", "oxide_goal", "shortcut_knowledge",
-                         "cortex_vortex_track", "character_unlocks"):
-                tally[f"opt:{name}={int(getattr(o, name).value)}"] += 1
-            tally["opt:racer_locks_drawn"] += bool(getattr(mw.worlds[PLAYER], "ctr_racer_locks", None))
-            tally["opt:custom_track"] += "custom_tracks" in options
-            tally["checks"] += len([1 for loc in mw.get_locations(PLAYER)
-                                    if loc.address is not None and win_kind(loc.name)])
-        if bad:
-            failures.append((seed, bad[:3], len(bad)))
-    if tally is not None:
-        tally["attempts"] += attempts
-    return failures
-
-
-class TestWinLogicParity(unittest.TestCase):
-    """`CHUNKS` methods, each `N_SEEDS / CHUNKS` seeds, so xdist parallelises."""
-
-
-def _make_chunk(index):
-    def test(self):
-        per = max(1, N_SEEDS // CHUNKS)
-        failures = run(per, 20261002 + index)
-        self.assertEqual(failures, [], json.dumps(failures, default=str)[:4000])
-    test.__name__ = f"test_parity_chunk_{index}"
-    return test
-
-
-for _i in range(CHUNKS):
-    setattr(TestWinLogicParity, f"test_parity_chunk_{_i}", _make_chunk(_i))
-
-
-class TestWinLogicFixedSeeds(unittest.TestCase):
-    """Named option corners the random draw reaches rarely."""
-
-    CASES = (
-        {},
-        {"warppad_unlock_requirements": "vanilla"},
-        {"progressive_boost": "per_character", "character_unlocks": True,
-         "racer_locked_pads": 6, "itemsanity": True, "box_locations": True,
-         "include_battle_arenas": False, "lettersanity": "locations_and_items",
-         "logic_difficulty": "easy"},
-        {"progressive_boost": "shared_global", "progressive_boost_blue_fire": True,
-         "oxide_goal": "101_percent", "bosses_required_goal": 4,
-         "gems_required_goal": 5, "oxide_final_challenge_unlock": "any_relic_type",
-         "cortex_vortex_track": True, "lettersanity": "items_only",
-         "box_locations": True},
-        {"progressive_boost": "shared_global", "oxide_goal": "any_percent",
-         "bosses_required_goal": 2, "gems_required_goal": 3,
-         "shortcut_knowledge": "hard", "itemsanity": True, "box_locations": True,
-         "slide_coliseum_races": "trophy_and_ctr_challenge",
-         "turbo_track_races": "trophy_race"},
-        {"oxide_goal": "disabled", "bosses_required_goal": 4},
-    )
-
-    def test_corners(self):
-        rng = random.Random(7)
-        for case in self.CASES:
-            with self.subTest(options=case):
-                mw = setup_multiworld(ctrAPWorld, STEPS, seed=11, options=case)
-                self.assertEqual(check_seed(mw, rng, states_per_seed=60), [])
-
-
-def generate_with_start(options, seed, steps=STEPS, from_pool=None):
-    """`setup_multiworld` in Main.py's order around the start inventory: the
-    YAML `start_inventory` (and `from_pool`, Main's
-    `start_inventory_from_pool` handling) is precollected right after
-    `generate_early` with `create_item`, and the `from_pool` copies are then
-    removed from the item pool and topped up with filler after
-    `generate_basic` (or at the end), before `pre_fill`."""
-    mw = setup_multiworld(ctrAPWorld, (), seed=seed, options=options)
-    world = mw.worlds[PLAYER]
-    pending = dict(from_pool or {})
-
-    def deplete():
-        for name, n in pending.items():
-            for _ in range(n):
-                index = next(i for i, it in enumerate(mw.itempool)
-                             if it.player == PLAYER and it.name == name)
-                del mw.itempool[index]
-                mw.itempool.append(world.create_filler())
-        pending.clear()
-
-    for step in steps:
-        if step == "pre_fill":
-            deplete()
-        call_all(mw, step)
-        if step == "generate_early":
-            for name, n in world.options.start_inventory.value.items():
-                for _ in range(n):
-                    mw.push_precollected(mw.create_item(name, PLAYER))
-            for name, n in pending.items():
-                for _ in range(n):
-                    mw.push_precollected(mw.create_item(name, PLAYER))
-        if step == "generate_basic":
-            deplete()
-    deplete()
-    return mw
-
-
-class TestWinLogicStartInventory(unittest.TestCase):
-    """Review B1: the server sends start inventory with flags 0, but
-    Archipelago's logic and Universal Tracker count its progression copies.
-    The block's `start` table carries them; every source of precollected
-    items must keep parity."""
-
-    def _check(self, mw, states=40):
-        precollected = [it for it in mw.precollected_items[PLAYER] if it.code is not None]
-        self.assertTrue(precollected, "the seed has no start inventory")
-        block = mw.worlds[PLAYER].fill_slot_data()["win_logic"]
-        want = collections.Counter(str(int(it.code)) for it in precollected if it.advancement)
-        self.assertEqual(block["start"], dict(want))
-        self.assertEqual(check_seed(mw, random.Random(5), states_per_seed=states), [])
-        return block
-
-    def test_yaml_start_inventory(self):
-        coco_unlock = unlock_item_name("Coco Bandicoot")
-        cases = (
-            {"start_inventory": {"Key": 4, "Trophy": 16}},
-            {"progressive_boost": "shared_global",
-             "start_inventory": {"Progressive Boost": 3}},
-            {"start_inventory": {"Sapphire Relic": 5, "Red CTR Token": 4,
-                                 "Green CTR Token": 4, "Blue CTR Token": 4,
-                                 "Yellow CTR Token": 4, "Wumpa Fruit": 2}},
-            {"progressive_boost": "per_character", "character_unlocks": True,
-             "starting_character": "crash_bandicoot",
-             "start_inventory": {coco_unlock: 1,
-                                 boost_item_name("Coco Bandicoot"): 2,
-                                 "Key": 1}},
-            {"warppad_unlock_requirements": "vanilla", "accessibility": "minimal",
-             "start_inventory": {"Gold Relic": 3, "Platinum Relic": 2,
-                                 "Red Gem": 1, "Purple CTR Token": 2}},
-            {"oxide_goal": "101_percent", "bosses_required_goal": 4,
-             "gems_required_goal": 5, "include_battle_arenas": False,
-             "start_inventory": {"Purple Gem": 1, "Yellow CTR Token": 3,
-                                 "Trophy": 8}},
-        )
-        for case in cases:
-            with self.subTest(options=case):
-                try:
-                    mw = generate_with_start(case, seed=13)
-                except OptionError as exc:
-                    self.fail(f"fixture refused: {exc}")
-                self._check(mw)
-
-    def test_random_options_with_start_inventory(self):
-        """Random option draws, each with a random start inventory drawn from
-        the slot's own progression items."""
-        rng = random.Random(4242)
-        done = attempts = 0
-        while done < 12:
-            attempts += 1
-            self.assertLess(attempts, 150)
-            seed = rng.randrange(1 << 30)
-            options = _random_options(rng)
-            try:
-                probe = setup_multiworld(ctrAPWorld, STEPS, seed=seed, options=options)
-            except OptionError:
-                continue
-            names = sorted({it.name for it in probe.itempool
-                            if it.player == PLAYER and it.advancement})
-            pick = rng.sample(names, min(len(names), rng.randint(1, 6)))
-            options = dict(options, start_inventory={n: rng.randint(1, 4) for n in pick})
-            mw = generate_with_start(options, seed)
-            with self.subTest(seed=seed, start=options["start_inventory"]):
-                self._check(mw, states=20)
-            done += 1
-
-    def test_start_inventory_from_pool(self):
-        """CTR declares no `start_inventory_from_pool` option today; this pins
-        Main.py's mechanism for it (create_item copies precollected, the pool
-        copies removed) in case one is added."""
-        from_pool = {"Key": 2, "Sapphire Relic": 3, "Red CTR Token": 2}
-        mw = generate_with_start({}, seed=17, from_pool=from_pool)
-        pool = collections.Counter(it.name for it in mw.itempool if it.player == PLAYER)
-        ref = generate_with_start({}, seed=17)
-        ref_pool = collections.Counter(it.name for it in ref.itempool if it.player == PLAYER)
-        for name, n in from_pool.items():
-            self.assertEqual(pool[name], ref_pool[name] - n, name)
-        self._check(mw)
-
-    def test_backstop_precollect(self):
-        """The tight-fill backstop (`_rollback_precollect_backstop`) moves
-        stranded pool items into the start inventory. Natural firings are
-        about 0.1 to 0.2 percent of solo seeds, so the simulation is forced to
-        dead-end once and to name two progression items; the precollect
-        itself is the backstop's own code."""
-        world_cls = ctrAPWorld
-        calls = {"n": 0}
-
-        def simulate(self, panic):
-            calls["n"] += 1
-            return calls["n"] > 1
-
-        def stranded(self):
-            names = [it.name for it in self.multiworld.itempool
-                     if it.player == self.player and it.advancement
-                     and it.name in ("Key", "Trophy", "Sapphire Relic")]
-            return sorted(set(names))[:2]
-
-        steps = STEPS + ("connect_entrances", "generate_basic", "pre_fill")
-        with mock.patch.object(world_cls, "_rollback_simulate_fill", simulate), \
-                mock.patch.object(world_cls, "_rollback_enumerate_stranded", stranded):
-            mw = generate_with_start({}, seed=19, steps=steps)
-        world = mw.worlds[PLAYER]
-        self.assertTrue(getattr(world, "_ctr_backstop_fired", False))
-        self.assertEqual(len(world._ctr_backstop_items), 2)
-        block = self._check(mw)
-        self.assertTrue(block["start"])
-
-
-if __name__ == "__main__":
-    # Evidence run: python -m worlds.ctr.test.test_win_logic_parity N [rng_seed]
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else N_SEEDS
-    tally = collections.Counter()
-    sizes = []
-    fails = run(n, int(sys.argv[2]) if len(sys.argv) > 2 else 1, tally, sizes)
-    sizes.sort()
-    print(json.dumps({"failures": len(fails), "tally": dict(sorted(tally.items())),
-                      "size_min_median_max": [sizes[0], sizes[len(sizes) // 2], sizes[-1]],
-                      "failure_samples": fails[:3]}, indent=1, default=str))

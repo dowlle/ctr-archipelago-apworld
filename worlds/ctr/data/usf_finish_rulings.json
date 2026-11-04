@@ -1,0 +1,11 @@
+{
+  "description": "Per-track rulings on the super turbo pad finish rule (#133 PR 4c). A custom track whose LEV has super turbo pads needs USF to finish unless a ruling here says otherwise (ruling 2026-10-18: \"they require USF UNLESS I say otherwise\"). Keyed by registry content id (the package's content_id); usf_finish true needs USF to finish, false takes the generic terms only. Each entry cites its ruling. Project-owned: this is never a package descriptor field. A track not listed keeps the measured default.",
+  "version": 1,
+  "rulings": [
+    {"content_id": "arabian-heights-night", "usf_finish": true, "ruling": "Project ruling 2026-10-18 01:44 CEST: needs USF to finish"},
+    {"content_id": "baby-t-park", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
+    {"content_id": "cortex-vortex", "usf_finish": true, "ruling": "Project ruling 2026-10-18 01:44 CEST: Cortex Vortex (bundled) needs USF to finish"},
+    {"content_id": "north-pole", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
+    {"content_id": "tv-world", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"}
+  ]
+}

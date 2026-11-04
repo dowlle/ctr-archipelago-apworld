@@ -1,0 +1,2031 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Package"
+      },
+      "maxItems": 132,
+      "minItems": 0
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Track"
+      },
+      "maxItems": 151,
+      "minItems": 0
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "maxItems": 33,
+      "minItems": 0
+    },
+    "pads": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Pad"
+      },
+      "maxItems": 32,
+      "minItems": 32
+    },
+    "encounters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Encounter"
+      },
+      "maxItems": 6,
+      "minItems": 0
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "maxItems": 128,
+      "minItems": 0
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "maxItems": 4096,
+      "minItems": 0
+    },
+    "items": {
+      "$ref": "#/$defs/ItemPlan"
+    },
+    "goal": {
+      "$ref": "#/$defs/Predicate"
+    },
+    "required_features": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "content_plan_v1",
+          "manual_pad_requirements_v1",
+          "crystal_entries_v1",
+          "crystal_pickups_v1",
+          "arcade_crystals_v1",
+          "track_modes_v1",
+          "podium_rungs_v1",
+          "wumpa_checks_v1",
+          "lettersanity_v1",
+          "relic_perfect_v1",
+          "item_packs_v1",
+          "character_unlocks_v1",
+          "capability_packs_v1",
+          "global_checks_v1",
+          "item_boxes_v1",
+          "cup_entries_v1",
+          "boss_encounters_v1",
+          "gem_cups_v1",
+          "surface_items_v1",
+          "relic_tier_checks_v1",
+          "pad_requirements_v1",
+          "fixed_items_v1",
+          "ctr_first_v1",
+          "boss_opponents_v1",
+          "final_chaos_v1",
+          "wumpa_shop_v1",
+          "wumpa_goal_v1",
+          "pad_client_v1",
+          "lap_checks_v1"
+        ]
+      },
+      "maxItems": 28,
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "track_checks": {
+      "$ref": "#/$defs/TrackChecks"
+    },
+    "item_packs": {
+      "$ref": "#/$defs/ItemPacks"
+    },
+    "racers": {
+      "$ref": "#/$defs/Racers"
+    },
+    "capability": {
+      "$ref": "#/$defs/Capability"
+    },
+    "global_checks": {
+      "$ref": "#/$defs/GlobalChecks"
+    },
+    "item_boxes": {
+      "$ref": "#/$defs/ItemBoxes"
+    },
+    "bosses": {
+      "$ref": "#/$defs/Bosses"
+    },
+    "adventure_structure": {
+      "description": "adventure_structure: ctr_first (job J11), present only then. A track entry whose track lists trophy and ctr runs the CTR Challenge first and has no Trophy Race (decisions 4 and 14).",
+      "const": "ctr_first"
+    },
+    "wumpa_shop": {
+      "$ref": "#/$defs/WumpaShop"
+    },
+    "pad_requirements": {
+      "$ref": "#/$defs/PadRequirements"
+    },
+    "fixed_items": {
+      "$ref": "#/$defs/FixedItems"
+    },
+    "pad_client": {
+      "description": "Plan pads in the client (one generator row 6): when the race type menu opens, and whether the in-game tracker can start pads. No logic.",
+      "type": "object",
+      "properties": {
+        "race_type_selector": {
+          "enum": [
+            "productive",
+            "always"
+          ]
+        },
+        "tracker_pad_launch": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "race_type_selector",
+        "tracker_pad_launch"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version",
+    "packages",
+    "tracks",
+    "entries",
+    "pads",
+    "encounters",
+    "requirements",
+    "checks",
+    "items",
+    "goal",
+    "required_features"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "FilePin": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "enum": [
+            "lev",
+            "vrm",
+            "navigation",
+            "ctr_letters",
+            "relic_targets",
+            "ap_boxes"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "format_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "role",
+        "sha256",
+        "bytes",
+        "format",
+        "format_version"
+      ],
+      "additionalProperties": false
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "capability": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "file_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "verifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "level": {
+          "enum": [
+            "structural",
+            "runtime"
+          ]
+        }
+      },
+      "required": [
+        "capability",
+        "file_hashes",
+        "verifier",
+        "revision",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "Package": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "content_id": {
+          "description": "Registry track key, carried verbatim. The apworld looks the named id block up by this string; a key without a block uses a generic Custom Track slot (path B+). The wire name is kept so schema 1 plans stay compatible. The package id is \"package/<content_id>/<revision>\" and fits 64 bytes.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "uuid": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "laps": {
+          "description": "Authored race laps (#133 PR 2). The Track record repeats it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "capabilities": {
+          "description": "Measured capability flags. Native measures the pinned bytes on load and refuses the package when a flag set to true is not there.",
+          "type": "object",
+          "properties": {
+            "time_trial": {
+              "type": "boolean"
+            },
+            "arcade": {
+              "type": "boolean"
+            },
+            "relic": {
+              "type": "boolean"
+            },
+            "ctr_tokens": {
+              "type": "boolean"
+            },
+            "wumpa": {
+              "type": "boolean"
+            },
+            "super_turbo_pads": {
+              "description": "Optional (#133 PR 4c): the LEV has a trigger quad whose terrain byte carries the super turbo pad step flag. Native measures it and refuses a stated value the bytes disagree with. Absent counts as true in logic.",
+              "type": "boolean"
+            },
+            "weapon_crates": {
+              "description": "Optional (#133 PR 4e): how many weapon crates (PU_RANDOM_CRATE instances) the LEV holds. Native counts them and refuses a stated count the bytes disagree with. Item Box checks on a named-block track take min(count, 15) of them as seats; 0 also means the track is no Itemsanity route.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65536
+            },
+            "checkpoints": {
+              "description": "Optional (#133 PR 6b): the LEV's restart point count. Native measures it and refuses a stated count the bytes disagree with. With ai_nav true it lets the track race a boss under Boss Track Shuffle when the count carries the garage's attack schedule.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255
+            },
+            "ai_nav": {
+              "description": "Optional (#133 PR 6b): the LEV has AI navigation paths. Native measures it and refuses a stated value the bytes disagree with. A boss venue needs it.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "time_trial",
+            "arcade",
+            "relic",
+            "ctr_tokens",
+            "wumpa"
+          ],
+          "additionalProperties": false
+        },
+        "relic_targets": {
+          "description": "Present exactly when capabilities.relic is true. Ticks at 960 per second; sapphire > gold > platinum.",
+          "type": "object",
+          "properties": {
+            "sapphire": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            },
+            "gold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            },
+            "platinum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3456000
+            }
+          },
+          "required": [
+            "sapphire",
+            "gold",
+            "platinum"
+          ],
+          "additionalProperties": false
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FilePin"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "description": "Exactly the LEV pin, then the VRM pin."
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "maxItems": 16,
+          "minItems": 0,
+          "description": "Informational. Every hash must be one of this package's file pins."
+        },
+        "locator": {
+          "description": "Optional (xdelta importer, 0.3.0): which xdelta patch and BIGFILE slot an imported track comes from, so the client can name the patch to import. Informational only: no logic, ids or admission depend on it.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "xdelta"
+              ]
+            },
+            "patch_sha256": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bigfile_index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4095
+            },
+            "patch_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[\\x20-\\x7e]+$"
+            },
+            "source_url": {
+              "type": "string",
+              "minLength": 9,
+              "maxLength": 128,
+              "pattern": "^https://[\\x21-\\x7e]+$"
+            }
+          },
+          "required": [
+            "kind",
+            "patch_sha256",
+            "bigfile_index"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "content_id",
+        "uuid",
+        "revision",
+        "display_name",
+        "author",
+        "laps",
+        "capabilities",
+        "files",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Track": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "retail"
+            },
+            "retail_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "retail_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "custom"
+            },
+            "package_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "custom_slot": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 132
+            },
+            "named_block": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "room_title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "package_id",
+            "custom_slot"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "origin": {
+              "const": "cortex_vortex"
+            },
+            "package_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            }
+          },
+          "required": [
+            "id",
+            "display_name",
+            "laps",
+            "modes",
+            "capabilities",
+            "field_size",
+            "origin",
+            "package_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Racer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "player"
+            },
+            "slot": {
+              "const": 0
+            }
+          },
+          "required": [
+            "role",
+            "slot"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "opponent"
+            },
+            "slot": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "character_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "driving_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "attack_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            }
+          },
+          "required": [
+            "role",
+            "slot",
+            "character_id",
+            "driving_profile",
+            "attack_profile"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Opponent": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "opponent"
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "character_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "driving_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "attack_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "schedule": {
+          "description": "Boss kit shuffle and N. Oxide's all_compatible profile (job J11), present only with attack_profile composed: rows [checkpoint, throw, weapon, path, cooldown, juice].",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 13,
+          "items": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        }
+      },
+      "required": [
+        "role",
+        "slot",
+        "character_id",
+        "driving_profile",
+        "attack_profile"
+      ],
+      "additionalProperties": false
+    },
+    "Leg": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "track_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "laps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      },
+      "required": [
+        "id",
+        "track_id",
+        "laps"
+      ],
+      "additionalProperties": false
+    },
+    "Entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "track"
+            },
+            "track_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trophy",
+                  "ctr",
+                  "relic"
+                ]
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "merged": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "track_id",
+            "modes",
+            "merged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "cup"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            },
+            "legs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Leg"
+              },
+              "maxItems": 4,
+              "minItems": 4
+            },
+            "roster": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Racer"
+              },
+              "maxItems": 8,
+              "minItems": 1
+            },
+            "field_size": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "display_name",
+            "legs",
+            "roster",
+            "field_size"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "crystal"
+            },
+            "arena_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "target": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "time_limit_ticks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "arena_id",
+            "target",
+            "time_limit_ticks"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "boss_race"
+            },
+            "track_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "laps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "opponent": {
+              "$ref": "#/$defs/Opponent"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "track_id",
+            "laps",
+            "opponent"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "kind": {
+              "const": "boss_cup"
+            },
+            "legs": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "track_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+                  },
+                  "laps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7
+                  }
+                },
+                "required": [
+                  "id",
+                  "track_id",
+                  "laps"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "opponent": {
+              "$ref": "#/$defs/Opponent"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "legs",
+            "opponent"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ModeGate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "trophy",
+            "ctr",
+            "relic",
+            "merged",
+            "crystal",
+            "cup"
+          ]
+        },
+        "stage": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "requirement_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        }
+      },
+      "required": [
+        "mode",
+        "stage",
+        "requirement_id"
+      ],
+      "additionalProperties": false
+    },
+    "Pad": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "hub_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "kind": {
+          "enum": [
+            "normal",
+            "garage"
+          ]
+        },
+        "entry_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entrance_req": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "mode_gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModeGate"
+          },
+          "maxItems": 3,
+          "minItems": 0
+        },
+        "racer_lock": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "hub_id",
+        "kind",
+        "entry_id",
+        "entrance_req",
+        "mode_gates",
+        "racer_lock"
+      ],
+      "additionalProperties": false
+    },
+    "Encounter": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "pad_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "index": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "entry_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirement_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "completion_location": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "pad_id",
+        "index",
+        "entry_id",
+        "requirement_id",
+        "completion_location"
+      ],
+      "additionalProperties": false
+    },
+    "Predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "always"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "count"
+            },
+            "item": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "item",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "distinct"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 1024,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "items",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "sum"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 1024,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "items",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "checked"
+            },
+            "locations": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxItems": 4096,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "op",
+            "locations",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Predicate"
+              },
+              "maxItems": 64,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "op",
+            "terms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "The Wumpa goal arm (job J11), valid only in the plan goal: lifetime banked fruit.",
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "wumpa_banked"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            }
+          },
+          "required": [
+            "op",
+            "count"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Requirement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "predicate": {
+          "$ref": "#/$defs/Predicate"
+        }
+      },
+      "required": [
+        "id",
+        "predicate"
+      ],
+      "additionalProperties": false
+    },
+    "Route": {
+      "type": "object",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "mode": {
+          "enum": [
+            "trophy",
+            "ctr",
+            "relic",
+            "merged",
+            "cup",
+            "crystal",
+            "boss_race",
+            "boss_cup"
+          ]
+        },
+        "leg_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encounter_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "own_pad_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "award": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        }
+      },
+      "required": [
+        "entry_id",
+        "mode",
+        "leg_id",
+        "encounter_id",
+        "own_pad_id",
+        "award"
+      ],
+      "additionalProperties": false
+    },
+    "Check": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Route"
+          },
+          "maxItems": 132,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "boost": {
+          "description": "Progressive Boost ranks the check needs (#133 PR 4c), present only when the plan's capability record has Progressive Boost on and the rank is above 0. Bound to the pad's racer lock. content_capability.check_boost decides it; content_plan.validate recomputes it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "stats": {
+          "description": "Item Box Locations (#133 PR 4e): true when the check needs one copy of each stat chain (the hard-tier box rule), present only when the plan's capability record has Progressive Stats on. Bound to the pad's racer lock with the check's boost rank. content_item_boxes decides it; content_plan.validate recomputes it.",
+          "const": true
+        },
+        "price": {
+          "description": "Wumpa Shop slot (job J11): the final price, written when slot_data is built.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        },
+        "unlock_banked": {
+          "description": "Wumpa Shop slot (job J11): lifetime banked fruit that puts the slot on sale, 0 from the start.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        }
+      },
+      "required": [
+        "location",
+        "owner",
+        "kind",
+        "display_name",
+        "routes"
+      ],
+      "additionalProperties": false
+    },
+    "ItemRow": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "base": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "extra": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "start_from_pool": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "start_additional": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "locked_selected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "receipt_cap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "requirement_ceiling": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "item",
+        "base",
+        "extra",
+        "start_from_pool",
+        "start_additional",
+        "locked_selected",
+        "remaining",
+        "receipt_cap",
+        "requirement_ceiling"
+      ],
+      "additionalProperties": false
+    },
+    "ItemPlan": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ItemRow"
+          },
+          "maxItems": 1024,
+          "minItems": 0
+        },
+        "coded_checks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "locked_checks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "filler_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "trap_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "rows",
+        "coded_checks",
+        "locked_checks",
+        "filler_count",
+        "trap_count"
+      ],
+      "additionalProperties": false
+    },
+    "TrackChecks": {
+      "description": "Per-track check families (#133 PR 3b), present only when one is on. podium_rungs: the created rung keys in podium SLOT_ORDER; wumpa: Reach 10 Wumpa as one global check or one per track; lettersanity: mode 1 locations, 2 locations and items, 3 items, with letters_per_track for modes 1 and 2; relic_perfect: Relic Race Perfect checks on every Relic Race (#133 PR 3c). content_plan.validate checks the combinations.",
+      "type": "object",
+      "properties": {
+        "podium_rungs": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "held_1st",
+              "held_3rd",
+              "held_5th",
+              "finish_podium",
+              "finish_any"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "wumpa": {
+          "enum": [
+            "global",
+            "per_track"
+          ]
+        },
+        "lettersanity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "letters_per_track": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "relic_perfect": {
+          "const": true
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ItemPacks": {
+      "description": "Pool-only packs (#133 PR 4a), present only when one is on: progressive_starting_wumpa copies of Progressive Starting Wumpa, one Turbo Grant, one Tizi Helper, and with Spoiler Items (#459) one Warp Pad Preview and, with coloured AP boxes, one AP Box Colours. Each takes an item ledger row and no location; content_plan.validate checks the rows and the key order.",
+      "type": "object",
+      "properties": {
+        "progressive_starting_wumpa": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "turbo_grant": {
+          "const": true
+        },
+        "tizi_helper": {
+          "const": true
+        },
+        "warp_pad_preview": {
+          "const": true
+        },
+        "ap_box_colours": {
+          "const": true
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "Racers": {
+      "description": "Character unlocks (#133 PR 4b), present only when Character Unlocks is on: the starting racer (engine character id), whether Remove Playable Oxide is on, and the requested racer-lock maximum. The item ledger pools one row per unlock racer; content_plan.validate checks the rows, the pad racer locks and their count.",
+      "type": "object",
+      "properties": {
+        "starting_character": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "remove_playable_oxide": {
+          "type": "boolean"
+        },
+        "requested_locks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 27
+        }
+      },
+      "required": [
+        "starting_character",
+        "remove_playable_oxide",
+        "requested_locks"
+      ],
+      "additionalProperties": false
+    },
+    "Capability": {
+      "description": "Capability packs (#133 PR 4c), present only when Progressive Boost or Progressive Stats is on: the two modes (0 off, 1 shared, 2 per racer), Blue Fire (only with boost), Logic Difficulty (0 easy, 1 medium, 2 hard) and Shortcut Knowledge (0 easy, 1 medium, 2 hard). The item ledger pools the chains; checks carry their boost rank.",
+      "type": "object",
+      "properties": {
+        "boost_mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "boost_blue_fire": {
+          "type": "boolean"
+        },
+        "stats_mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "logic_difficulty": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "shortcut_knowledge": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "boost_mode",
+        "boost_blue_fire",
+        "stats_mode",
+        "logic_difficulty",
+        "shortcut_knowledge"
+      ],
+      "additionalProperties": false
+    },
+    "GlobalChecks": {
+      "description": "Global check families (#133 PR 4d), present only when one is on: itemsanity (22 use checks and one ledger row per weapon item) and hit_character (16 checks, with the room's hit_character_encounters block). Their checks have owner global and a route per Trophy Race and CTR Challenge that can earn them; content_global_checks.checks decides them and content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "itemsanity": {
+          "const": true
+        },
+        "hit_character": {
+          "const": true
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ItemBoxes": {
+      "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none.",
+      "type": "object",
+      "properties": {
+        "shortcut_knowledge": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "shortcut_knowledge"
+      ],
+      "additionalProperties": false
+    },
+    "Bosses": {
+      "description": "Boss garages (#133 PR 6), present exactly when content_pool.bosses.enabled is true and then with the encounters: the Oxide goal (0 none, 1 any_percent, 2 101_percent, 3 disabled), Bosses Required Goal, whether N. Oxide's Challenge is optional before the Final Challenge (101_percent only), the Final Challenge relic mode and its resolved count (the defaults 0 and 18 when Oxide is disabled), Boss Track Shuffle with its repeat policy, and the garage requirement level of the mixed-item roll (#133 PR 6b). content_bosses decides the encounters, their boss race entries, requirements and checks from it; content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "oxide_goal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "bosses_required": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "oxide_1_optional": {
+          "type": "boolean"
+        },
+        "oxide_final_unlock": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "oxide_final_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 54
+        },
+        "track_shuffle": {
+          "type": "boolean"
+        },
+        "repeats": {
+          "type": "boolean"
+        },
+        "requirement_level": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "high",
+            "very_high",
+            "chaotic"
+          ]
+        },
+        "cups": {
+          "description": "#133 PR 6b: the ordinary garages (0 to 3, in order) that hold a boss cup instead of a boss race.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "opponent_shuffle": {
+          "description": "Job J11: the encounter fields, present together only when an opponent, kit or N. Oxide profile is drawn.",
+          "type": "boolean"
+        },
+        "oxide_in_pool": {
+          "type": "boolean"
+        },
+        "kit_shuffle": {
+          "type": "boolean"
+        },
+        "gauntlet": {
+          "type": "boolean"
+        },
+        "kit": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "assignment": {
+                  "enum": [
+                    "mixed_loadouts",
+                    "signature_profiles"
+                  ]
+                },
+                "intensity": {
+                  "enum": [
+                    "relaxed",
+                    "standard",
+                    "intense",
+                    "mayhem"
+                  ]
+                },
+                "loss_easing": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "assignment",
+                "intensity",
+                "loss_easing"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "oxide_attack_profile": {
+          "enum": [
+            "retail",
+            "all_compatible"
+          ]
+        },
+        "track_assignment": {
+          "enum": [
+            "character_home_track",
+            "independent_track"
+          ]
+        },
+        "final_chaos": {
+          "description": "Present only on a chaos Final Challenge: the five bosses race at once on the final encounter's attack schedule.",
+          "const": true
+        }
+      },
+      "required": [
+        "oxide_goal",
+        "bosses_required",
+        "oxide_1_optional",
+        "oxide_final_unlock",
+        "oxide_final_count",
+        "track_shuffle",
+        "repeats",
+        "requirement_level",
+        "cups"
+      ],
+      "additionalProperties": false
+    },
+    "WumpaShop": {
+      "description": "The Wumpa Shop (job J11), present only with wumpa_shop_slots above 0: slots per hub, the price percentage, whether progression may sit in a slot, and shop hints. content_wumpa decides the shop checks; content_plan.validate recomputes them.",
+      "type": "object",
+      "properties": {
+        "slots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25
+        },
+        "prices": {
+          "type": "integer",
+          "minimum": 25,
+          "maximum": 400
+        },
+        "progression": {
+          "enum": [
+            "allowed",
+            "excluded"
+          ]
+        },
+        "hints": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "slots",
+        "prices",
+        "progression",
+        "hints"
+      ],
+      "additionalProperties": false
+    },
+    "FixedItems": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "keys": {
+          "const": true
+        },
+        "gems": {
+          "const": true
+        },
+        "oxide_1_filler": {
+          "const": true
+        }
+      }
+    },
+    "PadRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "vanilla",
+            "randomized",
+            "random_without_4_keys"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -77,13 +77,11 @@ destination role provides a race mode in which reaching 10 wumpa is possible.
 inferred from the broad `crates` flag, because a track can carry crate instances
 without offering a real path to ten fruit.
 """
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
-from .custom_tracks import (REPLACEABLE_DESTINATIONS, WUMPA_COLLECTIBLE_FLAG,
-                            normalize_custom_tracks)
-from .item_boxes import BOX_TRACKS, TRACK_LEVEL_IDS
+from .item_boxes import BOX_TRACKS
 from .location_class import LocationClass
-from .trial_trophy import TRIAL_TRACKS, TRIAL_TROPHY_CLASS
+from .destinations import TRIAL_TRACKS, TRIAL_TROPHY_CLASS
 
 # ── option modes ────────────────────────────────────────────────────────────
 #: `wumpa_check` Choice values. The order preserves the retired Boolean
@@ -180,15 +178,15 @@ def dropped_boss_wumpa_track(options) -> Optional[str]:
 
     Returns the track name, or None when the dropped destination hosts no boss
     race, when this seed removed that race, or when nothing is dropped. The
-    garage-to-track mapping is read from `Regions.BOSS_WUMPA_TRACKS` rather
-    than retyped, so a later boss shuffle moves this answer with it.
+    garage-to-track mapping is `boss_track_shuffle.garage_tracks`: the retail
+    table, or this seed's #169 boss track draw, which moves this answer.
     """
-    from .cortex_vortex_track import dropped_track
-    from .Regions import BOSS_WUMPA_TRACKS
+    from .cortex_vortex import dropped_track
+    from .boss_track_shuffle import garage_tracks
     dropped = dropped_track(options)
     if dropped is None or dropped not in WUMPA_RETAIL_TRACKS:
         return None
-    garages = [garage for garage, track in BOSS_WUMPA_TRACKS.items()
+    garages = [garage for garage, track in garage_tracks(options).items()
                if track == dropped]
     if not garages:
         return None
@@ -196,7 +194,9 @@ def dropped_boss_wumpa_track(options) -> Optional[str]:
     # (issue #320), so a dropped Oxide Station then has no race left to award
     # the check. Every other setting keeps N. Oxide's Challenge, which is raced
     # on Oxide Station whatever `oxide_final_track` says, so the check survives.
-    if "N. Oxide Garage" in garages and not _oxide_content_present(options):
+    if not _oxide_content_present(options):
+        garages = [garage for garage in garages if garage != "N. Oxide Garage"]
+    if not garages:
         return None
     return dropped
 
@@ -212,7 +212,7 @@ def eligible_retail_tracks(options) -> Tuple[str, ...]:
     A destination dropped by `cortex_vortex_track` leaves, EXCEPT when it hosts
     a boss race that is still in the seed (`dropped_boss_wumpa_track`).
     """
-    from .cortex_vortex_track import dropped_track
+    from .cortex_vortex import dropped_track
     trial_trophies = set(TRIAL_TROPHY_CLASS.created_location_names(options))
     dropped = dropped_track(options)
     kept = dropped_boss_wumpa_track(options)
@@ -229,7 +229,8 @@ def cortex_vortex_venue_active(options) -> bool:
     content is present -- the venue route onto the Cortex Vortex Wumpa check."""
     oxide_final = getattr(options, "oxide_final_track", None)
     oxide_goal = getattr(options, "oxide_goal", None)
-    return (oxide_final is not None and int(oxide_final.value) == 0 and
+    from .Options import final_on_cortex
+    return (oxide_final is not None and final_on_cortex(oxide_final) and
             (oxide_goal is None or int(oxide_goal.value) != 3))
 
 
@@ -237,7 +238,7 @@ def cortex_vortex_wumpa_active(options) -> bool:
     """Per-track mode creates `Cortex Vortex: Reach 10 Wumpa` when Cortex
     Vortex is a pad track, or when it is the Oxide 2 venue with Oxide content
     present (2026-09-13 contract). One identity for every route onto it."""
-    from .cortex_vortex_track import track_on
+    from .cortex_vortex import track_on
     if _mode(options) != WUMPA_PER_TRACK:
         return False
     return track_on(options) or cortex_vortex_venue_active(options)
@@ -262,53 +263,6 @@ def _mode(options) -> int:
     if value not in (WUMPA_OFF, WUMPA_GLOBAL, WUMPA_PER_TRACK):
         return WUMPA_OFF
     return value
-
-
-def _descriptor(options) -> Dict[str, Dict[str, object]]:
-    """This seed's normalized `custom_tracks` descriptor, or `{}`.
-
-    Normalized through the option validator rather than read raw, so the
-    eligibility question below and the rest of generation are looking at exactly
-    the same descriptor. A stand-in options object without the key answers `{}`.
-    """
-    raw = getattr(getattr(options, "custom_tracks", None), "value", None)
-    if not raw:
-        return {}
-    return normalize_custom_tracks(raw)
-
-
-def eligible_custom_roles(options) -> List[Tuple[str, str, str, Dict[str, object]]]:
-    """The custom destination roles that earn a Wumpa check this seed.
-
-    Returns `(role, label, region, entry)` per eligible role, in
-    `CUSTOM_DESTINATION_ROLES` order. Every one of the specification's four
-    conditions is checked here, in one place, so creation, logic, the wire and
-    the tests can never disagree about which roles are live.
-    """
-    tracks = _descriptor(options)
-    if not tracks:
-        return []
-    # `replaces` -> the entry that claimed it. Validation already guarantees at
-    # most one entry and a known destination, but resolving through the map
-    # rather than assuming keeps this honest if that ever widens.
-    by_role: Dict[str, Dict[str, object]] = {}
-    for entry in tracks.values():
-        role = entry.get("replaces")
-        if role in REPLACEABLE_DESTINATIONS:
-            by_role[role] = entry
-
-    out = []
-    for role, label, region in CUSTOM_DESTINATION_ROLES:
-        entry = by_role.get(role)
-        if entry is None:
-            continue  # not present in the descriptor, or bound elsewhere
-        if not ROLE_OFFERS_TEN_WUMPA.get(role, False):
-            continue  # the role's race mode cannot reach ten fruit
-        flags = entry.get("flags") or {}
-        if not bool(flags.get(WUMPA_COLLECTIBLE_FLAG, False)):
-            continue  # the package measured NO wumpa route
-        out.append((role, label, region, entry))
-    return out
 
 
 class WumpaLocationClass(LocationClass):
@@ -353,9 +307,10 @@ class WumpaLocationClass(LocationClass):
 
     def created_location_names(self, options):
         """Off: nothing. Global: the one global check. Per-track: each retail
-        destination with a supported race this seed plus one per eligible custom
-        destination role, and NOT the global one -- the modes are alternatives,
-        not layers."""
+        destination with a supported race this seed, and NOT the global one --
+        the modes are alternatives, not layers. The content plan creates its
+        own Wumpa checks (content_wumpa); one generator row 12 deleted the
+        legacy custom-descriptor roles here."""
         mode = _mode(options)
         if mode == WUMPA_GLOBAL:
             return [WUMPA_TEN_LOCATION]
@@ -363,62 +318,11 @@ class WumpaLocationClass(LocationClass):
             return []
         names = [retail_location_name(track)
                  for track in eligible_retail_tracks(options)]
-        names += [custom_location_name(label)
-                  for _role, label, _region, _entry
-                  in eligible_custom_roles(options)]
         if cortex_vortex_wumpa_active(options):
             names.append(WUMPA_CORTEX_VORTEX_LOCATION)
         return names
 
     # ------------------------------------------------------------------- wire
-
-    def cortex_vortex_active(self, options) -> bool:
-        """Whether `Cortex Vortex: Reach 10 Wumpa` exists this seed."""
-        return cortex_vortex_wumpa_active(options)
-
-    def retail_code(self, track: str) -> int:
-        return WUMPA_RETAIL_CODE_BASE + WUMPA_RETAIL_TRACKS.index(track)
-
-    def custom_code(self, role: str) -> int:
-        for index, (candidate, _label, _region) in enumerate(
-                CUSTOM_DESTINATION_ROLES):
-            if candidate == role:
-                return WUMPA_CUSTOM_CODE_BASE + index
-        raise KeyError(f"no custom Wumpa destination slot for role {role!r}")
-
-    def wire_block(self, options) -> Dict[str, object]:
-        """The self-describing `wumpa_checks` slot_data block (call only when the
-        mode is not off).
-
-        Native parses this rather than hardcoding the new range: the wire is the
-        authority on which codes exist in this seed. `global` is -1 when the
-        global check is not live, matching the -1 = absent sentinel the podium
-        and item-box blocks already use. `retail_tracks` is keyed by engine
-        LevelID as a decimal string, the same currency `warp_pad_map`,
-        `gem_cup_legs` and `item_box_checks` use.
-        """
-        mode = _mode(options)
-        block: Dict[str, object] = {
-            "mode": mode,
-            "global": WUMPA_CODE_BASE if mode == WUMPA_GLOBAL else -1,
-            "retail_tracks": {},
-            "custom_destinations": {},
-        }
-        if mode != WUMPA_PER_TRACK:
-            return block
-        block["retail_tracks"] = {
-            str(TRACK_LEVEL_IDS[track]): self.retail_code(track)
-            for track in eligible_retail_tracks(options)
-        }
-        block["custom_destinations"] = {
-            role: {
-                "code": self.custom_code(role),
-                "package_uuid": entry["package_uuid"],
-                WUMPA_COLLECTIBLE_FLAG: True,
-            }
-            for role, _label, _region, entry in eligible_custom_roles(options)
-        }
-        return block
 
 
 #: The registered wumpa class. `Locations.py` registers this instance.

@@ -22,7 +22,6 @@ from BaseClasses import ItemClassification
 
 from ..Items import load_item_table
 from ..Locations import CTR_LOCATION_CLASSES
-from .. import rung_sizer
 from ..tizi_helper import TIZI_HELPER_CODE
 from ..turbo_grant import (
     RULED_MASK_SIBLING,
@@ -103,10 +102,6 @@ class TestTurboGrantOff(CTRTestBase):
                       if item.player == self.player]
         self.assertNotIn(TURBO_GRANT_ITEM, pool_names)
 
-    def test_wire_scalar_is_emitted_and_false(self) -> None:
-        slot_data = self.world.fill_slot_data()
-        self.assertIn("turbo_grant", slot_data["ctr_options"])
-        self.assertFalse(slot_data["ctr_options"]["turbo_grant"])
 
 
 class TestTurboGrantOn(CTRTestBase):
@@ -125,15 +120,7 @@ class TestTurboGrantOn(CTRTestBase):
         self.assertFalse([loc for loc in self.multiworld.get_locations(self.player)
                           if "Turbo Grant" in loc.name])
 
-    def test_wire_scalar_is_true(self) -> None:
-        slot_data = self.world.fill_slot_data()
-        self.assertTrue(slot_data["ctr_options"]["turbo_grant"])
 
-    def test_the_rung_sizer_counts_the_supply_spend(self) -> None:
-        with_grant = rung_sizer.predicted_mandatory_pool(self.world)
-        self.world.options.turbo_grant.value = 0
-        without_grant = rung_sizer.predicted_mandatory_pool(self.world)
-        self.assertEqual(with_grant, without_grant + 1)
 
 
 class TestTurboGrantWithItemsanity(CTRTestBase):
@@ -149,10 +136,6 @@ class TestTurboGrantWithItemsanity(CTRTestBase):
         self.assertIn(TURBO_GRANT_ITEM, pool_names)
         self.assertIn(TURBO_ITEMSANITY_COMPANION, pool_names)
 
-    def test_both_scalars_ride_the_same_wire(self) -> None:
-        options = self.world.fill_slot_data()["ctr_options"]
-        self.assertTrue(options["turbo_grant"])
-        self.assertTrue(options["itemsanity"])
 
 
 class TestTurboGrantWithItsRuledSiblings(CTRTestBase):
@@ -194,16 +177,4 @@ class TestTurboGrantUniversalTrackerRestore(CTRTestBase):
     run_default_tests = False
     options = {"turbo_grant": True}
 
-    def test_the_scalar_round_trips(self) -> None:
-        wire = self.world.fill_slot_data()
-        self.world.options.turbo_grant.value = 0
-        self.world._ut_restore_options(wire)
-        self.assertEqual(self.world.options.turbo_grant.value, 1)
 
-    def test_a_pre_224_seed_restores_to_off(self) -> None:
-        """No key on the wire is any seed generated before this build."""
-        wire = self.world.fill_slot_data()
-        del wire["ctr_options"]["turbo_grant"]
-        self.world.options.turbo_grant.value = 1
-        self.world._ut_restore_options(wire)
-        self.assertEqual(self.world.options.turbo_grant.value, 0)

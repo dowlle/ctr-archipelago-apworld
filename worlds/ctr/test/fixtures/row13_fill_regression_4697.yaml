@@ -1,0 +1,195 @@
+description: Crash Team Racing Template, generated with https://github.com/Eijebong/Archipelago-fuzzer/tree/0.2.1
+game: Crash Team Racing
+requires:
+  version: 0.6.7
+Crash Team Racing:
+  progression_balancing: 80
+  accessibility: full
+  retail_tracks:
+  - all
+  track_modes:
+    default:
+    - trophy
+    - ctr
+    - relic
+  custom_tracks: []
+  cortex_vortex_track: in_pool
+  required_entries: []
+  cup_count: 24
+  cup_tracks: random_repeats
+  cup_custom_legs: 4
+  one_lap_cups: 'true'
+  crystal_challenge_count: 1
+  crystal_arenas:
+  - Skull Rock
+  - Rampage Ruins
+  - Rocky Road
+  - Nitro Court
+  - Parking Lot
+  - The North Bowl
+  - Lab Basement
+  boss_garages: true
+  boss_cups: 3
+  garage_requirement_level: chaotic
+  boss_track_shuffle: 'false'
+  boss_track_pool: []
+  boss_opponent_shuffle: 'false'
+  boss_character_pool:
+  - Crash Bandicoot
+  - Coco Bandicoot
+  - Polar
+  - Pura
+  - Neo Cortex
+  - N. Tropy
+  - Ripper Roo
+  - Papu Papu
+  - Komodo Joe
+  - Pinstripe
+  - Dingodile
+  - Tiny Tiger
+  - N. Gin
+  - Fake Crash
+  - Penta Penguin
+  boss_track_assignment: independent_track
+  boss_kit_shuffle: 'true'
+  boss_attack_assignment: mixed_loadouts
+  boss_attack_intensity: mayhem
+  boss_loss_easing: 'false'
+  boss_weapon_pool:
+  - tnt
+  - potion
+  - bomb
+  - missile
+  - turbo
+  - shield
+  - mask
+  - clock
+  - warp_orb
+  - invisibility
+  oxide_attack_profile: retail
+  oxide_weapon_pool:
+  - tnt
+  - potion
+  - bomb
+  - missile
+  - turbo
+  - shield
+  - mask
+  - clock
+  - warp_orb
+  - invisibility
+  - super_engine
+  purple_cup_boss_gauntlet: false
+  oxide_goal: disabled
+  oxide_1_optional: filler
+  bosses_required_goal: 3
+  gems_required_goal: 3
+  goal_wumpa: 4450
+  oxide_final_challenge_unlock: any_relic_type
+  oxide_final_challenge_relic_count: 18
+  oxide_final_track: cortex_vortex
+  pad_placement: vanilla
+  race_mode_order: per_pad
+  adventure_structure: classic
+  warppad_unlock_requirements: randomized
+  requirement_weights:
+    Trophy: 90
+    Key: 20
+    Red CTR Token: 16
+    Green CTR Token: 16
+    Blue CTR Token: 16
+    Yellow CTR Token: 16
+    Purple CTR Token: 12
+    Sapphire Relic: 18
+    Gold Relic: 18
+    Platinum Relic: 18
+    Red Gem: 4
+    Green Gem: 4
+    Blue Gem: 4
+    Yellow Gem: 4
+    Purple Gem: 4
+  two_stage_density: 'false'
+  warp_pad_rules: {}
+  racer_locked_pads: 25
+  shuffle_keys: 'false'
+  shuffle_gems: 'false'
+  podium_rungs: []
+  cup_only_podium_rungs: 'false'
+  relic_perfect_checks: 'false'
+  lettersanity: locations_only
+  letters_per_track: 3
+  cup_sweep_checks: 'true'
+  lap_completion_checks: 'true'
+  box_locations: 'true'
+  itemsanity: 'false'
+  crystalsanity: 'false'
+  wumpa_check: global
+  hit_character: 'false'
+  wumpa_shop_slots: 7
+  wumpa_shop_prices: 179
+  wumpa_shop_progression: excluded
+  wumpa_shop_hints: 'false'
+  item_pool: {}
+  trap_fill_percentage: 22
+  trap_weights:
+    icy_road: 5
+    low_gravity: 5
+    forced_usf: 2
+    forced_boost: 4
+    first_person: 3
+    wumpa_wipeout: 4
+    flatten: 6
+    item_reroll: 5
+    forced_use: 4
+    empty_crates: 3
+    weakened_kart: 3
+    boost_blocker: 3
+    wireframe: 2
+    nitro: 5
+    reverse_steering: 4
+    red_potion: 3
+    upside_down: 0
+    mirror_mode: 3
+    warpball_ambush: 3
+    demo_camera: 3
+    clocked_out: 3
+    reverse_camera: 2
+  wumpa_bundles: 'false'
+  reserve_top_up: 'false'
+  progressive_starting_wumpa: 9
+  turbo_grant: 'false'
+  tizi_helper: 'true'
+  starting_character: dingodile
+  character_unlocks: 'true'
+  remove_playable_oxide: 'true'
+  starting_stat_class: acceleration
+  penta_stats: pal
+  editable_stats: 'false'
+  progressive_stats: 'off'
+  progressive_boost: per_character
+  progressive_boost_blue_fire: 'false'
+  logic_difficulty: hard
+  shortcut_knowledge: hard
+  death_link: mask_reset
+  death_link_send:
+  - follow_death_link
+  - mask_grab
+  - race_loss
+  - weapon_hit
+  deathlink_amnesty: 5
+  warp_pad_item_display: by_reward_type
+  ap_item_type_colors: 'true'
+  color_boxes_by_item: 'true'
+  spoiler_items: 'true'
+  race_type_selector: productive
+  tracker_pad_launch: 'true'
+  local_items: []
+  non_local_items: []
+  start_inventory: {}
+  start_inventory_from_pool: {}
+  start_hints: []
+  start_location_hints: []
+  exclude_locations: []
+  priority_locations: []
+  item_links: []
+  plando_items: []

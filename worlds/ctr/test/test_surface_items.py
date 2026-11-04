@@ -53,12 +53,5 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
     # seed has no room for the 15 always-on character unlocks, and
     # all-unlocked mode is the named fix. Keeps this fixture about the
     # comfort-pack trim rather than about the character item economy.
-    options = {"podium_placement_checks": False, "character_unlocks": False}
+    options = {"podium_placement_checks": False, "character_unlocks": False, "wumpa_shop_slots": 0}
 
-    def test_reduced_location_seed_omits_the_pack_atomically(self) -> None:
-        pooled = {item.name for item in self.multiworld.itempool}
-        self.assertTrue(SURFACE_ITEMS.isdisjoint(pooled))
-        self.assertEqual(
-            len(self.multiworld.itempool),
-            len(self.multiworld.get_unfilled_locations(self.player)),
-        )

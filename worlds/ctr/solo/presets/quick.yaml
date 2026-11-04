@@ -1,0 +1,11 @@
+# Quick: a shorter seed with few locks. Beat Oxide; pads open on plain
+# requirements without second-stage locks.
+name: Player
+game: Crash Team Racing
+Crash Team Racing:
+  oxide_goal: any_percent
+  warppad_unlock_requirements: vanilla
+  two_stage_density: "off"
+  racer_locked_pads: 0
+  trap_fill_percentage: 5
+  death_link: "off"

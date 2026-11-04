@@ -9,7 +9,9 @@ This Alpha6 slice creates the geometry-independent race family only: one
 Trophy Race check plus the same five creatable podium rungs used by retail
 trophy races.  All 32 x 6 names are registered unconditionally; a seed creates
 only the slots occupied by selected packages and only the podium rungs enabled
-by that seed's normal podium options.
+by that seed's normal podium options.  A selected package whose track id has a
+named block (#133) creates its block's names instead and leaves its slot's
+generic names uncreated (custom_track_ids).
 """
 from typing import List, Mapping
 
@@ -82,10 +84,13 @@ class CustomTrackLocationClass(LocationClass):
         if not isinstance(raw, Mapping):
             return []
         rungs = created_rung_keys_from_options(options)
+        # A track with a named block creates its block's checks instead (#133).
         out = []
-        for slot, _track_id in enumerate(sorted(raw), start=1):
+        for slot, track_id in enumerate(sorted(raw), start=1):
             if slot > CUSTOM_TRACK_SLOT_COUNT:
                 break
+            if destinations.named_track(track_id) is not None:
+                continue
             out.append(self.trophy_name(slot))
             out.extend(self.location_name(slot, rung) for rung in rungs)
         return out

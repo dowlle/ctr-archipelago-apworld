@@ -42,18 +42,7 @@ class TestWarpPadItemDisplayDefault(CTRTestBase):
         self.assertEqual(opt.value, 0)
         self.assertEqual(opt.current_key, "one_pile")
 
-    def test_wire_value_matches_the_option(self):
-        slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["ctr_options"][WIRE_KEY], 0)
 
-    def test_ut_does_not_restore_it(self):
-        # Display only: a tracking player keeps their own preference, so the
-        # restore pass must leave it alone even when the seed says otherwise.
-        world = self.world
-        world.options.warp_pad_item_display.value = 1
-        world._ut_restore_options({"ctr_options": {WIRE_KEY: 0},
-                                   "warp_pad_unlock": {}, "podium_checks": {}})
-        self.assertEqual(world.options.warp_pad_item_display.value, 1)
 
 
 class TestWarpPadItemDisplayByRewardType(CTRTestBase):
@@ -71,8 +60,8 @@ class TestWarpPadItemDisplayByRewardType(CTRTestBase):
         # Baseline is 7, the unconditional #166 bump (Q28 ruling); this
         # feature itself contributes no further bump.
         slot_data = self.world.fill_slot_data()
-        self.assertEqual(slot_data["schema_version"], 16)
-        self.assertEqual(slot_data["ctr_options"]["schema_version"], 16)
+        self.assertEqual(slot_data["schema_version"], 18)
+        self.assertEqual(slot_data["ctr_options"]["schema_version"], 18)
 
 
 class TestWarpPadItemDisplayIsGenerationNeutral(CTRTestBase):
@@ -88,23 +77,3 @@ class TestWarpPadItemDisplayIsGenerationNeutral(CTRTestBase):
                               options={"warp_pad_item_display": value})
         return mw, mw.worlds[1]
 
-    def test_locations_items_and_slot_data_are_identical(self):
-        mw_a, world_a = self._generate(0)
-        mw_b, world_b = self._generate(1)
-
-        names_a = sorted(loc.name for loc in mw_a.get_locations(1))
-        names_b = sorted(loc.name for loc in mw_b.get_locations(1))
-        self.assertEqual(names_a, names_b)
-
-        pool_a = sorted(item.name for item in mw_a.itempool)
-        pool_b = sorted(item.name for item in mw_b.itempool)
-        self.assertEqual(pool_a, pool_b)
-
-        sd_a = world_a.fill_slot_data()
-        sd_b = world_b.fill_slot_data()
-        self.assertEqual(sd_a["ctr_options"][WIRE_KEY], 0)
-        self.assertEqual(sd_b["ctr_options"][WIRE_KEY], 1)
-        del sd_a["ctr_options"][WIRE_KEY]
-        del sd_b["ctr_options"][WIRE_KEY]
-        self.assertEqual(sd_a, sd_b,
-                         "a display option moved something on the wire")

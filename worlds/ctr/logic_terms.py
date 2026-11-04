@@ -114,6 +114,11 @@ class Or(Term):
         return ["any"] + [c.wire(enc) for c in self.children]
 
 
+def any_of(*terms: Term) -> Term:
+    """OR with explicit empty and singleton semantics."""
+    return FALSE if not terms else terms[0] if len(terms) == 1 else Or(*terms)
+
+
 class Has(Term):
     """`state.has(item, player, count)`."""
 
@@ -257,6 +262,47 @@ def boost_cap(world, racer: Optional[str], boost: int) -> Term:
     return Cap(world, boost, racer)
 
 
+class StatCap(Cap):
+    """Item Box capability: boost and one of each stat on the same racer."""
+
+    def _build(self):
+        from .progressive_capability import gate_satisfied, STAT_CHAINS
+        return (lambda state, w=self.world, p=self.world.player, b=self.boost,
+                r=self.racer, gate=gate_satisfied, stats={chain: 1 for chain in STAT_CHAINS}:
+                gate(w, state, p, boost_min=b, stat_mins=stats, required_character=r))
+
+    def wire(self, enc):
+        term = enc.cap(self.boost, self.racer)
+        mode = int(self.world.options.progressive_stats.value)
+        return term + [mode] if mode else term
+
+
+class ReachRegion(Term):
+    """Live region reachability; serialize its actual entrance graph."""
+
+    def __init__(self, world, region: str):
+        self.world, self.region = world, region
+
+    def _build(self):
+        return lambda state, region=self.region, player=self.world.player: state.can_reach(region, "Region", player)
+
+    def wire(self, enc):
+        return enc.region(self.region)
+
+
+class SerializedRule(Term):
+    """Keep an existing callable while supplying its equivalent wire term."""
+
+    def __init__(self, rule: Callable, term: Term):
+        self.rule, self.term = rule, term
+
+    def _build(self):
+        return self.rule
+
+    def wire(self, enc):
+        return self.term.wire(enc)
+
+
 class BossWins(Term):
     """At least `count` of the boss-won companion flags are held: the
     `bosses_required_goal` predicate (`_install_goal`), native's
@@ -293,21 +339,87 @@ class Families(Term):
         return enc.families(self.families, self.count)
 
 
-class Ref(Term):
-    """`state.can_reach(<location>, "Location", player)`: region access AND
-    that location's own rule. On the wire, a reference to that check's
-    entry."""
+class Local(Term):
+    """A rule that never reaches the export: a plan's goal arms and Item Box
+    stat terms, which are no win check. `wire` refuses, so a win check that
+    ever holds one fails generation instead of exporting a guess."""
 
-    def __init__(self, location: str, player: int):
-        self.location = location
+    def __init__(self, rule: Callable, what: str):
+        self.rule = rule
+        self.what = what
+
+    def _build(self):
+        return self.rule
+
+    def wire(self, enc):
+        from .win_logic import WinLogicExportError
+        raise WinLogicExportError(f"CTR win_logic: {self.what} has no wire form")
+
+
+class Reached(Term):
+    """`Location.can_reach(state)` of a check on the same plan pad as the rule
+    that asks: the pad's first race won. The location is looked up in `placed`
+    at call time, as it may not exist yet. Both sit behind one pad entrance, so
+    the wire form is that check's own rule, read when the block is built. A
+    `Ref` cannot carry this: a race pad's later check may be a ref target too."""
+
+    def __init__(self, placed, code: int, pad_id: str):
+        self.placed = placed
+        self.code = code
+        self.pad_id = pad_id
+
+    def _build(self):
+        return lambda state, placed=self.placed, code=self.code: placed[code].can_reach(state)
+
+    def wire(self, enc):
+        term = term_of(self.placed[self.code])
+        if term is None:
+            from .win_logic import WinLogicExportError
+            raise WinLogicExportError(f"CTR win_logic: pad {self.pad_id} proof {self.code} has no term-backed rule")
+        return term.wire(enc)
+
+
+class EventTerm(Term):
+    """`state.has(event)`, on the wire the term that collects the event. Items
+    with no id cannot travel, and `resolve` gives what the event stands for."""
+
+    def __init__(self, event: str, player: int, resolve: Callable[[], Term]):
+        self.event = event
+        self.player = player
+        self.resolve = resolve
+
+    def _build(self):
+        return lambda state, e=self.event, p=self.player: state.has(e, p)
+
+    def wire(self, enc):
+        return self.resolve().wire(enc)
+
+
+class Ref(Term):
+    """`Location.can_reach(state)`: region access AND that location's own rule.
+    On the wire, a reference to that check's entry.
+
+    Holds the Location object, not its name (#306 B+): Universal Tracker's
+    regeneration renames generic custom locations to their room title, and a
+    rule that looked its target up by name would then fail. A bare name is
+    still accepted for callers that have no object; it resolves by name at
+    evaluation time, as before."""
+
+    def __init__(self, location, player: int):
+        if isinstance(location, str):
+            self.location, self.spot = location, None
+        else:
+            self.location, self.spot = location.name, location
         self.player = player
 
     def _build(self):
+        if self.spot is not None:
+            return lambda state, spot=self.spot: spot.can_reach(state)
         return (lambda state, t=self.location, p=self.player:
                 state.can_reach(t, "Location", p))
 
     def wire(self, enc):
-        return enc.ref(self.location)
+        return enc.ref(self.spot if self.spot is not None else self.location)
 
 
 # --- installing terms on locations and entrances ---------------------------

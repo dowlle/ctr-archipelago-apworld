@@ -1,0 +1,3 @@
+# Lettersanity items with ctr_first: the Trophy Race check needs no letters.
+  adventure_structure: ctr_first
+  lettersanity: {locations_and_items: 1, items_only: 1}

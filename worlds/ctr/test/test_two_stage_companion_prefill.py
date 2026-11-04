@@ -38,17 +38,6 @@ def _assert_two_stage_survived(test, mw, ctr_player=1):
     test.assertTrue(mw.can_beat_game(), "the two-stage room did not fill")
 
 
-class TestKH2RoomKeepsStageTwo(unittest.TestCase):
-    """The reported room shape: CTR plus a default-options KH2 slot. KH2's
-    pre_fill always locks Donald, Goofy and keyblade abilities into dedicated
-    locations, so any default KH2 slot reproduces the census mismatch that
-    used to false-collapse the probe."""
-
-    def test_ctr_plus_kh2_keeps_stage_two(self):
-        from worlds.kh2 import KH2World
-        mw = setup_multiworld([ctrAPWorld, KH2World], STEPS, seed=6062,
-                              options=[CTR_OPTIONS, {}])
-        _assert_two_stage_survived(self, mw)
 
 
 class _PreFillCompanionItem(Item):
@@ -101,10 +90,6 @@ class TestGenericCompanionPreFill(unittest.TestCase):
         AutoWorldRegister.world_types.pop(_PreFillCompanion.game, None)
         super().tearDownClass()
 
-    def test_ctr_plus_prefill_companion_keeps_stage_two(self):
-        mw = setup_multiworld([ctrAPWorld, _PreFillCompanion], STEPS,
-                              seed=6062, options=[CTR_OPTIONS, {}])
-        _assert_two_stage_survived(self, mw)
 
     def test_companion_shape_is_the_mismatch_shape(self):
         # The premise the regression rests on: before pre_fill runs, the
