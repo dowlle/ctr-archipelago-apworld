@@ -187,6 +187,74 @@ class TestDescribe(SoloTestCase):
         self.assertNotIn("death_link", [r["option"] for r in overlay["rules"]])
         self.assertEqual(set(result["values"]), set(overlay_names))
 
+    def test_every_world_option_is_on_the_screen_or_left_out_with_a_reason(self):
+        """Alpha2: Play Solo offers every option that can be a row. A new world
+        option must be placed in a group or named in left_out with its reason."""
+        from worlds.ctr.Options import ctrAPOptions
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        overlay = result["overlay"]
+        shown = [n for g in overlay["groups"] for n in g["options"]]
+        left_out = overlay["left_out"]
+        self.assertEqual(len(shown), len(set(shown)), "an option sits in two groups")
+        self.assertFalse(set(shown) & set(left_out), "an option is both shown and left out")
+        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints),
+                         "place every new option in a group or give it a left_out reason")
+        for name, reason in left_out.items():
+            self.assertTrue(reason.strip(), name)
+        facts = {o["name"]: o for o in result["options"]}
+        for name in shown:
+            self.assertIn(facts[name]["kind"], ("toggle", "choice", "range", "named_range"), name)
+        # Lists, sets and dictionaries are never rows.
+        for name, entry in facts.items():
+            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other"):
+                self.assertIn(name, left_out, name)
+        rule_options = [r["option"] for r in overlay["rules"]]
+        self.assertEqual(len(rule_options), len(set(rule_options)), "one rule per option")
+        for rule in overlay["rules"]:
+            if "label" in rule:
+                self.assertLessEqual(len(rule["label"]), 30, "a row name must fit the screen")
+            elif rule["option"] in shown:
+                self.assertLessEqual(len(facts[rule["option"]]["display_name"]), 30,
+                                     "add a short label rule: the row name must fit the screen")
+            if "step" in rule:
+                self.assertIn(facts[rule["option"]]["kind"], ("range", "named_range"), rule)
+                self.assertGreaterEqual(rule["step"], 1)
+
+    def test_every_value_the_screen_can_pick_is_accepted_by_the_option(self):
+        from worlds.ctr.Options import ctrAPOptions
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        hints = ctrAPOptions.type_hints
+        steps = {r["option"]: r["step"] for r in result["overlay"]["rules"] if "step" in r}
+        facts = {o["name"]: o for o in result["options"]}
+        for group in result["overlay"]["groups"]:
+            for name in group["options"]:
+                entry = facts[name]
+                if entry["kind"] == "toggle":
+                    values = [True, False]
+                elif entry["kind"] == "choice":
+                    values = [c["name"] for c in entry["choices"]]
+                else:
+                    step = steps.get(name, 1)
+                    values = sorted({entry["range_start"], entry["range_end"], entry["default"]} |
+                                    set(range(entry["range_start"], entry["range_end"] + 1, step)))
+                for value in values:
+                    with self.subTest(option=name, value=value):
+                        self.assertEqual(ctr_solo._canonical(hints[name], value), value)
+
+    def test_a_standard_seed_takes_options_from_every_group(self):
+        events, code = self.call(
+            "validate", "--yaml", self.preset("standard.yaml"),
+            "--set", "progressive_boost=\"shared_global\"", "--set", "progressive_boost_blue_fire=true",
+            "--set", "goal_wumpa=50", "--set", "wumpa_shop_prices=25", "--set", "accessibility=\"minimal\"",
+            "--set", "cup_tracks=\"off\"", "--set", "boss_cups=1", "--set", "spoiler_items=true",
+            "--set", "reserve_top_up=false", "--set", "wumpa_check=\"global\"")
+        self.assertEqual(code, 0, events)
+        self.assertEqual(last(events)["event"], "result", events)
+
     def test_describe_reports_preset_values(self):
         events, code = self.call("describe", "--yaml", self.preset("quick.yaml"))
         self.assertEqual(code, 0, events)
