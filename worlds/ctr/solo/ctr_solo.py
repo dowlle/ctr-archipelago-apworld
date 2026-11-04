@@ -1534,7 +1534,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
 
     room_file = room_file_path(room, meta)
     save_file = os.path.splitext(room_file)[0] + ".apsave"
-    password = password or secrets.token_hex(12)
+    password = password or None
 
     log = logging.getLogger()
     log.setLevel(logging.INFO)
@@ -1552,8 +1552,8 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
     log.info("solo serve: room %s, save %s", room_id, save_state)
     load_save(ctx, save_file)
     # The room's embedded server options and a loaded save both set the
-    # passwords. A solo server always uses this session's password and has
-    # no admin password.
+    # passwords. Use only an explicitly requested session password; by
+    # default the loopback-only solo server has no password or admin password.
     ctx.password = password
     ctx.server_password = None
     # Save on every check batch, so a crash cannot lose a check.
@@ -1592,7 +1592,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
         write_json_atomic(os.path.join(room, "session.lock"),
                           {"pid": os.getpid(), "port": port, "seed_name": ctx.seed_name,
                            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
-        emit("ready", port=port, password=password, seed_name=ctx.seed_name, slot=meta.get("slot"),
+        emit("ready", port=port, password=password or "", seed_name=ctx.seed_name, slot=meta.get("slot"),
              room_id=room_id)
         loop = asyncio.get_running_loop()
         lines: asyncio.Queue = asyncio.Queue()
