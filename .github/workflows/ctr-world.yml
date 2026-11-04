@@ -13,7 +13,7 @@ on:
       - '.github/workflows/ctr-world.yml'
       - '.github/fuzz/**'
   push:
-    branches: [main, 'release/**', 'ci/**']
+    branches: [main, 'dev/**', 'release/**', 'ci/**']
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
@@ -21,6 +21,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   AP_VERSION: '0.6.7'
