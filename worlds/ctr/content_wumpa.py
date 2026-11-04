@@ -6,7 +6,8 @@ content plan as plan data. Both are absent when off, so a plan with
 `wumpa_shop_slots: 0` and `goal_wumpa: 0` keeps its wire byte for byte.
 
 SHOP. With `wumpa_shop_slots` N above 0 the plan has the record
-`wumpa_shop: {slots, prices, progression, hints}` (feature `wumpa_shop_v1`)
+`wumpa_shop: {slots, prices, progression, hints, logic_scale}`
+(features `wumpa_shop_v1` and `wumpa_shop_key_tiers_v1`)
 and 5 x N checks, appended after every other check family, hub order N.
 Sanity Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, slot
 order 1..N. Each is the frozen `<Hub> Shop: Slot <n>` location
@@ -19,7 +20,9 @@ band bottom). There is no top-level `wumpa_shop` block and no new envelope
 key: native builds its shop from the plan.
 
 LOGIC. A shop slot needs its hub's Key floor (`KEY_FLOORS`) and `Wumpa
-Income`. On a content plan `Wumpa Income` is reached by any route of a track
+Income`, plus its price/shelf budget from `key_floor`. Legacy plans without
+`logic_scale` keep the original hub-only floor. On a content plan `Wumpa
+Income` is reached by any route of a track
 entry on a normal pad whose track banks fruit (`income_track`: a retail race
 track 0..15, or a custom track whose package has measured Wumpa capability,
 ruling of 2026-11-02), in a Trophy Race or CTR Challenge the entry has, with that
@@ -100,6 +103,14 @@ def check_settings(record):
 
 def check_count(record):
     return len(wumpa_shop.SHOP_HUBS) * record["slots"] if record else 0
+
+
+def key_floor(record, hub, check):
+    """Shared shop rule for opening placement and the installed AP rules."""
+    floor = KEY_FLOORS[hub]
+    if "logic_scale" in record:
+        floor = max(floor, wumpa_shop.logic_key_floor(check["price"], check["unlock_banked"], record["logic_scale"]))
+    return floor
 
 
 def slots(record):
@@ -350,10 +361,7 @@ def install(world, plan, menu, stage_gate, stage_term):
     for hub, _n, code, name in slots(record):
         location = Location(player, LOCATION_BY_CODE[code], code, menu)
         location.type = KIND
-        floor = KEY_FLOORS[hub]
-        if "logic_scale" in record:
-            check = checks[code]
-            floor = max(floor, wumpa_shop.logic_key_floor(check["price"], check["unlock_banked"], record["logic_scale"]))
+        floor = key_floor(record, hub, checks[code])
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
         if hints:
