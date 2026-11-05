@@ -24,14 +24,15 @@ pad_placement race_mode_order adventure_structure warppad_unlock_requirements re
 warp_pad_rules racer_locked_pads shuffle_keys shuffle_gems
 podium_rungs cup_only_podium_rungs relic_perfect_checks lettersanity letters_per_track cup_sweep_checks
 lap_completion_checks box_locations itemsanity
-crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_progression wumpa_shop_hints
+crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_logic_scale wumpa_shop_progression wumpa_shop_hints
 item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up
 progressive_starting_wumpa turbo_grant tizi_helper
 starting_character character_unlocks remove_playable_oxide starting_stat_class penta_stats editable_stats
 progressive_stats
 progressive_boost progressive_boost_blue_fire logic_difficulty shortcut_knowledge
 death_link death_link_send deathlink_amnesty
-warp_pad_item_display ap_item_type_colors color_boxes_by_item spoiler_items pad_approach_hints race_type_selector
+warp_pad_item_display ap_item_type_colors color_boxes_by_item spoiler_items pad_approach_hints pad_hints_wait_for_spoiler pad_hints_progression_only
+shop_hints_progression_only race_type_selector
 tracker_pad_launch
 """.split()
 #: Plan section 2, what happens to every current option: the names that go.
@@ -58,7 +59,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2), 91)
+        self.assertEqual(len(SECTION_2), 95)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))

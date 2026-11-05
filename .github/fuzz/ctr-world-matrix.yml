@@ -1,0 +1,155 @@
+- {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
+- {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'random'}
+- {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-collect-accessibility, check_runs: 500,  check_hook: 'hooks.collect_accessibility_test:Hook',                     check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-item-location-count,   check_runs: 500,  check_hook: 'hooks.item_location_count:Hook',                            check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-placement-refs,        check_runs: 500,  check_hook: 'hooks.check_placement_item_location_references:Hook',       check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz, check_meta: 'random'}
+- {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz, check_meta: 'random'}
+# check-ut compares Universal Tracker's logic with the server's own
+# logic, so it needs the tracker world installed and its own hook. It
+# also forces accessibility: full, because a tracker divergence shows
+# up as locations the server reached and the tracker did not.
+# Both tracker arms run .github/fuzz/ctr_ut_hook.py, which runs the
+# tracker's own hook and compares checks by location id, because the
+# tracker shows generic-slot custom-track checks under their room
+# title (#306 B+). check-ut keeps the plain world (`custom_tracks: []`);
+# check-ut-custom-tracks puts Baby T Park on a pad on every seed, from
+# .github/fuzz/check-ut-custom-tracks-meta.yaml (ruling of 2026-10-18,
+# superseding the 2026-10-13 exclusion).
+- {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
+- {check_name: check-ut-custom-tracks,      check_runs: 1000, check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'check-ut-custom-tracks'}
+# Two custom tracks (#133 PR 2, one named block, one generic B+ slot)
+# and no cups, arenas or garages, from
+# .github/fuzz/content-plan-meta.yaml. The rest is randomized.
+- {check_name: content-plan,                check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan'}
+# Universal Tracker on the forced content plan (#133). The meta has a
+# generic-slot (B+) track, whose checks the tracker shows under their
+# room title. The upstream hook compares checks by name, so this arm
+# runs .github/fuzz/ctr_ut_hook.py, which runs that hook and compares
+# by location id instead. It uses the content-plan meta and its
+# ignored-share cap, and the same pinned tracker as check-ut.
+- {check_name: content-plan-ut,             check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan'}
+# Cups on the forced content plan (#133 PR 5): the content-plan meta
+# with one to eight cups over every leg source, from
+# .github/fuzz/content-plan-cups-meta.yaml, under the same cap.
+- {check_name: content-plan-cups,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-cups'}
+# Boss garages on the forced content plan (#133 PR 6): the cups meta
+# with bosses on and the goal and boss options drawn, from
+# .github/fuzz/content-plan-bosses-meta.yaml, under the same cap.
+- {check_name: content-plan-bosses,         check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-bosses'}
+- {check_name: content-plan-bosses-ut,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-bosses'}
+# Every composing pack at once on the forced content plan (#133 PR 9):
+# the bosses meta with cups, crystals, boss cups and all packs on, from
+# .github/fuzz/content-plan-full-meta.yaml, under the same cap.
+- {check_name: content-plan-full,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-full'}
+- {check_name: content-plan-full-ut,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-full'}
+# The Play Solo seed with picked custom tracks (#89): the default
+# shape with two custom tracks in the pool, one on its own pad, from
+# .github/fuzz/content-plan-vanilla-meta.yaml, under the same cap.
+- {check_name: content-plan-vanilla,        check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-vanilla'}
+# 132 custom tracks in the YAML (row 10a), with more cups, some on
+# generic slots past 32: .github/fuzz/custom-tracks-132.py writes the
+# meta from content-plan-vanilla-meta.yaml, under the same cap.
+- {check_name: content-plan-132,            check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-132'}
+- {check_name: content-plan-132-ut,         check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-132'}
+# Row 5 on the forced content plan: ctr_first, the Wumpa Shop and
+# goal, and Boss Opponent and Kit Shuffle all forced on, from
+# .github/fuzz/content-plan-030-meta.yaml, under the same cap.
+- {check_name: content-plan-030,            check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-030'}
+- {check_name: content-plan-030-ut,         check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-030'}
+# Original Gem Cups on the forced content plan (one generator row 2):
+# the default item pool, so Platinum 0, the surface items and relic
+# checks that follow the item counts are in every seed, with three and
+# seven cups under each cup track value. The arm name carries both;
+# .github/fuzz/content-plan-gem-cups-meta.yaml holds the rest.
+- {check_name: gem-cups-3-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-off'}
+- {check_name: gem-cups-3-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random'}
+- {check_name: gem-cups-3-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random_no_repeats'}
+- {check_name: gem-cups-7-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-off'}
+- {check_name: gem-cups-7-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random'}
+- {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
+- {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
+# Pad placement and requirements (one generator row 3): the vanilla-shape
+# plan at each unlock mode, pad_placement and two_stage_density,
+# accessibility full. .github/fuzz/content-plan-pads-meta.yaml holds the rest.
+- {check_name: pads-vanilla-vanilla,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-vanilla-full'}
+- {check_name: pads-vanilla-within,        check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle_within_kind-full'}
+- {check_name: pads-vanilla-shuffle,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full'}
+- {check_name: pads-within,                check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle_within_kind-full'}
+- {check_name: pads-no-4-keys,             check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-random_without_4_keys-shuffle-full'}
+- {check_name: pads-density-off,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-off'}
+- {check_name: pads-density-light,         check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-light'}
+- {check_name: pads-density-standard,      check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-standard'}
+- {check_name: pads-density-deep,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-deep'}
+- {check_name: pads-density-full,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full'}
+- {check_name: pads-ut,                     check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full'}
+# One generator row 4: items fixed to their own check, with vanilla and
+# random requirements, on the pads meta at accessibility full. The last
+# part of check_meta picks keys, gems, both, filler (oxide_1_optional on
+# its goal, 101_percent) or all of them.
+- {check_name: pads-fixed-keys-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-keys'}
+- {check_name: pads-fixed-gems-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-gems'}
+- {check_name: pads-fixed-both-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both'}
+- {check_name: pads-fixed-keys-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-keys'}
+- {check_name: pads-fixed-gems-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-gems'}
+- {check_name: pads-fixed-both-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both'}
+- {check_name: pads-filler-vanilla,        check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-filler'}
+- {check_name: pads-filler-random,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-filler'}
+- {check_name: pads-fixed-ut-vanilla,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-all'}
+- {check_name: pads-fixed-ut-random,       check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-all'}
+# One generator row 5, on the pads meta at accessibility full. After the
+# fixed part, the rest of check_meta names an overlay in .github/fuzz/overlays.
+- {check_name: pads-goal-any,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-any'}
+- {check_name: pads-goal-101,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-101'}
+- {check_name: pads-goal-bosses,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-bosses'}
+- {check_name: pads-goal-gems,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-gems'}
+- {check_name: pads-goal-wumpa,                 check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-wumpa'}
+- {check_name: pads-goal-all,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-all'}
+- {check_name: pads-goal-wumpa-vanilla,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-goal-wumpa'}
+- {check_name: pads-boss-opponent,              check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-opponent'}
+- {check_name: pads-boss-kit,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-kit'}
+- {check_name: pads-boss-all,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-all'}
+- {check_name: pads-boss-all-vanilla,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-boss-all'}
+- {check_name: pads-boss-cups,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-cups'}
+- {check_name: pads-boss-cups-vanilla,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-boss-cups'}
+- {check_name: pads-gauntlet,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-gauntlet'}
+- {check_name: pads-gauntlet-vanilla,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-gauntlet'}
+- {check_name: pads-ctr-first,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-ctr-first'}
+- {check_name: pads-ctr-first-vanilla,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-ctr-first'}
+- {check_name: pads-letters,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-letters'}
+- {check_name: pads-letters-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-letters'}
+- {check_name: pads-shop-allowed,               check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-shop-allowed'}
+- {check_name: pads-shop-excluded,              check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-shop-excluded'}
+- {check_name: pads-shop-excluded-vanilla,      check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-shop-excluded'}
+- {check_name: pads-shop-fixed,                 check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-shop-excluded'}
+- {check_name: pads-shop-fixed-vanilla,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both-shop-excluded'}
+- {check_name: pads-shop-filler,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-filler-shop-excluded'}
+- {check_name: pads-shop-filler-vanilla,        check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-filler-shop-excluded'}
+- {check_name: pads-wumpa-fixed,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-goal-all'}
+- {check_name: pads-spoiler,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-spoiler'}
+- {check_name: pads-spoiler-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-spoiler'}
+- {check_name: pads-client,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-client'}
+- {check_name: pads-client-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-client'}
+- {check_name: pads-all-ut,                check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-all'}
+- {check_name: pads-all-ut-vanilla,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-all'}
+# One generator row 8: lap checks with each goal, with fixed Keys and Gems,
+# with boss cups, and through Universal Tracker. Overlays laps*.yaml.
+- {check_name: pads-laps-goal-any,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-any'}
+- {check_name: pads-laps-goal-101,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-101'}
+- {check_name: pads-laps-goal-bosses,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-bosses'}
+- {check_name: pads-laps-goal-gems,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-gems'}
+- {check_name: pads-laps-goal-wumpa,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-wumpa'}
+- {check_name: pads-laps-goal-all,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-all'}
+- {check_name: pads-laps-goal-all-vanilla,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-laps-goal-all'}
+- {check_name: pads-laps-fixed-keys-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-keys-laps'}
+- {check_name: pads-laps-fixed-keys-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-keys-laps'}
+- {check_name: pads-laps-fixed-gems-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-gems-laps'}
+- {check_name: pads-laps-fixed-gems-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-gems-laps'}
+- {check_name: pads-laps-fixed-both-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both-laps'}
+- {check_name: pads-laps-fixed-both-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-laps'}
+- {check_name: pads-laps-boss-cups,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-boss-cups'}
+- {check_name: pads-laps-ut,                   check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-laps'}
+- {check_name: pads-laps-ut-vanilla,           check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-laps'}

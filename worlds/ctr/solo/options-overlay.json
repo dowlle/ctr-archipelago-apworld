@@ -1,12 +1,71 @@
 {
   "schema": 1,
   "groups": [
-    {"id": "goal", "label": "Goal", "options": ["oxide_goal", "bosses_required_goal", "gems_required_goal", "oxide_final_challenge_unlock"]},
-    {"id": "progression", "label": "Progression", "options": ["shuffle_keys", "shuffle_gems", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "character_unlocks", "progressive_boost", "progressive_stats", "logic_difficulty"]},
-    {"id": "extras", "label": "Extras", "options": ["itemsanity", "lettersanity", "box_locations", "trap_fill_percentage", "one_lap_cups"]}
+    {"id": "goal", "label": "Goal", "options": ["oxide_goal", "oxide_1_optional", "bosses_required_goal", "gems_required_goal", "goal_wumpa", "oxide_final_challenge_unlock", "oxide_final_challenge_relic_count", "oxide_final_track", "accessibility"]},
+    {"id": "cups", "label": "Cups and Arenas", "options": ["cup_count", "cup_tracks", "cup_custom_legs", "one_lap_cups", "crystal_challenge_count", "crystal_arenas"]},
+    {"id": "bosses", "label": "Bosses", "options": ["boss_garages", "boss_cups", "garage_requirement_level", "boss_track_shuffle", "boss_track_pool", "boss_opponent_shuffle", "boss_character_pool", "boss_track_assignment", "boss_kit_shuffle", "boss_attack_assignment", "boss_weapon_pool", "boss_attack_intensity", "boss_loss_easing", "oxide_attack_profile", "oxide_weapon_pool", "purple_cup_boss_gauntlet"]},
+    {"id": "pads", "label": "Pads and Locks", "options": ["pad_placement", "race_mode_order", "adventure_structure", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "shuffle_keys", "shuffle_gems"]},
+    {"id": "checks", "label": "Checks", "options": ["podium_rungs", "cup_only_podium_rungs", "relic_perfect_checks", "lettersanity", "letters_per_track", "cup_sweep_checks", "lap_completion_checks", "box_locations", "itemsanity", "crystalsanity", "wumpa_check", "hit_character"]},
+    {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_logic_scale", "wumpa_shop_progression", "wumpa_shop_hints", "shop_hints_progression_only"]},
+    {"id": "items", "label": "Items and Traps", "options": ["trap_fill_percentage", "wumpa_bundles", "reserve_top_up", "progressive_starting_wumpa", "turbo_grant", "tizi_helper"]},
+    {"id": "racers", "label": "Racers and Stats", "options": ["starting_character", "character_unlocks", "remove_playable_oxide", "starting_stat_class", "penta_stats", "editable_stats", "progressive_stats"]},
+    {"id": "boost", "label": "Boost", "options": ["progressive_boost", "progressive_boost_blue_fire", "logic_difficulty", "shortcut_knowledge"]},
+    {"id": "display", "label": "Display", "options": ["warp_pad_item_display", "ap_item_type_colors", "color_boxes_by_item", "spoiler_items", "pad_approach_hints", "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "race_type_selector", "tracker_pad_launch"]}
   ],
   "rules": [
+    {"option": "oxide_1_optional", "visible_when": {"oxide_goal": ["101_percent"]}},
     {"option": "oxide_final_challenge_unlock", "visible_when": {"oxide_goal": ["101_percent"]}},
-    {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"}
-  ]
+    {"option": "oxide_final_challenge_relic_count", "label": "Final Challenge Relic Count", "visible_when": {"oxide_goal": ["101_percent"]}},
+    {"option": "letters_per_track", "visible_when": {"lettersanity": ["locations_only", "locations_and_items"]}},
+    {"option": "boss_loss_easing", "visible_when": {"boss_kit_shuffle": [true]}},
+    {"option": "boss_track_pool", "visible_when": {"boss_track_shuffle": [true]}},
+    {"option": "boss_character_pool", "visible_when": {"boss_opponent_shuffle": [true]}},
+    {"option": "boss_weapon_pool", "visible_when": {"boss_kit_shuffle": [true]}},
+    {"option": "oxide_weapon_pool", "visible_when": {"oxide_attack_profile": ["all_compatible"]}},
+    {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"},
+    {"option": "goal_wumpa", "step": 50},
+    {"option": "wumpa_shop_prices", "step": 25},
+    {"option": "wumpa_shop_logic_scale", "step": 25}
+  ],
+  "checklists": {
+    "crystal_arenas": [["Rocky Road"], ["Rampage Ruins"], ["Skull Rock"], ["Nitro Court"], ["Parking Lot"], ["The North Bowl"], ["Lab Basement"]],
+    "boss_track_pool": [["Crash Cove"], ["Roo's Tubes"], ["Tiger Temple"], ["Coco Park"], ["Mystery Caves"], ["Blizzard Bluff"], ["Sewer Speedway"], ["Dingo Canyon"], ["Papu's Pyramid"], ["Dragon Mines"], ["Polar Pass"], ["Cortex Castle"], ["Tiny Arena"], ["Hot Air Skyway"], ["N. Gin Labs"], ["Oxide Station"], ["Slide Coliseum"], ["Turbo Track"], ["Cortex Vortex"]],
+    "boss_character_pool": [["Crash Bandicoot"], ["Coco Bandicoot"], ["Polar"], ["Pura"], ["Neo Cortex"], ["N. Tropy"], ["Ripper Roo"], ["Papu Papu"], ["Komodo Joe"], ["Pinstripe"], ["Dingodile"], ["Tiny Tiger"], ["N. Gin"], ["Fake Crash"], ["Penta Penguin"], ["Nitros Oxide"]],
+    "boss_weapon_pool": [["tnt", "TNT"], ["potion", "Potion"], ["bomb", "Bomb"], ["missile", "Missile"], ["turbo", "Turbo"], ["shield", "Shield"], ["mask", "Mask"], ["clock", "Clock"], ["warp_orb", "Warp Orb"], ["invisibility", "Invisibility"]],
+    "oxide_weapon_pool": [["tnt", "TNT"], ["potion", "Potion"], ["bomb", "Bomb"], ["missile", "Missile"], ["turbo", "Turbo"], ["shield", "Shield"], ["mask", "Mask"], ["clock", "Clock"], ["warp_orb", "Warp Orb"], ["invisibility", "Invisibility"], ["super_engine", "Super Engine"]],
+    "podium_rungs": [["held_1st", "Hold 1st"], ["held_3rd", "Hold 3rd"], ["held_5th", "Hold 5th"], ["finish_on_podium", "Finish on Podium"], ["finish_any", "Finish Any Place"]]
+  },
+  "guards": [
+    {"option": "crystal_challenge_count", "at_most_count_of": "crystal_arenas", "reason": "Check at least as many arenas as Crystal Challenges."},
+    {"option": "boss_character_pool", "when": {"boss_garages": [true], "boss_opponent_shuffle": [true]}, "at_least": 4, "reason": "Opponent shuffle needs 4 racers: bosses never repeat."},
+    {"option": "boss_character_pool", "when": {"boss_garages": [true], "boss_opponent_shuffle": [true], "oxide_goal": ["none", "any_percent", "101_percent"]}, "has": "Nitros Oxide", "at_least": 5, "reason": "With Nitros Oxide checked, check at least 5 racers."},
+    {"option": "boss_weapon_pool", "when": {"boss_garages": [true], "boss_kit_shuffle": [true], "boss_attack_assignment": ["mixed_loadouts"]}, "at_least": 2, "reason": "Mixed loadouts need at least 2 weapons checked."},
+    {"option": "boss_weapon_pool", "when": {"boss_garages": [true], "boss_kit_shuffle": [true], "boss_attack_assignment": ["signature_profiles"]}, "needs_all": ["tnt", "potion", "bomb"], "reason": "Signature profiles need TNT, Potion and Bomb checked."},
+    {"option": "oxide_weapon_pool", "when": {"oxide_attack_profile": ["all_compatible"], "oxide_goal": ["none", "any_percent", "101_percent"]}, "at_least": 1, "reason": "N. Oxide's all_compatible profile needs 1 weapon."}
+  ],
+  "left_out": {
+    "death_link": "Solo has no other players, so DeathLink is forced off (ruling 2026-11-02).",
+    "death_link_send": "DeathLink is forced off in solo.",
+    "deathlink_amnesty": "DeathLink is forced off in solo.",
+    "retail_tracks": "A set of tracks. The Custom Tracks page and a YAML cover track choice.",
+    "track_modes": "A dictionary of per-track modes. Set it in a YAML.",
+    "custom_tracks": "A list. The Custom Tracks page owns it.",
+    "required_entries": "A list. The Custom Tracks page owns it.",
+    "cortex_vortex_track": "The Custom Tracks page owns it.",
+    "requirement_weights": "A dictionary of weights. Set it in a YAML.",
+    "warp_pad_rules": "A dictionary of per-pad rules. Set it in a YAML.",
+    "item_pool": "A dictionary of item counts. Set it in a YAML.",
+    "trap_weights": "A dictionary of weights. Set it in a YAML.",
+    "progression_balancing": "Balances progression between players; there is one player in solo.",
+    "item_links": "Links item pools between players; there is one player in solo.",
+    "local_items": "Keeps items local to a player; every item is local in solo.",
+    "non_local_items": "Sends items to other players; there are none in solo.",
+    "start_inventory": "A dictionary of items. Set it in a YAML.",
+    "start_inventory_from_pool": "A dictionary of items. Set it in a YAML.",
+    "start_hints": "A set of item names. Set it in a YAML.",
+    "start_location_hints": "A set of locations. Set it in a YAML.",
+    "priority_locations": "A set of locations. Set it in a YAML.",
+    "exclude_locations": "A set of locations. Set it in a YAML.",
+    "plando_items": "A list of placements. Set it in a YAML."
+  }
 }

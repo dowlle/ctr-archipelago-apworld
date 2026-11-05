@@ -216,6 +216,28 @@ class TestContentBossShuffleDraws(unittest.TestCase):
                 break
         self.assertEqual(seen, {"custom/baby-t-park/1.0.2", "cortex_vortex"})
 
+    def test_custom_venue_boss_check_reads_its_package(self):
+        """A2-22: a boss race on a custom venue takes the venue package's finish
+        rank. Baby T Park is ruled to need no USF (2026-10-18), so its boss
+        check needs only the first boost, in the plan and on validation."""
+        for seed in range(1, 120):
+            options = shuffle_options(boss_track_shuffle=True, boss_track_assignment="independent_track",
+                                      progressive_boost="shared_global")
+            try:
+                plan = make_world(options, seed=seed).ctr_content_plan
+            except OptionError:
+                continue
+            garages = [g for g in range(4) if venue_of(plan, g) == "custom/baby-t-park/1.0.2"]
+            if not garages:
+                continue
+            for g in garages:
+                enc = plan["encounters"][g]
+                check = next(c for c in plan["checks"] if c["location"] == enc["completion_location"])
+                self.assertEqual(check["boost"], 1)
+            self.assertTrue(content_plan.validate(plan))
+            return
+        self.fail("no seed raced a boss on Baby T Park")
+
     def test_signature_profiles_and_intensity(self):
         world = make_world(shuffle_options(boss_attack_assignment="signature_profiles",
                                            boss_attack_intensity="mayhem", boss_loss_easing=False), seed=3)
@@ -296,8 +318,8 @@ class TestContentAll030(unittest.TestCase):
                 assert_complete(self, world)
                 plan = wire["content_plan"]
                 self.assertTrue(content_plan.validate(plan))
-                self.assertEqual(plan["required_features"][-5:],
-                                 ["ctr_first_v1", "boss_opponents_v1", "wumpa_shop_v1", "wumpa_goal_v1", "pad_client_v1"])
+                self.assertEqual(plan["required_features"][-6:],
+                                 ["ctr_first_v1", "boss_opponents_v1", "wumpa_shop_v1", "wumpa_shop_key_tiers_v1", "wumpa_goal_v1", "pad_client_v1"])
                 tracker = make_world({}, seed=999, passthrough=wire)
                 self.assertEqual(tracker.fill_slot_data(), wire)
                 # The regenerated world reasons like the room: the same

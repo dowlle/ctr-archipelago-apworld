@@ -125,21 +125,105 @@ class TestCortexVortexTrack(unittest.TestCase):
                     for s in range(12))
         self.assertGreater(drawn, 0)
 
-    def test_saphi_cortex_vortex_package_keeps_its_own_identity(self):
+    @staticmethod
+    def saphi_cortex_vortex():
         saphi = copy.deepcopy(UNKNOWN)
         saphi.update(id="package/cortex-vortex/1.1.2", content_id="cortex-vortex", revision="1.1.2",
                      uuid="f1a619f0-9176-5e75-ad96-00db77d8cf2b", display_name="Cortex Vortex", author="Lockheart")
         saphi["files"] = [dict(f, sha256=h * 32) for f, h in zip(saphi["files"], ("aa", "bb"))]
-        plan = make_world(cv_options(custom=[saphi]), seed=6).ctr_content_plan
-        custom = track_of(plan, "custom/cortex-vortex/1.1.2")
-        self.assertEqual(custom["room_title"], "Cortex Vortex (Custom)")
-        names = [c["display_name"] for c in plan["checks"]]
-        self.assertEqual(len(names), len(set(names)))
-        self.assertIn("Cortex Vortex: Trophy Race", names)
-        self.assertIn("Cortex Vortex (Custom): Trophy Race", names)
+        return saphi
+
+    def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):
+        # A tester report (alpha2, 2026-11-04): a seed had two Cortex Vortex pads,
+        # the bundled track and a downloaded copy listed in custom_tracks.
+        for required in (True, False):
+            with self.subTest(own_pad=required), self.assertRaises(OptionError) as caught:
+                make_world(cv_options(custom=[self.saphi_cortex_vortex()], required=required), seed=6)
+            message = str(caught.exception)
+            self.assertIn("package/cortex-vortex/1.1.2", message)
+            self.assertIn("one Cortex Vortex", message)
+
+    def swap_options(self, pinned=False):
+        """`cortex_vortex_track: off` and a downloaded copy listed with the other tracks;
+        `pinned` also puts the copy in `required_entries`."""
+        custom = [copy.deepcopy(content_plan.PACKAGES[1]), copy.deepcopy(UNKNOWN), relic_named(),
+                  self.saphi_cortex_vortex()]
+        options = cv_options(cortex=False, custom=custom)
+        required = options["content_pool"]["required_entries"]
+        if not pinned:
+            required.remove("custom/cortex-vortex/1.1.2")
+        return options
+
+    def test_the_bundled_cortex_vortex_replaces_a_downloaded_copy_when_the_option_is_off(self):
+        # Ruling of 2026-11-05: "Bundled replaces it". Same pool as in_pool with the copy removed.
+        drawn = 0
+        for seed in range(12):
+            world = make_world(self.swap_options(), seed=seed)
+            plan = world.ctr_content_plan
+            ids = {t["id"] for t in plan["tracks"]}
+            self.assertNotIn("custom/cortex-vortex/1.1.2", ids)
+            self.assertNotIn("package/cortex-vortex/1.1.2", {p["id"] for p in plan["packages"]})
+            self.assertNotIn("Cortex Vortex (Custom)", json.dumps(plan))
+            self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_IN_POOL)
+            self.assertEqual(world.ctr_cortex_swap, ["package/cortex-vortex/1.1.2"])
+            self.assertIn("package/north-pole/1.1.0", {p["id"] for p in plan["packages"]})
+            if CV in ids:
+                drawn += 1
+                self.assertEqual(track_of(plan, CV)["package_id"], "bundled/cortex-vortex")
+        self.assertGreater(drawn, 0)
+
+    def test_a_required_downloaded_copy_becomes_the_own_pad_bundled_track(self):
+        for seed in range(4):
+            world = make_world(self.swap_options(pinned=True), seed=seed)
+            self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
+            self.assertIn(CV, {t["id"] for t in world.ctr_content_plan["tracks"]})
+            self.assertEqual(world.ctr_cortex_swap_mode, "own_pad")
+
+    def test_the_swap_matches_in_pool_without_the_copy(self):
+        swapped = make_world(self.swap_options(), seed=4).ctr_content_plan
+        options = self.swap_options()
+        options["content_pool"]["tracks"]["custom"].pop()
+        options["content_pool"]["tracks"]["cortex_vortex"] = True
+        plain = make_world(options, seed=4).ctr_content_plan
+        self.assertEqual(json.dumps(swapped, sort_keys=True), json.dumps(plain, sort_keys=True))
+
+    def test_a_track_mode_override_on_the_copy_carries_over(self):
+        # The test options name tracks by id; the copy's id reaches the generator as its key "cortex-vortex".
+        options = self.swap_options(pinned=True)
+        options["content_pool"]["tracks"]["overrides"] = {"custom/cortex-vortex/1.1.2": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+        # An override under a renamed copy's own title carries over too.
+        options = self.swap_options(pinned=True)
+        options["content_pool"]["tracks"]["custom"][-1]["display_name"] = "Cortex Vortex Remix"
+        world = make_world(options, seed=3, stop_before="generate_early")
+        world.options.track_modes.value = {"default": ["trophy", "ctr", "relic"], "Cortex Vortex Remix": ["relic"]}
+        content_plan.swap_in_bundled_cortex(world)
+        self.assertEqual(world.options.track_modes.value["Cortex Vortex"], ["relic"])
+        self.assertNotIn("Cortex Vortex Remix", world.options.track_modes.value)
+        content_plan.generate(world)
+        self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["relic"])
+
+    def test_the_swap_is_written_to_the_spoiler(self):
+        import io
+        out = io.StringIO()
+        make_world(self.swap_options(), seed=6).write_spoiler(out)
+        self.assertIn("downloaded copy (package/cortex-vortex/1.1.2) was replaced", out.getvalue())
+        self.assertIn("(cortex_vortex_track in_pool)", out.getvalue())
+        out = io.StringIO()
+        make_world(cv_options(cortex=False), seed=6).write_spoiler(out)
+        self.assertNotIn("was replaced by the Cortex Vortex", out.getvalue())
+
+    def test_the_tracker_restores_a_swapped_seed(self):
+        from NetUtils import convert_to_base_types
+        world = make_world(self.swap_options(), seed=2)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        for options in ({}, self.swap_options()):
+            tracker = make_world(options, seed=999, passthrough=convert_to_base_types(wire))
+            self.assertEqual(tracker.ctr_content_plan, world.ctr_content_plan)
+            self.assertEqual(tracker.fill_slot_data(), wire)
 
 
-class TestRelicRacePerfect(unittest.TestCase):
     def test_one_perfect_per_relic_race_with_its_frozen_code(self):
         for seed in range(4):
             plan = make_world(cv_options(), seed=seed).ctr_content_plan

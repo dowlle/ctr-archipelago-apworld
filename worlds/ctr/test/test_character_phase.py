@@ -434,7 +434,7 @@ class TestCharacterSlotData(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Net-capacity across every enabled location and item family (Stef's 00:51
+# Net-capacity across every enabled location and item family (the 00:51
 # ruling: "Count every location actually created by all enabled families
 # against the complete item demand; fail cleanly when demand exceeds supply;
 # fill surplus with normal filler.")

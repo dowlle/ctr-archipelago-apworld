@@ -5,6 +5,8 @@ name: CTR world
 # suite and the content-plan fuzz matrix against a .apworld packed from this
 # commit. The inherited quality hooks retain their run counts; all metas now
 # use the single content-plan generator, including default and tracker arms.
+# The arms live in .github/fuzz/ctr-world-matrix.yml; the classify job picks
+# the none, pr or full tier (.github/fuzz/README.md).
 
 on:
   pull_request:
@@ -12,22 +14,44 @@ on:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
       - '.github/fuzz/**'
+      - '.github/scripts/**'
+      - 'ci-requirements.txt'
+      - '*.md'
+      - '**/*.md'
   push:
-    branches: [main, 'release/**', 'ci/**']
+    branches: [main, 'dev/**', 'release/**', 'ci/**']
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
       - '.github/fuzz/**'
+      - '.github/scripts/**'
+      - 'ci-requirements.txt'
+      - '*.md'
+      - '**/*.md'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    # Manual runs use the selected branch and always run the full tier. The
+    # schedule only dispatches the nightly dev run (schedules fire on main).
+    inputs:
+      nightly:
+        description: Internal marker for the scheduled dev run
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   AP_VERSION: '0.6.7'
   PYTHON_VERSION: '3.12'
   # Pinned to the same commits as dowlle/Archipelago-index fuzz.yml so a PR here
   # and the publication gate cannot disagree on verdict semantics. The one
-  # deliberate difference is the check-ut arm below, which runs the real
+  # deliberate difference is the check-ut arm in ctr-world-matrix.yml, which runs the real
   # Universal Tracker hook instead of the index's placeholder.
   FUZZ_HOOKS_REPO: dowlle/apworld-fuzz-hooks
   FUZZ_HOOKS_REF: 38215940cb45a9258bc1e205de0240ea3f92b471
@@ -40,8 +64,69 @@ env:
   TRACKER_SHA256: 'ce5674e899d0303f156d43f2c8ebe026498031bf7cd3382524c1d02ee359d463'
 
 jobs:
+  classify:
+    name: classify CTR fuzz tier
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      tier: ${{ steps.tier.outputs.tier }}
+      matrix: ${{ steps.tier.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Select fuzz tier and arms
+        id: tier
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          paths="$RUNNER_TEMP/ctr-changed-paths"
+          : > "$paths"
+          # Only pull requests look at the changed paths; pushes never skip fuzz.
+          # The PR file list is the diff against the merge base, so commits that
+          # land on the base branch meanwhile do not count as changes here.
+          # Renames list both names. A failed or truncated list (GitHub stops
+          # at 3000 files) stays empty, which selects the pr tier.
+          # Labels are read live, not from the event, so adding full-fuzz and
+          # then re-running the workflow (or pushing) selects the full tier.
+          labels='[]'
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            labels="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels?per_page=100" --jq '.[].name' \
+              | python -c 'import json, sys; print(json.dumps(sys.stdin.read().splitlines()))')"
+            echo "Labels: $labels"
+            if gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+                --jq '.[] | (.filename, (.previous_filename // empty)) | @json' > "$RUNNER_TEMP/pr-files"; then
+              if [[ "$(wc -l < "$RUNNER_TEMP/pr-files")" -lt 3000 ]]; then
+                # One JSON string per line keeps a newline inside a file name
+                # from splitting it into two paths.
+                python -c 'import json, sys; sys.stdout.write("".join(json.loads(line) + "\0" for line in open(sys.argv[1]) if line.strip()))' \
+                  "$RUNNER_TEMP/pr-files" > "$paths"
+              fi
+            fi
+            echo "Changed paths:"; tr '\0' '\n' < "$paths"
+          fi
+          python -m pip install 'PyYAML==6.0.2'
+          python -m unittest discover -s .github/scripts -p 'test_ctr_fuzz_tiers.py'
+          python .github/scripts/ctr_fuzz_tiers.py \
+            --event "$EVENT_NAME" \
+            --ref "$GIT_REF" \
+            --labels-json "$labels" \
+            --paths-file "$paths" \
+            --matrix-file .github/fuzz/ctr-world-matrix.yml \
+            --output "$GITHUB_OUTPUT"
+
   tests:
     name: pytest worlds/ctr
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -81,6 +166,7 @@ jobs:
 
   pack:
     name: pack ctr.apworld
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -103,168 +189,13 @@ jobs:
 
   fuzz:
     name: fuzz / ${{ matrix.check_name }}
-    needs: pack
+    needs: [classify, pack]
+    if: needs.classify.outputs.tier != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
-          - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'random'}
-          - {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-collect-accessibility, check_runs: 500,  check_hook: 'hooks.collect_accessibility_test:Hook',                     check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-item-location-count,   check_runs: 500,  check_hook: 'hooks.item_location_count:Hook',                            check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-placement-refs,        check_runs: 500,  check_hook: 'hooks.check_placement_item_location_references:Hook',       check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz, check_meta: 'random'}
-          - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz, check_meta: 'random'}
-          # check-ut compares Universal Tracker's logic with the server's own
-          # logic, so it needs the tracker world installed and its own hook. It
-          # also forces accessibility: full, because a tracker divergence shows
-          # up as locations the server reached and the tracker did not.
-          # Both tracker arms run .github/fuzz/ctr_ut_hook.py, which runs the
-          # tracker's own hook and compares checks by location id, because the
-          # tracker shows generic-slot custom-track checks under their room
-          # title (#306 B+). check-ut keeps the plain world (`custom_tracks: []`);
-          # check-ut-custom-tracks puts Baby T Park on a pad on every seed, from
-          # .github/fuzz/check-ut-custom-tracks-meta.yaml (ruling of 2026-10-18,
-          # superseding the 2026-10-13 exclusion).
-          - {check_name: check-ut,                    check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'accessibility-full'}
-          - {check_name: check-ut-custom-tracks,      check_runs: 1000, check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'check-ut-custom-tracks'}
-          # Two custom tracks (#133 PR 2, one named block, one generic B+ slot)
-          # and no cups, arenas or garages, from
-          # .github/fuzz/content-plan-meta.yaml. The rest is randomized.
-          - {check_name: content-plan,                check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan'}
-          # Universal Tracker on the forced content plan (#133). The meta has a
-          # generic-slot (B+) track, whose checks the tracker shows under their
-          # room title. The upstream hook compares checks by name, so this arm
-          # runs .github/fuzz/ctr_ut_hook.py, which runs that hook and compares
-          # by location id instead. It uses the content-plan meta and its
-          # ignored-share cap, and the same pinned tracker as check-ut.
-          - {check_name: content-plan-ut,             check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan'}
-          # Cups on the forced content plan (#133 PR 5): the content-plan meta
-          # with one to eight cups over every leg source, from
-          # .github/fuzz/content-plan-cups-meta.yaml, under the same cap.
-          - {check_name: content-plan-cups,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-cups'}
-          # Boss garages on the forced content plan (#133 PR 6): the cups meta
-          # with bosses on and the goal and boss options drawn, from
-          # .github/fuzz/content-plan-bosses-meta.yaml, under the same cap.
-          - {check_name: content-plan-bosses,         check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-bosses'}
-          - {check_name: content-plan-bosses-ut,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-bosses'}
-          # Every composing pack at once on the forced content plan (#133 PR 9):
-          # the bosses meta with cups, crystals, boss cups and all packs on, from
-          # .github/fuzz/content-plan-full-meta.yaml, under the same cap.
-          - {check_name: content-plan-full,           check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-full'}
-          - {check_name: content-plan-full-ut,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-full'}
-          # The Play Solo seed with picked custom tracks (#89): the default
-          # shape with two custom tracks in the pool, one on its own pad, from
-          # .github/fuzz/content-plan-vanilla-meta.yaml, under the same cap.
-          - {check_name: content-plan-vanilla,        check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-vanilla'}
-          # 132 custom tracks in the YAML (row 10a), with more cups, some on
-          # generic slots past 32: .github/fuzz/custom-tracks-132.py writes the
-          # meta from content-plan-vanilla-meta.yaml, under the same cap.
-          - {check_name: content-plan-132,            check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-132'}
-          - {check_name: content-plan-132-ut,         check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-132'}
-          # Row 5 on the forced content plan: ctr_first, the Wumpa Shop and
-          # goal, and Boss Opponent and Kit Shuffle all forced on, from
-          # .github/fuzz/content-plan-030-meta.yaml, under the same cap.
-          - {check_name: content-plan-030,            check_runs: 1000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'content-plan-030'}
-          - {check_name: content-plan-030-ut,         check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'content-plan-030'}
-          # Original Gem Cups on the forced content plan (one generator row 2):
-          # the default item pool, so Platinum 0, the surface items and relic
-          # checks that follow the item counts are in every seed, with three and
-          # seven cups under each cup track value. The arm name carries both;
-          # .github/fuzz/content-plan-gem-cups-meta.yaml holds the rest.
-          - {check_name: gem-cups-3-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-off'}
-          - {check_name: gem-cups-3-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random'}
-          - {check_name: gem-cups-3-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-3-random_no_repeats'}
-          - {check_name: gem-cups-7-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-off'}
-          - {check_name: gem-cups-7-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random'}
-          - {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
-          - {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
-          # Pad placement and requirements (one generator row 3): the vanilla-shape
-          # plan at each unlock mode, pad_placement and two_stage_density,
-          # accessibility full. .github/fuzz/content-plan-pads-meta.yaml holds the rest.
-          - {check_name: pads-vanilla-vanilla,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-vanilla-full'}
-          - {check_name: pads-vanilla-within,        check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle_within_kind-full'}
-          - {check_name: pads-vanilla-shuffle,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full'}
-          - {check_name: pads-within,                check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle_within_kind-full'}
-          - {check_name: pads-no-4-keys,             check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-random_without_4_keys-shuffle-full'}
-          - {check_name: pads-density-off,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-off'}
-          - {check_name: pads-density-light,         check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-light'}
-          - {check_name: pads-density-standard,      check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-standard'}
-          - {check_name: pads-density-deep,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-deep'}
-          - {check_name: pads-density-full,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full'}
-          - {check_name: pads-ut,                     check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full'}
-          # One generator row 4: items fixed to their own check, with vanilla and
-          # random requirements, on the pads meta at accessibility full. The last
-          # part of check_meta picks keys, gems, both, filler (oxide_1_optional on
-          # its goal, 101_percent) or all of them.
-          - {check_name: pads-fixed-keys-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-keys'}
-          - {check_name: pads-fixed-gems-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-gems'}
-          - {check_name: pads-fixed-both-vanilla,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both'}
-          - {check_name: pads-fixed-keys-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-keys'}
-          - {check_name: pads-fixed-gems-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-gems'}
-          - {check_name: pads-fixed-both-random,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both'}
-          - {check_name: pads-filler-vanilla,        check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-filler'}
-          - {check_name: pads-filler-random,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-filler'}
-          - {check_name: pads-fixed-ut-vanilla,      check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-all'}
-          - {check_name: pads-fixed-ut-random,       check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-all'}
-          # One generator row 5, on the pads meta at accessibility full. After the
-          # fixed part, the rest of check_meta names an overlay in .github/fuzz/overlays.
-          - {check_name: pads-goal-any,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-any'}
-          - {check_name: pads-goal-101,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-101'}
-          - {check_name: pads-goal-bosses,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-bosses'}
-          - {check_name: pads-goal-gems,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-gems'}
-          - {check_name: pads-goal-wumpa,                 check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-wumpa'}
-          - {check_name: pads-goal-all,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-goal-all'}
-          - {check_name: pads-goal-wumpa-vanilla,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-goal-wumpa'}
-          - {check_name: pads-boss-opponent,              check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-opponent'}
-          - {check_name: pads-boss-kit,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-kit'}
-          - {check_name: pads-boss-all,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-all'}
-          - {check_name: pads-boss-all-vanilla,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-boss-all'}
-          - {check_name: pads-boss-cups,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-boss-cups'}
-          - {check_name: pads-boss-cups-vanilla,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-boss-cups'}
-          - {check_name: pads-gauntlet,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-gauntlet'}
-          - {check_name: pads-gauntlet-vanilla,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-gauntlet'}
-          - {check_name: pads-ctr-first,                  check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-ctr-first'}
-          - {check_name: pads-ctr-first-vanilla,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-ctr-first'}
-          - {check_name: pads-letters,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-letters'}
-          - {check_name: pads-letters-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-letters'}
-          - {check_name: pads-shop-allowed,               check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-shop-allowed'}
-          - {check_name: pads-shop-excluded,              check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-shop-excluded'}
-          - {check_name: pads-shop-excluded-vanilla,      check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-shop-excluded'}
-          - {check_name: pads-shop-fixed,                 check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-shop-excluded'}
-          - {check_name: pads-shop-fixed-vanilla,         check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both-shop-excluded'}
-          - {check_name: pads-shop-filler,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-filler-shop-excluded'}
-          - {check_name: pads-shop-filler-vanilla,        check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-filler-shop-excluded'}
-          - {check_name: pads-wumpa-fixed,                check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-goal-all'}
-          - {check_name: pads-spoiler,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-spoiler'}
-          - {check_name: pads-spoiler-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-spoiler'}
-          - {check_name: pads-client,                    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-client'}
-          - {check_name: pads-client-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-client'}
-          - {check_name: pads-all-ut,                check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-all'}
-          - {check_name: pads-all-ut-vanilla,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-all'}
-          # One generator row 8: lap checks with each goal, with fixed Keys and Gems,
-          # with boss cups, and through Universal Tracker. Overlays laps*.yaml.
-          - {check_name: pads-laps-goal-any,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-any'}
-          - {check_name: pads-laps-goal-101,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-101'}
-          - {check_name: pads-laps-goal-bosses,          check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-bosses'}
-          - {check_name: pads-laps-goal-gems,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-gems'}
-          - {check_name: pads-laps-goal-wumpa,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-wumpa'}
-          - {check_name: pads-laps-goal-all,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-all'}
-          - {check_name: pads-laps-goal-all-vanilla,     check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-laps-goal-all'}
-          - {check_name: pads-laps-fixed-keys-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-keys-laps'}
-          - {check_name: pads-laps-fixed-keys-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-keys-laps'}
-          - {check_name: pads-laps-fixed-gems-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-gems-laps'}
-          - {check_name: pads-laps-fixed-gems-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-gems-laps'}
-          - {check_name: pads-laps-fixed-both-vanilla,   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-both-laps'}
-          - {check_name: pads-laps-fixed-both-random,    check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-both-laps'}
-          - {check_name: pads-laps-boss-cups,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-boss-cups'}
-          - {check_name: pads-laps-ut,                   check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-laps'}
-          - {check_name: pads-laps-ut-vanilla,           check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-laps'}
+      matrix: ${{ fromJSON(needs.classify.outputs.matrix) }}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
         uses: actions/checkout@v4
@@ -419,6 +350,42 @@ jobs:
               exit 1
             fi
           fi
+      - name: Name the failing generations
+        # The nightly issue reads these annotations to list arm and seed.
+        if: failure()
+        shell: bash
+        working-directory: archipelago
+        env:
+          CHECK_NAME: ${{ matrix.check_name }}
+          CHECK_MODE: ${{ matrix.check_mode }}
+        run: |
+          shopt -s nullglob
+          if [ "$CHECK_MODE" = "canonical" ]; then
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} canonical generation, seed 0"
+            exit 0
+          fi
+          # The pinned fuzzer draws a random Archipelago seed and does not log
+          # it, so a failure is named by its run number, its YAML in the
+          # fuzz-failure artifact and its last error line.
+          n=0
+          for log in fuzz_output/error/*/*/*.log fuzz_output/timeout/*/*/*.log; do
+            kind="$(basename "$(dirname "$(dirname "$(dirname "$log")")")")"
+            run="$(basename "$log" .log)"
+            yamls="$(cd "$(dirname "$log")" && ls -- *.yaml 2>/dev/null | tr '\n' ' ')"
+            err="$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" | tail -1 | cut -c1-200 || true)"
+            if [ "$kind" = timeout ]; then err="timed out"; fi
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} ${kind} run=${run} yaml=${yamls% } ${err:-no error line}"
+            n=$((n + 1))
+            # GitHub keeps 10 error annotations per step.
+            if [ "$n" -ge 9 ]; then break; fi
+          done
+          total="$(ls -d fuzz_output/error/*/*/ fuzz_output/timeout/*/*/ 2>/dev/null | wc -l)"
+          if [ "$total" -gt "$n" ]; then
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} and $((total - n)) more failed generations, all in the fuzz-failure artifact"
+          fi
+          if [ "$n" -eq 0 ]; then
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} no failing seed in fuzz_output (see the job log)"
+          fi
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -429,3 +396,116 @@ jobs:
             archipelago/canonical_output
           if-no-files-found: ignore
           retention-days: 14
+
+  nightly-dev-dispatch:
+    name: start nightly dev CTR run
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'ctr-world.yml',
+              ref: 'dev/custom-pad-0.3.0',
+              inputs: {nightly: 'true'},
+            });
+
+  nightly-failure-issue:
+    name: report nightly CTR fuzz failure
+    needs: [classify, tests, pack, fuzz, nightly-dev-dispatch]
+    # The schedule reports a failed dispatch; the dispatched dev run reports
+    # its own failed jobs.
+    if: ${{ always() && ((github.event_name == 'schedule' && needs.nightly-dev-dispatch.result != 'success') || (github.event_name == 'workflow_dispatch' && inputs.nightly && (needs.classify.result != 'success' || needs.tests.result != 'success' || needs.pack.result != 'success' || needs.fuzz.result != 'success'))) }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // One open issue collects every nightly failure: the first one
+            // opens it, later ones add a comment, closing it starts afresh.
+            const title = 'Nightly CTR fuzz failure';
+            const {owner, repo} = context.repo;
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner, repo, run_id: context.runId, per_page: 100,
+            });
+            const failed = jobs.filter(job => ['failure', 'cancelled'].includes(job.conclusion));
+            const failingArms = [];
+            for (const job of failed.filter(job => job.name.startsWith('fuzz / '))) {
+              const arm = job.name.slice('fuzz / '.length);
+              const notes = await github.paginate(github.rest.checks.listAnnotations, {
+                owner, repo, check_run_id: job.id, per_page: 100,
+              });
+              const seeds = notes.filter(note => note.title === 'CTR fuzz failure').map(note => note.message);
+              failingArms.push(`- ${arm} (${job.conclusion})`, ...seeds.map(seed => `  - ${seed}`));
+            }
+            const otherFailures = failed
+              .filter(job => !job.name.startsWith('fuzz / '))
+              .map(job => `- ${job.name} (${job.conclusion})`);
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const what = context.eventName === 'schedule'
+              ? 'The nightly dev dispatch failed'
+              : `Nightly full CTR fuzz run on ${context.ref.replace('refs/heads/', '')} at ${context.sha.slice(0, 9)} failed`;
+            const body = [
+              `${what}: ${runUrl}`,
+              '',
+              'Failing arms, with run number, YAML and error for each failed generation (the YAMLs are in the run\'s fuzz-failure artifacts):',
+              ...(failingArms.length ? failingArms : ['- None.']),
+              '',
+              'Other failed jobs:',
+              ...(otherFailures.length ? otherFailures : ['- None.']),
+            ].join('\n');
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const existing = open.find(issue => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({owner, repo, issue_number: existing.number, body});
+              core.info(`Updated #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({owner, repo, title, body});
+              core.info(`Opened #${created.data.number}`);
+            }
+
+  # Branch protection should require only "ctr-world summary" from this workflow.
+  summary:
+    name: ctr-world summary
+    needs: [classify, tests, pack, fuzz, nightly-dev-dispatch, nightly-failure-issue]
+    # The schedule only dispatches the dev run, which has its own summary.
+    if: always() && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required CTR jobs
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          needs = json.loads(os.environ['NEEDS_JSON'])
+          tier = needs['classify']['outputs'].get('tier')
+          expected = {
+              'classify': {'success'},
+              'tests': {'success'},
+              'pack': {'success'},
+              'fuzz': {'success', 'skipped'} if tier == 'none' else {'success'},
+              'nightly-dev-dispatch': {'success', 'skipped'},
+              'nightly-failure-issue': {'success', 'skipped'},
+          }
+          bad = [f'{name}: {needs[name]["result"]}' for name, allowed in expected.items()
+                 if needs[name]['result'] not in allowed]
+          print(f'CTR tier: {tier}; ' + ', '.join(
+              f'{name}: {job["result"]}' for name, job in needs.items()))
+          if bad:
+              print('Unexpected job results: ' + ', '.join(bad), file=sys.stderr)
+              sys.exit(1)
+          PY

@@ -7,7 +7,7 @@ global 10-wumpa location name the same way. A frozen name is a reserved id and
 nothing else: no option created any of them, no pool drew them, and the native
 half sat waiting. This module is the half that makes them real.
 
-THE RULING THIS IMPLEMENTS. Stef, 2026-08-10 16:28/16:30, walking the R-H
+THE RULING THIS IMPLEMENTS. Ruled 2026-08-10 16:28/16:30, walking the R-H
 dossier family by family: two bundles as FILLER, one `Progressive Starting
 Wumpa` name received up to ten times per the #12/#13 progressive convention
 (the dossier's separate "+5 / +10 wumpa useful items" folded into that ladder
@@ -43,7 +43,7 @@ WUMPA_BUNDLE_ITEMS: List[str] = [
     "Big Wumpa Bundle",
 ]
 
-#: The ruled progressive: ONE name, up to ten received copies (Stef, 16:30).
+#: The ruled progressive: ONE name, up to ten received copies (ruled 16:30).
 PROGRESSIVE_WUMPA_ITEM = "Progressive Starting Wumpa"
 
 #: The hard ceiling on that ladder. Ten is not an arbitrary option bound: a kart

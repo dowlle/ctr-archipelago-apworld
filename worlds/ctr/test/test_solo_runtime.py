@@ -187,6 +187,85 @@ class TestDescribe(SoloTestCase):
         self.assertNotIn("death_link", [r["option"] for r in overlay["rules"]])
         self.assertEqual(set(result["values"]), set(overlay_names))
 
+    def test_every_world_option_is_on_the_screen_or_left_out_with_a_reason(self):
+        """Alpha2: Play Solo offers every option that can be a row. A new world
+        option must be placed in a group or named in left_out with its reason."""
+        from worlds.ctr.Options import ctrAPOptions
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        overlay = result["overlay"]
+        shown = [n for g in overlay["groups"] for n in g["options"]]
+        left_out = overlay["left_out"]
+        self.assertEqual(len(shown), len(set(shown)), "an option sits in two groups")
+        self.assertFalse(set(shown) & set(left_out), "an option is both shown and left out")
+        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints),
+                         "place every new option in a group or give it a left_out reason")
+        for name, reason in left_out.items():
+            self.assertTrue(reason.strip(), name)
+        facts = {o["name"]: o for o in result["options"]}
+        checklists = overlay["checklists"]
+        for name in shown:
+            if name in checklists:
+                self.assertEqual(facts[name]["kind"], "set", name)
+            else:
+                self.assertIn(facts[name]["kind"], ("toggle", "choice", "range", "named_range"), name)
+        # A set is a row only as a checklist (A2-41); lists and dictionaries never are.
+        for name, entry in facts.items():
+            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other") and name not in checklists:
+                self.assertIn(name, left_out, name)
+        rule_options = [r["option"] for r in overlay["rules"]]
+        self.assertEqual(len(rule_options), len(set(rule_options)), "one rule per option")
+        for rule in overlay["rules"]:
+            if "label" in rule:
+                self.assertLessEqual(len(rule["label"]), 30, "a row name must fit the screen")
+            elif rule["option"] in shown:
+                self.assertLessEqual(len(facts[rule["option"]]["display_name"]), 30,
+                                     "add a short label rule: the row name must fit the screen")
+            if "step" in rule:
+                self.assertIn(facts[rule["option"]]["kind"], ("range", "named_range"), rule)
+                self.assertGreaterEqual(rule["step"], 1)
+
+    def test_every_value_the_screen_can_pick_is_accepted_by_the_option(self):
+        from worlds.ctr.Options import ctrAPOptions
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        hints = ctrAPOptions.type_hints
+        steps = {r["option"]: r["step"] for r in result["overlay"]["rules"] if "step" in r}
+        facts = {o["name"]: o for o in result["options"]}
+        for group in result["overlay"]["groups"]:
+            for name in group["options"]:
+                entry = facts[name]
+                if entry["kind"] == "toggle":
+                    values = [True, False]
+                elif entry["kind"] == "choice":
+                    values = [c["name"] for c in entry["choices"]]
+                elif entry["kind"] == "set":
+                    # Every row alone, none and all, in checklist order.
+                    keys = [row[0] for row in result["overlay"]["checklists"][name]]
+                    for value in [[key] for key in keys] + [[], keys]:
+                        with self.subTest(option=name, value=value):
+                            self.assertEqual(ctr_solo._canonical(hints[name], value, keys), value)
+                    continue
+                else:
+                    step = steps.get(name, 1)
+                    values = sorted({entry["range_start"], entry["range_end"], entry["default"]} |
+                                    set(range(entry["range_start"], entry["range_end"] + 1, step)))
+                for value in values:
+                    with self.subTest(option=name, value=value):
+                        self.assertEqual(ctr_solo._canonical(hints[name], value), value)
+
+    def test_a_standard_seed_takes_options_from_every_group(self):
+        events, code = self.call(
+            "validate", "--yaml", self.preset("standard.yaml"),
+            "--set", "progressive_boost=\"shared_global\"", "--set", "progressive_boost_blue_fire=true",
+            "--set", "goal_wumpa=50", "--set", "wumpa_shop_prices=25", "--set", "accessibility=\"minimal\"",
+            "--set", "cup_tracks=\"off\"", "--set", "boss_cups=1", "--set", "spoiler_items=true",
+            "--set", "reserve_top_up=false", "--set", "wumpa_check=\"global\"")
+        self.assertEqual(code, 0, events)
+        self.assertEqual(last(events)["event"], "result", events)
+
     def test_describe_reports_preset_values(self):
         events, code = self.call("describe", "--yaml", self.preset("quick.yaml"))
         self.assertEqual(code, 0, events)
@@ -195,6 +274,241 @@ class TestDescribe(SoloTestCase):
         self.assertEqual(values["two_stage_density"], "off")
         self.assertEqual(values["racer_locked_pads"], 0)
         self.assertIs(values["shuffle_keys"], True)
+
+
+CHECKLIST_SETS = ("crystal_arenas", "boss_track_pool", "boss_character_pool", "boss_weapon_pool",
+                  "oxide_weapon_pool", "podium_rungs")
+
+
+#: Boss Garages off, as the option allows it (no Oxide goal, a gem goal).
+NO_GARAGES = ["boss_garages=false", "oxide_goal=\"disabled\"", "bosses_required_goal=0", "gems_required_goal=1"]
+
+
+def guard_refuses(guard: dict, values: dict) -> bool:
+    """The overlay guard rule as native evaluates it (AP_SoloGuardActive)."""
+    for other, allowed in guard.get("when", {}).items():
+        if values[other] not in allowed:
+            return False
+    entries = values[guard["option"]] if isinstance(values[guard["option"]], list) else []
+    if "has" in guard and guard["has"] not in entries:
+        return False
+    if "at_most_count_of" in guard:
+        return values[guard["option"]] > len(values[guard["at_most_count_of"]])
+    if "at_least" in guard and len(entries) < guard["at_least"]:
+        return True
+    return any(key not in entries for key in guard.get("needs_all", []))
+
+
+class TestChecklists(SoloTestCase):
+    """A2-41: the set options are checklists on the options screen, and the
+    guards refuse on screen exactly what generation refuses."""
+
+    def describe(self, *args):
+        events, code = self.call("describe", *args)
+        self.assertEqual(code, 0, events)
+        return last(events)
+
+    def test_checklist_rows_are_the_option_keys_in_docstring_order(self):
+        from worlds.ctr.Options import ctrAPOptions
+        from worlds.ctr import boss_encounters, boss_track_shuffle, destinations
+        result = self.describe()
+        overlay = result["overlay"]
+        facts = {o["name"]: o for o in result["options"]}
+        shown = {n: g["id"] for g in overlay["groups"] for n in g["options"]}
+        checklists = overlay["checklists"]
+        self.assertEqual(set(checklists), set(CHECKLIST_SETS))
+        groups = {"crystal_arenas": "cups", "podium_rungs": "checks"}
+        for name, rows in checklists.items():
+            with self.subTest(option=name):
+                self.assertEqual(shown.get(name), groups.get(name, "bosses"))
+                keys = [row[0] for row in rows]
+                self.assertEqual(len(keys), len(set(keys)))
+                for row in rows:
+                    self.assertIn(len(row), (1, 2), row)
+                    self.assertLessEqual(len(row[-1]), 18, "a checklist row must fit beside its mark")
+                option = ctrAPOptions.type_hints[name]
+                if option.valid_keys:
+                    self.assertEqual(set(keys), set(option.valid_keys))
+                self.assertLessEqual(set(facts[name]["default"]), set(keys))
+                self.assertLessEqual(len(facts[name]["display_name"]), 30)
+        # Rows follow the docstring where it lists the keys, else the source tables.
+        for name in ("crystal_arenas", "podium_rungs"):
+            doc = ctrAPOptions.type_hints[name].__doc__
+            spots = [doc.index(row[0]) for row in checklists[name]]
+            self.assertEqual(spots, sorted(spots), name)
+        self.assertEqual([r[0] for r in checklists["boss_character_pool"]],
+                         list(boss_encounters.OPPONENT_NAMES) + [boss_encounters.OXIDE_NAME])
+        self.assertEqual([r[0] for r in checklists["boss_weapon_pool"]], list(boss_encounters.GARAGE_FAMILIES))
+        self.assertEqual([r[0] for r in checklists["oxide_weapon_pool"]], list(boss_encounters.FAMILIES))
+        # No valid_keys: the boss venues and Cortex Vortex (a custom track is
+        # kept from a YAML, not offered as a row).
+        self.assertEqual({r[0] for r in checklists["boss_track_pool"]},
+                         set(boss_track_shuffle.VENUES) | {destinations.CORTEX_VORTEX})
+
+    def test_guards_name_real_options_and_values(self):
+        result = self.describe()
+        overlay = result["overlay"]
+        facts = {o["name"]: o for o in result["options"]}
+        shown = {n for g in overlay["groups"] for n in g["options"]}
+        for guard in overlay["guards"]:
+            with self.subTest(guard=guard):
+                self.assertIn(guard["option"], shown)
+                self.assertTrue(guard["reason"].strip())
+                self.assertLessEqual(len(guard["reason"]), 56, "the reason must fit the two help lines")
+                for other, allowed in guard.get("when", {}).items():
+                    self.assertIn(other, shown)
+                    fact = facts[other]
+                    legal = [True, False] if fact["kind"] == "toggle" else [c["name"] for c in fact["choices"]]
+                    self.assertLessEqual(set(allowed), set(legal), other)
+                keys = {r[0] for r in overlay["checklists"].get(guard["option"], [])}
+                if "at_most_count_of" in guard:
+                    self.assertIn(facts[guard["option"]]["kind"], ("range", "named_range"))
+                    self.assertIn(guard["at_most_count_of"], overlay["checklists"])
+                else:
+                    self.assertTrue(keys)
+                    self.assertLessEqual(set(guard.get("needs_all", [])) | ({guard["has"]} if "has" in guard else set()),
+                                         keys)
+
+    def check_guard_cases(self, cases):
+        """Each case: the --set list and whether generation accepts it. The
+        guard verdict must agree with the generator on both sides of the line."""
+        overlay = self.describe()["overlay"]
+        base = self.describe("--yaml", self.preset("standard.yaml"))["values"]
+        for settings, accepted in cases:
+            with self.subTest(settings=settings):
+                values = dict(base)
+                for item in settings:
+                    key, _, raw = item.partition("=")
+                    values[key] = json.loads(raw)
+                refused_on_screen = any(guard_refuses(g, values) for g in overlay["guards"])
+                self.assertEqual(not refused_on_screen, accepted, "guard verdict")
+                args = ["validate", "--yaml", self.preset("standard.yaml")]
+                for item in settings:
+                    args += ["--set", item]
+                events, code = self.call(*args)
+                self.assertEqual(code == 0, accepted, events[-3:])
+                if not accepted:
+                    self.assertEqual(last(events)["kind"], "option", last(events))
+
+    def test_crystal_count_guard_matches_generation(self):
+        four = json.dumps(["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"])
+        self.check_guard_cases([
+            (["crystal_challenge_count=5", "crystal_arenas=" + four], False),
+            (["crystal_challenge_count=4", "crystal_arenas=" + four], True),
+            (["crystal_challenge_count=1", "crystal_arenas=[]"], False),
+            (["crystal_challenge_count=0", "crystal_arenas=[]"], True),
+        ])
+
+    def test_boss_racer_pool_guards_match_generation(self):
+        three = ["Crash Bandicoot", "Coco Bandicoot", "Polar"]
+        self.check_guard_cases([
+            (["boss_opponent_shuffle=true", "boss_character_pool=" + json.dumps(three)], False),
+            (["boss_opponent_shuffle=true", "boss_character_pool=" + json.dumps(three + ["Pura"])], True),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"any_percent\"",
+              "boss_character_pool=" + json.dumps(three + ["Nitros Oxide"])], False),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"any_percent\"",
+              "boss_character_pool=" + json.dumps(three + ["Pura", "Nitros Oxide"])], True),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"disabled\"", "bosses_required_goal=2",
+              "boss_character_pool=" + json.dumps(three + ["Nitros Oxide"])], True),
+            (["boss_opponent_shuffle=false", "boss_character_pool=[]"], True),
+            # Boss Garages off: no boss is drawn, so any pool generates.
+            (NO_GARAGES + ["boss_opponent_shuffle=true", "boss_character_pool=[\"Crash Bandicoot\"]"], True),
+        ])
+
+    def test_boss_weapon_pool_guards_match_generation(self):
+        self.check_guard_cases([
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"mixed_loadouts\"", "boss_weapon_pool=[\"tnt\"]"],
+             False),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"mixed_loadouts\"",
+              "boss_weapon_pool=[\"tnt\", \"mask\"]"], True),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+              "boss_weapon_pool=[\"tnt\", \"potion\", \"missile\", \"mask\"]"], False),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+              "boss_weapon_pool=[\"tnt\", \"potion\", \"bomb\"]"], True),
+            (["boss_kit_shuffle=false", "boss_weapon_pool=[]"], True),
+            (NO_GARAGES + ["boss_kit_shuffle=true", "boss_weapon_pool=[\"tnt\"]"], True),
+            (NO_GARAGES + ["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+                           "boss_weapon_pool=[\"mask\"]"], True),
+        ])
+
+    def test_oxide_weapon_pool_guard_matches_generation(self):
+        self.check_guard_cases([
+            (["oxide_goal=\"any_percent\"", "oxide_attack_profile=\"all_compatible\"", "oxide_weapon_pool=[]"], False),
+            (["oxide_goal=\"any_percent\"", "oxide_attack_profile=\"all_compatible\"",
+              "oxide_weapon_pool=[\"super_engine\"]"], True),
+            (["oxide_attack_profile=\"retail\"", "oxide_weapon_pool=[]"], True),
+        ])
+
+    def test_pools_without_a_screen_guard_are_refused_by_name(self):
+        """No screen guard for Boss Track Pool or for the racer pool with
+        character_home_track: what fits depends on the custom tracks picked
+        after the options screen and on which garages draw a boss cup. The
+        world refuses them with an option error naming the option, so the
+        screen opens that row."""
+        overlay = self.describe()["overlay"]
+        base = self.describe("--yaml", self.preset("standard.yaml"))["values"]
+        cases = [
+            (["boss_track_shuffle=true", "boss_track_pool=[\"Crash Cove\"]"], "boss_track_pool"),
+            (["boss_track_shuffle=true", "boss_opponent_shuffle=true", "boss_track_assignment=\"character_home_track\"",
+              "boss_track_pool=" + json.dumps(["Crash Cove", "Tiger Temple", "Coco Park", "Mystery Caves", "Polar Pass"]),
+              "boss_character_pool=" + json.dumps(["Ripper Roo", "Papu Papu", "Komodo Joe", "Pinstripe"])],
+             "boss_character_pool"),
+        ]
+        for settings, option in cases:
+            with self.subTest(option=option):
+                values = dict(base)
+                for item in settings:
+                    key, _, raw = item.partition("=")
+                    values[key] = json.loads(raw)
+                self.assertFalse(any(guard_refuses(g, values) for g in overlay["guards"]))
+                args = ["validate", "--yaml", self.preset("standard.yaml")]
+                for item in settings:
+                    args += ["--set", item]
+                events, code = self.call(*args)
+                self.assertNotEqual(code, 0, events[-3:])
+                self.assertEqual(last(events)["kind"], "option", last(events))
+                self.assertIn(option, last(events)["options"], last(events))
+
+    def test_seven_crystal_challenges_on_seven_arenas_generate_and_round_trip(self):
+        import yaml
+        from worlds.ctr.Options import ARENA_NAMES
+        arenas = [r[0] for r in self.describe()["overlay"]["checklists"]["crystal_arenas"]]
+        rungs = ["held_1st", "finish_any"]
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--name", "Solo",
+                                 "--stamp-requires", "--preset", "standard",
+                                 "--set", "crystal_challenge_count=7", "--set", "crystal_arenas=" + json.dumps(arenas),
+                                 "--set", "podium_rungs=" + json.dumps(rungs))
+        self.assertEqual(code, 0, events[-3:])
+        room = os.path.join(self.solo, "rooms", last(events)["room_id"])
+        player = os.path.join(room, "player.yaml")
+        with open(player, encoding="utf-8") as handle:
+            section = yaml.safe_load(handle)[GAME]
+        self.assertEqual(sorted(section["crystal_arenas"]), sorted(ARENA_NAMES))
+        self.assertEqual(section["crystal_challenge_count"], 7)
+        # The room's YAML shows the same sets on the checklists, in row order.
+        values = self.describe("--yaml", player)["values"]
+        self.assertEqual(values["crystal_arenas"], arenas)
+        self.assertEqual(values["crystal_challenge_count"], 7)
+        self.assertEqual(values["podium_rungs"], rungs)
+
+    def test_a_yaml_set_shows_on_the_checklist_and_keeps_entries_without_a_row(self):
+        path = write_yaml(self.work, "lists.yaml", f"""name: Lists
+game: {GAME}
+{GAME}:
+  crystal_arenas: [Lab Basement, Rocky Road]
+  boss_track_pool: [Crash Cove, custom/some-track]
+  podium_rungs: []
+  boss_weapon_pool:
+    random: 1
+""")
+        result = self.describe("--yaml", path)
+        values, facts = result["values"], {o["name"]: o for o in result["options"]}
+        self.assertEqual(values["crystal_arenas"], ["Rocky Road", "Lab Basement"])
+        self.assertEqual(values["boss_track_pool"], ["Crash Cove", "custom/some-track"])
+        self.assertEqual(values["podium_rungs"], [])
+        # A weighted value cannot be a checklist: the default shows.
+        order = [r[0] for r in result["overlay"]["checklists"]["boss_weapon_pool"]]
+        self.assertEqual(values["boss_weapon_pool"], [k for k in order if k in facts["boss_weapon_pool"]["default"]])
 
 
 class TestPresets(SoloTestCase):
@@ -298,7 +612,11 @@ class TestCustomTracks(SoloTestCase):
         shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-gone"))
         changed = self.install("fixture-changed", "1.0", "Fixture Changed")
         with open(os.path.join(self.assets, "tracks", "fixture-changed", "original", "b-1.0.vrm"), "r+b") as handle:
-            handle.write(b"x")
+            # Flip the first byte: writing a fixed byte left the random file
+            # unchanged when it already started with that byte (1 in 256).
+            first = handle.read(1)[0]
+            handle.seek(0)
+            handle.write(bytes([first ^ 0xFF]))
         with open(os.path.join(self.descriptors, "junk.json"), "w", encoding="utf-8") as handle:
             handle.write("{not json")
         with open(os.path.join(self.descriptors, "foreign.json"), "w", encoding="utf-8") as handle:
@@ -420,7 +738,10 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(last(events)["kind"], "option")
         self.assertIn("required_entries", last(events)["message"])
 
-    def test_removed_options_are_ignored_silently(self):
+    def test_removed_options_are_refused_with_one_message(self):
+        # Ruled 2026-11-04: a 0.2.x YAML does not work in 0.3.0. It used to be
+        # skipped silently here; now it gets the one readable refusal
+        # (legacy_yaml.py), with and without a picked track.
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         section = dict(include_battle_arenas=False, include_gem_cups=False, randomize_gem_cup_tracks=True,
@@ -431,9 +752,12 @@ class TestCustomTracks(SoloTestCase):
         source = write_yaml(self.work, "old.yaml", yaml.safe_dump({"name": "Old", "game": GAME, GAME: section}))
         for extra in ([], ["--track", loop["id"]]):
             events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "6", *extra)
-            self.assertEqual(code, 0, events)
-            self.assertEqual([e for e in events if e["event"] == "error"], [])
-            self.assertEqual(last(events)["custom_tracks"], [loop] if extra else [])
+            self.assertNotEqual(code, 0, events)
+            self.assertEqual(last(events)["kind"], "option")
+            message = last(events)["message"]
+            self.assertIn("from 0.2.x", message)
+            self.assertIn("include_battle_arenas", message)
+            self.assertIn("0.3.0 release notes", message)
 
     def test_a_yaml_sets_the_starting_picks(self):
         import yaml
@@ -494,6 +818,35 @@ class TestCustomTracks(SoloTestCase):
                                      "--seed", "2", *args)
             self.assertEqual(code, 0, events)
             self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
+
+    def test_a_downloaded_cortex_vortex_is_the_same_row_as_the_bundled_one(self):
+        # A tester report (alpha2, 2026-11-04): Play Solo offered the bundled Cortex
+        # Vortex and a downloaded copy as two rows, and the seed got both.
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
+        folder = os.path.join(self.assets, "tracks", "cortex-vortex")
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x")
+        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", loop["id"]])
+        source = write_yaml(self.work, "both.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[saphi, loop], required_entries=["cortex-vortex"])}))
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]}, {"cortex-vortex": 2, loop["id"]: 1})
+        events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "3",
+                                 "--tracks-page", "--track", "cortex-vortex", "--guarantee", "cortex-vortex",
+                                 "--track", loop["id"])
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop])
+        self.assertNotIn("required_entries", section)
+        self.assertEqual(section["cortex_vortex_track"], "own_pad")
+        events, code = self.call("validate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
+                                 "--track", "cortex-vortex", "--track", saphi["id"])
+        self.assertNotEqual(code, 0, events)
+        self.assertEqual((last(events)["kind"], last(events)["track"]), ("track", saphi["id"]))
 
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml
@@ -832,11 +1185,13 @@ class TestServe(SoloTestCase):
         self.assertEqual(code, 0, events)
         return last(events)
 
-    def start(self, room_id: str, first: int, last_port: int) -> tuple[subprocess.Popen, dict]:
+    def start(self, room_id: str, first: int, last_port: int,
+              password: str | None = None) -> tuple[subprocess.Popen, dict]:
         script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        extra = ["--password", password] if password else []
         proc = subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room_id,
                                  "--game-pid", str(os.getpid()), "--port-first", str(first),
-                                 "--port-last", str(last_port)],
+                                 "--port-last", str(last_port)] + extra,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, env=env(self.home))
         line = []
@@ -943,12 +1298,30 @@ class TestServe(SoloTestCase):
         room = self.generate_room()
         base = free_ports(3)
         for _ in range(2):  # the second start loads the save written by the first
-            proc, ready = self.start(room["room_id"], base, base + 2)
+            proc, ready = self.start(room["room_id"], base, base + 2, "test-room-password")
             try:
                 self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], "test-room-password")
                 self.assertEqual(self.try_connect(ready, ""), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, "wrong"), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, ready["password"]), "Connected")
+                proc.stdin.write("/exit\n")
+                proc.stdin.flush()
+                self.assertEqual(proc.wait(15), 0)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+
+    def test_default_has_no_password_even_after_a_passworded_save(self):
+        room = self.generate_room()
+        base = free_ports(3)
+        # A password from an earlier session must not silently come back.
+        for password in ("old-room-password", None, None):
+            proc, ready = self.start(room["room_id"], base, base + 2, password)
+            try:
+                self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], password or "")
+                self.assertEqual(self.try_connect(ready, password or ""), "Connected")
                 proc.stdin.write("/exit\n")
                 proc.stdin.flush()
                 self.assertEqual(proc.wait(15), 0)

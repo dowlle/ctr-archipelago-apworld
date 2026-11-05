@@ -294,7 +294,9 @@ class PlanReach:
         entries = {e["id"]: e for e in plan["entries"]}
         goal = content_bosses.goal_location(plan["bosses"]) if plan.get("bosses") else None
         shop = plan.get("wumpa_shop")
-        floors = {code: content_wumpa.KEY_FLOORS[hub] for hub, _n, code, _name in content_wumpa.slots(shop)} if shop else {}
+        shop_checks = {c["location"]: c for c in plan["checks"] if c["kind"] == content_wumpa.KIND}
+        floors = {code: content_wumpa.key_floor(shop, hub, shop_checks[code])
+                  for hub, _n, code, _name in content_wumpa.slots(shop)} if shop else {}
         spare_shop = bool(shop) and shop["progression"] != "excluded"
         by_pad = {}
         for check in plan["checks"]:
