@@ -1098,7 +1098,10 @@ def required_ids(options, candidates, arenas, packages):
 
 #: Full draws of a plan whose opening does not fit. Random pads with their
 #: simulation take the longest, and few draws fall short (content_opening).
-OPENING_REDRAWS = 16
+#: 16 was too few for a garage that asks a whole family before a fixed Key:
+#: dev fuzz case 581 fits about one draw in six, so 16 all fell short in about
+#: 4 seeds of 100. A plan that fits within 16 draws is unchanged.
+OPENING_REDRAWS = 64
 
 
 def generate(world):

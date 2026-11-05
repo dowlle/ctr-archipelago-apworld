@@ -366,7 +366,11 @@ class TestCustomTracks(SoloTestCase):
         shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-gone"))
         changed = self.install("fixture-changed", "1.0", "Fixture Changed")
         with open(os.path.join(self.assets, "tracks", "fixture-changed", "original", "b-1.0.vrm"), "r+b") as handle:
-            handle.write(b"x")
+            # Flip the first byte: writing a fixed byte left the random file
+            # unchanged when it already started with that byte (1 in 256).
+            first = handle.read(1)[0]
+            handle.seek(0)
+            handle.write(bytes([first ^ 0xFF]))
         with open(os.path.join(self.descriptors, "junk.json"), "w", encoding="utf-8") as handle:
             handle.write("{not json")
         with open(os.path.join(self.descriptors, "foreign.json"), "w", encoding="utf-8") as handle:

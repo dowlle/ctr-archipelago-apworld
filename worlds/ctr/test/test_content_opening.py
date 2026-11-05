@@ -506,6 +506,29 @@ class TestRedraw(unittest.TestCase):
             self.assertGreaterEqual(room, need)
 
 
+class TestExhaustedRedraws(unittest.TestCase):
+    """Dev fuzz case 581 (2026-11-05): random requirements, fixed Keys, and the
+    third Key's garage asking all 20 CTR Tokens. About one draw in six fits, so
+    16 redraws all fell short in about 4 seeds of 100 and seed 101 failed the
+    fill. The budget only matters once a draw falls short."""
+
+    def options(self):
+        path = Path(__file__).parent / "fixtures" / "fuzz_20261105_581-0.yaml"
+        return yaml.safe_load(path.read_text())["Crash Team Racing"]
+
+    def test_case_581_draws_until_it_fits_and_fills(self):
+        world = make_world(self.options(), seed=101, stop_before="fill")
+        room, need = content_opening.fit(world, world.ctr_content_plan)
+        self.assertGreaterEqual(room, need)
+        mw = world.multiworld
+        distribute_items_restrictive(mw)
+        state = CollectionState(mw)
+        state.sweep_for_advancements(locations=mw.get_locations(world.player))
+        self.assertTrue(mw.can_beat_game())
+        self.assertTrue(all(location.can_reach(state) for location in mw.get_locations(world.player)
+                            if location.address is not None))
+
+
 class TestSeating(unittest.TestCase):
     def test_a_reservation_locks_nothing(self):
         world = make_world(dict(TIGHT), seed=2, stop_before="pre_fill")
