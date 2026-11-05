@@ -624,7 +624,7 @@ def encounter_rows(record, venues, final_track):
 
 
 def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None,
-          opponents=None, mode=None):
+          opponents=None, mode=None, packages=None):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
@@ -635,8 +635,11 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
     `cups` {garage: [leg venue]} of the garages holding a boss cup.
     `opponents` {garage: (engine id, schedule or None)} is the drawn racer
     and composed kit of each garage (OXIDE_GARAGE for both N. Oxide races,
-    job J11); None keeps the retail opponents and their inherited attacks."""
+    job J11); None keeps the retail opponents and their inherited attacks.
+    `packages` {package id: descriptor} lets a custom venue's finish rank read
+    its package (measured super turbo pads and the per-package rulings, A2-22)."""
     cups = cups or {}
+    packages = packages or {}
     encounters, entries, requirements, checks = [], [], [], []
     companions = companion_terms(record, gem_term)
     for g, index, venue, opponent, code in encounter_rows(record, venues, final_track):
@@ -671,7 +674,9 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
                      routes=[dict(entry_id=nid, mode=CUP_MODE if cup else MODE, leg_id=None, encounter_id=eid,
                                   own_pad_id=f"garage:{g}", award=AWARD)])
         if capability and capability.get("boost_mode"):
-            check["boost"] = max([FIRST_BOOST_COUNT] + [finish_boost(track_records[tid], capability) for tid in leg_ids])
+            check["boost"] = max([FIRST_BOOST_COUNT] + [
+                finish_boost(track_records[tid], capability, packages.get(track_records[tid].get("package_id")))
+                for tid in leg_ids])
         checks.append(check)
     return encounters, entries, requirements, checks
 
@@ -870,7 +875,7 @@ def expected(plan, retail, cortex):
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
                   {g: own.get(f"boss:{g}") for g in range(4)}, cups, opponents,
-                  plan.get("pad_requirements", {}).get("mode"))
+                  plan.get("pad_requirements", {}).get("mode"), packages)
     return built + (tracks,)
 
 

@@ -106,8 +106,29 @@ class TestBundlesOffIsGenerationNeutral(unittest.TestCase):
         self.assertEqual(draw_filler_name(_FakeWorld(0)), "Wumpa Fruit")
 
 
+class TestBundlesDefaultIsOn(unittest.TestCase):
+    """0.3.0-alpha2: the option now defaults to on."""
+
+    def test_the_option_defaults_to_on(self) -> None:
+        from ..Options import WumpaBundles
+        self.assertEqual(WumpaBundles.default, 1)
+        self.assertEqual(WumpaBundles.from_any(WumpaBundles.default).value, 1)
+
+
+class TestBundlesDefaultSeed(CTRTestBase):
+    """A seed that leaves the option out gets bundles in its filler."""
+    run_default_tests = False
+
+    def test_bundles_reach_the_pool_without_setting_the_option(self) -> None:
+        self.assertEqual(self.world.options.wumpa_bundles.value, 1)
+        names = {i.name for i in self.multiworld.itempool if i.player == self.player}
+        self.assertTrue(names & set(WUMPA_BUNDLE_ITEMS),
+                        "default seed produced no Wumpa bundle")
+
+
 class TestBundlesOffSeed(CTRTestBase):
-    """Default seed: the family is entirely absent."""
+    """Option explicitly off: the family is entirely absent."""
+    options = {"wumpa_bundles": False}
 
     def test_no_bundle_and_no_ladder_item_is_created(self) -> None:
         names = {i.name for i in self.multiworld.itempool if i.player == self.player}

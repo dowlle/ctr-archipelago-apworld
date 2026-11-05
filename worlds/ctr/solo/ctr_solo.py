@@ -1120,6 +1120,11 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
             for t in tracks]
     cortex = _cortex_pick(section)
     if cortex or _cortex_installed(assets):
+        # A downloaded Cortex Vortex is the same track as the bundled one: the page
+        # shows one Cortex Vortex row, which starts as the YAML has either copy.
+        copies = [row for row in rows if row["content_id"] == CORTEX_ID]
+        rows = [row for row in rows if row["content_id"] != CORTEX_ID]
+        cortex = max([cortex] + [row["start"] for row in copies])
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
                         "modes": ["trophy", "ctr", "relic"], "race_modes": ["trophy", "ctr", "relic", "time_trial"],
                         "time_trial": True, "seed_usable": True, "source": "built-in", "start": cortex})
@@ -1177,6 +1182,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     if unusable:
         raise SoloError("track", f"{by_id[unusable]['display_name']} supports Time Trial only and cannot use an Adventure pad.", track=unusable)
     keys = [by_id[p]["content_id"] for p in packages]
+    if CORTEX_ID in keys and CORTEX_ID in picked:
+        raise SoloError("track", "Pick one Cortex Vortex: the one that comes with CTR AP is already picked.",
+                        track=packages[keys.index(CORTEX_ID)])
     twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
     if twice:
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
@@ -1534,7 +1542,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
 
     room_file = room_file_path(room, meta)
     save_file = os.path.splitext(room_file)[0] + ".apsave"
-    password = password or secrets.token_hex(12)
+    password = password or None
 
     log = logging.getLogger()
     log.setLevel(logging.INFO)
@@ -1552,8 +1560,8 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
     log.info("solo serve: room %s, save %s", room_id, save_state)
     load_save(ctx, save_file)
     # The room's embedded server options and a loaded save both set the
-    # passwords. A solo server always uses this session's password and has
-    # no admin password.
+    # passwords. Use only an explicitly requested session password; by
+    # default the loopback-only solo server has no password or admin password.
     ctx.password = password
     ctx.server_password = None
     # Save on every check batch, so a crash cannot lose a check.
@@ -1592,7 +1600,7 @@ def _serve_locked(paths: Paths, room: str, room_id: str, meta: dict, game_pid: i
         write_json_atomic(os.path.join(room, "session.lock"),
                           {"pid": os.getpid(), "port": port, "seed_name": ctx.seed_name,
                            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
-        emit("ready", port=port, password=password, seed_name=ctx.seed_name, slot=meta.get("slot"),
+        emit("ready", port=port, password=password or "", seed_name=ctx.seed_name, slot=meta.get("slot"),
              room_id=room_id)
         loop = asyncio.get_running_loop()
         lines: asyncio.Queue = asyncio.Queue()

@@ -551,11 +551,14 @@ class TestBossCups(unittest.TestCase):
         plan = first_open_world(options).ctr_content_plan
         tracks = {t["id"]: t for t in plan["tracks"]}
         entries = {e["id"]: e for e in plan["entries"]}
+        packages = {p["id"]: p for p in plan["packages"]}
         from ..content_capability import finish_boost
         for enc in plan["encounters"][:4]:
             check = next(c for c in plan["checks"] if c["location"] == enc["completion_location"])
             legs = entries[enc["entry_id"]]["legs"]
-            self.assertEqual(check["boost"], max([1] + [finish_boost(tracks[l["track_id"]], plan["capability"]) for l in legs]))
+            self.assertEqual(check["boost"], max([1] + [
+                finish_boost(tracks[l["track_id"]], plan["capability"],
+                             packages.get(tracks[l["track_id"]].get("package_id"))) for l in legs]))
 
     def test_forged_cups_refuse(self):
         world = self.cup_world(cups=1)

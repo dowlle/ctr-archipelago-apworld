@@ -488,7 +488,10 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(last(events)["kind"], "option")
         self.assertIn("required_entries", last(events)["message"])
 
-    def test_removed_options_are_ignored_silently(self):
+    def test_removed_options_are_refused_with_one_message(self):
+        # Ruled 2026-11-04: a 0.2.x YAML does not work in 0.3.0. It used to be
+        # skipped silently here; now it gets the one readable refusal
+        # (legacy_yaml.py), with and without a picked track.
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         section = dict(include_battle_arenas=False, include_gem_cups=False, randomize_gem_cup_tracks=True,
@@ -499,9 +502,12 @@ class TestCustomTracks(SoloTestCase):
         source = write_yaml(self.work, "old.yaml", yaml.safe_dump({"name": "Old", "game": GAME, GAME: section}))
         for extra in ([], ["--track", loop["id"]]):
             events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "6", *extra)
-            self.assertEqual(code, 0, events)
-            self.assertEqual([e for e in events if e["event"] == "error"], [])
-            self.assertEqual(last(events)["custom_tracks"], [loop] if extra else [])
+            self.assertNotEqual(code, 0, events)
+            self.assertEqual(last(events)["kind"], "option")
+            message = last(events)["message"]
+            self.assertIn("from 0.2.x", message)
+            self.assertIn("include_battle_arenas", message)
+            self.assertIn("0.3.0 release notes", message)
 
     def test_a_yaml_sets_the_starting_picks(self):
         import yaml
@@ -562,6 +568,35 @@ class TestCustomTracks(SoloTestCase):
                                      "--seed", "2", *args)
             self.assertEqual(code, 0, events)
             self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
+
+    def test_a_downloaded_cortex_vortex_is_the_same_row_as_the_bundled_one(self):
+        # A tester report (alpha2, 2026-11-04): Play Solo offered the bundled Cortex
+        # Vortex and a downloaded copy as two rows, and the seed got both.
+        import yaml
+        loop = self.install("fixture-loop", "2.1", "Fixture Loop")
+        saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
+        folder = os.path.join(self.assets, "tracks", "cortex-vortex")
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(b"x")
+        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", loop["id"]])
+        source = write_yaml(self.work, "both.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[saphi, loop], required_entries=["cortex-vortex"])}))
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]}, {"cortex-vortex": 2, loop["id"]: 1})
+        events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "3",
+                                 "--tracks-page", "--track", "cortex-vortex", "--guarantee", "cortex-vortex",
+                                 "--track", loop["id"])
+        self.assertEqual(code, 0, events)
+        section = self.room_section(events)
+        self.assertEqual(section["custom_tracks"], [loop])
+        self.assertNotIn("required_entries", section)
+        self.assertEqual(section["cortex_vortex_track"], "own_pad")
+        events, code = self.call("validate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
+                                 "--track", "cortex-vortex", "--track", saphi["id"])
+        self.assertNotEqual(code, 0, events)
+        self.assertEqual((last(events)["kind"], last(events)["track"]), ("track", saphi["id"]))
 
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml
@@ -900,11 +935,13 @@ class TestServe(SoloTestCase):
         self.assertEqual(code, 0, events)
         return last(events)
 
-    def start(self, room_id: str, first: int, last_port: int) -> tuple[subprocess.Popen, dict]:
+    def start(self, room_id: str, first: int, last_port: int,
+              password: str | None = None) -> tuple[subprocess.Popen, dict]:
         script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        extra = ["--password", password] if password else []
         proc = subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room_id,
                                  "--game-pid", str(os.getpid()), "--port-first", str(first),
-                                 "--port-last", str(last_port)],
+                                 "--port-last", str(last_port)] + extra,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, env=env(self.home))
         line = []
@@ -1011,12 +1048,30 @@ class TestServe(SoloTestCase):
         room = self.generate_room()
         base = free_ports(3)
         for _ in range(2):  # the second start loads the save written by the first
-            proc, ready = self.start(room["room_id"], base, base + 2)
+            proc, ready = self.start(room["room_id"], base, base + 2, "test-room-password")
             try:
                 self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], "test-room-password")
                 self.assertEqual(self.try_connect(ready, ""), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, "wrong"), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, ready["password"]), "Connected")
+                proc.stdin.write("/exit\n")
+                proc.stdin.flush()
+                self.assertEqual(proc.wait(15), 0)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+
+    def test_default_has_no_password_even_after_a_passworded_save(self):
+        room = self.generate_room()
+        base = free_ports(3)
+        # A password from an earlier session must not silently come back.
+        for password in ("old-room-password", None, None):
+            proc, ready = self.start(room["room_id"], base, base + 2, password)
+            try:
+                self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], password or "")
+                self.assertEqual(self.try_connect(ready, password or ""), "Connected")
                 proc.stdin.write("/exit\n")
                 proc.stdin.flush()
                 self.assertEqual(proc.wait(15), 0)
