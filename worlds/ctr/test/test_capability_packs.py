@@ -209,7 +209,7 @@ class TestRanks(unittest.TestCase):
     def test_per_track_rulings(self):
         # the project's per-track rulings (2026-10-18), by content id, decide before
         # the measured flag, whatever the package states.
-        self.assertEqual(content_capability.USF_FINISH_RULINGS, {
+        self.assertEqual({k: v for k, v in content_capability.USF_FINISH_RULINGS.items() if k[1] is None}, {
             ("arabian-heights-night", None, None): 2, ("cortex-vortex", None, None): 2,
             ("tv-world", None, None): 0, ("north-pole", None, None): 0, ("baby-t-park", None, None): 0})
         track = dict(origin="custom", display_name="Loop")
@@ -284,6 +284,43 @@ class TestRanks(unittest.TestCase):
             self.assertEqual(self.need(track, "ctr", "win_letters", loop, logic_difficulty=2), 1)
             self.assertEqual(self.need(track, "perfect", "perfect", loop, logic_difficulty=2), 2)
             self.assertEqual(self.need(track, "trophy", "win", loop, logic_difficulty=0), 1)
+
+    def test_registry_revision_rulings(self):
+        # Project rulings of 2026-11-05 07:19 CET (A2-27), one row per registry
+        # revision and its LEV pin. A tester report is not certification.
+        pins = {
+            ("ancient-lake", "1.0.0"): ("7e5b776f312f500112061b3b95a1f371571fd7dfe7fbd1dc404e7b3d3a3a1e78", 0),
+            ("ancient-lake", "1.0.1"): ("2fc45ad5edaf735426b99229cc561293d02badc6a578ef53f328ad3fc2f85360", 0),
+            ("ancient-lake", "1.0.2"): ("c4497a621a97a8df1c763e0b6a2dc75cd9f3a57b217b0cefa6a938fc83ee6c70", 0),
+            ("bowser-castle-1", "1.0.0"): ("0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9", 0),
+            ("drive-thru-danger", "1.0.0"): ("77706a3b5d46cdd75ffa05e4da316cf5dc400d6e17aad7ccdf0c3f5cd62eee79", 0),
+            ("lights-out", "1.0.0"): ("5ebdb9f235ba0c07ba5c72b715c949afdd6062fcf3208f45a1c13936ffb529c6", 1),
+            ("neon-paradise", "1.0.0"): ("665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0", 0),
+            ("neon-paradise", "1.1.0"): ("639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", 0),
+        }
+        table = content_capability.USF_FINISH_RULINGS
+        self.assertEqual({k: v for k, v in table.items() if k[1] is not None},
+                         {(c, r, lev): rank for (c, r), (lev, rank) in pins.items()})
+        track = dict(origin="custom", display_name="Loop")
+        for (key, revision), (lev, rank) in pins.items():
+            def package(pin, rev=revision, pads=True):
+                return dict(content_id=key, revision=rev, capabilities=dict(super_turbo_pads=pads),
+                            files=[dict(role="lev", sha256=pin), dict(role="vrm", sha256="cd" * 32)])
+            with self.subTest(key=key, revision=revision):
+                self.assertEqual(content_capability.finish_boost(track, RECORD, package(lev)), rank)
+                self.assertEqual(self.need(track, "trophy", "win", package(lev), logic_difficulty=2), rank)
+                self.assertEqual(self.need(track, "relic", "sapphire", package(lev), logic_difficulty=2), rank)
+                # Other bytes under the same revision: the measured default.
+                self.assertEqual(content_capability.finish_boost(track, RECORD, package("ef" * 32)), 2)
+                # The CTR Challenge's first boost and the Perfect's USF stay.
+                self.assertEqual(self.need(track, "perfect", "perfect", package(lev), logic_difficulty=2), 2)
+                self.assertEqual(self.need(track, "ctr", "win_letters", package(lev), logic_difficulty=2), 1)
+        # Not ruled: Green Hill Raceway stays USF in every revision.
+        self.assertFalse([k for k in table if k[0] == "green-hill-raceway"])
+        # A revision no row names keeps the measured default.
+        other = dict(content_id="ancient-lake", revision="LRG2Pancho", capabilities=dict(super_turbo_pads=True),
+                     files=[dict(role="lev", sha256="256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8")])
+        self.assertEqual(content_capability.finish_boost(track, RECORD, other), 2)
 
     def test_malformed_rulings_are_refused(self):
         lev = "ab" * 32
