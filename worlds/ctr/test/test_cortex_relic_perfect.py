@@ -193,6 +193,16 @@ class TestCortexVortexTrack(unittest.TestCase):
         options["content_pool"]["tracks"]["overrides"] = {"custom/cortex-vortex/1.1.2": ["relic"]}
         plan = make_world(options, seed=3).ctr_content_plan
         self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+        # An override under a renamed copy's own title carries over too.
+        options = self.swap_options(pinned=True)
+        options["content_pool"]["tracks"]["custom"][-1]["display_name"] = "Cortex Vortex Remix"
+        world = make_world(options, seed=3, stop_before="generate_early")
+        world.options.track_modes.value = {"default": ["trophy", "ctr", "relic"], "Cortex Vortex Remix": ["relic"]}
+        content_plan.swap_in_bundled_cortex(world)
+        self.assertEqual(world.options.track_modes.value["Cortex Vortex"], ["relic"])
+        self.assertNotIn("Cortex Vortex Remix", world.options.track_modes.value)
+        content_plan.generate(world)
+        self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["relic"])
 
     def test_the_swap_is_written_to_the_spoiler(self):
         import io
