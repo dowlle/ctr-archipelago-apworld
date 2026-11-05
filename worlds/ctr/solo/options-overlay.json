@@ -6,7 +6,7 @@
     {"id": "bosses", "label": "Bosses", "options": ["boss_garages", "boss_cups", "garage_requirement_level", "boss_track_shuffle", "boss_opponent_shuffle", "boss_track_assignment", "boss_kit_shuffle", "boss_attack_assignment", "boss_attack_intensity", "boss_loss_easing", "oxide_attack_profile", "purple_cup_boss_gauntlet"]},
     {"id": "pads", "label": "Pads and Locks", "options": ["pad_placement", "race_mode_order", "adventure_structure", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "shuffle_keys", "shuffle_gems"]},
     {"id": "checks", "label": "Checks", "options": ["cup_only_podium_rungs", "relic_perfect_checks", "lettersanity", "letters_per_track", "cup_sweep_checks", "lap_completion_checks", "box_locations", "itemsanity", "crystalsanity", "wumpa_check", "hit_character"]},
-    {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_progression", "wumpa_shop_hints"]},
+    {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_logic_scale", "wumpa_shop_progression", "wumpa_shop_hints"]},
     {"id": "items", "label": "Items and Traps", "options": ["trap_fill_percentage", "wumpa_bundles", "reserve_top_up", "progressive_starting_wumpa", "turbo_grant", "tizi_helper"]},
     {"id": "racers", "label": "Racers and Stats", "options": ["starting_character", "character_unlocks", "remove_playable_oxide", "starting_stat_class", "penta_stats", "editable_stats", "progressive_stats"]},
     {"id": "boost", "label": "Boost", "options": ["progressive_boost", "progressive_boost_blue_fire", "logic_difficulty", "shortcut_knowledge"]},
@@ -20,7 +20,8 @@
     {"option": "boss_loss_easing", "visible_when": {"boss_kit_shuffle": [true]}},
     {"option": "bosses_required_goal", "warn_when": {"oxide_goal": ["none", "disabled"], "value": 0, "also_zero": "gems_required_goal"}, "reason": "Without Oxide as the goal, set Bosses or Gems Required above 0"},
     {"option": "goal_wumpa", "step": 50},
-    {"option": "wumpa_shop_prices", "step": 25}
+    {"option": "wumpa_shop_prices", "step": 25},
+    {"option": "wumpa_shop_logic_scale", "step": 25}
   ],
   "left_out": {
     "death_link": "Solo has no other players, so DeathLink is forced off (ruling 2026-11-02).",
