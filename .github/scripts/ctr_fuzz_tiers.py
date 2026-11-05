@@ -87,14 +87,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--event", required=True)
     parser.add_argument("--ref", default="")
-    parser.add_argument("--labels-json", default="[]")
+    parser.add_argument("--labels-json", default="[]", help="JSON list of label names")
     parser.add_argument("--matrix-file", type=Path, required=True)
     parser.add_argument("--paths-file", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     paths = args.paths_file.read_bytes().split(b"\0") if args.paths_file else []
     paths = [path.decode() for path in paths if path]
-    labels = [label["name"] for label in json.loads(args.labels_json or "null") or []]
+    labels = json.loads(args.labels_json)
     tier = classify(args.event, paths, args.ref, labels)
     matrix = matrix_for_tier(tier, args.matrix_file)
     with args.output.open("a") as output:

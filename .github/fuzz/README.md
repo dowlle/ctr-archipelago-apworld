@@ -28,14 +28,18 @@ The classifier's own tests fail if a family loses its last arm. A change that on
 
 ## The full-fuzz label
 
-Adding `full-fuzz` to a pull request reruns it on the full tier straight away and cancels its running pr-tier checks. Every later push to that pull request stays on the full tier until the label is removed. Other labels start no checks and cancel nothing.
+Add `full-fuzz` to a pull request, then push or re-run the CTR world workflow (Re-run all jobs): the classify job reads the labels live, so that run and every later push use the full tier until the label is removed. Adding or removing a label does not start a run by itself, so it never cancels or replaces running checks.
+
+## What starts a run
+
+The workflow runs only for changes under `worlds/ctr/`, `.github/fuzz/`, `.github/scripts/`, its own file, or an `.md` file. Other files (Archipelago core, `ci-requirements.txt`) start no CTR world run, as before: the fuzz arms install the pinned Archipelago release and the packed `ctr.apworld`, so those files never reach a fuzz arm.
 
 ## Nightly and before a tag
 
 - The schedule (03:17 UTC, on `main`) only dispatches a full run on `dev/custom-pad-0.3.0`. GitHub runs schedules from the default branch, so the nightly starts once this workflow is on `main`. Until then, start it by hand.
 - A failed nightly run opens one issue titled "Nightly CTR fuzz failure", with the failing arms and, for each failed generation, its run number, YAML file and error line (the pinned fuzzer draws a random Archipelago seed and does not log it); later failures add a comment to that issue while it is open. The failing YAMLs are in the run's `fuzz-failure-<arm>` artifacts.
 - Before tagging, run the CTR world workflow by hand (Run workflow, or `gh workflow run ctr-world.yml --ref <branch>`) on the commit to tag, and use that run's id as `apworld_run_id` in the native `release-prepare` workflow.
-- `.github/workflows/ctr-tag-guard.yml` checks a pushed `v*` tag: it fails unless the tagged commit has a CTR world run in which pytest, pack and every matrix arm passed. A pr-tier run never counts. Run it by hand on a branch to check that branch's head before tagging.
+- `.github/workflows/ctr-tag-guard.yml` checks a pushed `v*` tag: it fails unless the tagged commit has a CTR world run in which pytest, pack and every matrix arm passed. A pr-tier run never counts. Run it by hand on a branch to check that branch's head before tagging. The guard reports after a tag is pushed; it cannot stop the push.
 
 ## Required check
 

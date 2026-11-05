@@ -10,8 +10,6 @@ name: CTR world
 
 on:
   pull_request:
-    # labeled: adding the full-fuzz label reruns the PR on the full tier.
-    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
@@ -42,10 +40,8 @@ on:
 permissions:
   contents: read
 
-# Any other label gives its run a group of its own, so it never cancels the
-# PR's running checks; that run's jobs all skip.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'full-fuzz') && github.ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -68,7 +64,7 @@ env:
 jobs:
   classify:
     name: classify CTR fuzz tier
-    if: github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'full-fuzz')
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,7 +83,6 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           GIT_REF: ${{ github.ref }}
-          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels) }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -99,11 +94,19 @@ jobs:
           # land on the base branch meanwhile do not count as changes here.
           # Renames list both names. A failed or truncated list (GitHub stops
           # at 3000 files) stays empty, which selects the pr tier.
+          # Labels are read live, not from the event, so adding full-fuzz and
+          # then re-running the workflow (or pushing) selects the full tier.
+          labels='[]'
           if [[ "$EVENT_NAME" == pull_request ]]; then
+            labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '[.[].name]')"
+            echo "Labels: $labels"
             if gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
-                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/pr-files"; then
+                --jq '.[] | (.filename, (.previous_filename // empty)) | @json' > "$RUNNER_TEMP/pr-files"; then
               if [[ "$(wc -l < "$RUNNER_TEMP/pr-files")" -lt 3000 ]]; then
-                tr '\n' '\0' < "$RUNNER_TEMP/pr-files" > "$paths"
+                # One JSON string per line keeps a newline inside a file name
+                # from splitting it into two paths.
+                python -c 'import json, sys; sys.stdout.write("".join(json.loads(line) + "\0" for line in open(sys.argv[1]) if line.strip()))' \
+                  "$RUNNER_TEMP/pr-files" > "$paths"
               fi
             fi
             echo "Changed paths:"; tr '\0' '\n' < "$paths"
@@ -113,14 +116,14 @@ jobs:
           python .github/scripts/ctr_fuzz_tiers.py \
             --event "$EVENT_NAME" \
             --ref "$GIT_REF" \
-            --labels-json "$LABELS_JSON" \
+            --labels-json "$labels" \
             --paths-file "$paths" \
             --matrix-file .github/fuzz/ctr-world-matrix.yml \
             --output "$GITHUB_OUTPUT"
 
   tests:
     name: pytest worlds/ctr
-    if: github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'full-fuzz')
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -160,7 +163,7 @@ jobs:
 
   pack:
     name: pack ctr.apworld
-    if: github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'full-fuzz')
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -370,8 +373,13 @@ jobs:
             if [ "$kind" = timeout ]; then err="timed out"; fi
             echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} ${kind} run=${run} yaml=${yamls% } ${err:-no error line}"
             n=$((n + 1))
-            if [ "$n" -ge 5 ]; then break; fi
+            # GitHub keeps 10 error annotations per step.
+            if [ "$n" -ge 9 ]; then break; fi
           done
+          total="$(ls -d fuzz_output/error/*/*/ fuzz_output/timeout/*/*/ 2>/dev/null | wc -l)"
+          if [ "$total" -gt "$n" ]; then
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} and $((total - n)) more failed generations, all in the fuzz-failure artifact"
+          fi
           if [ "$n" -eq 0 ]; then
             echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} no failing seed in fuzz_output (see the job log)"
           fi
@@ -467,8 +475,8 @@ jobs:
   summary:
     name: ctr-world summary
     needs: [classify, tests, pack, fuzz, nightly-dev-dispatch, nightly-failure-issue]
-    # Skips with the other jobs on the schedule and on other labels.
-    if: always() && github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'full-fuzz')
+    # The schedule only dispatches the dev run, which has its own summary.
+    if: always() && github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Check required CTR jobs
