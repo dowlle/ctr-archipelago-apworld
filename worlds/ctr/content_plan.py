@@ -203,8 +203,10 @@ STARTING_WUMPA_MAX = 10
 #: send list, and the two warp-pad display settings. Native reads each one;
 #: absent keys mean the legacy send coupling, the one-pile glow and AP item
 #: type colours on, as before. `pad_approach_hints` (native #124) is present only
-#: when on; absent means no hints on pad approach.
-ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors", "pad_approach_hints")
+#: when on; absent means no hints on pad approach. The three hint filters
+#: (A2-23) are likewise present only when on; absent means no filter.
+ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors", "pad_approach_hints",
+                     "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "shop_hints_progression_only")
 #: Character packs (#133 PR 4b). With Character Unlocks on, the plan's
 #: optional `racers` record names the starting racer (engine character id),
 #: whether Remove Playable Oxide is on and the requested racer-lock maximum.
@@ -545,6 +547,9 @@ def pad_client(options):
                 tracker_pad_launch=bool(options.tracker_pad_launch.value))
 
 
+HINT_FILTER_KEYS = ("pad_hints_wait_for_spoiler", "pad_hints_progression_only", "shop_hints_progression_only")
+
+
 def envelope_options(options):
     """The optional content-plan `ctr_options` keys this seed sets (#133 PR
     4a), see ENVELOPE_OPTIONAL. Values use the normal seed's encoding."""
@@ -557,6 +562,9 @@ def envelope_options(options):
         out["ap_item_type_colors"] = False
     if options.pad_approach_hints.value:
         out["pad_approach_hints"] = True
+    for key in HINT_FILTER_KEYS:
+        if getattr(options, key).value:
+            out[key] = True
     return out
 
 
@@ -574,6 +582,9 @@ def check_envelope_options(co):
         error("ctr_options.ap_item_type_colors must be true or false.")
     if "pad_approach_hints" in co and co["pad_approach_hints"] is not True:
         error("ctr_options.pad_approach_hints must be true when present.")
+    for key in HINT_FILTER_KEYS:
+        if key in co and co[key] is not True:
+            error(f"ctr_options.{key} must be true when present.")
     if "starting_stat_class" in co and (type(co["starting_stat_class"]) is not int
                                         or not 1 <= co["starting_stat_class"] <= 4):
         error("ctr_options.starting_stat_class must be 1 to 4 when present.")
@@ -3065,6 +3076,8 @@ def restore(world, slot_data):
     world.options.warp_pad_item_display.value = co.get("warp_pad_item_display", 0)
     world.options.ap_item_type_colors.value = int(co.get("ap_item_type_colors", True))
     world.options.pad_approach_hints.value = int(co.get("pad_approach_hints", False))
+    for key in HINT_FILTER_KEYS:
+        getattr(world.options, key).value = int(co.get(key, False))
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
     # room's encounter block verbatim (no redraw), its fallback checked against
     # the plan's unlock wins.
