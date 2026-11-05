@@ -1152,6 +1152,12 @@ def swap_in_bundled_cortex(world):
     o.required_entries.value = kept
     o.custom_tracks.value = [raw for raw in o.custom_tracks.value
                              if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
+    # A track_modes override that names the copy carries over to the bundled track.
+    modes = dict(o.track_modes.value)
+    if CORTEX_TRACK_KEY in modes:
+        modes.setdefault(destinations.CORTEX_VORTEX, modes[CORTEX_TRACK_KEY])
+        del modes[CORTEX_TRACK_KEY]
+    o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins
     world.ctr_cortex_swap_mode = "own_pad" if pinned else "in_pool"

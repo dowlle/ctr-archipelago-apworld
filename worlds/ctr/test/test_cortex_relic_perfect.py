@@ -187,6 +187,13 @@ class TestCortexVortexTrack(unittest.TestCase):
         plain = make_world(options, seed=4).ctr_content_plan
         self.assertEqual(json.dumps(swapped, sort_keys=True), json.dumps(plain, sort_keys=True))
 
+    def test_a_track_mode_override_on_the_copy_carries_over(self):
+        # The test options name tracks by id; the copy's id reaches the generator as its key "cortex-vortex".
+        options = self.swap_options(pinned=True)
+        options["content_pool"]["tracks"]["overrides"] = {"custom/cortex-vortex/1.1.2": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+
     def test_the_swap_is_written_to_the_spoiler(self):
         import io
         out = io.StringIO()
