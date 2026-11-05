@@ -204,11 +204,15 @@ class TestDescribe(SoloTestCase):
         for name, reason in left_out.items():
             self.assertTrue(reason.strip(), name)
         facts = {o["name"]: o for o in result["options"]}
+        checklists = overlay["checklists"]
         for name in shown:
-            self.assertIn(facts[name]["kind"], ("toggle", "choice", "range", "named_range"), name)
-        # Lists, sets and dictionaries are never rows.
+            if name in checklists:
+                self.assertEqual(facts[name]["kind"], "set", name)
+            else:
+                self.assertIn(facts[name]["kind"], ("toggle", "choice", "range", "named_range"), name)
+        # A set is a row only as a checklist (A2-41); lists and dictionaries never are.
         for name, entry in facts.items():
-            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other"):
+            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other") and name not in checklists:
                 self.assertIn(name, left_out, name)
         rule_options = [r["option"] for r in overlay["rules"]]
         self.assertEqual(len(rule_options), len(set(rule_options)), "one rule per option")
@@ -237,6 +241,13 @@ class TestDescribe(SoloTestCase):
                     values = [True, False]
                 elif entry["kind"] == "choice":
                     values = [c["name"] for c in entry["choices"]]
+                elif entry["kind"] == "set":
+                    # Every row alone, none and all, in checklist order.
+                    keys = [row[0] for row in result["overlay"]["checklists"][name]]
+                    for value in [[key] for key in keys] + [[], keys]:
+                        with self.subTest(option=name, value=value):
+                            self.assertEqual(ctr_solo._canonical(hints[name], value, keys), value)
+                    continue
                 else:
                     step = steps.get(name, 1)
                     values = sorted({entry["range_start"], entry["range_end"], entry["default"]} |
@@ -263,6 +274,202 @@ class TestDescribe(SoloTestCase):
         self.assertEqual(values["two_stage_density"], "off")
         self.assertEqual(values["racer_locked_pads"], 0)
         self.assertIs(values["shuffle_keys"], True)
+
+
+CHECKLIST_SETS = ("crystal_arenas", "boss_track_pool", "boss_character_pool", "boss_weapon_pool",
+                  "oxide_weapon_pool", "podium_rungs")
+
+
+def guard_refuses(guard: dict, values: dict) -> bool:
+    """The overlay guard rule as native evaluates it (AP_SoloGuardActive)."""
+    for other, allowed in guard.get("when", {}).items():
+        if values[other] not in allowed:
+            return False
+    entries = values[guard["option"]] if isinstance(values[guard["option"]], list) else []
+    if "has" in guard and guard["has"] not in entries:
+        return False
+    if "at_most_count_of" in guard:
+        return values[guard["option"]] > len(values[guard["at_most_count_of"]])
+    if "at_least" in guard and len(entries) < guard["at_least"]:
+        return True
+    return any(key not in entries for key in guard.get("needs_all", []))
+
+
+class TestChecklists(SoloTestCase):
+    """A2-41: the set options are checklists on the options screen, and the
+    guards refuse on screen exactly what generation refuses."""
+
+    def describe(self, *args):
+        events, code = self.call("describe", *args)
+        self.assertEqual(code, 0, events)
+        return last(events)
+
+    def test_checklist_rows_are_the_option_keys_in_docstring_order(self):
+        from worlds.ctr.Options import ctrAPOptions
+        from worlds.ctr import boss_encounters, boss_track_shuffle, destinations
+        result = self.describe()
+        overlay = result["overlay"]
+        facts = {o["name"]: o for o in result["options"]}
+        shown = {n: g["id"] for g in overlay["groups"] for n in g["options"]}
+        checklists = overlay["checklists"]
+        self.assertEqual(set(checklists), set(CHECKLIST_SETS))
+        groups = {"crystal_arenas": "cups", "podium_rungs": "checks"}
+        for name, rows in checklists.items():
+            with self.subTest(option=name):
+                self.assertEqual(shown.get(name), groups.get(name, "bosses"))
+                keys = [row[0] for row in rows]
+                self.assertEqual(len(keys), len(set(keys)))
+                for row in rows:
+                    self.assertIn(len(row), (1, 2), row)
+                    self.assertLessEqual(len(row[-1]), 18, "a checklist row must fit beside its mark")
+                option = ctrAPOptions.type_hints[name]
+                if option.valid_keys:
+                    self.assertEqual(set(keys), set(option.valid_keys))
+                self.assertLessEqual(set(facts[name]["default"]), set(keys))
+                self.assertLessEqual(len(facts[name]["display_name"]), 30)
+        # Rows follow the docstring where it lists the keys, else the source tables.
+        for name in ("crystal_arenas", "podium_rungs"):
+            doc = ctrAPOptions.type_hints[name].__doc__
+            spots = [doc.index(row[0]) for row in checklists[name]]
+            self.assertEqual(spots, sorted(spots), name)
+        self.assertEqual([r[0] for r in checklists["boss_character_pool"]],
+                         list(boss_encounters.OPPONENT_NAMES) + [boss_encounters.OXIDE_NAME])
+        self.assertEqual([r[0] for r in checklists["boss_weapon_pool"]], list(boss_encounters.GARAGE_FAMILIES))
+        self.assertEqual([r[0] for r in checklists["oxide_weapon_pool"]], list(boss_encounters.FAMILIES))
+        # No valid_keys: the boss venues and Cortex Vortex (a custom track is
+        # kept from a YAML, not offered as a row).
+        self.assertEqual({r[0] for r in checklists["boss_track_pool"]},
+                         set(boss_track_shuffle.VENUES) | {destinations.CORTEX_VORTEX})
+
+    def test_guards_name_real_options_and_values(self):
+        result = self.describe()
+        overlay = result["overlay"]
+        facts = {o["name"]: o for o in result["options"]}
+        shown = {n for g in overlay["groups"] for n in g["options"]}
+        for guard in overlay["guards"]:
+            with self.subTest(guard=guard):
+                self.assertIn(guard["option"], shown)
+                self.assertTrue(guard["reason"].strip())
+                self.assertLessEqual(len(guard["reason"]), 56, "the reason must fit the two help lines")
+                for other, allowed in guard.get("when", {}).items():
+                    self.assertIn(other, shown)
+                    fact = facts[other]
+                    legal = [True, False] if fact["kind"] == "toggle" else [c["name"] for c in fact["choices"]]
+                    self.assertLessEqual(set(allowed), set(legal), other)
+                keys = {r[0] for r in overlay["checklists"].get(guard["option"], [])}
+                if "at_most_count_of" in guard:
+                    self.assertIn(facts[guard["option"]]["kind"], ("range", "named_range"))
+                    self.assertIn(guard["at_most_count_of"], overlay["checklists"])
+                else:
+                    self.assertTrue(keys)
+                    self.assertLessEqual(set(guard.get("needs_all", [])) | ({guard["has"]} if "has" in guard else set()),
+                                         keys)
+
+    def check_guard_cases(self, cases):
+        """Each case: the --set list and whether generation accepts it. The
+        guard verdict must agree with the generator on both sides of the line."""
+        overlay = self.describe()["overlay"]
+        base = self.describe("--yaml", self.preset("standard.yaml"))["values"]
+        for settings, accepted in cases:
+            with self.subTest(settings=settings):
+                values = dict(base)
+                for item in settings:
+                    key, _, raw = item.partition("=")
+                    values[key] = json.loads(raw)
+                refused_on_screen = any(guard_refuses(g, values) for g in overlay["guards"])
+                self.assertEqual(not refused_on_screen, accepted, "guard verdict")
+                args = ["validate", "--yaml", self.preset("standard.yaml")]
+                for item in settings:
+                    args += ["--set", item]
+                events, code = self.call(*args)
+                self.assertEqual(code == 0, accepted, events[-3:])
+                if not accepted:
+                    self.assertEqual(last(events)["kind"], "option", last(events))
+
+    def test_crystal_count_guard_matches_generation(self):
+        four = json.dumps(["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"])
+        self.check_guard_cases([
+            (["crystal_challenge_count=5", "crystal_arenas=" + four], False),
+            (["crystal_challenge_count=4", "crystal_arenas=" + four], True),
+            (["crystal_challenge_count=1", "crystal_arenas=[]"], False),
+            (["crystal_challenge_count=0", "crystal_arenas=[]"], True),
+        ])
+
+    def test_boss_racer_pool_guards_match_generation(self):
+        three = ["Crash Bandicoot", "Coco Bandicoot", "Polar"]
+        self.check_guard_cases([
+            (["boss_opponent_shuffle=true", "boss_character_pool=" + json.dumps(three)], False),
+            (["boss_opponent_shuffle=true", "boss_character_pool=" + json.dumps(three + ["Pura"])], True),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"any_percent\"",
+              "boss_character_pool=" + json.dumps(three + ["Nitros Oxide"])], False),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"any_percent\"",
+              "boss_character_pool=" + json.dumps(three + ["Pura", "Nitros Oxide"])], True),
+            (["boss_opponent_shuffle=true", "oxide_goal=\"disabled\"", "bosses_required_goal=2",
+              "boss_character_pool=" + json.dumps(three + ["Nitros Oxide"])], True),
+            (["boss_opponent_shuffle=false", "boss_character_pool=[]"], True),
+        ])
+
+    def test_boss_weapon_pool_guards_match_generation(self):
+        self.check_guard_cases([
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"mixed_loadouts\"", "boss_weapon_pool=[\"tnt\"]"],
+             False),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"mixed_loadouts\"",
+              "boss_weapon_pool=[\"tnt\", \"mask\"]"], True),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+              "boss_weapon_pool=[\"tnt\", \"potion\", \"missile\", \"mask\"]"], False),
+            (["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+              "boss_weapon_pool=[\"tnt\", \"potion\", \"bomb\"]"], True),
+            (["boss_kit_shuffle=false", "boss_weapon_pool=[]"], True),
+        ])
+
+    def test_oxide_weapon_pool_guard_matches_generation(self):
+        self.check_guard_cases([
+            (["oxide_goal=\"any_percent\"", "oxide_attack_profile=\"all_compatible\"", "oxide_weapon_pool=[]"], False),
+            (["oxide_goal=\"any_percent\"", "oxide_attack_profile=\"all_compatible\"",
+              "oxide_weapon_pool=[\"super_engine\"]"], True),
+            (["oxide_attack_profile=\"retail\"", "oxide_weapon_pool=[]"], True),
+        ])
+
+    def test_seven_crystal_challenges_on_seven_arenas_generate_and_round_trip(self):
+        import yaml
+        from worlds.ctr.Options import ARENA_NAMES
+        arenas = [r[0] for r in self.describe()["overlay"]["checklists"]["crystal_arenas"]]
+        rungs = ["held_1st", "finish_any"]
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--name", "Solo",
+                                 "--stamp-requires", "--preset", "standard",
+                                 "--set", "crystal_challenge_count=7", "--set", "crystal_arenas=" + json.dumps(arenas),
+                                 "--set", "podium_rungs=" + json.dumps(rungs))
+        self.assertEqual(code, 0, events[-3:])
+        room = os.path.join(self.solo, "rooms", last(events)["room_id"])
+        player = os.path.join(room, "player.yaml")
+        with open(player, encoding="utf-8") as handle:
+            section = yaml.safe_load(handle)[GAME]
+        self.assertEqual(sorted(section["crystal_arenas"]), sorted(ARENA_NAMES))
+        self.assertEqual(section["crystal_challenge_count"], 7)
+        # The room's YAML shows the same sets on the checklists, in row order.
+        values = self.describe("--yaml", player)["values"]
+        self.assertEqual(values["crystal_arenas"], arenas)
+        self.assertEqual(values["crystal_challenge_count"], 7)
+        self.assertEqual(values["podium_rungs"], rungs)
+
+    def test_a_yaml_set_shows_on_the_checklist_and_keeps_entries_without_a_row(self):
+        path = write_yaml(self.work, "lists.yaml", f"""name: Lists
+game: {GAME}
+{GAME}:
+  crystal_arenas: [Lab Basement, Rocky Road]
+  boss_track_pool: [Crash Cove, custom/some-track]
+  podium_rungs: []
+  boss_weapon_pool:
+    random: 1
+""")
+        result = self.describe("--yaml", path)
+        values, facts = result["values"], {o["name"]: o for o in result["options"]}
+        self.assertEqual(values["crystal_arenas"], ["Rocky Road", "Lab Basement"])
+        self.assertEqual(values["boss_track_pool"], ["Crash Cove", "custom/some-track"])
+        self.assertEqual(values["podium_rungs"], [])
+        # A weighted value cannot be a checklist: the default shows.
+        order = [r[0] for r in result["overlay"]["checklists"]["boss_weapon_pool"]]
+        self.assertEqual(values["boss_weapon_pool"], [k for k in order if k in facts["boss_weapon_pool"]["default"]])
 
 
 class TestPresets(SoloTestCase):
