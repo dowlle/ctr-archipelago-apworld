@@ -91,7 +91,8 @@ def _load_rulings():
         key = (row.get("content_id"), row.get("revision"), row.get("lev_sha256"))
         if (set(row) != keys or type(row["finish_rank"]) is not int
                 or row["finish_rank"] not in (0, FIRST_BOOST_COUNT, USF_BOOST_COUNT)
-                or type(row["content_id"]) is not str or not row["content_id"] or "2026-" not in row["ruling"]
+                or type(row["content_id"]) is not str or not row["content_id"]
+                or type(row["ruling"]) is not str or "2026-" not in row["ruling"]
                 or (scoped and not (type(row["revision"]) is str and row["revision"]
                                     and type(row["lev_sha256"]) is str and len(row["lev_sha256"]) == 64
                                     and all(c in "0123456789abcdef" for c in row["lev_sha256"])))

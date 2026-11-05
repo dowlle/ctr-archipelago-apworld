@@ -1718,7 +1718,7 @@ def draw_plan(world, key_estimate=True):
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
-            content_requirements.MODES[unlock_mode])
+            content_requirements.MODES[unlock_mode], package_by_id)
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)

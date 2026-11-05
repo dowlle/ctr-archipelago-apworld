@@ -291,7 +291,8 @@ class TestRanks(unittest.TestCase):
         for bad in (dict(good, finish_rank=3), dict(good, finish_rank=True), dict(good, ruling="undated"),
                     dict(good, revision="1.0.0"), dict(good, lev_sha256=lev),
                     dict(good, revision="1.0.0", lev_sha256=lev.upper()),
-                    dict(good, revision="", lev_sha256=lev), dict(good, extra=1), dict(good, content_id="")):
+                    dict(good, revision="", lev_sha256=lev), dict(good, extra=1), dict(good, content_id=""),
+                    dict(good, ruling=["2026-11-05"])):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.rulings([bad])
         with self.assertRaises(ValueError):
