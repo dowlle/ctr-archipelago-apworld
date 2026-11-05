@@ -208,7 +208,7 @@ a Relic tier, a Gem colour, and the sums `AnyCtrToken`, `AnyRelic` and
 `AnyGem`. Counts are whole numbers from 1 up to what the seed has of that item.
 Pads you leave out keep the randomized rule, and a track or cup shuffled onto a
 pad takes that pad's rule. Your rules ignore Requirement Weights, only set the
-first requirement of a pad (Two-Stage Gate Density still adds the second), and
+first requirement of a pad (Pads With Two Requirements still adds the second), and
 are never changed to make a seed work: a rule that cannot work stops
 generation with an error that names the pad, the item and the count. The
 option needs randomized or random_without_4_keys unlock requirements, and
