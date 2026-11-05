@@ -96,12 +96,13 @@
           "boss_opponents_v1",
           "final_chaos_v1",
           "wumpa_shop_v1",
+          "wumpa_shop_key_tiers_v1",
           "wumpa_goal_v1",
           "pad_client_v1",
           "lap_checks_v1"
         ]
       },
-      "maxItems": 28,
+      "maxItems": 29,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -1967,6 +1968,12 @@
       "description": "The Wumpa Shop (job J11), present only with wumpa_shop_slots above 0: slots per hub, the price percentage, whether progression may sit in a slot, and shop hints. content_wumpa decides the shop checks; content_plan.validate recomputes them.",
       "type": "object",
       "properties": {
+        "logic_scale": {
+          "description": "Optional Key-budget percentage. Absent means legacy income-only shop logic.",
+          "type": "integer",
+          "minimum": 25,
+          "maximum": 400
+        },
         "slots": {
           "type": "integer",
           "minimum": 1,

@@ -6,7 +6,8 @@ content plan as plan data. Both are absent when off, so a plan with
 `wumpa_shop_slots: 0` and `goal_wumpa: 0` keeps its wire byte for byte.
 
 SHOP. With `wumpa_shop_slots` N above 0 the plan has the record
-`wumpa_shop: {slots, prices, progression, hints}` (feature `wumpa_shop_v1`)
+`wumpa_shop: {slots, prices, progression, hints, logic_scale}`
+(features `wumpa_shop_v1` and `wumpa_shop_key_tiers_v1`)
 and 5 x N checks, appended after every other check family, hub order N.
 Sanity Beach, Gem Stone Valley, Lost Ruins, Glacier Park, Citadel City, slot
 order 1..N. Each is the frozen `<Hub> Shop: Slot <n>` location
@@ -19,7 +20,9 @@ band bottom). There is no top-level `wumpa_shop` block and no new envelope
 key: native builds its shop from the plan.
 
 LOGIC. A shop slot needs its hub's Key floor (`KEY_FLOORS`) and `Wumpa
-Income`. On a content plan `Wumpa Income` is reached by any route of a track
+Income`, plus its price/shelf budget from `key_floor`. Legacy plans without
+`logic_scale` keep the original hub-only floor. On a content plan `Wumpa
+Income` is reached by any route of a track
 entry on a normal pad whose track banks fruit (`income_track`: a retail race
 track 0..15, or a custom track whose package has measured Wumpa capability,
 ruling of 2026-11-02), in a Trophy Race or CTR Challenge the entry has, with that
@@ -47,6 +50,7 @@ from Options import OptionError
 from . import logic_terms, wumpa_shop
 
 SHOP_FEATURE = "wumpa_shop_v1"
+LOGIC_FEATURE = "wumpa_shop_key_tiers_v1"
 GOAL_FEATURE = "wumpa_goal_v1"
 KIND = wumpa_shop.LOCATION_TYPE
 GOAL_OP = "wumpa_banked"
@@ -76,13 +80,16 @@ def settings(options):
         return None
     return dict(slots=slots, prices=int(options.wumpa_shop_prices.value),
                 progression=PROGRESSION[1 if wumpa_shop.progression_excluded(options) else 0],
-                hints=bool(options.wumpa_shop_hints.value))
+                hints=bool(options.wumpa_shop_hints.value),
+                logic_scale=int(options.wumpa_shop_logic_scale.value))
 
 
 def check_settings(record):
     """Shape and values of a plan's `wumpa_shop` record."""
-    if not isinstance(record, dict) or set(record) != set(RECORD_KEYS):
-        error("wumpa_shop must be a mapping of exactly " + ", ".join(RECORD_KEYS) + ".")
+    if not isinstance(record, dict) or set(record) not in (set(RECORD_KEYS), set(RECORD_KEYS) | {"logic_scale"}):
+        error("wumpa_shop must contain " + ", ".join(RECORD_KEYS) + ", optionally logic_scale.")
+    if "logic_scale" in record and (type(record["logic_scale"]) is not int or not 25 <= record["logic_scale"] <= 400):
+        error("wumpa_shop.logic_scale must be 25 to 400.")
     if type(record["slots"]) is not int or not 1 <= record["slots"] <= wumpa_shop.SHOP_SLOTS_PER_HUB:
         error(f"wumpa_shop.slots must be 1 to {wumpa_shop.SHOP_SLOTS_PER_HUB}.")
     if type(record["prices"]) is not int or not PRICES_MIN <= record["prices"] <= PRICES_MAX:
@@ -96,6 +103,14 @@ def check_settings(record):
 
 def check_count(record):
     return len(wumpa_shop.SHOP_HUBS) * record["slots"] if record else 0
+
+
+def key_floor(record, hub, check):
+    """Shared shop rule for opening placement and the installed AP rules."""
+    floor = KEY_FLOORS[hub]
+    if "logic_scale" in record:
+        floor = max(floor, wumpa_shop.logic_key_floor(check["price"], check["unlock_banked"], record["logic_scale"]))
+    return floor
 
 
 def slots(record):
@@ -342,10 +357,11 @@ def install(world, plan, menu, stage_gate, stage_term):
     excluded = record["progression"] == "excluded"
     from .content_plan import ITEM_BY_CODE
     key = ITEM_BY_CODE[KEY_ITEM]
+    checks = {c["location"]: c for c in plan["checks"] if c["kind"] == KIND}
     for hub, _n, code, name in slots(record):
         location = Location(player, LOCATION_BY_CODE[code], code, menu)
         location.type = KIND
-        floor = KEY_FLOORS[hub]
+        floor = key_floor(record, hub, checks[code])
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
         if hints:
@@ -359,12 +375,13 @@ def install(world, plan, menu, stage_gate, stage_term):
 
 
 def restore_options(world, plan):
-    """Universal Tracker: the five options from the plan."""
+    """Universal Tracker: restore options; absent scale retains legacy rules."""
     o = world.options
     record = plan.get("wumpa_shop")
     arm = goal_arm(plan["goal"])
     o.wumpa_shop_slots.value = record["slots"] if record else 0
     o.wumpa_shop_prices.value = record["prices"] if record else 100
+    o.wumpa_shop_logic_scale.value = record.get("logic_scale", 100) if record else 100
     o.wumpa_shop_progression.value = PROGRESSION.index(record["progression"]) if record else 0
     o.wumpa_shop_hints.value = int(record["hints"]) if record else 1
     o.goal_wumpa.value = arm["count"] if arm else 0

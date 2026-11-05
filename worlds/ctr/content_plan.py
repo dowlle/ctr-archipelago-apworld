@@ -420,6 +420,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
+            + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
             # Lap completion checks (#344) last.
