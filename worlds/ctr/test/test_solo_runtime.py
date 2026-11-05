@@ -439,6 +439,36 @@ class TestChecklists(SoloTestCase):
             (["oxide_attack_profile=\"retail\"", "oxide_weapon_pool=[]"], True),
         ])
 
+    def test_pools_without_a_screen_guard_are_refused_by_name(self):
+        """No screen guard for Boss Track Pool or for the racer pool with
+        character_home_track: what fits depends on the custom tracks picked
+        after the options screen and on which garages draw a boss cup. The
+        world refuses them with an option error naming the option, so the
+        screen opens that row."""
+        overlay = self.describe()["overlay"]
+        base = self.describe("--yaml", self.preset("standard.yaml"))["values"]
+        cases = [
+            (["boss_track_shuffle=true", "boss_track_pool=[\"Crash Cove\"]"], "boss_track_pool"),
+            (["boss_track_shuffle=true", "boss_opponent_shuffle=true", "boss_track_assignment=\"character_home_track\"",
+              "boss_track_pool=" + json.dumps(["Crash Cove", "Tiger Temple", "Coco Park", "Mystery Caves", "Polar Pass"]),
+              "boss_character_pool=" + json.dumps(["Ripper Roo", "Papu Papu", "Komodo Joe", "Pinstripe"])],
+             "boss_character_pool"),
+        ]
+        for settings, option in cases:
+            with self.subTest(option=option):
+                values = dict(base)
+                for item in settings:
+                    key, _, raw = item.partition("=")
+                    values[key] = json.loads(raw)
+                self.assertFalse(any(guard_refuses(g, values) for g in overlay["guards"]))
+                args = ["validate", "--yaml", self.preset("standard.yaml")]
+                for item in settings:
+                    args += ["--set", item]
+                events, code = self.call(*args)
+                self.assertNotEqual(code, 0, events[-3:])
+                self.assertEqual(last(events)["kind"], "option", last(events))
+                self.assertIn(option, last(events)["options"], last(events))
+
     def test_seven_crystal_challenges_on_seven_arenas_generate_and_round_trip(self):
         import yaml
         from worlds.ctr.Options import ARENA_NAMES
