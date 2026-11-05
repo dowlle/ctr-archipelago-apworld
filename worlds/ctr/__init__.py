@@ -192,6 +192,7 @@ class ctrAPWorld(World):
         one comes from v0.2.x and is refused with the client's sentence."""
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         from . import content_plan
+        content_plan.swap_in_bundled_cortex(self)
         if passthrough:
             if "content_plan" not in passthrough:
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
@@ -416,6 +417,10 @@ class ctrAPWorld(World):
         spoiler_handle.write("\nCTR independent content/item plan:\n")
         json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
         spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
+        if getattr(self, "ctr_cortex_swap", None):
+            spoiler_handle.write("CTR Cortex Vortex: the downloaded copy (" + ", ".join(self.ctr_cortex_swap)
+                                 + ") was replaced by the Cortex Vortex that comes with CTR AP "
+                                 "(cortex_vortex_track " + self.ctr_cortex_swap_mode + ").\n")
         # Boss opponent and kit shuffle on content plans.
         from . import content_bosses
         _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
