@@ -1,11 +1,19 @@
 {
-  "description": "Per-track rulings on the super turbo pad finish rule (#133 PR 4c). A custom track whose LEV has super turbo pads needs USF to finish unless a ruling here says otherwise (ruling 2026-10-18: \"they require USF UNLESS I say otherwise\"). Keyed by registry content id (the package's content_id); usf_finish true needs USF to finish, false takes the generic terms only. Each entry cites its ruling. Project-owned: this is never a package descriptor field. A track not listed keeps the measured default.",
-  "version": 1,
+  "description": "Per-package rulings on the custom track finish rank (#133 PR 4c, A2-22). A custom track whose LEV has super turbo pads needs USF to finish unless a ruling here says otherwise (ruling 2026-10-18: \"they require USF UNLESS I say otherwise\"). Keyed by registry content id (the package's content_id). A row without revision covers every revision of that track; a row with revision also names the package's LEV pin (lev_sha256) and covers only that exact package, and it wins over a row without revision. finish_rank is the Progressive Boost rank crossing the finish line needs: 2 USF, 1 the first boost, 0 the generic terms only. Each entry cites its ruling. Only ruled or certified rows go here; a player finishing a track is not certification. Project-owned: this is never a package descriptor field. A package no row matches keeps the measured default.",
+  "version": 2,
   "rulings": [
-    {"content_id": "arabian-heights-night", "usf_finish": true, "ruling": "Project ruling 2026-10-18 01:44 CEST: needs USF to finish"},
-    {"content_id": "baby-t-park", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
-    {"content_id": "cortex-vortex", "usf_finish": true, "ruling": "Project ruling 2026-10-18 01:44 CEST: Cortex Vortex (bundled) needs USF to finish"},
-    {"content_id": "north-pole", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
-    {"content_id": "tv-world", "usf_finish": false, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"}
+    {"content_id": "arabian-heights-night", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: needs USF to finish"},
+    {"content_id": "baby-t-park", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
+    {"content_id": "cortex-vortex", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: Cortex Vortex (bundled) needs USF to finish"},
+    {"content_id": "north-pole", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
+    {"content_id": "tv-world", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
+    {"content_id": "ancient-lake", "revision": "1.0.0", "lev_sha256": "7e5b776f312f500112061b3b95a1f371571fd7dfe7fbd1dc404e7b3d3a3a1e78", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "ancient-lake", "revision": "1.0.1", "lev_sha256": "2fc45ad5edaf735426b99229cc561293d02badc6a578ef53f328ad3fc2f85360", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "ancient-lake", "revision": "1.0.2", "lev_sha256": "c4497a621a97a8df1c763e0b6a2dc75cd9f3a57b217b0cefa6a938fc83ee6c70", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "bowser-castle-1", "revision": "1.0.0", "lev_sha256": "0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "drive-thru-danger", "revision": "1.0.0", "lev_sha256": "77706a3b5d46cdd75ffa05e4da316cf5dc400d6e17aad7ccdf0c3f5cd62eee79", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "lights-out", "revision": "1.0.0", "lev_sha256": "5ebdb9f235ba0c07ba5c72b715c949afdd6062fcf3208f45a1c13936ffb529c6", "finish_rank": 1, "ruling": "Project ruling 2026-11-05 07:19 CET: every finish check needs the first boost"},
+    {"content_id": "neon-paradise", "revision": "1.0.0", "lev_sha256": "665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
+    {"content_id": "neon-paradise", "revision": "1.1.0", "lev_sha256": "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"}
   ]
 }

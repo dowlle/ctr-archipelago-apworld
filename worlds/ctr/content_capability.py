@@ -19,12 +19,13 @@ term, because it crosses the line.
   * finish term F: two ranks (USF) on the confirmed finish tracks (Hot Air
     Skyway, Cortex Castle, Cortex Vortex; Oxide Station unless Shortcut
     Knowledge is hard), and on a custom track whose LEV has a super turbo pad
-    (ruling 2026-10-17). the project's per-track rulings in
-    `data/usf_finish_rulings.json` (2026-10-18) decide first, by content id:
+    (ruling 2026-10-17). the project's per-package rulings in
+    `data/usf_finish_rulings.json` (2026-10-18) decide first, by content id
+    and, for a row scoped to one revision (A2-22), revision and LEV pin:
     Arabian Heights Night and Cortex Vortex need USF; TV World, North Pole and
-    Baby T Park take the generic terms only. A custom package that is not
-    ruled and does not state `super_turbo_pads` is treated as having one, the
-    safe direction;
+    Baby T Park take the generic terms only. A ruling may also set the first
+    boost (rank 1). A custom package that is not ruled and does not state
+    `super_turbo_pads` is treated as having one, the safe direction;
   * Trophy Race: F, and on easy and medium the first rank on every
     difficulty-gated track (all retail tracks outside the finish set, and every
     custom track, `CUSTOM_TRACK_SLOTS_RULED`);
@@ -73,24 +74,50 @@ OXIDE = "Oxide Station"
 
 
 def _load_rulings():
-    """{content id: needs USF to finish} from the project's per-track rulings on
-    the super turbo pad finish rule (ruling 2026-10-18: "they require USF
-    UNLESS I say otherwise"). Project-owned data, never a descriptor field;
-    every entry cites its ruling. A track not listed keeps the measured
-    default (`super_turbo_pads`)."""
+    """{(content id, revision, LEV sha256): finish rank} from the project's
+    per-package rulings on the custom track finish rank (ruling 2026-10-18:
+    "they require USF UNLESS I say otherwise"; per-revision rows and the
+    first-boost rank since A2-22). A row without revision is keyed
+    (content id, None, None) and covers every revision. Project-owned data,
+    never a descriptor field; every entry cites its ruling. A package no row
+    matches keeps the measured default (`super_turbo_pads`)."""
     raw = json.loads(pkgutil.get_data(__package__, "data/usf_finish_rulings.json"))
+    if raw.get("version") != 2:
+        raise ValueError("usf_finish_rulings.json: version must be 2")
     out = {}
     for row in raw["rulings"]:
-        if (set(row) != {"content_id", "usf_finish", "ruling"} or type(row["usf_finish"]) is not bool
-                or not row["content_id"] or "2026-" not in row["ruling"] or row["content_id"] in out):
-            raise ValueError("usf_finish_rulings.json: each entry needs content_id, a Boolean usf_finish "
-                             "and a dated ruling, once per track")
-        out[row["content_id"]] = row["usf_finish"]
+        scoped = "revision" in row or "lev_sha256" in row
+        keys = {"content_id", "finish_rank", "ruling"} | ({"revision", "lev_sha256"} if scoped else set())
+        key = (row.get("content_id"), row.get("revision"), row.get("lev_sha256"))
+        if (set(row) != keys or type(row["finish_rank"]) is not int
+                or row["finish_rank"] not in (0, FIRST_BOOST_COUNT, USF_BOOST_COUNT)
+                or type(row["content_id"]) is not str or not row["content_id"]
+                or type(row["ruling"]) is not str or "2026-" not in row["ruling"]
+                or (scoped and not (type(row["revision"]) is str and row["revision"]
+                                    and type(row["lev_sha256"]) is str and len(row["lev_sha256"]) == 64
+                                    and all(c in "0123456789abcdef" for c in row["lev_sha256"])))
+                or key in out):
+            raise ValueError("usf_finish_rulings.json: each entry needs content_id, a finish_rank of 0, 1 or 2 "
+                             "and a dated ruling, and a revision with its lowercase LEV sha256 or neither, "
+                             "once per package")
+        out[key] = row["finish_rank"]
     return out
 
 
-#: the project's per-track rulings: {content id: needs USF to finish}.
+#: the project's per-package rulings: {(content id, revision, LEV sha256):
+#: finish rank}, revision and LEV sha256 None on a row for every revision.
 USF_FINISH_RULINGS = _load_rulings()
+
+
+def ruled_finish(package):
+    """The ruled finish rank of a custom package, or None when no row matches.
+    A row for the package's exact revision and LEV pin wins over a row for
+    every revision of its content id."""
+    content = package.get("content_id")
+    lev = next((pin.get("sha256") for pin in package.get("files", ()) if isinstance(pin, dict)
+                and pin.get("role") == "lev"), None)
+    exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev)) if lev else None
+    return exact if exact is not None else USF_FINISH_RULINGS.get((content, None, None))
 
 
 def error(message):
@@ -153,9 +180,9 @@ def finish_boost(track, record, package=None):
     name = _name(track)
     if name is None:
         package = package or {}
-        ruled = USF_FINISH_RULINGS.get(package.get("content_id"))
+        ruled = ruled_finish(package)
         if ruled is not None:
-            return USF_BOOST_COUNT if ruled else 0
+            return ruled
         stated = package.get("capabilities", {}).get("super_turbo_pads", True)
         return USF_BOOST_COUNT if stated else 0
     if name in capability_contract.unconditional_usf_finish_tracks():

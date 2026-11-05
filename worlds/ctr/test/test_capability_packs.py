@@ -209,9 +209,9 @@ class TestRanks(unittest.TestCase):
     def test_per_track_rulings(self):
         # the project's per-track rulings (2026-10-18), by content id, decide before
         # the measured flag, whatever the package states.
-        self.assertEqual(content_capability.USF_FINISH_RULINGS, {
-            "arabian-heights-night": True, "cortex-vortex": True,
-            "tv-world": False, "north-pole": False, "baby-t-park": False})
+        self.assertEqual({k: v for k, v in content_capability.USF_FINISH_RULINGS.items() if k[1] is None}, {
+            ("arabian-heights-night", None, None): 2, ("cortex-vortex", None, None): 2,
+            ("tv-world", None, None): 0, ("north-pole", None, None): 0, ("baby-t-park", None, None): 0})
         track = dict(origin="custom", display_name="Loop")
         for key, stated, want in (("arabian-heights-night", False, 2), ("cortex-vortex", None, 2),
                                   ("tv-world", True, 0), ("north-pole", True, 0), ("baby-t-park", True, 0)):
@@ -233,7 +233,107 @@ class TestRanks(unittest.TestCase):
         import json as _json
         raw = _json.loads(open(content_capability.__file__.replace("content_capability.py",
                                                                     "data/usf_finish_rulings.json")).read())
-        self.assertTrue(all("2026-10-18" in row["ruling"] for row in raw["rulings"]))
+        self.assertEqual(raw["version"], 2)
+        self.assertTrue(all("2026-" in row["ruling"] for row in raw["rulings"]))
+
+    def rulings(self, rows):
+        """The loader's verdict on a forged rulings file."""
+        from unittest import mock
+        import json as _json
+        data = _json.dumps(dict(description="", version=2, rulings=rows)).encode()
+        with mock.patch.object(content_capability.pkgutil, "get_data", return_value=data):
+            return content_capability._load_rulings()
+
+    def test_per_package_rulings(self):
+        # A2-22: a row may name one revision and its LEV pin; it covers only
+        # that exact package and wins over a row for every revision. A ruling
+        # may also set the first boost.
+        lev = "ab" * 32
+        rows = [dict(content_id="loop", finish_rank=2, ruling="ruling 2026-11-05"),
+                dict(content_id="loop", revision="1.0.2", lev_sha256=lev, finish_rank=0, ruling="ruling 2026-11-05"),
+                dict(content_id="jumps", revision="1.0.0", lev_sha256=lev, finish_rank=1, ruling="ruling 2026-11-05")]
+        table = self.rulings(rows)
+        self.assertEqual(table, {("loop", None, None): 2, ("loop", "1.0.2", lev): 0, ("jumps", "1.0.0", lev): 1})
+        track = dict(origin="custom", display_name="Loop")
+
+        def package(key, revision, pin, pads=True):
+            return dict(content_id=key, revision=revision, capabilities=dict(super_turbo_pads=pads),
+                        files=[dict(role="lev", sha256=pin), dict(role="vrm", sha256="cd" * 32)])
+        from unittest import mock
+        with mock.patch.object(content_capability, "USF_FINISH_RULINGS", table):
+            finish = lambda pkg: content_capability.finish_boost(track, RECORD, pkg)
+            self.assertEqual(finish(package("loop", "1.0.2", lev)), 0)
+            # Another revision, or the same revision with other bytes: the
+            # row for every revision.
+            self.assertEqual(finish(package("loop", "1.0.1", lev)), 2)
+            self.assertEqual(finish(package("loop", "1.0.2", "ef" * 32)), 2)
+            # A one-revision row alone: other revisions keep the measured default.
+            self.assertEqual(finish(package("jumps", "1.0.0", lev, pads=False)), 1)
+            self.assertEqual(finish(package("jumps", "1.0.1", lev, pads=False)), 0)
+            self.assertEqual(finish(package("jumps", "1.0.1", lev)), 2)
+            # The first-boost finish carries into every finish check, with no
+            # weapon alternative, and lowers no other floor.
+            jumps = package("jumps", "1.0.0", lev, pads=False)
+            self.assertEqual(self.need(track, "trophy", "win", jumps, logic_difficulty=2), 1)
+            self.assertEqual(self.need(track, "relic", "sapphire", jumps, logic_difficulty=2), 1)
+            self.assertEqual(self.need(track, "perfect", "perfect", jumps, logic_difficulty=2), 2)
+            self.assertIsNone(content_capability.weapon_arm(track, "trophy", "win",
+                                                            dict(RECORD, logic_difficulty=0), jumps))
+            # A lowered finish keeps the CTR Challenge, Perfect and difficulty floors.
+            loop = package("loop", "1.0.2", lev)
+            self.assertEqual(self.need(track, "ctr", "win_letters", loop, logic_difficulty=2), 1)
+            self.assertEqual(self.need(track, "perfect", "perfect", loop, logic_difficulty=2), 2)
+            self.assertEqual(self.need(track, "trophy", "win", loop, logic_difficulty=0), 1)
+
+    def test_registry_revision_rulings(self):
+        # Project rulings of 2026-11-05 07:19 CET (A2-27), one row per registry
+        # revision and its LEV pin. A tester report is not certification.
+        pins = {
+            ("ancient-lake", "1.0.0"): ("7e5b776f312f500112061b3b95a1f371571fd7dfe7fbd1dc404e7b3d3a3a1e78", 0),
+            ("ancient-lake", "1.0.1"): ("2fc45ad5edaf735426b99229cc561293d02badc6a578ef53f328ad3fc2f85360", 0),
+            ("ancient-lake", "1.0.2"): ("c4497a621a97a8df1c763e0b6a2dc75cd9f3a57b217b0cefa6a938fc83ee6c70", 0),
+            ("bowser-castle-1", "1.0.0"): ("0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9", 0),
+            ("drive-thru-danger", "1.0.0"): ("77706a3b5d46cdd75ffa05e4da316cf5dc400d6e17aad7ccdf0c3f5cd62eee79", 0),
+            ("lights-out", "1.0.0"): ("5ebdb9f235ba0c07ba5c72b715c949afdd6062fcf3208f45a1c13936ffb529c6", 1),
+            ("neon-paradise", "1.0.0"): ("665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0", 0),
+            ("neon-paradise", "1.1.0"): ("639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", 0),
+        }
+        table = content_capability.USF_FINISH_RULINGS
+        self.assertEqual({k: v for k, v in table.items() if k[1] is not None},
+                         {(c, r, lev): rank for (c, r), (lev, rank) in pins.items()})
+        track = dict(origin="custom", display_name="Loop")
+        for (key, revision), (lev, rank) in pins.items():
+            def package(pin, rev=revision, pads=True):
+                return dict(content_id=key, revision=rev, capabilities=dict(super_turbo_pads=pads),
+                            files=[dict(role="lev", sha256=pin), dict(role="vrm", sha256="cd" * 32)])
+            with self.subTest(key=key, revision=revision):
+                self.assertEqual(content_capability.finish_boost(track, RECORD, package(lev)), rank)
+                self.assertEqual(self.need(track, "trophy", "win", package(lev), logic_difficulty=2), rank)
+                self.assertEqual(self.need(track, "relic", "sapphire", package(lev), logic_difficulty=2), rank)
+                # Other bytes under the same revision: the measured default.
+                self.assertEqual(content_capability.finish_boost(track, RECORD, package("ef" * 32)), 2)
+                # The CTR Challenge's first boost and the Perfect's USF stay.
+                self.assertEqual(self.need(track, "perfect", "perfect", package(lev), logic_difficulty=2), 2)
+                self.assertEqual(self.need(track, "ctr", "win_letters", package(lev), logic_difficulty=2), 1)
+        # Not ruled: Green Hill Raceway stays USF in every revision.
+        self.assertFalse([k for k in table if k[0] == "green-hill-raceway"])
+        # A revision no row names keeps the measured default.
+        other = dict(content_id="ancient-lake", revision="LRG2Pancho", capabilities=dict(super_turbo_pads=True),
+                     files=[dict(role="lev", sha256="256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8")])
+        self.assertEqual(content_capability.finish_boost(track, RECORD, other), 2)
+
+    def test_malformed_rulings_are_refused(self):
+        lev = "ab" * 32
+        good = dict(content_id="loop", finish_rank=0, ruling="ruling 2026-11-05")
+        for bad in (dict(good, finish_rank=3), dict(good, finish_rank=True), dict(good, ruling="undated"),
+                    dict(good, revision="1.0.0"), dict(good, lev_sha256=lev),
+                    dict(good, revision="1.0.0", lev_sha256=lev.upper()),
+                    dict(good, revision="", lev_sha256=lev), dict(good, extra=1), dict(good, content_id=""),
+                    dict(good, ruling=["2026-11-05"])):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.rulings([bad])
+        with self.assertRaises(ValueError):
+            self.rulings([good, dict(good)])
 
     def test_boost_off_means_no_rank(self):
         self.assertEqual(self.need(retail("Hot Air Skyway"), "trophy", boost_mode=0, stats_mode=1), 0)
