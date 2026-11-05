@@ -32,7 +32,7 @@ Add `full-fuzz` to a pull request, then push or re-run the CTR world workflow (R
 
 ## What starts a run
 
-The workflow runs only for changes under `worlds/ctr/`, `.github/fuzz/`, `.github/scripts/`, its own file, or an `.md` file. Other files (Archipelago core, `ci-requirements.txt`) start no CTR world run, as before: the fuzz arms install the pinned Archipelago release and the packed `ctr.apworld`, so those files never reach a fuzz arm.
+The workflow runs only for changes under `worlds/ctr/`, `.github/fuzz/`, `.github/scripts/`, its own file, `ci-requirements.txt` (pytest installs it), or an `.md` file. Other files start no CTR world run, as before. The fuzz arms install the pinned Archipelago release and the packed `ctr.apworld`, so other files never reach a fuzz arm; Archipelago core files in this repository do reach the pytest job, so after an upstream sync of core files, run the workflow by hand.
 
 ## Nightly and before a tag
 

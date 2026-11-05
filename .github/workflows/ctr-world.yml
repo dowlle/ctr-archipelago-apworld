@@ -15,6 +15,7 @@ on:
       - '.github/workflows/ctr-world.yml'
       - '.github/fuzz/**'
       - '.github/scripts/**'
+      - 'ci-requirements.txt'
       - '*.md'
       - '**/*.md'
   push:
@@ -24,6 +25,7 @@ on:
       - '.github/workflows/ctr-world.yml'
       - '.github/fuzz/**'
       - '.github/scripts/**'
+      - 'ci-requirements.txt'
       - '*.md'
       - '**/*.md'
   schedule:
@@ -98,7 +100,8 @@ jobs:
           # then re-running the workflow (or pushing) selects the full tier.
           labels='[]'
           if [[ "$EVENT_NAME" == pull_request ]]; then
-            labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '[.[].name]')"
+            labels="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels?per_page=100" --jq '.[].name' \
+              | python -c 'import json, sys; print(json.dumps(sys.stdin.read().splitlines()))')"
             echo "Labels: $labels"
             if gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
                 --jq '.[] | (.filename, (.previous_filename // empty)) | @json' > "$RUNNER_TEMP/pr-files"; then
