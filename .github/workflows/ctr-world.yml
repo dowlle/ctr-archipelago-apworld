@@ -344,7 +344,7 @@ jobs:
               exit 1
             fi
           fi
-      - name: Name the failing seeds
+      - name: Name the failing generations
         # The nightly issue reads these annotations to list arm and seed.
         if: failure()
         shell: bash
@@ -355,14 +355,20 @@ jobs:
         run: |
           shopt -s nullglob
           if [ "$CHECK_MODE" = "canonical" ]; then
-            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} seed=0 (canonical generation)"
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} canonical generation, seed 0"
             exit 0
           fi
+          # The pinned fuzzer draws a random Archipelago seed and does not log
+          # it, so a failure is named by its run number, its YAML in the
+          # fuzz-failure artifact and its last error line.
           n=0
           for log in fuzz_output/error/*/*/*.log fuzz_output/timeout/*/*/*.log; do
             kind="$(basename "$(dirname "$(dirname "$(dirname "$log")")")")"
-            seed="$(grep -oE 'Seed: [0-9]+' "$log" | head -1 | cut -d' ' -f2 || true)"
-            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} ${kind} run=$(basename "$log" .log) seed=${seed:-unknown}"
+            run="$(basename "$log" .log)"
+            yamls="$(cd "$(dirname "$log")" && ls -- *.yaml 2>/dev/null | tr '\n' ' ')"
+            err="$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" | tail -1 | cut -c1-200 || true)"
+            if [ "$kind" = timeout ]; then err="timed out"; fi
+            echo "::error title=CTR fuzz failure::arm=${CHECK_NAME} ${kind} run=${run} yaml=${yamls% } ${err:-no error line}"
             n=$((n + 1))
             if [ "$n" -ge 5 ]; then break; fi
           done
@@ -439,7 +445,7 @@ jobs:
             const body = [
               `${what}: ${runUrl}`,
               '',
-              'Failing arms and seeds (the failing YAMLs are in the run\'s fuzz-failure artifacts):',
+              'Failing arms, with run number, YAML and error for each failed generation (the YAMLs are in the run\'s fuzz-failure artifacts):',
               ...(failingArms.length ? failingArms : ['- None.']),
               '',
               'Other failed jobs:',
