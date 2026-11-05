@@ -838,11 +838,13 @@ class TestServe(SoloTestCase):
         self.assertEqual(code, 0, events)
         return last(events)
 
-    def start(self, room_id: str, first: int, last_port: int) -> tuple[subprocess.Popen, dict]:
+    def start(self, room_id: str, first: int, last_port: int,
+              password: str | None = None) -> tuple[subprocess.Popen, dict]:
         script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        extra = ["--password", password] if password else []
         proc = subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room_id,
                                  "--game-pid", str(os.getpid()), "--port-first", str(first),
-                                 "--port-last", str(last_port)],
+                                 "--port-last", str(last_port)] + extra,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 text=True, env=env(self.home))
         line = []
@@ -949,12 +951,30 @@ class TestServe(SoloTestCase):
         room = self.generate_room()
         base = free_ports(3)
         for _ in range(2):  # the second start loads the save written by the first
-            proc, ready = self.start(room["room_id"], base, base + 2)
+            proc, ready = self.start(room["room_id"], base, base + 2, "test-room-password")
             try:
                 self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], "test-room-password")
                 self.assertEqual(self.try_connect(ready, ""), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, "wrong"), "ConnectionRefused")
                 self.assertEqual(self.try_connect(ready, ready["password"]), "Connected")
+                proc.stdin.write("/exit\n")
+                proc.stdin.flush()
+                self.assertEqual(proc.wait(15), 0)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+
+    def test_default_has_no_password_even_after_a_passworded_save(self):
+        room = self.generate_room()
+        base = free_ports(3)
+        # A password from an earlier session must not silently come back.
+        for password in ("old-room-password", None, None):
+            proc, ready = self.start(room["room_id"], base, base + 2, password)
+            try:
+                self.assertEqual(ready["event"], "ready", ready)
+                self.assertEqual(ready["password"], password or "")
+                self.assertEqual(self.try_connect(ready, password or ""), "Connected")
                 proc.stdin.write("/exit\n")
                 proc.stdin.flush()
                 self.assertEqual(proc.wait(15), 0)

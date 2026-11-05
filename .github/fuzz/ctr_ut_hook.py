@@ -26,6 +26,9 @@ class Hook(TrackerHook):
 
     def before_generate(self, args):
         super().before_generate(args)
+        # The fuzzer captures stdout in the failure log. Its case number is
+        # not the AP seed, so retain the actual input needed to replay a failure.
+        print(f"CTR reproduction seed: {args.seed}", flush=True)
         self.server_names = {}
         core = self.ut_core
         update = core.updateTracker
