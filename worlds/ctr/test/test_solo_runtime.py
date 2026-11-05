@@ -280,6 +280,10 @@ CHECKLIST_SETS = ("crystal_arenas", "boss_track_pool", "boss_character_pool", "b
                   "oxide_weapon_pool", "podium_rungs")
 
 
+#: Boss Garages off, as the option allows it (no Oxide goal, a gem goal).
+NO_GARAGES = ["boss_garages=false", "oxide_goal=\"disabled\"", "bosses_required_goal=0", "gems_required_goal=1"]
+
+
 def guard_refuses(guard: dict, values: dict) -> bool:
     """The overlay guard rule as native evaluates it (AP_SoloGuardActive)."""
     for other, allowed in guard.get("when", {}).items():
@@ -407,6 +411,8 @@ class TestChecklists(SoloTestCase):
             (["boss_opponent_shuffle=true", "oxide_goal=\"disabled\"", "bosses_required_goal=2",
               "boss_character_pool=" + json.dumps(three + ["Nitros Oxide"])], True),
             (["boss_opponent_shuffle=false", "boss_character_pool=[]"], True),
+            # Boss Garages off: no boss is drawn, so any pool generates.
+            (NO_GARAGES + ["boss_opponent_shuffle=true", "boss_character_pool=[\"Crash Bandicoot\"]"], True),
         ])
 
     def test_boss_weapon_pool_guards_match_generation(self):
@@ -420,6 +426,9 @@ class TestChecklists(SoloTestCase):
             (["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
               "boss_weapon_pool=[\"tnt\", \"potion\", \"bomb\"]"], True),
             (["boss_kit_shuffle=false", "boss_weapon_pool=[]"], True),
+            (NO_GARAGES + ["boss_kit_shuffle=true", "boss_weapon_pool=[\"tnt\"]"], True),
+            (NO_GARAGES + ["boss_kit_shuffle=true", "boss_attack_assignment=\"signature_profiles\"",
+                           "boss_weapon_pool=[\"mask\"]"], True),
         ])
 
     def test_oxide_weapon_pool_guard_matches_generation(self):

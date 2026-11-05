@@ -37,10 +37,10 @@
   },
   "guards": [
     {"option": "crystal_challenge_count", "at_most_count_of": "crystal_arenas", "reason": "Check at least as many arenas as Crystal Challenges."},
-    {"option": "boss_character_pool", "when": {"boss_opponent_shuffle": [true]}, "at_least": 4, "reason": "Opponent shuffle needs 4 racers: bosses never repeat."},
-    {"option": "boss_character_pool", "when": {"boss_opponent_shuffle": [true], "oxide_goal": ["none", "any_percent", "101_percent"]}, "has": "Nitros Oxide", "at_least": 5, "reason": "With Nitros Oxide checked, check at least 5 racers."},
-    {"option": "boss_weapon_pool", "when": {"boss_kit_shuffle": [true], "boss_attack_assignment": ["mixed_loadouts"]}, "at_least": 2, "reason": "Mixed loadouts need at least 2 weapons checked."},
-    {"option": "boss_weapon_pool", "when": {"boss_kit_shuffle": [true], "boss_attack_assignment": ["signature_profiles"]}, "needs_all": ["tnt", "potion", "bomb"], "reason": "Signature profiles need TNT, Potion and Bomb checked."},
+    {"option": "boss_character_pool", "when": {"boss_garages": [true], "boss_opponent_shuffle": [true]}, "at_least": 4, "reason": "Opponent shuffle needs 4 racers: bosses never repeat."},
+    {"option": "boss_character_pool", "when": {"boss_garages": [true], "boss_opponent_shuffle": [true], "oxide_goal": ["none", "any_percent", "101_percent"]}, "has": "Nitros Oxide", "at_least": 5, "reason": "With Nitros Oxide checked, check at least 5 racers."},
+    {"option": "boss_weapon_pool", "when": {"boss_garages": [true], "boss_kit_shuffle": [true], "boss_attack_assignment": ["mixed_loadouts"]}, "at_least": 2, "reason": "Mixed loadouts need at least 2 weapons checked."},
+    {"option": "boss_weapon_pool", "when": {"boss_garages": [true], "boss_kit_shuffle": [true], "boss_attack_assignment": ["signature_profiles"]}, "needs_all": ["tnt", "potion", "bomb"], "reason": "Signature profiles need TNT, Potion and Bomb checked."},
     {"option": "oxide_weapon_pool", "when": {"oxide_attack_profile": ["all_compatible"], "oxide_goal": ["none", "any_percent", "101_percent"]}, "at_least": 1, "reason": "N. Oxide's all_compatible profile needs 1 weapon."}
   ],
   "left_out": {
