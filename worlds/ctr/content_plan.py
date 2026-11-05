@@ -25,6 +25,7 @@ plan: the options' defaults are the original game's counts.
 import copy
 import itertools
 import json
+import logging
 import pkgutil
 
 from BaseClasses import Region, Location
@@ -109,8 +110,12 @@ PERFECT_SUFFIX = "Relic Race Perfect"
 CORTEX_ORIGIN = "cortex_vortex"
 CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
+#: The track key of Cortex Vortex. A downloaded Cortex Vortex package (the Saphi
+#: release) carries it too: it is the same track, so a seed takes one or the other.
+CORTEX_TRACK_KEY = "cortex-vortex"
 CORTEX_LAPS = 3
-#: `cortex_vortex_track: own_pad`.
+#: `cortex_vortex_track: in_pool` and `own_pad`.
+CORTEX_IN_POOL = 1
 CORTEX_OWN_PAD = 2
 #: Colour index of the Purple Gem Cup, the fifth Gem Cup.
 PURPLE_GEM_CUP = 4
@@ -420,6 +425,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
+            + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
             # Lap completion checks (#344) last.
@@ -1124,6 +1130,44 @@ def generate(world):
     return plan
 
 
+def swap_in_bundled_cortex(world):
+    """`cortex_vortex_track: off` with a downloaded Cortex Vortex in `custom_tracks`
+    (maintainer ruling of 2026-11-05: "Bundled replaces it"). The downloaded copy leaves
+    the list and the seed behaves as `in_pool`: the bundled Cortex Vortex is a drawn
+    candidate exactly where the copy was, so the player keeps the track they asked
+    for and every player races the same certified bytes and boxes. `in_pool` and not
+    `own_pad`, because a listed custom track is never promised a pad either. A copy that
+    `required_entries` names keeps that promise: the swap is `own_pad` and the entry leaves the list.
+    Runs before the plan is drawn or restored, so both see the same options."""
+    o = world.options
+    if o.cortex_vortex_track.value:
+        return
+    packages = resolve_packages(list(o.custom_tracks.value))
+    copies = [p for p in packages if p["content_id"] == CORTEX_TRACK_KEY]
+    if not copies:
+        return
+    twins = [p["id"] for p in copies]
+    names = {n for p in copies for n in (p["display_name"], p["content_id"])}
+    kept = [n for n in o.required_entries.value if n not in names]
+    pinned = len(kept) != len(o.required_entries.value)
+    o.required_entries.value = kept
+    o.custom_tracks.value = [raw for raw in o.custom_tracks.value
+                             if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
+    # A track_modes override that names the copy carries over to the bundled track.
+    modes = dict(o.track_modes.value)
+    for name in sorted(names - {destinations.CORTEX_VORTEX}):
+        if name in modes:
+            modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+    o.track_modes.value = modes
+    o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
+    world.ctr_cortex_swap = twins
+    world.ctr_cortex_swap_mode = "own_pad" if pinned else "in_pool"
+    logging.getLogger("CTR").info(
+        "CTR: %s replaced the downloaded Cortex Vortex (%s) with the Cortex Vortex that comes with CTR AP "
+        "(cortex_vortex_track %s).", world.multiworld.player_name[world.player], ", ".join(twins),
+        world.ctr_cortex_swap_mode)
+
+
 def draw_plan(world, key_estimate=True):
     """One draw of the plan. `key_estimate` lets the first Key's estimate pick the
     layout. It knows no boss rank and no Relic Race first, so a redraw goes without
@@ -1148,6 +1192,11 @@ def draw_plan(world, key_estimate=True):
     forced_options.raise_if_starting_as_removed_oxide(world)
     forced_options.warn_racer_locked_pads_boolean_normalized(world)
     packages = resolve_packages(list(o.custom_tracks.value))
+    twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
+    if twin is not None:
+        error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
+              "Cortex Vortex that comes with CTR AP. A seed has one Cortex Vortex: remove it from custom_tracks, "
+              "or set cortex_vortex_track to off and the Cortex Vortex that comes with CTR AP replaces it.")
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
@@ -1718,7 +1767,7 @@ def draw_plan(world, key_estimate=True):
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
-            content_requirements.MODES[unlock_mode])
+            content_requirements.MODES[unlock_mode], package_by_id)
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)

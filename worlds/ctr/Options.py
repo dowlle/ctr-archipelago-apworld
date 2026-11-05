@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool)
 
-from . import characters
+from . import characters, legacy_yaml
 from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
@@ -582,8 +582,11 @@ class WumpaBundles(Toggle):
 
     Small bundles give 3 fruit and big bundles fill your kart to 10. Plain
     single-fruit filler remains the most common result. This adds variety to
-    existing filler slots; it does not add items or locations."""
+    existing filler slots; it does not add items or locations. On by default
+    since 0.3.0-alpha2; turn it off to keep every Wumpa filler item a single
+    fruit."""
     display_name = "Wumpa Bundles"
+    default = 1
 
 
 class ProgressiveStartingWumpa(Range):
@@ -658,6 +661,22 @@ class WumpaShopPrices(Range):
     to 40 to 80 in Citadel City. Every slot draws its price from its hub's
     range the same way, whatever it holds."""
     display_name = "Wumpa Shop Prices"
+    range_start = 25
+    range_end = 400
+    default = 100
+
+
+class WumpaShopLogicScale(Range):
+    """Scales the Wumpa amounts considered reasonable at each Key count.
+
+    At 100 percent, up to 100 fruit needs 0 Keys, 300 needs 1, 600 needs 2,
+    900 needs 3, and above 900 (including 1200 and more) needs all 4.
+    Uses the higher of a slot's price
+    and lifetime shelf unlock. Higher percentages allow more farming earlier;
+    lower percentages put expensive shelves later. The hub's Key gate still
+    applies. Changes item placement and tracker logic, not prices or buying:
+    you can always farm and buy early."""
+    display_name = "Wumpa Shop Logic Scale"
     range_start = 25
     range_end = 400
     default = 100
@@ -1334,6 +1353,13 @@ class RetailTracks(OptionSet):
     valid_keys = ["all"] + sorted(BOSS_VENUE_TRACKS)
     default = frozenset({"all"})
 
+    @classmethod
+    def from_any(cls, data: Any) -> "RetailTracks":
+        # First option rolled: refuse a whole 0.2.x YAML here, once, naming
+        # every old option (legacy_yaml.py).
+        legacy_yaml.check_caller()
+        return super().from_any(data)
+
 
 class TrackModes(OptionDict):
     """Which races each track offers: `trophy`, `ctr` and `relic`.
@@ -1687,6 +1713,7 @@ class ctrAPOptions(PerGameCommonOptions):
     hit_character: HitCharacter
     wumpa_shop_slots: WumpaShopSlots
     wumpa_shop_prices: WumpaShopPrices
+    wumpa_shop_logic_scale: WumpaShopLogicScale
     wumpa_shop_progression: WumpaShopProgression
     wumpa_shop_hints: WumpaShopHints
     # items and traps
@@ -1743,7 +1770,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                               ShuffleGems],
     "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
-    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopProgression, WumpaShopHints],
+    "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,
