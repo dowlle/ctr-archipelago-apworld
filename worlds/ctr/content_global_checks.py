@@ -55,7 +55,6 @@ count keeps the earlier routes (every real package measured has crates).
 from Options import OptionError
 
 from . import characters, content_bosses, content_cups, hit_character, itemsanity, logic_terms, progressive_capability
-from .Locations import CTR_LOCATION_IDS
 
 FEATURE = "global_checks_v1"
 KEYS = ("itemsanity", "hit_character")
@@ -324,12 +323,12 @@ def install(world, check, location, route_tests):
     legs = []
     leg_terms = []
     # Boss races (#133 PR 6): the boss can be hit in its own boss race once
-    # that race is in logic, whether or not it joined the draw
-    # (hit_character._boss_predicate on the legacy path).
-    by_code = {code: name for name, code in CTR_LOCATION_IDS.items()}
-    encounters = {enc["id"]: enc for enc in plan.get("encounters", ())}
-    boss = tuple(world.multiworld.get_location(by_code[encounters[route["encounter_id"]]["completion_location"]], player)
-                 for _entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
+    # the player can enter that race, whether or not it joined the draw
+    # (hit_character._boss_predicate on the legacy path). Entering is the
+    # encounter's region (garage gate and the race's own requirement); the win
+    # check's boost rank is not needed to hit the racer (Rulebook: the player
+    # does not need to beat the boss first).
+    boss = tuple(entry for entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
     for (entry, test, route), (_entry, stage, _route) in zip(route_tests, route_terms):
         if route["mode"] in content_bosses.MODES:
             continue
@@ -375,7 +374,7 @@ def install(world, check, location, route_tests):
     def rule(state):
         if weapons and not state.has_any(hit_character.HIT_METHOD_ITEMS, player):
             return False
-        if boss and any(location.can_reach(state) for location in boss):
+        if boss and any(state.can_reach(region, "Region", player) for region in boss):
             return True
         if fallback_keys is not None:
             if not state.has(hit_character.KEY_ITEM, player, fallback_keys):
@@ -394,7 +393,7 @@ def install(world, check, location, route_tests):
                  else alternatives(logic_terms.Ref(trigger, player) for trigger in triggers) if triggers
                  else logic_terms.TRUE)
         ordinary = logic_terms.And(guest, alternatives(leg_terms))
-        paths = [ordinary] + [logic_terms.Ref(completion, player) for completion in boss]
+        paths = [ordinary] + [logic_terms.ReachRegion(world, region) for region in boss]
         term = alternatives(paths)
         if weapons:
             term = logic_terms.And(logic_terms.HasAny(hit_character.HIT_METHOD_ITEMS, player), term)
