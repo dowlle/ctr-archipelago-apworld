@@ -33,3 +33,5 @@ More detail about how I use and verify AI-assisted work is available in the clie
 ## License
 
 MIT, matching upstream [ArchipelagoMW/Archipelago](https://github.com/ArchipelagoMW/Archipelago) - see [LICENSE](LICENSE). The requirement logic ports from [Icebound777's CTR randomizer](https://github.com/icebound777/CTR-Randomizer-Standalone) (MIT); his copyright notice is carried in the LICENSE file. The companion game client [`ctr-native-ap`](https://github.com/dowlle/ctr-native-ap) is a separate codebase and is GPL-3.0 (inherited from the CTR-native decompilation).
+
+CI tier test line, not for merging.
