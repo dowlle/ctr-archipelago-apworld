@@ -343,8 +343,9 @@ def describe_option(name: str, option) -> dict:
     return entry
 
 
-def _canonical(option, raw):
-    """The value the options screen shows: choice name, bool or int."""
+def _canonical(option, raw, order=()):
+    """The value the options screen shows: choice name, bool, int, or for a
+    set its entries in checklist order (`order`), then any others sorted."""
     import Options
     value = option.from_any(raw)
     if isinstance(value, Options.Choice):
@@ -353,6 +354,9 @@ def _canonical(option, raw):
         return bool(value.value)
     if isinstance(value, Options.Range):
         return int(value.value)
+    if isinstance(value, Options.OptionSet):
+        entries = {str(entry) for entry in value.value}
+        return [key for key in order if key in entries] + sorted(entries - set(order))
     return None
 
 
@@ -367,18 +371,20 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
         if not isinstance(section, dict):
             section = {}
     values = {}
+    checklists = overlay.get("checklists", {})
     for group in overlay.get("groups", []):
         for name in group.get("options", []):
             option = hints.get(name)
             if option is None:
                 continue
+            order = [row[0] for row in checklists.get(name, [])]
             raw = section.get(name, option.default)
             if isinstance(raw, dict) or (isinstance(raw, str) and raw.strip().lower().startswith("random")):
                 raw = option.default
             try:
-                values[name] = _canonical(option, raw)
+                values[name] = _canonical(option, raw, order)
             except Exception:
-                values[name] = _canonical(option, option.default)
+                values[name] = _canonical(option, option.default, order)
     return values
 
 
