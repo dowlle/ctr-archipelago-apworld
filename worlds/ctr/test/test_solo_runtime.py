@@ -759,6 +759,22 @@ future_metadata:
         player = os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml")
         self.assertEqual(ctr_solo.read_player_yaml(player)[GAME]["start_location_hints"], names)
 
+    def test_list_form_rolls_defer_guards_but_literal_checklists_do_not(self):
+        path = self.imported_yaml()
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME]["crystal_challenge_count"] = [1]
+        doc[GAME]["start_location_hints"] = []
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        self.assertIn("crystal_challenge_count", result["unresolved"])
+        self.assertNotIn("crystal_arenas", result["unresolved"])
+        self.assertNotIn("start_hints", result["unresolved"])
+        self.assertEqual(result["values"]["crystal_arenas"], ["Rocky Road"])
+        events, code = self.call("validate", "--yaml", path)
+        self.assertEqual(code, 0, events[-3:])
+
 
 class TestPresets(SoloTestCase):
     def test_every_preset_generates(self):

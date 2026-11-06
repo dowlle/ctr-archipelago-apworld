@@ -448,6 +448,7 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
             option = cls.options_dataclass.type_hints[name]
             raw = section.get(name, option.default)
             if (modified_at_roll or (isinstance(raw, dict) and not issubclass(option, Options.OptionDict)) or
+                    (isinstance(raw, list) and option.supports_weighting) or
                     (isinstance(raw, str) and raw.strip().lower().startswith("random"))):
                 unresolved.append(name)
     return {"game": GAME, "world_version": world_version(), "ap_version": ap_version(),
