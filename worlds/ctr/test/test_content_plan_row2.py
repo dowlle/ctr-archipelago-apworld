@@ -199,7 +199,7 @@ class TestCupTracks(unittest.TestCase):
                 self.assertEqual(check["display_name"], names[tid] + ": Cup Leg Victory")
                 self.assertEqual(check["location"], content_cups.CTR_LOCATION_IDS[check["display_name"]])
                 found.add(tid)
-        self.assertTrue(found)
+        self.assertEqual(found, set(TRIAL_IDS))
 
     def test_unknown_value_refuses(self):
         with self.assertRaises(KeyError):
