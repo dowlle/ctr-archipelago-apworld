@@ -753,10 +753,11 @@ class ShortcutKnowledge(Choice):
 class OneLapCups(DefaultOnToggle):
     """Shorten cup races. On by default.
 
-    Each cup race, Gem Cups and boss cups included, uses half its track's laps,
-    rounded down and at least one: an original track races one lap instead of
-    three, and a boss cup race one lap. Single races, boss races, Relic Races
-    and CTR Challenges keep their full laps. The checks do not change."""
+    Each cup race, Gem Cups included, uses half its track's laps, rounded down
+    and at least one: an original track races one lap instead of three. Boss
+    cup races run three laps on any track, so they run one. Single races, boss
+    races, Relic Races and CTR Challenges keep their full laps. The checks do
+    not change."""
     # Reuses the engine's built-in one-lap mechanism (the vanilla one-lap
     # cheat), scoped to cups.
     display_name = "One-Lap Cup Races"

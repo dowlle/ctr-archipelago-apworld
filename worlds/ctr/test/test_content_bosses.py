@@ -587,6 +587,25 @@ class TestBossCups(unittest.TestCase):
             restored = make_world({}, passthrough=json.loads(json.dumps(world.fill_slot_data())))
             self.assertEqual(bool(restored.options.one_lap_cups.value), one_lap)
 
+    def test_custom_boss_cup_leg_races_boss_laps(self):
+        """A custom boss cup leg races the boss's three laps, or one with
+        one_lap_cups, not its own authored laps halved (Baby T Park has 7)."""
+        for one_lap, laps in ((True, 1), (False, 3)):
+            options = boss_options(one_lap_cups=one_lap)
+            options["content_pool"]["bosses"]["cups"] = 4
+            for seed in range(40):
+                plan = make_world(copy.deepcopy(options), seed=seed).ctr_content_plan
+                tracks = {t["id"]: t for t in plan["tracks"]}
+                legs = [leg for e in plan["entries"] if e["kind"] == content_bosses.CUP_KIND for leg in e["legs"]
+                        if tracks[leg["track_id"]].get("origin") == "custom"]
+                if legs:
+                    break
+            else:
+                self.fail("no seed drew a custom boss cup leg")
+            self.assertTrue(all(tracks[leg["track_id"]]["laps"] == 7 for leg in legs))
+            self.assertEqual({leg["laps"] for leg in legs}, {laps})
+            self.assertTrue(content_plan.validate(plan))
+
     def test_forged_cup_laps_refuse(self):
         """A boss cup leg races three laps or one, the same in every leg and
         the same switch as the ordinary cups (A3-6)."""
