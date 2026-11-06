@@ -132,11 +132,13 @@ class TestStarts(unittest.TestCase):
             make_world(options(shuffle_keys=False, start_inventory_from_pool={"Key": 5}))
 
     def test_all_copies_counted_after_the_fill(self):
-        # Seed 0: this YAML fails to fill on about a third of seeds before and
-        # after row 10i (base 5 of 13, row 10i 3 of 13); the default seed 420
-        # moved into the failing third when cup legs became rung routes.
+        # Seed 1: this YAML fails to fill on some seeds before and after row 10i
+        # (base 5 of 13, row 10i 3 of 13); the default seed 420 moved into the
+        # failing share when cup legs became rung routes, and seed 0 when trial
+        # tracks became cup legs (A3-9: seeds 0 to 412 fail 60 times on the
+        # base and 51 times with trial legs).
         world = make_world(options(shuffle_keys=False, shuffle_gems=False, start_inventory_from_pool={"Key": 2, "Blue Gem": 1}),
-                           seed=0)
+                           seed=1)
         mw = filled(world)
         placed = [l.item.name for l in mw.get_locations(1) if l.item is not None and l.address is not None]
         self.assertEqual(placed.count("Key"), 2)

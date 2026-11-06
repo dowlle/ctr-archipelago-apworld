@@ -1427,8 +1427,8 @@ class CupCount(Range):
 
 
 class CupTracks(Choice):
-    """Choose the tracks in each cup. Slide Coliseum and Turbo Track never appear
-    in cups.
+    """Choose the tracks in each cup. Slide Coliseum and Turbo Track can appear
+    in cups too.
 
     - **off**: an original Gem Cup keeps its four original tracks. A sixth cup
       and later draw four different tracks.

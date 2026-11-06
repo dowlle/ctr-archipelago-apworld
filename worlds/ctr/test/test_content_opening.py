@@ -290,7 +290,7 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
         self.assertTrue(all(location.can_reach(state) for location in world.multiworld.get_locations(world.player)
                             if location.address is not None))
 
-    cases = (("letters", 169, 53), ("racers", 83, 48))
+    cases = (("letters", 169, 52), ("racers", 83, 58))
 
     def options(self, name):
         path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"
@@ -679,7 +679,7 @@ class TestAuxiliaryOnlyOpening(unittest.TestCase):
         world = self.world()
         mw, player = world.multiworld, world.player
         state = sphere0_guard._base_state(world)
-        self.assertEqual(len(sphere0_guard._room(world, state)), 15)
+        self.assertEqual(len(sphere0_guard._room(world, state)), 27)
         self.assertFalse(any(loc.can_reach(state) for loc in self.wins(world)))
         pool = list(mw.itempool)
         starts = list(mw.precollected_items[player])
@@ -707,7 +707,7 @@ class TestAuxiliaryOnlyOpening(unittest.TestCase):
                 self.assertFalse(any(loc.can_reach(prefix) for loc in self.wins(world)))
         actual = sphere0_guard._base_state(world)
         self.assertTrue(any(loc.can_reach(actual) for loc in self.wins(world)))
-        self.assertGreaterEqual(len(sphere0_guard._room(world, actual)), 15)
+        self.assertGreaterEqual(len(sphere0_guard._room(world, actual)), 27)
         self.assertFalse(actual.has("Key", player))
         distribute_items_restrictive(mw)
         self.assertFalse(mw.get_unfilled_locations())
@@ -729,7 +729,7 @@ class TestAuxiliaryOnlyOpening(unittest.TestCase):
         key = next(item for item in world.multiworld.itempool if item.name == "Key")
         held = sphere0_guard._collect(world, state, [key])
         room = len(sphere0_guard._room(world, held))-1
-        self.assertEqual(room, 15)
+        self.assertEqual(room, 27)
         self.assertFalse(any(loc.can_reach(held) for loc in self.wins(world)))
         before = self.snapshot(world)
         with mock.patch.object(sphere0_guard, "plan_opening", return_value=([key], room)):

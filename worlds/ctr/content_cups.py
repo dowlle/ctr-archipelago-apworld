@@ -4,7 +4,8 @@ A content plan seats `cup_count` cups on its 27 normal pads. Tracks fill the
 remaining pads.
 
 LEGS. A cup has exactly four ordered legs, drawn from the seed's own tracks:
-the 16 retail race tracks of `retail_tracks` (no trial track), the custom tracks
+the 18 retail race tracks of `retail_tracks` (Slide Coliseum and Turbo Track
+too, ruled 2026-11-05), the custom tracks
 that can run a Trophy race (eight karts with AI paths) and Cortex Vortex when
 `cortex_vortex_track` is on. `cup_custom_legs` is the most custom and Cortex
 Vortex legs per cup. A track may always lead several cups.
@@ -76,8 +77,12 @@ MODE = "cup"
 AWARD = "win"
 SWEEP_AWARD = "win_all_legs"
 LEG_AWARD = "leg_win"
-#: Retail race tracks a leg can be: the 16 Trophy tracks, no trial track.
+#: Retail race tracks a boss cup leg can be (content_bosses): the 16 Trophy
+#: tracks, no trial track.
 LEG_RETAIL_IDS = tuple(range(16))
+#: Retail race tracks a plan cup leg can be: the 16 Trophy tracks and the trial
+#: tracks Slide Coliseum (16) and Turbo Track (17), ruled 2026-11-05.
+CUP_LEG_RETAIL_IDS = tuple(range(18))
 LEGS = 4
 FIELD_SIZE = 8
 ROSTER = ({"role": "player", "slot": 0},)
@@ -115,9 +120,9 @@ def settings(options):
 
 def leg_pools(candidates, packages, sources):
     """(other, custom): the track candidates a leg can race. `other` holds the
-    retail race tracks 0..15; `custom` the custom tracks that can run a
+    retail race tracks 0..17; `custom` the custom tracks that can run a
     Trophy race, then Cortex Vortex. Each in a stable order."""
-    other = sorted((t for t in candidates if t.get("origin") == "retail" and t["retail_id"] in LEG_RETAIL_IDS
+    other = sorted((t for t in candidates if t.get("origin") == "retail" and t["retail_id"] in CUP_LEG_RETAIL_IDS
                     and "retail" in sources), key=lambda t: t["retail_id"])
     custom = [t for t in candidates if t.get("origin") == "custom" and "custom" in sources
               and packages[t["package_id"]]["capabilities"]["arcade"]]
@@ -444,7 +449,7 @@ def check_entry(cup_entry, tracks, packages, shortened):
         if leg["id"] != f"{eid}/leg:{n}" or track is None:
             error("a cup leg does not name a track of the plan")
         origin = track.get("origin")
-        if not ((origin == "retail" and track["retail_id"] in LEG_RETAIL_IDS) or origin == "cortex_vortex"
+        if not ((origin == "retail" and track["retail_id"] in CUP_LEG_RETAIL_IDS) or origin == "cortex_vortex"
                 or (origin == "custom" and packages[track["package_id"]]["capabilities"]["arcade"])):
             error("a cup leg is not a retail race track, Cortex Vortex or a custom track with a Trophy race")
         full, short = base_laps(track), max(1, base_laps(track) // 2)
