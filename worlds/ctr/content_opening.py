@@ -367,6 +367,10 @@ class PlanReach:
                             need=content_capability.finish_boost(track, capability, content_wumpa.income_package(plan, track))
                             if capability.get("boost_mode") else 0)
                        for _entry, pad_id, mode, track in content_wumpa.income_routes(plan)]
+        # A plan with no Trophy or CTR income route banks in its cup legs (A3-7).
+        self.income += [dict(own_pad_id=pad_id, mode="cup", later=False, boost=boost_of(dict(own_pad_id=pad_id)),
+                             need=content_wumpa.cup_income_need(plan, entry_id, leg_id))
+                        for entry_id, pad_id, leg_id, _track in content_wumpa.cup_income_routes(plan)]
 
     def _met(self, requirement, held):
         return term_met(self.req[requirement], held)
