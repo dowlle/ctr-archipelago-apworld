@@ -388,8 +388,13 @@ def _canonical(option, raw, order=()):
             if isinstance(val, bool):
                 continue
             try:
+                # A float that is no whole number (1.9, NaN, .inf) is skipped
+                # too, instead of truncating or raising into the fallback of
+                # the whole table.
+                if isinstance(val, float) and not val.is_integer():
+                    continue
                 merged[str(key)] = int(val)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 continue
         return merged
     return None

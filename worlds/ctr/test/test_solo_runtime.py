@@ -595,9 +595,13 @@ game: {GAME}
       nested: 1
     forced_usf: not-a-number
     forced_boost: yes
+    warpball_ambush: 1.9
+    demo_camera: .inf
+    mirror_mode: 9
 """)
         values = self.describe("--yaml", path)["values"]
-        self.assertEqual(values["trap_weights"], DEFAULT_TRAP_WEIGHTS)
+        # Unusable entries fall back per row; a valid sibling keeps its value.
+        self.assertEqual(values["trap_weights"], dict(DEFAULT_TRAP_WEIGHTS, mirror_mode=9))
 
     def test_writing_all_weights_round_trips_to_the_preset_seed(self):
         """The screen writes the whole table when a weight changed (a partial
