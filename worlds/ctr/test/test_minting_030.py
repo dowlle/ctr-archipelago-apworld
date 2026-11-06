@@ -117,9 +117,9 @@ class TestReservedNotMinted(unittest.TestCase):
         for track in nt.NAMED_TRACKS:
             base = nt.NAMED_LOCATION_BASE + nt.LOCATION_BUDGET * track.block_index
             used = {code - base for _n, code in nt.track_locations(track)}
-            self.assertEqual(used, set(range(0, 17)) | set(range(20, 35)))
+            self.assertEqual(used, set(range(0, 17)) | set(range(20, 70)))
         self.assertEqual([(lo, hi) for lo, hi, _l in nt.RESERVED_LOCATION_OFFSETS],
-                         [(17, 19), (35, 119), (120, 140), (141, 199)])
+                         [(17, 19), (70, 119), (120, 140), (141, 199)])
 
     def test_arcade_names_belong_to_the_separate_259_mint(self):
         for a,arena in enumerate(("Parking Lot", "The North Bowl", "Lab Basement")):
@@ -210,7 +210,7 @@ class TestThirdPassLrg2Blocks(unittest.TestCase):
                 self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
                 self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
                                  [first_letter, first_letter + 1, first_letter + 2])
-                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 32)
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67)  # 32, plus Item Box 16 to 50 (alpha3 data package)
 
     def test_sids_house_key_has_no_dash_before_the_s(self):
         self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
