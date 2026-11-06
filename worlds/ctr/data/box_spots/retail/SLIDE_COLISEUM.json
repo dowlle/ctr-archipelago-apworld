@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 16, "name": "Slide Coliseum"},
+  "spots": [
+    {"number": 1, "pos": [-1014, 1, -9960], "rot_y": 3700, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-1793, 1, -6745], "rot_y": 3275, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-6385, 63, -5619], "rot_y": -39, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-8182, 461, 2797], "rot_y": 4205, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-4540, 1, 7352], "rot_y": 3809, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-716, 2, 2137], "rot_y": 3044, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-806, 310, -897], "rot_y": 1597, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [7839, 28, -3236], "rot_y": 51, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [4343, 1, -6233], "rot_y": 1185, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [5582, 50, -8647], "rot_y": 2392, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [2272, 1, -9671], "rot_y": 3108, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [-6766, 1, -8548], "rot_y": 3487, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [-8991, 25, -6455], "rot_y": 3972, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [-6235, 1, -1033], "rot_y": 3273, "needs": "none", "source": "builtin"},
+    {"number": 15, "pos": [-4060, 395, 5887], "rot_y": 1296, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

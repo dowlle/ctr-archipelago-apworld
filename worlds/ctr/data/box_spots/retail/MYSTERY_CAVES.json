@@ -1,0 +1,21 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 9, "name": "Mystery Caves"},
+  "spots": [
+    {"number": 1, "pos": [8902, 354, 7862], "rot_y": 1058, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [10801, 61, 3723], "rot_y": 1832, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [5250, 527, 1610], "rot_y": 2582, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [802, -1606, -7473], "rot_y": 2261, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-7447, -1162, -14272], "rot_y": 3233, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-8636, -1215, -8545], "rot_y": 173, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-6146, -1261, -3951], "rot_y": 355, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-8469, -48, 5313], "rot_y": 77, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-3148, 441, 9756], "rot_y": 286, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-4918, 665, 15323], "rot_y": 2548, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [-1768, -48, 16197], "rot_y": 624, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [12101, 22, 5167], "rot_y": 2819, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [-7792, 390, 6131], "rot_y": 148, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

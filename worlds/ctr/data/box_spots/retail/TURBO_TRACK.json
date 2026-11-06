@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 17, "name": "Turbo Track"},
+  "spots": [
+    {"number": 1, "pos": [10275, 25, -7102], "rot_y": 2379, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [8309, 13, -9648], "rot_y": 3262, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-1593, 230, -9439], "rot_y": 3508, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-9863, 49, -9573], "rot_y": 3993, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-10401, 61, -989], "rot_y": 634, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-6224, 45, -6833], "rot_y": 1756, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-2366, 1, -1946], "rot_y": 1353, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-53, 1, -5402], "rot_y": 3823, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-1734, 167, 1080], "rot_y": 3868, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-2773, 30, 7568], "rot_y": 982, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [2953, 159, 7937], "rot_y": 1511, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [2969, 135, 3737], "rot_y": 1224, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [9394, 68, -1131], "rot_y": 2220, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [8064, 42, -7782], "rot_y": 3147, "needs": "none", "source": "builtin"},
+    {"number": 15, "pos": [-11030, 1, -10404], "rot_y": 4651, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

@@ -414,6 +414,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_capability.FEATURE] if capability else [])
             + ([content_global_checks.FEATURE] if global_checks else [])
             + ([content_item_boxes.FEATURE] if item_boxes else [])
+            + ([content_item_boxes.SPOT_FEATURE] if item_boxes and item_boxes.get(content_item_boxes.SPOT_KEY) else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
             + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
@@ -998,7 +999,10 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
                 item["boost"] = need
     for slot, code, suffix in content_item_boxes.track_boxes(track, item_boxes, package):
         box = check(code, content_item_boxes.KIND, suffix, [(mode, content_item_boxes.AWARD) for mode in modes])
-        need, stats = content_item_boxes.box_terms(track, slot, capability, package)
+        spot = content_item_boxes.spot_of(track, item_boxes, package, slot)
+        if spot is not None:
+            box["spot"] = spot
+        need, stats = content_item_boxes.box_terms(track, slot, capability, package, item_boxes)
         if need:
             box["boost"] = need
         if stats:
@@ -1451,6 +1455,9 @@ def draw_plan(world, key_estimate=True):
     # pad requirements only decide which race and gate reaches each one.
     # Item Box Locations (#133 PR 4e): per-track box checks.
     item_boxes = content_item_boxes.settings(o)
+    # Hand-placed spots (A3-14): each track's pick from its spot file, on a
+    # generator of its own (box_spots.pick), so the world's stream is untouched.
+    content_item_boxes.add_spot_sets(item_boxes, candidates, package_by_id, world.multiworld.seed, world.player)
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
     # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
     # Challenge venue. Nothing is drawn with bosses off.
@@ -1735,6 +1742,11 @@ def draw_plan(world, key_estimate=True):
         pads.append(pad)
     standalone = [t for t in chosen if is_track(t)]
     plan_tracks = standalone + cup_only_tracks(standalone, entries, track_records)
+    if item_boxes:
+        # Only pad tracks carry boxes; an empty set leaves the record as before.
+        content_item_boxes.keep_spot_sets(item_boxes, {t["id"] for t in standalone})
+        if not item_boxes.get(content_item_boxes.SPOT_KEY):
+            item_boxes.pop(content_item_boxes.SPOT_KEY, None)
     checks.extend(content_cups.leg_victories({t["id"]: t for t in plan_tracks}, entries, pads,
                                              {t["id"]: room_title(t) for t in plan_tracks}))
     if settings.get("wumpa") == "global":
@@ -2670,6 +2682,8 @@ def validate(plan):
     sweep = any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"])
     shortened, cup_names, leg_tracks = None, set(), set()
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
+    # Hand-placed spots (A3-14): before any box check is recomputed from them.
+    content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages)
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue

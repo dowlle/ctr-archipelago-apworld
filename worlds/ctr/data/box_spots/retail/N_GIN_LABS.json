@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 11, "name": "N. Gin Labs"},
+  "spots": [
+    {"number": 1, "pos": [14723, 1, 1646], "rot_y": 470, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [17443, 503, 16111], "rot_y": 5, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [7426, 767, 23254], "rot_y": 3772, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [6094, 767, 21794], "rot_y": 2661, "needs": "usf", "source": "builtin"},
+    {"number": 5, "pos": [6452, -906, 22330], "rot_y": 452, "needs": "usf", "source": "builtin"},
+    {"number": 6, "pos": [8910, -838, 24621], "rot_y": 305, "needs": "usf", "source": "builtin"},
+    {"number": 7, "pos": [11751, -189, 27796], "rot_y": 815, "needs": "usf", "source": "builtin"},
+    {"number": 8, "pos": [15744, 263, 26395], "rot_y": 493, "needs": "usf", "source": "builtin"},
+    {"number": 9, "pos": [14132, 720, 20701], "rot_y": 2056, "needs": "usf", "source": "builtin"},
+    {"number": 10, "pos": [9229, -721, 9153], "rot_y": 2145, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [9608, 170, 4406], "rot_y": 928, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [17776, 458, 6829], "rot_y": 4025, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [12854, 420, 19694], "rot_y": 2945, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [-2682, -768, 19444], "rot_y": 1537, "needs": "usf", "source": "builtin"},
+    {"number": 15, "pos": [2363, -768, 20378], "rot_y": 3397, "needs": "usf", "source": "builtin"}
+  ],
+  "retired": []
+}

@@ -1,0 +1,18 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 14, "name": "Coco Park"},
+  "spots": [
+    {"number": 1, "pos": [-4423, 33, -4568], "rot_y": 3059, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-8309, 865, 3142], "rot_y": 185, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [4673, 92, 3047], "rot_y": 2511, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [4755, 746, 7736], "rot_y": 3802, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [8651, 734, 2430], "rot_y": 3567, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [4775, 31, -3326], "rot_y": 3104, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-2171, 129, -3800], "rot_y": 31, "needs": "none", "shortcut": "medium", "source": "builtin"},
+    {"number": 8, "pos": [-3100, 345, -8335], "rot_y": 2065, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-5943, 10, -3189], "rot_y": 146, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-6165, 96, 7140], "rot_y": 1057, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}
