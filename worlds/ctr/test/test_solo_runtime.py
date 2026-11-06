@@ -675,7 +675,7 @@ class TestImportedOptions(SoloTestCase):
 
     def imported_yaml(self):
         return write_yaml(self.work, "imported.yaml", f"""# Preserve this comment too.
-name: ImportedPlayer
+name: {{ImportedPlayer: 1}}
 game: {GAME}
 description: An imported file
 future_metadata:
@@ -685,6 +685,8 @@ future_metadata:
   death_link: 'off'
   death_link_send: [follow_death_link]
   goal_wumpa: 150
+  crystal_challenge_count: {{1: 1}}
+  crystal_arenas: [Rocky Road]
   trap_fill_percentage: {{0: 1, 5: 2}}
   start_hints: [Key]
   start_location_hints: [Crash Cove - Trophy]
@@ -706,6 +708,8 @@ future_metadata:
         self.assertEqual(values["goal_wumpa"], 150)
         self.assertEqual(values["start_hints"], ["Key"])
         self.assertEqual(values["start_location_hints"], [location])
+        self.assertIn("crystal_challenge_count", last(events)["unresolved"])
+        self.assertIn("trap_fill_percentage", last(events)["unresolved"])
         paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
                                os.path.join(self.client, "ctr.apworld"), REPO)
         paths.ensure()
@@ -741,6 +745,19 @@ future_metadata:
             return ctr_solo.read_multidata(os.path.join(room, archive))
         self.assertEqual(generate_and_read(path, os.path.join(self.work, "original")),
                          generate_and_read(prepared, os.path.join(self.work, "untouched")))
+
+    def test_large_hint_selection_uses_a_short_file_argument(self):
+        cls = ctr_solo.world_class()
+        names = sorted(cls.location_name_to_id)[:-1]
+        overrides = os.path.join(self.work, "overrides.json")
+        with open(overrides, "w", encoding="utf-8") as handle:
+            json.dump(["start_location_hints=" + json.dumps(names)], handle)
+        self.assertGreater(os.path.getsize(overrides), 131072)
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"),
+                                 "--set-file", overrides, "--seed", "2026110619")
+        self.assertEqual(code, 0, events[-3:])
+        player = os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml")
+        self.assertEqual(ctr_solo.read_player_yaml(player)[GAME]["start_location_hints"], names)
 
 
 class TestPresets(SoloTestCase):

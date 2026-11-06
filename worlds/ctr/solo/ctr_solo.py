@@ -438,9 +438,21 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
     options = [describe_option(name, option)
                for name, option in cls.options_dataclass.type_hints.items()]
     overlay = load_overlay(paths)
+    doc = read_player_yaml(yaml_path) if yaml_path else {}
+    section = _section(doc)
+    modified_at_roll = bool(doc.get("linked_options") or doc.get("triggers") or section.get("triggers"))
+    import Options
+    unresolved = []
+    for group in overlay.get("groups", []):
+        for name in group.get("options", []):
+            option = cls.options_dataclass.type_hints[name]
+            raw = section.get(name, option.default)
+            if (modified_at_roll or (isinstance(raw, dict) and not issubclass(option, Options.OptionDict)) or
+                    (isinstance(raw, str) and raw.strip().lower().startswith("random"))):
+                unresolved.append(name)
     return {"game": GAME, "world_version": world_version(), "ap_version": ap_version(),
             "options": options, "overlay": overlay, "presets": list_presets(paths),
-            "values": overlay_values(yaml_path, overlay)}
+            "values": overlay_values(yaml_path, overlay), "unresolved": unresolved}
 
 
 def load_overlay(paths: Paths) -> dict:
@@ -1737,6 +1749,7 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--yaml", required=True)
         cmd.add_argument("--name", default=None)
         cmd.add_argument("--set", action="append", default=[], metavar="OPTION=VALUE")
+        cmd.add_argument("--set-file", default=None, help="JSON list of OPTION=VALUE overrides")
         cmd.add_argument("--stamp-requires", action="store_true",
                          help="add requires: for a YAML this client wrote (presets, options screen)")
         cmd.add_argument("--assets", default=None, help="the client's assets folder (default <client>/assets)")
@@ -1784,6 +1797,11 @@ def main(argv: list[str] | None = None) -> int:
             clear_tmp(paths)
         bootstrap_core(paths, load_worlds=True)
         assets = os.path.abspath(getattr(args, "assets", None) or os.path.join(client, "assets"))
+        if args.command in ("validate", "generate") and args.set_file:
+            settings = read_json(args.set_file)
+            if not isinstance(settings, list) or not all(isinstance(s, str) for s in settings):
+                raise SoloError("option", "The options file must contain a list of overrides.")
+            args.set.extend(settings)
         tracks = ({"assets": assets, "picked": args.track, "guaranteed": args.guarantee,
                    "page": args.tracks_page}
                   if args.command in ("validate", "generate") else None)
