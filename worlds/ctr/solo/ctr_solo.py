@@ -446,7 +446,15 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
 def load_overlay(paths: Paths) -> dict:
     if not os.path.isfile(paths.overlay):
         return {}
-    return read_json(paths.overlay)
+    overlay = read_json(paths.overlay)
+    # Hint names come from the loaded world, including its registered custom
+    # names. Keep the existing checklist protocol used by the client.
+    cls = world_class()
+    for name, registry in (("start_hints", cls.item_name_to_id),
+                           ("start_location_hints", cls.location_name_to_id)):
+        if name in overlay.get("checklists", {}):
+            overlay["checklists"][name] = [[key] for key in sorted(registry)]
+    return overlay
 
 
 # ---------------------------------------------------------------------------
@@ -504,8 +512,9 @@ def read_player_yaml(path: str) -> dict:
 
 
 def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
+    import copy
     import yaml
-    doc = json.loads(json.dumps(doc))  # deep copy, plain types only
+    doc = copy.deepcopy(doc)  # unknown keys may contain YAML dates or sets
     if name:
         doc["name"] = name
     section = doc.setdefault(GAME, {})
@@ -675,6 +684,7 @@ def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str
     """Read and override a YAML, add picked custom tracks, write the exact
     input to a temp file."""
     doc = read_player_yaml(source)
+    original = doc
     doc = apply_overrides(doc, name, settings)
     if tracks:
         doc = apply_tracks(paths, doc, tracks["assets"], tracks["picked"], tracks["guaranteed"], tracks["page"])
@@ -684,7 +694,11 @@ def prepare_yaml(paths: Paths, source: str, name: str | None, settings: list[str
         doc = stamp_requires(doc)  # a bundled preset is always this client's own YAML
     fd, tmp = tempfile.mkstemp(prefix="player-", suffix=".yaml", dir=paths.tmp)
     os.close(fd)
-    dump_yaml(doc, tmp)
+    if doc == original:
+        # Preserve even comments and spelling when the screen changed nothing.
+        shutil.copyfile(source, tmp)
+    else:
+        dump_yaml(doc, tmp)
     return doc, tmp
 
 
@@ -1239,7 +1253,8 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
     if twice:
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
-    doc = json.loads(json.dumps(doc))
+    import copy
+    doc = copy.deepcopy(doc)
     section = doc.setdefault(GAME, {})
     start = _cortex_pick(section)
     cortex = PICK_OWN_PAD if CORTEX_ID in guaranteed else PICK_POOL if CORTEX_ID in picked else 0

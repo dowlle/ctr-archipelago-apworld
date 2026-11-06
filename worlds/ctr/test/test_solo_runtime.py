@@ -249,7 +249,8 @@ class TestDescribe(SoloTestCase):
                 elif entry["kind"] == "set":
                     # Every row alone, none and all, in checklist order.
                     keys = [row[0] for row in result["overlay"]["checklists"][name]]
-                    for value in [[key] for key in keys] + [[], keys]:
+                    sample = keys if name not in ("start_hints", "start_location_hints") else keys[::max(1, len(keys) // 10)]
+                    for value in [[key] for key in sample] + [[], keys]:
                         with self.subTest(option=name, value=value):
                             self.assertEqual(ctr_solo._canonical(hints[name], value, keys), value)
                     continue
@@ -332,9 +333,11 @@ class TestChecklists(SoloTestCase):
         facts = {o["name"]: o for o in result["options"]}
         shown = {n: g["id"] for g in overlay["groups"] for n in g["options"]}
         checklists = overlay["checklists"]
-        self.assertEqual(set(checklists), set(CHECKLIST_SETS))
+        self.assertEqual(set(checklists), set(CHECKLIST_SETS) | {"start_hints", "start_location_hints"})
         groups = {"crystal_arenas": "cups", "podium_rungs": "checks"}
         for name, rows in checklists.items():
+            if name in ("start_hints", "start_location_hints"):
+                continue  # registry-backed names have separate coverage below
             with self.subTest(option=name):
                 self.assertEqual(shown.get(name), groups.get(name, "bosses"))
                 keys = [row[0] for row in rows]
@@ -657,6 +660,87 @@ game: {GAME}
             self.skipTest("this combination has no filler to turn into traps")
         self.assertEqual(last(events)["kind"], "option", last(events))
         self.assertIn("trap_weights", last(events)["options"], last(events))
+
+
+class TestImportedOptions(SoloTestCase):
+    def test_hint_rows_come_from_the_loaded_world(self):
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        cls = ctr_solo.world_class()
+        for name, registry in (("start_hints", cls.item_name_to_id),
+                               ("start_location_hints", cls.location_name_to_id)):
+            self.assertEqual(result["overlay"]["checklists"][name], [[n] for n in sorted(registry)])
+            self.assertNotIn(name, result["overlay"]["left_out"])
+
+    def imported_yaml(self):
+        return write_yaml(self.work, "imported.yaml", f"""# Preserve this comment too.
+name: ImportedPlayer
+game: {GAME}
+description: An imported file
+future_metadata:
+  date: 2026-11-06
+  nested: [one, two]
+{GAME}:
+  death_link: 'off'
+  death_link_send: [follow_death_link]
+  goal_wumpa: 150
+  trap_fill_percentage: {{0: 1, 5: 2}}
+  start_hints: [Key]
+  start_location_hints: [Crash Cove - Trophy]
+  priority_locations: []
+  future_option: {{nested: [a, b]}}
+""")
+
+    def test_imported_values_and_unsupported_data_survive_edits(self):
+        import yaml
+        path = self.imported_yaml()
+        # Use actual registry names, rather than requiring a seed-specific name.
+        doc = ctr_solo.read_player_yaml(path)
+        location = next(iter(ctr_solo.world_class().location_name_to_id))
+        doc[GAME]["start_location_hints"] = [location]
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        values = last(events)["values"]
+        self.assertEqual(values["goal_wumpa"], 150)
+        self.assertEqual(values["start_hints"], ["Key"])
+        self.assertEqual(values["start_location_hints"], [location])
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        paths.ensure()
+        prepared, tmp = ctr_solo.prepare_yaml(paths, path, None,
+                                              ["goal_wumpa=200", 'start_hints=["Trophy"]'], False)
+        expected = ctr_solo.read_player_yaml(path)
+        expected[GAME].update(goal_wumpa=200, start_hints=["Trophy"])
+        self.assertEqual(prepared, expected)
+        self.assertEqual(ctr_solo.read_player_yaml(tmp), expected)
+        self.assertEqual(ctr_solo.read_player_yaml(path), doc)
+
+    def test_untouched_import_is_byte_identical_and_generates_the_same_seed(self):
+        path = self.imported_yaml()
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME]["start_location_hints"] = []
+        ctr_solo.dump_yaml(doc, path)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write("# A comment the options screen must keep.\n")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        paths.ensure()
+        _, prepared = ctr_solo.prepare_yaml(paths, path, None, [], False)
+        with open(path, "rb") as original, open(prepared, "rb") as written:
+            self.assertEqual(original.read(), written.read())
+        # Both sides use the same solo policy. Compare server-visible seed
+        # content, not ZIP timestamps or pickle insertion order.
+        def generate_and_read(source, folder):
+            events, code = run(self.client, "generate", "--yaml", source, "--seed", "2026110618",
+                               solo=folder, home=self.home)
+            self.assertEqual(code, 0, events[-3:])
+            room = os.path.join(folder, "rooms", last(events)["room_id"])
+            archive = next(n for n in os.listdir(room) if n.endswith(".zip"))
+            return ctr_solo.read_multidata(os.path.join(room, archive))
+        self.assertEqual(generate_and_read(path, os.path.join(self.work, "original")),
+                         generate_and_read(prepared, os.path.join(self.work, "untouched")))
 
 
 class TestPresets(SoloTestCase):
