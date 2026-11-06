@@ -208,11 +208,16 @@ class TestDescribe(SoloTestCase):
         for name in shown:
             if name in checklists:
                 self.assertEqual(facts[name]["kind"], "set", name)
+            elif "weight_rows" in facts[name]:
+                # A dict is a row as one number row per key (A3-22, trap weights).
+                self.assertEqual(facts[name]["kind"], "dict", name)
             else:
                 self.assertIn(facts[name]["kind"], ("toggle", "choice", "range", "named_range"), name)
-        # A set is a row only as a checklist (A2-41); lists and dictionaries never are.
+        # A set is a row only as a checklist (A2-41), a dict only with weight
+        # rows (A3-22); lists and other dictionaries never are.
         for name, entry in facts.items():
-            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other") and name not in checklists:
+            if entry["kind"] in ("set", "list", "dict", "counter", "text", "other") \
+                    and name not in checklists and "weight_rows" not in entry:
                 self.assertIn(name, left_out, name)
         rule_options = [r["option"] for r in overlay["rules"]]
         self.assertEqual(len(rule_options), len(set(rule_options)), "one rule per option")
@@ -247,6 +252,17 @@ class TestDescribe(SoloTestCase):
                     for value in [[key] for key in keys] + [[], keys]:
                         with self.subTest(option=name, value=value):
                             self.assertEqual(ctr_solo._canonical(hints[name], value, keys), value)
+                    continue
+                elif entry["kind"] == "dict":
+                    # Every weight row at its ends and at the default (A3-22).
+                    keys = [row["key"] for row in entry["weight_rows"]]
+                    table = {key: entry["default"][key] for key in keys}
+                    for key in keys:
+                        for weight in {0, 1, entry["weight_max"], table[key]}:
+                            value = dict(table, **{key: weight})
+                            with self.subTest(option=name, key=key, weight=weight):
+                                self.assertEqual(ctr_solo._canonical(hints[name], value), value)
+                                hints[name](value).verify_keys()
                     continue
                 else:
                     step = steps.get(name, 1)
@@ -509,6 +525,115 @@ game: {GAME}
         # A weighted value cannot be a checklist: the default shows.
         order = [r[0] for r in result["overlay"]["checklists"]["boss_weapon_pool"]]
         self.assertEqual(values["boss_weapon_pool"], [k for k in order if k in facts["boss_weapon_pool"]["default"]])
+
+
+class TestTrapWeights(SoloTestCase):
+    """A3-22: one number row per trap for trap_weights in Items and Traps,
+    from the world's own trap registry, starting at the preset's or the
+    imported YAML's weights."""
+
+    def describe(self, *args):
+        events, code = self.call("describe", *args)
+        self.assertEqual(code, 0, events)
+        return last(events)
+
+    def test_one_row_per_registered_trap(self):
+        from worlds.ctr import traps
+        result = self.describe()
+        facts = {o["name"]: o for o in result["options"]}
+        entry = facts["trap_weights"]
+        self.assertEqual(entry["kind"], "dict")
+        self.assertEqual([row["key"] for row in entry["weight_rows"]], list(traps.TRAP_WEIGHT_KEYS))
+        self.assertEqual([row["label"] for row in entry["weight_rows"]],
+                         [trap.name for trap in traps.TRAP_REGISTRY])
+        self.assertEqual(entry["weight_max"], traps.MAX_TRAP_WEIGHT)
+        self.assertEqual(entry["default"], traps.DEFAULT_TRAP_WEIGHTS)
+        groups = {g["id"]: g for g in result["overlay"]["groups"]}
+        items = groups["items"]["options"]
+        self.assertEqual(items[items.index("trap_weights") - 1], "trap_fill_percentage")
+        self.assertNotIn("trap_weights", result["overlay"]["left_out"])
+
+    def test_defaults_come_from_the_preset(self):
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        values = self.describe("--yaml", self.preset("standard.yaml"))["values"]
+        self.assertEqual(values["trap_weights"], DEFAULT_TRAP_WEIGHTS)
+
+    def test_an_imported_yaml_starts_at_its_own_weights(self):
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        path = write_yaml(self.work, "weights.yaml", f"""name: Weights
+game: {GAME}
+{GAME}:
+  trap_weights:
+    icy_road: 9
+    upside_down: 4
+""")
+        values = self.describe("--yaml", path)["values"]
+        self.assertEqual(values["trap_weights"], dict(DEFAULT_TRAP_WEIGHTS, icy_road=9, upside_down=4))
+
+    def test_a_value_that_is_no_mapping_falls_back_to_the_default(self):
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        path = write_yaml(self.work, "weights.yaml", f"""name: Weights
+game: {GAME}
+{GAME}:
+  trap_weights: 7
+""")
+        values = self.describe("--yaml", path)["values"]
+        self.assertEqual(values["trap_weights"], DEFAULT_TRAP_WEIGHTS)
+
+    def test_writing_all_weights_round_trips_to_the_preset_seed(self):
+        """The screen writes the whole table when a weight changed (a partial
+        table would drop weights a YAML set). With nothing changed the table
+        equals the preset's effective weights, so the seed is identical: the
+        multidata content matches. (Room bytes are not compared: two plain
+        runs of one seed already differ in pickle ordering and zip times.)"""
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        standard = self.preset("standard.yaml")
+        base_args = ("generate", "--yaml", standard, "--name", "Solo", "--seed", "20261106",
+                     "--preset", "standard", "--stamp-requires")
+        events, code = self.call(*base_args)
+        self.assertEqual(code, 0, events[-3:])
+        plain = last(events)["room_id"]
+        other = tempfile.mkdtemp(prefix="solo-weights-", dir=self.work)
+        events, code = run(self.client, *base_args, "--set", "trap_weights=" + json.dumps(DEFAULT_TRAP_WEIGHTS),
+                           solo=os.path.join(other, "solo"), home=self.home)
+        self.assertEqual(code, 0, events[-3:])
+        written = last(events)["room_id"]
+
+        def multidata(room_id, solo):
+            folder = os.path.join(solo, "rooms", room_id)
+            room_zip = next(n for n in os.listdir(folder) if n.endswith(".zip"))
+            return ctr_solo.read_multidata(os.path.join(folder, room_zip))
+
+        self.assertEqual(multidata(plain, self.solo), multidata(written, os.path.join(other, "solo")))
+
+    def test_a_changed_weight_lands_in_the_room_and_describes_back(self):
+        import yaml
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        table = dict(DEFAULT_TRAP_WEIGHTS, flatten=9, upside_down=1)
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--name", "Solo",
+                                 "--seed", "20261107", "--preset", "standard", "--stamp-requires",
+                                 "--set", "trap_weights=" + json.dumps(table))
+        self.assertEqual(code, 0, events[-3:])
+        player = os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml")
+        with open(player, encoding="utf-8") as handle:
+            section = yaml.safe_load(handle)[GAME]
+        self.assertEqual(section["trap_weights"], table)
+        values = self.describe("--yaml", player)["values"]
+        self.assertEqual(values["trap_weights"], table)
+
+    def test_all_zero_weights_are_refused_naming_trap_weights(self):
+        """No screen guard for the all-zero table: whether the world refuses
+        it depends on the plan having filler to trap at all. Generation
+        refuses with an option error naming trap_weights, so the screen
+        highlights the row."""
+        from worlds.ctr.traps import TRAP_WEIGHT_KEYS
+        zero = json.dumps({key: 0 for key in TRAP_WEIGHT_KEYS})
+        events, code = self.call("validate", "--yaml", self.preset("quick.yaml"),
+                                 "--set", "trap_fill_percentage=100", "--set", "trap_weights=" + zero)
+        if code == 0:
+            self.skipTest("this combination has no filler to turn into traps")
+        self.assertEqual(last(events)["kind"], "option", last(events))
+        self.assertIn("trap_weights", last(events)["options"], last(events))
 
 
 class TestPresets(SoloTestCase):
