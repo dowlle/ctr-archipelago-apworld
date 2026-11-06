@@ -2208,7 +2208,11 @@ def create_regions(world):
             laps.append(check)  # Complete One Lap (#344), standalone and Cup leg routes
             continue
         pads_of = {r["own_pad_id"] for r in check["routes"]}
-        if len(pads_of) == 1:
+        # Itemsanity and Hit Character are always global checks with their
+        # own rule (content_global_checks.install), also when every route is
+        # on one pad (one Trophy pad among cups, A3-7): a pad check would drop
+        # the weapon and hit terms.
+        if len(pads_of) == 1 and check["kind"] not in content_global_checks.KINDS:
             by_pad.setdefault(check['routes'][0]['own_pad_id'], []).append(check)
         else:
             shared.append(check)  # `wumpa: global`, one route per race

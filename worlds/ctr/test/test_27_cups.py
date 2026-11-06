@@ -112,6 +112,26 @@ class TestTwentySevenCups(unittest.TestCase):
         self.assertTrue(content_wumpa.income_routes(plan))
         self.assertEqual(content_wumpa.cup_income_routes(plan), [])
 
+    def test_one_race_pad_keeps_the_weapon_rule(self):
+        # 26 cups and one Trophy pad: every Itemsanity route is on that pad.
+        # The checks stay global, with their weapon rule (before A3-7 they
+        # were pad checks and needed only the pad).
+        for seed in (1, 2):
+            with self.subTest(seed=seed):
+                world = make_world(cups_options(cup_count=26, itemsanity=True, hit_character=True), seed=seed)
+                mw = world.multiworld
+                items = [c for c in world.ctr_content_plan["checks"] if c["kind"] == "itemsanity"]
+                self.assertEqual(len({r["own_pad_id"] for r in items[0]["routes"]}), 1)
+                location = mw.get_location("Itemsanity: Beaker", 1)
+                self.assertEqual(location.parent_region.name, "Menu")
+                state = CollectionState(mw)
+                for item in mw.itempool:
+                    if item.advancement and item.name != "Beaker":
+                        state.collect(item, prevent_sweep=True)
+                self.assertFalse(location.can_reach(state))
+                state.collect(world.create_item("Beaker"), prevent_sweep=True)
+                self.assertTrue(location.can_reach(state))
+
     def test_crystals_still_take_pads(self):
         with self.assertRaisesRegex(OptionError, "27 cups do not fit"):
             make_world(dict(cup_count=27), seed=1)

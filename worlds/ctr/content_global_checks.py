@@ -64,6 +64,8 @@ from . import characters, content_bosses, content_cups, hit_character, itemsanit
 
 FEATURE = "global_checks_v1"
 KEYS = ("itemsanity", "hit_character")
+#: The check kinds of the two families.
+KINDS = ("itemsanity", "hit")
 #: Modes whose race seats AI opponents and rolls weapon crates.
 RACE_MODES = ("trophy", "ctr")
 MODE_ORDER = ("trophy", "ctr", "relic", "cup")
