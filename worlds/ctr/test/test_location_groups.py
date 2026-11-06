@@ -77,7 +77,7 @@ class TestLocationGroups(CTRTestBase):
         # 31 retail and special tracks + 86 named blocks + 13 kind groups
         # + Itemsanity Checks + Everywhere.
         self.assertEqual(len(self.groups), 31 + 86 + 13 + 1 + 1)
-        self.assertEqual(len(self.groups["Crash Cove"]), 34)
+        self.assertEqual(len(self.groups["Crash Cove"]), 34 + 35)
         self.assertEqual(len(self.groups["Cortex Vortex"]), 17)
 
     def test_no_generic_custom_slot_has_a_group(self) -> None:
@@ -135,7 +135,9 @@ class TestLocationGroups(CTRTestBase):
         self.assertEqual(len(self.groups["Hit Characters"]), 16)
         self.assertEqual(self.groups["Item Boxes"],
                          self._where(lambda t, s: re.fullmatch(r"Item Box \d+", s)))
-        self.assertEqual(len(self.groups["Item Boxes"]), 3540)
+        # 270 retail + 86 x 15 named + 132 x 15 generic, plus the alpha3 Item
+        # Box 16 to 50 for 18 retail tracks and 86 named blocks.
+        self.assertEqual(len(self.groups["Item Boxes"]), 3540 + 18 * 35 + 86 * 35)
 
     def test_itemsanity_checks_is_kept(self) -> None:
         self.assertEqual(self.groups["Itemsanity Checks"],
