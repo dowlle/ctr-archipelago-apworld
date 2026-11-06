@@ -7,7 +7,7 @@
 | Tier | Arms | When |
 |---|---|---|
 | none | no fuzz; pytest and pack still run | a pull request that changes only safe paths |
-| pr | the 12 arms in `PR_ARMS` | every other pull request, and every push to `dev/**` |
+| pr | the 13 arms in `PR_ARMS` | every other pull request, and every push to `dev/**` |
 | full | every arm in `ctr-world-matrix.yml` | pushes to `main`, `release/**` and `ci/**`, the nightly dev run, manual runs, and pull requests with the `full-fuzz` label |
 
 Safe paths are `worlds/ctr/solo/`, `worlds/ctr/docs/`, `worlds/ctr/test/`, any `.md` file, and the version files `worlds/ctr/version.py`, `worlds/ctr/archipelago.json` and `worlds/ctr/datapackage_manifest.json`. A pull request is classified on its whole file list, so one generation file anywhere in it selects the pr tier. A push is never tier none.
@@ -18,7 +18,7 @@ The pr tier covers each generation family at least once:
 |---|---|
 | default | `canonical-default`, `default`, `no-restrictive-starts` |
 | content plan | `content-plan-vanilla`, `content-plan-full`, `content-plan-132` |
-| cups | `gem-cups-7-random` |
+| cups | `gem-cups-7-random`, `gem-cups-2-random-gauntlet` |
 | bosses | `content-plan-bosses` |
 | pads | `pads-all-ut` (every pad overlay at once, through Universal Tracker) |
 | Universal Tracker | `check-ut` |

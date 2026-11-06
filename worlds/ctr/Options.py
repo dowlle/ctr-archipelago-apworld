@@ -281,8 +281,9 @@ class PurpleCupBossGauntlet(Toggle):
     boss garage attacks. Off by default.
 
     The cup's tracks, racers and checks stay the same, but the podium places
-    get harder. Needs Boss Kit Shuffle on and the Purple Gem Cup in the seed;
-    otherwise generation fails."""
+    get harder. Needs Boss Kit Shuffle on and at least one Gem Cup in the seed;
+    with it on, the Purple Gem Cup is the first Gem Cup the seed takes.
+    Otherwise generation fails."""
     # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire: the plan's
     # bosses.gauntlet. See content_bosses.py.
     display_name = "Purple Gem Cup Boss Gauntlet"
