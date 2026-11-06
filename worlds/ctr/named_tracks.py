@@ -96,13 +96,14 @@ LOCATION_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
     # 17 to 19 stay spare for later per-track race checks.
     ("cup_leg_victory", 15, "Cup Leg Victory"),
     ("lap", 16, "Complete One Lap"),
-) + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(1, 16))
+) + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(1, 16)) \
+  + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(16, 51))  # alpha3 data package
 #: Offsets reserved in the 0.3.0 layout and not minted: 17 to 19 spare race
-#: checks, Item Box 16 to 100 at 35 to 119, 120 to 140 certified custom arenas
+#: checks, Item Box 51 to 100 at 70 to 119 (16 to 50 minted in alpha3), 120 to 140 certified custom arenas
 #: (crystals and completion; a race block never carries them), 141 to 199 spare.
 RESERVED_LOCATION_OFFSETS: Tuple[Tuple[int, int, str], ...] = (
     (17, 19, "spare per-track race checks"),
-    (35, 119, "Item Box 16 to Item Box 100"),
+    (70, 119, "Item Box 51 to Item Box 100"),
     (120, 140, "certified custom arenas only"),
     (141, 199, "spare"),
 )

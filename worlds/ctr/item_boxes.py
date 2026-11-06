@@ -54,6 +54,12 @@ from .location_class import LocationClass
 
 # Additive block for the 270 item-box checks, stride 15 per track.
 ITEM_BOX_CODE_BASE = 35014000
+#: The alpha3 data package: Item Box 16 to 50 per track, stride 35, in
+#: BOX_TRACKS order (35014300 to 35014929), so a track has 50 permanent box
+#: numbers (ruled 2026-11-06).
+SPOT_CODE_BASE = 35014300
+SPOT_NUMBERS_PER_TRACK = 50
+SPOT_EXTRA_PER_TRACK = SPOT_NUMBERS_PER_TRACK - 15
 
 #: Per-track slot ceiling. The curation model's "roughly 15 candidate slots per
 #: track", taken as the hard naming ceiling per the 16:23 ruling. Frozen: it is
@@ -138,14 +144,17 @@ class ItemBoxLocationClass(LocationClass):
 
     key = "item_boxes"
     display_name = "Item Box Checks"
-    code_blocks = (ITEM_BOX_CODE_BASE,)
+    code_blocks = (ITEM_BOX_CODE_BASE, SPOT_CODE_BASE)
 
     def all_locations(self):
-        return [(self.location_name(track, slot + 1),
-                 ITEM_BOX_CODE_BASE + ti * SLOTS_PER_TRACK + slot,
-                 track)
-                for ti, track in enumerate(BOX_TRACKS)
-                for slot in range(SLOTS_PER_TRACK)]
+        return ([(self.location_name(track, slot + 1),
+                  ITEM_BOX_CODE_BASE + ti * SLOTS_PER_TRACK + slot,
+                  track)
+                 for ti, track in enumerate(BOX_TRACKS)
+                 for slot in range(SLOTS_PER_TRACK)]
+                + [(self.location_name(track, n), self.slot_code(track, n), track)
+                   for track in BOX_TRACKS
+                   for n in range(SLOTS_PER_TRACK + 1, SPOT_NUMBERS_PER_TRACK + 1)])
 
     def location_name(self, track: str, slot: int) -> str:
         """AP location name for a track's box slot, e.g.
@@ -178,9 +187,11 @@ class ItemBoxLocationClass(LocationClass):
         return out
 
     def slot_code(self, track: str, slot: int) -> int:
-        """AP location code for a track's 1-based slot."""
-        return (ITEM_BOX_CODE_BASE
-                + BOX_TRACKS.index(track) * SLOTS_PER_TRACK + (slot - 1))
+        """AP location code for a track's 1-based slot (box number 1 to 50)."""
+        index = BOX_TRACKS.index(track)
+        if slot > SLOTS_PER_TRACK:
+            return SPOT_CODE_BASE + index * SPOT_EXTRA_PER_TRACK + (slot - SLOTS_PER_TRACK - 1)
+        return ITEM_BOX_CODE_BASE + index * SLOTS_PER_TRACK + (slot - 1)
 
     def wire_block(self, options):
         """The `item_box_checks` slot_data block (call only when the toggle is
