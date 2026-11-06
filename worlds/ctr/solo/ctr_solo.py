@@ -400,10 +400,28 @@ def _canonical(option, raw, order=()):
     return None
 
 
+def _preview_unresolved(name: str, option, raw) -> bool:
+    """Distinguish AP expressions from concrete values named random_*.
+
+    OptionSet mappings are literal iterables of keys, not weighted choices.
+    Cup Tracks also has a documented deterministic `random` alias which its
+    from_text override handles before the generic Choice random expression.
+    """
+    import Options
+    if isinstance(raw, (dict, list)):
+        return bool(option.supports_weighting)
+    if not isinstance(raw, str) or not raw.strip().lower().startswith("random"):
+        return False
+    text = raw.strip().lower()
+    if issubclass(option, Options.Choice):
+        if text in option.options or (name == "cup_tracks" and text == "random"):
+            return False
+    return True
+
+
 def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
     """Values of the overlay's options in a YAML (or the defaults). A weighted
     or random value cannot be shown on the screen and falls back to the default."""
-    import Options
     hints = world_class().options_dataclass.type_hints
     section = {}
     if yaml_path:
@@ -420,11 +438,7 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
                 continue
             order = [row[0] for row in checklists.get(name, [])]
             raw = section.get(name, option.default)
-            # A dict is a weighted value for every kind but a dict option,
-            # where it is the plain value (trap weights never weight).
-            if isinstance(raw, dict) and not issubclass(option, Options.OptionDict):
-                raw = option.default
-            elif isinstance(raw, str) and raw.strip().lower().startswith("random"):
+            if _preview_unresolved(name, option, raw):
                 raw = option.default
             try:
                 values[name] = _canonical(option, raw, order)
@@ -441,15 +455,12 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
     doc = read_player_yaml(yaml_path) if yaml_path else {}
     section = _section(doc)
     modified_at_roll = bool(doc.get("linked_options") or doc.get("triggers") or section.get("triggers"))
-    import Options
     unresolved = []
     for group in overlay.get("groups", []):
         for name in group.get("options", []):
             option = cls.options_dataclass.type_hints[name]
             raw = section.get(name, option.default)
-            if (modified_at_roll or (isinstance(raw, dict) and not issubclass(option, Options.OptionDict)) or
-                    (isinstance(raw, list) and option.supports_weighting) or
-                    (isinstance(raw, str) and raw.strip().lower().startswith("random"))):
+            if modified_at_roll or _preview_unresolved(name, option, raw):
                 unresolved.append(name)
     return {"game": GAME, "world_version": world_version(), "ap_version": ap_version(),
             "options": options, "overlay": overlay, "presets": list_presets(paths),

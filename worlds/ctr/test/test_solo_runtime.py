@@ -518,16 +518,17 @@ game: {GAME}
   boss_track_pool: [Crash Cove, custom/some-track]
   podium_rungs: []
   boss_weapon_pool:
-    random: 1
+    tnt: 1
+    potion: 0
 """)
         result = self.describe("--yaml", path)
-        values, facts = result["values"], {o["name"]: o for o in result["options"]}
+        values = result["values"]
         self.assertEqual(values["crystal_arenas"], ["Rocky Road", "Lab Basement"])
         self.assertEqual(values["boss_track_pool"], ["Crash Cove", "custom/some-track"])
         self.assertEqual(values["podium_rungs"], [])
-        # A weighted value cannot be a checklist: the default shows.
-        order = [r[0] for r in result["overlay"]["checklists"]["boss_weapon_pool"]]
-        self.assertEqual(values["boss_weapon_pool"], [k for k in order if k in facts["boss_weapon_pool"]["default"]])
+        # OptionSet has no weighting: a mapping is an iterable of literal keys.
+        self.assertEqual(values["boss_weapon_pool"], ["tnt", "potion"])
+        self.assertNotIn("boss_weapon_pool", result["unresolved"])
 
 
 class TestTrapWeights(SoloTestCase):
@@ -774,6 +775,42 @@ future_metadata:
         self.assertEqual(result["values"]["crystal_arenas"], ["Rocky Road"])
         events, code = self.call("validate", "--yaml", path)
         self.assertEqual(code, 0, events[-3:])
+
+    def test_registered_random_choices_keep_their_own_values(self):
+        import Options
+        cls = ctr_solo.world_class()
+        for name, option in cls.options_dataclass.type_hints.items():
+            if issubclass(option, Options.Choice):
+                for key in option.options:
+                    if key.startswith("random"):
+                        self.assertFalse(ctr_solo._preview_unresolved(name, option, key), (name, key))
+        path = write_yaml(self.work, "random-choices.yaml", f"""name: Choices
+game: {GAME}
+{GAME}:
+  cup_tracks: random_repeats
+  starting_character: random_any
+  warppad_unlock_requirements: random_without_4_keys
+  goal_wumpa: random-range-100-200
+""")
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        for name, value in (("cup_tracks", "random_repeats"), ("starting_character", "random_any"),
+                            ("warppad_unlock_requirements", "random_without_4_keys")):
+            self.assertEqual(result["values"][name], value)
+            self.assertNotIn(name, result["unresolved"])
+        self.assertIn("goal_wumpa", result["unresolved"])
+        # Cup Tracks' documented `random` alias is concrete; Choice's generic
+        # `random` expression for Starting Character remains unresolved.
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME].update(cup_tracks="random", starting_character="random")
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        self.assertEqual(result["values"]["cup_tracks"], "random_repeats")
+        self.assertNotIn("cup_tracks", result["unresolved"])
+        self.assertIn("starting_character", result["unresolved"])
 
 
 class TestPresets(SoloTestCase):
