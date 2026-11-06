@@ -41,7 +41,7 @@ def entry(path):
 
 
 @contextlib.contextmanager
-def test_files(retail=(), custom=()):
+def spot_files(retail=(), custom=()):
     """Put test spot files in place of the shipped ones for the block."""
     r = {e["doc"]["track"]["level_id"]: e for e in (entry(f"box_spots/retail/{n}.json") for n in retail)}
     c = {e["doc"]["track"]["track_key"]: e for e in (entry(f"box_spots/custom/{n}.json") for n in custom)}
@@ -222,7 +222,7 @@ class TestCommunitySpotsOnRetail(unittest.TestCase):
     """Crash Cove with its 10 built-in spots and 8 test spots 16 to 23."""
 
     def test_more_than_fifteen_picks_fifteen(self):
-        with test_files(retail=["CRASH_COVE"]):
+        with spot_files(retail=["CRASH_COVE"]):
             picks = set()
             for seed in range(6):
                 plan = make_world(box_options(tier="hard", progressive_boost="shared_global"), seed=seed).ctr_content_plan
@@ -241,7 +241,7 @@ class TestCommunitySpotsOnRetail(unittest.TestCase):
             self.assertGreater(len(picks), 1)
 
     def test_filled_seed_is_beatable_with_every_location_reachable(self):
-        with test_files(retail=["CRASH_COVE"], custom=["baby-t-park"]):
+        with spot_files(retail=["CRASH_COVE"], custom=["baby-t-park"]):
             for seed, extra in enumerate(({}, dict(progressive_boost="per_character", tier="hard"))):
                 world = first_world(box_options(custom=[btp()], **extra), seed=seed * 5)
                 distribute_items_restrictive(world.multiworld)
@@ -251,7 +251,7 @@ class TestCommunitySpotsOnRetail(unittest.TestCase):
                 self.assertTrue(all(loc.can_reach(state) for loc in world.multiworld.get_locations()), extra)
 
     def test_forged_spot_sets_refuse(self):
-        with test_files(retail=["CRASH_COVE"]):
+        with spot_files(retail=["CRASH_COVE"]):
             plan = make_world(box_options(tier="hard"), seed=3).ctr_content_plan
             self.assertFalse(refused(plan))
 
@@ -280,7 +280,7 @@ class TestNamedCustomSpots(unittest.TestCase):
     """Baby T Park (named block 8) with a test file of 18 spots from 1."""
 
     def test_spots_replace_crate_seating(self):
-        with test_files(custom=["baby-t-park"]):
+        with spot_files(custom=["baby-t-park"]):
             for tier, pool in (("easy", 17), ("medium", 18)):
                 plan = make_world(box_options(custom=[btp(8)], tier=tier, progressive_boost="shared_global"),
                                   seed=4).ctr_content_plan
@@ -299,7 +299,7 @@ class TestNamedCustomSpots(unittest.TestCase):
                 self.assertFalse(refused(plan))
 
     def test_another_lev_keeps_crate_seating(self):
-        with test_files(custom=["baby-t-park"]):
+        with spot_files(custom=["baby-t-park"]):
             plan = make_world(box_options(custom=[content_plan.PACKAGES[0] | {"capabilities": dict(
                 content_plan.PACKAGES[0]["capabilities"], weapon_crates=8)}]), seed=4).ctr_content_plan
             track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == 8)
@@ -320,7 +320,7 @@ class TestNamedCustomSpots(unittest.TestCase):
         self.assertEqual(len(boxes(plan, LOOP_ID)), 12)
 
     def test_tracker_round_trip_with_spots(self):
-        with test_files(retail=["CRASH_COVE"], custom=["baby-t-park"]):
+        with spot_files(retail=["CRASH_COVE"], custom=["baby-t-park"]):
             options = box_options(custom=[btp()], tier="hard")
             wire = json.loads(json.dumps(make_world(options, seed=2).fill_slot_data()))
             self.assertIn(box_spots.FEATURE, wire["content_plan"]["required_features"])
