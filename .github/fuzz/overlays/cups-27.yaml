@@ -8,8 +8,13 @@
   required_entries: []
   itemsanity: {true: 3, false: 1}
   hit_character: {true: 3, false: 1}
-  wumpa_shop_slots: {10: 2, 15: 1}
+  wumpa_shop_slots: {15: 2, 20: 1}
+# `excluded` needs a filler copy per slot, which a 27-cup pool rarely has; it
+# is refused with its own message, so this arm keeps `allowed`.
+  wumpa_shop_progression: allowed
   goal_wumpa: {0: 2, 300: 1, 2500: 1}
   wumpa_check: {"off": 1, global: 1, per_track: 2}
   box_locations: {true: 1, false: 1}
   logic_difficulty: {hard: 2, medium: 1}
+# Removing Oxide refuses when he is the drawn starting racer; that has its own arms.
+  remove_playable_oxide: {"false": 3, "true": 1}
