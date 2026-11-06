@@ -153,7 +153,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the three Cortex Vortex pad-track letter items (2026-09-13).
         # + the 0.3.0 id step: five items and 82 x 3 named-block letters.
         # + the third step (2026-10-29): 4 x 3 letters of the LRG2 blocks 85 to 88.
-        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12)
+        # + the alpha3 data package (2026-11-06): seven traps.
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
@@ -259,7 +260,8 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
         """The completed native roster activates every reserved identity."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 22)  # #455 and #248 activate the minted traps
+        # #455 and #248 activate the minted traps; the alpha3 data package adds seven.
+        self.assertEqual(len(TRAP_ITEM_NAMES), 29)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
         self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 4)
         newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)
@@ -271,12 +273,14 @@ class TestNameFreezeInertness(unittest.TestCase):
         to its own group later would spend a second bump."""
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         trap_group = set(world_type.item_name_groups["Traps"])
-        # The two 0.3.0 traps are minted names without a registry row yet.
+        # Every registered trap, including the 0.3.0 and alpha3 traps.
         self.assertEqual(
             trap_group,
             set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
-            | set(REWORK_TRAP_ITEM_NAMES) | {"Clocked Out", "Reverse Camera"})
-        self.assertEqual(len(trap_group), 22)
+            | set(REWORK_TRAP_ITEM_NAMES) | {"Clocked Out", "Reverse Camera"}
+            | {"Always Jumping", "No Drifting", "Rival Surge", "Mud Season",
+               "Limp Mode", "Stuck Steering", "Wumpa Leak"})
+        self.assertEqual(len(trap_group), 29)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):

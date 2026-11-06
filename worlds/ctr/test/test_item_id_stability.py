@@ -47,6 +47,8 @@ FIXTURE_PATHS = (
     FIXTURE_DIR / "item_id_stability_v0_2_0.json",
     # The 0.3.0 id step: five items and the named-block letters.
     FIXTURE_DIR / "item_id_stability_2026_10_15_minting_030.json",
+    # The alpha3 data package (ruled 2026-11-06): seven traps.
+    FIXTURE_DIR / "item_id_stability_2026_11_06_alpha3.json",
 )
 
 
@@ -91,6 +93,11 @@ class TestItemIdStability(unittest.TestCase):
         minted = {"Reserve Top-Up": 35010203, "Warp Pad Preview": 35010204,
                   "AP Box Colours": 35010205, "Clocked Out": 35010206,
                   "Reverse Camera": 35010207}
+        # The alpha3 data package (ruled 2026-11-06): seven traps.
+        minted.update({"Always Jumping": 35010208, "No Drifting": 35010209,
+                       "Rival Surge": 35010210, "Mud Season": 35010211,
+                       "Limp Mode": 35010212, "Stuck Steering": 35010213,
+                       "Wumpa Leak": 35010214})
         named_doc = json.loads(pkgutil.get_data(
             "worlds.ctr", "data/named_tracks.json").decode("utf-8"))
         named = {f"Letter {letter} ({row['ap_name']})": 35100000 + 5 * row["block_index"] + li

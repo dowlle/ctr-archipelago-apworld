@@ -228,17 +228,23 @@ class TestMintedItems(unittest.TestCase):
             ("AP Box Colours", 35010205, "useful"),
             ("Clocked Out", 35010206, "trap"),
             ("Reverse Camera", 35010207, "trap"),
+            ("Always Jumping", 35010208, "trap"),
+            ("No Drifting", 35010209, "trap"),
+            ("Rival Surge", 35010210, "trap"),
+            ("Mud Season", 35010211, "trap"),
+            ("Limp Mode", 35010212, "trap"),
+            ("Stuck Steering", 35010213, "trap"),
+            ("Wumpa Leak", 35010214, "trap"),
         ])
         for row in ITEM_DATA:
             self.assertEqual(I[row["name"]], row["code"])
             self.assertEqual(row["count"], 0)
 
-    def test_only_implemented_minted_traps_are_registered(self):
-        """No registry row until the feature PR: the trap_identities block and
-        the trap draw stay as they are."""
-        registered = {e.name for e in traps.TRAP_REGISTRY}
-        self.assertEqual(registered & set(MINTED_TRAP_KEYS), {"Clocked Out", "Reverse Camera"})
-        self.assertEqual({e.key for e in traps.TRAP_REGISTRY} & set(MINTED_TRAP_KEYS.values()), {"clocked_out", "reverse_camera"})
+    def test_every_minted_trap_is_registered(self):
+        """Every minted trap has its registry row with the minted key (the
+        alpha3 traps were minted and built in one change, ruled 2026-11-06)."""
+        registered = {e.name: e.key for e in traps.TRAP_REGISTRY}
+        self.assertEqual({n: registered[n] for n in MINTED_TRAP_KEYS}, MINTED_TRAP_KEYS)
         self.assertLessEqual(set(MINTED_TRAP_KEYS), set(ctrAPWorld.item_name_groups["Traps"]))
 
 
