@@ -580,6 +580,25 @@ game: {GAME}
         values = self.describe("--yaml", path)["values"]
         self.assertEqual(values["trap_weights"], DEFAULT_TRAP_WEIGHTS)
 
+    def test_unusable_weights_show_the_default_instead_of_breaking(self):
+        """A date, NaN, a nested mapping or a word cannot be a row: the row
+        keeps the default and the JSON stays valid. Generation still refuses
+        the value by name."""
+        from worlds.ctr.traps import DEFAULT_TRAP_WEIGHTS
+        path = write_yaml(self.work, "weights.yaml", f"""name: Weights
+game: {GAME}
+{GAME}:
+  trap_weights:
+    icy_road: 2020-01-01
+    low_gravity: .nan
+    flatten:
+      nested: 1
+    forced_usf: not-a-number
+    forced_boost: yes
+""")
+        values = self.describe("--yaml", path)["values"]
+        self.assertEqual(values["trap_weights"], DEFAULT_TRAP_WEIGHTS)
+
     def test_writing_all_weights_round_trips_to_the_preset_seed(self):
         """The screen writes the whole table when a weight changed (a partial
         table would drop weights a YAML set). With nothing changed the table

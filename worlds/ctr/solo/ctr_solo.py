@@ -379,13 +379,18 @@ def _canonical(option, raw, order=()):
         return [key for key in order if key in entries] + sorted(entries - set(order))
     if isinstance(value, Options.OptionDict):
         # A dict option (trap weights): the full table, so every row has a
-        # number. A key the YAML leaves out keeps the option's default.
+        # number. A key the YAML leaves out keeps the option's default. An
+        # entry that is no whole number (a YAML date, NaN, a nested mapping)
+        # cannot be a row and is skipped: the row keeps the default, and
+        # generating the untouched YAML refuses the value by name.
         merged = dict(option.default) if isinstance(option.default, dict) else {}
         for key, val in (value.value or {}).items():
+            if isinstance(val, bool):
+                continue
             try:
                 merged[str(key)] = int(val)
             except (TypeError, ValueError):
-                merged[str(key)] = val
+                continue
         return merged
     return None
 
