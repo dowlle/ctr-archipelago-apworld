@@ -42,6 +42,12 @@ for themselves in the game under **OPTIONS → Archipelago → Item Box Colours*
 When the YAML turned them off, that row shows **OFF (SEED)** and cannot be
 turned on.
 
+## Why do some weapon crates stay ordinary?
+
+On a custom track without hand-placed AP boxes, up to 15 eligible weapon crates become AP boxes. Crates at reviewed excluded positions stay normal weapon crates, including the origin crate in the reviewed Ancient Lake revisions.
+
+Hand-placed AP layouts keep every weapon crate ordinary and use their own spots. A saved room keeps the layout recorded in its seed.
+
 ## Options in detail
 
 The help text for each option in the YAML is kept short. This section holds

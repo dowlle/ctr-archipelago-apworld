@@ -422,6 +422,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_global_checks.FEATURE] if global_checks else [])
             + ([content_item_boxes.FEATURE] if item_boxes else [])
             + ([content_item_boxes.SPOT_FEATURE] if item_boxes and item_boxes.get(content_item_boxes.SPOT_KEY) else [])
+            + ([content_item_boxes.crate_exclusions.FEATURE] if item_boxes and item_boxes.get(content_item_boxes.crate_exclusions.KEY) else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
             + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND

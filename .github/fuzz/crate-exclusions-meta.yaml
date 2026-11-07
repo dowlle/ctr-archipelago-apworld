@@ -1,0 +1,26 @@
+# Reviewed Ancient Lake fallback exclusion, exact LEV and VRM bytes only.
+Crash Team Racing:
+  accessibility: full
+  box_locations: true
+  custom_tracks:
+    - id: package/ancient-lake/1.1.0
+      content_id: ancient-lake
+      uuid: 11111111-2222-4333-8444-555555555535
+      revision: "1.1.0"
+      display_name: Ancient Lake
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 17, checkpoints: 58, ai_nav: true}
+      files:
+        - {role: lev, sha256: 21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee, bytes: 413804, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 57c14cc95b6080f0095f303817fbec8ca1cb885a2a254ed0e99d4536294ed0e2, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [ancient-lake]
+  retail_tracks: [all]
+  track_modes: {default: [trophy]}
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
+  boss_garages: true
+  purple_cup_boss_gauntlet: false
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
+  boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
+  oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]
