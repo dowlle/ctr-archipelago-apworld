@@ -61,7 +61,7 @@ class TestCrateExclusions(unittest.TestCase):
 
     def test_box_terms_unchanged(self):
         p = ancient()
-        world = first_world(box_options(custom=[p], progressive_boost=True, progressive_stats="shared_global"))
+        world = first_world(box_options(custom=[p], progressive_boost="shared_global", progressive_stats="shared_global"))
         plan = world.ctr_content_plan
         track_id = plan["item_boxes"][crate_exclusions.KEY][0]["track_id"]
         track = next(t for t in plan["tracks"] if t["id"] == track_id)
