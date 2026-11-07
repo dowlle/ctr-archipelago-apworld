@@ -306,6 +306,22 @@ def _clean_doc(text: str | None) -> str:
     return inspect.cleandoc(text or "").strip()
 
 
+def _weight_rows(name: str):
+    """Number rows for a dict option the screen can edit (A3-22), or None.
+
+    Keys, labels and the per-key maximum come from the world's own trap
+    registry, never a hard-coded list, so a trap the world adds appears on
+    the screen without a change here."""
+    if name != "trap_weights":
+        return None
+    try:
+        from worlds.ctr import traps
+    except ImportError:
+        return None
+    return ([{"key": entry.key, "label": entry.name} for entry in traps.TRAP_REGISTRY],
+            traps.MAX_TRAP_WEIGHT)
+
+
 def describe_option(name: str, option) -> dict:
     import Options
     kind = _option_kind(option)
@@ -340,12 +356,16 @@ def describe_option(name: str, option) -> dict:
         keys = getattr(option, "valid_keys", None)
         if keys:
             entry["valid_keys"] = sorted(keys)
+        rows = _weight_rows(name) if kind == "dict" else None
+        if rows is not None:
+            entry["weight_rows"], entry["weight_max"] = rows
     return entry
 
 
 def _canonical(option, raw, order=()):
-    """The value the options screen shows: choice name, bool, int, or for a
-    set its entries in checklist order (`order`), then any others sorted."""
+    """The value the options screen shows: choice name, bool, int, for a
+    set its entries in checklist order (`order`), then any others sorted,
+    and for a dict the default table overlaid with the YAML's entries."""
     import Options
     value = option.from_any(raw)
     if isinstance(value, Options.Choice):
@@ -357,12 +377,33 @@ def _canonical(option, raw, order=()):
     if isinstance(value, Options.OptionSet):
         entries = {str(entry) for entry in value.value}
         return [key for key in order if key in entries] + sorted(entries - set(order))
+    if isinstance(value, Options.OptionDict):
+        # A dict option (trap weights): the full table, so every row has a
+        # number. A key the YAML leaves out keeps the option's default. An
+        # entry that is no whole number (a YAML date, NaN, a nested mapping)
+        # cannot be a row and is skipped: the row keeps the default, and
+        # generating the untouched YAML refuses the value by name.
+        merged = dict(option.default) if isinstance(option.default, dict) else {}
+        for key, val in (value.value or {}).items():
+            if isinstance(val, bool):
+                continue
+            try:
+                # A float that is no whole number (1.9, NaN, .inf) is skipped
+                # too, instead of truncating or raising into the fallback of
+                # the whole table.
+                if isinstance(val, float) and not val.is_integer():
+                    continue
+                merged[str(key)] = int(val)
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return merged
     return None
 
 
 def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
     """Values of the overlay's options in a YAML (or the defaults). A weighted
     or random value cannot be shown on the screen and falls back to the default."""
+    import Options
     hints = world_class().options_dataclass.type_hints
     section = {}
     if yaml_path:
@@ -379,7 +420,11 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
                 continue
             order = [row[0] for row in checklists.get(name, [])]
             raw = section.get(name, option.default)
-            if isinstance(raw, dict) or (isinstance(raw, str) and raw.strip().lower().startswith("random")):
+            # A dict is a weighted value for every kind but a dict option,
+            # where it is the plain value (trap weights never weight).
+            if isinstance(raw, dict) and not issubclass(option, Options.OptionDict):
+                raw = option.default
+            elif isinstance(raw, str) and raw.strip().lower().startswith("random"):
                 raw = option.default
             try:
                 values[name] = _canonical(option, raw, order)
