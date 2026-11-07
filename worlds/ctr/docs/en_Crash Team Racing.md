@@ -10,7 +10,8 @@ requirements or reduce the two-stage gate and trap settings.
 
 A YAML that sets no content gets the original game's shape: the 18 original race
 tracks, 5 Gem Cups, 4 Crystal Challenges and the five garages, shuffled onto the
-27 warp pads, with the cup races drawn. Custom tracks and Cortex Vortex join the
+27 warp pads, with the cup races drawn. The 4 Crystal Challenges are drawn from
+all 7 arenas, the 4 original ones and the 3 new ones. Custom tracks and Cortex Vortex join the
 same pool. YAML files from v0.2.x need a new look: option names that are gone are
 ignored without a message. A v0.2.x room plays on the v0.2.4 client only.
 

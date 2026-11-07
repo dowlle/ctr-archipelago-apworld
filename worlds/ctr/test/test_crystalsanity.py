@@ -8,7 +8,8 @@ from Options import OptionError
 
 class TestCrystalsanity(CTRTestBase):
     run_default_tests = False
-    options = {"crystalsanity": True, "accessibility": "full"}
+    options = {"crystalsanity": True, "accessibility": "full",
+               "crystal_arenas": ["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"]}
 
 
     def test_pickups_use_the_same_entry_as_completion(self):

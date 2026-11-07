@@ -161,12 +161,45 @@ class TestCupTracks(unittest.TestCase):
             seen |= any(len(set(self.legs(plan, cup))) < 4 for cup in cups_of(plan))
         self.assertTrue(seen)
 
-    def test_trial_tracks_are_never_cup_races(self):
+    def test_trial_tracks_can_be_cup_races(self):
+        # Slide Coliseum and Turbo Track are drawn like any other race track
+        # (ruled 2026-11-05). `off` keeps the original Gem Cups, which never
+        # race them; its sixth and seventh cups draw.
         for value in content_cups.CUP_TRACKS:
-            for seed in range(8):
+            seen = set()
+            for seed in range(16):
                 plan = make_world(plan_options(dict(count=7, tracks=value)), seed=seed).ctr_content_plan
-                legs = {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]}
-                self.assertFalse(legs & set(TRIAL_IDS), value)
+                seen |= {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]} & set(TRIAL_IDS)
+                if value == "off":
+                    gem = {leg["track_id"] for cup in gems_of(plan) for leg in cup["legs"]}
+                    self.assertFalse(gem & set(TRIAL_IDS))
+            self.assertEqual(seen, set(TRIAL_IDS), value)
+
+    def test_trial_tracks_stay_out_of_cups_outside_retail_tracks(self):
+        options = plan_options(dict(count=7, tracks="random_no_repeats"))
+        options["content_pool"]["tracks"]["retail"] = list(range(16))
+        for seed in range(8):
+            plan = make_world(options, seed=seed).ctr_content_plan
+            legs = {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]}
+            self.assertFalse(legs & set(TRIAL_IDS))
+
+    def test_a_trial_track_without_a_trophy_race_gets_its_cup_leg_victory(self):
+        # Relic Races only, so no leg track has a standalone Trophy Race check.
+        names = {"retail:16": "Slide Coliseum", "retail:17": "Turbo Track"}
+        found = set()
+        options = plan_options(dict(count=7, tracks="random"), modes=("relic",))
+        options["content_pool"]["tracks"]["custom"] = []
+        options["content_pool"]["required_entries"] = []
+        for seed in range(12):
+            plan = make_world(options, seed=seed).ctr_content_plan
+            legs = {leg["track_id"] for cup in cups_of(plan) for leg in cup["legs"]}
+            victories = {c["owner"]: c for c in plan["checks"] if c["kind"] == content_cups.LEG_KIND}
+            for tid in legs & set(TRIAL_IDS):
+                check = victories[tid]
+                self.assertEqual(check["display_name"], names[tid] + ": Cup Leg Victory")
+                self.assertEqual(check["location"], content_cups.CTR_LOCATION_IDS[check["display_name"]])
+                found.add(tid)
+        self.assertEqual(found, set(TRIAL_IDS))
 
     def test_unknown_value_refuses(self):
         with self.assertRaises(KeyError):

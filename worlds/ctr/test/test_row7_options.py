@@ -26,7 +26,7 @@ podium_rungs cup_only_podium_rungs relic_perfect_checks lettersanity letters_per
 lap_completion_checks box_locations itemsanity
 crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_logic_scale wumpa_shop_progression wumpa_shop_hints
 item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up
-progressive_starting_wumpa turbo_grant tizi_helper
+progressive_starting_wumpa turbo_grant tizi_helper trap_display
 starting_character character_unlocks remove_playable_oxide starting_stat_class penta_stats editable_stats
 progressive_stats
 progressive_boost progressive_boost_blue_fire logic_difficulty shortcut_knowledge
@@ -59,7 +59,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2), 95)
+        self.assertEqual(len(SECTION_2), 96)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))
@@ -86,7 +86,7 @@ class TestOptionSet(unittest.TestCase):
         self.assertEqual(len(hints["boss_weapon_pool"].default), 10)
         self.assertEqual(len(hints["oxide_weapon_pool"].default), 11)
         self.assertEqual(len(hints["crystal_arenas"].valid_keys), 7)
-        self.assertEqual(len(hints["crystal_arenas"].default), 4)
+        self.assertEqual(len(hints["crystal_arenas"].default), 7)
 
     def test_cup_tracks_takes_the_word_random(self):
         self.assertEqual(CupTracks.from_any("random").value, CupTracks.option_random_repeats)
@@ -209,7 +209,7 @@ class TestEntranceHints(unittest.TestCase):
         self.assertIn(content_requirements.KEY_BY_PHYSICAL[int(pad.split(":")[1])], text[check["location"]])
 
     def test_vanilla_placement_has_no_hints(self):
-        world = make_world(dict(pad_placement="vanilla"), 420)
+        world = make_world(dict(pad_placement="vanilla", crystal_arenas=["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"]), 420)
         hints = {}
         world.extend_hint_information(hints)
         self.assertEqual(hints, {})

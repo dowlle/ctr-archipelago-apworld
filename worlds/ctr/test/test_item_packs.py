@@ -45,7 +45,9 @@ class TestOffKeepsTheWire(unittest.TestCase):
 
     def test_default_envelope_has_no_optional_key(self):
         wire = make_world(profile_options(), seed=4).fill_slot_data()
-        self.assertFalse(set(content_plan.ENVELOPE_OPTIONAL) & set(wire["ctr_options"]))
+        # The two pad hint filters default on (A3-8) and send their key.
+        sent = set(content_plan.ENVELOPE_OPTIONAL) & set(wire["ctr_options"])
+        self.assertEqual(sent, {"pad_hints_wait_for_spoiler", "pad_hints_progression_only"})
 
     def test_packs_take_no_draw(self):
         # The plan apart from the ledger and the record is the same seed.

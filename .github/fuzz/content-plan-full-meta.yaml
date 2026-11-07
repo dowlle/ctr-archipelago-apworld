@@ -18,7 +18,7 @@ Crash Team Racing:
   # items can refuse, so the weights keep the ignored share under the cap.
   goal_wumpa: {0: 2, 300: 1, 2500: 1}
   wumpa_shop_slots: {0: 1, 2: 1, 5: 1, 10: 1}
-  adventure_structure: {classic: 3, ctr_first: 1}
+  adventure_structure: {classic: 3, trophy_ctr_combined: 1}
   retail_tracks: [all]
   cortex_vortex_track: in_pool
   custom_tracks:

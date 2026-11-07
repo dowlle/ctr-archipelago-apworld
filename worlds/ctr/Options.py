@@ -281,8 +281,9 @@ class PurpleCupBossGauntlet(Toggle):
     boss garage attacks. Off by default.
 
     The cup's tracks, racers and checks stay the same, but the podium places
-    get harder. Needs Boss Kit Shuffle on and the Purple Gem Cup in the seed;
-    otherwise generation fails."""
+    get harder. Needs Boss Kit Shuffle on and at least one Gem Cup in the seed;
+    with it on, the Purple Gem Cup is the first Gem Cup the seed takes.
+    Otherwise generation fails."""
     # Design answer 3 (2026-10-13) and decision 5 (2026-10-28). Wire: the plan's
     # bosses.gauntlet. See content_bosses.py.
     display_name = "Purple Gem Cup Boss Gauntlet"
@@ -426,6 +427,17 @@ class TrapWeights(OptionDict):
     `clocked_out` defaults to 3 and puts the clock effect on you for 7.7
     seconds. `reverse_camera` defaults to 2 and forces the rear view with
     normal steering, for as long as your local Trap Duration setting.
+
+    Seven traps are new in 0.3.0-alpha3. Each lasts as long as your Trap
+    Duration setting, except Stuck Steering (always 7 seconds) and Wumpa Leak
+    (one event):
+    - `always_jumping` (3): the kart hops whenever it touches the ground.
+    - `no_drifting` (3): no hopping and no power sliding.
+    - `rival_surge` (3): the AI racers move 50% faster. Races with AI only.
+    - `mud_season` (3): every surface drives like dirt. Ignore Dirt blocks it.
+    - `limp_mode` (3): your top speed is halved, boosts included.
+    - `stuck_steering` (1): you cannot steer to one side, picked at random.
+    - `wumpa_leak` (4): you lose half of your Wumpa Fruit, rounded down.
 
     `first_person`, `wireframe`, `upside_down`, `mirror_mode`, `demo_camera`
     and `reverse_camera` change the camera or the screen and can be visually
@@ -754,9 +766,10 @@ class OneLapCups(DefaultOnToggle):
     """Shorten cup races. On by default.
 
     Each cup race, Gem Cups included, uses half its track's laps, rounded down
-    and at least one: an original track races one lap instead of three. Single
-    races, boss races and boss cups, Relic Races and CTR Challenges keep their
-    full laps. The checks do not change."""
+    and at least one: an original track races one lap instead of three. Boss
+    cup races run three laps on any track, so they run one. Single races, boss
+    races, Relic Races and CTR Challenges keep their full laps. The checks do
+    not change."""
     # Reuses the engine's built-in one-lap mechanism (the vanilla one-lap
     # cheat), scoped to cups.
     display_name = "One-Lap Cup Races"
@@ -838,10 +851,10 @@ class PadApproachHints(Toggle):
     display_name = "Pad Approach Hints"
 
 
-class PadHintsWaitForSpoiler(Toggle):
-    """Pad Approach Hints wait for Warp Pad Preview.
+class PadHintsWaitForSpoiler(DefaultOnToggle):
+    """Pad Approach Hints wait for Warp Pad Preview. On by default.
 
-    Off (default): Pad Approach Hints work as before.
+    Off: Pad Approach Hints work as before.
 
     On: with Spoiler Items and Pad Approach Hints both on, a pad hints nothing
     until you receive Warp Pad Preview, the item that also reveals the pad's
@@ -851,16 +864,35 @@ class PadHintsWaitForSpoiler(Toggle):
     display_name = "Pad Hints Wait for Spoiler"
 
 
-class PadHintsProgressionOnly(Toggle):
-    """Pad Approach Hints only hint progression items.
+class PadHintsProgressionOnly(DefaultOnToggle):
+    """Pad Approach Hints only hint progression items. On by default.
 
-    Off (default): a pad hints every open check behind it.
+    Off: a pad hints every open check behind it.
 
     On: a pad hints only the checks that hold a progression item, which keeps
     the hint list short. Checks with useful items, filler and traps are not
     hinted, and a later approach does not hint them either. Without Pad
     Approach Hints this option does nothing."""
     display_name = "Pad Hints Progression Only"
+
+
+class TrapDisplay(Choice):
+    """Choose how a location holding a trap looks in CTR before you collect
+    it: on item boxes, on warp pad glow and in the Wumpa Shop.
+
+    - **shown** (default): traps look like traps.
+    - **as_progression**: traps look like progression items.
+    - **mixed**: each trap location looks like progression or like filler,
+      picked once per location when the seed is generated.
+
+    Received traps still say their name in the feed. Other games and the
+    Archipelago server still show the item as a trap. It never changes the
+    logic."""
+    display_name = "Trap Display"
+    option_shown = 0
+    option_as_progression = 1
+    option_mixed = 2
+    default = 0
 
 
 class RaceTypeSelector(Choice):
@@ -895,23 +927,25 @@ class TrackerPadLaunch(DefaultOnToggle):
 
 
 class AdventureStructure(Choice):
-    """Choose whether a track's Trophy Race and CTR Challenge stay two races or
-    are merged into one.
+    """Choose whether a track's Trophy Race and CTR Challenge stay two separate
+    races or are merged into one.
 
     - **classic** (default): two races, as in the original game. Win the Trophy
       Race first; the CTR Challenge and the Relic Race open after it.
-    - **ctr_first**: the Trophy Race and the CTR Challenge are merged into one
-      race, the CTR Challenge. Finishing first sends the track's Trophy Race
-      check, and finishing first with the letters also sends its CTR Token
-      Challenge check. Item boxes, Wumpa and placement checks come from this
-      race, and placement counts even without the letters. A Relic Race opens
-      after it, like any later race on the pad.
+    - **trophy_ctr_combined**: merges the Trophy Race and the CTR Challenge into
+      one race, played as the CTR Challenge. Finishing first earns the track's
+      Trophy Race check. Finishing first with all three letters also earns its
+      CTR Token check. Item boxes, Wumpa and placement checks come from this one
+      race, and placement counts even without the letters. The Relic Race opens
+      after it, like any later race on the pad. `ctr_first` is the old name and
+      still works.
 
     The checks keep their names, so "Trophy Race" is still the track's first
     check. A track without a CTR Challenge uses classic."""
     display_name = "Adventure Structure"
     option_classic = 0
-    option_ctr_first = 1
+    option_trophy_ctr_combined = 1
+    alias_ctr_first = 1
     default = 0
 
 
@@ -1315,6 +1349,18 @@ class ContentItemPool(OptionDict):
     item_pool:
       base:
         relics: {sapphire: 12, gold: 6, platinum: 0}
+    ```
+
+    `extra` takes exact counts, not percentages. Extra Trophies and Keys are
+    the same items as the base ones, so requirements are easier to meet. Pads
+    and garages only ask for the base count.
+
+    Example, 4 extra Trophies and 2 extra Keys:
+    ```yaml
+    item_pool:
+      extra:
+        trophies: 4
+        keys: 2
     ```"""
     display_name = "Item Pool"
     default = {}
@@ -1427,8 +1473,8 @@ class CupCount(Range):
 
 
 class CupTracks(Choice):
-    """Choose the tracks in each cup. Slide Coliseum and Turbo Track never appear
-    in cups.
+    """Choose the tracks in each cup. Slide Coliseum and Turbo Track can appear
+    in cups too.
 
     - **off**: an original Gem Cup keeps its four original tracks. A sixth cup
       and later draw four different tracks.
@@ -1471,15 +1517,19 @@ class CrystalChallengeCount(Range):
 
 
 class CrystalArenas(OptionSet):
-    """Choose which arenas a Crystal Challenge can use. The default is the four
-    original arenas: Rocky Road, Rampage Ruins, Skull Rock and Nitro Court.
+    """Choose which arenas a Crystal Challenge can use. The default is all
+    seven: Rocky Road, Rampage Ruins, Skull Rock, Nitro Court, Parking Lot,
+    The North Bowl and Lab Basement. Crystal Challenge Count sets how many of
+    them the seed uses.
 
-    You can also list Parking Lot, The North Bowl and Lab Basement. Each of
-    those uses a warp pad, has 20 crystals and gives no Purple CTR Token.
-    Crystal Challenge Count cannot be higher than the number of arenas listed."""
+    Parking Lot, The North Bowl and Lab Basement are the new arenas. Each of
+    those uses a warp pad, has 20 crystals and gives no Purple CTR Token. To
+    keep only the four original arenas, list Rocky Road, Rampage Ruins, Skull
+    Rock and Nitro Court. Crystal Challenge Count cannot be higher than the
+    number of arenas listed."""
     display_name = "Crystal Arenas"
     valid_keys = sorted(ARENA_NAMES)
-    default = frozenset(ORIGINAL_ARENA_NAMES)
+    default = frozenset(ARENA_NAMES)
 
 
 class BossGarages(DefaultOnToggle):
@@ -1737,6 +1787,7 @@ class ctrAPOptions(PerGameCommonOptions):
     pad_approach_hints: PadApproachHints
     pad_hints_wait_for_spoiler: PadHintsWaitForSpoiler
     pad_hints_progression_only: PadHintsProgressionOnly
+    trap_display: TrapDisplay
     shop_hints_progression_only: ShopHintsProgressionOnly
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
@@ -1762,7 +1813,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
-                        ProgressiveStartingWumpa, TurboGrant, TiziHelper],
+                        ProgressiveStartingWumpa, TurboGrant, TiziHelper,
+                        TrapDisplay],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,
                              EditableStats, ProgressiveStatsMode],
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],

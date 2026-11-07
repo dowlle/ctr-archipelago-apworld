@@ -27,6 +27,7 @@ import itertools
 import json
 import logging
 import pkgutil
+import random
 
 from BaseClasses import Region, Location
 from Options import OptionError
@@ -207,6 +208,12 @@ STARTING_WUMPA_MAX = 10
 #: (A2-23) are likewise present only when on; absent means no filter.
 ENVELOPE_OPTIONAL = ("death_link_send", "warp_pad_item_display", "ap_item_type_colors", "pad_approach_hints",
                      "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "shop_hints_progression_only")
+#: Trap Display (the alpha3 data package, ruled 2026-11-06): `trap_display` is
+#: present only when not `shown` (1 as_progression, 2 mixed); `mixed` also
+#: carries `trap_display_salt`, from which native picks progression or filler
+#: per location. Absent keys mean traps look like traps, as before.
+TRAP_DISPLAY_KEYS = ("trap_display", "trap_display_salt")
+TRAP_DISPLAY_SALT_MAX = 0x7FFFFFFF
 #: Character packs (#133 PR 4b). With Character Unlocks on, the plan's
 #: optional `racers` record names the starting racer (engine character id),
 #: whether Remove Playable Oxide is on and the requested racer-lock maximum.
@@ -570,8 +577,32 @@ def envelope_options(options):
     return out
 
 
+def trap_display_envelope(world):
+    """The optional Trap Display keys, see TRAP_DISPLAY_KEYS. The salt comes
+    from its own generator seeded from the multiworld seed and the player, so
+    the seed's main random stream is never touched."""
+    mode = int(world.options.trap_display.value)
+    if not mode:
+        return {}
+    out = {"trap_display": mode}
+    if mode == 2:
+        restored = getattr(world, "_ctr_trap_display_salt", None)
+        if restored is not None:  # Universal Tracker keeps the room's salt
+            return dict(out, trap_display_salt=restored)
+        rng = random.Random(f"ctr-trap-display:{world.multiworld.seed}:{world.player}")
+        out["trap_display_salt"] = rng.randint(0, TRAP_DISPLAY_SALT_MAX)
+    return out
+
+
 def check_envelope_options(co):
     """Types and bounds of the optional envelope keys, as native reads them."""
+    if "trap_display" in co and (type(co["trap_display"]) is not int or co["trap_display"] not in (1, 2)):
+        error("ctr_options.trap_display must be 1 or 2 when present.")
+    if ("trap_display_salt" in co) != (co.get("trap_display") == 2):
+        error("ctr_options.trap_display_salt is present exactly when trap_display is 2.")
+    if "trap_display_salt" in co and (type(co["trap_display_salt"]) is not int
+                                      or not 0 <= co["trap_display_salt"] <= TRAP_DISPLAY_SALT_MAX):
+        error("ctr_options.trap_display_salt must be 0 to 2147483647.")
     # death_link is always emitted; native admits 0 off to 4 weapon_hit (#483).
     if "death_link" in co and (type(co["death_link"]) is not int or not 0 <= co["death_link"] <= 4):
         error("ctr_options.death_link must be 0 to 4.")
@@ -1094,7 +1125,17 @@ def required_ids(options, candidates, arenas, packages):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
             or len(wanted) > content_cups.PADS):
-        error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads.")
+        problems = []
+        unknown = [name for name in dict.fromkeys(wanted) if name not in names]
+        if unknown:
+            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown))
+        repeated = [name for name in dict.fromkeys(wanted) if name in names and wanted.count(name) > 1]
+        if repeated:
+            problems.append("listed more than once: " + ", ".join(repr(name) for name in repeated))
+        if len(wanted) > content_cups.PADS:
+            problems.append(f"{len(wanted)} entries do not fit the {content_cups.PADS} normal pads")
+        error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads. "
+              + "; ".join(problems) + ".")
     out = [names[name] for name in wanted]
     if int(options.cortex_vortex_track.value) == CORTEX_OWN_PAD:
         out.append(CORTEX_TRACK_ID)
@@ -1264,7 +1305,8 @@ def draw_plan(world, key_estimate=True):
     if cup_spec["bounds"][1]:
         # Whether the cups fit, and their legs (#133 PR 5).
         legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
-        fixed_legs = content_cups.fixed_legs(cup_spec, candidates)
+        fixed_legs = content_cups.fixed_legs(cup_spec, candidates,
+                                             content_cups.gem_order(bool(o.purple_cup_boss_gauntlet.value)))
         pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
                                             len(required) - len(chosen_arenas), legs_other, legs_custom, fixed_legs)
         if not pairs:
@@ -1290,7 +1332,7 @@ def draw_plan(world, key_estimate=True):
         # The first five are the Gem Cups; a sixth cup onward takes a name
         # from the pool (#133 PR 5). They are seated with the other entries.
         cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
-                                      bool(o.one_lap_cups.value), fixed_legs)
+                                      bool(o.one_lap_cups.value), fixed_legs, bool(o.purple_cup_boss_gauntlet.value))
     # Room titles of the seed's custom tracks, also those raced only as cup legs.
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:
@@ -1305,8 +1347,9 @@ def draw_plan(world, key_estimate=True):
     # The Purple Gem Cup gauntlet (ruled 2026-10-30): one message for both needs.
     if o.purple_cup_boss_gauntlet.value and not (o.boss_kit_shuffle.value and boss_record is not None
                                                  and any(cup.get("gem_cup") == PURPLE_GEM_CUP for cup in cups)):
-        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and the Purple Gem Cup in the seed. Turn on "
-              "boss_kit_shuffle and keep five Gem Cups, or turn off purple_cup_boss_gauntlet.")
+        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and at least one Gem Cup in the seed (the Purple "
+              "Gem Cup is the first Gem Cup it takes). Turn on boss_kit_shuffle and keep at least one Gem Cup, or "
+              "turn off purple_cup_boss_gauntlet.")
     manual = manual_rules(o)
     unlock_mode = int(o.warppad_unlock_requirements.value)
     if unlock_mode and not content_playthrough.effective_custom_weights(world)["Trophy"]:
@@ -1794,7 +1837,7 @@ def draw_plan(world, key_estimate=True):
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
-            content_requirements.MODES[unlock_mode], package_by_id)
+            content_requirements.MODES[unlock_mode], package_by_id, bool(world.options.one_lap_cups.value))
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
@@ -2221,7 +2264,11 @@ def create_regions(world):
             laps.append(check)  # Complete One Lap (#344), standalone and Cup leg routes
             continue
         pads_of = {r["own_pad_id"] for r in check["routes"]}
-        if len(pads_of) == 1:
+        # Itemsanity and Hit Character are always global checks with their
+        # own rule (content_global_checks.install), also when every route is
+        # on one pad (one Trophy pad among cups, A3-7): a pad check would drop
+        # the weapon and hit terms.
+        if len(pads_of) == 1 and check["kind"] not in content_global_checks.KINDS:
             by_pad.setdefault(check['routes'][0]['own_pad_id'], []).append(check)
         else:
             shared.append(check)  # `wumpa: global`, one route per race
@@ -2519,7 +2566,8 @@ def wire(world):
                                  progressive_stats=plan.get("capability", {}).get("stats_mode", 0),
                                  hit_character=bool(plan.get("global_checks", {}).get("hit_character")),
                                  death_link=o.death_link.value, deathlink_amnesty=o.deathlink_amnesty.value,**extra,
-                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world), **relic_option),
+                                 **envelope_options(o), **stat_envelope(world), **box_envelope(world), **relic_option,
+                                 **trap_display_envelope(world)),
                 trap_identities=traps.trap_identities_block(world.item_name_to_id), **hit)
 
 
@@ -3075,13 +3123,8 @@ def restore(world, slot_data):
     world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
     world.options.lap_completion_checks.value = int(any(c["kind"] == content_laps.KIND for c in plan["checks"]))
     world.options.cup_only_podium_rungs.value = int(content_race_routes.cup_only_on(plan["checks"]))
-    shortened = None
-    tracks_by_id = {t["id"]: t for t in plan["tracks"]}
-    for entry in plan["entries"]:
-        for leg in entry.get("legs", ()):
-            full = content_cups.base_laps(tracks_by_id[leg["track_id"]])
-            if full != max(1, full // 2):
-                shortened = leg["laps"] != full
+    # Boss cup legs carry it too (A3-6), on their own three laps.
+    shortened = content_bosses.plan_shortened(plan)
     if shortened is not None:
         world.options.one_lap_cups.value = int(shortened)
     # Pool-only packs (#133 PR 4a): the ledger rows above are the items; the
@@ -3096,6 +3139,8 @@ def restore(world, slot_data):
     world.options.pad_approach_hints.value = int(co.get("pad_approach_hints", False))
     for key in HINT_FILTER_KEYS:
         getattr(world.options, key).value = int(co.get(key, False))
+    world.options.trap_display.value = co.get("trap_display", 0)
+    world._ctr_trap_display_salt = co.get("trap_display_salt")
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
     # room's encounter block verbatim (no redraw), its fallback checked against
     # the plan's unlock wins.

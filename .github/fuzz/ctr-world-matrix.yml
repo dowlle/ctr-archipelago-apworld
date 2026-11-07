@@ -72,6 +72,9 @@
 - {check_name: gem-cups-7-off,              check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-off'}
 - {check_name: gem-cups-7-random,           check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random'}
 - {check_name: gem-cups-7-no-repeats,       check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-7-random_no_repeats'}
+- {check_name: gem-cups-2-random-gauntlet,  check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-2-random-gauntlet'}
+- {check_name: gem-cups-2-off-gauntlet,     check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-2-off-gauntlet'}
+- {check_name: gem-cups-5-random-gauntlet,  check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'gem-cups-5-random-gauntlet'}
 - {check_name: gem-cups-ut,                 check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'gem-cups-7-off'}
 # Pad placement and requirements (one generator row 3): the vanilla-shape
 # plan at each unlock mode, pad_placement and two_stage_density,
@@ -136,6 +139,11 @@
 - {check_name: pads-client-vanilla,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-client'}
 - {check_name: pads-all-ut,                check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-all'}
 - {check_name: pads-all-ut-vanilla,        check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-all'}
+# 27 cups (A3-7): every normal pad a cup, no Trophy Race or CTR Challenge, with
+# Itemsanity, Hit Character, the shop and the Wumpa goal drawn. Overlay cups-27.yaml.
+- {check_name: pads-cups-27,                   check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-cups-27'}
+- {check_name: pads-cups-27-vanilla,           check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-vanilla-shuffle-full-none-cups-27'}
+- {check_name: pads-cups-27-ut,                check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-cups-27'}
 # One generator row 8: lap checks with each goal, with fixed Keys and Gems,
 # with boss cups, and through Universal Tracker. Overlays laps*.yaml.
 - {check_name: pads-laps-goal-any,             check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-goal-any'}
