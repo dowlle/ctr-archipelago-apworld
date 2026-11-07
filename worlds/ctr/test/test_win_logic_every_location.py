@@ -85,9 +85,12 @@ class TestWinLogicEveryLocation(unittest.TestCase):
     def test_placement_does_not_depend_on_the_option(self):
         """The rules are the same callables with the option on or off, so
         the placement and every other slot_data key match."""
+        from Fill import distribute_items_restrictive
         for seed in (3, 29):
             off = make_world(pack_options(box_locations=True), seed=seed)
             on = make_world(pack_options(box_locations=True, pad_approach_hints=True), seed=seed)
+            for world in (off, on):
+                distribute_items_restrictive(world.multiworld)
             placed = [{loc.name: (loc.item.name, loc.item.player) for loc in w.multiworld.get_locations()
                        if loc.item is not None} for w in (off, on)]
             with self.subTest(seed=seed):
@@ -113,6 +116,20 @@ class TestWinLogicEveryLocation(unittest.TestCase):
         self.assertEqual(block, wire_block(world, include_hints=False))
         self.assertEqual(block["version"], 1)
         self.assertNotIn(str(box.address), block["checks"])
+
+    def test_foreign_wrap_on_a_reached_proof_falls_back(self):
+        """A win or shared rule that reads another check through `Reached`
+        sees a wrapped target as a foreign rule, so the fallback still runs."""
+        from ..logic_terms import Reached
+        world = make_world(pack_options(box_locations=True), seed=3)
+        snapshot_rules(world)
+        target = next(location for location in world.multiworld.get_locations(world.player)
+                      if location.address is not None and term_of(location) is not None)
+        previous = target.access_rule
+        target.access_rule = lambda state: state.has("Foreign Unlock", 2) and previous(state)
+        from ..win_logic import _Encoder
+        with self.assertRaises(ForeignRuleError):
+            Reached({target.address: target}, target.address, "pad").wire(_Encoder(world))
 
     def test_block_fits_native_tables(self):
         """Native refuses a block over its tables (ap_win_logic.h): 4,096

@@ -66,7 +66,7 @@ class TestHintGlobalTerms(unittest.TestCase):
         previous = event.access_rule
         event.access_rule = lambda state: state.has("Foreign Unlock", 2) and previous(state)
         with self.assertRaises(ForeignRuleError):
-            content_wumpa.slot_income_term(world)
+            content_wumpa.income_term(world)
 
     def test_hints_off_annotates_global_rules_too(self):
         """A3-37b: the global checks are term-backed on every seed, and the

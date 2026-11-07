@@ -341,27 +341,18 @@ def check_income(plan):
 
 def income_term(world):
     """What `Wumpa Income` stands for, for the `win_logic` export: any income
-    route, with its pad's gate, as `install` built them."""
-    if bool(world.options.pad_approach_hints.value):
-        event = world.ctr_income_event
-        term = logic_terms.term_of(event)
-        if term is None:
-            from .win_logic import _unexportable
-            raise _unexportable(world, event, "CTR win_logic: Wumpa Income has no term-backed rule")
-        return term
-    return world.ctr_income_term
-
-
-def slot_income_term(world):
-    """What `Wumpa Income` stands for in a shop slot's row (A3-37b): the
-    event's own term, so a foreign wrapper on the event refuses the export on
-    every seed. Its wire is `ctr_income_term`, the same as `income_term`."""
+    route, with its pad's gate, as `install` built them. The event's own term
+    is checked on every seed, so a foreign wrapper on it refuses the export
+    (A3-37b review). Without Pad Approach Hints the wire stays
+    `ctr_income_term`, as before; the event's term wires the same routes."""
     event = world.ctr_income_event
     term = logic_terms.term_of(event)
     if term is None:
         from .win_logic import _unexportable
         raise _unexportable(world, event, "CTR win_logic: Wumpa Income has no term-backed rule")
-    return term
+    if bool(world.options.pad_approach_hints.value):
+        return term
+    return world.ctr_income_term
 
 
 def install(world, plan, menu, stage_gate, stage_term):
@@ -438,7 +429,7 @@ def install(world, plan, menu, stage_gate, stage_term):
         floor = key_floor(record, hub, checks[code])
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
-        term = logic_terms.EventTerm(INCOME, player, lambda: slot_income_term(world))
+        term = logic_terms.EventTerm(INCOME, player, lambda: income_term(world))
         if floor:
             term = logic_terms.And(term, logic_terms.Has(key, floor, player))
         logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, term))
