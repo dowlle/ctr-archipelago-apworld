@@ -149,12 +149,13 @@ def check_spot_sets(record, tracks, packages):
     build, each a valid pick from that file."""
     if not record:
         return
-    expected = crate_exclusions.records(tracks, packages, spot_sets(record))
-    # Validation receives pad tracks in set order. Compare complete canonical
-    # JSON records without relying on that order, retaining exact token types.
-    canonical = lambda rows: sorted(json.dumps(row, sort_keys=True) for row in rows)
-    if canonical(record.get(crate_exclusions.KEY, [])) != canonical(expected):
-        error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
+    if crate_exclusions.KEY in record:
+        expected = crate_exclusions.records(tracks, packages, spot_sets(record))
+        # Validation receives pad tracks in set order. Compare complete JSON
+        # records without relying on that order, retaining exact token types.
+        canonical = lambda rows: sorted(json.dumps(row, sort_keys=True) for row in rows)
+        if canonical(record[crate_exclusions.KEY]) != canonical(expected):
+            error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
     if SPOT_KEY not in record:
         return
     sets = spot_sets(record)
@@ -202,11 +203,16 @@ def box_code(track, number):
     return CUSTOM_ITEM_BOX_CLASS.slot_code(track["custom_slot"], number)
 
 
-def crate_count(package):
-    """The package's stated weapon crate count, or None when it states none."""
+def crate_count(package, record=None, track_id=None):
+    """Eligible crates in this seed; legacy records keep the raw package count.
+
+    Never apply today's catalog implicitly when restoring an older room.
+    """
     if not package:
         return None
-    return crate_exclusions.count(package)
+    excluded = next((row["crates"] for row in (record or {}).get(crate_exclusions.KEY, ())
+                     if row["track_id"] == track_id), ())
+    return crate_exclusions.count(package, excluded)
 
 
 def seat_indices(crates, slots=SLOTS_PER_TRACK):
@@ -237,7 +243,7 @@ def track_boxes(track, record, package=None):
         return [(slot, ITEM_BOX_CLASS.slot_code(name, slot), f"Item Box {slot}")
                 for slot in retail_slots(name, record["shortcut_knowledge"])]
     if track["origin"] == "custom":
-        crates = crate_count(package)
+        crates = crate_count(package, record, track["id"])
         if not crates:
             return []
         return [(slot, box_code(track, slot), f"Item Box {slot}") for slot in range(1, len(seat_indices(crates)) + 1)]

@@ -20,9 +20,14 @@ def entries(package):
     return copy.deepcopy(EXCLUSIONS.get(lev_pin(package), []))
 
 
-def count(package):
+def count(package, excluded=()):
+    """Raw package count minus this seed's carried entries, never a live lookup.
+
+    A seed without the feature keeps its old seating, including in Tracker.
+    Only new generation looks up the current catalog through records().
+    """
     raw = (package or {}).get("capabilities", {}).get("weapon_crates")
-    return None if raw is None else raw - len(entries(package))
+    return None if raw is None else raw - len(excluded)
 
 
 def records(tracks, packages, spots):
