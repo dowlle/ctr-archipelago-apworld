@@ -131,19 +131,28 @@ def leg_pools(candidates, packages, sources):
     return other, custom
 
 
-def fixed_legs(spec, candidates):
+def gem_order(gauntlet=False):
+    """The Gem Cup colours in the order a seed takes them: Red to Purple, or with
+    the Purple Gem Cup gauntlet Purple first and then Red onward (A3-25), so
+    the gauntlet needs one Gem Cup rather than five."""
+    colours = tuple(range(len(GEM_CUPS)))
+    return colours[-1:] + colours[:-1] if gauntlet else colours
+
+
+def fixed_legs(spec, candidates, order=None):
     """[[four track records]] of the Gem Cups that race their original tracks,
-    in cup order, or None when no cup does (any value but `off`). The list stops
-    at the first cup with a track the seed's selection leaves out."""
+    in `order` (Red first by default), or None when no cup does (any value but
+    `off`). The list stops at the first cup with a track the seed's selection
+    leaves out."""
     if spec["tracks"] != "off":
         return None
     records = {t["display_name"]: t for t in candidates if t.get("origin") == "retail"}
     table = load_vanilla_cup_legs()
     out = []
-    for cup in GEM_CUPS:
-        if any(name not in records for name in table[cup]):
+    for cup in (order if order is not None else gem_order()):
+        if any(name not in records for name in table[GEM_CUPS[cup]]):
             break
-        out.append([records[name] for name in table[cup]])
+        out.append([records[name] for name in table[GEM_CUPS[cup]]])
     return out
 
 
@@ -248,17 +257,17 @@ def leg_laps(track, shortened):
     return max(1, base_laps(track) // 2) if shortened else base_laps(track)
 
 
-def draw_cups(world, count, other, custom, spec, shortened, fixed=None):
+def draw_cups(world, count, other, custom, spec, shortened, fixed=None, gauntlet=False):
     """The seed's cups as plan candidates: {cup_index, id, legs, shortened}. The
-    first five are the Gem Cups, Red first, with `gem_cup` their colour and
-    `cup_index` None. The drawn legs come first, then a sample of the pool's
+    first five are the Gem Cups, Red first (Purple first with `gauntlet`), with
+    `gem_cup` their colour and `cup_index` None. The drawn legs come first, then a sample of the pool's
     name indices for a sixth cup onward. `fixed` is fixed_legs."""
     gems = min(count, len(GEM_CUPS))
     kept = (fixed or [])[:gems]
     legs = kept + draw_legs(world, count - len(kept), other, custom, spec)
     names = world.random.sample(range(len(cup_checks.CUP_NAMES)), count - gems)
-    return ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[colour], shortened=shortened)
-             for colour in range(gems)]
+    return ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[place], shortened=shortened)
+             for place, colour in enumerate(gem_order(gauntlet)[:gems])]
             + [dict(cup_index=index, id=f"cup:{index}", legs=cup_legs, shortened=shortened)
                for index, cup_legs in zip(names, legs[gems:])])
 
@@ -416,11 +425,14 @@ def prefix_boost(cup_entry, leg_id, tracks, capability, packages=None):
 
 
 def check_lineup(entries):
-    """The plan's cups are the Gem Cups Red first, and a pool cup only after
-    all five."""
+    """The plan's cups are the Gem Cups Red first (or, short of five, the Purple
+    Gem Cup and then Red onward), and a pool cup only after all five."""
     ids = [e["id"] for e in entries if e["kind"] == KIND]
     gems = sorted(colour for colour in map(gem_colour, ids) if colour is not None)
-    if gems != list(range(len(gems))) or (len(gems) < len(GEM_CUPS) and len(gems) != len(ids)):
+    rest = [colour for colour in gems if colour != len(GEM_CUPS) - 1]
+    red_first = gems == list(range(len(gems)))
+    purple_first = len(gems) < len(GEM_CUPS) and rest != gems and rest == list(range(len(rest)))
+    if not (red_first or purple_first) or (len(gems) < len(GEM_CUPS) and len(gems) != len(ids)):
         error("a plan's first five cups are the Gem Cups, Red first")
 
 

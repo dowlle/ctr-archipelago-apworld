@@ -71,4 +71,7 @@ Crash Team Racing:
   boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
   boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
   oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]
-  purple_cup_boss_gauntlet: false
+  # The gauntlet arms (A3-25, an arm name ending in -gauntlet) turn both on; the
+  # Purple Gem Cup is then the first Gem Cup at any cup count.
+  boss_kit_shuffle: __GAUNTLET__
+  purple_cup_boss_gauntlet: __GAUNTLET__

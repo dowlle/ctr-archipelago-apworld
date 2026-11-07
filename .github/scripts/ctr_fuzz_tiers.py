@@ -30,6 +30,7 @@ PR_ARMS = {
     "content-plan-vanilla": "content plan",
     "content-plan-132": "content plan",
     "gem-cups-7-random": "cups",
+    "gem-cups-2-random-gauntlet": "cups",
     "pads-all-ut": "pads",
 }
 FAMILIES = {"default", "content plan", "cups", "bosses", "pads", "ut", "determinism"}

@@ -1294,7 +1294,8 @@ def draw_plan(world, key_estimate=True):
     if cup_spec["bounds"][1]:
         # Whether the cups fit, and their legs (#133 PR 5).
         legs_other, legs_custom = content_cups.leg_pools(candidates, package_by_id, cup_spec["sources"])
-        fixed_legs = content_cups.fixed_legs(cup_spec, candidates)
+        fixed_legs = content_cups.fixed_legs(cup_spec, candidates,
+                                             content_cups.gem_order(bool(o.purple_cup_boss_gauntlet.value)))
         pairs = content_cups.feasible_pairs(cup_spec, crystal_range, len(arena_pool), len(chosen_arenas),
                                             len(required) - len(chosen_arenas), legs_other, legs_custom, fixed_legs)
         if not pairs:
@@ -1320,7 +1321,7 @@ def draw_plan(world, key_estimate=True):
         # The first five are the Gem Cups; a sixth cup onward takes a name
         # from the pool (#133 PR 5). They are seated with the other entries.
         cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
-                                      bool(o.one_lap_cups.value), fixed_legs)
+                                      bool(o.one_lap_cups.value), fixed_legs, bool(o.purple_cup_boss_gauntlet.value))
     # Room titles of the seed's custom tracks, also those raced only as cup legs.
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:
@@ -1335,8 +1336,9 @@ def draw_plan(world, key_estimate=True):
     # The Purple Gem Cup gauntlet (ruled 2026-10-30): one message for both needs.
     if o.purple_cup_boss_gauntlet.value and not (o.boss_kit_shuffle.value and boss_record is not None
                                                  and any(cup.get("gem_cup") == PURPLE_GEM_CUP for cup in cups)):
-        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and the Purple Gem Cup in the seed. Turn on "
-              "boss_kit_shuffle and keep five Gem Cups, or turn off purple_cup_boss_gauntlet.")
+        error("purple_cup_boss_gauntlet needs boss_kit_shuffle and at least one Gem Cup in the seed (the Purple "
+              "Gem Cup is the first Gem Cup it takes). Turn on boss_kit_shuffle and keep at least one Gem Cup, or "
+              "turn off purple_cup_boss_gauntlet.")
     manual = manual_rules(o)
     unlock_mode = int(o.warppad_unlock_requirements.value)
     if unlock_mode and not content_playthrough.effective_custom_weights(world)["Trophy"]:

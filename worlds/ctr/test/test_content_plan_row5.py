@@ -113,14 +113,44 @@ class TestBossCups(unittest.TestCase):
 
 
 class TestGauntlet(unittest.TestCase):
-    MESSAGE = "purple_cup_boss_gauntlet needs boss_kit_shuffle and the Purple Gem Cup"
+    MESSAGE = "purple_cup_boss_gauntlet needs boss_kit_shuffle and at least one Gem Cup"
 
     def test_it_needs_the_kit_switch(self):
         self.assertIn(self.MESSAGE, refusal(options(purple_cup_boss_gauntlet=True)))
 
-    def test_it_needs_the_purple_gem_cup(self):
+    def test_it_needs_one_gem_cup(self):
         self.assertIn(self.MESSAGE, refusal(options(purple_cup_boss_gauntlet=True, boss_kit_shuffle=True,
-                                                    cups=dict(count=4))))
+                                                    cups=dict(count=0))))
+
+    def test_purple_is_the_first_gem_cup_at_every_count(self):
+        # A3-25: the gauntlet takes Purple first, then Red onward.
+        for count in range(1, 6):
+            for seed in (1, 2):
+                plan = make_world(options(purple_cup_boss_gauntlet=True, boss_kit_shuffle=True,
+                                          cups=dict(count=count)), seed=seed).ctr_content_plan
+                colours = [content_cups.gem_colour(e["id"]) for e in plan["entries"]
+                           if content_cups.gem_colour(e["id"]) is not None]
+                self.assertEqual(sorted(colours), sorted(content_cups.gem_order(True)[:count]), (count, seed))
+                self.assertIn(4, colours)
+                self.assertTrue(content_plan.validate(plan), (count, seed))
+
+    def test_without_the_gauntlet_the_order_is_unchanged(self):
+        for count in range(1, 6):
+            plan = make_world(options(cups=dict(count=count)), seed=1).ctr_content_plan
+            colours = sorted(content_cups.gem_colour(e["id"]) for e in plan["entries"]
+                             if content_cups.gem_colour(e["id"]) is not None)
+            self.assertEqual(colours, list(range(count)))
+
+    def test_gem_order(self):
+        self.assertEqual(content_cups.gem_order(), (0, 1, 2, 3, 4))
+        self.assertEqual(content_cups.gem_order(True), (4, 0, 1, 2, 3))
+
+    def test_a_lineup_that_skips_red_is_refused(self):
+        entries = [dict(id=content_cups.gem_entry_id(c), kind=content_cups.KIND) for c in (4, 1)]
+        with self.assertRaises(OptionError):
+            content_cups.check_lineup(entries)
+        entries = [dict(id=content_cups.gem_entry_id(c), kind=content_cups.KIND) for c in (4, 0, 1)]
+        content_cups.check_lineup(entries)
 
     def test_bosses_off_is_the_same_message(self):
         o = options(purple_cup_boss_gauntlet=True, oxide_goal="disabled", gems_required_goal=2,
