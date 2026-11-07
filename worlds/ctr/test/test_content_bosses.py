@@ -530,7 +530,8 @@ class TestBossCups(unittest.TestCase):
                 if g in cups:
                     legs = [leg["track_id"] for leg in entry["legs"]]
                     self.assertEqual(len(set(legs)), 4)
-                    self.assertTrue(all(leg["laps"] == 3 for leg in entry["legs"]))
+                    # one_lap_cups is on by default: a boss cup leg races one lap (A3-6).
+                    self.assertTrue(all(leg["laps"] == 1 for leg in entry["legs"]))
                     check = next(c for c in plan["checks"] if c["location"] == enc["completion_location"])
                     self.assertEqual((check["kind"], check["routes"][0]["mode"]), ("boss_cup", "boss_cup"))
             wire = json.loads(json.dumps(world.fill_slot_data()))
@@ -539,6 +540,100 @@ class TestBossCups(unittest.TestCase):
             all_state = world.multiworld.get_all_state(False)
             for location in world.multiworld.get_locations(1):
                 self.assertTrue(location.can_reach(all_state), location.name)
+
+    def test_cup_legs_follow_one_lap_cups(self):
+        """A3-6 (ruled 2026-11-06): a boss cup follows the same lap setting as
+        other cups. On, every boss cup leg and every ordinary cup leg is
+        shortened; off, all race their full laps. Boss races keep three laps
+        either way, and validate and the Tracker restore agree."""
+        for one_lap, boss_laps in ((True, 1), (False, 3)):
+            options = boss_options(one_lap_cups=one_lap)
+            options["content_pool"]["bosses"]["cups"] = 2
+            options["content_pool"]["cups"] = dict(count=2)
+            world = make_world(options, seed=3)
+            plan = world.ctr_content_plan
+            self.assertTrue(content_plan.validate(plan))
+            tracks = {t["id"]: t for t in plan["tracks"]}
+            kinds = {e["kind"] for e in plan["entries"]}
+            self.assertIn(content_bosses.CUP_KIND, kinds)
+            self.assertIn("cup", kinds)
+            for entry in plan["entries"]:
+                with self.subTest(one_lap=one_lap, entry=entry["id"]):
+                    if entry["kind"] == content_bosses.CUP_KIND:
+                        self.assertEqual([leg["laps"] for leg in entry["legs"]], [boss_laps] * 4)
+                    elif entry["kind"] == "cup":
+                        for leg in entry["legs"]:
+                            full = tracks[leg["track_id"]]["laps"]
+                            self.assertEqual(leg["laps"], max(1, full // 2) if one_lap else full)
+                    elif entry["kind"] == content_bosses.KIND:
+                        self.assertEqual(entry["laps"], 3)
+            self.assertEqual(content_bosses.plan_shortened(plan), one_lap)
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            restored = make_world({}, passthrough=copy.deepcopy(wire))
+            self.assertEqual(restored.ctr_content_plan, plan)
+            self.assertEqual(bool(restored.options.one_lap_cups.value), one_lap)
+
+    def test_boss_cups_alone_carry_the_lap_switch(self):
+        """With no ordinary cup in the plan the boss cup legs alone tell the
+        switch, and the Tracker restore reads it from them (A3-6)."""
+        for one_lap in (True, False):
+            options = boss_options(one_lap_cups=one_lap)
+            options["content_pool"]["bosses"]["cups"] = 1
+            world = make_world(options, seed=5)
+            plan = world.ctr_content_plan
+            self.assertFalse(any(e["kind"] == "cup" for e in plan["entries"]))
+            self.assertEqual(content_bosses.plan_shortened(plan), one_lap)
+            self.assertTrue(content_plan.validate(plan))
+            restored = make_world({}, passthrough=json.loads(json.dumps(world.fill_slot_data())))
+            self.assertEqual(bool(restored.options.one_lap_cups.value), one_lap)
+
+    def test_custom_boss_cup_leg_races_boss_laps(self):
+        """A custom boss cup leg races the boss's three laps, or one with
+        one_lap_cups, not its own authored laps halved (Baby T Park has 7)."""
+        for one_lap, laps in ((True, 1), (False, 3)):
+            options = boss_options(one_lap_cups=one_lap)
+            options["content_pool"]["bosses"]["cups"] = 4
+            for seed in range(40):
+                plan = make_world(copy.deepcopy(options), seed=seed).ctr_content_plan
+                tracks = {t["id"]: t for t in plan["tracks"]}
+                legs = [leg for e in plan["entries"] if e["kind"] == content_bosses.CUP_KIND for leg in e["legs"]
+                        if tracks[leg["track_id"]].get("origin") == "custom"]
+                if legs:
+                    break
+            else:
+                self.fail("no seed drew a custom boss cup leg")
+            self.assertTrue(all(tracks[leg["track_id"]]["laps"] == 7 for leg in legs))
+            self.assertEqual({leg["laps"] for leg in legs}, {laps})
+            self.assertTrue(content_plan.validate(plan))
+
+    def test_forged_cup_laps_refuse(self):
+        """A boss cup leg races three laps or one, the same in every leg and
+        the same switch as the ordinary cups (A3-6)."""
+        options = boss_options()
+        options["content_pool"]["bosses"]["cups"] = 2
+        options["content_pool"]["cups"] = dict(count=1)
+        plan = make_world(options, seed=3).ctr_content_plan
+        boss_cups = [e["id"] for e in plan["entries"] if e["kind"] == content_bosses.CUP_KIND]
+        self.assertEqual(len(boss_cups), 2)
+        def legs(p, eid):
+            return next(e for e in p["entries"] if e["id"] == eid)["legs"]
+        def lengthen_cup(p, eid):
+            for leg in legs(p, eid):
+                leg["laps"] = 3
+        def lengthen_ordinary(p):
+            tracks = {t["id"]: t for t in p["tracks"]}
+            for e in p["entries"]:
+                if e["kind"] == "cup":
+                    for leg in e["legs"]:
+                        leg["laps"] = tracks[leg["track_id"]]["laps"]
+        for name, change in (("two laps", lambda p: legs(p, boss_cups[0])[0].__setitem__("laps", 2)),
+                             ("one leg long", lambda p: legs(p, boss_cups[0])[2].__setitem__("laps", 3)),
+                             ("one boss cup long", lambda p: lengthen_cup(p, boss_cups[1])),
+                             ("ordinary cups long", lengthen_ordinary)):
+            forged = copy.deepcopy(plan)
+            change(forged)
+            with self.subTest(name), self.assertRaises(OptionError):
+                content_plan.validate(forged)
 
     def test_no_cups_by_default_and_draws_nothing(self):
         plan = make_world(boss_options()).ctr_content_plan

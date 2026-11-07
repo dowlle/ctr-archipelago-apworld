@@ -39,7 +39,9 @@ his boss race on every leg; a points win completes the garage's encounter
 says. The legs are four different tracks of the garage's certified venue
 pool (the retail venues that carry its attack schedule, and the plan's
 certified custom tracks and Cortex Vortex as for Boss Track Shuffle), three
-laps each. Its check's boost is the strictest of its legs' boss win rules. Venue tracks are plan
+laps each, or one each with `one_lap_cups` (A3-6, ruled 2026-11-06: a boss
+cup follows the same lap setting as other cups; a boss leg's own laps are
+three, so it shortens to max(1, 3 // 2)). Its check's boost is the strictest of its legs' boss win rules. Venue tracks are plan
 tracks; a venue raced nowhere else lists the trophy mode only, like a track
 raced only in cups.
 
@@ -137,6 +139,8 @@ RECORD_KEYS = ("oxide_goal", "bosses_required", "oxide_1_optional", "oxide_final
 CUP_KIND = "boss_cup"
 CUP_MODE = "boss_cup"
 CUP_LEGS = 4
+#: A boss cup leg's laps with `one_lap_cups` (A3-6): the cup rule on LAPS.
+SHORT_LAPS = max(1, LAPS // 2)
 KINDS = (KIND, CUP_KIND)
 MODES = (MODE, CUP_MODE)
 #: garage_requirement_level (2026-09-01 Wayfinder ruling C3a).
@@ -623,8 +627,33 @@ def encounter_rows(record, venues, final_track):
     return rows
 
 
+def cup_leg_laps(shortened):
+    """The laps of every boss cup leg: LAPS, or SHORT_LAPS with `one_lap_cups`."""
+    return SHORT_LAPS if shortened else LAPS
+
+
+def plan_shortened(plan):
+    """The plan-wide `one_lap_cups` switch its cup legs show: True, False, or
+    None when no leg tells. The plan has no envelope key; the legs carry it.
+    An ordinary cup leg tells when its track's laps shorten at all
+    (content_cups.leg_laps); a boss cup leg always tells (LAPS or SHORT_LAPS).
+    Legs that disagree are refused. A leg with other laps is left to the
+    entry checks."""
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    seen = set()
+    for entry in plan["entries"]:
+        for leg in entry.get("legs", ()):
+            full = LAPS if entry.get("kind") == CUP_KIND else tracks[leg["track_id"]]["laps"]
+            short = max(1, full // 2)
+            if full != short and leg["laps"] in (full, short):
+                seen.add(leg["laps"] == short)
+    if len(seen) > 1:
+        error("cup legs shorten their laps in some legs and not in others")
+    return seen.pop() if seen else None
+
+
 def build(record, venues, final_track, rows, gem_term, capability, track_records, garage_reqs, cups=None,
-          opponents=None, mode=None, packages=None):
+          opponents=None, mode=None, packages=None, shortened=False):
     """(encounters, entries, requirements, checks) of a `bosses` record.
 
     `venues` maps ordinary garages to track names, `final_track` is the Final
@@ -637,7 +666,8 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
     and composed kit of each garage (OXIDE_GARAGE for both N. Oxide races,
     job J11); None keeps the retail opponents and their inherited attacks.
     `packages` {package id: descriptor} lets a custom venue's finish rank read
-    its package (measured super turbo pads and the per-package rulings, A2-22)."""
+    its package (measured super turbo pads and the per-package rulings, A2-22).
+    `shortened` is `one_lap_cups`: boss cup legs race SHORT_LAPS (A3-6)."""
     cups = cups or {}
     packages = packages or {}
     encounters, entries, requirements, checks = [], [], [], []
@@ -663,7 +693,8 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
         if cup:
             leg_ids = [track_id_of(leg) for leg in cups[g]]
             entries.append(dict(id=nid, kind=CUP_KIND,
-                                legs=[dict(id=f"{nid}/leg:{n}", track_id=tid, laps=LAPS) for n, tid in enumerate(leg_ids)],
+                                legs=[dict(id=f"{nid}/leg:{n}", track_id=tid, laps=cup_leg_laps(shortened))
+                                      for n, tid in enumerate(leg_ids)],
                                 opponent=opponent_record))
         else:
             leg_ids = [track_id_of(venue)]
@@ -875,7 +906,7 @@ def expected(plan, retail, cortex):
     built = build(record, venues, final, plan["items"]["rows"], gem, plan.get("capability", {}),
                   {tid: known.get(tid, venue) for tid, venue in tracks.items()},
                   {g: own.get(f"boss:{g}") for g in range(4)}, cups, opponents,
-                  plan.get("pad_requirements", {}).get("mode"), packages)
+                  plan.get("pad_requirements", {}).get("mode"), packages, bool(plan_shortened(plan)))
     return built + (tracks,)
 
 

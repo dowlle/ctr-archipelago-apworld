@@ -1824,7 +1824,7 @@ def draw_plan(world, key_estimate=True):
         encounters, boss_entries, boss_requirements, boss_checks = content_bosses.build(
             boss_record, boss_venues, boss_final, world.ctr_content_items.rows, gem_term, capability,
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
-            content_requirements.MODES[unlock_mode], package_by_id)
+            content_requirements.MODES[unlock_mode], package_by_id, bool(world.options.one_lap_cups.value))
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
     checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
     checks.extend(boss_checks)
@@ -3106,13 +3106,8 @@ def restore(world, slot_data):
     world.options.cup_sweep_checks.value = int(any(c["kind"] == content_cups.SWEEP_KIND for c in plan["checks"]))
     world.options.lap_completion_checks.value = int(any(c["kind"] == content_laps.KIND for c in plan["checks"]))
     world.options.cup_only_podium_rungs.value = int(content_race_routes.cup_only_on(plan["checks"]))
-    shortened = None
-    tracks_by_id = {t["id"]: t for t in plan["tracks"]}
-    for entry in plan["entries"]:
-        for leg in entry.get("legs", ()):
-            full = content_cups.base_laps(tracks_by_id[leg["track_id"]])
-            if full != max(1, full // 2):
-                shortened = leg["laps"] != full
+    # Boss cup legs carry it too (A3-6), on their own three laps.
+    shortened = content_bosses.plan_shortened(plan)
     if shortened is not None:
         world.options.one_lap_cups.value = int(shortened)
     # Pool-only packs (#133 PR 4a): the ledger rows above are the items; the
