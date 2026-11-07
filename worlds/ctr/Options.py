@@ -427,6 +427,17 @@ class TrapWeights(OptionDict):
     seconds. `reverse_camera` defaults to 2 and forces the rear view with
     normal steering, for as long as your local Trap Duration setting.
 
+    Seven traps are new in 0.3.0-alpha3. Each lasts as long as your Trap
+    Duration setting, except Stuck Steering (always 7 seconds) and Wumpa Leak
+    (one event):
+    - `always_jumping` (3): the kart hops whenever it touches the ground.
+    - `no_drifting` (3): no hopping and no power sliding.
+    - `rival_surge` (3): the AI racers move 50% faster. Races with AI only.
+    - `mud_season` (3): every surface drives like dirt. Ignore Dirt blocks it.
+    - `limp_mode` (3): your top speed is halved, boosts included.
+    - `stuck_steering` (1): you cannot steer to one side, picked at random.
+    - `wumpa_leak` (4): you lose half of your Wumpa Fruit, rounded down.
+
     `first_person`, `wireframe`, `upside_down`, `mirror_mode`, `demo_camera`
     and `reverse_camera` change the camera or the screen and can be visually
     intense. Set a trap to 0 to turn it off; `upside_down` is 0 by default.
@@ -861,6 +872,25 @@ class PadHintsProgressionOnly(Toggle):
     hinted, and a later approach does not hint them either. Without Pad
     Approach Hints this option does nothing."""
     display_name = "Pad Hints Progression Only"
+
+
+class TrapDisplay(Choice):
+    """Choose how a location holding a trap looks in CTR before you collect
+    it: on item boxes, on warp pad glow and in the Wumpa Shop.
+
+    - **shown** (default): traps look like traps.
+    - **as_progression**: traps look like progression items.
+    - **mixed**: each trap location looks like progression or like filler,
+      picked once per location when the seed is generated.
+
+    Received traps still say their name in the feed. Other games and the
+    Archipelago server still show the item as a trap. It never changes the
+    logic."""
+    display_name = "Trap Display"
+    option_shown = 0
+    option_as_progression = 1
+    option_mixed = 2
+    default = 0
 
 
 class RaceTypeSelector(Choice):
@@ -1315,6 +1345,18 @@ class ContentItemPool(OptionDict):
     item_pool:
       base:
         relics: {sapphire: 12, gold: 6, platinum: 0}
+    ```
+
+    `extra` takes exact counts, not percentages. Extra Trophies and Keys are
+    the same items as the base ones, so requirements are easier to meet. Pads
+    and garages only ask for the base count.
+
+    Example, 4 extra Trophies and 2 extra Keys:
+    ```yaml
+    item_pool:
+      extra:
+        trophies: 4
+        keys: 2
     ```"""
     display_name = "Item Pool"
     default = {}
@@ -1737,6 +1779,7 @@ class ctrAPOptions(PerGameCommonOptions):
     pad_approach_hints: PadApproachHints
     pad_hints_wait_for_spoiler: PadHintsWaitForSpoiler
     pad_hints_progression_only: PadHintsProgressionOnly
+    trap_display: TrapDisplay
     shop_hints_progression_only: ShopHintsProgressionOnly
     race_type_selector: RaceTypeSelector
     tracker_pad_launch: TrackerPadLaunch
@@ -1762,7 +1805,8 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
-                        ProgressiveStartingWumpa, TurboGrant, TiziHelper],
+                        ProgressiveStartingWumpa, TurboGrant, TiziHelper,
+                        TrapDisplay],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,
                              EditableStats, ProgressiveStatsMode],
     "Boost": [ProgressiveBoostMode, ProgressiveBoostBlueFire, LogicDifficulty, ShortcutKnowledge],

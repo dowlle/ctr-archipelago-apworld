@@ -51,7 +51,8 @@ EXPECTED_CLASSES = [
     ("podium", 127, (35015000, 35015100, 35015200, 35026010)),
     ("relic_perfect", 18, (35012400,)),
     ("lettersanity", 54, (35012500,)),
-    ("item_boxes", 270, (35014000,)),
+    # The alpha3 data package (ruled 2026-11-06): Item Box 16 to 50 per track.
+    ("item_boxes", 900, (35014000, 35014300)),
     ("itemsanity", 22, (35016000,)),
     # WIDENED by the approved 2026-08-29 unfreeze: the permanent global
     # code, the 18 retail destination codes behind it, and the custom
@@ -70,8 +71,9 @@ EXPECTED_CLASSES = [
     ("hit_character", 16, (35025000,)),
     # #306 named custom-track blocks: the 0.3.0 id step minted the 82 `mint`
     # entries of registry commit e01959a, 32 names each (offsets 0..16, 20..34);
-    # the third step (2026-10-29) added blocks 85 to 88 from registry commit 9f61917.
-    ("named_track", 86 * 32, tuple(range(35200000, 35218000, 1000))),
+    # the third step (2026-10-29) added blocks 85 to 88 from registry commit 9f61917;
+    # the alpha3 data package (ruled 2026-11-06) added Item Box 16 to 50 (offsets 35..69).
+    ("named_track", 86 * 67, tuple(range(35200000, 35218000, 1000))),
     # The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST), appended
     # after the named blocks. All inert until their feature PRs.
     ("cup_win", 27, (35027000,)),
@@ -151,7 +153,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the three Cortex Vortex pad-track letter items (2026-09-13).
         # + the 0.3.0 id step: five items and 82 x 3 named-block letters.
         # + the third step (2026-10-29): 4 x 3 letters of the LRG2 blocks 85 to 88.
-        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12)
+        # + the alpha3 data package (2026-11-06): seven traps.
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
@@ -159,7 +162,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the 16 Hit Character encounter names (0.2.1 candidate).
         # + the 0.3.0 id step: 3,682 fixed-family names and 82 x 32 named.
         # + the third step (2026-10-29): 4 x 32 for the LRG2 blocks 85 to 88.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125)
+        # + the alpha3 data package (2026-11-06): 18 x 35 retail and 86 x 35 named box names.
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
@@ -256,7 +260,8 @@ class TestNameFreezeInertness(unittest.TestCase):
 
     def test_every_frozen_trap_is_now_in_the_buildable_draw_list(self) -> None:
         """The completed native roster activates every reserved identity."""
-        self.assertEqual(len(TRAP_ITEM_NAMES), 22)  # #455 and #248 activate the minted traps
+        # #455 and #248 activate the minted traps; the alpha3 data package adds seven.
+        self.assertEqual(len(TRAP_ITEM_NAMES), 29)
         self.assertEqual(len(FROZEN_TRAP_ITEM_NAMES), 11)
         self.assertEqual(len(REWORK_TRAP_ITEM_NAMES), 4)
         newly_buildable = (set(FROZEN_TRAP_ITEM_NAMES)
@@ -268,12 +273,14 @@ class TestNameFreezeInertness(unittest.TestCase):
         to its own group later would spend a second bump."""
         world_type = AutoWorldRegister.world_types["Crash Team Racing"]
         trap_group = set(world_type.item_name_groups["Traps"])
-        # The two 0.3.0 traps are minted names without a registry row yet.
+        # Every registered trap, including the 0.3.0 and alpha3 traps.
         self.assertEqual(
             trap_group,
             set(TRAP_ITEM_NAMES) | set(FROZEN_TRAP_ITEM_NAMES)
-            | set(REWORK_TRAP_ITEM_NAMES) | {"Clocked Out", "Reverse Camera"})
-        self.assertEqual(len(trap_group), 22)
+            | set(REWORK_TRAP_ITEM_NAMES) | {"Clocked Out", "Reverse Camera"}
+            | {"Always Jumping", "No Drifting", "Rival Surge", "Mud Season",
+               "Limp Mode", "Stuck Steering", "Wumpa Leak"})
+        self.assertEqual(len(trap_group), 29)
 
 
 class TestNameFreezeCrossSideConsistency(unittest.TestCase):
@@ -319,9 +326,10 @@ class TestNameFreezeCrossSideConsistency(unittest.TestCase):
 
     def test_the_box_ceiling_is_the_full_grid_not_the_authored_set(self) -> None:
         """Ruled 2026-08-10 16:23: freeze 18 x 15, not the 241 authored boxes, so
-        curation and lap-skip additions never need a second bump."""
+        curation and lap-skip additions never need a second bump. The alpha3
+        data package (ruled 2026-11-06) raises the grid to 18 x 50."""
         self.assertEqual(item_boxes.SLOTS_PER_TRACK, 15)
-        self.assertEqual(len(item_boxes.ITEM_BOX_CLASS.all_locations()), 270)
+        self.assertEqual(len(item_boxes.ITEM_BOX_CLASS.all_locations()), 900)
         for track in item_boxes.BOX_TRACKS:
             with self.subTest(track=track):
                 self.assertEqual(
