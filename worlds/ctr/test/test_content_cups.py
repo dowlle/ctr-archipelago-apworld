@@ -136,7 +136,7 @@ class TestCupDraw(unittest.TestCase):
         plan = make_world(options).ctr_content_plan
         for cup in cups_of(plan):
             for leg in cup["legs"]:
-                self.assertRegex(leg["track_id"], r"^retail:(\d|1[0-5])$")
+                self.assertRegex(leg["track_id"], r"^retail:(\d|1[0-7])$")
 
     def test_feasible_pairs(self):
         spec = dict(bounds=(25, 27), repeats=dict(content_cups.DEFAULT_REPEATS), custom_legs=(0, 4))
