@@ -249,7 +249,8 @@ class TestDescribe(SoloTestCase):
                 elif entry["kind"] == "set":
                     # Every row alone, none and all, in checklist order.
                     keys = [row[0] for row in result["overlay"]["checklists"][name]]
-                    for value in [[key] for key in keys] + [[], keys]:
+                    sample = keys if name not in ("start_hints", "start_location_hints") else keys[::max(1, len(keys) // 10)]
+                    for value in [[key] for key in sample] + [[], keys]:
                         with self.subTest(option=name, value=value):
                             self.assertEqual(ctr_solo._canonical(hints[name], value, keys), value)
                     continue
@@ -332,9 +333,11 @@ class TestChecklists(SoloTestCase):
         facts = {o["name"]: o for o in result["options"]}
         shown = {n: g["id"] for g in overlay["groups"] for n in g["options"]}
         checklists = overlay["checklists"]
-        self.assertEqual(set(checklists), set(CHECKLIST_SETS))
+        self.assertEqual(set(checklists), set(CHECKLIST_SETS) | {"start_hints", "start_location_hints"})
         groups = {"crystal_arenas": "cups", "podium_rungs": "checks"}
         for name, rows in checklists.items():
+            if name in ("start_hints", "start_location_hints"):
+                continue  # registry-backed names have separate coverage below
             with self.subTest(option=name):
                 self.assertEqual(shown.get(name), groups.get(name, "bosses"))
                 keys = [row[0] for row in rows]
@@ -515,16 +518,17 @@ game: {GAME}
   boss_track_pool: [Crash Cove, custom/some-track]
   podium_rungs: []
   boss_weapon_pool:
-    random: 1
+    tnt: 1
+    potion: 0
 """)
         result = self.describe("--yaml", path)
-        values, facts = result["values"], {o["name"]: o for o in result["options"]}
+        values = result["values"]
         self.assertEqual(values["crystal_arenas"], ["Rocky Road", "Lab Basement"])
         self.assertEqual(values["boss_track_pool"], ["Crash Cove", "custom/some-track"])
         self.assertEqual(values["podium_rungs"], [])
-        # A weighted value cannot be a checklist: the default shows.
-        order = [r[0] for r in result["overlay"]["checklists"]["boss_weapon_pool"]]
-        self.assertEqual(values["boss_weapon_pool"], [k for k in order if k in facts["boss_weapon_pool"]["default"]])
+        # OptionSet has no weighting: a mapping is an iterable of literal keys.
+        self.assertEqual(values["boss_weapon_pool"], ["tnt", "potion"])
+        self.assertNotIn("boss_weapon_pool", result["unresolved"])
 
 
 class TestTrapWeights(SoloTestCase):
@@ -657,6 +661,156 @@ game: {GAME}
             self.skipTest("this combination has no filler to turn into traps")
         self.assertEqual(last(events)["kind"], "option", last(events))
         self.assertIn("trap_weights", last(events)["options"], last(events))
+
+
+class TestImportedOptions(SoloTestCase):
+    def test_hint_rows_come_from_the_loaded_world(self):
+        events, code = self.call("describe")
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        cls = ctr_solo.world_class()
+        for name, registry in (("start_hints", cls.item_name_to_id),
+                               ("start_location_hints", cls.location_name_to_id)):
+            self.assertEqual(result["overlay"]["checklists"][name], [[n] for n in sorted(registry)])
+            self.assertNotIn(name, result["overlay"]["left_out"])
+
+    def imported_yaml(self):
+        return write_yaml(self.work, "imported.yaml", f"""# Preserve this comment too.
+name: {{ImportedPlayer: 1}}
+game: {GAME}
+description: An imported file
+future_metadata:
+  date: 2026-11-06
+  nested: [one, two]
+{GAME}:
+  death_link: 'off'
+  death_link_send: [follow_death_link]
+  goal_wumpa: 150
+  crystal_challenge_count: {{1: 1}}
+  crystal_arenas: [Rocky Road]
+  trap_fill_percentage: {{0: 1, 5: 2}}
+  start_hints: [Key]
+  start_location_hints: [Crash Cove - Trophy]
+  priority_locations: []
+  future_option: {{nested: [a, b]}}
+""")
+
+    def test_imported_values_and_unsupported_data_survive_edits(self):
+        import yaml
+        path = self.imported_yaml()
+        # Use actual registry names, rather than requiring a seed-specific name.
+        doc = ctr_solo.read_player_yaml(path)
+        location = next(iter(ctr_solo.world_class().location_name_to_id))
+        doc[GAME]["start_location_hints"] = [location]
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        values = last(events)["values"]
+        self.assertEqual(values["goal_wumpa"], 150)
+        self.assertEqual(values["start_hints"], ["Key"])
+        self.assertEqual(values["start_location_hints"], [location])
+        self.assertIn("crystal_challenge_count", last(events)["unresolved"])
+        self.assertIn("trap_fill_percentage", last(events)["unresolved"])
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        paths.ensure()
+        prepared, tmp = ctr_solo.prepare_yaml(paths, path, None,
+                                              ["goal_wumpa=200", 'start_hints=["Trophy"]'], False)
+        expected = ctr_solo.read_player_yaml(path)
+        expected[GAME].update(goal_wumpa=200, start_hints=["Trophy"])
+        self.assertEqual(prepared, expected)
+        self.assertEqual(ctr_solo.read_player_yaml(tmp), expected)
+        self.assertEqual(ctr_solo.read_player_yaml(path), doc)
+
+    def test_untouched_import_is_byte_identical_and_generates_the_same_seed(self):
+        path = self.imported_yaml()
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME]["start_location_hints"] = []
+        ctr_solo.dump_yaml(doc, path)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write("# A comment the options screen must keep.\n")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        paths.ensure()
+        _, prepared = ctr_solo.prepare_yaml(paths, path, None, [], False)
+        with open(path, "rb") as original, open(prepared, "rb") as written:
+            self.assertEqual(original.read(), written.read())
+        # Both sides use the same solo policy. Compare server-visible seed
+        # content, not ZIP timestamps or pickle insertion order.
+        def generate_and_read(source, folder):
+            events, code = run(self.client, "generate", "--yaml", source, "--seed", "2026110618",
+                               solo=folder, home=self.home)
+            self.assertEqual(code, 0, events[-3:])
+            room = os.path.join(folder, "rooms", last(events)["room_id"])
+            archive = next(n for n in os.listdir(room) if n.endswith(".zip"))
+            return ctr_solo.read_multidata(os.path.join(room, archive))
+        self.assertEqual(generate_and_read(path, os.path.join(self.work, "original")),
+                         generate_and_read(prepared, os.path.join(self.work, "untouched")))
+
+    def test_large_hint_selection_uses_a_short_file_argument(self):
+        cls = ctr_solo.world_class()
+        names = sorted(cls.location_name_to_id)[:-1]
+        overrides = os.path.join(self.work, "overrides.json")
+        with open(overrides, "w", encoding="utf-8") as handle:
+            json.dump(["start_location_hints=" + json.dumps(names)], handle)
+        self.assertGreater(os.path.getsize(overrides), 131072)
+        events, code = self.call("generate", "--yaml", self.preset("standard.yaml"),
+                                 "--set-file", overrides, "--seed", "2026110619")
+        self.assertEqual(code, 0, events[-3:])
+        player = os.path.join(self.solo, "rooms", last(events)["room_id"], "player.yaml")
+        self.assertEqual(ctr_solo.read_player_yaml(player)[GAME]["start_location_hints"], names)
+
+    def test_list_form_rolls_defer_guards_but_literal_checklists_do_not(self):
+        path = self.imported_yaml()
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME]["crystal_challenge_count"] = [1]
+        doc[GAME]["start_location_hints"] = []
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        self.assertIn("crystal_challenge_count", result["unresolved"])
+        self.assertNotIn("crystal_arenas", result["unresolved"])
+        self.assertNotIn("start_hints", result["unresolved"])
+        self.assertEqual(result["values"]["crystal_arenas"], ["Rocky Road"])
+        events, code = self.call("validate", "--yaml", path)
+        self.assertEqual(code, 0, events[-3:])
+
+    def test_registered_random_choices_keep_their_own_values(self):
+        import Options
+        cls = ctr_solo.world_class()
+        for name, option in cls.options_dataclass.type_hints.items():
+            if issubclass(option, Options.Choice):
+                for key in option.options:
+                    if key.startswith("random"):
+                        self.assertFalse(ctr_solo._preview_unresolved(name, option, key), (name, key))
+        path = write_yaml(self.work, "random-choices.yaml", f"""name: Choices
+game: {GAME}
+{GAME}:
+  cup_tracks: random_repeats
+  starting_character: random_any
+  warppad_unlock_requirements: random_without_4_keys
+  goal_wumpa: random-range-100-200
+""")
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        for name, value in (("cup_tracks", "random_repeats"), ("starting_character", "random_any"),
+                            ("warppad_unlock_requirements", "random_without_4_keys")):
+            self.assertEqual(result["values"][name], value)
+            self.assertNotIn(name, result["unresolved"])
+        self.assertIn("goal_wumpa", result["unresolved"])
+        # Cup Tracks' documented `random` alias is concrete; Choice's generic
+        # `random` expression for Starting Character remains unresolved.
+        doc = ctr_solo.read_player_yaml(path)
+        doc[GAME].update(cup_tracks="random", starting_character="random")
+        ctr_solo.dump_yaml(doc, path)
+        events, code = self.call("describe", "--yaml", path)
+        self.assertEqual(code, 0, events)
+        result = last(events)
+        self.assertEqual(result["values"]["cup_tracks"], "random_repeats")
+        self.assertNotIn("cup_tracks", result["unresolved"])
+        self.assertIn("starting_character", result["unresolved"])
 
 
 class TestPresets(SoloTestCase):

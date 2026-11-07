@@ -10,7 +10,7 @@
     {"id": "items", "label": "Items and Traps", "options": ["trap_fill_percentage", "trap_weights", "wumpa_bundles", "reserve_top_up", "progressive_starting_wumpa", "turbo_grant", "tizi_helper", "trap_display"]},
     {"id": "racers", "label": "Racers and Stats", "options": ["starting_character", "character_unlocks", "remove_playable_oxide", "starting_stat_class", "penta_stats", "editable_stats", "progressive_stats"]},
     {"id": "boost", "label": "Boost", "options": ["progressive_boost", "progressive_boost_blue_fire", "logic_difficulty", "shortcut_knowledge"]},
-    {"id": "display", "label": "Display", "options": ["warp_pad_item_display", "ap_item_type_colors", "color_boxes_by_item", "spoiler_items", "pad_approach_hints", "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "race_type_selector", "tracker_pad_launch"]}
+    {"id": "display", "label": "Display", "options": ["warp_pad_item_display", "ap_item_type_colors", "color_boxes_by_item", "spoiler_items", "pad_approach_hints", "pad_hints_wait_for_spoiler", "pad_hints_progression_only", "race_type_selector", "tracker_pad_launch", "start_hints", "start_location_hints"]}
   ],
   "rules": [
     {"option": "oxide_1_optional", "visible_when": {"oxide_goal": ["101_percent"]}},
@@ -28,6 +28,8 @@
     {"option": "wumpa_shop_logic_scale", "step": 25}
   ],
   "checklists": {
+    "start_hints": [],
+    "start_location_hints": [],
     "crystal_arenas": [["Rocky Road"], ["Rampage Ruins"], ["Skull Rock"], ["Nitro Court"], ["Parking Lot"], ["The North Bowl"], ["Lab Basement"]],
     "boss_track_pool": [["Crash Cove"], ["Roo's Tubes"], ["Tiger Temple"], ["Coco Park"], ["Mystery Caves"], ["Blizzard Bluff"], ["Sewer Speedway"], ["Dingo Canyon"], ["Papu's Pyramid"], ["Dragon Mines"], ["Polar Pass"], ["Cortex Castle"], ["Tiny Arena"], ["Hot Air Skyway"], ["N. Gin Labs"], ["Oxide Station"], ["Slide Coliseum"], ["Turbo Track"], ["Cortex Vortex"]],
     "boss_character_pool": [["Crash Bandicoot"], ["Coco Bandicoot"], ["Polar"], ["Pura"], ["Neo Cortex"], ["N. Tropy"], ["Ripper Roo"], ["Papu Papu"], ["Komodo Joe"], ["Pinstripe"], ["Dingodile"], ["Tiny Tiger"], ["N. Gin"], ["Fake Crash"], ["Penta Penguin"], ["Nitros Oxide"]],
@@ -61,8 +63,6 @@
     "non_local_items": "Sends items to other players; there are none in solo.",
     "start_inventory": "A dictionary of items. Set it in a YAML.",
     "start_inventory_from_pool": "A dictionary of items. Set it in a YAML.",
-    "start_hints": "A set of item names. Set it in a YAML.",
-    "start_location_hints": "A set of locations. Set it in a YAML.",
     "priority_locations": "A set of locations. Set it in a YAML.",
     "exclude_locations": "A set of locations. Set it in a YAML.",
     "plando_items": "A list of placements. Set it in a YAML."
