@@ -74,6 +74,8 @@ class TestContentWumpaShop(unittest.TestCase):
         self.assertEqual({k: v for k, v in restored.items() if k != "win_logic"},
                          {k: v for k, v in wire.items() if k != "win_logic"})
         shop = {str(c["location"]) for c in plan["checks"] if c["kind"] == content_wumpa.KIND}
+        for key in ("version", "families", "regions", "start"):
+            self.assertEqual(restored["win_logic"][key], wire["win_logic"][key], key)
         self.assertEqual({k: v for k, v in restored["win_logic"]["checks"].items() if k not in shop},
                          {k: v for k, v in wire["win_logic"]["checks"].items() if k not in shop})
         self.assertTrue(shop <= set(restored["win_logic"]["checks"]))

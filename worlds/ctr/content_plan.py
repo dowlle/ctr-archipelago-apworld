@@ -2300,8 +2300,9 @@ def create_regions(world):
                 term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
             term = with_boost(with_letters(term, check), check)
             # Every check is term-backed, so win_logic exports a row for each
-            # (A3-37b). A free non-win keeps Archipelago's default rule object.
-            if term is not None or check["location"] in wins:
+            # (A3-37b). Without Pad Approach Hints a free non-win keeps
+            # Archipelago's default rule object; with it, the rule of main.
+            if term is not None or check["location"] in wins or world.options.pad_approach_hints.value:
                 logic_terms.set_term(location, term or logic_terms.TRUE)
             else:
                 logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, logic_terms.TRUE))
