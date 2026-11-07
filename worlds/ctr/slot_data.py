@@ -17,12 +17,22 @@ SLOT_DATA_SCHEMA = 18
 
 
 def win_logic_block(world) -> Dict[str, object]:
-    """The `win_logic` key, or nothing when another world wrapped a rule."""
+    """The `win_logic` key with a row for every addressed location (A3-37b).
+
+    When another world wrapped a rule, the win-only block of before A3-37b is
+    sent instead, and nothing when that one is wrapped too (the SlotLock
+    fallback, Contract 7m "Invalid or missing block")."""
     from .win_logic import ForeignRuleError, wire_block
+    log = logging.getLogger(__name__)
     try:
         return {"win_logic": wire_block(world)}
     except ForeignRuleError as error:
-        logging.getLogger(__name__).warning(
+        log.warning("%s: win_logic sent without non-win rows, pads keep their"
+                    " open look for those checks: %s", world.player_name, error)
+    try:
+        return {"win_logic": wire_block(world, include_hints=False)}
+    except ForeignRuleError as error:
+        log.warning(
             "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
             world.player_name, error)
         return {}

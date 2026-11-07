@@ -66,7 +66,19 @@ class TestContentWumpaShop(unittest.TestCase):
         state = CollectionState(tracker.multiworld)
         state.collect(tracker.create_event(content_wumpa.INCOME), True)
         self.assertTrue(tracker.multiworld.get_location("N. Sanity Beach Shop: Slot 25", 1).access_rule(state))
-        self.assertEqual(tracker.fill_slot_data(), wire)
+        # A3-37b: shop slots have win_logic rows, and the tracker's follow the
+        # legacy rule it restored. This wire is a new room with the scale
+        # removed, so only its block's shop rows differ; a real legacy room
+        # never carried shop rows.
+        restored = tracker.fill_slot_data()
+        self.assertEqual({k: v for k, v in restored.items() if k != "win_logic"},
+                         {k: v for k, v in wire.items() if k != "win_logic"})
+        shop = {str(c["location"]) for c in plan["checks"] if c["kind"] == content_wumpa.KIND}
+        for key in ("version", "families", "regions", "start"):
+            self.assertEqual(restored["win_logic"][key], wire["win_logic"][key], key)
+        self.assertEqual({k: v for k, v in restored["win_logic"]["checks"].items() if k not in shop},
+                         {k: v for k, v in wire["win_logic"]["checks"].items() if k not in shop})
+        self.assertTrue(shop <= set(restored["win_logic"]["checks"]))
         self.assertEqual(plan["goal"]["op"], "all")
         self.assertEqual(plan["goal"]["terms"][-1], dict(op="wumpa_banked", count=750))
         self.assertEqual(plan["goal"]["terms"][0]["op"], "distinct")

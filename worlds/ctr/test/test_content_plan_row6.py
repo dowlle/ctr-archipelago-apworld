@@ -63,7 +63,10 @@ def compare(world, rng, states=24):
     plan = world.ctr_content_plan
     wins = {loc.address: loc for loc in mw.get_locations(PLAYER)
             if loc.address in content_plan.win_kinds(plan)}
-    assert set(map(int, block["checks"])) == set(wins)
+    # A3-37b: every addressed location has a row, the non-wins as kind hint.
+    addressed = {loc.address: loc for loc in mw.get_locations(PLAYER) if loc.address is not None}
+    assert set(map(int, block["checks"])) == set(addressed)
+    assert all(block["checks"][str(code)]["kind"] == "hint" for code in set(addressed) - set(wins))
     items = [(it, 1) for it in mw.itempool if it.player == PLAYER]
     items += [(loc.item, int(loc.address)) for loc in mw.get_locations() if loc.item is not None
               and loc.item.player == PLAYER and loc.address is not None]
@@ -89,7 +92,7 @@ def compare(world, rng, states=24):
             state.stale[PLAYER] = True
         received = _received(start + [(int(it.code), loc, it.flags) for it, loc in chosen if it.code is not None])
         ev = WireEvaluator(block, wire_options(world, plan), received, len(won), item_ids)
-        for code, loc in wins.items():
+        for code, loc in addressed.items():
             if loc.can_reach(state) != ev.in_logic(code):
                 bad.append((loc.name, n, loc.can_reach(state)))
     return bad
@@ -156,7 +159,7 @@ class TestPadClient(unittest.TestCase):
 class TestPlanWinLogic(unittest.TestCase):
     def test_the_room_carries_the_block(self):
         wire = fill(make_world(client_options(), seed=2))
-        self.assertEqual(wire["win_logic"]["version"], 1)
+        self.assertEqual(wire["win_logic"]["version"], 2)
         self.assertTrue(wire["win_logic"]["checks"])
 
     def test_every_win_kind_is_exported(self):
@@ -175,6 +178,9 @@ class TestPlanWinLogic(unittest.TestCase):
                         self.assertNotIn("win_logic", str(refused))
                         continue
                     self.assertEqual(compare(world, random.Random(seed)), [])
-                    self.assertLess(wire_size(wire_block(world)), 32 * 1024)
+                    # The 32 KiB budget is version 1's, the win-only graph;
+                    # the complete graph is bounded by native's tables.
+                    self.assertLess(wire_size(wire_block(world, include_hints=False)), 32 * 1024)
+                    self.assertLessEqual(len(wire_block(world)["checks"]), 4096)
                     compared += 1
             self.assertGreater(compared, 0, name)

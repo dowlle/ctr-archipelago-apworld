@@ -372,10 +372,14 @@ class Reached(Term):
         return lambda state, placed=self.placed, code=self.code: placed[code].can_reach(state)
 
     def wire(self, enc):
-        term = term_of(self.placed[self.code])
+        target = self.placed[self.code]
+        term = term_of(target)
         if term is None:
-            from .win_logic import WinLogicExportError
-            raise WinLogicExportError(f"CTR win_logic: pad {self.pad_id} proof {self.code} has no term-backed rule")
+            # A rule another world replaced after set_rules is a foreign
+            # wrapper (ForeignRuleError), so the exporter can fall back.
+            from .win_logic import _unexportable
+            raise _unexportable(enc.world, target,
+                                f"CTR win_logic: pad {self.pad_id} proof {self.code} has no term-backed rule")
         return term.wire(enc)
 
 
