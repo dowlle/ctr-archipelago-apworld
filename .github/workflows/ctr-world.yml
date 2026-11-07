@@ -292,6 +292,10 @@ jobs:
             cp ../world-src/.github/fuzz/check-ut-custom-tracks-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [ "$CHECK_META" = "crate-exclusions" ]; then
+            cp ../world-src/.github/fuzz/crate-exclusions-meta.yaml ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           if [ "$CHECK_META" = "content-plan" ]; then
             cp ../world-src/.github/fuzz/content-plan-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)

@@ -56,9 +56,11 @@ registry rows (`boxes` per retail row, or the spot numbers) and refuses any
 difference; like the boost rank, it reads `stats` and `spot` as given (range
 checks only).
 """
+import json
+
 from Options import OptionError
 
-from . import box_spots, named_tracks
+from . import box_spots, named_tracks, crate_exclusions
 from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
@@ -95,6 +97,9 @@ def add_spot_sets(record, tracks, package_by_id, seed, player):
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
+    excluded = crate_exclusions.records(tracks, package_by_id, {s["track_id"] for s in sets})
+    if excluded:
+        record[crate_exclusions.KEY] = excluded
     return record
 
 
@@ -107,6 +112,12 @@ def keep_spot_sets(record, track_ids):
     """Drop the spot sets of tracks that hold no pad of the plan."""
     if record and SPOT_KEY in record:
         record[SPOT_KEY] = [s for s in record[SPOT_KEY] if s["track_id"] in track_ids]
+    if record and crate_exclusions.KEY in record:
+        kept = [s for s in record[crate_exclusions.KEY] if s["track_id"] in track_ids]
+        if kept:
+            record[crate_exclusions.KEY] = kept
+        else:
+            del record[crate_exclusions.KEY]
     return record
 
 
@@ -114,13 +125,17 @@ def check_settings(record, capability=None):
     """Shape and values of a plan's `item_boxes` record. With the capability
     record (#133 PR 4c) present, the two Shortcut Knowledge tiers agree. The
     spot sets are checked against their tracks by check_spot_sets."""
-    if not isinstance(record, dict) or set(record) - {SPOT_KEY} != set(KEYS):
+    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY} != set(KEYS):
         error("item_boxes must be a mapping of shortcut_knowledge and, with box spots, spot_sets.")
     tier = record["shortcut_knowledge"]
     if type(tier) is not int or tier not in (0, 1, 2):
         error("item_boxes.shortcut_knowledge must be 0, 1 or 2.")
     if capability and capability.get("shortcut_knowledge") != tier:
         error("item_boxes.shortcut_knowledge disagrees with capability.shortcut_knowledge.")
+    if crate_exclusions.KEY in record:
+        excluded = record[crate_exclusions.KEY]
+        if not isinstance(excluded, list) or not excluded:
+            error("item_boxes.crate_exclusions must be a nonempty list.")
     if SPOT_KEY in record:
         sets = record[SPOT_KEY]
         if (not isinstance(sets, list) or not sets or any(not isinstance(s, dict) or "track_id" not in s for s in sets)
@@ -132,7 +147,15 @@ def check_settings(record, capability=None):
 def check_spot_sets(record, tracks, packages):
     """A plan's spot sets: exactly the pad tracks with a spot file of this
     build, each a valid pick from that file."""
-    if not record or SPOT_KEY not in record:
+    if not record:
+        return
+    expected = crate_exclusions.records(tracks, packages, spot_sets(record))
+    # Validation receives pad tracks in set order. Compare complete canonical
+    # JSON records without relying on that order, retaining exact token types.
+    canonical = lambda rows: sorted(json.dumps(row, sort_keys=True) for row in rows)
+    if canonical(record.get(crate_exclusions.KEY, [])) != canonical(expected):
+        error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
+    if SPOT_KEY not in record:
         return
     sets = spot_sets(record)
     by_id = {t["id"]: t for t in tracks}
@@ -183,7 +206,7 @@ def crate_count(package):
     """The package's stated weapon crate count, or None when it states none."""
     if not package:
         return None
-    return package.get("capabilities", {}).get("weapon_crates")
+    return crate_exclusions.count(package)
 
 
 def seat_indices(crates, slots=SLOTS_PER_TRACK):

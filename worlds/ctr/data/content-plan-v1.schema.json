@@ -85,6 +85,7 @@
           "capability_packs_v1",
           "global_checks_v1",
           "item_boxes_v1",
+          "crate_exclusions_v1",
           "cup_entries_v1",
           "boss_encounters_v1",
           "gem_cups_v1",
@@ -103,7 +104,7 @@
           "box_spots_v1"
         ]
       },
-      "maxItems": 29,
+      "maxItems": 30,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -1827,6 +1828,30 @@
       "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none. With hand-placed box spots (A3-14, feature box_spots_v1), spot_sets names each pad track that has a spot file of this apworld: the file digest, the eligible pool and the picked numbers; those tracks take their box checks from the picked spots instead.",
       "type": "object",
       "properties": {
+        "crate_exclusions": {
+          "description": "Reviewed fallback crate exclusions from data/crate_exclusions.json, only for affected pad tracks without spots. Requires crate_exclusions_v1.",
+          "type": "array", "minItems": 1, "maxItems": 160,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["track_id", "lev_sha256", "crates"],
+            "properties": {
+              "track_id": {"type": "string"},
+              "lev_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "crates": {
+                "type": "array", "minItems": 1, "maxItems": 16,
+                "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["ordinal", "pos"],
+                  "properties": {
+                    "ordinal": {"type": "integer", "minimum": 1, "maximum": 65536},
+                    "pos": {"type": "array", "minItems": 3, "maxItems": 3,
+                      "items": {"type": "integer", "minimum": -32768, "maximum": 32767}}
+                  }
+                }
+              }
+            }
+          }
+        },
         "shortcut_knowledge": {
           "type": "integer",
           "minimum": 0,
