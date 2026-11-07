@@ -27,7 +27,8 @@ NORTH_POLE = "17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c"
 
 def north_pole(crates=29):
     p = ancient(crates, NORTH_POLE)
-    p.update(content_id="north-pole", display_name="North Pole", id="package/north-pole/1.1.0")
+    p.update(content_id="north-pole", display_name="North Pole", id="package/north-pole/1.1.0",
+             uuid="11111111-2222-4333-8444-555555555536")
     return p
 
 
@@ -69,6 +70,30 @@ class TestCrateExclusions(unittest.TestCase):
         for n in range(1, 16):
             self.assertEqual(content_item_boxes.box_terms(track, n, plan["capability"], p),
                              content_item_boxes.box_terms(track, n, plan["capability"], other))
+
+    def test_mixed_room_from_before_north_pole_restores(self):
+        """A room generated when only Ancient Lake was listed carries one row."""
+        ancient_only = {d: crate_exclusions.EXCLUSIONS[d] for d in ANCIENT_LAKE}
+        custom = [ancient(17, ANCIENT_LAKE[1]), north_pole()]
+        with patch.dict(crate_exclusions.EXCLUSIONS, ancient_only, clear=True):
+            old = first_world(box_options(custom=custom))
+            wire = json.loads(json.dumps(old.fill_slot_data()))
+        rows = wire["content_plan"]["item_boxes"][crate_exclusions.KEY]
+        self.assertEqual([r["lev_sha256"] for r in rows], [ANCIENT_LAKE[1]])
+        restored = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        north = next(t["id"] for t in wire["content_plan"]["tracks"] if t.get("package_id") == "package/north-pole/1.1.0")
+        lake = next(t["id"] for t in wire["content_plan"]["tracks"] if t.get("package_id") == custom[0]["id"])
+        plan = restored.ctr_content_plan
+        self.assertEqual(content_item_boxes.crate_count(custom[1], plan["item_boxes"], north), 29)
+        self.assertEqual(content_item_boxes.crate_count(custom[0], plan["item_boxes"], lake), 16)
+        # A fresh room carries both rows, and a carried row must still match.
+        fresh = first_world(box_options(custom=custom)).ctr_content_plan
+        self.assertEqual(len(fresh["item_boxes"][crate_exclusions.KEY]), 2)
+        bad = copy.deepcopy(fresh)
+        bad["item_boxes"][crate_exclusions.KEY][1]["crates"][0]["ordinal"] = 2
+        with self.assertRaises(OptionError):
+            content_plan.validate(bad)
 
     def test_north_pole_restores_legacy_and_current_seating(self):
         for count in (3, 29):

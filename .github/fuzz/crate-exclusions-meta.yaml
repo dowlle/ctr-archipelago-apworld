@@ -22,7 +22,7 @@ Crash Team Racing:
       display_name: North Pole
       author: Fuzz fixture
       laps: 3
-      capabilities: {time_trial: true, arcade: false, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: false, weapon_crates: 29, checkpoints: 151, ai_nav: true}
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 29, checkpoints: 151, ai_nav: true}
       files:
         - {role: lev, sha256: 17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c, bytes: 1636116, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: fd5741d2b23843b1a868fc85799f5331c407b93c6f05e1529ae5e2f075bd67ea, bytes: 458808, format: ctr-vrm, format_version: 1}

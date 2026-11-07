@@ -150,11 +150,16 @@ def check_spot_sets(record, tracks, packages):
     if not record:
         return
     if crate_exclusions.KEY in record:
-        expected = crate_exclusions.records(tracks, packages, spot_sets(record))
-        # Validation receives pad tracks in set order. Compare complete JSON
-        # records without relying on that order, retaining exact token types.
-        canonical = lambda rows: sorted(json.dumps(row, sort_keys=True) for row in rows)
-        if canonical(record[crate_exclusions.KEY]) != canonical(expected):
+        expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, spot_sets(record))}
+        # A room generated before a later catalog entry carries only the rows
+        # of its day: each carried row must equal this build's row for its
+        # track, but a track without a carried row keeps its original seating.
+        # Compare complete JSON records, retaining exact token types.
+        canonical = lambda row: json.dumps(row, sort_keys=True)
+        carried = [row.get("track_id") if isinstance(row, dict) else None for row in record[crate_exclusions.KEY]]
+        if len(set(carried)) != len(carried) or any(
+                track_id not in expected or canonical(row) != canonical(expected[track_id])
+                for track_id, row in zip(carried, record[crate_exclusions.KEY])):
             error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
     if SPOT_KEY not in record:
         return
