@@ -1,0 +1,22 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 10, "name": "Cortex Castle"},
+  "spots": [
+    {"number": 1, "pos": [-7586, 1, 10787], "rot_y": 3643, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-3276, 1535, 2909], "rot_y": 681, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-2776, 1558, -1550], "rot_y": 1438, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [3430, 2365, -4859], "rot_y": 793, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [10048, 3400, -8140], "rot_y": 2958, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [1049, 2687, -8842], "rot_y": 3585, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-128, 2304, -9187], "rot_y": 3916, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-1102, 1919, -8624], "rot_y": 554, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-1606, 1535, -7542], "rot_y": 1206, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-6627, 2226, -3685], "rot_y": 3985, "needs": "boost", "source": "builtin"},
+    {"number": 11, "pos": [-2753, 3387, -3], "rot_y": 1073, "needs": "usf", "source": "builtin"},
+    {"number": 12, "pos": [4321, 1, -393], "rot_y": 795, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 13, "pos": [4524, 1, 399], "rot_y": 2646, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 14, "pos": [-1390, 1, 5469], "rot_y": 3023, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

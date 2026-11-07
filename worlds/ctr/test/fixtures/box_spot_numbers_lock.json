@@ -1,0 +1,23 @@
+{
+  "comment": "Box spot number lock (A3-14). Append only: a number listed here never changes track, is never reused, and never disappears from its file unless it is listed under that file's retired. Keys are retail:<LevelID> and custom:<track_key>.",
+  "tracks": {
+    "retail:0": {"name": "Dingo Canyon", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:1": {"name": "Dragon Mines", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], "retired": []},
+    "retail:2": {"name": "Blizzard Bluff", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "retired": []},
+    "retail:3": {"name": "Crash Cove", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "retired": []},
+    "retail:4": {"name": "Tiger Temple", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "retired": []},
+    "retail:5": {"name": "Papu's Pyramid", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "retired": []},
+    "retail:6": {"name": "Roo's Tubes", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "retired": []},
+    "retail:7": {"name": "Hot Air Skyway", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:8": {"name": "Sewer Speedway", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:9": {"name": "Mystery Caves", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], "retired": []},
+    "retail:10": {"name": "Cortex Castle", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "retired": []},
+    "retail:11": {"name": "N. Gin Labs", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:12": {"name": "Polar Pass", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:13": {"name": "Oxide Station", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "retired": []},
+    "retail:14": {"name": "Coco Park", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "retired": []},
+    "retail:15": {"name": "Tiny Arena", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:16": {"name": "Slide Coliseum", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "retail:17": {"name": "Turbo Track", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 8, "name": "Sewer Speedway"},
+  "spots": [
+    {"number": 1, "pos": [-3444, 604, -9141], "rot_y": 1451, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-2753, 895, -23808], "rot_y": 1956, "needs": "boost", "shortcut": "medium", "source": "builtin"},
+    {"number": 3, "pos": [4428, 801, -26880], "rot_y": 160, "needs": "boost", "shortcut": "medium", "source": "builtin"},
+    {"number": 4, "pos": [7305, 523, -18424], "rot_y": 86, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [7817, -719, -13310], "rot_y": 2727, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [1099, -748, -9709], "rot_y": 4170, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [2894, -392, -5986], "rot_y": 2701, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [2035, 125, 29], "rot_y": 1000, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-5499, -739, -8139], "rot_y": 925, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-2900, -56, -10902], "rot_y": 1892, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [1299, 1, -15639], "rot_y": 4031, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [-1251, 1, -26492], "rot_y": 86, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [2786, 1, -24040], "rot_y": 1243, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [2998, 1, -26416], "rot_y": 2060, "needs": "none", "source": "builtin"},
+    {"number": 15, "pos": [7288, -763, -17128], "rot_y": 547, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

@@ -1,0 +1,26 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 3, "name": "Crash Cove"},
+  "spots": [
+    {"number": 1, "pos": [-9378, 17, -5718], "rot_y": 4011, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-11797, 82, -579], "rot_y": 691, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-12974, 15, -2308], "rot_y": 123, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-6191, 589, 11273], "rot_y": 2015, "needs": "boost", "source": "builtin"},
+    {"number": 5, "pos": [13877, 129, 1908], "rot_y": 1490, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [14384, 956, -3142], "rot_y": 2360, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [12873, 1556, -5318], "rot_y": 2114, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [11175, -20, -7563], "rot_y": 2815, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-3542, 599, 3423], "rot_y": 1963, "needs": "boost", "source": "builtin"},
+    {"number": 10, "pos": [-5503, 575, 5515], "rot_y": 1431, "needs": "boost", "source": "builtin"},
+    {"number": 16, "pos": [-768, 747, -4751], "rot_y": 2928, "needs": "none", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 17, "pos": [-7680, 64, -5393], "rot_y": 3271, "needs": "none", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 18, "pos": [384, 528, 4608], "rot_y": 1024, "needs": "boost", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 19, "pos": [7417, 157, 3124], "rot_y": 1354, "needs": "none", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 20, "pos": [11939, 128, -2688], "rot_y": 2038, "needs": "usf", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 21, "pos": [6528, 338, -6260], "rot_y": 3286, "needs": "none", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 22, "pos": [-4608, 256, -5437], "rot_y": 3046, "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"},
+    {"number": 23, "pos": [-11106, 89, -4184], "rot_y": 3892, "needs": "none", "source": "community", "credit": "test fixture", "note": "A3-14 test fixture from a LEV restart point; not shipped"}
+  ],
+  "retired": []
+}

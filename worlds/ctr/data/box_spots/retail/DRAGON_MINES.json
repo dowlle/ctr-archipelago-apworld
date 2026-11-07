@@ -1,0 +1,21 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 1, "name": "Dragon Mines"},
+  "spots": [
+    {"number": 1, "pos": [8072, -70, -5388], "rot_y": 2215, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [2086, -382, -7216], "rot_y": 552, "needs": "none", "shortcut": "medium", "source": "builtin"},
+    {"number": 3, "pos": [-2421, 10, -11986], "rot_y": 3126, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-5246, -158, -8834], "rot_y": 3887, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-3280, -32, -9752], "rot_y": 2343, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-3932, -6, -4604], "rot_y": 4048, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-5285, -150, -4967], "rot_y": 2268, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-5373, 111, -2243], "rot_y": 3525, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-5918, 1403, 448], "rot_y": 2612, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-4245, 1633, 826], "rot_y": 368, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [-1222, 1522, 3392], "rot_y": 1126, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [3397, -43, -3378], "rot_y": 441, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [6037, -49, -5400], "rot_y": 1950, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

@@ -99,7 +99,8 @@
           "wumpa_shop_key_tiers_v1",
           "wumpa_goal_v1",
           "pad_client_v1",
-          "lap_checks_v1"
+          "lap_checks_v1",
+          "box_spots_v1"
         ]
       },
       "maxItems": 29,
@@ -1561,6 +1562,10 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 100000
+        },
+        "spot": {
+          "description": "Hand-placed box spots (A3-14): on an Item Box check from a spot file, the spot's permanent number and where the client stands the box (LEV world units, engine angle). content_item_boxes decides it; content_plan.validate recomputes it.",
+          "$ref": "#/$defs/BoxSpot"
         }
       },
       "required": [
@@ -1819,13 +1824,22 @@
       "additionalProperties": false
     },
     "ItemBoxes": {
-      "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none.",
+      "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none. With hand-placed box spots (A3-14, feature box_spots_v1), spot_sets names each pad track that has a spot file of this apworld: the file digest, the eligible pool and the picked numbers; those tracks take their box checks from the picked spots instead.",
       "type": "object",
       "properties": {
         "shortcut_knowledge": {
           "type": "integer",
           "minimum": 0,
           "maximum": 2
+        },
+        "spot_sets": {
+          "description": "Hand-placed box spots (A3-14): one spot set per pad track that has a spot file, in plan track order. box_spots.py decides it; content_plan.validate checks it against the shipped files.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SpotSet"
+          },
+          "minItems": 1,
+          "maxItems": 160
         }
       },
       "required": [
@@ -2033,6 +2047,80 @@
           ]
         }
       }
+    },
+    "SpotSet": {
+      "description": "One track's box spots (A3-14): the shipped file's SHA-256, the custom LEV pin it applies to (custom tracks only), the eligible spot count at the seed's Shortcut Knowledge tier, and the picked spot numbers, sorted (all of them when 15 or fewer).",
+      "type": "object",
+      "properties": {
+        "track_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "file_sha256": {
+          "type": "string",
+          "pattern": "[0-9a-f]{64}",
+          "maxLength": 64
+        },
+        "lev_sha256": {
+          "type": "string",
+          "pattern": "[0-9a-f]{64}",
+          "maxLength": 64
+        },
+        "pool": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "picked": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "maxItems": 15,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "track_id",
+        "file_sha256",
+        "pool",
+        "picked"
+      ],
+      "additionalProperties": false
+    },
+    "BoxSpot": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "pos": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rot_y": {
+          "type": "integer",
+          "minimum": -32768,
+          "maximum": 32767
+        }
+      },
+      "required": [
+        "number",
+        "pos",
+        "rot_y"
+      ],
+      "additionalProperties": false
     }
   }
 }

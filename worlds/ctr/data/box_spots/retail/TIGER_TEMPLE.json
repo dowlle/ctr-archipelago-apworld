@@ -1,0 +1,18 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 4, "name": "Tiger Temple"},
+  "spots": [
+    {"number": 1, "pos": [-12700, -920, -3009], "rot_y": 3009, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-8501, -64, 1874], "rot_y": 986, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [2413, -52, 203], "rot_y": 724, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [4177, -80, 563], "rot_y": 419, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [14181, -313, 5385], "rot_y": 1644, "needs": "none", "shortcut": "medium", "door": "tiger_temple", "source": "builtin"},
+    {"number": 6, "pos": [14428, -761, 5299], "rot_y": 2190, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [11390, -1067, 9255], "rot_y": 2785, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [7810, 1, -632], "rot_y": 3120, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [1957, -82, -946], "rot_y": 2994, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-8723, -606, -2196], "rot_y": 3857, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}
