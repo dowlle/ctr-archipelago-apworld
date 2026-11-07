@@ -2186,7 +2186,13 @@ def create_regions(world):
         arm = (content_capability.weapon_arm(track, check["kind"], check["routes"][0]["award"], plan["capability"],
                                              package_by_id.get(track.get("package_id")))
                if weapons and track is not None and need == 1 else None)
-        gate = logic_terms.Cap(world, need, racer) if not stat_mins else logic_terms.StatCap(world, need, racer)
+        gate = (logic_terms.Cap(world, need, racer) if not stat_mins else logic_terms.StatCap(world, need, racer)
+                if world.options.pad_approach_hints.value else logic_terms.SerializedRule(
+            # A3-37b: the option-off runtime callable stays exactly as it was;
+            # StatCap supplies the equivalent wire term.
+            lambda state, need=need, racer=racer, stat_mins=stat_mins: gate_satisfied(
+                world, state, player, boost_min=need, stat_mins=stat_mins, required_character=racer),
+            logic_terms.StatCap(world, need, racer)))
         if arm is not None:
             gate = logic_terms.Or(gate, logic_terms.Families(USEFUL_WEAPON_FAMILIES, arm[1], player)
                                   if arm[0] == "families" else logic_terms.HasAny(arm[1], player))

@@ -27,6 +27,17 @@ def _resolved(block):
             for code, row in block["checks"].items()}
 
 
+def _nodes(block):
+    """Term nodes over every region and rule: an upper bound of native's
+    node table, which shares nothing between terms."""
+    def count(term):
+        if isinstance(term, list) and term[0] in ("all", "any"):
+            return 1 + sum(count(child) for child in term[1:])
+        return 1
+    return (sum(count(region) for region in block["regions"])
+            + sum(count(row["rule"]) for row in block["checks"].values()))
+
+
 def _option_sets():
     yield "default", pack_options()
     yield "families", pack_options(podium_rungs=["held_1st", "finish_any"], podium_placement_checks=True,
@@ -141,6 +152,7 @@ class TestWinLogicEveryLocation(unittest.TestCase):
             with self.subTest(options=label):
                 self.assertLessEqual(len(block["checks"]), 4096)
                 self.assertLessEqual(len(block["regions"]), 1024)
+                self.assertLessEqual(_nodes(block), 16384)
 
 
 if __name__ == "__main__":
