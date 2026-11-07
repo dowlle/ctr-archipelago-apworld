@@ -405,8 +405,8 @@ def tiger_temple_door(world):
     Itemsanity on, picking it up needs one of the door-opener weapons
     (Rules.add_lettersanity_rules, item_boxes.TIGER_TEMPLE_DOOR_OPENERS): on its
     Letter R check, and on its CTR Token Challenge unless Lettersanity 2 left the
-    R undrawn. Item Box 5 sits behind the same door (item_boxes.BOX_RULES,
-    #133 PR 4e) and takes the same term. Applies to the retail Tiger Temple
+    R undrawn. Item Box 5 sits behind the same door (its spot's `door` field,
+    #133 PR 4e, A3-14) and takes the same term. Applies to the retail Tiger Temple
     only."""
     plan = world.ctr_content_plan
     if not plan.get("global_checks", {}).get("itemsanity"):
@@ -422,9 +422,12 @@ def tiger_temple_door(world):
         names.append(letter_r)
     if CTR_LOCATION_IDS[token] in codes and (mode != 2 or CTR_LOCATION_IDS[letter_r] in codes):
         names.append(token)
-    door_box = "Tiger Temple: Item Box 5"
-    if CTR_LOCATION_IDS[door_box] in codes:
-        names.append(door_box)
+    # The boxes behind the door are the spots marked `door` (A3-14).
+    from .item_boxes import TIGER_TEMPLE_DOOR_BOXES
+    for track, number in TIGER_TEMPLE_DOOR_BOXES:
+        door_box = f"{track}: Item Box {number}"
+        if CTR_LOCATION_IDS.get(door_box) in codes:
+            names.append(door_box)
     for name in names:
         location = world.multiworld.get_location(name, player)
         logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))

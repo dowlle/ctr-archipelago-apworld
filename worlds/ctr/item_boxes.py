@@ -49,11 +49,17 @@ AND interleaving-aware slot numbers) before this build. Placement truth:
 slots the same way; `placement_counts` on the wire is the desync guard.
 """
 
-from . import destinations
+from . import box_spots, destinations
 from .location_class import LocationClass
 
 # Additive block for the 270 item-box checks, stride 15 per track.
 ITEM_BOX_CODE_BASE = 35014000
+#: The alpha3 data package: Item Box 16 to 50 per track, stride 35, in
+#: BOX_TRACKS order (35014300 to 35014929), so a track has 50 permanent box
+#: numbers (ruled 2026-11-06).
+SPOT_CODE_BASE = 35014300
+SPOT_NUMBERS_PER_TRACK = 50
+SPOT_EXTRA_PER_TRACK = SPOT_NUMBERS_PER_TRACK - 15
 
 #: Per-track slot ceiling. The curation model's "roughly 15 candidate slots per
 #: track", taken as the hard naming ceiling per the 16:23 ruling. Frozen: it is
@@ -73,109 +79,49 @@ BOX_TRACKS = destinations.tracks_with_suffix(": Sapphire Time Trial")
 #: table (which reads data/warp_pad_ids.json, the single LevelID source).
 TRACK_LEVEL_IDS = destinations.level_ids_for(BOX_TRACKS)
 
-#: Authored placements per track (FINAL 241 file; re-verified 2026-08-11).
-#: Slots placed+1..15 stay inert this curation generation.
-PLACED_COUNTS = {
-    "Dingo Canyon": 15, "Dragon Mines": 13, "Blizzard Bluff": 14,
-    "Crash Cove": 10, "Tiger Temple": 10, "Papu's Pyramid": 12,
-    "Roo's Tubes": 11, "Hot Air Skyway": 15, "Sewer Speedway": 15,
-    "Mystery Caves": 13, "Cortex Castle": 14, "N. Gin Labs": 15,
-    "Polar Pass": 15, "Oxide Station": 14, "Coco Park": 10,
-    "Tiny Arena": 15, "Slide Coliseum": 15, "Turbo Track": 15,
-}
-destinations.check_keys(PLACED_COUNTS, BOX_TRACKS, "item_boxes.PLACED_COUNTS")
-assert sum(PLACED_COUNTS.values()) == 241
-
 #: `shortcut_knowledge` tiers (Choice values).
 SK_EASY, SK_MEDIUM, SK_HARD = 0, 1, 2
 
-#: Slots REMOVED below a knowledge tier, keyed (track, slot) -> minimum tier
-#: that creates the slot. easy removes all 12 (both respawn boxes ruled medium,
-#: 2026-08-10 15:00); medium additionally removes the 5 hard-tier slots (ruled
-#: 08-10 19:53: a hard slot left in a medium seed would be unreachable).
-SK_REQUIRED_TIER = {
-    ("Tiger Temple", 5): SK_MEDIUM,
-    ("Coco Park", 7): SK_MEDIUM,        # respawn box, ruled medium
-    ("Dragon Mines", 2): SK_MEDIUM,     # respawn box, ruled medium
-    ("Sewer Speedway", 2): SK_MEDIUM,
-    ("Sewer Speedway", 3): SK_MEDIUM,
-    ("Papu's Pyramid", 6): SK_MEDIUM,
-    ("Papu's Pyramid", 12): SK_MEDIUM,
-    ("Papu's Pyramid", 7): SK_HARD,
-    ("Papu's Pyramid", 10): SK_HARD,
-    ("Polar Pass", 9): SK_HARD,         # ruled hard TIER (ruled 08-10 15:07)
-    ("Hot Air Skyway", 8): SK_HARD,
-    ("Oxide Station", 6): SK_HARD,
-}
+# Hand-placed box spots (A3-14, ruled 2026-11-06): the per-box tables below are
+# no longer literals. They are derived from the 18 built-in retail spot files
+# (data/box_spots/retail, box_spots.py), which carry the same 241 boxes, numbers
+# and logic; test/fixtures/retail_box_tables.json keeps the old literals and the
+# conversion test rebuilds them from the files.
 
-#: Item-term rules for gated slots, keyed (track, slot) -> (boost_min, stats).
-#: `boost_min` is the required received `Progressive Boost` count (0 = no boost
-#: term); `stats` = True requires one received copy of EACH stat chain (the
-#: hard-tier general rule). The `shortcut_knowledge` term is CREATION-side
-#: (SK_REQUIRED_TIER above), never a state term: a slot that exists in the seed
-#: already satisfies its knowledge tier. Every term is vacuous while the option
-#: that creates its items is off (spec 2.2) -- see Rules.add_item_box_rules.
-#: The Tiger Temple door's itemsanity-conditional weapon set is special-cased
-#: there, not here.
+#: Built-in placements per track (the 2026-08-10 FINAL 241 file). A track's
+#: community spots, when its file has any, are numbered from 16.
+PLACED_COUNTS = dict(box_spots.RETAIL_PLACED)
+destinations.check_keys(PLACED_COUNTS, BOX_TRACKS, "item_boxes.PLACED_COUNTS")
+assert sum(PLACED_COUNTS.values()) == 241
+
+#: (track, number) -> minimum `shortcut_knowledge` tier that creates the box
+#: (the spot's `shortcut` field). easy removes 12 built-in boxes (both respawn
+#: boxes ruled medium, 2026-08-10 15:00); medium additionally removes the 5
+#: hard-tier boxes (ruled 08-10 19:53: a hard box left in a medium seed would be
+#: unreachable).
+SK_REQUIRED_TIER = dict(box_spots.RETAIL_TIERS)
+
+#: Item-term rules for gated boxes, (track, number) -> (boost_min, stats).
+#: `boost_min` is the spot's `needs` as a received `Progressive Boost` count
+#: (0 = no boost term); `stats` = True (a hard-shortcut spot) requires one
+#: received copy of EACH stat chain (the hard-tier general rule). The
+#: `shortcut_knowledge` term is CREATION-side (SK_REQUIRED_TIER above), never a
+#: state term. Every term is vacuous while the option that creates its items is
+#: off (spec 2.2). The Tiger Temple door's itemsanity-conditional weapon set is
+#: the spot's `door` field (TIGER_TEMPLE_DOOR_BOXES).
 #:
-#: ⚠ The three UNCAPTURED Hot Air Skyway slots (4, 6, 7) carry the ruled
-#: conservative `Progressive Boost >= 2` DEFAULT (re-arm amendment + 08-10
-#: 19:53 ruling), pending an in-game marking pass with exact evidence --
-#: over-restriction cannot create an unbeatable seed, free-reach could.
-BOX_RULES = {
-    ("Crash Cove", 4): (1, False),
-    ("Crash Cove", 9): (1, False),
-    ("Crash Cove", 10): (1, False),
-    ("Sewer Speedway", 2): (1, False),
-    ("Sewer Speedway", 3): (1, False),
-    ("Papu's Pyramid", 6): (1, False),
-    ("Papu's Pyramid", 12): (1, False),
-    ("Papu's Pyramid", 7): (1, True),
-    ("Papu's Pyramid", 10): (1, True),
-    ("Dragon Mines", 2): (0, False),    # respawn: SK creation term only
-    ("Coco Park", 7): (0, False),       # respawn: SK creation term only
-    ("Polar Pass", 14): (1, False),
-    ("Polar Pass", 15): (1, False),
-    ("Polar Pass", 9): (1, True),
-    ("Cortex Castle", 10): (1, False),
-    ("Cortex Castle", 11): (2, False),
-    ("N. Gin Labs", 4): (2, False),
-    ("N. Gin Labs", 5): (2, False),
-    ("N. Gin Labs", 6): (2, False),
-    ("N. Gin Labs", 7): (2, False),
-    ("N. Gin Labs", 8): (2, False),
-    ("N. Gin Labs", 9): (2, False),
-    ("N. Gin Labs", 14): (2, False),
-    ("N. Gin Labs", 15): (2, False),
-    ("Oxide Station", 6): (0, True),    # NO boost term: pads are ladder-exempt
-    ("Oxide Station", 13): (2, False),
-    ("Hot Air Skyway", 1): (2, False),
-    ("Hot Air Skyway", 2): (2, False),
-    ("Hot Air Skyway", 3): (2, False),
-    ("Hot Air Skyway", 4): (2, False),  # UNCAPTURED, ruled conservative default
-    ("Hot Air Skyway", 5): (2, False),
-    ("Hot Air Skyway", 6): (2, False),  # UNCAPTURED, ruled conservative default
-    ("Hot Air Skyway", 7): (2, False),  # UNCAPTURED, ruled conservative default
-    ("Hot Air Skyway", 8): (2, True),
-    ("Hot Air Skyway", 9): (2, False),
-    ("Hot Air Skyway", 13): (2, False),
-    ("Hot Air Skyway", 14): (2, False),
-    ("Hot Air Skyway", 15): (2, False),
-    # Slot 1 = level_id 15, pos (-7846, 390, -6907): unbreakable without boost,
-    # found in logic and stuck in the 2026-08-12 live session (ruled
-    # 21:39). Boost, not USF -- the report says "boost".
-    ("Tiny Arena", 1): (1, False),
-    ("Tiger Temple", 5): (0, False),    # itemsanity-conditional door, Rules.py
-}
+#: The three UNCAPTURED Hot Air Skyway boxes (4, 6, 7) carry the ruled
+#: conservative `needs: usf` default (re-arm amendment + 08-10 19:53 ruling;
+#: values confirmed, ruled 2026-10-29).
+BOX_RULES = dict(box_spots.RETAIL_RULES)
 
-#: Slots the ledger EXPLICITLY cleared as no-gate (reachable backwards from the
-#: finish). Listed so nobody "fixes" them into gates later; carrying no rule is
-#: their ruled state, not an omission.
-EXPLICIT_NO_GATE = frozenset({
-    ("Cortex Castle", 12), ("Cortex Castle", 13),
-    ("Oxide Station", 4), ("Oxide Station", 7), ("Oxide Station", 14),
-    ("Hot Air Skyway", 10), ("Hot Air Skyway", 11), ("Hot Air Skyway", 12),
-})
+#: Boxes the ledger EXPLICITLY cleared as no-gate (reachable backwards from the
+#: finish), the spots' `no_gate` field. Listed so nobody "fixes" them into gates
+#: later; carrying no rule is their ruled state, not an omission.
+EXPLICIT_NO_GATE = box_spots.RETAIL_NO_GATE
+
+#: The boxes behind the Tiger Temple stone door (the spots' `door` field).
+TIGER_TEMPLE_DOOR_BOXES = tuple(box_spots.RETAIL_DOORS.get("tiger_temple", ()))
 
 #: The seven Tiger Temple door openers (ledger set, verbatim): thrown-forward
 #: or protective weapons that can break the door. TNT is out (cannot be thrown
@@ -198,14 +144,17 @@ class ItemBoxLocationClass(LocationClass):
 
     key = "item_boxes"
     display_name = "Item Box Checks"
-    code_blocks = (ITEM_BOX_CODE_BASE,)
+    code_blocks = (ITEM_BOX_CODE_BASE, SPOT_CODE_BASE)
 
     def all_locations(self):
-        return [(self.location_name(track, slot + 1),
-                 ITEM_BOX_CODE_BASE + ti * SLOTS_PER_TRACK + slot,
-                 track)
-                for ti, track in enumerate(BOX_TRACKS)
-                for slot in range(SLOTS_PER_TRACK)]
+        return ([(self.location_name(track, slot + 1),
+                  ITEM_BOX_CODE_BASE + ti * SLOTS_PER_TRACK + slot,
+                  track)
+                 for ti, track in enumerate(BOX_TRACKS)
+                 for slot in range(SLOTS_PER_TRACK)]
+                + [(self.location_name(track, n), self.slot_code(track, n), track)
+                   for track in BOX_TRACKS
+                   for n in range(SLOTS_PER_TRACK + 1, SPOT_NUMBERS_PER_TRACK + 1)])
 
     def location_name(self, track: str, slot: int) -> str:
         """AP location name for a track's box slot, e.g.
@@ -238,9 +187,11 @@ class ItemBoxLocationClass(LocationClass):
         return out
 
     def slot_code(self, track: str, slot: int) -> int:
-        """AP location code for a track's 1-based slot."""
-        return (ITEM_BOX_CODE_BASE
-                + BOX_TRACKS.index(track) * SLOTS_PER_TRACK + (slot - 1))
+        """AP location code for a track's 1-based slot (box number 1 to 50)."""
+        index = BOX_TRACKS.index(track)
+        if slot > SLOTS_PER_TRACK:
+            return SPOT_CODE_BASE + index * SPOT_EXTRA_PER_TRACK + (slot - SLOTS_PER_TRACK - 1)
+        return ITEM_BOX_CODE_BASE + index * SLOTS_PER_TRACK + (slot - 1)
 
     def wire_block(self, options):
         """The `item_box_checks` slot_data block (call only when the toggle is

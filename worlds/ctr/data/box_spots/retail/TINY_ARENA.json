@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 15, "name": "Tiny Arena"},
+  "spots": [
+    {"number": 1, "pos": [-7846, 390, -6907], "rot_y": 2222, "needs": "boost", "source": "builtin"},
+    {"number": 2, "pos": [4585, 1, -1118], "rot_y": 2977, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-4854, -20, 5888], "rot_y": 2111, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [8388, 44, 1692], "rot_y": 2816, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [3547, 242, 47], "rot_y": 3162, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-599, 288, 763], "rot_y": 3015, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-5809, 34, 1670], "rot_y": 1408, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-3093, -309, 3074], "rot_y": -528, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-4607, 240, 3224], "rot_y": 969, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [972, -25, 5531], "rot_y": 1033, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [-3135, 38, 322], "rot_y": 3011, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [-11981, 15, -6055], "rot_y": 279, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [-4069, 399, -11401], "rot_y": 1079, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [-1387, 489, -11478], "rot_y": 1052, "needs": "none", "source": "builtin"},
+    {"number": 15, "pos": [5114, 209, -9427], "rot_y": 1531, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

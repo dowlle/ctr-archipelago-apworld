@@ -104,7 +104,9 @@ class TestRetailBoxes(unittest.TestCase):
         for tier, value in TIERS.items():
             world = make_world(box_options(tier=tier), seed=2)
             plan = world.ctr_content_plan
-            self.assertEqual(plan["item_boxes"], {"shortcut_knowledge": value})
+            self.assertEqual(plan["item_boxes"]["shortcut_knowledge"], value)
+            # A3-14: retail boxes come from the built-in spot files, same seating.
+            self.assertEqual(set(plan["item_boxes"]), {"shortcut_knowledge", "spot_sets"})
             self.assertIn(content_item_boxes.FEATURE, plan["required_features"])
             got = {c["display_name"]: c["location"] for c in boxes(plan) if c["owner"].startswith("retail:")}
             want = {n: CTR_LOCATION_IDS[n] for n in ITEM_BOX_CLASS.created_location_names(world.options)}

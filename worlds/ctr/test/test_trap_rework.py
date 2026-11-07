@@ -95,6 +95,10 @@ RENAMED_AFTER_FREEZE = {
     "Nitro": "Nitro Drop",
 }
 
+#: The seven traps of the alpha3 data package (ruled 2026-11-06).
+ALPHA3_TRAP_NAMES = ("Always Jumping", "No Drifting", "Rival Surge", "Mud Season",
+                     "Limp Mode", "Stuck Steering", "Wumpa Leak")
+
 #: Every key with a working native effect, in AP_TrapEffect order.
 BUILDABLE_KEYS = (
     "icy_road", "low_gravity", "forced_usf", "forced_boost",
@@ -103,6 +107,8 @@ BUILDABLE_KEYS = (
     "wireframe", "nitro", "reverse_steering", "red_potion",
     "upside_down", "mirror_mode", "warpball_ambush",
     "demo_camera", "clocked_out", "reverse_camera",
+    "always_jumping", "no_drifting", "rival_surge", "mud_season",
+    "limp_mode", "stuck_steering", "wumpa_leak",
 )
 
 
@@ -176,12 +182,13 @@ class TestTrapNames(unittest.TestCase):
         self.assertIn("demo_camera", traps.TRAP_WEIGHT_KEYS)
 
     def test_the_weight_keys_cover_every_trap_exactly_once(self):
-        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 22)
-        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 22)
+        self.assertEqual(len(traps.TRAP_WEIGHT_KEYS), 29)
+        self.assertEqual(len(set(traps.TRAP_WEIGHT_KEYS)), 29)
         self.assertEqual(set(traps.DEFAULT_TRAP_WEIGHTS),
                          set(traps.TRAP_WEIGHT_KEYS))
         self.assertEqual(sorted(traps.ALL_TRAP_ITEM_NAMES),
-                         sorted([*EXPECTED_TRAP_IDS, "Clocked Out", "Reverse Camera"]))
+                         sorted([*EXPECTED_TRAP_IDS, "Clocked Out", "Reverse Camera",
+                                 *ALPHA3_TRAP_NAMES]))
 
 
 class TestTrapWeightResolution(unittest.TestCase):
@@ -266,6 +273,9 @@ class TestWeightedDraw(unittest.TestCase):
             "Red Potion": 3, "Mirror Mode": 3,
             "Warpball Ambush": 3,
             "Demo Camera": 3, "Clocked Out": 3, "Reverse Camera": 2,
+            "Always Jumping": 3, "No Drifting": 3, "Rival Surge": 3,
+            "Mud Season": 3, "Limp Mode": 3, "Stuck Steering": 1,
+            "Wumpa Leak": 4,
         }
         expected = {name: weight / sum(expected_weights.values())
                     for name, weight in expected_weights.items()}

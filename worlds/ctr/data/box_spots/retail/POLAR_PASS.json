@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 12, "name": "Polar Pass"},
+  "spots": [
+    {"number": 1, "pos": [10431, 610, 411], "rot_y": 2086, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [4284, 474, -4254], "rot_y": 2213, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [6715, 354, -17333], "rot_y": 1352, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-3740, 1680, -20684], "rot_y": 3471, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-6796, 1247, -12344], "rot_y": 3044, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-3763, 1701, -10195], "rot_y": 852, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [-6577, 1872, -2267], "rot_y": 4399, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-7271, 568, -458], "rot_y": 2953, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [1486, 274, -810], "rot_y": 1271, "needs": "boost", "shortcut": "hard", "source": "builtin"},
+    {"number": 10, "pos": [6862, 1051, 1336], "rot_y": 68, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [11357, 95, -3009], "rot_y": 1997, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [14609, 1245, -16715], "rot_y": 391, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [4889, 525, -14837], "rot_y": 1683, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [790, 1790, -24972], "rot_y": 3677, "needs": "boost", "source": "builtin"},
+    {"number": 15, "pos": [895, 1790, -23536], "rot_y": 3368, "needs": "boost", "source": "builtin"}
+  ],
+  "retired": []
+}

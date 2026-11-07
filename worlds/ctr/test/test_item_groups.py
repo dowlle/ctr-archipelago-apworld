@@ -66,8 +66,11 @@ EXPECTED_GROUPS = {
         "Reverse Steering", "Red Potion",
         # minted by #280, now buildable
         "Upside Down", "Mirror Mode", "Warpball Ambush", "Demo Camera",
-        # minted by the 0.3.0 id step, not buildable until #455 and #248
+        # minted by the 0.3.0 id step, built by #455 and #248
         "Clocked Out", "Reverse Camera",
+        # the alpha3 data package (ruled 2026-11-06)
+        "Always Jumping", "No Drifting", "Rival Surge", "Mud Season",
+        "Limp Mode", "Stuck Steering", "Wumpa Leak",
     },
     "Itemsanity Weapons": set(ITEM_NAMES),
     # --- #536. Written out, not imported: the registries build these.
