@@ -104,7 +104,7 @@
           "box_spots_v1"
         ]
       },
-      "maxItems": 30,
+      "maxItems": 32,
       "minItems": 1,
       "uniqueItems": true
     },
