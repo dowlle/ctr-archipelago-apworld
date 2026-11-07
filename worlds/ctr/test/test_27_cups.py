@@ -26,6 +26,16 @@ def leg_count(plan):
     return sum(len(e["legs"]) for e in plan["entries"] if e["kind"] == content_cups.KIND)
 
 
+def income_leg_count(plan):
+    """Cup legs on a track that banks fruit. Slide Coliseum and Turbo Track
+    can be cup legs since A3-9 but are not income tracks (`income_track`)."""
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    packages = {p["id"]: p for p in plan["packages"]}
+    return sum(1 for e in plan["entries"] if e["kind"] == content_cups.KIND for leg in e["legs"]
+               if content_wumpa.income_track(tracks[leg["track_id"]],
+                                             packages.get(tracks[leg["track_id"]].get("package_id"))))
+
+
 class TestTwentySevenCups(unittest.TestCase):
     def test_every_pad_is_a_cup(self):
         world = make_world(cups_options(), seed=1)
@@ -55,7 +65,8 @@ class TestTwentySevenCups(unittest.TestCase):
                 self.assertEqual(strip(items[0]["routes"]), strip(hits[0]["routes"]))
                 self.assertTrue(content_wumpa.banking(plan))
                 self.assertFalse(content_wumpa.income_routes(plan))
-                self.assertEqual(len(content_wumpa.cup_income_routes(plan)), legs)
+                self.assertEqual(len(content_wumpa.cup_income_routes(plan)), income_leg_count(plan))
+                self.assertGreater(income_leg_count(plan), 0)
                 self.assertEqual(len([loc for loc in world.multiworld.get_locations(1) if loc.address is not None]),
                                  len(plan["checks"]))
                 wire = json.loads(json.dumps(world.fill_slot_data()))
