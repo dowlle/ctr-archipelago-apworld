@@ -2294,8 +2294,11 @@ def create_regions(world):
                 term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
             term = with_boost(with_letters(term, check), check)
             # Every check is term-backed, so win_logic exports a row for each
-            # (A3-37b; the rule is the same callable either way).
-            logic_terms.set_term(location, term or logic_terms.TRUE)
+            # (A3-37b). A free non-win keeps Archipelago's default rule object.
+            if term is not None or check["location"] in wins:
+                logic_terms.set_term(location, term or logic_terms.TRUE)
+            else:
+                logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, logic_terms.TRUE))
             region.locations.append(location)
         # ctr_first: first place pays the Trophy Race check, and first place
         # with the letters also pays the CTR Token check, so the CTR Token needs
