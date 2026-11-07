@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 7, "name": "Hot Air Skyway"},
+  "spots": [
+    {"number": 1, "pos": [8433, -268, 4495], "rot_y": 2877, "needs": "usf", "source": "builtin"},
+    {"number": 2, "pos": [5656, -664, -2134], "rot_y": 1857, "needs": "usf", "source": "builtin"},
+    {"number": 3, "pos": [-3011, 923, -3471], "rot_y": 76, "needs": "usf", "source": "builtin"},
+    {"number": 4, "pos": [4372, 84, -720], "rot_y": 2137, "needs": "usf", "source": "builtin"},
+    {"number": 5, "pos": [8827, -389, 6259], "rot_y": 2957, "needs": "usf", "source": "builtin"},
+    {"number": 6, "pos": [9966, 349, -1256], "rot_y": 2902, "needs": "usf", "source": "builtin"},
+    {"number": 7, "pos": [14644, 549, 4749], "rot_y": 2678, "needs": "usf", "source": "builtin"},
+    {"number": 8, "pos": [1991, -144, -7723], "rot_y": 1880, "needs": "usf", "shortcut": "hard", "source": "builtin"},
+    {"number": 9, "pos": [-2261, 933, -3268], "rot_y": 52, "needs": "usf", "source": "builtin"},
+    {"number": 10, "pos": [-8261, -259, 5806], "rot_y": 1208, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 11, "pos": [-5918, 202, 3038], "rot_y": 1914, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 12, "pos": [-943, 269, -89], "rot_y": 433, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 13, "pos": [4204, -1410, -5590], "rot_y": 2336, "needs": "usf", "source": "builtin"},
+    {"number": 14, "pos": [8603, -458, -8051], "rot_y": 2305, "needs": "usf", "source": "builtin"},
+    {"number": 15, "pos": [-4, 13, -8180], "rot_y": 3133, "needs": "usf", "source": "builtin"}
+  ],
+  "retired": []
+}

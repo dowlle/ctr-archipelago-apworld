@@ -1,0 +1,22 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 2, "name": "Blizzard Bluff"},
+  "spots": [
+    {"number": 1, "pos": [-3959, 551, 2286], "rot_y": 1961, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-2257, 732, 6723], "rot_y": 3593, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-4634, -529, 10478], "rot_y": 4323, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [8210, 624, 7669], "rot_y": 1996, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [9608, 575, 9360], "rot_y": 3489, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [11157, 497, 4576], "rot_y": 1623, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [9007, 804, 369], "rot_y": 2954, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [-455, 622, 1813], "rot_y": 492, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [528, 905, -2751], "rot_y": 2557, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-847, -408, 5548], "rot_y": 2231, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [-3192, -1131, 10873], "rot_y": 1175, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [-1451, -1136, 13578], "rot_y": 2234, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [4920, 83, 12578], "rot_y": 2838, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [12871, 462, 8995], "rot_y": 767, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

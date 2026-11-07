@@ -51,7 +51,8 @@ class TestBattleArenasOffVanilla(ArenaChecksMixin, CTRTestBase):
 
 class TestBattleArenasOn(ArenaChecksMixin, CTRTestBase):
     run_default_tests = False
-    options = {"include_battle_arenas": True, "accessibility": "full"}
+    options = {"include_battle_arenas": True, "accessibility": "full",
+               "crystal_arenas": ["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"]}
 
     def test_four_arena_locations_and_tokens(self):
         names = {loc.name for loc in self.multiworld.get_locations(self.player)}

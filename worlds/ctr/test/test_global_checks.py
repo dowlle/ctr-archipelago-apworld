@@ -177,7 +177,7 @@ class TestItemsanity(unittest.TestCase):
         options = global_options(hits=False, modes=("relic",))
         options["content_pool"]["tracks"]["custom"] = []
         options["content_pool"]["required_entries"] = []
-        with self.assertRaisesRegex(OptionError, "itemsanity needs at least one Trophy Race or CTR Challenge"):
+        with self.assertRaisesRegex(OptionError, "itemsanity needs at least one Trophy Race, CTR Challenge or cup"):
             make_world(options, seed=1)
 
     def test_tiger_temple_door(self):

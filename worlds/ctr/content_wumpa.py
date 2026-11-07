@@ -32,8 +32,17 @@ Custom tracks call the same `RB_Player_ModifyWumpa` in game. A custom track
 without measured Wumpa capability adds no route, also with owned Progressive
 Starting Wumpa (that item is useful, not progression, so logic cannot hold
 it). Cortex Vortex, cup legs, arenas and boss races bank natively but add no
-income route. `keep_income_track` is only the fallback for a draw with no
-income route at all. `excluded` keeps
+income route, with one exception: a plan whose normal pads hold no such
+Trophy Race or CTR Challenge (every pad a cup or an arena, the 27-cup seed of
+0.3.0-alpha3 job A3-7, ruled 2026-11-05) takes every cup leg on an
+`income_track` as its income routes instead (`cup_income_routes`). A cup leg
+is an Adventure race and banks its fruit at the finish or on leaving, and a
+cup pad stays enterable once Done, so the route repeats. It needs the cup
+pad's gates and racer lock and the finish rank of every leg up to and
+including its own (content_cups.prefix_boost plus the leg's finish, as a
+Complete One Lap cup route). A plan with a Trophy or CTR income route keeps
+its routes exactly. `keep_income_track` is only the fallback for a draw with
+no income route at all. `excluded` keeps
 progression out of every shop slot with an item rule (useful, filler and
 traps may go there), and the plan refuses when its non-progression supply
 (filler and traps, and the always-useful pack items) is below 5 x N.
@@ -255,6 +264,45 @@ def income_routes(plan):
     return sorted(out, key=lambda r: (int(r[1].split(":")[1]), INCOME_MODES.index(r[2])))
 
 
+def cup_income_routes(plan):
+    """[(entry id, pad id, leg id, track)] of every cup leg that banks fruit in
+    logic, in physical pad order, then leg order: the income routes of a plan
+    with no Trophy or CTR income route (`income_routes` empty), and none
+    otherwise. A leg banks when its track is an `income_track`."""
+    if income_routes(plan):
+        return []
+    from .content_cups import KIND as CUP_KIND
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    packages = {p["id"]: p for p in plan["packages"]}
+    pad_of = {p["entry_id"]: p for p in plan["pads"] if p["kind"] == "normal" and p["entry_id"] is not None}
+    out = []
+    for entry in plan["entries"]:
+        if entry.get("kind") != CUP_KIND or entry["id"] not in pad_of:
+            continue
+        pad = pad_of[entry["id"]]
+        for leg in entry["legs"]:
+            track = tracks[leg["track_id"]]
+            if income_track(track, packages.get(track.get("package_id"))):
+                out.append((int(pad["id"].split(":")[1]), entry["id"], pad["id"], leg["id"], track))
+    return [r[1:] for r in sorted(out, key=lambda r: r[0])]
+
+
+def cup_income_need(plan, entry_id, leg_id):
+    """The rank a cup income route needs: the finish of every leg up to and
+    including its own. 0 without boost."""
+    from .content_capability import finish_boost
+    from .content_cups import prefix_boost
+    capability = plan.get("capability", {})
+    if not capability.get("boost_mode"):
+        return 0
+    tracks = {t["id"]: t for t in plan["tracks"]}
+    packages = {p["id"]: p for p in plan["packages"]}
+    entry = next(e for e in plan["entries"] if e["id"] == entry_id)
+    track = tracks[next(leg["track_id"] for leg in entry["legs"] if leg["id"] == leg_id)]
+    return max(prefix_boost(entry, leg_id, tracks, capability, packages),
+               finish_boost(track, capability, packages.get(track.get("package_id"))))
+
+
 def keep_income_track(world, chosen, drawn, optional, packages=None):
     """The tracks drawn for the pads, with one swapped for a track that can bank
     fruit when the shop or the Wumpa goal needs one and the draw left none. A long
@@ -284,11 +332,11 @@ def earns_income(track, packages):
 
 
 def check_income(plan):
-    if banking(plan) and not income_routes(plan):
-        error("the Wumpa Shop and the Wumpa goal need a Trophy Race or CTR Challenge on a pad to bank fruit, on a "
-              "retail race track (engine ids 0 to 15) or a custom track with measured Wumpa capability, and this "
-              "plan has none. Select such tracks with the trophy or ctr mode, or turn the shop and the Wumpa goal "
-              "off. No content was changed.")
+    if banking(plan) and not income_routes(plan) and not cup_income_routes(plan):
+        error("the Wumpa Shop and the Wumpa goal need a Trophy Race, CTR Challenge or cup race on a pad to bank "
+              "fruit, on a retail race track (engine ids 0 to 15) or a custom track with measured Wumpa capability, "
+              "and this plan has none. Select such tracks with the trophy or ctr mode or in a cup, or turn the shop "
+              "and the Wumpa goal off. No content was changed.")
 
 
 def income_term(world):
@@ -334,6 +382,18 @@ def install(world, plan, menu, stage_gate, stage_term):
         stage = stage_term(route)
         if stage is not None:
             terms.append(stage)
+        if need:
+            terms.append(logic_terms.Cap(world, need, racer))
+        wires.append(logic_terms.all_of(*terms))
+    # A plan with no Trophy or CTR income route banks in its cup legs (A3-7):
+    # the cup pad's gates and lock, and the finish of every leg up to its own.
+    for entry_id, pad_id, leg_id, _track in cup_income_routes(plan):
+        lock = pads[pad_id]["racer_lock"]
+        racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
+        need = cup_income_need(plan, entry_id, leg_id)
+        routes.append((entry_id, None, need, racer))
+        terms = [logic_terms.ReachRegion(world, entry_id) if hints else
+                 logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
         if need:
             terms.append(logic_terms.Cap(world, need, racer))
         wires.append(logic_terms.all_of(*terms))

@@ -321,8 +321,9 @@ jobs:
             extra_args+=(-m ci_meta.yaml)
           fi
           if [[ "$CHECK_META" == gem-cups-* ]]; then
-            IFS=- read -r _ _ cups cup_tracks <<< "$CHECK_META"
-            sed -e "s/__COUNT__/$cups/" -e "s/__TRACKS__/$cup_tracks/" ../world-src/.github/fuzz/content-plan-gem-cups-meta.yaml > ci_meta.yaml
+            IFS=- read -r _ _ cups cup_tracks gauntlet <<< "$CHECK_META"
+            [[ "$gauntlet" == gauntlet ]] && gauntlet=true || gauntlet=false
+            sed -e "s/__COUNT__/$cups/" -e "s/__TRACKS__/$cup_tracks/" -e "s/__GAUNTLET__/$gauntlet/" ../world-src/.github/fuzz/content-plan-gem-cups-meta.yaml > ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
           if [[ "$CHECK_META" == pads-* ]]; then

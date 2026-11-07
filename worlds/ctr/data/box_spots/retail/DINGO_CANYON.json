@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 0, "name": "Dingo Canyon"},
+  "spots": [
+    {"number": 1, "pos": [3856, 2303, -4008], "rot_y": 876, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [5624, 2303, -7244], "rot_y": 439, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [11612, 868, -1526], "rot_y": 2351, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [22214, -32, 956], "rot_y": 1096, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [20225, 771, 8888], "rot_y": 54, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [19577, 815, 10038], "rot_y": 2036, "needs": "none", "source": "builtin"},
+    {"number": 7, "pos": [18124, 1141, 9550], "rot_y": 2541, "needs": "none", "source": "builtin"},
+    {"number": 8, "pos": [10832, 2160, 10369], "rot_y": 427, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [6946, 2323, 9593], "rot_y": 993, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [3821, 3240, 4331], "rot_y": 2158, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [520, 2304, 2852], "rot_y": 1514, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [1979, 2318, -125], "rot_y": 2704, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [3340, 2303, 3788], "rot_y": 925, "needs": "none", "source": "builtin"},
+    {"number": 14, "pos": [5323, 2303, -4642], "rot_y": -891, "needs": "none", "source": "builtin"},
+    {"number": 15, "pos": [4562, 2304, -2884], "rot_y": 3206, "needs": "none", "source": "builtin"}
+  ],
+  "retired": []
+}

@@ -1,0 +1,22 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 13, "name": "Oxide Station"},
+  "spots": [
+    {"number": 1, "pos": [-3532, -420, 10578], "rot_y": 1644, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-2981, 280, 6311], "rot_y": 2150, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-559, 0, 3341], "rot_y": 1970, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [18128, 37, 458], "rot_y": 1680, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 5, "pos": [4640, -1678, 12337], "rot_y": 4009, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [8169, -419, 11141], "rot_y": 2332, "needs": "none", "shortcut": "hard", "source": "builtin"},
+    {"number": 7, "pos": [10657, -98, -651], "rot_y": 2724, "needs": "none", "no_gate": true, "source": "builtin"},
+    {"number": 8, "pos": [5346, 110, 8727], "rot_y": 3618, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-810, -324, 17664], "rot_y": 3046, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [11098, 484, 12381], "rot_y": 1038, "needs": "none", "source": "builtin"},
+    {"number": 11, "pos": [17436, 499, 15873], "rot_y": -21, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [13411, 623, 17435], "rot_y": 2865, "needs": "none", "source": "builtin"},
+    {"number": 13, "pos": [10628, 477, 18083], "rot_y": 3574, "needs": "usf", "source": "builtin"},
+    {"number": 14, "pos": [11875, -430, 6099], "rot_y": 1635, "needs": "none", "no_gate": true, "source": "builtin"}
+  ],
+  "retired": []
+}

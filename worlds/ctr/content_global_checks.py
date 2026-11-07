@@ -13,7 +13,13 @@ on retail tracks, Cortex Vortex and custom tracks alike: a weapon can be fired
 in any race that rolls weapon crates. The 11 weapon items take one item ledger
 row each. The rule is the legacy one (Rules.add_itemsanity_rules): the weapon
 item, and for Turbo the first Progressive Boost rank when boost is on, ANDed
-with any route. Native keys the whole runtime (use hook, crate filter, the
+with any route. A plan with no such race (every normal pad a cup or an arena,
+the 27-cup seed of 0.3.0-alpha3 job A3-7, ruled 2026-11-05) routes every
+Itemsanity check from every cup leg instead, as Hit Character does: a cup leg
+is an Adventure race that rolls weapon crates, and native mints a use in any
+race. Such a leg route needs the finish of every earlier leg, bound to the cup
+pad's racer lock. A plan with a Trophy Race or CTR Challenge keeps its routes
+exactly. Native keys the whole runtime (use hook, crate filter, the
 Turbo Grant and Tizi Helper companions) on the server holding `35016000`, so a
 content-plan room needs no other wire for it.
 
@@ -58,6 +64,8 @@ from . import characters, content_bosses, content_cups, hit_character, itemsanit
 
 FEATURE = "global_checks_v1"
 KEYS = ("itemsanity", "hit_character")
+#: The check kinds of the two families.
+KINDS = ("itemsanity", "hit")
 #: Modes whose race seats AI opponents and rolls weapon crates.
 RACE_MODES = ("trophy", "ctr")
 MODE_ORDER = ("trophy", "ctr", "relic", "cup")
@@ -159,13 +167,16 @@ def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
     routes = race_routes(tracks, entries, pads, packages)
     out = []
     if record.get("itemsanity"):
-        if not routes:
-            error("itemsanity needs at least one Trophy Race or CTR Challenge in the plan; select the "
-                  "trophy or ctr mode, or turn itemsanity off. No content was changed.")
+        # Every Trophy Race and CTR Challenge; with none, every cup leg (A3-7).
+        use = ([(r[0], r[1], r[2], r[3], None) for r in routes] if routes
+               else cup_routes(tracks, entries, pads, packages))
+        if not use:
+            error("itemsanity needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
+                  "trophy or ctr mode or a cup, or turn itemsanity off. No content was changed.")
         for name, code, _region in itemsanity.ITEMSANITY_CLASS.all_locations():
             award = "use_juiced" if name.endswith("(Juiced)") else "use"
             out.append(dict(location=code, owner=OWNER, kind="itemsanity", display_name=name,
-                            routes=[_route(e, m, p, award) for _phys, e, p, m, _o in routes]))
+                            routes=[_route(e, m, p, award, leg) for _phys, e, p, m, leg in use]))
     if record.get("hit_character"):
         own = hit_routes(routes, cup_routes(tracks, entries, pads, packages))
         if not own:
@@ -190,9 +201,9 @@ def check_count(record, tracks, packages=None, cup_legs=()):
               and not no_crates(t, packages)]
     count = 0
     if record.get("itemsanity"):
-        if not racing:
-            error("itemsanity needs at least one Trophy Race or CTR Challenge in the plan; select the "
-                  "trophy or ctr mode, or turn itemsanity off. No content was changed.")
+        if not racing and all(no_crates(t, packages) for t in cup_legs):
+            error("itemsanity needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
+                  "trophy or ctr mode or a cup, or turn itemsanity off. No content was changed.")
         count += len(itemsanity.ITEMSANITY_CLASS.all_locations())
     if record.get("hit_character"):
         if not racing and all(no_crates(t, packages) for t in cup_legs):
@@ -289,9 +300,11 @@ def install(world, check, location, route_tests):
         terms = tuple(terms)
         return logic_terms.FALSE if not terms else terms[0] if len(terms) == 1 else logic_terms.Or(*terms)
 
-    def route_term(entry, stage):
+    def route_term(entry, stage, need_racer=(0, None)):
         region = logic_terms.ReachRegion(world, entry)
-        return region if stage is None else logic_terms.And(region, stage)
+        term = region if stage is None else logic_terms.And(region, stage)
+        need, racer = need_racer
+        return term if not need else logic_terms.And(term, logic_terms.Cap(world, need, racer))
 
     def any_route(state):
         return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
@@ -300,6 +313,34 @@ def install(world, check, location, route_tests):
     if kind == "itemsanity":
         weapon = check["display_name"].removeprefix("Itemsanity: ").removesuffix(" (Juiced)")
         boost = weapon == "Turbo" and bool(world.options.progressive_boost.value)
+        if any(route["mode"] == content_cups.MODE for _entry, _test, route in route_tests):
+            # Cup leg routes (A3-7): the finish of every earlier leg, bound
+            # to the cup pad's racer lock, as a Cup Leg Victory route.
+            plan = world.ctr_content_plan
+            pad_by_id = {pad["id"]: pad for pad in plan["pads"]}
+            entry_by_id = {entry["id"]: entry for entry in plan["entries"]}
+            tracks = {track["id"]: track for track in plan["tracks"]}
+            packages = {package["id"]: package for package in plan["packages"]}
+            capability = plan.get("capability", {})
+
+            def leg_need(route):
+                if route["mode"] != content_cups.MODE:
+                    return 0, None
+                lock = pad_by_id[route["own_pad_id"]]["racer_lock"]
+                return (content_cups.prefix_boost(entry_by_id[route["entry_id"]], route["leg_id"], tracks, capability,
+                                                  packages),
+                        characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None)
+            needs = tuple(leg_need(route) for _entry, _test, route in route_tests)
+
+            def any_route(state):
+                return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
+                           and (not need or progressive_capability.gate_satisfied(world, state, player, boost_min=need,
+                                                                                 required_character=racer))
+                           for (entry, test), (need, racer) in zip(opens, needs))
+
+            route_terms = tuple((entry, stage, route, need) for (entry, stage, route), need in zip(route_terms, needs))
+        else:
+            route_terms = tuple((entry, stage, route, (0, None)) for entry, stage, route in route_terms)
 
         def rule(state, weapon=weapon, boost=boost):
             return (state.has(weapon, player)
@@ -308,7 +349,7 @@ def install(world, check, location, route_tests):
         location.access_rule = rule
         if hints:
             terms = [logic_terms.Has(weapon, 1, player),
-                     alternatives(route_term(entry, stage) for entry, stage, _route in route_terms)]
+                     alternatives(route_term(entry, stage, need) for entry, stage, _route, need in route_terms)]
             if boost:
                 terms.append(logic_terms.Cap(world, 1, None))
             logic_terms.set_term(location, logic_terms.SerializedRule(rule, logic_terms.all_of(*terms)))
@@ -405,8 +446,8 @@ def tiger_temple_door(world):
     Itemsanity on, picking it up needs one of the door-opener weapons
     (Rules.add_lettersanity_rules, item_boxes.TIGER_TEMPLE_DOOR_OPENERS): on its
     Letter R check, and on its CTR Token Challenge unless Lettersanity 2 left the
-    R undrawn. Item Box 5 sits behind the same door (item_boxes.BOX_RULES,
-    #133 PR 4e) and takes the same term. Applies to the retail Tiger Temple
+    R undrawn. Item Box 5 sits behind the same door (its spot's `door` field,
+    #133 PR 4e, A3-14) and takes the same term. Applies to the retail Tiger Temple
     only."""
     plan = world.ctr_content_plan
     if not plan.get("global_checks", {}).get("itemsanity"):
@@ -422,9 +463,12 @@ def tiger_temple_door(world):
         names.append(letter_r)
     if CTR_LOCATION_IDS[token] in codes and (mode != 2 or CTR_LOCATION_IDS[letter_r] in codes):
         names.append(token)
-    door_box = "Tiger Temple: Item Box 5"
-    if CTR_LOCATION_IDS[door_box] in codes:
-        names.append(door_box)
+    # The boxes behind the door are the spots marked `door` (A3-14).
+    from .item_boxes import TIGER_TEMPLE_DOOR_BOXES
+    for track, number in TIGER_TEMPLE_DOOR_BOXES:
+        door_box = f"{track}: Item Box {number}"
+        if CTR_LOCATION_IDS.get(door_box) in codes:
+            names.append(door_box)
     for name in names:
         location = world.multiworld.get_location(name, player)
         logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))

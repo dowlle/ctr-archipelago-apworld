@@ -1,6 +1,6 @@
 """Hint filters (A2-23): wait for Warp Pad Preview, progression only for pad and shop hints.
 
-All three are client settings: off by default, hint policy only. Each rides the
+All three are client settings, hint policy only: the two pad filters are on by default since A3-8, the shop filter is off. Each rides the
 content-plan envelope as `<name>: true` only when on, so an option-off room's
 slot_data is unchanged and the draw never reads them. The paired native reader
 is ap/ap_hint_filters_logic.h (tools/test-hint-filters.cpp).
@@ -21,23 +21,24 @@ KEYS = content_plan.HINT_FILTER_KEYS
 
 
 class TestHintFilters(unittest.TestCase):
-    def test_off_by_default_and_grouped(self):
-        for cls in (PadHintsWaitForSpoiler, PadHintsProgressionOnly, ShopHintsProgressionOnly):
-            self.assertEqual(cls.default, 0)
+    def test_defaults_and_grouped(self):
+        # The two pad filters default on since A3-8 (ruled 2026-11-06); the shop filter stays off.
+        for cls, default in ((PadHintsWaitForSpoiler, 1), (PadHintsProgressionOnly, 1), (ShopHintsProgressionOnly, 0)):
+            self.assertEqual(cls.default, default)
         self.assertIn(PadHintsWaitForSpoiler, ap_ctr_option_groups["Display"])
         self.assertIn(PadHintsProgressionOnly, ap_ctr_option_groups["Display"])
         self.assertIn(ShopHintsProgressionOnly, ap_ctr_option_groups["Wumpa Shop"])
 
-    def test_off_sends_no_key(self):
-        co = make_world(pack_options(), seed=3).fill_slot_data()["ctr_options"]
+    def test_explicit_off_sends_no_key(self):
+        co = make_world(pack_options(**{key: False for key in KEYS}), seed=3).fill_slot_data()["ctr_options"]
         for key in KEYS:
             self.assertNotIn(key, co)
 
     def test_each_on_sends_true_and_takes_no_draw(self):
-        base = make_world(pack_options(), seed=3).fill_slot_data()
+        base = make_world(pack_options(**{key: False for key in KEYS}), seed=3).fill_slot_data()
         for key in KEYS:
             with self.subTest(key=key):
-                wire = make_world(pack_options(**{key: True}), seed=3).fill_slot_data()
+                wire = make_world(pack_options(**{k: k == key for k in KEYS}), seed=3).fill_slot_data()
                 self.assertIs(wire["ctr_options"].pop(key), True)
                 self.assertEqual(json.dumps(wire, sort_keys=True), json.dumps(base, sort_keys=True))
 

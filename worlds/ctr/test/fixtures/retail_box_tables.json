@@ -1,0 +1,367 @@
+{
+ "comment": "Frozen literals of item_boxes.py as of v0.3.0-alpha2 (apworld 385def6e4). The 18 retail box spot files must rebuild exactly these tables (A3-14 conversion equality test).",
+ "placed_counts": {
+  "Dingo Canyon": 15,
+  "Dragon Mines": 13,
+  "Blizzard Bluff": 14,
+  "Crash Cove": 10,
+  "Tiger Temple": 10,
+  "Papu's Pyramid": 12,
+  "Roo's Tubes": 11,
+  "Hot Air Skyway": 15,
+  "Sewer Speedway": 15,
+  "Mystery Caves": 13,
+  "Cortex Castle": 14,
+  "N. Gin Labs": 15,
+  "Polar Pass": 15,
+  "Oxide Station": 14,
+  "Coco Park": 10,
+  "Tiny Arena": 15,
+  "Slide Coliseum": 15,
+  "Turbo Track": 15
+ },
+ "sk_required_tier": [
+  [
+   "Coco Park",
+   7,
+   1
+  ],
+  [
+   "Dragon Mines",
+   2,
+   1
+  ],
+  [
+   "Hot Air Skyway",
+   8,
+   2
+  ],
+  [
+   "Oxide Station",
+   6,
+   2
+  ],
+  [
+   "Papu's Pyramid",
+   6,
+   1
+  ],
+  [
+   "Papu's Pyramid",
+   7,
+   2
+  ],
+  [
+   "Papu's Pyramid",
+   10,
+   2
+  ],
+  [
+   "Papu's Pyramid",
+   12,
+   1
+  ],
+  [
+   "Polar Pass",
+   9,
+   2
+  ],
+  [
+   "Sewer Speedway",
+   2,
+   1
+  ],
+  [
+   "Sewer Speedway",
+   3,
+   1
+  ],
+  [
+   "Tiger Temple",
+   5,
+   1
+  ]
+ ],
+ "box_rules": [
+  [
+   "Coco Park",
+   7,
+   0,
+   false
+  ],
+  [
+   "Cortex Castle",
+   10,
+   1,
+   false
+  ],
+  [
+   "Cortex Castle",
+   11,
+   2,
+   false
+  ],
+  [
+   "Crash Cove",
+   4,
+   1,
+   false
+  ],
+  [
+   "Crash Cove",
+   9,
+   1,
+   false
+  ],
+  [
+   "Crash Cove",
+   10,
+   1,
+   false
+  ],
+  [
+   "Dragon Mines",
+   2,
+   0,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   1,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   2,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   3,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   4,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   5,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   6,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   7,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   8,
+   2,
+   true
+  ],
+  [
+   "Hot Air Skyway",
+   9,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   13,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   14,
+   2,
+   false
+  ],
+  [
+   "Hot Air Skyway",
+   15,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   4,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   5,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   6,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   7,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   8,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   9,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   14,
+   2,
+   false
+  ],
+  [
+   "N. Gin Labs",
+   15,
+   2,
+   false
+  ],
+  [
+   "Oxide Station",
+   6,
+   0,
+   true
+  ],
+  [
+   "Oxide Station",
+   13,
+   2,
+   false
+  ],
+  [
+   "Papu's Pyramid",
+   6,
+   1,
+   false
+  ],
+  [
+   "Papu's Pyramid",
+   7,
+   1,
+   true
+  ],
+  [
+   "Papu's Pyramid",
+   10,
+   1,
+   true
+  ],
+  [
+   "Papu's Pyramid",
+   12,
+   1,
+   false
+  ],
+  [
+   "Polar Pass",
+   9,
+   1,
+   true
+  ],
+  [
+   "Polar Pass",
+   14,
+   1,
+   false
+  ],
+  [
+   "Polar Pass",
+   15,
+   1,
+   false
+  ],
+  [
+   "Sewer Speedway",
+   2,
+   1,
+   false
+  ],
+  [
+   "Sewer Speedway",
+   3,
+   1,
+   false
+  ],
+  [
+   "Tiger Temple",
+   5,
+   0,
+   false
+  ],
+  [
+   "Tiny Arena",
+   1,
+   1,
+   false
+  ]
+ ],
+ "explicit_no_gate": [
+  [
+   "Cortex Castle",
+   12
+  ],
+  [
+   "Cortex Castle",
+   13
+  ],
+  [
+   "Hot Air Skyway",
+   10
+  ],
+  [
+   "Hot Air Skyway",
+   11
+  ],
+  [
+   "Hot Air Skyway",
+   12
+  ],
+  [
+   "Oxide Station",
+   4
+  ],
+  [
+   "Oxide Station",
+   7
+  ],
+  [
+   "Oxide Station",
+   14
+  ]
+ ],
+ "tiger_temple_door": [
+  [
+   "Tiger Temple",
+   5
+  ]
+ ]
+}

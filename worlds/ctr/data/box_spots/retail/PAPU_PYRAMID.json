@@ -1,0 +1,20 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "retail", "level_id": 5, "name": "Papu's Pyramid"},
+  "spots": [
+    {"number": 1, "pos": [-4766, 1390, 2811], "rot_y": 1028, "needs": "none", "source": "builtin"},
+    {"number": 2, "pos": [-4500, 2332, 958], "rot_y": -246, "needs": "none", "source": "builtin"},
+    {"number": 3, "pos": [-7737, 2291, 842], "rot_y": 3177, "needs": "none", "source": "builtin"},
+    {"number": 4, "pos": [-9852, 2314, 2008], "rot_y": 4248, "needs": "none", "source": "builtin"},
+    {"number": 5, "pos": [-8613, 2348, 4331], "rot_y": 831, "needs": "none", "source": "builtin"},
+    {"number": 6, "pos": [-1705, 1980, 5894], "rot_y": 1282, "needs": "boost", "shortcut": "medium", "source": "builtin"},
+    {"number": 7, "pos": [-5228, 2310, -6612], "rot_y": 1877, "needs": "boost", "shortcut": "hard", "source": "builtin"},
+    {"number": 8, "pos": [-7418, 2137, -4303], "rot_y": 2775, "needs": "none", "source": "builtin"},
+    {"number": 9, "pos": [-7283, 2123, -8452], "rot_y": 1283, "needs": "none", "source": "builtin"},
+    {"number": 10, "pos": [-1552, 1067, -5994], "rot_y": 735, "needs": "boost", "shortcut": "hard", "source": "builtin"},
+    {"number": 11, "pos": [-7441, 2384, -1491], "rot_y": 1825, "needs": "none", "source": "builtin"},
+    {"number": 12, "pos": [-859, 1390, -4], "rot_y": 1853, "needs": "boost", "shortcut": "medium", "source": "builtin"}
+  ],
+  "retired": []
+}

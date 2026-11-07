@@ -97,6 +97,15 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("demo_camera",      "Demo Camera",      3, True, "rework"),
     TrapEntry("clocked_out",      "Clocked Out",      3, True, "030"),
     TrapEntry("reverse_camera",   "Reverse Camera",   2, True, "030"),
+    # Native AP_TrapEffect 22-28, the alpha3 data package (ruled 2026-11-06),
+    # ids 35010208-35010214. Stuck Steering is low weight on purpose.
+    TrapEntry("always_jumping",   "Always Jumping",   3, True, "alpha3"),
+    TrapEntry("no_drifting",      "No Drifting",      3, True, "alpha3"),
+    TrapEntry("rival_surge",      "Rival Surge",      3, True, "alpha3"),
+    TrapEntry("mud_season",       "Mud Season",       3, True, "alpha3"),
+    TrapEntry("limp_mode",        "Limp Mode",        3, True, "alpha3"),
+    TrapEntry("stuck_steering",   "Stuck Steering",   1, True, "alpha3"),
+    TrapEntry("wumpa_leak",       "Wumpa Leak",       4, True, "alpha3"),
 )
 
 #: The BUILDABLE draw list, in registry order.

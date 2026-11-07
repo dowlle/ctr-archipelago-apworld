@@ -14,7 +14,8 @@ from .test_custom_packages import UNKNOWN
 
 LOOP = "fixture-loop"
 BABY = "baby-t-park"
-RETAIL_ARENAS = {"arena:18", "arena:19", "arena:21", "arena:23"}
+#: The default Crystal Challenge pool is all seven arenas since A3-8; the default count of 4 draws from it.
+DEFAULT_ARENAS = {f"arena:{level}" for level in range(18, 25)}
 
 
 def profile_options(custom, guaranteed):
@@ -42,7 +43,7 @@ class TestVanillaShapeProfile(unittest.TestCase):
                     pads = [p for p in plan["pads"] if p["id"].startswith("pad:") and p["entry_id"]]
                     self.assertEqual(len(pads), 27)
                     arenas = {e["id"].split("/")[-1] for e in plan["entries"] if e["kind"] == "crystal"}
-                    self.assertTrue(arenas <= RETAIL_ARENAS, arenas)
+                    self.assertTrue(arenas <= DEFAULT_ARENAS, arenas)
                     on_pads = {e["id"] for e in plan["entries"] if e["kind"] == "track"}
                     for track_id in guaranteed:
                         self.assertTrue(any(track_id in entry_id for entry_id in on_pads), track_id)
