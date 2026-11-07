@@ -58,7 +58,7 @@ Crash Team Racing:
       evidence: []
   cup_count: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}
   crystal_challenge_count: {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}
-  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court]
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
   boss_garages: true
   boss_cups: {0: 1, 1: 1, 2: 1}
   required_entries: [baby-t-park, fuzz-fixture-loop]

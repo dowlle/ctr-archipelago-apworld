@@ -86,7 +86,7 @@ class TestOptionSet(unittest.TestCase):
         self.assertEqual(len(hints["boss_weapon_pool"].default), 10)
         self.assertEqual(len(hints["oxide_weapon_pool"].default), 11)
         self.assertEqual(len(hints["crystal_arenas"].valid_keys), 7)
-        self.assertEqual(len(hints["crystal_arenas"].default), 4)
+        self.assertEqual(len(hints["crystal_arenas"].default), 7)
 
     def test_cup_tracks_takes_the_word_random(self):
         self.assertEqual(CupTracks.from_any("random").value, CupTracks.option_random_repeats)
@@ -209,7 +209,7 @@ class TestEntranceHints(unittest.TestCase):
         self.assertIn(content_requirements.KEY_BY_PHYSICAL[int(pad.split(":")[1])], text[check["location"]])
 
     def test_vanilla_placement_has_no_hints(self):
-        world = make_world(dict(pad_placement="vanilla"), 420)
+        world = make_world(dict(pad_placement="vanilla", crystal_arenas=["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"]), 420)
         hints = {}
         world.extend_hint_information(hints)
         self.assertEqual(hints, {})

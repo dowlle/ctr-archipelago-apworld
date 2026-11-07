@@ -1124,7 +1124,17 @@ def required_ids(options, candidates, arenas, packages):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
             or len(wanted) > content_cups.PADS):
-        error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads.")
+        problems = []
+        unknown = [name for name in dict.fromkeys(wanted) if name not in names]
+        if unknown:
+            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown))
+        repeated = [name for name in dict.fromkeys(wanted) if name in names and wanted.count(name) > 1]
+        if repeated:
+            problems.append("listed more than once: " + ", ".join(repr(name) for name in repeated))
+        if len(wanted) > content_cups.PADS:
+            problems.append(f"{len(wanted)} entries do not fit the {content_cups.PADS} normal pads")
+        error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads. "
+              + "; ".join(problems) + ".")
     out = [names[name] for name in wanted]
     if int(options.cortex_vortex_track.value) == CORTEX_OWN_PAD:
         out.append(CORTEX_TRACK_ID)

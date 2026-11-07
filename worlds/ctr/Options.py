@@ -851,10 +851,10 @@ class PadApproachHints(Toggle):
     display_name = "Pad Approach Hints"
 
 
-class PadHintsWaitForSpoiler(Toggle):
-    """Pad Approach Hints wait for Warp Pad Preview.
+class PadHintsWaitForSpoiler(DefaultOnToggle):
+    """Pad Approach Hints wait for Warp Pad Preview. On by default.
 
-    Off (default): Pad Approach Hints work as before.
+    Off: Pad Approach Hints work as before.
 
     On: with Spoiler Items and Pad Approach Hints both on, a pad hints nothing
     until you receive Warp Pad Preview, the item that also reveals the pad's
@@ -864,10 +864,10 @@ class PadHintsWaitForSpoiler(Toggle):
     display_name = "Pad Hints Wait for Spoiler"
 
 
-class PadHintsProgressionOnly(Toggle):
-    """Pad Approach Hints only hint progression items.
+class PadHintsProgressionOnly(DefaultOnToggle):
+    """Pad Approach Hints only hint progression items. On by default.
 
-    Off (default): a pad hints every open check behind it.
+    Off: a pad hints every open check behind it.
 
     On: a pad hints only the checks that hold a progression item, which keeps
     the hint list short. Checks with useful items, filler and traps are not
@@ -927,23 +927,25 @@ class TrackerPadLaunch(DefaultOnToggle):
 
 
 class AdventureStructure(Choice):
-    """Choose whether a track's Trophy Race and CTR Challenge stay two races or
-    are merged into one.
+    """Choose whether a track's Trophy Race and CTR Challenge stay two separate
+    races or are merged into one.
 
     - **classic** (default): two races, as in the original game. Win the Trophy
       Race first; the CTR Challenge and the Relic Race open after it.
-    - **ctr_first**: the Trophy Race and the CTR Challenge are merged into one
-      race, the CTR Challenge. Finishing first sends the track's Trophy Race
-      check, and finishing first with the letters also sends its CTR Token
-      Challenge check. Item boxes, Wumpa and placement checks come from this
-      race, and placement counts even without the letters. A Relic Race opens
-      after it, like any later race on the pad.
+    - **trophy_ctr_combined**: merges the Trophy Race and the CTR Challenge into
+      one race, played as the CTR Challenge. Finishing first earns the track's
+      Trophy Race check. Finishing first with all three letters also earns its
+      CTR Token check. Item boxes, Wumpa and placement checks come from this one
+      race, and placement counts even without the letters. The Relic Race opens
+      after it, like any later race on the pad. `ctr_first` is the old name and
+      still works.
 
     The checks keep their names, so "Trophy Race" is still the track's first
     check. A track without a CTR Challenge uses classic."""
     display_name = "Adventure Structure"
     option_classic = 0
-    option_ctr_first = 1
+    option_trophy_ctr_combined = 1
+    alias_ctr_first = 1
     default = 0
 
 
@@ -1515,15 +1517,19 @@ class CrystalChallengeCount(Range):
 
 
 class CrystalArenas(OptionSet):
-    """Choose which arenas a Crystal Challenge can use. The default is the four
-    original arenas: Rocky Road, Rampage Ruins, Skull Rock and Nitro Court.
+    """Choose which arenas a Crystal Challenge can use. The default is all
+    seven: Rocky Road, Rampage Ruins, Skull Rock, Nitro Court, Parking Lot,
+    The North Bowl and Lab Basement. Crystal Challenge Count sets how many of
+    them the seed uses.
 
-    You can also list Parking Lot, The North Bowl and Lab Basement. Each of
-    those uses a warp pad, has 20 crystals and gives no Purple CTR Token.
-    Crystal Challenge Count cannot be higher than the number of arenas listed."""
+    Parking Lot, The North Bowl and Lab Basement are the new arenas. Each of
+    those uses a warp pad, has 20 crystals and gives no Purple CTR Token. To
+    keep only the four original arenas, list Rocky Road, Rampage Ruins, Skull
+    Rock and Nitro Court. Crystal Challenge Count cannot be higher than the
+    number of arenas listed."""
     display_name = "Crystal Arenas"
     valid_keys = sorted(ARENA_NAMES)
-    default = frozenset(ORIGINAL_ARENA_NAMES)
+    default = frozenset(ARENA_NAMES)
 
 
 class BossGarages(DefaultOnToggle):
