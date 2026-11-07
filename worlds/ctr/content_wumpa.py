@@ -352,6 +352,18 @@ def income_term(world):
     return world.ctr_income_term
 
 
+def slot_income_term(world):
+    """What `Wumpa Income` stands for in a shop slot's row (A3-37b): the
+    event's own term, so a foreign wrapper on the event refuses the export on
+    every seed. Its wire is `ctr_income_term`, the same as `income_term`."""
+    event = world.ctr_income_event
+    term = logic_terms.term_of(event)
+    if term is None:
+        from .win_logic import _unexportable
+        raise _unexportable(world, event, "CTR win_logic: Wumpa Income has no term-backed rule")
+    return term
+
+
 def install(world, plan, menu, stage_gate, stage_term):
     """The `Wumpa Income` event (in Menu, any income route) and the shop
     locations (in Menu, the hub's Key floor and `Wumpa Income`), with the
@@ -406,9 +418,11 @@ def install(world, plan, menu, stage_gate, stage_term):
                    for entry, test, need, racer in routes)
     event = Location(player, INCOME, None, menu)
     event.access_rule = income
-    if hints:
-        logic_terms.set_term(event, logic_terms.SerializedRule(income, world.ctr_income_term))
-        world.ctr_income_event = event
+    # A3-37b: always term-backed, so every shop slot gets a win_logic row.
+    # Win rows keep reading `ctr_income_term` without Pad Approach Hints
+    # (income_term), so their wire is unchanged.
+    logic_terms.set_term(event, logic_terms.SerializedRule(income, world.ctr_income_term))
+    world.ctr_income_event = event
     event.place_locked_item(world.create_event(INCOME))
     menu.locations.append(event)
     record = plan.get("wumpa_shop")
@@ -424,11 +438,10 @@ def install(world, plan, menu, stage_gate, stage_term):
         floor = key_floor(record, hub, checks[code])
         location.access_rule = (lambda state, floor=floor: state.has(INCOME, player)
                                 and (not floor or state.has(key, player, floor)))
-        if hints:
-            term = logic_terms.EventTerm(INCOME, player, lambda: income_term(world))
-            if floor:
-                term = logic_terms.And(term, logic_terms.Has(key, floor, player))
-            logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, term))
+        term = logic_terms.EventTerm(INCOME, player, lambda: slot_income_term(world))
+        if floor:
+            term = logic_terms.And(term, logic_terms.Has(key, floor, player))
+        logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, term))
         if excluded:
             location.item_rule = lambda item: not item.advancement
         menu.locations.append(location)

@@ -21,9 +21,9 @@ class TestHintGlobalTerms(unittest.TestCase):
                  boss_options(itemsanity=True, hit_character=True, boss_opponent_shuffle=True,
                               progressive_boost="per_character", character_unlocks=True,
                               racer_locked_pads=4, cup_count=3)]
-        for seed, options in enumerate(cases):
-            options["pad_approach_hints"] = True
-            if seed >= 2:
+        for seed, (options, hints) in enumerate([(c, h) for h in (True, False) for c in cases]):
+            options = dict(options, pad_approach_hints=hints)
+            if seed % len(cases) >= 2:
                 # Leave room for the weapon, racer and capability copies.
                 options["item_pool"]["base"]["trophies"] = 12
             world = make_world(options, seed=seed + 31, stop_before="generate_basic")
@@ -58,8 +58,23 @@ class TestHintGlobalTerms(unittest.TestCase):
         with self.assertRaises(ForeignRuleError):
             content_wumpa.income_term(world)
 
-    def test_hints_off_keeps_original_global_rules_unannotated(self):
+    def test_foreign_income_wrapper_refuses_shop_rows_without_hints(self):
+        """A3-37b: shop slots have rows on every seed, so a wrapped income
+        event must refuse their export with the option off too."""
+        world = make_world(shop_options(), seed=73, stop_before="generate_basic")
+        event = world.multiworld.get_location(content_wumpa.INCOME, world.player)
+        previous = event.access_rule
+        event.access_rule = lambda state: state.has("Foreign Unlock", 2) and previous(state)
+        with self.assertRaises(ForeignRuleError):
+            content_wumpa.slot_income_term(world)
+
+    def test_hints_off_annotates_global_rules_too(self):
+        """A3-37b: the global checks are term-backed on every seed, and the
+        runtime rule stays the original callable."""
         world = make_world(global_options(pad_approach_hints=False), seed=31,
                            stop_before="generate_basic")
+        self.assertTrue(world.ctr_global_routes)
         for _check, location, _routes in world.ctr_global_routes:
-            self.assertIsNone(logic_terms.term_of(location))
+            term = logic_terms.term_of(location)
+            self.assertIsInstance(term, logic_terms.SerializedRule)
+            self.assertIs(location.access_rule, term.rule)

@@ -335,15 +335,16 @@ def _region_wire(world, enc, region, stack, memo):
 
 # --- the block ---------------------------------------------------------------
 
-def win_locations(world):
+def win_locations(world, include_hints: bool = True):
     """Exported checks, ordered by id. Actual wins keep their win kind.
 
-    Pad Approach Hints additionally exports every addressed non-win with
-    kind `hint`, so native can evaluate all families without guessing gates.
-    With the option off, this remains the unchanged win-only graph.
+    Every addressed non-win is exported too, with kind `hint` (A3-37b, ruling of
+    2026-11-07 12:35 CET "Yes, export all"): native colours a pad by whether
+    any open check behind it is in logic, boxes, Wumpa, letters and rungs
+    included, and Pad Approach Hints reads the same rows. `include_hints`
+    False gives the win-only graph, the block a seed carried before A3-37b.
     """
     out = []
-    include_hints = bool(getattr(getattr(world.options, "pad_approach_hints", None), "value", 0))
     from .content_plan import win_kinds
     kinds = win_kinds(world.ctr_content_plan)
     for loc in world.multiworld.get_locations(world.player):
@@ -374,14 +375,18 @@ def start_counts(world) -> Dict[str, int]:
     return {str(code): counts[code] for code in sorted(counts)}
 
 
-def wire_block(world) -> Dict[str, object]:
-    """Build the `win_logic` block for this slot from the installed terms."""
+def wire_block(world, include_hints: bool = True) -> Dict[str, object]:
+    """Build the `win_logic` block for this slot from the installed terms.
+
+    With hint rows the block is version 2 (Contract 7m, schema changes of
+    2026-11-03 and 2026-11-07). The win-only graph keeps version 1, as before
+    A3-37b."""
     enc = _Encoder(world)
     memo: Dict = {}
     regions: List = []
     region_index: Dict[str, int] = {}
     checks: Dict[str, Dict[str, object]] = {}
-    for loc, kind in win_locations(world):
+    for loc, kind in win_locations(world, include_hints):
         term = term_of(loc)
         if term is None:
             raise _unexportable(
@@ -417,7 +422,7 @@ def wire_block(world) -> Dict[str, object]:
             raise WinLogicExportError(
                 f"CTR win_logic: check {key} nests {d} levels (limit {MAX_DEPTH})")
     return {
-        "version": 2 if world.options.pad_approach_hints.value else WIN_LOGIC_VERSION,
+        "version": 2 if include_hints else WIN_LOGIC_VERSION,
         "families": [sorted(int(world.item_name_to_id[n]) for n in fam)
                      for fam in weapon_families()],
         "regions": regions,
