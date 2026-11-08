@@ -387,7 +387,7 @@ class TestCommunitySpotFiles(unittest.TestCase):
         self.assertFalse(refused(plan))
 
     def test_other_revisions_keep_crate_seating(self):
-        # Ancient Lake 1.0.0's LEV keeps its reviewed crate exclusion.
+        # The xdelta-import Ancient Lake LEV keeps its reviewed crate exclusion.
         old = "256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8"
         for key, digest in (("ancient-lake", old), ("dk-pass", "01" * 32)):
             plan = first_world(box_options(custom=[community_package(key, 8, digest)])).ctr_content_plan
