@@ -20,7 +20,7 @@ from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from .. import box_spots, content_item_boxes, content_plan, item_boxes, named_tracks
+from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
 from ..Locations import CTR_LOCATION_IDS
 from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, first_world, refused
 from .test_content_plan import make_world
@@ -28,6 +28,12 @@ from .test_custom_packages import UNKNOWN
 
 FIXTURES = "test/fixtures/"
 CRASH_COVE = 3
+#: The reviewed community files (A3-45): track key -> (named block, LEV pin of
+#: the package revision in the shared YAMLs, spots that need more than none).
+COMMUNITY = {
+    "ancient-lake": (1, "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee", {2: "boost"}),
+    "dk-pass": (25, "cf29d61f8e7b9a5d210a060ffbc4da22b04483d25d85c6a01bff855f312c09ef", {}),
+}
 
 
 def fixture(path):
@@ -69,9 +75,9 @@ class TestConversion(unittest.TestCase):
         self.assertEqual(rows, fixture("box_spots_builtin_rows.json")["rows"])
         self.assertEqual(len(rows), 241)
 
-    def test_shipped_files_are_the_18_retail_tracks_only(self):
+    def test_shipped_files_are_the_18_retail_tracks_and_the_reviewed_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(box_spots.CUSTOM_FILES, {})
+        self.assertEqual(sorted(box_spots.CUSTOM_FILES), sorted(COMMUNITY))
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -330,6 +336,93 @@ class TestNamedCustomSpots(unittest.TestCase):
             forged["content_plan"]["item_boxes"]["spot_sets"][0]["picked"].reverse()
             with self.assertRaises(OptionError):
                 make_world(options, seed=2, passthrough=forged)
+
+
+def community_package(key, crates=17, digest=None):
+    """A catalogue package of a community-file track on the given LEV."""
+    package = btp(crates)
+    old = package["files"][0]["sha256"]
+    name = box_spots.CUSTOM_FILES[key]["doc"]["track"]["name"]
+    package.update(content_id=key, display_name=name, id=f"package/{key}/1.0.0", revision="1.0.0",
+                   uuid=f"11111111-2222-4333-8444-{COMMUNITY[key][0]:012d}")
+    package["files"][0]["sha256"] = digest or COMMUNITY[key][1]
+    for evidence in package.get("evidence", []):
+        evidence["file_hashes"] = [package["files"][0]["sha256"] if h == old else h for h in evidence["file_hashes"]]
+    return package
+
+
+class TestCommunitySpotFiles(unittest.TestCase):
+    """The first reviewed community files: DK Pass and Ancient Lake (A3-45)."""
+
+    def test_files_are_reviewed_named_track_files(self):
+        for key, (block, pin, needs) in COMMUNITY.items():
+            doc = box_spots.CUSTOM_FILES[key]["doc"]
+            self.assertEqual(destinations.named_track(key).block_index, block)
+            self.assertEqual(doc["track"]["lev_sha256"], [pin])
+            self.assertEqual([s["number"] for s in doc["spots"]], list(range(1, 16)))
+            self.assertEqual(doc["retired"], [])
+            for spot in doc["spots"]:
+                self.assertEqual(spot["source"], "community")
+                self.assertEqual(spot["needs"], needs.get(spot["number"], "none"), (key, spot["number"]))
+                self.assertNotIn("shortcut", spot)
+
+    def test_seed_stands_every_box_at_the_spots(self):
+        packages = [community_package(key) for key in COMMUNITY]
+        plan = first_world(box_options(custom=packages, progressive_boost="shared_global")).ctr_content_plan
+        self.assertIn(box_spots.FEATURE, plan["required_features"])
+        self.assertNotIn(crate_exclusions.KEY, plan["item_boxes"])
+        for key, (block, pin, needs) in COMMUNITY.items():
+            track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == block)
+            record = spot_set(plan, track_id)
+            self.assertEqual(record["lev_sha256"], pin)
+            self.assertEqual((record["pool"], record["picked"]), (15, list(range(1, 16))))
+            spots = box_spots.spots_by_number(box_spots.CUSTOM_FILES[key])
+            own = boxes(plan, track_id)
+            self.assertEqual([c["spot"]["number"] for c in own], list(range(1, 16)))
+            for check in own:
+                n = check["spot"]["number"]
+                self.assertEqual(check["spot"], box_spots.wire_spot(spots[n]))
+                self.assertEqual(check["location"], named_tracks.location_code(block, f"item_box_{n}"))
+                self.assertEqual(check.get("boost", 0), box_spots.NEEDS[needs.get(n, "none")])
+        self.assertFalse(refused(plan))
+
+    def test_other_revisions_keep_crate_seating(self):
+        # Ancient Lake 1.0.0's LEV keeps its reviewed crate exclusion.
+        old = "256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8"
+        for key, digest in (("ancient-lake", old), ("dk-pass", "01" * 32)):
+            plan = first_world(box_options(custom=[community_package(key, 8, digest)])).ctr_content_plan
+            track_id = next(t["id"] for t in plan["tracks"] if t["origin"] == "custom")
+            self.assertIsNone(spot_set(plan, track_id))
+            self.assertNotIn("spot", boxes(plan, track_id)[0])
+            self.assertEqual(crate_exclusions.KEY in plan["item_boxes"], key == "ancient-lake")
+
+    def test_room_from_before_the_files_restores(self):
+        """A room generated before the files shipped keeps its crate seats."""
+        packages = [community_package(key) for key in COMMUNITY]
+        with mock.patch.dict(box_spots.CUSTOM_FILES, {}, clear=True):
+            wire = json.loads(json.dumps(first_world(box_options(custom=packages)).fill_slot_data()))
+        sets = {s["track_id"] for s in wire["content_plan"]["item_boxes"]["spot_sets"]}
+        self.assertFalse(any(t.startswith("custom/") for t in sets))
+        restored = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        # A retail track without its set still refuses.
+        forged = copy.deepcopy(wire)
+        forged["content_plan"]["item_boxes"]["spot_sets"] = [
+            s for s in forged["content_plan"]["item_boxes"]["spot_sets"] if not s["track_id"].startswith("retail:")]
+        self.assertTrue(any(t.startswith("retail:") for t in sets))
+        with self.assertRaises(OptionError):
+            make_world({}, seed=999, passthrough=forged)
+
+    def test_tracker_round_trip(self):
+        packages = [community_package(key) for key in COMMUNITY]
+        wire = json.loads(json.dumps(first_world(box_options(custom=packages, tier="hard")).fill_slot_data()))
+        restored = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        forged = copy.deepcopy(wire)
+        record = next(s for s in forged["content_plan"]["item_boxes"]["spot_sets"] if s["track_id"].startswith("custom/"))
+        record["lev_sha256"] = "01" * 32
+        with self.assertRaises(OptionError):
+            make_world({}, seed=999, passthrough=forged)
 
 
 if __name__ == "__main__":

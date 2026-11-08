@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "dk-pass", "name": "DK Pass", "lev_sha256": ["cf29d61f8e7b9a5d210a060ffbc4da22b04483d25d85c6a01bff855f312c09ef"]},
+  "spots": [
+    {"number": 1, "pos": [2657, 2942, -6925], "rot_y": 1192, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 2, "pos": [-4589, 2162, 94], "rot_y": 3628, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 3, "pos": [-6709, 907, 6347], "rot_y": 432, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 4, "pos": [-5791, 238, 8412], "rot_y": 73, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 5, "pos": [-6152, -795, 16919], "rot_y": 2553, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 6, "pos": [-8587, -1040, 17263], "rot_y": 3154, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 7, "pos": [-7594, -1347, 15559], "rot_y": 1147, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 8, "pos": [-789, 1636, -4545], "rot_y": 1041, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 9, "pos": [2800, 2968, -10131], "rot_y": 2053, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 10, "pos": [-455, 3795, -11324], "rot_y": 1894, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 11, "pos": [-4120, 3948, -13349], "rot_y": 3202, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 12, "pos": [-7280, 4505, -10375], "rot_y": 1621, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 13, "pos": [-6843, 3232, -4590], "rot_y": 531, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 14, "pos": [-4697, 905, 6159], "rot_y": 20, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"},
+    {"number": 15, "pos": [-5449, 330, 8248], "rot_y": 2068, "needs": "none", "source": "community", "credit": "Discord community", "review": "A3-45"}
+  ],
+  "retired": []
+}

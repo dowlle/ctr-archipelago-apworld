@@ -32,6 +32,11 @@ def north_pole(crates=29):
     return p
 
 
+# Ancient Lake 1.1.0 (LEV 21e1ff...) ships a community spot file since A3-45,
+# so new seeds of that revision stand their boxes at the spots and carry no
+# exclusion row. These tests cover the fallback seating itself, so they run
+# without community spot files (test_box_spots covers the file).
+@patch.dict(box_spots.CUSTOM_FILES, {}, clear=True)
 class TestCrateExclusions(unittest.TestCase):
     def test_catalog_pins_exact_digests(self):
         self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE})

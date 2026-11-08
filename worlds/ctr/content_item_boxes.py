@@ -49,7 +49,9 @@ angle) so the client stands it there. Its terms are the spot's own fields:
 `needs` as the boost rank, a hard `shortcut` as the stat term; on a custom
 track they replace the finish term F, and no weapon crate is hidden. A track
 without a file keeps the rules above. A record without `spot_sets` (a seed from
-before A3-14) keeps them for every track.
+before A3-14) keeps them for every track, and a record without a set for a
+named custom track (a seed from before that track's file shipped, A3-45) keeps
+them for that track.
 
 Native re-derives the box identities, names and routes from the plan and its
 registry rows (`boxes` per retail row, or the spot numbers) and refuses any
@@ -170,9 +172,12 @@ def check_spot_sets(record, tracks, packages):
     for track_id, track in by_id.items():
         package = packages.get(track.get("package_id"))
         has_file = box_spots.file_for(track, package) is not None
-        if has_file != (track_id in sets):
+        # A named custom track whose file shipped after the room was generated
+        # keeps its crate seats there: Item Box 1 to 15 are crate seats until
+        # the track's file ships (ruled 2026-11-06, D1). Retail stays strict.
+        if has_file != (track_id in sets) and not (has_file and track.get("origin") == "custom"):
             error(f"item_boxes.spot_sets disagrees with this build's box spot files for {track_id}.")
-        if has_file:
+        if track_id in sets:
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
                                          {k: v for k, v in sets[track_id].items() if k != "track_id"})
