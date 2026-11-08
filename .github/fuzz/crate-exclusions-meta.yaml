@@ -1,4 +1,6 @@
 # Reviewed Ancient Lake and North Pole fallback exclusions, exact LEV and VRM bytes only.
+# Ancient Lake uses its xdelta-import LEV (256d1ed4...): the catalogue 1.1.0 LEV (21e1ffe3...)
+# has a community spot file since A3-45, so it no longer seats boxes on crates (community-spots arm).
 Crash Team Racing:
   accessibility: full
   box_locations: true
@@ -12,7 +14,7 @@ Crash Team Racing:
       laps: 3
       capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 17, checkpoints: 58, ai_nav: true}
       files:
-        - {role: lev, sha256: 21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee, bytes: 413804, format: ctr-lev, format_version: 1}
+        - {role: lev, sha256: 256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8, bytes: 445556, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: 57c14cc95b6080f0095f303817fbec8ca1cb885a2a254ed0e99d4536294ed0e2, bytes: 458808, format: ctr-vrm, format_version: 1}
       evidence: []
     - id: package/north-pole/1.1.0
