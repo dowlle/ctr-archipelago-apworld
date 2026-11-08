@@ -175,7 +175,8 @@ class TestCupChecks(unittest.TestCase):
                     win = next(c for c in plan["checks"] if c["location"] == 35011200 + index)
                     self.assertEqual(win["display_name"], f"{cup_checks.GEM_CUPS[index]}: Gem")
                 else:
-                    win = next(c for c in plan["checks"] if c["location"] == 35027000 + index)
+                    code = cup_checks._pool_code(cup_checks.CUP_WIN_CODE_BASE, cup_checks.CUP_WIN_GROWTH_BASE, index)
+                    win = next(c for c in plan["checks"] if c["location"] == code)
                     self.assertEqual(win["display_name"], f"{cup_checks.CUP_NAMES[index]}: Win")
             victories = [c for c in plan["checks"] if c["kind"] == "cup_leg"]
             self.assertEqual({c["owner"] for c in victories}, legs - trophy)

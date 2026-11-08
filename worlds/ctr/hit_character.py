@@ -89,7 +89,7 @@ TRACK_LEVEL_IDS: Tuple[int, ...] = tuple(range(18))
 CUP_IDS: Tuple[int, ...] = (100, 101, 102, 103, 104)
 
 #: Content-plan cups (#133 PR 5b): a content plan seats its cups on the 27
-#: normal pads, each named from the 27-name pool (cup_checks.CUP_NAMES). Each
+#: normal pads, each named from the named pool (cup_checks.CUP_NAMES). Each
 #: cup draws its frozen field from its own order, carried in the block's
 #: optional `content_cups` object keyed by the cup's name index. The order is
 #: `destination_order(seed, CONTENT_CUP_DESTINATION_BASE + name index)`, so it
