@@ -18,6 +18,8 @@
     "retail:14": {"name": "Coco Park", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "retired": []},
     "retail:15": {"name": "Tiny Arena", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
     "retail:16": {"name": "Slide Coliseum", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
-    "retail:17": {"name": "Turbo Track", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []}
+    "retail:17": {"name": "Turbo Track", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "custom:ancient-lake": {"name": "Ancient Lake", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []},
+    "custom:dk-pass": {"name": "DK Pass", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "retired": []}
   }
 }

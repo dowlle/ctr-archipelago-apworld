@@ -19,5 +19,8 @@
     "TINY_ARENA",
     "TURBO_TRACK"
   ],
-  "custom": []
+  "custom": [
+    "ancient-lake",
+    "dk-pass"
+  ]
 }

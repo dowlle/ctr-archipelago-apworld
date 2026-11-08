@@ -1,5 +1,6 @@
 - {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
 - {check_name: crate-exclusions,            check_runs: 500,  check_hook: '', check_mode: fuzz, check_meta: 'crate-exclusions'}
+- {check_name: community-spots,             check_runs: 500,  check_hook: '', check_mode: fuzz, check_meta: 'community-spots'}
 - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'random'}
 - {check_name: no-restrictive-starts,       check_runs: 5000, check_hook: 'hooks.no_rs:Hook',                                          check_mode: fuzz, check_meta: 'random'}
 - {check_name: check-determinism,           check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz, check_meta: 'random'}
