@@ -40,14 +40,14 @@ block's `content_cups`), frozen for every leg and retry, custom legs
 included; every leg is then a Hit route (content_global_checks).
 
 CHECKS.
-  * `<Cup>: Win` (35027000 + name index) on a points win, `<Colour> Gem Cup:
-    Gem` (35011200 + colour) on a Gem Cup. A sixth cup onward takes one name
-    from the 27-name pool (cup_checks.CUP_NAMES), drawn per seed (naming
+  * `<Cup>: Win` (35027000 + name index; index 27 and up 35027100 + index - 27)
+    on a points win, `<Colour> Gem Cup: Gem` (35011200 + colour) on a Gem Cup. A sixth cup onward takes one name
+    from the named pool (cup_checks.CUP_NAMES), drawn per seed (naming
     model ruled 2026-10-13 21:47 CEST). Its `boost` is the legs' highest
     finish rank (usf_finish.cup_finish_t: USF when a leg is a USF finish
     track).
-  * `<Cup>: Win All Legs` (35027200 + name index, 35028300 + colour on a Gem
-    Cup) with `cup_sweep_checks`: first place in all four legs of one
+  * `<Cup>: Win All Legs` (35027200 + name index; index 27 and up
+    35027300 + index - 27; 35028300 + colour on a Gem Cup) with `cup_sweep_checks`: first place in all four legs of one
     uninterrupted attempt (#246). Its `boost` is the legs' highest Trophy Race
     rank.
   * `<Track>: Cup Leg Victory` for a leg track with no standalone Trophy Race

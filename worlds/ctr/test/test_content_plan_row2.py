@@ -88,8 +88,8 @@ class TestGemCups(unittest.TestCase):
             self.assertEqual(win["routes"][0]["award"], "win")
         for cup in pool_cups(plan):
             index = int(cup["id"].split(":")[1])
-            self.assertIn(35027000 + index, checks)
-            self.assertIn(35027200 + index, checks)
+            self.assertIn(cup_checks._pool_code(35027000, 35027100, index), checks)
+            self.assertIn(cup_checks._pool_code(35027200, 35027300, index), checks)
 
     def test_gems_stay_shuffled_items(self):
         world = make_world(plan_options(), stop_before="pre_fill")

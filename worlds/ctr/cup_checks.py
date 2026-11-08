@@ -45,6 +45,8 @@ CUP_NAMES: Tuple[str, ...] = (
     "Bethany Cup", "Niko1Point0 Cup", "Aalhendi Cup", "MateusFavarin Cup",
     "TheUbMunster Cup", "Kabarakh Cup", "DragRedSim Cup", "Stroodlydoodles Cup",
     "Bob90 Cup", "Turbo Cup", "Relic Cup", "Multiworld Cup", "Sphere Cup",
+    "Cristichi Cup", "FruitLion8 Cup", "TayWoodz Cup", "MeD Cup", "Lionboy Cup",
+    "MisterShaokahn Cup", "Sturg Cup", "Prototyp_002 Cup", "Em Cup",
 )
 #: Room reserved for later cup names, ruled 2026-10-13 21:47 CEST.
 CUP_NAME_CAPACITY = 127

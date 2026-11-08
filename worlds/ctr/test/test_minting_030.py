@@ -32,12 +32,16 @@ NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_co
 
 class TestFixedFamilies(unittest.TestCase):
     def test_cup_checks(self):
-        self.assertEqual(len(CUP_NAMES), 27)
+        self.assertEqual(len(CUP_NAMES), 36)
         self.assertEqual(CUP_NAMES[0], "Patries Cup")
-        self.assertEqual(CUP_NAMES[-1], "Sphere Cup")
+        self.assertEqual(CUP_NAMES[26], "Sphere Cup")
+        self.assertEqual(CUP_NAMES[-1], "Em Cup")
         for i, cup in enumerate(CUP_NAMES):
-            self.assertEqual(L[f"{cup}: Win"], 35027000 + i)
-            self.assertEqual(L[f"{cup}: Win All Legs"], 35027200 + i)
+            # Index 27 and up use the growth ranges; 35027027 is Cortex Vortex's leg.
+            win = 35027000 + i if i < 27 else 35027100 + i - 27
+            sweep = 35027200 + i if i < 27 else 35027300 + i - 27
+            self.assertEqual(L[f"{cup}: Win"], win)
+            self.assertEqual(L[f"{cup}: Win All Legs"], sweep)
         for i, cup in enumerate(GEM_CUPS):
             self.assertEqual(L[f"{cup}: Win All Legs"], 35028300 + i)
 
@@ -94,8 +98,10 @@ class TestFixedFamilies(unittest.TestCase):
 class TestReservedNotMinted(unittest.TestCase):
     RESERVED = (
         (35019000, 35019191, "race v2 codes of slots 1..32, never used"),
-        (35027100, 35027199, "later cup names, Win"),
-        (35027300, 35027399, "later cup names, Win All Legs"),
+        # The nine alpha3 tester cup names (A3-42) took 35027100 to 35027108
+        # and 35027300 to 35027308; the rest of both growth ranges stays reserved.
+        (35027109, 35027199, "later cup names, Win"),
+        (35027309, 35027399, "later cup names, Win All Legs"),
         (35028503, 35028519, "arcade completion expansion"),
         (35028580, 35028599, "arcade crystal expansion"),
         (35028625, 35028639, "Wumpa Shop expansion, N. Sanity Beach"),
