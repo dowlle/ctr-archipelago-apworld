@@ -3,4 +3,5 @@
 name: Player
 game: Crash Team Racing
 Crash Team Racing:
+  item_box_count: 0
   death_link: "off"

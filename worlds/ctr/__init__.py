@@ -198,6 +198,8 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
+            from . import content_item_boxes
+            content_item_boxes.settings(self.options)
             content_plan.generate(self)
 
     def create_regions(self):

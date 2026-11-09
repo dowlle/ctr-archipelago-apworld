@@ -532,6 +532,9 @@ def read_player_yaml(path: str) -> dict:
                         file=os.path.basename(path))
     if not str(doc.get("name") or "").strip():
         raise SoloError("yaml", "The YAML has no player name.", file=os.path.basename(path))
+    from worlds.ctr.legacy_yaml import migrate_box_count
+    if isinstance(doc.get(GAME), dict):
+        migrate_box_count(doc[GAME])
     return doc
 
 
@@ -551,6 +554,8 @@ def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
         if not sep or key not in known:
             raise SoloError("option", f"Unknown option {key!r}.", option=key)
         section[key] = yaml.safe_load(raw)
+        if key == "item_box_count":
+            section.pop("box_locations", None)
     return doc
 
 

@@ -1,4 +1,8 @@
 - {check_name: canonical-default,           check_runs: 1,    check_hook: '',                                                          check_mode: canonical}
+- {check_name: box-count-0, check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'box-count-0'}
+- {check_name: box-count-1, check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'box-count-1'}
+- {check_name: box-count-15, check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'box-count-15'}
+- {check_name: box-count-50, check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'box-count-50'}
 - {check_name: crate-exclusions,            check_runs: 500,  check_hook: '', check_mode: fuzz, check_meta: 'crate-exclusions'}
 - {check_name: community-spots,             check_runs: 500,  check_hook: '', check_mode: fuzz, check_meta: 'community-spots'}
 - {check_name: default,                     check_runs: 5000, check_hook: '',                                                          check_mode: fuzz, check_meta: 'random'}

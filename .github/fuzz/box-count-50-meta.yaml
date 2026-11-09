@@ -1,0 +1,40 @@
+# The first community box spot files (A3-45): DK Pass 1.0.0 and Ancient Lake 1.1.0, exact LEV pins,
+# so both tracks stand their boxes at the shipped spots. Progressive Boost on, so Ancient Lake 2 (boost) matters.
+Crash Team Racing:
+  accessibility: full
+  item_box_count: 50
+  progressive_boost: shared_global
+  custom_tracks:
+    - id: package/dk-pass/1.0.0
+      content_id: dk-pass
+      uuid: 11111111-2222-4333-8444-555555555537
+      revision: "1.0.0"
+      display_name: DK Pass
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: false, weapon_crates: 15, checkpoints: 122, ai_nav: true}
+      files:
+        - {role: lev, sha256: cf29d61f8e7b9a5d210a060ffbc4da22b04483d25d85c6a01bff855f312c09ef, bytes: 537464, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 30993ad9afb782470317b5c256578d5d432094b304e0765c2205a4c16ef1178a, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+    - id: package/ancient-lake/1.1.0
+      content_id: ancient-lake
+      uuid: 11111111-2222-4333-8444-555555555535
+      revision: "1.1.0"
+      display_name: Ancient Lake
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 17, checkpoints: 58, ai_nav: true}
+      files:
+        - {role: lev, sha256: 21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee, bytes: 413804, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 57c14cc95b6080f0095f303817fbec8ca1cb885a2a254ed0e99d4536294ed0e2, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [dk-pass, ancient-lake]
+  retail_tracks: [all]
+  track_modes: {default: [trophy]}
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
+  boss_garages: true
+  purple_cup_boss_gauntlet: false
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
+  boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
+  oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]

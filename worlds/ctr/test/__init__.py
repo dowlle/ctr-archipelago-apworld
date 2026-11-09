@@ -3,6 +3,7 @@ from test.bases import WorldTestBase
 
 class CTRTestBase(WorldTestBase):
     game = "Crash Team Racing"
+    options = {"box_locations": False}
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         from .plan_options import plan_options

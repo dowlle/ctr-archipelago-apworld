@@ -185,15 +185,15 @@ def eligible(entry, knowledge):
     return sorted(s["number"] for s in entry["doc"]["spots"] if tier(s) <= knowledge)
 
 
-def pick(numbers, seed, player, track_id):
+def pick(numbers, seed, player, track_id, count=PICK):
     """The numbers a seed uses from the eligible `numbers`: all when 15 or
     fewer (no random draw), else 15 drawn by a generator of their own. Sorted."""
     numbers = sorted(numbers)
-    if len(numbers) <= PICK:
+    if len(numbers) <= count:
         return numbers
     key = f"{seed}:{player}:box_spots:{track_id}".encode("utf-8")
     rng = random.Random(int.from_bytes(hashlib.sha256(key).digest(), "big"))
-    return sorted(rng.sample(numbers, PICK))
+    return sorted(rng.sample(numbers, count))
 
 
 def lev_pin(package):
@@ -215,19 +215,19 @@ def file_for(track, package=None):
     return None
 
 
-def spot_set(track, package, knowledge, seed, player):
+def spot_set(track, package, knowledge, seed, player, count=PICK):
     """The plan's `spot_sets` record of one track, or None without a file."""
     entry = file_for(track, package)
     if entry is None:
         return None
     pool = eligible(entry, knowledge)
-    out = dict(file_sha256=entry["sha256"], pool=len(pool), picked=pick(pool, seed, player, track["id"]))
+    out = dict(file_sha256=entry["sha256"], pool=len(pool), picked=pick(pool, seed, player, track["id"], count))
     if track.get("origin") == "custom":
         out["lev_sha256"] = lev_pin(package)
     return out
 
 
-def check_spot_set(track, package, knowledge, record):
+def check_spot_set(track, package, knowledge, record, count=PICK):
     """A plan's spot set against this build's file; returns the file entry."""
     entry = file_for(track, package)
     if entry is None:
@@ -242,7 +242,7 @@ def check_spot_set(track, package, knowledge, record):
     pool = eligible(entry, knowledge)
     picked = record["picked"]
     if (record["pool"] != len(pool) or not isinstance(picked, list) or picked != sorted(set(picked))
-            or not set(picked) <= set(pool) or len(picked) != min(PICK, len(pool))):
+            or not set(picked) <= set(pool) or len(picked) != min(count, len(pool))):
         raise SpotFileError(f"box spots for {track['id']}: picked spots are not a valid pick from the file")
     return entry
 

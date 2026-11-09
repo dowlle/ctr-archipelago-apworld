@@ -66,7 +66,7 @@ class ClassifyTests(unittest.TestCase):
         matrix_file = SCRIPT.parents[1] / "fuzz" / "ctr-world-matrix.yml"
         full = tiers.matrix_for_tier("full", matrix_file)["include"]
         pr = tiers.matrix_for_tier("pr", matrix_file)["include"]
-        self.assertEqual(len(pr), 13)
+        self.assertEqual(len(pr), 17)
         self.assertEqual({arm["check_name"] for arm in pr}, set(tiers.PR_ARMS))
         self.assertEqual(pr, [arm for arm in full if arm["check_name"] in tiers.PR_ARMS])
         self.assertEqual(set(tiers.PR_ARMS.values()), tiers.FAMILIES)

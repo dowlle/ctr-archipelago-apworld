@@ -104,3 +104,34 @@ def check_caller() -> None:
     game_weights = frame.f_locals.get("game_weights")
     if isinstance(game_weights, dict):
         check_game_weights(game_weights)
+        migrate_box_count(game_weights)
+
+
+def migrate_box_count(section):
+    """Upgrade the old box switch before options roll, preserving its weights.
+
+    An explicit count wins when both names are present. Keep no visible second
+    switch. This also lets Play Solo show and save an imported YAML accurately.
+    """
+    if "box_locations" not in section:
+        return section
+    from Options import Toggle
+    old = section.pop("box_locations")
+    if "item_box_count" not in section:
+        def count(value):
+            return 15 if Toggle.from_any(value).value else 0
+        if isinstance(old, dict):
+            weights = {}
+            for key, weight in old.items():
+                if str(key).lower() == "random":
+                    for value in (0, 15):
+                        weights[value] = weights.get(value, 0) + weight / 2
+                else:
+                    value = count(key)
+                    weights[value] = weights.get(value, 0) + weight
+            section["item_box_count"] = weights
+        elif str(old).lower() == "random":
+            section["item_box_count"] = {0: 1, 15: 1}
+        else:
+            section["item_box_count"] = count(old)
+    return section

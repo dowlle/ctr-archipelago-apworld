@@ -79,6 +79,10 @@ def _pool(allow, block, every):
 
 def plan_options(options):
     out = copy.deepcopy(dict(options))
+    # Existing scenarios were authored with boxes off unless explicitly on.
+    # Count-specific scenarios set the new option themselves.
+    if "item_box_count" not in out:
+        out.setdefault("box_locations", False)
     if "content_pool" in out:
         _content(out, out.pop("content_pool"))
     if not out.pop("include_battle_arenas", True):
