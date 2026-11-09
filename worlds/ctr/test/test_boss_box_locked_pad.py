@@ -35,7 +35,7 @@ turning a fence into a no-op.
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld

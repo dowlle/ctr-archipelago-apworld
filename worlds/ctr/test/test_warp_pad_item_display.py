@@ -22,7 +22,7 @@ tests can prove is exactly what the apworld is responsible for:
   player's own preference is the right one to keep).
 """
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from . import CTRTestBase
@@ -76,4 +76,3 @@ class TestWarpPadItemDisplayIsGenerationNeutral(CTRTestBase):
         mw = setup_multiworld(ctrAPWorld, seed=FIXED_SEED,
                               options={"warp_pad_item_display": value})
         return mw, mw.worlds[1]
-

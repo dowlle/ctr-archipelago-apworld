@@ -9,7 +9,7 @@ installs during `set_rules` still raises, so the parity guard is unchanged.
 """
 import unittest
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..logic_terms import term_of

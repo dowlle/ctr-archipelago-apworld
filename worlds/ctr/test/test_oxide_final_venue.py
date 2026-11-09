@@ -3,7 +3,7 @@ import unittest
 from BaseClasses import CollectionState
 
 from . import CTRTestBase
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld
 
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")

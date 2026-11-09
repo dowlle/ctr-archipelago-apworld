@@ -25,7 +25,7 @@ import unittest
 
 from Options import OptionError
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld, content_playthrough
 
 

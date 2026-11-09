@@ -20,7 +20,7 @@ behaviour are explicitly out of scope for this ticket.
 import unittest
 
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import characters, ctrAPWorld
 from ..hit_character import (

@@ -23,7 +23,7 @@ apworld is responsible for:
   player's own preference is the right one to keep).
 """
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from . import CTRTestBase
@@ -77,4 +77,3 @@ class TestApItemTypeColorsIsGenerationNeutral(CTRTestBase):
         mw = setup_multiworld(ctrAPWorld, seed=FIXED_SEED,
                               options={"ap_item_type_colors": value})
         return mw, mw.worlds[1]
-

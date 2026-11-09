@@ -13,7 +13,7 @@ from argparse import Namespace
 from BaseClasses import CollectionState, MultiWorld
 from Fill import distribute_items_restrictive
 from Options import ItemLinks, OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld

@@ -3,7 +3,7 @@ import json
 import unittest
 
 from worlds.AutoWorld import call_all
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld
 
 from ..destinations import TRIAL_TROPHY_CLASS
@@ -24,5 +24,4 @@ class TestBothFamilies(CTRTestBase):
         "turbo_track_races": "trophy_and_ctr_challenge",
         "wumpa_check": "per_track",
     }
-
 

@@ -11,7 +11,7 @@ import json
 import os
 import unittest
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..hit_character import HIT_CHARACTER_CLASS

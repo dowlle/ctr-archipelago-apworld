@@ -18,7 +18,7 @@ What the apworld owns and these tests prove:
 - Universal Tracker does not restore it (it steers no logic).
 """
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from . import CTRTestBase

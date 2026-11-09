@@ -11,7 +11,7 @@ import random
 import unittest
 
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld

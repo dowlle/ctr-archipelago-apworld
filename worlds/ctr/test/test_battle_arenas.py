@@ -5,7 +5,8 @@ Purple Gem Cup keeps its token requirement.
 """
 
 from Fill import distribute_items_restrictive
-from test.general import gen_steps, setup_multiworld
+from test.general import gen_steps
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from . import CTRTestBase
@@ -59,7 +60,6 @@ class TestBattleArenasOn(ArenaChecksMixin, CTRTestBase):
         self.assertTrue(ARENA_LOCATIONS <= names)
         self.assertEqual(_purple_count(self.multiworld, self.player), 4)
         self.assertIs(self.world.fill_slot_data()["ctr_options"]["include_battle_arenas"], True)
-
 
 
 

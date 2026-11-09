@@ -9,7 +9,7 @@ red suite, not a silently mis-seated seed.
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..item_boxes import (BOX_RULES, BOX_TRACKS, EXPLICIT_NO_GATE,

@@ -20,7 +20,7 @@ import json
 import unittest
 from unittest import mock
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..destinations import boss_garage_tracks
@@ -286,5 +286,4 @@ class TestOffSeed(CTRTestBase):
 
 # ---------------------------------------------------------------------------
 # Universal Tracker
-
 
