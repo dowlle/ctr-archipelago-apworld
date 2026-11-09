@@ -82,6 +82,14 @@ class TestCortexVortexTrack(unittest.TestCase):
         track_of(plan, CV).pop("standalone_laps")
         content_plan.validate(plan)
 
+    def test_standalone_laps_is_only_two(self):
+        plan = make_world(cv_options(), seed=4).ctr_content_plan
+        for laps in (1, 3, 7):
+            bad = copy.deepcopy(plan)
+            track_of(bad, CV)["standalone_laps"] = laps
+            with self.subTest(laps=laps), self.assertRaises(OptionError):
+                content_plan.validate(bad)
+
     def test_standalone_laps_record(self):
         # A4-13 (ruling of 2026-11-09): standalone races are two laps; the
         # authored laps stay three, so cup legs keep the cup lap rule.
