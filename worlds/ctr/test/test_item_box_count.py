@@ -46,6 +46,12 @@ class TestItemBoxCount(unittest.TestCase):
         self.assertEqual(migrate_box_count({"box_locations": {False: 2, True: 3}}), {"item_box_count": {0: 2, 15: 3}})
         self.assertEqual(migrate_box_count({"box_locations": False, "item_box_count": 15}), {"item_box_count": 15})
 
+    def test_yaml_roll_migrates_before_the_new_option(self):
+        from .test_legacy_yaml import _roll
+        for raw, expected in ((False, 0), (True, 15), ({False: 1, True: 0}, 0), ({False: 0, True: 1}, 15)):
+            self.assertEqual(_roll({"box_locations": raw}).item_box_count.value, expected)
+        self.assertEqual(_roll({"box_locations": False, "item_box_count": 15}).item_box_count.value, 15)
+
     def test_legacy_switch_and_new_default(self):
         off = first_world(box_options(box_locations=False)).fill_slot_data()
         self.assertNotIn("item_boxes", off["content_plan"])

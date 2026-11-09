@@ -10,7 +10,7 @@ import zipfile
 with zipfile.ZipFile(sys.argv[1]) as source, zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as target:
     for member in source.infolist():
         data = source.read(member)
-        if member.filename in ("ctr/data/box_spots/retail/CRASH_COVE.json", "ctr/data/box_spots/custom/dk-pass.json"):
+        if member.filename in ("ctr/data/box_spots/retail/POLAR_PASS.json", "ctr/data/box_spots/custom/dk-pass.json"):
             doc = json.loads(data)
             doc["spots"] = [dict(number=n, pos=[n * 10, 0, n * 20], rot_y=0, needs="none")
                             for n in range(1, 51)]
