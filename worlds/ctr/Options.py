@@ -1438,7 +1438,8 @@ class CustomTracks(OptionList):
 class CortexVortexTrack(Choice):
     """Choose whether Cortex Vortex can appear as a track. It has a Trophy Race,
     CTR Challenge and Relic Race, no item boxes, and you need Ultimate Sacred
-    Fire to cross its finish line.
+    Fire to cross its finish line. Standalone races on its own pad are two
+    laps; cup races follow the cup lap setting.
 
     - **off** (default): no warp pad or cup race. N. Oxide's Final Challenge
       can still race there.

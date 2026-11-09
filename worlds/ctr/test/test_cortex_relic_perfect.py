@@ -16,7 +16,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 
-from .. import content_plan, cortex_vortex, named_tracks, relic_perfect
+from .. import content_cups, content_plan, cortex_vortex, named_tracks, relic_perfect
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, named_fixture
 from .test_track_checks import check_options, checks_of, track_of
@@ -77,13 +77,24 @@ class TestOffKeepsThePlan(unittest.TestCase):
                                  make_world(cv_options(cortex=False, perfect=False), seed=seed).ctr_content_plan)
 
 class TestCortexVortexTrack(unittest.TestCase):
+    def test_standalone_laps_record(self):
+        # A4-13 (ruling of 2026-11-09): standalone races are two laps; the
+        # authored laps stay three, so cup legs keep the cup lap rule.
+        self.assertNotIn("standalone_laps", content_plan.cortex_track())
+        track = content_plan.cortex_track(standalone=True)
+        self.assertEqual(track["laps"], 3)
+        self.assertEqual(track["standalone_laps"], 2)
+        self.assertEqual(content_cups.leg_laps(track, False), 3)
+        self.assertEqual(content_cups.leg_laps(track, True), 1)
+
     def test_record_modes_and_frozen_codes(self):
         world = make_world(cv_options(podium_placement_checks=True, wumpa_check="per_track",
                                       lettersanity=1, letters_per_track=3), seed=4)
         plan = world.ctr_content_plan
         track = track_of(plan, CV)
         self.assertEqual(track, dict(id=CV, origin="cortex_vortex", package_id="bundled/cortex-vortex",
-                                     display_name="Cortex Vortex", laps=3, modes=["trophy", "ctr", "relic"],
+                                     display_name="Cortex Vortex", laps=3, standalone_laps=2,
+                                     modes=["trophy", "ctr", "relic"],
                                      capabilities=["trophy", "ctr", "relic"], field_size=8))
         self.assertNotIn("custom_slot", track)
         mine = {c["location"]: c for c in plan["checks"] if c["owner"] == CV}
