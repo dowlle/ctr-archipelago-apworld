@@ -41,7 +41,7 @@ def code(track, family, number):
 class SanityLocations(LocationClass):
     key = "sanity"
     display_name = "Weapon crates and Wumpa pickups"
-    code_blocks = (35026100, 35026180, 35026200, 35026300, 35029000, 35029600, NAMED_BASE)
+    code_blocks = (35026000, 35029000) + tuple(range(NAMED_BASE, NAMED_BASE + 12000, 1000))
 
     def all_locations(self):
         tracks = [(dict(origin="retail", display_name=d.region_name, retail_id=d.level_id), COUNTS[d.level_id])

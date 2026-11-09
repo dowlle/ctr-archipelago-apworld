@@ -88,6 +88,7 @@ EXPECTED_CLASSES = [
     ("arcade_arena", 63, (35028500,35028520)),
     # 0.3.0 second id step: Wumpa Shop slots (#249), 5 hubs x 25.
     ("wumpa_shop", 125, (35028600,)),
+    ("sanity", 11558, (35026000, 35029000) + tuple(range(37200000, 37212000, 1000))),
 ]
 
 #: (label, first item code, last item code, count) for each appended item block,
@@ -165,7 +166,7 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the alpha3 data package (2026-11-06): 18 x 35 retail and 86 x 35 named box names.
         # + the nine tester cup names (A3-42, 2026-11-08): Win and Win All Legs each.
         # + Dex Cup (A4-16, 2026-11-09): Win and Win All Legs.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35 + 9 * 2 + 2)
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35 + 9 * 2 + 2 + 11558)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:
