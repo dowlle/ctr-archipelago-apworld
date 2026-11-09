@@ -418,7 +418,8 @@ class TestLocationClassIdStability(unittest.TestCase):
         # + 3,640 Item Box 16 to 50 names (the alpha3 data package, 2026-11-06).
         # + 18 Win and Win All Legs names of the nine tester cups (A3-42, 2026-11-08).
         # + 2 Win and Win All Legs names of Dex Cup (A4-16, 2026-11-09).
-        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2)
+        # + 8 Win and Win All Legs names of the four Discord cups (A4-16c).
+        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2 + 8)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(
