@@ -304,16 +304,29 @@ class ctrAPWorld(World):
     # 'start_inventory' -- precollected_items + state (push_precollected).
     # It never reassigns multiworld.itempool or early_items (it works on
     # sorted local copies), but both are snapshotted anyway as cheap insurance.
+    # Its accessibility step also wraps location.item_rule on unreachable
+    # locations (inaccessible_location_rules), so item rules are restored too.
 
     def _fill_snapshot(self) -> dict:
         mw = self.multiworld
+        # Race mode (`--race`, host.yaml `race: 1`) makes multiworld.random a
+        # SystemRandom, which has no state to save (A4-8 M01). Its draws are not
+        # reproducible anyway, so there is nothing to restore: the check still
+        # runs, but a green replay no longer promises the same real fill.
+        try:
+            rng = mw.random.getstate()
+        except NotImplementedError:
+            rng = None
         return {
-            "rng": mw.random.getstate(),
+            "rng": rng,
             "state": mw.state.copy(),
             "early": {p: dict(d) for p, d in mw.early_items.items()},
             "local_early": {p: dict(d) for p, d in mw.local_early_items.items()},
             "precollected_len": {p: len(v) for p, v in mw.precollected_items.items()},
             "placements": [(loc, loc.item, loc.locked) for loc in mw.get_locations()],
+            # inaccessible_location_rules (Fill.py) wraps item_rule on
+            # locations the trial finds unreachable (A4-8 review).
+            "item_rules": [(loc, loc.item_rule) for loc in mw.get_locations()],
             "itempool": list(mw.itempool),
         }
 
@@ -326,6 +339,8 @@ class ctrAPWorld(World):
             loc.locked = locked
             if item is not None:
                 item.location = loc
+        for loc, rule in snap["item_rules"]:
+            loc.item_rule = rule
         mw.itempool[:] = snap["itempool"]
         for p, ln in snap["precollected_len"].items():
             del mw.precollected_items[p][ln:]
@@ -336,12 +351,14 @@ class ctrAPWorld(World):
         for p, d in snap["local_early"].items():
             mw.local_early_items[p] = dict(d)
         mw.state = snap["state"]
-        mw.random.setstate(snap["rng"])
+        if snap["rng"] is not None:
+            mw.random.setstate(snap["rng"])
 
     def _rollback_simulate_fill(self, panic: str) -> bool:
         """Run the REAL upcoming fill on the REAL multiworld, then roll every
         mutation back. True = the fill goes green (and, since the RNG state is
-        restored, the real fill will replay it identically)."""
+        restored, the real fill will replay it identically; in race mode the
+        RNG has no state, so the real fill draws again)."""
         from Fill import distribute_items_restrictive as _dist, FillError as _FE
         snap = self._fill_snapshot()
         prev_disable = logging.root.manager.disable

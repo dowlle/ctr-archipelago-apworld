@@ -65,6 +65,12 @@ def normalize(raw):
                     nested.get(part, defaults[part] if side == "base" else 0), f"{side}.{family}.{part}")
         if side == "base":
             gems = config.get("gems", list(COLOURS))
+            if isinstance(gems, dict):
+                # A4-8 M02: `{red: 1, ...}` is the extra.gems shape. Base Gems are
+                # one copy per listed colour, so the base form is a list.
+                fail("base.gems is a list of colours, for example `gems: [red, blue]` "
+                     "(one Gem of each listed colour). The `{colour: count}` form is "
+                     "only for extra.gems.")
             if (not isinstance(gems, list) or any(type(x) is not str or x not in COLOURS for x in gems)
                     or len(set(gems)) != len(gems)):
                 fail("base.gems must be a list of distinct red/green/blue/yellow/purple colours.")

@@ -293,6 +293,39 @@ class TestContentPlan(unittest.TestCase):
         plain._rollback_simulate_fill = dead_end
         plain.pre_fill()  # no manual rules: the content-plan path never replays the fill
 
+    def test_fill_check_runs_in_race_mode(self):
+        # A4-8 M01: race mode swaps multiworld.random for a SystemRandom, which
+        # has no state. The fill check used to crash on getstate() with every
+        # manual rule, the documented example included.
+        for seed in (3, 7):
+            with self.subTest(seed=seed):
+                world = self.world(seed=seed)
+                world.multiworld.secure()
+                rules = {loc: loc.item_rule for loc in world.multiworld.get_locations()}
+                world._rollback_simulate_fill("swap")
+                self.assertTrue(all(loc.item_rule is rule for loc, rule in rules.items()))
+                self.assertTrue(all(loc.item is None or loc.locked for loc in world.multiworld.get_locations()))
+                world.pre_fill()
+                distribute_items_restrictive(world.multiworld)
+                self.assertTrue(world.multiworld.can_beat_game(CollectionState(world.multiworld)))
+
+    def test_trial_fill_rollback_restores_item_rules(self):
+        # A4-8 review: Fill's accessibility step wraps item_rule on unreachable
+        # locations; the trial fill must leave every rule as it found it.
+        from unittest import mock
+        from worlds.generic.Rules import add_item_rule
+        world = self.world(seed=3)
+        world.multiworld.secure()
+        before = {loc: loc.item_rule for loc in world.multiworld.get_locations()}
+
+        def wrapping_fill(multiworld, panic):
+            for loc in multiworld.get_locations():
+                add_item_rule(loc, lambda item: False)
+
+        with mock.patch("Fill.distribute_items_restrictive", wrapping_fill):
+            world._rollback_simulate_fill("swap")
+        self.assertTrue(all(loc.item_rule is rule for loc, rule in before.items()))
+
     def test_hub_key_floor_stays_in_entrance_req(self):
         plan = self.world().ctr_content_plan
         pads = {p["id"]: p for p in plan["pads"]}
