@@ -1351,6 +1351,14 @@ class ContentItemPool(OptionDict):
         relics: {sapphire: 12, gold: 6, platinum: 0}
     ```
 
+    `base.gems` is a list of colours, one Gem of each. Example, only the Red
+    and Blue Gems:
+    ```yaml
+    item_pool:
+      base:
+        gems: [red, blue]
+    ```
+
     `extra` takes exact counts, not percentages. Extra Trophies and Keys are
     the same items as the base ones, so requirements are easier to meet. Pads
     and garages only ask for the base count.
@@ -1361,7 +1369,10 @@ class ContentItemPool(OptionDict):
       extra:
         trophies: 4
         keys: 2
-    ```"""
+    ```
+
+    `extra.gems` takes a count per colour, for example
+    `gems: {red: 1, purple: 2}`."""
     display_name = "Item Pool"
     default = {}
 

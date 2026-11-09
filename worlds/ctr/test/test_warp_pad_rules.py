@@ -293,6 +293,18 @@ class TestContentPlan(unittest.TestCase):
         plain._rollback_simulate_fill = dead_end
         plain.pre_fill()  # no manual rules: the content-plan path never replays the fill
 
+    def test_fill_check_runs_in_race_mode(self):
+        # A4-8 M01: race mode swaps multiworld.random for a SystemRandom, which
+        # has no state. The fill check used to crash on getstate() with every
+        # manual rule, the documented example included.
+        for seed in (3, 7):
+            with self.subTest(seed=seed):
+                world = self.world(seed=seed)
+                world.multiworld.secure()
+                world.pre_fill()
+                distribute_items_restrictive(world.multiworld)
+                self.assertTrue(world.multiworld.can_beat_game(CollectionState(world.multiworld)))
+
     def test_hub_key_floor_stays_in_entrance_req(self):
         plan = self.world().ctr_content_plan
         pads = {p["id"]: p for p in plan["pads"]}

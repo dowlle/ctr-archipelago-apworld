@@ -305,8 +305,16 @@ class ctrAPWorld(World):
 
     def _fill_snapshot(self) -> dict:
         mw = self.multiworld
+        # Race mode (`--race`, host.yaml `race: 1`) makes multiworld.random a
+        # SystemRandom, which has no state to save (A4-8 M01). Its draws are not
+        # reproducible anyway, so there is nothing to restore: the check still
+        # runs, but a green replay no longer promises the same real fill.
+        try:
+            rng = mw.random.getstate()
+        except NotImplementedError:
+            rng = None
         return {
-            "rng": mw.random.getstate(),
+            "rng": rng,
             "state": mw.state.copy(),
             "early": {p: dict(d) for p, d in mw.early_items.items()},
             "local_early": {p: dict(d) for p, d in mw.local_early_items.items()},
@@ -334,12 +342,14 @@ class ctrAPWorld(World):
         for p, d in snap["local_early"].items():
             mw.local_early_items[p] = dict(d)
         mw.state = snap["state"]
-        mw.random.setstate(snap["rng"])
+        if snap["rng"] is not None:
+            mw.random.setstate(snap["rng"])
 
     def _rollback_simulate_fill(self, panic: str) -> bool:
         """Run the REAL upcoming fill on the REAL multiworld, then roll every
         mutation back. True = the fill goes green (and, since the RNG state is
-        restored, the real fill will replay it identically)."""
+        restored, the real fill will replay it identically; in race mode the
+        RNG has no state, so the real fill draws again)."""
         from Fill import distribute_items_restrictive as _dist, FillError as _FE
         snap = self._fill_snapshot()
         prev_disable = logging.root.manager.disable
