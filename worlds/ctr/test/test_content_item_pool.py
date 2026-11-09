@@ -79,15 +79,21 @@ class TestContentItemPool(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(OptionError):
                 normalize(raw)
 
-    def test_base_gems_mapping_names_the_list_form(self):
-        # A4-8 M02: the tester's `{red: 1, ...}` (the extra.gems shape) gets an
-        # error that shows the list form; the list form keeps working.
-        mapping = {"base": {"gems": dict.fromkeys(("red", "green", "blue", "yellow", "purple"), 1)}}
-        with self.assertRaisesRegex(OptionError, r"base\.gems is a list of colours.*\[red, blue\]"):
-            normalize(mapping)
-        base, _extra = normalize({"base": {"gems": ["red", "blue"]}})
-        self.assertEqual([base[f"{c} Gem"] for c in ("Red", "Green", "Blue", "Yellow", "Purple")],
-                         [1, 0, 1, 0, 0])
+    def test_base_gems_mapping_matches_list_and_ledger(self):
+        for colours in ([], ["red", "blue"], ["red", "green", "blue", "yellow", "purple"]):
+            listed = {"base": {"gems": colours}}
+            mapped = {"base": {"gems": {c: int(c in colours) for c in
+                                       ("red", "green", "blue", "yellow", "purple")}}}
+            self.assertEqual(normalize(mapped), normalize(listed))
+            self.assertEqual(resolve(mapped, 200).wire(), resolve(listed, 200).wire())
+        self.assertEqual(normalize({"base": {"gems": {"red": 1, "blue": 1}}}),
+                         normalize({"base": {"gems": ["red", "blue"]}}))
+
+    def test_base_gems_mapping_rejects_invalid_colours_and_counts(self):
+        for gems in ({"cyan": 1}, {"red": True}, {"red": False}, {"red": 1.0},
+                     {"red": "1"}, {"red": -1}, {"red": 2}, {"red": None}):
+            with self.subTest(gems=gems), self.assertRaises(OptionError):
+                normalize({"base": {"gems": gems}})
 
     def test_registered_pack_copies_share_the_capacity_ledger(self):
         plan = resolve(small_pool(), 16, selected_packs={"Ignore Grass": 1})

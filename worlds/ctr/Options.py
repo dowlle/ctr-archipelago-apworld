@@ -1375,12 +1375,13 @@ class ContentItemPool(OptionDict):
         relics: {sapphire: 12, gold: 6, platinum: 0}
     ```
 
-    `base.gems` is a list of colours, one Gem of each. Example, only the Red
-    and Blue Gems:
+    `base.gems` accepts a list of colours or a map of exact 0 or 1 counts.
+    Omitted map colours are 0. Both examples select only Red and Blue:
     ```yaml
     item_pool:
       base:
         gems: [red, blue]
+        # Equivalent: gems: {red: 1, green: 0, blue: 1}
     ```
 
     `extra` takes exact counts, not percentages. Extra Trophies and Keys are
