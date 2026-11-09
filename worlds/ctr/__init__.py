@@ -302,6 +302,8 @@ class ctrAPWorld(World):
     # 'start_inventory' -- precollected_items + state (push_precollected).
     # It never reassigns multiworld.itempool or early_items (it works on
     # sorted local copies), but both are snapshotted anyway as cheap insurance.
+    # Its accessibility step also wraps location.item_rule on unreachable
+    # locations (inaccessible_location_rules), so item rules are restored too.
 
     def _fill_snapshot(self) -> dict:
         mw = self.multiworld
@@ -320,6 +322,9 @@ class ctrAPWorld(World):
             "local_early": {p: dict(d) for p, d in mw.local_early_items.items()},
             "precollected_len": {p: len(v) for p, v in mw.precollected_items.items()},
             "placements": [(loc, loc.item, loc.locked) for loc in mw.get_locations()],
+            # inaccessible_location_rules (Fill.py) wraps item_rule on
+            # locations the trial finds unreachable (A4-8 review).
+            "item_rules": [(loc, loc.item_rule) for loc in mw.get_locations()],
             "itempool": list(mw.itempool),
         }
 
@@ -332,6 +337,8 @@ class ctrAPWorld(World):
             loc.locked = locked
             if item is not None:
                 item.location = loc
+        for loc, rule in snap["item_rules"]:
+            loc.item_rule = rule
         mw.itempool[:] = snap["itempool"]
         for p, ln in snap["precollected_len"].items():
             del mw.precollected_items[p][ln:]

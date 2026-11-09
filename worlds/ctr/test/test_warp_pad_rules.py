@@ -301,6 +301,10 @@ class TestContentPlan(unittest.TestCase):
             with self.subTest(seed=seed):
                 world = self.world(seed=seed)
                 world.multiworld.secure()
+                rules = {loc: loc.item_rule for loc in world.multiworld.get_locations()}
+                world._rollback_simulate_fill("swap")
+                self.assertTrue(all(loc.item_rule is rule for loc, rule in rules.items()))
+                self.assertTrue(all(loc.item is None or loc.locked for loc in world.multiworld.get_locations()))
                 world.pre_fill()
                 distribute_items_restrictive(world.multiworld)
                 self.assertTrue(world.multiworld.can_beat_game(CollectionState(world.multiworld)))
