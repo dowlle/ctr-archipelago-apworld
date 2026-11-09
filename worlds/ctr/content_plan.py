@@ -2798,8 +2798,9 @@ def validate(plan):
             name = RETAIL[i] + ": Trophy Race"
         elif track["origin"] == CORTEX_ORIGIN:
             # The bundled pair under its own identity; one per plan.
-            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
-                     == cortex_track(standalone=True), "Cortex Vortex track metadata mismatch")
+            require({k: v for k, v in track.items()
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
+                     == cortex_track(), "Cortex Vortex track metadata mismatch")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
@@ -2844,8 +2845,9 @@ def validate(plan):
             require(track["display_name"] == RETAIL[i] and track["laps"] == RETAIL_LAPS and track["id"] == f"retail:{i}",
                     "retail track metadata mismatch")
         elif track["origin"] == CORTEX_ORIGIN:
-            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
-                    == cortex_track(standalone=True), "Cortex Vortex track metadata mismatch")
+            require({k: v for k, v in track.items()
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
+                    == cortex_track(), "Cortex Vortex track metadata mismatch")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
