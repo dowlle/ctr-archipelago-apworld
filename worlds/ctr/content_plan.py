@@ -115,6 +115,14 @@ CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 #: release) carries it too: it is the same track, so a seed takes one or the other.
 CORTEX_TRACK_KEY = "cortex-vortex"
 CORTEX_LAPS = 3
+#: Standalone Cortex Vortex races are two laps (ruling of 2026-11-09, A4-13):
+#: the pad's Trophy Race, CTR Challenge and Relic Race, with the client's
+#: relic targets scaled to match. `laps` stays the authored three, so cup
+#: legs keep their lap rule (shortened by `one_lap_cups` as before) and the
+#: native registry pin is unchanged. `standalone_laps` rides the track
+#: record; a plan from before the ruling has no key and races three laps,
+#: exactly as it did.
+CORTEX_STANDALONE_LAPS = 2
 #: `cortex_vortex_track: in_pool` and `own_pad`.
 CORTEX_IN_POOL = 1
 CORTEX_OWN_PAD = 2
@@ -165,10 +173,13 @@ def plan_ctr_first(plan, track):
     return plan.get("adventure_structure") == CTR_FIRST and ctr_first_modes(track["modes"]) is not None
 
 
-def cortex_track():
+def cortex_track(standalone=False):
     """The Cortex Vortex track record, without its modes."""
-    return dict(id=CORTEX_TRACK_ID, origin=CORTEX_ORIGIN, package_id=CORTEX_PACKAGE_ID,
-                display_name=destinations.CORTEX_VORTEX, laps=CORTEX_LAPS)
+    track = dict(id=CORTEX_TRACK_ID, origin=CORTEX_ORIGIN, package_id=CORTEX_PACKAGE_ID,
+                 display_name=destinations.CORTEX_VORTEX, laps=CORTEX_LAPS)
+    if standalone:
+        track["standalone_laps"] = CORTEX_STANDALONE_LAPS
+    return track
 #: Aggregate manual rule -> the counted item names it sums, in wire order.
 #: Native holds the same three lists; the parity fixtures compare them.
 SUM_FAMILIES = {"AnyCtrToken": warp_pad_rules.TOKENS, "AnyRelic": warp_pad_rules.RELICS,
@@ -1281,7 +1292,7 @@ def draw_plan(world, key_estimate=True):
     # Cortex Vortex is a candidate only when selected, so a plan without it
     # draws exactly as before (#133 PR 3c).
     if with_cortex:
-        pool.append((cortex_track(), None, {}))
+        pool.append((cortex_track(standalone=True), None, {}))
     for slot, package in enumerate(packages, 1):
         block = destinations.named_track(package["content_id"])
         pool.append((dict(id="custom/" + package["content_id"] + "/" + package["revision"],
@@ -2795,7 +2806,8 @@ def validate(plan):
             name = RETAIL[i] + ": Trophy Race"
         elif track["origin"] == CORTEX_ORIGIN:
             # The bundled pair under its own identity; one per plan.
-            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
+            require({k: v for k, v in track.items()
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
                      == cortex_track(), "Cortex Vortex track metadata mismatch")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
@@ -2841,7 +2853,8 @@ def validate(plan):
             require(track["display_name"] == RETAIL[i] and track["laps"] == RETAIL_LAPS and track["id"] == f"retail:{i}",
                     "retail track metadata mismatch")
         elif track["origin"] == CORTEX_ORIGIN:
-            require({k: v for k, v in track.items() if k not in ("modes", "capabilities", "field_size")}
+            require({k: v for k, v in track.items()
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
                     == cortex_track(), "Cortex Vortex track metadata mismatch")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")

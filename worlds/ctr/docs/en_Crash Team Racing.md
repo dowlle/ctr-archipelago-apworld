@@ -155,7 +155,8 @@ needs four different tracks of its own.
 With `in_pool` the seed may use Cortex Vortex on a warp pad or as a cup race, or
 not at all. With `own_pad` it is sure to get a pad. It takes no other content's
 checks with it. With Progressive Boost on, its finish checks need two Progressive
-Boosts.
+Boosts. Standalone races on its own pad are two laps; cup races follow the cup
+lap setting.
 
 ### Racer-Locked Warp Pads
 

@@ -687,6 +687,11 @@
               "minLength": 1,
               "maxLength": 64,
               "pattern": "^[A-Za-z0-9_.:/+\\-]+$"
+            },
+            "standalone_laps": {
+              "type": "integer",
+              "const": 2,
+              "description": "Laps of a standalone race on this track (A4-13, ruling of 2026-11-09). Absent on plans from before the ruling: those race the authored laps. Cup legs keep the authored laps either way."
             }
           },
           "required": [
