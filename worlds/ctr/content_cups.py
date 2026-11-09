@@ -204,7 +204,7 @@ def feasible_pairs(spec, crystal_bounds, crystal_pool, required_arenas, required
     return [(c, k) for c in range(cup_bounds[0], cup_bounds[1] + 1)
             for k in range(crystal_bounds[0], crystal_bounds[1] + 1)
             if required_arenas <= k <= crystal_pool and c + k + required_tracks <= PADS
-            and c <= len(cup_checks.CUP_NAMES)
+            and c <= len(cup_checks.CUP_DRAW_INDICES)
             and (fixed is None or min(c, len(GEM_CUPS)) <= len(fixed))
             and _fits(drawn(c), len(custom), len(other), spec["custom_legs"], spec["repeats"])]
 
@@ -261,11 +261,11 @@ def draw_cups(world, count, other, custom, spec, shortened, fixed=None, gauntlet
     """The seed's cups as plan candidates: {cup_index, id, legs, shortened}. The
     first five are the Gem Cups, Red first (Purple first with `gauntlet`), with
     `gem_cup` their colour and `cup_index` None. The drawn legs come first, then a sample of the pool's
-    name indices for a sixth cup onward. `fixed` is fixed_legs."""
+    drawable name indices (retired names are never drawn) for a sixth cup onward. `fixed` is fixed_legs."""
     gems = min(count, len(GEM_CUPS))
     kept = (fixed or [])[:gems]
     legs = kept + draw_legs(world, count - len(kept), other, custom, spec)
-    names = world.random.sample(range(len(cup_checks.CUP_NAMES)), count - gems)
+    names = world.random.sample(cup_checks.CUP_DRAW_INDICES, count - gems)
     return ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[place], shortened=shortened)
              for place, colour in enumerate(gem_order(gauntlet)[:gems])]
             + [dict(cup_index=index, id=f"cup:{index}", legs=cup_legs, shortened=shortened)

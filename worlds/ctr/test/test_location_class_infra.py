@@ -80,6 +80,9 @@ FIXTURE_PATHS = (
     # Nine tester cup names appended to the cup pool (A3-42, 2026-11-08): the
     # Win and Win All Legs checks at the growth codes 35027100 and 35027300.
     FIXTURE_DIR / "location_class_id_stability_2026_11_08_cup_names.json",
+    # Dex Cup appended to the cup pool (A4-16, 2026-11-09): the Win and
+    # Win All Legs checks at the growth codes 35027109 and 35027309.
+    FIXTURE_DIR / "location_class_id_stability_2026_11_09_dex_cup.json",
 )
 
 PODIUM_TOGGLES = (
@@ -413,7 +416,8 @@ class TestLocationClassIdStability(unittest.TestCase):
         # + 63 arcade arena names (#259) + 125 Wumpa Shop slots (second pass)
         # + 3,640 Item Box 16 to 50 names (the alpha3 data package, 2026-11-06).
         # + 18 Win and Win All Legs names of the nine tester cups (A3-42, 2026-11-08).
-        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18)
+        # + 2 Win and Win All Legs names of Dex Cup (A4-16, 2026-11-09).
+        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(
