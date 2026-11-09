@@ -429,6 +429,8 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
         section = doc.get(GAME) or {}
         if not isinstance(section, dict):
             section = {}
+    from worlds.ctr.legacy_yaml import migrate_box_count
+    section = migrate_box_count(dict(section))
     values = {}
     checklists = overlay.get("checklists", {})
     for group in overlay.get("groups", []):
@@ -453,7 +455,8 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
                for name, option in cls.options_dataclass.type_hints.items()]
     overlay = load_overlay(paths)
     doc = read_player_yaml(yaml_path) if yaml_path else {}
-    section = _section(doc)
+    from worlds.ctr.legacy_yaml import migrate_box_count
+    section = migrate_box_count(dict(_section(doc)))
     modified_at_roll = bool(doc.get("linked_options") or doc.get("triggers") or section.get("triggers"))
     unresolved = []
     for group in overlay.get("groups", []):
@@ -532,9 +535,6 @@ def read_player_yaml(path: str) -> dict:
                         file=os.path.basename(path))
     if not str(doc.get("name") or "").strip():
         raise SoloError("yaml", "The YAML has no player name.", file=os.path.basename(path))
-    from worlds.ctr.legacy_yaml import migrate_box_count
-    if isinstance(doc.get(GAME), dict):
-        migrate_box_count(doc[GAME])
     return doc
 
 

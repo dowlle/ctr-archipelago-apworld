@@ -4,6 +4,8 @@ import copy
 import hashlib
 import json
 import random
+from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -51,6 +53,21 @@ class TestItemBoxCount(unittest.TestCase):
         for raw, expected in ((False, 0), (True, 15), ({False: 1, True: 0}, 0), ({False: 0, True: 1}, 15)):
             self.assertEqual(_roll({"box_locations": raw}).item_box_count.value, expected)
         self.assertEqual(_roll({"box_locations": False, "item_box_count": 15}).item_box_count.value, 15)
+
+    def test_solo_previews_legacy_without_rewriting_unrelated_edits(self):
+        from ..solo import ctr_solo
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "old.yaml"
+            path.write_text("name: Player\ngame: Crash Team Racing\nCrash Team Racing:\n  box_locations: false\n")
+            doc = ctr_solo.read_player_yaml(str(path))
+            self.assertIn("box_locations", doc["Crash Team Racing"])
+            overlay = {"groups": [{"options": ["item_box_count"]}]}
+            self.assertEqual(ctr_solo.overlay_values(str(path), overlay)["item_box_count"], 0)
+            edited = ctr_solo.apply_overrides(doc, None, ["item_box_count=15"])
+            self.assertNotIn("box_locations", edited["Crash Team Racing"])
+            self.assertEqual(edited["Crash Team Racing"]["item_box_count"], 15)
+            other = ctr_solo.apply_overrides(doc, None, ["itemsanity=true"])
+            self.assertIn("box_locations", other["Crash Team Racing"])
 
     def test_legacy_switch_and_new_default(self):
         off = first_world(box_options(box_locations=False)).fill_slot_data()
