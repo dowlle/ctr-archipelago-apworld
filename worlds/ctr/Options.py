@@ -759,6 +759,14 @@ class ItemBoxCount(Range):
     range_end = 50
     default = 15
 
+    @classmethod
+    def from_any(cls, data):
+        option = super().from_any(data)
+        option.explicit_yaml_count, legacy = legacy_yaml.box_count_caller()
+        if legacy is not None:
+            option.value = 15 if legacy else 0
+        return option
+
 
 class ShortcutKnowledge(Choice):
     """Choose which shortcuts the game expects you to take.

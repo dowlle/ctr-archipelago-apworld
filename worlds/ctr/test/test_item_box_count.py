@@ -52,7 +52,20 @@ class TestItemBoxCount(unittest.TestCase):
         from .test_legacy_yaml import _roll
         for raw, expected in ((False, 0), (True, 15), ({False: 1, True: 0}, 0), ({False: 0, True: 1}, 15)):
             self.assertEqual(_roll({"box_locations": raw}).item_box_count.value, expected)
-        self.assertEqual(_roll({"box_locations": False, "item_box_count": 15}).item_box_count.value, 15)
+        rolled = _roll({"box_locations": False, "item_box_count": 15})
+        self.assertEqual(rolled.item_box_count.value, 15)
+        from ..content_item_boxes import settings
+        self.assertTrue(settings(rolled))
+        self.assertEqual(rolled.box_locations.value, 1)
+
+    def test_yaml_roll_never_mutates_shared_weights(self):
+        from .test_legacy_yaml import _roll
+        for section in ({"box_locations": False}, {"box_locations": {False: 2, True: 3}},
+                        {"box_locations": False, "item_box_count": 15}):
+            original = copy.deepcopy(section)
+            _roll(section)
+            _roll(section)
+            self.assertEqual(section, original)
 
     def test_solo_previews_legacy_without_rewriting_unrelated_edits(self):
         from ..solo import ctr_solo

@@ -104,14 +104,37 @@ def check_caller() -> None:
     game_weights = frame.f_locals.get("game_weights")
     if isinstance(game_weights, dict):
         check_game_weights(game_weights)
-        migrate_box_count(game_weights)
+
+
+def box_count_caller():
+    """Read Generate's per-roll options, never mutate its shared weights.
+
+    The deprecated switch precedes the count in the options dataclass. Its
+    already-rolled value preserves weighted/random legacy choices exactly.
+    """
+    try:
+        frame = sys._getframe(2)
+    except ValueError:
+        return False, None
+    try:
+        if frame.f_code.co_name != "handle_option":
+            return False, None
+        weights = frame.f_locals.get("game_weights", {})
+        if "item_box_count" in weights:
+            return True, None
+        legacy = getattr(frame.f_locals.get("ret"), "box_locations", None)
+        value = legacy.value if legacy is not None else -1
+        return False, value if value in (0, 1) else None
+    finally:
+        del frame
 
 
 def migrate_box_count(section):
-    """Upgrade the old box switch before options roll, preserving its weights.
+    """Preview the old box switch on a caller-owned copy, keeping its weights.
 
     An explicit count wins when both names are present. Keep no visible second
-    switch. This also lets Play Solo show and save an imported YAML accurately.
+    switch. Generate reads the already-rolled legacy option instead, because
+    its input weights are shared between slots. Play Solo uses this preview.
     """
     if "box_locations" not in section:
         return section

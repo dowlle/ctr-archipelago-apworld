@@ -85,7 +85,7 @@ def settings(options):
     count = options.item_box_count.value
     # Existing YAMLs and programmatic callers retain their on/off choice.
     # A non-default count takes precedence over the deprecated switch.
-    if count == 15 and options.box_locations.value == 0:
+    if count == 15 and options.box_locations.value == 0 and not getattr(options.item_box_count, "explicit_yaml_count", False):
         count = 0
     options.item_box_count.value = count
     options.box_locations.value = int(count > 0)
