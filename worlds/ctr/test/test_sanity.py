@@ -82,6 +82,16 @@ class TestSanity(unittest.TestCase):
         self.assertEqual(sanity.CATALOG["retail:7"]["needs"]["wumpa_crate"]["4"]["needs"], "usf")
         self.assertEqual(sanity.CATALOG["retail:6"]["needs"]["weapon_crate"]["9"]["needs"], "usf")
 
+    def test_measured_new_named_revision_defaults_to_usf(self):
+        t = dict(origin="custom", named_block=0, id="custom/acid-lake/fixture")
+        package = dict(files=[dict(role="lev", sha256="f" * 64)],
+                       capabilities=dict(weapon_crates=5, fruit_crates=2, loose_fruit=3))
+        inv = sanity.inventory(t, package)
+        self.assertEqual(inv["counts"], [5, 2, 3])
+        self.assertTrue(all(rule["needs"] == "usf" for family in inv["needs"].values() for rule in family.values()))
+        generic = {k: v for k, v in t.items() if k != "named_block"}
+        self.assertIsNone(sanity.inventory(generic, package))
+
     def test_usf_rank_and_tiger_door_terms(self):
         from .test_capability_packs import first_world
         options = dict(profile_options(), itemboxsanity=50, wumpasanity="both", itemsanity=True,
