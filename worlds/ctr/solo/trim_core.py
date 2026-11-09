@@ -16,12 +16,20 @@ import sys
 
 # Top-level modules: every core .py file except clients, adjusters and tools
 # that pull GUI or game-specific dependencies and are never imported here.
-SKIP_TOP_LEVEL = {"setup.py", "kvui.py", "Launcher.py", "LttPAdjuster.py", "OoTAdjuster.py",
+# Launcher.py stays: 0.6.8's worlds/LauncherComponents.py imports it at module
+# level, and its own module-level imports are stdlib plus Utils only.
+SKIP_TOP_LEVEL = {"setup.py", "kvui.py", "LttPAdjuster.py", "OoTAdjuster.py",
                   "WebHost.py", "OptionsCreator.py"}
 SKIP_SUFFIX_TOP_LEVEL = ("Client.py",)
 KEEP_TOP_LEVEL = {"CommonClient.py"}  # imported by core modules
 WORLD_FILES = ("__init__.py", "AutoWorld.py", "Files.py", "LauncherComponents.py")
 TREES = ("rule_builder", os.path.join("worlds", "generic"))
+# Trees newer cores add next to the top-level modules, copied when present so
+# one allowlist serves every pinned core. Archipelago 0.6.8 moves part of
+# MultiServer into apmw/multiserver (GamesPackageCache); older cores have no
+# apmw at all. apmw/webhost stays out: only the webhost uses it.
+OPTIONAL_TREES = (os.path.join("apmw", "multiserver"),)
+OPTIONAL_FILES = (os.path.join("apmw", "__init__.py"),)
 DATA_SUFFIXES = (".yaml", ".json", ".txt")
 EXTRA_FILES = ("LICENSE",)
 
@@ -44,6 +52,14 @@ def plan(source: str) -> list[str]:
                 if name.endswith((".pyc", ".pyo")):
                     continue
                 files.append(os.path.relpath(os.path.join(root, name), source))
+    for tree in OPTIONAL_TREES:
+        for root, dirs, names in os.walk(os.path.join(source, tree)):
+            dirs[:] = sorted(d for d in dirs if d not in ("__pycache__", "test", "docs"))
+            for name in names:
+                if name.endswith((".pyc", ".pyo")):
+                    continue
+                files.append(os.path.relpath(os.path.join(root, name), source))
+    files.extend(rel for rel in OPTIONAL_FILES if os.path.isfile(os.path.join(source, rel)))
     data = os.path.join(source, "data")
     for name in os.listdir(data):
         if os.path.isfile(os.path.join(data, name)) and name.endswith(DATA_SUFFIXES):
