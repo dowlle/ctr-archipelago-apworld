@@ -48,16 +48,14 @@ class TestFixedFamilies(unittest.TestCase):
     def test_retired_cup_names_keep_their_ids(self):
         """Ruled 2026-11-09: a retired name stays in CUP_NAMES and the data
         package with its ids (alpha3 rooms keep working) but leaves the draw.
-        Venusyprime's tester is credited as Dex, the appended "Dex Cup"; the
-        four generic labels are the filler names of playthrough F30."""
+        Venusyprime's tester is credited as Dex, the appended "Dex Cup"."""
         self.assertEqual(CUP_NAMES[12], "Venusyprime Cup")
         self.assertEqual(L["Venusyprime Cup: Win"], 35027012)
         self.assertEqual(L["Venusyprime Cup: Win All Legs"], 35027212)
         self.assertEqual(L["Dex Cup: Win"], 35027109)
         self.assertEqual(L["Dex Cup: Win All Legs"], 35027309)
-        self.assertEqual(CUP_NAMES_RETIRED, ("Venusyprime Cup", "Turbo Cup", "Relic Cup",
-                                             "Multiworld Cup", "Sphere Cup"))
-        self.assertEqual(len(CUP_DRAW_INDICES), 32)
+        self.assertEqual(CUP_NAMES_RETIRED, ("Venusyprime Cup",))
+        self.assertEqual(len(CUP_DRAW_INDICES), 36)
         self.assertFalse({CUP_NAMES.index(name) for name in CUP_NAMES_RETIRED}
                          & set(CUP_DRAW_INDICES))
         self.assertEqual(CUP_NAMES.index("Dex Cup"), 36)

@@ -33,9 +33,8 @@ cup names append to CUP_NAMES; nothing is reordered or renamed.
 RETIRED NAMES (ruled 2026-11-09). A released name is never removed or
 renamed, but it can leave the draw: it stays in CUP_NAMES and the data
 package with its ids, so old rooms keep working, and new seeds never draw
-it. "Venusyprime Cup" retired when its tester asked to be credited as Dex,
-and the four generic filler labels retired with it ("remove the filler
-names", playthrough F30). Every drawn cup is now a tester-named cup.
+it. "Venusyprime Cup" retired when its tester asked to be credited as Dex.
+The drawable pool stays at 36; generic names keep their frozen identities.
 """
 from typing import List, Tuple
 
@@ -58,10 +57,9 @@ CUP_NAMES: Tuple[str, ...] = (
 )
 #: Names no seed draws any more (ruled 2026-11-09). They stay in CUP_NAMES
 #: and the data package so alpha3 rooms keep working; only the draw skips
-#: them. Venusyprime's tester is credited as Dex (the appended "Dex Cup");
-#: the four generic labels are the filler names of playthrough F30.
+#: them. Venusyprime's tester is credited as Dex (the appended "Dex Cup").
 CUP_NAMES_RETIRED: Tuple[str, ...] = (
-    "Venusyprime Cup", "Turbo Cup", "Relic Cup", "Multiworld Cup", "Sphere Cup",
+    "Venusyprime Cup",
 )
 #: The pool indices a seed may draw: every name minus the retired ones.
 CUP_DRAW_INDICES: Tuple[int, ...] = tuple(

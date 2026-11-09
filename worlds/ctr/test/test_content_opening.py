@@ -290,10 +290,8 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
         self.assertTrue(all(location.can_reach(state) for location in world.multiworld.get_locations(world.player)
                             if location.address is not None))
 
-    # racers: 58 before the nine tester cup names joined the pool (A3-42), 65 after; the
-    # A4-16 retirements (Venusyprime and the four generic labels) changed the draw again and
-    # seed 83 now saturates the slack cap, so the probe moved to seed 80.
-    cases = (("letters", 169, 52), ("racers", 80, 83))
+    # racers: 58 before the nine tester cup names joined the pool (A3-42); seed 83 now draws other cup names.
+    cases = (("letters", 169, 52), ("racers", 83, 65))
 
     def options(self, name):
         path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"
