@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.3.0",
-  "checksum": "dfef5220b67ad917f534bac828b5bf882156caad",
+  "checksum": "9a2cf63559914cf62a867197a7c62c39d2b569ea",
   "item_name_to_id": {
     "AP Box Colours": 35010205,
     "Always Jumping": 35010208,
@@ -6973,6 +6973,8 @@
     "Deep Sea Driving N-Gage: Relic Race Perfect": 35204410,
     "Deep Sea Driving N-Gage: Sapphire Time Trial": 35204406,
     "Deep Sea Driving N-Gage: Trophy Race": 35204400,
+    "Dex Cup: Win": 35027109,
+    "Dex Cup: Win All Legs": 35027309,
     "Dingo Canyon: CTR Token Challenge": 35012307,
     "Dingo Canyon: Complete One Lap": 35028007,
     "Dingo Canyon: Cup Leg Victory": 35016807,
@@ -23277,6 +23279,8 @@
       "Deep Sea Driving N-Gage: Relic Race Perfect",
       "Deep Sea Driving N-Gage: Sapphire Time Trial",
       "Deep Sea Driving N-Gage: Trophy Race",
+      "Dex Cup: Win",
+      "Dex Cup: Win All Legs",
       "Dingo Canyon: CTR Token Challenge",
       "Dingo Canyon: Complete One Lap",
       "Dingo Canyon: Cup Leg Victory",

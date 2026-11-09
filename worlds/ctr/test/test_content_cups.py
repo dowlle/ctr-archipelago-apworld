@@ -138,6 +138,21 @@ class TestCupDraw(unittest.TestCase):
             for leg in cup["legs"]:
                 self.assertRegex(leg["track_id"], r"^retail:(\d|1[0-7])$")
 
+    def test_retired_names_are_never_drawn(self):
+        """Venusyprime stays registered but is never drawn; Dex is drawable."""
+        retired = {cup_checks.CUP_NAMES.index(name) for name in cup_checks.CUP_NAMES_RETIRED}
+        seen = set()
+        for seed in range(8):
+            plan = make_world(dict(cup_count=27, crystal_challenge_count=0,
+                                   accessibility="full"), seed=seed).ctr_content_plan
+            for cup in cups_of(plan):
+                if content_cups.gem_colour(cup["id"]) is None:
+                    seen.add(int(cup["id"].split(":")[1]))
+        self.assertFalse(seen & retired)
+        self.assertEqual(seen, set(cup_checks.CUP_DRAW_INDICES))
+        self.assertIn(cup_checks.CUP_NAMES.index("Dex Cup"), seen)
+        self.assertEqual(len(cup_checks.CUP_DRAW_INDICES), 36)
+
     def test_feasible_pairs(self):
         spec = dict(bounds=(25, 27), repeats=dict(content_cups.DEFAULT_REPEATS), custom_legs=(0, 4))
         other = [object()] * 16
