@@ -465,6 +465,15 @@ def tiger_temple_door(world):
         door_box = f"{track}: Item Box {number}"
         if CTR_LOCATION_IDS.get(door_box) in codes:
             names.append(door_box)
+    from . import sanity
+    for row in plan.get("sanity", {}).get("tracks", ()):
+        if row["track_id"] != "retail:4":
+            continue
+        inv = sanity.CATALOG["retail:4"]
+        for f, kind in enumerate(sanity.KINDS):
+            for n in row[kind]:
+                if inv["needs"].get(kind, {}).get(str(n), {}).get("door"):
+                    names.append(f"Tiger Temple: {sanity.SUFFIXES[f]} {n}")
     for name in names:
         location = world.multiworld.get_location(name, player)
         logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))

@@ -72,7 +72,7 @@ def build_location_name_groups(location_names: Iterable[str],
     groups: Dict[str, Set[str]] = {t: set() for t in sorted(tracks)}
     for g in ("Held Placements", "Finish Podium", "Trophy Race", "CTR Challenge",
               "Relic Race", "Battle Arenas", "Gem Cups", "Boss Races",
-              "Hit Characters", "Item Boxes",
+              "Hit Characters", "Item Boxes", "Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit",
               *(f"Relic Race {tier}" for tier in RELIC_TIERS)):
         groups[g] = set()
     groups["Hit Characters"] = set(HIT_CHARACTER_CLASS.names())
@@ -84,6 +84,9 @@ def build_location_name_groups(location_names: Iterable[str],
             continue
         if track in tracks:
             groups[track].add(name)
+        for prefix, group in (("Weapon Crate ", "Weapon Crates"), ("Wumpa Crate ", "Wumpa Crates"), ("Wumpa Fruit ", "Loose Wumpa Fruit")):
+            if suffix.startswith(prefix):
+                groups[group].add(name)
         if track in arenas:
             groups["Battle Arenas"].add(name)
         if track in gem_cups:

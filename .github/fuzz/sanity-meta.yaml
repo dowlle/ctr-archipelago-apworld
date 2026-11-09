@@ -1,0 +1,13 @@
+Crash Team Racing:
+  itemboxsanity: {0: 1, 5: 2, 50: 2, random: 1}
+  wumpasanity: {crates: 1, fruit: 1, both: 4}
+  item_box_count: {0: 2, 50: 2}
+  accessibility: full
+  custom_tracks: []
+  retail_tracks: [all]
+  crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
+  boss_garages: true
+  purple_cup_boss_gauntlet: false
+  boss_character_pool: [Crash Bandicoot, Coco Bandicoot, Polar, Pura, Neo Cortex, N. Tropy, Ripper Roo, Papu Papu, Komodo Joe, Pinstripe, Dingodile, Tiny Tiger, N. Gin, Fake Crash, Penta Penguin]
+  boss_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility]
+  oxide_weapon_pool: [tnt, potion, bomb, missile, turbo, shield, mask, clock, warp_orb, invisibility, super_engine]

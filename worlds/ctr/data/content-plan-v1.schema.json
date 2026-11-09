@@ -57,7 +57,7 @@
       "items": {
         "$ref": "#/$defs/Check"
       },
-      "maxItems": 4096,
+      "maxItems": 16384,
       "minItems": 0
     },
     "items": {
@@ -102,10 +102,12 @@
           "pad_client_v1",
           "lap_checks_v1",
           "box_spots_v1",
-          "box_count_v1"
+          "box_count_v1",
+          "itemboxsanity_v1",
+          "wumpasanity_v1"
         ]
       },
-      "maxItems": 33,
+      "maxItems": 35,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -126,6 +128,29 @@
     },
     "item_boxes": {
       "$ref": "#/$defs/ItemBoxes"
+    },
+    "sanity": {
+      "type": "object",
+      "properties": {
+        "itemboxsanity": {"type": "integer", "minimum": 0, "maximum": 50},
+        "wumpasanity": {"type": "integer", "minimum": 0, "maximum": 3},
+        "shortcut_knowledge": {"type": "integer", "minimum": 0, "maximum": 2},
+        "tracks": {"type": "array", "maxItems": 160, "items": {
+          "type": "object",
+          "properties": {
+            "track_id": {"type": "string", "maxLength": 64},
+            "lev_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "counts": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0, "maximum": 65536}},
+            "weapon_crate": {"$ref": "#/$defs/SanityOrdinals"},
+            "wumpa_crate": {"$ref": "#/$defs/SanityOrdinals"},
+            "wumpa_fruit": {"$ref": "#/$defs/SanityOrdinals"}
+          },
+          "required": ["track_id", "lev_sha256", "counts", "weapon_crate", "wumpa_crate", "wumpa_fruit"],
+          "additionalProperties": false
+        }}
+      },
+      "required": ["itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"],
+      "additionalProperties": false
     },
     "bosses": {
       "$ref": "#/$defs/Bosses"
@@ -180,6 +205,7 @@
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
+    "SanityOrdinals": {"type": "array", "maxItems": 80, "uniqueItems": true, "items": {"type": "integer", "minimum": 1, "maximum": 80}},
     "FilePin": {
       "type": "object",
       "properties": {
@@ -346,6 +372,8 @@
               "minimum": 0,
               "maximum": 65536
             },
+            "fruit_crates": {"type": "integer", "minimum": 0, "maximum": 65536},
+            "loose_fruit": {"type": "integer", "minimum": 0, "maximum": 65536},
             "checkpoints": {
               "description": "Optional (#133 PR 6b): the LEV's restart point count. Native measures it and refuses a stated count the bytes disagree with. With ai_nav true it lets the track race a boss under Boss Track Shuffle when the count carries the garage's attack schedule.",
               "type": "integer",
@@ -1660,22 +1688,22 @@
         "coded_checks": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 4096
+          "maximum": 16384
         },
         "locked_checks": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 4096
+          "maximum": 16384
         },
         "filler_count": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 4096
+          "maximum": 16384
         },
         "trap_count": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 4096
+          "maximum": 16384
         }
       },
       "required": [

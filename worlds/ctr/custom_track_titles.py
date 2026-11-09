@@ -71,7 +71,10 @@ def reserved_stems() -> Set[str]:
         from . import destinations
         from .Locations import CTR_LOCATION_IDS
         from .named_tracks import NAMED_TRACK_CLASS
+        from .sanity import SANITY_CLASS
         named = set(NAMED_TRACK_CLASS.names())
+        named_stems = {t.ap_name for t in NAMED_TRACK_CLASS.tracks}
+        named.update(n for n in SANITY_CLASS.names() if n.partition(": ")[0] in named_stems)
         stems = {name.split(": ", 1)[0].casefold()
                  for name in CTR_LOCATION_IDS if ": " in name and name not in named}
         stems |= {d.key.casefold() for d in destinations.BY_KEY.values()}

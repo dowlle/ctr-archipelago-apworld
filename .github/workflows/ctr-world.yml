@@ -296,6 +296,10 @@ jobs:
             cp ../world-src/.github/fuzz/random-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)
           fi
+          if [ "$CHECK_META" = "sanity" ]; then
+            cp ../world-src/.github/fuzz/sanity-meta.yaml ci_meta.yaml
+            extra_args+=(-m ci_meta.yaml)
+          fi
           if [ "$CHECK_META" = "check-ut-custom-tracks" ]; then
             cp ../world-src/.github/fuzz/check-ut-custom-tracks-meta.yaml ci_meta.yaml
             extra_args+=(-m ci_meta.yaml)

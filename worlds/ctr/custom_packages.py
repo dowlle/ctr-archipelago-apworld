@@ -72,7 +72,7 @@ CAPABILITIES = ("time_trial", "arcade", "relic", "ctr_tokens", "wumpa")
 #: (1 to 255) and whether it has AI navigation paths. Together they let the
 #: track race a boss under Boss Track Shuffle (content_bosses); native
 #: measures both on load and refuses a mismatch.
-OPTIONAL_CAPABILITIES = ("super_turbo_pads", "weapon_crates", "checkpoints", "ai_nav")
+OPTIONAL_CAPABILITIES = ("super_turbo_pads", "weapon_crates", "fruit_crates", "loose_fruit", "checkpoints", "ai_nav")
 CHECKPOINTS_MAX = 255
 #: The instance-table ceiling native measures against
 #: (native_custom_content_verify.c refuses a LEV with more instances).
@@ -177,7 +177,7 @@ def admit(descriptor, where="package"):
     caps = d["capabilities"]
     _closed(caps, CAPABILITIES, OPTIONAL_CAPABILITIES, where + ".capabilities")
     for name in CAPABILITIES + tuple(n for n in OPTIONAL_CAPABILITIES if n in caps):
-        if name == "weapon_crates":
+        if name in ("weapon_crates", "fruit_crates", "loose_fruit"):
             _integer(caps[name], 0, WEAPON_CRATES_MAX, f"{where}.capabilities.{name}")
         elif name == "checkpoints":
             _integer(caps[name], 1, CHECKPOINTS_MAX, f"{where}.capabilities.{name}")

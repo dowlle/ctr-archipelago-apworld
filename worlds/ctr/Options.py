@@ -749,6 +749,31 @@ class BoxLocations(Toggle):
         self.value = -1 if value == -1 else int(bool(value))
 
 
+class Itemboxsanity(Range):
+    """How many ordinary weapon crates on each track are checks, from 0 to 50.
+    0 turns this off. Breaking a crate the first time sends its check; you
+    still get the weapon and the crate comes back. A track with more crates
+    picks that many at random for the seed. Crates used as AP item boxes on
+    custom tracks are never counted. Generic custom slots are not supported."""
+    display_name = "Weapon Crate Checks per Track"
+    range_start = 0
+    range_end = 50
+    default = 0
+
+
+class Wumpasanity(Choice):
+    """Makes Wumpa crates, loose Wumpa Fruit, or both into checks. Collecting
+    one the first time sends its check; you still get the fruit. Counts in
+    Trophy Races, CTR Challenges, Gem Cups and boss races, not Relic Races.
+    Opponents drive through loose fruit that is still an open check."""
+    display_name = "Wumpasanity"
+    option_off = 0
+    option_crates = 1
+    option_fruit = 2
+    option_both = 3
+    default = 0
+
+
 class ItemBoxCount(Range):
     """Maximum AP item boxes per track. Zero turns them off. Tracks use all
     eligible placed spots when fewer are available. Tracks without placements
@@ -1780,6 +1805,8 @@ class ctrAPOptions(PerGameCommonOptions):
     lap_completion_checks: LapCompletionChecks
     box_locations: BoxLocations
     item_box_count: ItemBoxCount
+    itemboxsanity: Itemboxsanity
+    wumpasanity: Wumpasanity
     itemsanity: Itemsanity
     crystalsanity: Crystalsanity
     wumpa_check: WumpaCheck
@@ -1846,7 +1873,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
     "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
-               LapCompletionChecks, ItemBoxCount, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
+               LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,

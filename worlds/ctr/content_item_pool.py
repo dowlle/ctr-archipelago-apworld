@@ -164,8 +164,8 @@ def resolve(raw, coded_checks, *, starts=None, additional=None, locked=None,
             exact_count(count, f"{label}.{name}")
     for label, value in (("coded_checks", coded_checks), ("locked_checks", locked_checks)):
         exact_count(value, label)
-    if coded_checks > 4096 or locked_checks > coded_checks:
-        fail("coded check capacity must be at most 4096 and cover every locked check.")
+    if coded_checks > 16384 or locked_checks > coded_checks:
+        fail("coded check capacity must be at most 16384 and cover every locked check.")
     exact_count(trap_percentage, "trap_percentage")
     if trap_percentage > 100:
         fail("trap_percentage must be at most 100.")

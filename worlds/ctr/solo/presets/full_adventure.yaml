@@ -3,6 +3,8 @@
 name: Player
 game: Crash Team Racing
 Crash Team Racing:
+  itemboxsanity: 0
+  wumpasanity: "off"
   accessibility: full
   oxide_goal: 101_percent
   itemsanity: true
