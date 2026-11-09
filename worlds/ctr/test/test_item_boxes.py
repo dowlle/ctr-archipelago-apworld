@@ -84,7 +84,9 @@ class TestSeatingTables(unittest.TestCase):
 
 
 class TestBoxLocationsOff(CTRTestBase):
-    def test_no_box_locations_by_default(self):
+    options = {"item_box_count": 0}
+
+    def test_no_box_locations_when_off(self):
         for name in ITEM_BOX_CLASS.names():
             with self.subTest(location=name):
                 with self.assertRaises(KeyError):

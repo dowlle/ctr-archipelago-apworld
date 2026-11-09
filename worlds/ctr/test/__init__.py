@@ -7,10 +7,17 @@ def setup_multiworld(*args, **kwargs):
     Count scenarios use item_box_count and exercise the new defaults directly.
     """
     from test.general import setup_multiworld as setup
-    options = dict(kwargs.get("options") or {})
-    if "item_box_count" not in options:
-        options.setdefault("box_locations", False)
-    kwargs["options"] = options
+    def profile(raw):
+        options = dict(raw or {})
+        if "item_box_count" not in options:
+            options.setdefault("box_locations", False)
+        return options
+    raw = kwargs.get("options")
+    if isinstance(raw, list):
+        kwargs["options"] = [profile(option) if world.game == "Crash Team Racing" else option
+                             for world, option in zip(args[0], raw)]
+    else:
+        kwargs["options"] = profile(raw)
     return setup(*args, **kwargs)
 
 
