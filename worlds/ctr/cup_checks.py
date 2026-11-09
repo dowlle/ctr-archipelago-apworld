@@ -29,6 +29,12 @@ register (ruled 2026-10-13 22:02 CEST).
 
 FROZEN-NAME WARNING: once released these names and codes are permanent. New
 cup names append to CUP_NAMES; nothing is reordered or renamed.
+
+RETIRED NAMES (ruled 2026-11-09). A released name is never removed or
+renamed, but it can leave the draw: it stays in CUP_NAMES and the data
+package with its ids, so old rooms keep working, and new seeds never draw
+it. "Venusyprime Cup" retired when its tester asked to be credited as Dex.
+The drawable pool stays at 36; generic names keep their frozen identities.
 """
 from typing import List, Tuple
 
@@ -47,7 +53,17 @@ CUP_NAMES: Tuple[str, ...] = (
     "Bob90 Cup", "Turbo Cup", "Relic Cup", "Multiworld Cup", "Sphere Cup",
     "Cristichi Cup", "FruitLion8 Cup", "TayWoodz Cup", "MeD Cup", "Lionboy Cup",
     "MisterShaokahn Cup", "Sturg Cup", "Prototyp_002 Cup", "Em Cup",
+    "Dex Cup",
 )
+#: Names no seed draws any more (ruled 2026-11-09). They stay in CUP_NAMES
+#: and the data package so alpha3 rooms keep working; only the draw skips
+#: them. Venusyprime's tester is credited as Dex (the appended "Dex Cup").
+CUP_NAMES_RETIRED: Tuple[str, ...] = (
+    "Venusyprime Cup",
+)
+#: The pool indices a seed may draw: every name minus the retired ones.
+CUP_DRAW_INDICES: Tuple[int, ...] = tuple(
+    i for i, name in enumerate(CUP_NAMES) if name not in CUP_NAMES_RETIRED)
 #: Room reserved for later cup names, ruled 2026-10-13 21:47 CEST.
 CUP_NAME_CAPACITY = 127
 
@@ -65,6 +81,8 @@ GEM_CUPS: Tuple[str, ...] = tuple(region for region, _level in destinations.CUP_
 assert GEM_CUPS == ("Red Gem Cup", "Green Gem Cup", "Blue Gem Cup",
                     "Yellow Gem Cup", "Purple Gem Cup")
 assert len(set(CUP_NAMES)) == len(CUP_NAMES) <= CUP_NAME_CAPACITY
+assert set(CUP_NAMES_RETIRED) <= set(CUP_NAMES)
+assert len(CUP_DRAW_INDICES) == len(CUP_NAMES) - len(CUP_NAMES_RETIRED)
 
 
 def _pool_code(base: int, growth_base: int, index: int) -> int:

@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.3.0",
-  "checksum": "3dcd11eff9c3d673622f1274f065dcb4356b94b3",
+  "checksum": "3c9ff286f3ad0301340c35bc652ecc4a9a5caaff",
   "item_name_to_id": {
     "AP Box Colours": 35010205,
     "Always Jumping": 35010208,
@@ -10101,6 +10101,8 @@
     "Deep Sea Driving N-Gage: Wumpa Fruit 7": 37202918,
     "Deep Sea Driving N-Gage: Wumpa Fruit 8": 37202919,
     "Deep Sea Driving N-Gage: Wumpa Fruit 9": 37202920,
+    "Dex Cup: Win": 35027109,
+    "Dex Cup: Win All Legs": 35027309,
     "Dingo Canyon: CTR Token Challenge": 35012307,
     "Dingo Canyon: Complete One Lap": 35028007,
     "Dingo Canyon: Cup Leg Victory": 35016807,
@@ -41911,6 +41913,8 @@
       "Deep Sea Driving N-Gage: Wumpa Fruit 7",
       "Deep Sea Driving N-Gage: Wumpa Fruit 8",
       "Deep Sea Driving N-Gage: Wumpa Fruit 9",
+      "Dex Cup: Win",
+      "Dex Cup: Win All Legs",
       "Dingo Canyon: CTR Token Challenge",
       "Dingo Canyon: Complete One Lap",
       "Dingo Canyon: Cup Leg Victory",
