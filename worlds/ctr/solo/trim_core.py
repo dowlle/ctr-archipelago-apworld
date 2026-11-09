@@ -16,7 +16,9 @@ import sys
 
 # Top-level modules: every core .py file except clients, adjusters and tools
 # that pull GUI or game-specific dependencies and are never imported here.
-SKIP_TOP_LEVEL = {"setup.py", "kvui.py", "Launcher.py", "LttPAdjuster.py", "OoTAdjuster.py",
+# Launcher.py stays: 0.6.8's worlds/LauncherComponents.py imports it at module
+# level, and its own module-level imports are stdlib plus Utils only.
+SKIP_TOP_LEVEL = {"setup.py", "kvui.py", "LttPAdjuster.py", "OoTAdjuster.py",
                   "WebHost.py", "OptionsCreator.py"}
 SKIP_SUFFIX_TOP_LEVEL = ("Client.py",)
 KEEP_TOP_LEVEL = {"CommonClient.py"}  # imported by core modules
