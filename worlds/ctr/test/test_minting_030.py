@@ -122,7 +122,7 @@ class TestReservedNotMinted(unittest.TestCase):
         (35019000, 35019191, "race v2 codes of slots 1..32, never used"),
         # The nine alpha3 tester cup names (A3-42) took 35027100 to 35027108
         # and 35027300 to 35027308, and Dex Cup (A4-16) took 35027109 and
-        # 35027309. A4-16c took 35027110..113 and 35027310..313.
+        # 35027309. A4-16c took 35027110..35027113 and 35027310..35027313.
         # The rest of both growth ranges stays reserved.
         (35027114, 35027199, "later cup names, Win"),
         (35027314, 35027399, "later cup names, Win All Legs"),
