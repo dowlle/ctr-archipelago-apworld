@@ -46,6 +46,7 @@
     {"option": "oxide_weapon_pool", "when": {"oxide_attack_profile": ["all_compatible"], "oxide_goal": ["none", "any_percent", "101_percent"]}, "at_least": 1, "reason": "N. Oxide's all_compatible profile needs 1 weapon."}
   ],
   "left_out": {
+    "box_locations": "Legacy YAML alias. Item Boxes per Track replaces this switch; zero turns boxes off.",
     "death_link": "Solo has no other players, so DeathLink is forced off (ruling 2026-11-02).",
     "death_link_send": "DeathLink is forced off in solo.",
     "deathlink_amnesty": "DeathLink is forced off in solo.",
