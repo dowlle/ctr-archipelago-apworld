@@ -92,7 +92,7 @@ Crash Team Racing:
       trophies: 5
       relics: {sapphire: 6, gold: 4, platinum: 2}
       tokens: {red: 2, green: 2, blue: 2, yellow: 0, purple: 0}
-      gems: [red, green, blue, yellow, purple]
+      gems: {red: 1, green: 1, blue: 1, yellow: 1, purple: 1}
       keys: 4
   oxide_goal: disabled
   bosses_required_goal: 0
