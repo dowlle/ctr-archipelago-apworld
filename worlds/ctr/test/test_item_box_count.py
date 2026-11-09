@@ -86,6 +86,16 @@ class TestItemBoxCount(unittest.TestCase):
             expected = sorted(random.Random(int.from_bytes(hashlib.sha256(key).digest(), "big")).sample(numbers, 15))
             self.assertEqual(box_spots.pick(numbers, seed, 1, "retail:3", 15), expected)
 
+    def test_shape_has_capacity_for_the_new_feature_with_every_existing_one(self):
+        from ..content_plan_schema import SCHEMA, validate_shape
+        plan = copy.deepcopy(count_world(1).ctr_content_plan)
+        # Shape admission is separate from profile/feature agreement.
+        plan["required_features"] = list(SCHEMA["properties"]["required_features"]["items"]["enum"])
+        validate_shape(plan)
+        plan["required_features"][0] = "unknown_feature"
+        with self.assertRaises(ValueError):
+            validate_shape(plan)
+
     def test_counts_and_tracker(self):
         with fifty_spots():
             for count in (0, 1, 15, 50):
