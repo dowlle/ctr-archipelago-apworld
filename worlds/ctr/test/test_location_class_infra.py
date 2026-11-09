@@ -83,6 +83,7 @@ FIXTURE_PATHS = (
     # Dex Cup appended to the cup pool (A4-16, 2026-11-09): the Win and
     # Win All Legs checks at the growth codes 35027109 and 35027309.
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_dex_cup.json",
+    FIXTURE_DIR / "location_class_id_stability_2026_11_09_discord_cups.json",
 )
 
 PODIUM_TOGGLES = (
