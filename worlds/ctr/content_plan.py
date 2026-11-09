@@ -423,6 +423,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_item_boxes.FEATURE] if item_boxes else [])
             + ([content_item_boxes.SPOT_FEATURE] if item_boxes and item_boxes.get(content_item_boxes.SPOT_KEY) else [])
             + ([content_item_boxes.crate_exclusions.FEATURE] if item_boxes and item_boxes.get(content_item_boxes.crate_exclusions.KEY) else [])
+            + ([content_item_boxes.COUNT_FEATURE] if item_boxes and "box_count" in item_boxes else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
             + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
@@ -652,12 +653,19 @@ def box_envelope(world):
     `color_boxes_by_item` as off (pink boxes)."""
     if "item_boxes" not in world.ctr_content_plan:
         return {}
-    return dict(box_locations=True, color_boxes_by_item=bool(world.options.color_boxes_by_item.value))
+    envelope = dict(box_locations=True, color_boxes_by_item=bool(world.options.color_boxes_by_item.value))
+    if "box_count" in world.ctr_content_plan["item_boxes"]:
+        envelope["item_box_count"] = world.ctr_content_plan["item_boxes"]["box_count"]
+    return envelope
 
 
 def check_box_envelope(plan, co):
     """The envelope's box keys are present exactly with the `item_boxes`
     record: `box_locations` true and `color_boxes_by_item` true or false."""
+    count = plan.get("item_boxes", {}).get("box_count")
+    if ("item_box_count" in co) != (count is not None) or (count is not None and
+            (type(co["item_box_count"]) is not int or co["item_box_count"] != count)):
+        error("item_box_count envelope disagrees with the plan")
     if "item_boxes" in plan:
         if co.get("box_locations") is not True or type(co.get("color_boxes_by_item")) is not bool:
             error("box envelope disagrees with the plan's item_boxes record")
@@ -3152,6 +3160,7 @@ def restore(world, slot_data):
     # colour setting.
     item_boxes = plan.get("item_boxes")
     world.options.box_locations.value = int(item_boxes is not None)
+    world.options.item_box_count.value = item_boxes.get("box_count", 15) if item_boxes else 0
     if item_boxes is not None:
         world.options.shortcut_knowledge.value = item_boxes["shortcut_knowledge"]
         world.options.color_boxes_by_item.value = int(co["color_boxes_by_item"])

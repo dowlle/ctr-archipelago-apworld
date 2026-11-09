@@ -26,7 +26,7 @@ from collections import Counter
 
 from Options import OptionError
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld, traps
 from ..Items import load_item_table

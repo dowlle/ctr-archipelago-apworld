@@ -22,7 +22,7 @@ import copy
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..custom_packages import BABY_T_PARK_EXAMPLE

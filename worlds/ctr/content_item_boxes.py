@@ -68,6 +68,7 @@ from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TI
 
 FEATURE = "item_boxes_v1"
 SPOT_FEATURE = box_spots.FEATURE
+COUNT_FEATURE = "box_count_v1"
 KEYS = ("shortcut_knowledge",)
 SPOT_KEY = "spot_sets"
 KIND = "box"
@@ -81,9 +82,19 @@ def error(message):
 def settings(options):
     """The plan's `item_boxes` record from the seed's options; {} when Item
     Box Locations are off."""
-    if not options.box_locations.value:
+    count = options.item_box_count.value
+    # Existing YAMLs and programmatic callers retain their on/off choice.
+    # A non-default count takes precedence over the deprecated switch.
+    if count == 15 and options.box_locations.value == 0 and not getattr(options.item_box_count, "explicit_yaml_count", False):
+        count = 0
+    options.item_box_count.value = count
+    options.box_locations.value = int(count > 0)
+    if not count:
         return {}
-    return dict(shortcut_knowledge=int(options.shortcut_knowledge.value))
+    record = dict(shortcut_knowledge=int(options.shortcut_knowledge.value))
+    if count != 15:
+        record["box_count"] = count
+    return record
 
 
 def add_spot_sets(record, tracks, package_by_id, seed, player):
@@ -95,7 +106,7 @@ def add_spot_sets(record, tracks, package_by_id, seed, player):
     sets = []
     for track in tracks:
         found = box_spots.spot_set(track, package_by_id.get(track.get("package_id")),
-                                   record["shortcut_knowledge"], seed, player)
+                                   record["shortcut_knowledge"], seed, player, record.get("box_count", 15))
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
@@ -127,9 +138,12 @@ def check_settings(record, capability=None):
     """Shape and values of a plan's `item_boxes` record. With the capability
     record (#133 PR 4c) present, the two Shortcut Knowledge tiers agree. The
     spot sets are checked against their tracks by check_spot_sets."""
-    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY} != set(KEYS):
+    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY, "box_count"} != set(KEYS):
         error("item_boxes must be a mapping of shortcut_knowledge and, with box spots, spot_sets.")
     tier = record["shortcut_knowledge"]
+    if "box_count" in record and (type(record["box_count"]) is not int or not 1 <= record["box_count"] <= 50
+                                  or record["box_count"] == 15):
+        error("item_boxes.box_count must be 1 to 50, omitting the default 15.")
     if type(tier) is not int or tier not in (0, 1, 2):
         error("item_boxes.shortcut_knowledge must be 0, 1 or 2.")
     if capability and capability.get("shortcut_knowledge") != tier:
@@ -180,7 +194,7 @@ def check_spot_sets(record, tracks, packages):
         if track_id in sets:
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
-                                         {k: v for k, v in sets[track_id].items() if k != "track_id"})
+                                         {k: v for k, v in sets[track_id].items() if k != "track_id"}, record.get("box_count", 15))
             except box_spots.SpotFileError as exc:
                 error(str(exc))
 
@@ -256,7 +270,8 @@ def track_boxes(track, record, package=None):
         crates = crate_count(package, record, track["id"])
         if not crates:
             return []
-        return [(slot, box_code(track, slot), f"Item Box {slot}") for slot in range(1, len(seat_indices(crates)) + 1)]
+        return [(slot, box_code(track, slot), f"Item Box {slot}")
+                for slot in range(1, len(seat_indices(crates, min(record.get("box_count", 15), 15))) + 1)]
     return []
 
 

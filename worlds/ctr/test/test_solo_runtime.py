@@ -1293,7 +1293,8 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(section["custom_tracks"], [loop, hill])
         self.assertEqual(section["required_entries"], ["fixture-hill"])
         self.assertEqual(section["death_link"], "off")
-        self.assertEqual(sorted(section), ["custom_tracks", "death_link", "death_link_send", "required_entries"])
+        self.assertEqual(section["item_box_count"], 0)
+        self.assertEqual(sorted(section), ["custom_tracks", "death_link", "death_link_send", "item_box_count", "required_entries"])
         # Its tracks are listed afterwards even without the descriptor files.
         shutil.rmtree(self.descriptors)
         self.assertEqual(sorted(t["source"] for t in self.tracks()), ["room", "room"])

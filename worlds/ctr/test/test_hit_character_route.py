@@ -17,7 +17,7 @@ All-sixteen generation/reachability proofs live in test_hit_character_all16.py.
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import characters, ctrAPWorld

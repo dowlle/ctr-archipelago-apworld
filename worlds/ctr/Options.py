@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
-                     Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool)
+                     Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool, Visibility)
 
 from . import characters, legacy_yaml
 from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
@@ -742,6 +742,30 @@ class BoxLocations(Toggle):
     This makes a much longer seed. Some boxes sit behind jumps or shortcuts, so
     Shortcut Knowledge decides which ones are in the seed."""
     display_name = "Item Box Locations"
+    visibility = Visibility.none
+    default = -1  # hidden migration sentinel, omitted legacy setting
+
+    def __init__(self, value):
+        self.value = -1 if value == -1 else int(bool(value))
+
+
+class ItemBoxCount(Range):
+    """Maximum AP item boxes per track. Zero turns them off. Tracks use all
+    eligible placed spots when fewer are available. Tracks without placements
+    replace at most 15 weapon crates, and follow smaller counts. More boxes
+    make a longer seed. One count applies to the whole seed."""
+    display_name = "Item Boxes per Track"
+    range_start = 0
+    range_end = 50
+    default = 15
+
+    @classmethod
+    def from_any(cls, data):
+        option = super().from_any(data)
+        option.explicit_yaml_count, legacy = legacy_yaml.box_count_caller()
+        if legacy is not None:
+            option.value = 15 if legacy else 0
+        return option
 
 
 class ShortcutKnowledge(Choice):
@@ -1743,6 +1767,7 @@ class ctrAPOptions(PerGameCommonOptions):
     cup_sweep_checks: CupSweepChecks
     lap_completion_checks: LapCompletionChecks
     box_locations: BoxLocations
+    item_box_count: ItemBoxCount
     itemsanity: Itemsanity
     crystalsanity: Crystalsanity
     wumpa_check: WumpaCheck
@@ -1809,7 +1834,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
     "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
-               LapCompletionChecks, BoxLocations, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
+               LapCompletionChecks, ItemBoxCount, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
     "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,

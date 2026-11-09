@@ -429,6 +429,8 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
         section = doc.get(GAME) or {}
         if not isinstance(section, dict):
             section = {}
+    from worlds.ctr.legacy_yaml import migrate_box_count
+    section = migrate_box_count(dict(section))
     values = {}
     checklists = overlay.get("checklists", {})
     for group in overlay.get("groups", []):
@@ -453,7 +455,8 @@ def describe(paths: Paths, yaml_path: str | None = None) -> dict:
                for name, option in cls.options_dataclass.type_hints.items()]
     overlay = load_overlay(paths)
     doc = read_player_yaml(yaml_path) if yaml_path else {}
-    section = _section(doc)
+    from worlds.ctr.legacy_yaml import migrate_box_count
+    section = migrate_box_count(dict(_section(doc)))
     modified_at_roll = bool(doc.get("linked_options") or doc.get("triggers") or section.get("triggers"))
     unresolved = []
     for group in overlay.get("groups", []):
@@ -551,6 +554,8 @@ def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
         if not sep or key not in known:
             raise SoloError("option", f"Unknown option {key!r}.", option=key)
         section[key] = yaml.safe_load(raw)
+        if key == "item_box_count":
+            section.pop("box_locations", None)
     return doc
 
 

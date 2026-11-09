@@ -24,7 +24,8 @@ import yaml
 from BaseClasses import CollectionState, ItemClassification
 from Fill import distribute_items_restrictive
 from Options import OptionError
-from test.general import gen_steps, setup_multiworld
+from test.general import gen_steps
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import characters, ctrAPWorld

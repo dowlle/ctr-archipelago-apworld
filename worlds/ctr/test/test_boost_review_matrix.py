@@ -1,7 +1,7 @@
 """Approved 0.2.1 boost requirements at real location and event rules."""
 import unittest
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from .test_finish_gate_triage_corrections import _state_all_but_boost

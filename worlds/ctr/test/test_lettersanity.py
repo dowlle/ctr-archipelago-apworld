@@ -2,7 +2,7 @@
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from .. import lettersanity
@@ -326,7 +326,6 @@ class TestPapuPyramidLetterCapabilityRules(unittest.TestCase):
                     self.assertFalse(rule(state))
                     state.add_item("Turbo", 1, 1)
                     self.assertTrue(rule(state))
-
 
 
 

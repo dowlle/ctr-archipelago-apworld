@@ -101,10 +101,11 @@
           "wumpa_goal_v1",
           "pad_client_v1",
           "lap_checks_v1",
-          "box_spots_v1"
+          "box_spots_v1",
+          "box_count_v1"
         ]
       },
-      "maxItems": 32,
+      "maxItems": 33,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -1828,6 +1829,7 @@
       "description": "Item Box Locations (#133 PR 4e), present exactly when they are on: the Shortcut Knowledge tier that decides which retail box slots exist (equal to capability.shortcut_knowledge when that record is present). Retail tracks carry their frozen box checks; a named-block custom track carries Item Box 1 to min(weapon_crates, 15); generic slots and Cortex Vortex carry none. With hand-placed box spots (A3-14, feature box_spots_v1), spot_sets names each pad track that has a spot file of this apworld: the file digest, the eligible pool and the picked numbers; those tracks take their box checks from the picked spots instead.",
       "type": "object",
       "properties": {
+        "box_count": {"type": "integer", "minimum": 1, "maximum": 50, "not": {"const": 15}},
         "crate_exclusions": {
           "description": "Reviewed fallback crate exclusions from data/crate_exclusions.json, only for affected pad tracks without spots. Requires crate_exclusions_v1.",
           "type": "array", "minItems": 1, "maxItems": 160,
@@ -2104,7 +2106,7 @@
             "minimum": 1,
             "maximum": 50
           },
-          "maxItems": 15,
+          "maxItems": 50,
           "uniqueItems": true
         }
       },

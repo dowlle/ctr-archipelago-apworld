@@ -26,7 +26,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld
 from ..Options import OxideGoal
 from . import CTRTestBase

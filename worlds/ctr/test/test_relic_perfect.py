@@ -25,7 +25,7 @@ from collections import Counter
 from BaseClasses import CollectionState, ItemClassification
 from NetUtils import convert_to_base_types
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import call_all
 
 from .. import ctrAPWorld
@@ -270,5 +270,4 @@ class TestCustomTrackHooks(unittest.TestCase):
                      flags=dict(BABY_T_PARK_CURRENT["flags"],
                                 relic_crates=relic_crates))
         return {"baby-t-park": entry}
-
 

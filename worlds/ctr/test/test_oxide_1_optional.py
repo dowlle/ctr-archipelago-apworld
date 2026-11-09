@@ -5,7 +5,7 @@ import yaml
 
 from worlds.AutoWorld import call_all
 from BaseClasses import ItemClassification
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld
 from .test_oxide_access_contract import (
     _build, _reach, _boss_flags, FIRST, FINAL, KEYS, RELICS, RELIC_OPTS, STEPS,
@@ -76,5 +76,4 @@ class TestOxide1Optional(unittest.TestCase):
             mw = _build(oxide_goal=goal, oxide_1_optional="true_filler",
                         bosses_required_goal=2, **RELIC_OPTS)
             self.assertFalse(mw.get_location(FIRST, 1).locked)
-
 

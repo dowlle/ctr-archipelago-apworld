@@ -15,7 +15,7 @@ beatable with them in place.
 """
 import unittest
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.AutoWorld import AutoWorldRegister, World
 from BaseClasses import Item, ItemClassification, Location, Region
 from Fill import distribute_items_restrictive

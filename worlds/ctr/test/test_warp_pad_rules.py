@@ -13,7 +13,7 @@ from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld, content_plan, destinations, warp_pad_rules
 from .test_content_plan import make_world, profile_options

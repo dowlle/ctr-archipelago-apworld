@@ -87,7 +87,7 @@ import unittest
 
 from BaseClasses import LocationProgressType
 from Fill import FillError, distribute_items_restrictive
-from test.general import setup_multiworld
+from . import setup_multiworld
 from worlds.generic.Rules import exclusion_rules
 
 from .. import ctrAPWorld

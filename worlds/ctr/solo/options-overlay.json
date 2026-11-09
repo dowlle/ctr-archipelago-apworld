@@ -5,7 +5,7 @@
     {"id": "cups", "label": "Cups and Arenas", "options": ["cup_count", "cup_tracks", "cup_custom_legs", "one_lap_cups", "crystal_challenge_count", "crystal_arenas"]},
     {"id": "bosses", "label": "Bosses", "options": ["boss_garages", "boss_cups", "garage_requirement_level", "boss_track_shuffle", "boss_track_pool", "boss_opponent_shuffle", "boss_character_pool", "boss_track_assignment", "boss_kit_shuffle", "boss_attack_assignment", "boss_weapon_pool", "boss_attack_intensity", "boss_loss_easing", "oxide_attack_profile", "oxide_weapon_pool", "purple_cup_boss_gauntlet"]},
     {"id": "pads", "label": "Pads and Locks", "options": ["pad_placement", "race_mode_order", "adventure_structure", "warppad_unlock_requirements", "two_stage_density", "racer_locked_pads", "shuffle_keys", "shuffle_gems"]},
-    {"id": "checks", "label": "Checks", "options": ["podium_rungs", "cup_only_podium_rungs", "relic_perfect_checks", "lettersanity", "letters_per_track", "cup_sweep_checks", "lap_completion_checks", "box_locations", "itemsanity", "crystalsanity", "wumpa_check", "hit_character"]},
+    {"id": "checks", "label": "Checks", "options": ["podium_rungs", "cup_only_podium_rungs", "relic_perfect_checks", "lettersanity", "letters_per_track", "cup_sweep_checks", "lap_completion_checks", "item_box_count", "itemsanity", "crystalsanity", "wumpa_check", "hit_character"]},
     {"id": "shop", "label": "Wumpa Shop", "options": ["wumpa_shop_slots", "wumpa_shop_prices", "wumpa_shop_logic_scale", "wumpa_shop_progression", "wumpa_shop_hints", "shop_hints_progression_only"]},
     {"id": "items", "label": "Items and Traps", "options": ["trap_fill_percentage", "trap_weights", "wumpa_bundles", "reserve_top_up", "progressive_starting_wumpa", "turbo_grant", "tizi_helper", "trap_display"]},
     {"id": "racers", "label": "Racers and Stats", "options": ["starting_character", "character_unlocks", "remove_playable_oxide", "starting_stat_class", "penta_stats", "editable_stats", "progressive_stats"]},
@@ -46,6 +46,7 @@
     {"option": "oxide_weapon_pool", "when": {"oxide_attack_profile": ["all_compatible"], "oxide_goal": ["none", "any_percent", "101_percent"]}, "at_least": 1, "reason": "N. Oxide's all_compatible profile needs 1 weapon."}
   ],
   "left_out": {
+    "box_locations": "Legacy YAML alias. Item Boxes per Track replaces this switch; zero turns boxes off.",
     "death_link": "Solo has no other players, so DeathLink is forced off (ruling 2026-11-02).",
     "death_link_send": "DeathLink is forced off in solo.",
     "deathlink_amnesty": "DeathLink is forced off in solo.",

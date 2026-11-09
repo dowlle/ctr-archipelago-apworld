@@ -40,7 +40,7 @@ import yaml
 
 from Fill import distribute_items_restrictive
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld, sphere0_guard
 

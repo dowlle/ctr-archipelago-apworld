@@ -24,7 +24,7 @@ uniformly to both trial pads.
 """
 import unittest
 
-from test.general import setup_multiworld
+from . import setup_multiworld
 from .. import ctrAPWorld
 from ..content_playthrough import RELIC_ITEMS
 from . import CTRTestBase

@@ -19,6 +19,10 @@ FULL_LABEL = "full-fuzz"
 # Each pr-tier arm, with the generation family it stands for. Every family in
 # FAMILIES must have at least one arm here.
 PR_ARMS = {
+    "box-count-0": "content plan",
+    "box-count-1": "content plan",
+    "box-count-15": "content plan",
+    "box-count-50": "ut",
     "canonical-default": "default",
     "default": "default",
     "no-restrictive-starts": "default",

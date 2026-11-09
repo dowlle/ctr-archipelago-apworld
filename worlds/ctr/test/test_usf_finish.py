@@ -13,7 +13,7 @@ import collections
 import unittest
 
 from BaseClasses import CollectionState
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..capability_contract import (CONFIRMED_FINISH_BY_TRACK,

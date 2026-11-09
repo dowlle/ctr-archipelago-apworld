@@ -11,7 +11,7 @@ on `main` today independently of #179's own elastic options.
 import unittest
 
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from .. import podium

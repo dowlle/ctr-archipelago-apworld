@@ -7,5 +7,5 @@ Crash Team Racing:
   oxide_goal: 101_percent
   itemsanity: true
   lettersanity: locations_and_items
-  box_locations: true
+  item_box_count: 15
   death_link: "off"

@@ -11,7 +11,8 @@ import json
 import pkgutil
 import unittest
 
-from test.general import setup_multiworld, gen_steps
+from test.general import gen_steps
+from . import setup_multiworld
 
 from .. import ctrAPWorld, traps
 from ..cup_checks import CUP_NAMES, GEM_CUPS

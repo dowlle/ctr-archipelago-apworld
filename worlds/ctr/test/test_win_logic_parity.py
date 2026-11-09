@@ -17,7 +17,7 @@ from typing import Dict
 
 from BaseClasses import CollectionState
 from Options import OptionError
-from test.general import setup_multiworld
+from . import setup_multiworld
 
 from .. import ctrAPWorld
 from ..characters import ROSTER_CHARACTER_ID, unlock_item_name
@@ -261,5 +261,4 @@ def _states(mw, rng, n):
         p = rng.choice((0.15, 0.35, 0.6, 0.85))
         yield build([it for it in items if rng.random() < p],
                     [name for name in events if rng.random() < 0.5])
-
 
