@@ -3,6 +3,8 @@
 name: Player
 game: Crash Team Racing
 Crash Team Racing:
+  itemboxsanity: 0
+  wumpasanity: "off"
   item_box_count: 0
   oxide_goal: any_percent
   warppad_unlock_requirements: vanilla

@@ -19,7 +19,7 @@ KIND_GROUPS = (
     "Held Placements", "Finish Podium", "Trophy Race", "CTR Challenge",
     "Relic Race", "Relic Race Sapphire", "Relic Race Gold",
     "Relic Race Platinum", "Battle Arenas", "Gem Cups", "Boss Races",
-    "Hit Characters", "Item Boxes",
+    "Hit Characters", "Item Boxes", "Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit",
 )
 RETAIL_TRACKS = (
     "Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway", "Coco Park",
@@ -76,9 +76,9 @@ class TestLocationGroups(CTRTestBase):
     def test_group_counts(self) -> None:
         # 31 retail and special tracks + 86 named blocks + 13 kind groups
         # + Itemsanity Checks + Everywhere.
-        self.assertEqual(len(self.groups), 31 + 86 + 13 + 1 + 1)
-        self.assertEqual(len(self.groups["Crash Cove"]), 34 + 35)
-        self.assertEqual(len(self.groups["Cortex Vortex"]), 17)
+        self.assertEqual(len(self.groups), 31 + 86 + 16 + 1 + 1)
+        self.assertEqual(len(self.groups["Crash Cove"]), 34 + 35 + 18 + 3)
+        self.assertEqual(len(self.groups["Cortex Vortex"]), 17 + 69 + 7)
 
     def test_no_generic_custom_slot_has_a_group(self) -> None:
         self.assertFalse([g for g in self.groups if g.startswith("Custom Track")])

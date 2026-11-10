@@ -1,6 +1,8 @@
 # The arms with no meta of their own (.github/workflows/ctr-world.yml): the fuzzer
 # draws every other option.
 Crash Team Racing:
+  itemboxsanity: {0: 3, 5: 1, 50: 1, random: 2}
+  wumpasanity: {"off": 3, crates: 1, fruit: 1, both: 2}
   item_box_count: {0: 1, 1: 1, 15: 2, 50: 1, random: 4}
   # Random sets and switches here refuse most seeds, and a refused seed tests
   # nothing: Crystal Challenge Count above the listed arenas, cups the listed

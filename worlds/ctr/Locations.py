@@ -88,6 +88,8 @@ CTR_LOCATION_CLASSES.register(ARCADE_ARENA_CLASS)
 # 0.3.0 second id step: the 125 Wumpa Shop slots (#249), appended last. Inert.
 from .wumpa_shop import WUMPA_SHOP_CLASS
 CTR_LOCATION_CLASSES.register(WUMPA_SHOP_CLASS)
+from .sanity import SANITY_CLASS
+CTR_LOCATION_CLASSES.register(SANITY_CLASS)
 
 _LOCATION_DATA = json.loads(
     pkgutil.get_data(__package__, "data/locations.json").decode("utf-8")
@@ -131,5 +133,4 @@ def get_location_names() -> dict:
     Return a dictionary of all locations and their numeric IDs.
     """
     return CTR_LOCATION_IDS.copy()
-
 

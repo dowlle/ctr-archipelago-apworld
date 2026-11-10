@@ -83,6 +83,7 @@ FIXTURE_PATHS = (
     # Dex Cup appended to the cup pool (A4-16, 2026-11-09): the Win and
     # Win All Legs checks at the growth codes 35027109 and 35027309.
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_dex_cup.json",
+    FIXTURE_DIR / "location_class_id_stability_2026_11_09_sanity.json",
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_discord_cups.json",
 )
 
@@ -419,7 +420,8 @@ class TestLocationClassIdStability(unittest.TestCase):
         # + 18 Win and Win All Legs names of the nine tester cups (A3-42, 2026-11-08).
         # + 2 Win and Win All Legs names of Dex Cup (A4-16, 2026-11-09).
         # + 8 Win and Win All Legs names of the four Discord cups (A4-16c).
-        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2 + 8)
+        # + 11,558 ordinary pickup sanity names (A4-23).
+        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2 + 8 + 11558)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(

@@ -167,3 +167,5 @@
 - {check_name: pads-laps-boss-cups,            check_runs: 500,  check_hook: '',                                                        check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-laps-boss-cups'}
 - {check_name: pads-laps-ut,                   check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-randomized-shuffle-full-none-laps'}
 - {check_name: pads-laps-ut-vanilla,           check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                  check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full-none-laps'}
+- {check_name: sanity,                        check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'sanity'}
+- {check_name: sanity-ut,                     check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'sanity'}

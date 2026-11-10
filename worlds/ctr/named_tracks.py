@@ -160,6 +160,10 @@ RESERVED_ID_RANGES: Tuple[Tuple[int, int, str], ...] = (
     (35028400, 35028479, "crystals, retail arenas"),
     (35028500, 35028599, "arcade arena checks and expansion"),
     (35028600, 35028799, "Wumpa Shop slots and per-hub expansion"),
+    (35026100, 35026231, "Cortex Vortex ordinary pickups"),
+    (35026300, 35026587, "retail loose Wumpa Fruit"),
+    (35029000, 35029887, "retail weapon and Wumpa crates"),
+    (37200000, 38479999, "named-track sanity, 128 codes per block"),
 )
 for _first, _last, _label in RESERVED_ID_RANGES:
     for _lo, _hi in (NAMED_LOCATION_RANGE, NAMED_ITEM_RANGE):

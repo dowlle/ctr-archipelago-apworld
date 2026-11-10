@@ -143,16 +143,16 @@ class TestWinLogicEveryLocation(unittest.TestCase):
             Reached({target.address: target}, target.address, "pad").wire(_Encoder(world))
 
     def test_block_fits_native_tables(self):
-        """Native refuses a block over its tables (ap_win_logic.h): 4,096
-        checks, 1,024 regions, 16,384 nodes."""
+        """Native refuses a block over its tables (ap_win_logic.h): 16,384
+        checks, 1,024 regions, 65,536 nodes."""
         rng = random.Random(7)
         for label, options in _option_sets():
             world = make_world(options, seed=rng.randrange(1000))
             block = world.fill_slot_data()["win_logic"]
             with self.subTest(options=label):
-                self.assertLessEqual(len(block["checks"]), 4096)
+                self.assertLessEqual(len(block["checks"]), 16384)
                 self.assertLessEqual(len(block["regions"]), 1024)
-                self.assertLessEqual(_nodes(block), 16384)
+                self.assertLessEqual(_nodes(block), 65536)
 
 
 if __name__ == "__main__":

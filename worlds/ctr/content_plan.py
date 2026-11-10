@@ -39,7 +39,7 @@ from . import (content_item_pool, characters, cortex_vortex, destinations, named
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
-from . import (arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
+from . import (sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
                turbo_grant)
 from .Locations import CTR_LOCATION_IDS
@@ -406,7 +406,7 @@ def relic_races(entries):
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
-                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False):
+                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -447,6 +447,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([CTR_FIRST_FEATURE] if ctr_first else [])
             + ([content_bosses.OPPONENT_FEATURE] if bosses is not None and "opponent_shuffle" in bosses else [])
             + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
+            + ([sanity.FEATURES[0]] if sanity_record and sanity_record["itemboxsanity"] else [])
+            + ([sanity.FEATURES[1]] if sanity_record and sanity_record["wumpasanity"] else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
@@ -1579,6 +1581,14 @@ def draw_plan(world, key_estimate=True):
                                                   if boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else [])
     venue_record = lambda name: content_bosses.venue_record(name, RETAIL, cortex_track(),
                                                             {t["id"]: t for t in candidates if t.get("origin") == "custom"})
+    sanity_record = sanity.settings(o)
+    sanity_tracks = ([t for t in chosen if is_track(t) and any(m in t["modes"] for m in ("trophy", "ctr"))]
+                     + [leg for t in chosen if "cup_index" in t for leg in t["legs"]]
+                     + [venue_record(name) for name in venue_names])
+    sanity.add_tracks(sanity_record, sanity_tracks, package_by_id, item_boxes, world.multiworld.seed, world.player,
+                      int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)})
+    if sanity_record:
+        check_count += sum(len(row[kind]) for row in sanity_record["tracks"] for kind in sanity.KINDS)
     if laps:
         check_count += content_laps.count(chosen, is_track, [venue_record(name)["id"] for name in venue_names])
     # Reach 10 Wumpa through cup legs and boss races (row 10i): one per track
@@ -1634,6 +1644,19 @@ def draw_plan(world, key_estimate=True):
     pins = content_fixed.placements(fixed, base_counts,
                                     {name: base_counts[name] + extra_counts[name]
                                      - o.start_inventory_from_pool.value.get(name, 0) for name in base_counts})
+    filler_exclusions = set(o.exclude_locations.value) - {LOCATION_BY_CODE[code] for code in pins}
+    if filler_exclusions:
+        # Sanity groups expand to every frozen budget slot, including disabled
+        # families, unpicked crates and tracks absent from this room. Only the
+        # selected pickups consume filler. Keep the earlier families' reserve
+        # policy unchanged.
+        frozen_sanity = sanity.SANITY_CLASS.name_to_code()
+        by_id = {t["id"]: t for t in sanity_tracks}
+        selected_sanity = {sanity.code(by_id[row["track_id"]], family, number)
+                           for row in (sanity_record or {}).get("tracks", ())
+                           for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
+        filler_exclusions = {name for name in filler_exclusions
+                             if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
@@ -1641,8 +1664,7 @@ def draw_plan(world, key_estimate=True):
             additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
             locked=content_fixed.locked_copies(pins), locked_checks=len(pins),
             surface=content_item_pool.SURFACE_NAMES,
-            filler_reserve=int(oxide_filler) + len(set(o.exclude_locations.value)
-                                                   - {LOCATION_BY_CODE[code] for code in pins}),
+            filler_reserve=int(oxide_filler) + len(filler_exclusions),
             **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
                if chosen else {}))
     try:
@@ -1870,6 +1892,7 @@ def draw_plan(world, key_estimate=True):
     if laps:
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
+    checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability))
     # Wumpa Shop slots (job J11), last, each with its drawn price.
     checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
@@ -1932,7 +1955,7 @@ def draw_plan(world, key_estimate=True):
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes,boss_record,
                                                     world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
-                                                    ctr_first, shop, bool(wumpa_goal), True),
+                                                    ctr_first, shop, bool(wumpa_goal), True, sanity_record),
                 pad_requirements=pad_record, pad_client=pad_client(o))
     if ctr_first:
         plan["adventure_structure"] = CTR_FIRST
@@ -1948,6 +1971,8 @@ def draw_plan(world, key_estimate=True):
         plan["global_checks"] = global_checks
     if item_boxes:
         plan["item_boxes"] = item_boxes
+    if sanity_record:
+        plan["sanity"] = sanity_record
     if boss_record is not None:
         plan["bosses"] = boss_record
     if shop:
@@ -2274,7 +2299,7 @@ def create_regions(world):
     for check in plan['checks']:
         if check["kind"] in content_bosses.KINDS + (content_wumpa.KIND,):
             continue
-        if any(map(content_race_routes.is_race_route, check["routes"])) and check["kind"] in (
+        if check["kind"] in sanity.KINDS or any(map(content_race_routes.is_race_route, check["routes"])) and check["kind"] in (
                 content_race_routes.WUMPA_KIND, content_race_routes.PODIUM_KIND):
             races.append(check)  # row 10i: Wumpa and rungs with cup leg or boss race routes
             continue
@@ -2659,6 +2684,8 @@ def validate(plan):
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
+    sanity_record = plan.get("sanity")
+    sanity.validate(sanity_record, plan)
     # Row 5: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
     ctr_first = plan.get("adventure_structure") == CTR_FIRST
     require("adventure_structure" not in plan or ctr_first, "adventure_structure must be ctr_first when present")
@@ -2669,7 +2696,7 @@ def validate(plan):
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
-                                                         ctr_first, shop, wumpa_arm is not None, "pad_client" in plan),
+                                                         ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -2912,6 +2939,9 @@ def validate(plan):
             if content_race_routes.cup_only_on(plan["checks"]) else None):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
+    for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters, capability):
+        require(check["location"] not in expected_checks, "duplicate sanity identity")
+        expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
@@ -3099,6 +3129,8 @@ def restore(world, slot_data):
     content_bosses.restore_options(world, plan)
     content_fixed.restore_options(world, plan)
     world.options.crystalsanity.value=int(any(c['kind']=='crystal_pickup' for c in plan['checks']))
+    world.options.itemboxsanity.value = plan.get("sanity", {}).get("itemboxsanity", 0)
+    world.options.wumpasanity.value = plan.get("sanity", {}).get("wumpasanity", 0)
     world.options.death_link.value = co.get("death_link", 0)
     # An explicit send list (#133 PR 4a) is the bits of the mask; an absent key
     # is the default, which follows death_link.

@@ -240,7 +240,7 @@ class TestThirdPassLrg2Blocks(unittest.TestCase):
                 self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
                 self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
                                  [first_letter, first_letter + 1, first_letter + 2])
-                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67)  # 32, plus Item Box 16 to 50 (alpha3 data package)
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)  # Ordinary pickups own a separate range.
 
     def test_sids_house_key_has_no_dash_before_the_s(self):
         self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})

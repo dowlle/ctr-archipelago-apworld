@@ -465,6 +465,9 @@ def tiger_temple_door(world):
         door_box = f"{track}: Item Box {number}"
         if CTR_LOCATION_IDS.get(door_box) in codes:
             names.append(door_box)
+    from . import sanity
+    door_codes = sanity.door_codes(plan)
+    names.extend(check["display_name"] for check in plan["checks"] if check["location"] in door_codes)
     for name in names:
         location = world.multiworld.get_location(name, player)
         logic_terms.and_term(location, logic_terms.HasAny(TIGER_TEMPLE_DOOR_OPENERS, player))
