@@ -23,6 +23,7 @@ def ancient(crates=17, digest=None):
 ANCIENT_LAKE = ("256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8",
                 "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee")
 NORTH_POLE = "17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c"
+ROOS_TUBES = "d62e91af717d1ed16459f181e9bf944cc1c5e3ff272a89cb244bb59a87c3bfcc"
 
 
 def north_pole(crates=29):
@@ -39,7 +40,9 @@ def north_pole(crates=29):
 @patch.dict(box_spots.CUSTOM_FILES, {}, clear=True)
 class TestCrateExclusions(unittest.TestCase):
     def test_catalog_pins_exact_digests(self):
-        self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE})
+        self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE, ROOS_TUBES})
+        # Maintainer ruling, 2026-11-10: the dev-placed Roo's Tubes crate 9 lies fully outside the track.
+        self.assertEqual(crate_exclusions.EXCLUSIONS[ROOS_TUBES], [{"ordinal": 9, "pos": [0, 0, 0]}])
         self.assertEqual(crate_exclusions.EXCLUSIONS[NORTH_POLE], [{"ordinal": 1, "pos": [0, 0, 0]}])
 
     def test_north_pole_counts_and_generation(self):
@@ -118,7 +121,7 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(len(boxes(current_restored.ctr_content_plan, track_id)), min(count - 1, 15))
 
     def test_exact_revision_counts_and_generation(self):
-        for digest in crate_exclusions.EXCLUSIONS:
+        for digest in (*ANCIENT_LAKE, NORTH_POLE):  # custom revisions; the retail Roo's Tubes pin is sanity only
             p = ancient(digest=digest)
             self.assertEqual(content_item_boxes.crate_count(p), 17)
             world = first_world(box_options(custom=[p]))
@@ -136,7 +139,7 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(len(boxes(small.ctr_content_plan, track_id)), 2)
 
     def test_tracker_restores_legacy_and_current_seating(self):
-        for digest in list(crate_exclusions.EXCLUSIONS):
+        for digest in (*ANCIENT_LAKE, NORTH_POLE):
             for count in (3, 17):
                 p = ancient(count, digest)
                 # Generate the historical wire with no catalog, rather than

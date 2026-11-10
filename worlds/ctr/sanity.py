@@ -89,7 +89,8 @@ def eligible(track, family, record, item_boxes, package):
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
     if family == 0:
-        excluded = {c["ordinal"] for c in crate_exclusions.entries(package)} if package else set()
+        # Reviewed exclusions are keyed by exact LEV: custom revisions and the retail Roo's Tubes crate.
+        excluded = {c["ordinal"] for c in crate_exclusions.EXCLUSIONS.get(inv["lev_sha256"], ())}
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
         if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
