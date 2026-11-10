@@ -19,10 +19,10 @@ from .test_content_plan import make_world
 from .test_item_packs import pack_options
 
 ALPHA3 = {
-    "always_jumping": ("Always Jumping", 35010208, 3),
+    "always_jumping": ("Always Jumping", 35010208, 2),
     "no_drifting": ("No Drifting", 35010209, 3),
     "rival_surge": ("Rival Surge", 35010210, 3),
-    "mud_season": ("Mud Season", 35010211, 3),
+    "mud_season": ("Mud Season", 35010211, 2),
     "limp_mode": ("Limp Mode", 35010212, 3),
     "stuck_steering": ("Stuck Steering", 35010213, 1),
     "wumpa_leak": ("Wumpa Leak", 35010214, 4),
