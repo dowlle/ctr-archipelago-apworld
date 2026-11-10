@@ -78,7 +78,9 @@ class TestSanity(unittest.TestCase):
                         # Maintainer ruling, 2026-11-10: Roo's Tubes Weapon Crate 9 is outside the track and never a check.
                         eligible = row["counts"][0] - (1 if row["track_id"] == "retail:6" else 0)
                         self.assertEqual(len(row["weapon_crate"]), min(boxes, eligible))
-                        self.assertEqual(len(row["wumpa_crate"]), row["counts"][1] if wumpa == "both" else 0)
+                        # A4-41: Hot Air Skyway Wumpa Crate 4 is excluded as well.
+                        crates = row["counts"][1] - (1 if row["track_id"] == "retail:7" else 0)
+                        self.assertEqual(len(row["wumpa_crate"]), crates if wumpa == "both" else 0)
                         self.assertEqual(len(row["wumpa_fruit"]), row["counts"][2] if wumpa == "both" else 0)
                 wire = json.loads(json.dumps(world.fill_slot_data()))
                 tracker = make_world(profile_options(), passthrough=wire)
@@ -122,7 +124,8 @@ class TestSanity(unittest.TestCase):
 
     def test_geometry_rulings(self):
         needs = lambda key, kind, n: sanity.CATALOG[key]["needs"][kind][str(n)]
-        # Hot Air Skyway Wumpa Crate 4 stays the unreviewed conservative USF default until the new pictures are reviewed.
+        # Hot Air Skyway Wumpa Crate 4 is excluded (A4-41), so its needs row is never consulted. The
+        # location code stays registered.
         self.assertEqual(needs("retail:7", "wumpa_crate", 4), dict(needs="usf", reviewed=False))
         # Maintainer ruling, 2026-11-10: Cortex Castle Wumpa Crates 7 and 8 both need USF (a ruling, not a default).
         for n in (7, 8):
@@ -137,6 +140,32 @@ class TestSanity(unittest.TestCase):
         record = dict(shortcut_knowledge=2)
         self.assertEqual(sanity.eligible(roo, 0, record, None, None), list(range(1, 9)) + list(range(10, 14)))
         self.assertEqual(sanity.eligible(roo, 1, record, None, None), [1, 2])
+
+    def test_hot_air_skyway_wumpa_crate_4_is_excluded(self):
+        # Maintainer ruling, 2026-11-10 18:03 CET: exclude Hot Air Skyway Wumpa Crate 4. It hangs about
+        # 385 units below the road with no drivable ground beneath it (A4-35 pictures).
+        hot = dict(origin="retail", retail_id=7, display_name="Hot Air Skyway")
+        record = dict(shortcut_knowledge=2)
+        self.assertEqual(sanity.eligible(hot, 1, record, None, None), [1, 2, 3])
+        # Weapon crates and fruit of the same revision are untouched, and the location stays registered.
+        self.assertEqual(sanity.eligible(hot, 0, record, None, None), list(range(1, 25)))
+        names = sanity.SANITY_CLASS.name_to_code()
+        self.assertIn("Hot Air Skyway: Wumpa Crate 4", names)
+        self.assertEqual(names["Hot Air Skyway: Wumpa Crate 4"], sanity.code(dict(origin="retail", display_name="Hot Air Skyway"), 1, 4))
+        # The same ordinal in another family or on another track is not affected.
+        self.assertEqual(sanity.eligible(dict(origin="retail", retail_id=4, display_name="Tiger Temple"), 1, record, None, None),
+                         list(range(1, 12)))
+
+    def test_hot_air_skyway_crate_4_never_picked_or_accepted(self):
+        for seed in range(3):
+            plan = make_world(dict(profile_options(), wumpasanity="crates"), seed=seed).ctr_content_plan
+            row = next(r for r in plan["sanity"]["tracks"] if r["track_id"] == "retail:7")
+            self.assertEqual(row["wumpa_crate"], [1, 2, 3])
+            self.assertNotIn("Hot Air Skyway: Wumpa Crate 4", {c["display_name"] for c in plan["checks"]})
+            forged = copy.deepcopy(plan)
+            next(r for r in forged["sanity"]["tracks"] if r["track_id"] == "retail:7")["wumpa_crate"].append(4)
+            with self.assertRaises(OptionError):
+                content_plan.validate(forged)
 
     def test_excluded_crates_are_never_picked(self):
         for seed in range(3):
@@ -172,7 +201,7 @@ class TestSanity(unittest.TestCase):
                        progressive_boost="shared_global", progressive_boost_blue_fire=True)
         world = first_world(options, seed=3)
         checks = {c["display_name"]: c for c in world.ctr_content_plan["checks"]}
-        self.assertEqual(checks["Hot Air Skyway: Wumpa Crate 4"]["boost"], 2)  # USF, not the optional Blue Fire rank.
+        self.assertNotIn("Hot Air Skyway: Wumpa Crate 4", checks)  # excluded, A4-41
         self.assertNotIn("Roo's Tubes: Weapon Crate 9", checks)
         for n in (7, 8):
             self.assertEqual(checks[f"Cortex Castle: Wumpa Crate {n}"]["boost"], 2)

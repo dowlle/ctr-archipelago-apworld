@@ -88,16 +88,17 @@ def eligible(track, family, record, item_boxes, package):
     if inv is None:
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
+    # Reviewed exclusions are keyed by exact LEV and model family: custom revisions, the retail Roo's
+    # Tubes weapon crate and the Hot Air Skyway Wumpa crate. Fruit has none.
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family])
     if family == 0:
-        # Reviewed exclusions are keyed by exact LEV: custom revisions and the retail Roo's Tubes crate.
-        excluded = {c["ordinal"] for c in crate_exclusions.EXCLUSIONS.get(inv["lev_sha256"], ())}
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
         if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
             all_crates = [n for n in range(1, inv["counts"][0] + 1) if n not in excluded]
             slots = len(content_item_boxes.track_boxes(track, item_boxes, package))
             excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
-        out = [n for n in out if n not in excluded]
+    out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
     return [n for n in out if inv.get("needs", {}).get(KINDS[family], {}).get(str(n), {}).get("shortcut", 0) <= tier]
 

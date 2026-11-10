@@ -24,6 +24,7 @@ ANCIENT_LAKE = ("256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb
                 "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee")
 NORTH_POLE = "17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c"
 ROOS_TUBES = "d62e91af717d1ed16459f181e9bf944cc1c5e3ff272a89cb244bb59a87c3bfcc"
+HOT_AIR_SKYWAY = "7347cd50591736199bca22dceca9d32af82fde9fd079cc7b61c4a401a8cb7b3a"
 
 
 def north_pole(crates=29):
@@ -40,10 +41,23 @@ def north_pole(crates=29):
 @patch.dict(box_spots.CUSTOM_FILES, {}, clear=True)
 class TestCrateExclusions(unittest.TestCase):
     def test_catalog_pins_exact_digests(self):
-        self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE, ROOS_TUBES})
+        self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE, ROOS_TUBES, HOT_AIR_SKYWAY})
         # Maintainer ruling, 2026-11-10: the dev-placed Roo's Tubes crate 9 lies fully outside the track.
         self.assertEqual(crate_exclusions.EXCLUSIONS[ROOS_TUBES], [{"ordinal": 9, "pos": [0, 0, 0]}])
         self.assertEqual(crate_exclusions.EXCLUSIONS[NORTH_POLE], [{"ordinal": 1, "pos": [0, 0, 0]}])
+        # Maintainer ruling, 2026-11-10 18:03 CET: Hot Air Skyway Wumpa Crate 4 hangs under the road (A4-41).
+        self.assertEqual(crate_exclusions.EXCLUSIONS[HOT_AIR_SKYWAY],
+                         [{"family": "wumpa_crate", "ordinal": 4, "pos": [4884, -1699, 5680]}])
+        self.assertEqual(crate_exclusions.ordinals(HOT_AIR_SKYWAY, "wumpa_crate"), {4})
+        self.assertEqual(crate_exclusions.ordinals(HOT_AIR_SKYWAY), set())  # not a weapon crate
+
+    def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
+        p = ancient(24, HOT_AIR_SKYWAY)
+        self.assertEqual(crate_exclusions.entries(p), [])
+        self.assertEqual(content_item_boxes.crate_count(p), 24)
+        plan = first_world(box_options(custom=[p])).ctr_content_plan
+        self.assertNotIn(crate_exclusions.KEY, plan["item_boxes"])
+        self.assertNotIn(crate_exclusions.FEATURE, plan["required_features"])
 
     def test_north_pole_counts_and_generation(self):
         p = north_pole()
@@ -121,7 +135,7 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(len(boxes(current_restored.ctr_content_plan, track_id)), min(count - 1, 15))
 
     def test_exact_revision_counts_and_generation(self):
-        for digest in (*ANCIENT_LAKE, NORTH_POLE):  # custom revisions; the retail Roo's Tubes pin is sanity only
+        for digest in (*ANCIENT_LAKE, NORTH_POLE):  # custom revisions; the retail Roo's Tubes and Skyway pins are sanity only
             p = ancient(digest=digest)
             self.assertEqual(content_item_boxes.crate_count(p), 17)
             world = first_world(box_options(custom=[p]))
