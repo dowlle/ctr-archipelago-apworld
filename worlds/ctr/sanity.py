@@ -164,6 +164,17 @@ def checks(record, tracks, entries, pads, encounters, capability):
     return out
 
 
+def door_codes(plan):
+    """The selected Tiger Temple pickups behind its weapon-opened door."""
+    track = next((t for t in plan["tracks"] if t["id"] == "retail:4"), None)
+    if track is None:
+        return set()
+    needs = CATALOG["retail:4"]["needs"]
+    return {code(track, f, n) for row in plan.get("sanity", {}).get("tracks", ())
+            if row["track_id"] == "retail:4" for f, kind in enumerate(KINDS) for n in row[kind]
+            if needs.get(kind, {}).get(str(n), {}).get("door")}
+
+
 def validate(record, plan):
     if record is None:
         return

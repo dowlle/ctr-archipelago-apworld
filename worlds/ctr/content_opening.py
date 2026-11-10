@@ -270,10 +270,12 @@ class PlanReach:
     race won, boost ranks, letters and the `ctr_first` Trophy win. A fixed item
     counts once its check is open. What it cannot see counts as shut, so it finds no
     more room than the seed has: a stat term, Itemsanity's weapon arm, and the
-    Itemsanity and Hit checks, whose rules ask for a weapon or a kart."""
+    Itemsanity and Hit checks, whose rules ask for a weapon or a kart, and the
+    sanity pickups behind Tiger Temple's weapon-opened door."""
 
     def __init__(self, plan, rows, excluded, boost_item):
         self.plan = plan
+        from . import sanity
         from .characters import CHARACTER_ID_TO_NAME
         from .content_plan import first_race_checks, letter_requirements, merged_race
         from .progressive_capability import boost_item_name
@@ -326,8 +328,8 @@ class PlanReach:
                     need = max(need, content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks,
                                                                capability, packages))
                 return need
-            if route["leg_id"] is not None and check["kind"] in ("wumpa", "podium"):
-                # A cup leg route of a Wumpa check or rung (row 10i): the
+            if route["leg_id"] is not None and check["kind"] in ("wumpa", "podium", *sanity.KINDS):
+                # A cup leg route of a shared track check: the
                 # earlier legs' finish, with the check's own rank on top.
                 return max(check.get("boost", 0), content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"],
                                                                            tracks, capability, packages))
@@ -351,9 +353,12 @@ class PlanReach:
             return self.code.get(boost_item_name(CHARACTER_ID_TO_NAME[lock]))
 
         self.checks = []
+        # Like Itemsanity's own checks, these need a weapon this conservative
+        # opening model does not simulate. Do not budget their spots for free.
+        door_codes = sanity.door_codes(plan) if plan.get("global_checks", {}).get("itemsanity") else set()
         for check in plan["checks"]:
             code = check["location"]
-            if check.get("stats") or check["kind"] in ("itemsanity", "hit"):
+            if check.get("stats") or check["kind"] in ("itemsanity", "hit") or code in door_codes:
                 continue
             spot = code not in pins and code != goal and code not in excluded
             if check["kind"] == content_wumpa.KIND:
@@ -362,6 +367,20 @@ class PlanReach:
             else:
                 self.checks.append((code, spot, None, [(region(route), later(route), route, rank(check, route), boost_of(route))
                                                        for route in check["routes"]]))
+        # A track can have many pickup codes with identical access. Evaluate
+        # each immutable route/letter predicate once per sweep, then retain all
+        # of its individual codes for fixed rewards and first-race proofs.
+        groups = {}
+        self.shop_checks = []
+        for code, _spot, floor, routes in self.checks:
+            if routes is None:
+                self.shop_checks.append((code, floor))
+                continue
+            letters = tuple(self.code.get(name) for name in self.letters.get(code, ()))
+            key = (letters, tuple((own, late, tuple(sorted(route.items())), need, boost)
+                                  for own, late, route, need, boost in routes))
+            groups.setdefault(key, ([], letters, routes))[0].append(code)
+        self.route_groups = tuple((tuple(codes), letters, tuple(routes)) for codes, letters, routes in groups.values())
         self.income = [dict(own_pad_id=pad_id, mode=mode, later=later(dict(own_pad_id=pad_id, mode=mode)),
                             boost=boost_of(dict(own_pad_id=pad_id)),
                             need=content_capability.finish_boost(track, capability, content_wumpa.income_package(plan, track))
@@ -412,28 +431,26 @@ class PlanReach:
             won = self.first.get(pad["id"], ())
             return not won or any(code in opened for code in won)
 
-        def letters_held(code):
-            return all(held.get(self.code.get(name), 0) for name in self.letters.get(code, ()))
-
         opened = set()
         waiting = []
-        for code, _spot, _floor, routes in self.checks:
-            if routes is None or not letters_held(code):
+        for codes, letters, routes in self.route_groups:
+            if letters and not all(held.get(item, 0) for item in letters):
                 continue
             usable = [(later, route) for own, later, route, need, boost in routes
                       if need <= held.get(boost, 0) and region_open[own]]
             if any(not later for later, _route in usable):
-                opened.add(code)
+                opened.update(codes)
             elif usable:
-                waiting.append((code, usable))
+                waiting.append((codes, usable))
         first = set(opened)
-        opened.update(code for code, usable in waiting if any(stage_met(route, first) for _later, route in usable))
+        for codes, usable in waiting:
+            if any(stage_met(route, first) for _later, route in usable):
+                opened.update(codes)
         opened -= {code for code, trophy in self.merged.items() if trophy not in opened}
         income = any(route["need"] <= held.get(route["boost"], 0) and region_open[route["own_pad_id"]]
                      and (not route["later"] or stage_met(route, first)) for route in self.income)
         key = self.code.get("Key")
-        opened.update(code for code, _spot, floor, routes in self.checks
-                      if routes is None and income and held.get(key, 0) >= floor)
+        opened.update(code for code, floor in self.shop_checks if income and held.get(key, 0) >= floor)
         return opened
 
     def _held(self, held):

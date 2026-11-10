@@ -121,3 +121,62 @@ class TestSanity(unittest.TestCase):
             names = ctrAPWorld.location_name_groups[group]
             self.assertTrue(names)
             self.assertTrue(all(suffix in n for n in names))
+
+    def test_opening_forecast_matches_pickup_rules(self):
+        from .. import content_opening, sphere0_guard
+        from ..item_boxes import TIGER_TEMPLE_DOOR_OPENERS
+        from .test_27_cups import cups_options
+        options = dict(itemboxsanity=50, wumpasanity="both", progressive_boost="shared_global",
+                       progressive_stats="off", character_unlocks=False, wumpa_shop_slots=0)
+        cases = (dict(profile_options(), **options, itemsanity=True),
+                 cups_options(**options, boss_garages=False, oxide_goal="disabled", bosses_required_goal=0,
+                              gems_required_goal=5, shuffle_keys=True))
+        for index, settings in enumerate(cases):
+            world = make_world(settings, seed=3, stop_before="pre_fill")
+            plan = world.ctr_content_plan
+            boost = sphere0_guard.starting_boost_item(world)
+            reach = content_opening.PlanReach(plan, world.ctr_content_items.rows, set(), boost)
+            codes = {c["location"] for c in plan["checks"] if c["kind"] in sanity.KINDS}
+            locations = {location.address: location for location in world.multiworld.get_locations(world.player)
+                         if location.address in codes}
+            self.assertTrue(codes)
+            items = [item for item in world.multiworld.itempool if item.advancement and item.name != boost
+                     and item.name not in TIGER_TEMPLE_DOOR_OPENERS]
+            base = sphere0_guard._base_state(world)
+            for rank in (0, 1, 2):
+                held_items = items + [world.create_item(boost) for _ in range(rank)]
+                state = sphere0_guard._collect(world, base, held_items)
+                held = tuple(sorted(item.name for item in held_items))
+                predicted = reach._sweep(reach._held(held)) & codes
+                actual = {code for code, location in locations.items() if location.can_reach(state)}
+                with self.subTest(case=index, rank=rank):
+                    self.assertEqual(predicted, actual)
+                if index == 0:
+                    self.assertTrue(sanity.door_codes(plan))
+                    self.assertFalse(sanity.door_codes(plan) & actual)
+
+    def test_opening_forecast_keeps_cup_prefix_boost(self):
+        from .. import content_cups, content_opening, sphere0_guard
+        from .test_27_cups import cups_options
+        world = make_world(cups_options(itemboxsanity=50, wumpasanity="both", progressive_boost="shared_global"),
+                           seed=3, stop_before="pre_fill")
+        plan = world.ctr_content_plan
+        reach = content_opening.PlanReach(plan, world.ctr_content_items.rows, set(),
+                                          sphere0_guard.starting_boost_item(world))
+        checks = {c["location"]: c for c in plan["checks"]}
+        tracks = {t["id"]: t for t in plan["tracks"]}
+        packages = {p["id"]: p for p in plan["packages"]}
+        entries = {e["id"]: e for e in plan["entries"]}
+        constrained = 0
+        for code, _spot, _floor, routes in reach.checks:
+            if checks[code]["kind"] not in sanity.KINDS:
+                continue
+            for _own, _later, route, need, _boost in routes or ():
+                if route["leg_id"] is None:
+                    continue
+                prefix = content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks,
+                                                    plan["capability"], packages)
+                if prefix > checks[code].get("boost", 0):
+                    constrained += 1
+                    self.assertGreaterEqual(need, prefix)
+        self.assertGreater(constrained, 0)
