@@ -663,6 +663,125 @@ game: {GAME}
         self.assertIn("trap_weights", last(events)["options"], last(events))
 
 
+class TestRelicCounts(SoloTestCase):
+    """A4-40: Item Pool is a row in Items and Traps as one number row per Relic
+    tier (the base counts in item_pool.base.relics), so Platinum Time Trials
+    no longer need a hand-written YAML or the Oxide unlock value."""
+
+    def describe(self, *args):
+        events, code = self.call("describe", *args)
+        self.assertEqual(code, 0, events)
+        return last(events)
+
+    def test_three_rows_default_18_18_0(self):
+        from worlds.ctr import content_item_pool
+        result = self.describe()
+        entry = {o["name"]: o for o in result["options"]}["item_pool"]
+        self.assertEqual(entry["kind"], "dict")
+        self.assertEqual([row["key"] for row in entry["weight_rows"]], list(content_item_pool.TIERS))
+        self.assertEqual([row["label"] for row in entry["weight_rows"]],
+                         ["Sapphire Relics", "Gold Relics", "Platinum Relics"])
+        self.assertEqual(entry["weight_max"], 18)
+        self.assertEqual(entry["default"], content_item_pool.RELIC_DEFAULTS)
+        self.assertIn("Platinum", entry["doc"])
+        groups = {g["id"]: g for g in result["overlay"]["groups"]}
+        self.assertEqual(groups["items"]["options"][0], "item_pool")
+        self.assertNotIn("item_pool", result["overlay"]["left_out"])
+        rule = {r["option"]: r for r in result["overlay"]["rules"]}["item_pool"]
+        self.assertEqual(rule["label"], "Relic Counts")
+        self.assertNotIn("item_pool", result["unresolved"])
+
+    def test_every_preset_starts_at_the_defaults_and_is_unchanged(self):
+        from worlds.ctr.content_item_pool import RELIC_DEFAULTS
+        for name in ("quick.yaml", "standard.yaml", "full_adventure.yaml"):
+            values = self.describe("--yaml", self.preset(name))["values"]
+            self.assertEqual(values["item_pool"], RELIC_DEFAULTS, name)
+            with open(self.preset(name), encoding="utf-8") as handle:
+                self.assertNotIn("item_pool", handle.read(), "presets keep their values (A4-24 review is open)")
+
+    def test_an_imported_yaml_starts_at_its_own_base_relics(self):
+        path = write_yaml(self.work, "pool.yaml", f"""name: Pool
+game: {GAME}
+{GAME}:
+  item_pool:
+    base:
+      trophies: 10
+      relics: {{sapphire: 12, platinum: 5}}
+    extra:
+      relics: {{platinum: 7}}
+""")
+        values = self.describe("--yaml", path)["values"]
+        self.assertEqual(values["item_pool"], {"sapphire": 12, "gold": 18, "platinum": 5})
+
+    def test_unusable_values_fall_back_to_the_defaults(self):
+        from worlds.ctr.content_item_pool import RELIC_DEFAULTS
+        for text in ("item_pool: just text", "item_pool: [1, 2]", "item_pool: {base: 3}",
+                     "item_pool: {base: {relics: [1]}}", "item_pool: {base: {relics: {platinum: 1.9}}}",
+                     "item_pool: {base: {relics: {platinum: yes}}}"):
+            path = write_yaml(self.work, "pool.yaml", f"name: Pool\ngame: {GAME}\n{GAME}:\n  {text}\n")
+            self.assertEqual(self.describe("--yaml", path)["values"]["item_pool"], RELIC_DEFAULTS, text)
+
+    def test_the_screen_table_merges_into_base_relics_and_keeps_the_rest(self):
+        doc = {GAME: {"item_pool": {"base": {"trophies": 10, "relics": {"gold": 3}},
+                                    "extra": {"relics": {"platinum": 2}}}}}
+        out = ctr_solo.apply_overrides(doc, None, ["item_pool=" + json.dumps(
+            {"sapphire": 18, "gold": 18, "platinum": 6})])
+        self.assertEqual(out[GAME]["item_pool"], {
+            "base": {"trophies": 10, "relics": {"sapphire": 18, "gold": 18, "platinum": 6}},
+            "extra": {"relics": {"platinum": 2}}})
+        self.assertEqual(doc[GAME]["item_pool"]["base"]["relics"], {"gold": 3}, "the input is not changed")
+        fresh = ctr_solo.apply_overrides({GAME: {}}, None, ['item_pool={"platinum": 4}'])
+        self.assertEqual(fresh[GAME]["item_pool"], {"base": {"relics": {"platinum": 4}}})
+
+    def test_a_full_item_pool_is_written_as_it_is(self):
+        full = {"base": {"relics": {"platinum": 2}}, "extra": {"trophies": 4}}
+        out = ctr_solo.apply_overrides({GAME: {"item_pool": {"base": {"keys": 4}}}}, None,
+                                       ["item_pool=" + json.dumps(full)])
+        self.assertEqual(out[GAME]["item_pool"], full)
+
+    def test_a_pool_that_is_no_mapping_is_refused_by_name(self):
+        for bad in ({"item_pool": 3}, {"item_pool": {"base": 3}}, {"item_pool": {"base": {"relics": 3}}}):
+            with self.assertRaises(ctr_solo.SoloError) as caught:
+                ctr_solo.apply_overrides({GAME: bad}, None, ['item_pool={"platinum": 4}'])
+            self.assertEqual(caught.exception.kind, "option", bad)
+
+    def test_platinum_on_the_screen_gives_platinum_time_trials(self):
+        """The report: with the screen's table, Platinum Time Trial checks
+        appear on as many Relic Races as the count, and without it none do."""
+        import yaml
+        from worlds.ctr import ctrAPWorld
+
+        def platinum_checks(*extra, seed):
+            events, code = self.call("generate", "--yaml", self.preset("standard.yaml"), "--name", "Solo",
+                                     "--seed", seed, "--preset", "standard", "--stamp-requires", *extra)
+            self.assertEqual(code, 0, events[-3:])
+            folder = os.path.join(self.solo, "rooms", last(events)["room_id"])
+            room_zip = next(n for n in os.listdir(folder) if n.endswith(".zip"))
+            multidata = ctr_solo.read_multidata(os.path.join(folder, room_zip))
+            names = [ctrAPWorld.location_id_to_name.get(code, "") for code in multidata["locations"][1]]
+            with open(os.path.join(folder, "player.yaml"), encoding="utf-8") as handle:
+                section = yaml.safe_load(handle)[GAME]
+            return sum("Platinum Time Trial" in n for n in names), section
+
+        none, section = platinum_checks(seed="20261110")
+        self.assertEqual(none, 0)
+        self.assertNotIn("item_pool", section)
+        table = {"sapphire": 18, "gold": 18, "platinum": 6}
+        six, section = platinum_checks("--set", "item_pool=" + json.dumps(table), seed="20261111")
+        self.assertEqual(six, 6)
+        self.assertEqual(section["item_pool"], {"base": {"relics": table}})
+
+    def test_the_oxide_value_without_platinum_is_refused_naming_item_pool(self):
+        """The Oxide unlock value does not add Platinum Relics by itself: with
+        none in the pool, generation refuses and the screen's row opens."""
+        events, code = self.call("validate", "--yaml", self.preset("standard.yaml"),
+                                 "--set", "oxide_goal=101_percent",
+                                 "--set", "oxide_final_challenge_unlock=platinum_relics")
+        self.assertNotEqual(code, 0, events[-2:])
+        self.assertEqual(last(events)["kind"], "option", last(events))
+        self.assertIn("item_pool", last(events)["options"], last(events))
+
+
 class TestImportedOptions(SoloTestCase):
     def test_hint_rows_come_from_the_loaded_world(self):
         events, code = self.call("describe")

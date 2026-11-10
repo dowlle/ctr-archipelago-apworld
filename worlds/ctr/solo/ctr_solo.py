@@ -301,17 +301,41 @@ def _option_kind(option) -> str:
     return "other"
 
 
+RELIC_COUNTS_DOC = (
+    "How many Sapphire, Gold and Platinum Relics the seed has, 0 to 18 each. "
+    "A tier gets Time Trial checks on as many Relic Races as it has relics: "
+    "Platinum is 0 by default, so there are no Platinum Time Trials until you "
+    "raise it. These are the base counts, so a pad or garage requirement can "
+    "ask for them. Extra copies, Trophies, Keys, CTR Tokens and Gems are set "
+    "in a YAML (Item Pool).")
+
+
 def _clean_doc(text: str | None) -> str:
     import inspect
     return inspect.cleandoc(text or "").strip()
 
 
+#: The one part of Item Pool the screen edits (A4-40): the base count of each
+#: Relic tier, 0 to the 18 Relic Races of the original game. The rest of Item
+#: Pool stays a YAML matter.
+RELIC_ROW_MAX = 18
+
+
+def _relic_tiers():
+    from worlds.ctr import content_item_pool
+    return content_item_pool.TIERS, content_item_pool.RELIC_DEFAULTS
+
+
 def _weight_rows(name: str):
     """Number rows for a dict option the screen can edit (A3-22), or None.
 
-    Keys, labels and the per-key maximum come from the world's own trap
+    Trap keys, labels and the per-key maximum come from the world's own trap
     registry, never a hard-coded list, so a trap the world adds appears on
-    the screen without a change here."""
+    the screen without a change here. Item Pool shows one row per Relic tier
+    (A4-40), from the item pool code's own tier list."""
+    if name == "item_pool":
+        tiers, _ = _relic_tiers()
+        return [{"key": tier, "label": f"{tier.title()} Relics"} for tier in tiers], RELIC_ROW_MAX
     if name != "trap_weights":
         return None
     try:
@@ -352,6 +376,11 @@ def describe_option(name: str, option) -> dict:
             json.dumps(default)
         except TypeError:
             default = repr(default)
+        if name == "item_pool":
+            # The screen's view of Item Pool is the three Relic counts, so its
+            # default is theirs (18, 18, 0), not the option's empty mapping.
+            default = dict(_relic_tiers()[1])
+            entry["doc"] = RELIC_COUNTS_DOC
         entry["default"] = default
         keys = getattr(option, "valid_keys", None)
         if keys:
@@ -362,7 +391,7 @@ def describe_option(name: str, option) -> dict:
     return entry
 
 
-def _canonical(option, raw, order=()):
+def _canonical(option, raw, order=(), name=None):
     """The value the options screen shows: choice name, bool, int, for a
     set its entries in checklist order (`order`), then any others sorted,
     and for a dict the default table overlaid with the YAML's entries."""
@@ -377,6 +406,19 @@ def _canonical(option, raw, order=()):
     if isinstance(value, Options.OptionSet):
         entries = {str(entry) for entry in value.value}
         return [key for key in order if key in entries] + sorted(entries - set(order))
+    if name == "item_pool" and isinstance(value, Options.OptionDict):
+        # Item Pool on the screen (A4-40): the base count of each Relic tier,
+        # the YAML's own number where it has a whole one, else the default.
+        tiers, defaults = _relic_tiers()
+        base = (value.value or {}).get("base")
+        relics = base.get("relics") if isinstance(base, dict) else None
+        relics = relics if isinstance(relics, dict) else {}
+        out = {}
+        for tier in tiers:
+            count = relics.get(tier, defaults[tier])
+            ok = type(count) is int or (isinstance(count, float) and count.is_integer())
+            out[tier] = int(count) if ok else defaults[tier]
+        return out
     if isinstance(value, Options.OptionDict):
         # A dict option (trap weights): the full table, so every row has a
         # number. A key the YAML leaves out keeps the option's default. An
@@ -443,9 +485,9 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
             if _preview_unresolved(name, option, raw):
                 raw = option.default
             try:
-                values[name] = _canonical(option, raw, order)
+                values[name] = _canonical(option, raw, order, name)
             except Exception:
-                values[name] = _canonical(option, option.default, order)
+                values[name] = _canonical(option, option.default, order, name)
     return values
 
 
@@ -538,6 +580,32 @@ def read_player_yaml(path: str) -> dict:
     return doc
 
 
+def _is_relic_table(value) -> bool:
+    """The screen's Item Pool value (A4-40): a flat table of Relic counts.
+    A full item_pool (base / extra) is not one and is written as it is."""
+    if not isinstance(value, dict) or not value:
+        return False
+    return set(value) <= set(_relic_tiers()[0])
+
+
+def _set_relic_counts(section: dict, counts: dict) -> None:
+    """Write Relic counts into item_pool.base.relics, keeping every other entry
+    of an item_pool the YAML already has."""
+    pool = section.get("item_pool")
+    pool = {} if pool is None else pool
+    base = pool.get("base") if isinstance(pool, dict) else None
+    base = {} if base is None else base
+    relics = base.get("relics") if isinstance(base, dict) else None
+    relics = {} if relics is None else relics
+    if not (isinstance(pool, dict) and isinstance(base, dict) and isinstance(relics, dict)):
+        raise SoloError("option", "Item Pool must be a mapping with base and relics mappings "
+                        "to change the Relic counts.", option="item_pool")
+    relics.update(counts)
+    base["relics"] = relics
+    pool["base"] = base
+    section["item_pool"] = pool
+
+
 def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
     import copy
     import yaml
@@ -553,7 +621,11 @@ def apply_overrides(doc: dict, name: str | None, settings: list[str]) -> dict:
         key = key.strip()
         if not sep or key not in known:
             raise SoloError("option", f"Unknown option {key!r}.", option=key)
-        section[key] = yaml.safe_load(raw)
+        parsed = yaml.safe_load(raw)
+        if key == "item_pool" and _is_relic_table(parsed):
+            _set_relic_counts(section, parsed)
+            continue
+        section[key] = parsed
         if key == "item_box_count":
             section.pop("box_locations", None)
     return doc
