@@ -3,8 +3,8 @@ import copy
 import json
 import unittest
 
-from Options import OptionError
-from .. import content_plan, sanity
+from Options import ExcludeLocations, OptionError
+from .. import content_item_pool, content_plan, ctrAPWorld, sanity
 from ..Options import Itemboxsanity, Wumpasanity
 from .test_content_plan import make_world, profile_options
 
@@ -26,6 +26,46 @@ class TestSanity(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertNotIn("sanity", a["content_plan"])
         self.assertFalse(set(sanity.FEATURES) & set(a["content_plan"]["required_features"]))
+
+    def expanded_groups(self, *groups):
+        # Exercise Archipelago's real option verification and group expansion.
+        option = ExcludeLocations.from_any(list(groups))
+        option.verify(ctrAPWorld, "ContentPlan", 0)
+        return option.value
+
+    def test_disabled_groups_do_not_change_the_item_ledger(self):
+        baseline = self.world().fill_slot_data()
+        for group in ("Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit"):
+            with self.subTest(group=group):
+                world = self.world(exclude_locations=self.expanded_groups(group))
+                self.assertEqual(world.fill_slot_data(), baseline)
+
+    def test_disabled_group_allows_a_surface_start_from_pool(self):
+        start = {"Ignore Ice": 1}
+        baseline = self.world(start_inventory_from_pool=start).fill_slot_data()
+        world = self.world(start_inventory_from_pool=start,
+                           exclude_locations=self.expanded_groups("Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit"))
+        self.assertEqual(world.fill_slot_data(), baseline)
+
+    def test_enabled_groups_reserve_only_the_selected_pickups(self):
+        settings = dict(itemboxsanity=5, wumpasanity="both")
+        baseline = self.world(**settings).ctr_content_items.wire()
+        world = self.world(**settings,
+                           exclude_locations=self.expanded_groups("Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit"))
+        self.assertEqual(world.ctr_content_items.wire(), baseline)
+        self.assertTrue(set(content_item_pool.SURFACE_NAMES) <= {row.name for row in world.ctr_content_items.rows})
+
+    def test_selected_exclusions_still_keep_their_filler(self):
+        options = profile_options()
+        options["item_pool"]["base"]["trophies"] = 6
+        options.update(itemboxsanity=5, wumpasanity="both",
+                       exclude_locations=self.expanded_groups("Weapon Crates", "Wumpa Crates", "Loose Wumpa Fruit"))
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        selected = sum(c["kind"] in sanity.KINDS for c in plan["checks"])
+        self.assertGreater(selected, 0)
+        self.assertGreaterEqual(world.ctr_content_items.filler_count, selected)
+        self.assertFalse(set(content_item_pool.SURFACE_NAMES) & {row.name for row in world.ctr_content_items.rows})
 
     def test_counts_modes_and_tracker(self):
         for boxes, wumpa, ap_boxes in ((5, "off", 0), (50, "off", 50), (0, "both", 0), (50, "both", 50)):

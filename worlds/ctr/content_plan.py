@@ -1644,6 +1644,19 @@ def draw_plan(world, key_estimate=True):
     pins = content_fixed.placements(fixed, base_counts,
                                     {name: base_counts[name] + extra_counts[name]
                                      - o.start_inventory_from_pool.value.get(name, 0) for name in base_counts})
+    filler_exclusions = set(o.exclude_locations.value) - {LOCATION_BY_CODE[code] for code in pins}
+    if filler_exclusions:
+        # Sanity groups expand to every frozen budget slot, including disabled
+        # families, unpicked crates and tracks absent from this room. Only the
+        # selected pickups consume filler. Keep the earlier families' reserve
+        # policy unchanged.
+        frozen_sanity = sanity.SANITY_CLASS.name_to_code()
+        by_id = {t["id"]: t for t in sanity_tracks}
+        selected_sanity = {sanity.code(by_id[row["track_id"]], family, number)
+                           for row in (sanity_record or {}).get("tracks", ())
+                           for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
+        filler_exclusions = {name for name in filler_exclusions
+                             if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
@@ -1651,8 +1664,7 @@ def draw_plan(world, key_estimate=True):
             additional=o.start_inventory.value, trap_percentage=o.trap_fill_percentage.value,
             locked=content_fixed.locked_copies(pins), locked_checks=len(pins),
             surface=content_item_pool.SURFACE_NAMES,
-            filler_reserve=int(oxide_filler) + len(set(o.exclude_locations.value)
-                                                   - {LOCATION_BY_CODE[code] for code in pins}),
+            filler_reserve=int(oxide_filler) + len(filler_exclusions),
             **(dict(selected_packs=chosen, pack_codes={**letter_packs, **SPOILER_PACK_CODES})
                if chosen else {}))
     try:
