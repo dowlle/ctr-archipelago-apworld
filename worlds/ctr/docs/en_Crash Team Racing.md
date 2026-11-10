@@ -183,7 +183,7 @@ often as its default:
 ```yaml
 trap_weights:
   first_person: 0
-  icy_road: 10
+  icy_road: 8
 ```
 
 ### Requirement Weights

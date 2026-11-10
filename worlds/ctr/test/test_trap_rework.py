@@ -265,16 +265,16 @@ class TestWeightedDraw(unittest.TestCase):
         world = _world(seed=280)
         shares = self._shares(world)
         expected_weights = {
-            "Icy Road": 5, "Low Gravity": 5, "Forced USF": 2,
+            "Icy Road": 4, "Low Gravity": 5, "Forced USF": 2,
             "Forced Boost": 4, "First Person": 3, "Wumpa Wipeout": 4,
-            "Flatten": 6, "Item Reroll": 5, "Forced Use": 4,
+            "Flatten": 4, "Item Reroll": 5, "Forced Use": 4,
             "Empty Crates": 3, "Weakened Kart": 3, "Boost Blocker": 3,
-            "Wireframe": 2, "Nitro Drop": 5, "Reverse Steering": 4,
+            "Wireframe": 2, "Nitro Drop": 4, "Reverse Steering": 3,
             "Red Potion": 3, "Mirror Mode": 3,
             "Warpball Ambush": 3,
             "Demo Camera": 3, "Clocked Out": 3, "Reverse Camera": 2,
-            "Always Jumping": 3, "No Drifting": 3, "Rival Surge": 3,
-            "Mud Season": 3, "Limp Mode": 3, "Stuck Steering": 1,
+            "Always Jumping": 2, "No Drifting": 3, "Rival Surge": 3,
+            "Mud Season": 2, "Limp Mode": 3, "Stuck Steering": 1,
             "Wumpa Leak": 4,
         }
         expected = {name: weight / sum(expected_weights.values())

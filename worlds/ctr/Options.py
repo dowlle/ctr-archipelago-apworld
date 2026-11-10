@@ -431,10 +431,10 @@ class TrapWeights(OptionDict):
     Seven traps are new in 0.3.0-alpha3. Each lasts as long as your Trap
     Duration setting, except Stuck Steering (always 7 seconds) and Wumpa Leak
     (one event):
-    - `always_jumping` (3): the kart hops whenever it touches the ground.
+    - `always_jumping` (2): the kart hops whenever it touches the ground.
     - `no_drifting` (3): no hopping and no power sliding.
     - `rival_surge` (3): the AI racers move 50% faster. Races with AI only.
-    - `mud_season` (3): every surface drives like dirt. Ignore Dirt blocks it.
+    - `mud_season` (2): every surface drives like dirt. Ignore Dirt blocks it.
     - `limp_mode` (3): your top speed is halved, boosts included.
     - `stuck_steering` (1): you cannot steer to one side, picked at random.
     - `wumpa_leak` (4): you lose half of your Wumpa Fruit, rounded down.
