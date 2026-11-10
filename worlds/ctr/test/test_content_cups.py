@@ -139,7 +139,7 @@ class TestCupDraw(unittest.TestCase):
                 self.assertRegex(leg["track_id"], r"^retail:(\d|1[0-7])$")
 
     def test_retired_names_are_never_drawn(self):
-        """Venusyprime stays registered but is never drawn; Dex is drawable."""
+        """Retired identities stay registered; every replacement is drawable."""
         retired = {cup_checks.CUP_NAMES.index(name) for name in cup_checks.CUP_NAMES_RETIRED}
         seen = set()
         for seed in range(8):
@@ -151,6 +151,8 @@ class TestCupDraw(unittest.TestCase):
         self.assertFalse(seen & retired)
         self.assertEqual(seen, set(cup_checks.CUP_DRAW_INDICES))
         self.assertIn(cup_checks.CUP_NAMES.index("Dex Cup"), seen)
+        for name in ("Hiru Cup", "Spark Cup", "Sido Cup", "DM3 Productions Cup"):
+            self.assertIn(cup_checks.CUP_NAMES.index(name), seen)
         self.assertEqual(len(cup_checks.CUP_DRAW_INDICES), 36)
 
     def test_feasible_pairs(self):

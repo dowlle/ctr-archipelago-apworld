@@ -33,10 +33,11 @@ NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_co
 
 class TestFixedFamilies(unittest.TestCase):
     def test_cup_checks(self):
-        self.assertEqual(len(CUP_NAMES), 37)
+        self.assertEqual(len(CUP_NAMES), 41)
         self.assertEqual(CUP_NAMES[0], "Patries Cup")
         self.assertEqual(CUP_NAMES[26], "Sphere Cup")
-        self.assertEqual(CUP_NAMES[-1], "Dex Cup")
+        self.assertEqual(CUP_NAMES[36:], ("Dex Cup", "Hiru Cup", "Spark Cup",
+                                        "Sido Cup", "DM3 Productions Cup"))
         for i, cup in enumerate(CUP_NAMES):
             # Index 27 and up use the growth ranges; 35027027 is Cortex Vortex's leg.
             win = 35027000 + i if i < 27 else 35027100 + i - 27
@@ -55,7 +56,11 @@ class TestFixedFamilies(unittest.TestCase):
         self.assertEqual(L["Venusyprime Cup: Win All Legs"], 35027212)
         self.assertEqual(L["Dex Cup: Win"], 35027109)
         self.assertEqual(L["Dex Cup: Win All Legs"], 35027309)
-        self.assertEqual(CUP_NAMES_RETIRED, ("Venusyprime Cup",))
+        self.assertEqual(CUP_NAMES_RETIRED, ("Venusyprime Cup", "Turbo Cup", "Relic Cup",
+                                            "Multiworld Cup", "Sphere Cup"))
+        for index, name in enumerate(CUP_NAMES[23:27], 23):
+            self.assertEqual(L[f"{name}: Win"], 35027000 + index)
+            self.assertEqual(L[f"{name}: Win All Legs"], 35027200 + index)
         self.assertEqual(len(CUP_DRAW_INDICES), 36)
         self.assertFalse({CUP_NAMES.index(name) for name in CUP_NAMES_RETIRED}
                          & set(CUP_DRAW_INDICES))
@@ -117,9 +122,10 @@ class TestReservedNotMinted(unittest.TestCase):
         (35019000, 35019191, "race v2 codes of slots 1..32, never used"),
         # The nine alpha3 tester cup names (A3-42) took 35027100 to 35027108
         # and 35027300 to 35027308, and Dex Cup (A4-16) took 35027109 and
-        # 35027309; the rest of both growth ranges stays reserved.
-        (35027110, 35027199, "later cup names, Win"),
-        (35027310, 35027399, "later cup names, Win All Legs"),
+        # 35027309. A4-16c took 35027110..35027113 and 35027310..35027313.
+        # The rest of both growth ranges stays reserved.
+        (35027114, 35027199, "later cup names, Win"),
+        (35027314, 35027399, "later cup names, Win All Legs"),
         (35028503, 35028519, "arcade completion expansion"),
         (35028580, 35028599, "arcade crystal expansion"),
         (35028625, 35028639, "Wumpa Shop expansion, N. Sanity Beach"),
