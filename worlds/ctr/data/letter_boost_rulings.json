@@ -1,0 +1,8 @@
+{
+  "description": "Project-owned minimum Progressive Boost ranks for custom-track AP letters, keyed by package content_id and letter. These apply at every logic difficulty when Progressive Boost is on, in addition to the existing finish rank. CTR Token Challenges inherit the floors of letters that must be picked up. This is never a package descriptor field.",
+  "version": 1,
+  "rulings": [
+    {"content_id": "tv-world", "letter": "letter_r", "rank": 2, "ruling": "Project ruling 2026-11-10, A4-30: Boost 2 for both. TV World's visible T is AP Letter R because the track spells CRT."},
+    {"content_id": "nina-s-nightmare", "letter": "letter_t", "rank": 2, "ruling": "Project ruling 2026-11-10, A4-30: Boost 2 for both. Nina's Nightmare Letter T is AP Letter T."}
+  ]
+}

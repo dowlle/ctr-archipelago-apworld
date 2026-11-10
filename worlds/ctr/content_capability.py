@@ -34,10 +34,13 @@ term, because it crosses the line.
     and USF on Hot Air Skyway, Cortex Castle and Oxide Station (unless
     Shortcut Knowledge is hard), Held 3rd and Held 5th nothing;
   * CTR Token Challenge: F and the first rank (ruling 2026-09-20); on Oxide
-    Station USF whenever its T or R letter must be picked up;
+    Station USF whenever its T or R letter must be picked up; custom tracks
+    also take the ruled floor of every letter that must be picked up;
   * letters: F, Papu's Pyramid C and T the first rank, Oxide Station T and R
     USF (the legacy letter rulings; with Itemsanity on, #133 PR 4d, the
     legacy weapon alternatives join the first-boost floors, `weapon_arm`);
+    custom tracks also take their project-owned per-letter floor from
+    `data/letter_boost_rulings.json` (A4-30, 2026-11-10);
   * Time Trials: Sapphire F, Gold and Platinum also `relic_tier_boost_min`
     (the difficulty-aware Platinum floor, three ranks on easy with Blue Fire);
   * Relic Race Perfect: USF on every track (ruling 2026-09-29, #453 answer 1);
@@ -107,6 +110,36 @@ def _load_rulings():
 #: the project's per-package rulings: {(content id, revision, LEV sha256):
 #: finish rank}, revision and LEV sha256 None on a row for every revision.
 USF_FINISH_RULINGS = _load_rulings()
+
+
+def _load_letter_rulings():
+    """Project-owned minimum ranks, keyed by package content id and AP letter."""
+    raw = json.loads(pkgutil.get_data(__package__, "data/letter_boost_rulings.json"))
+    if raw["version"] != 1:
+        raise ValueError("letter_boost_rulings.json: version must be 1")
+    out = {}
+    for row in raw["rulings"]:
+        key = (row.get("content_id"), row.get("letter"))
+        if (set(row) != {"content_id", "letter", "rank", "ruling"}
+                or type(key[0]) is not str or not key[0]
+                or key[1] not in ("letter_c", "letter_t", "letter_r")
+                or type(row.get("rank")) is not int or row["rank"] not in (1, 2)
+                or type(row.get("ruling")) is not str or "2026-" not in row["ruling"]
+                or key in out):
+            raise ValueError("letter_boost_rulings.json: expected a unique content id and AP letter, "
+                             "rank 1 or 2 and a dated ruling")
+        out[key] = row["rank"]
+    return out
+
+
+LETTER_BOOST_RULINGS = _load_letter_rulings()
+
+
+def letter_boost(track, award, package=None):
+    """Letter floor, independent of the finish rank and logic difficulty."""
+    if track["origin"] == "custom":
+        return LETTER_BOOST_RULINGS.get(((package or {}).get("content_id"), award), 0)
+    return LETTER_BOOST.get((_name(track), award), 0)
 
 
 def ruled_finish(package):
@@ -232,9 +265,11 @@ def check_boost(track, kind, award, record, package=None, letters=None):
         picked = set(letters) if letters is not None else {"letter_c", "letter_t", "letter_r"}
         if name == OXIDE and picked & {"letter_t", "letter_r"}:
             need = max(need, USF_BOOST_COUNT)
+        if track["origin"] == "custom":
+            need = max([need] + [letter_boost(track, letter, package) for letter in picked])
         return need
     if kind == "letter":
-        return max(finish, LETTER_BOOST.get((name, award), 0))
+        return max(finish, letter_boost(track, award, package))
     if kind == "relic":
         tier = award.title()
         options = SimpleNamespace(logic_difficulty=SimpleNamespace(value=difficulty),
