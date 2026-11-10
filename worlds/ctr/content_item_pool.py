@@ -66,11 +66,11 @@ def normalize(raw):
         if side == "base":
             gems = config.get("gems", list(COLOURS))
             if isinstance(gems, dict):
-                # A4-8 M02: `{red: 1, ...}` is the extra.gems shape. Base Gems are
-                # one copy per listed colour, so the base form is a list.
-                fail("base.gems is a list of colours, for example `gems: [red, blue]` "
-                     "(one Gem of each listed colour). The `{colour: count}` form is "
-                     "only for extra.gems.")
+                fields(gems, COLOURS, "base.gems")
+                for colour, count in gems.items():
+                    if type(count) is not int or count not in (0, 1):
+                        fail(f"base.gems.{colour} must be an exact integer, 0 or 1.")
+                gems = [colour for colour in COLOURS if gems.get(colour, 0) == 1]
             if (not isinstance(gems, list) or any(type(x) is not str or x not in COLOURS for x in gems)
                     or len(set(gems)) != len(gems)):
                 fail("base.gems must be a list of distinct red/green/blue/yellow/purple colours.")
