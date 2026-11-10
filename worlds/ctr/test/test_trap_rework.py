@@ -279,6 +279,8 @@ class TestWeightedDraw(unittest.TestCase):
         }
         expected = {name: weight / sum(expected_weights.values())
                     for name, weight in expected_weights.items()}
+        self.assertEqual({e.name: e.weight for e in traps.TRAP_REGISTRY
+                          if e.buildable and e.weight > 0}, expected_weights)
         self.assertEqual(set(shares), set(expected))
         for name, share in expected.items():
             with self.subTest(trap=name):
