@@ -134,6 +134,8 @@
       "properties": {
         "itemboxsanity": {"type": "integer", "minimum": 0, "maximum": 50},
         "wumpasanity": {"type": "integer", "minimum": 0, "maximum": 3},
+        "logic_difficulty": {"type": "integer", "minimum": 0, "maximum": 2},
+        "boost_blue_fire": {"type": "boolean"},
         "shortcut_knowledge": {"type": "integer", "minimum": 0, "maximum": 2},
         "tracks": {"type": "array", "maxItems": 160, "items": {
           "type": "object",

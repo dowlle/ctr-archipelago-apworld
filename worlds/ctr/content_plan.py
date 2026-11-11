@@ -1586,7 +1586,7 @@ def draw_plan(world, key_estimate=True):
                      + [leg for t in chosen if "cup_index" in t for leg in t["legs"]]
                      + [venue_record(name) for name in venue_names])
     sanity.add_tracks(sanity_record, sanity_tracks, package_by_id, item_boxes, world.multiworld.seed, world.player,
-                      int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)})
+                      int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)}, capability)
     if sanity_record:
         check_count += sum(len(row[kind]) for row in sanity_record["tracks"] for kind in sanity.KINDS)
     if laps:
@@ -1892,7 +1892,7 @@ def draw_plan(world, key_estimate=True):
     if laps:
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
-    checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability))
+    checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability, package_by_id))
     # Wumpa Shop slots (job J11), last, each with its drawn price.
     checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
@@ -2939,7 +2939,7 @@ def validate(plan):
             if content_race_routes.cup_only_on(plan["checks"]) else None):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
-    for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters, capability):
+    for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters, capability, packages):
         require(check["location"] not in expected_checks, "duplicate sanity identity")
         expected_checks[check["location"]] = check
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
