@@ -70,22 +70,22 @@ class TrapEntry(NamedTuple):
 #: (pinned by test/fixtures/trap_identities.json; append only).
 TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     # Native AP_TrapEffect 0-4, ids 35010016-35010020.
-    TrapEntry("icy_road",         "Icy Road",         5, True,  "shipped"),
+    TrapEntry("icy_road",         "Icy Road",         4, True,  "shipped"),
     TrapEntry("low_gravity",      "Low Gravity",      5, True,  "shipped"),
     TrapEntry("forced_usf",       "Forced USF",       2, True,  "shipped"),
     TrapEntry("forced_boost",     "Forced Boost",     4, True,  "shipped"),
     TrapEntry("first_person",     "First Person",     3, True,  "shipped"),
     # Native AP_TrapEffect 5-15, minted by #177, ids 35010106-35010116.
     TrapEntry("wumpa_wipeout",    "Wumpa Wipeout",    4, True, "freeze"),
-    TrapEntry("flatten",          "Flatten",          6, True, "freeze"),
+    TrapEntry("flatten",          "Flatten",          4, True, "freeze"),
     TrapEntry("item_reroll",      "Item Reroll",      5, True, "freeze"),
     TrapEntry("forced_use",       "Forced Use",       4, True, "freeze"),
     TrapEntry("empty_crates",     "Empty Crates",     3, True, "freeze"),
     TrapEntry("weakened_kart",    "Weakened Kart",    3, True, "freeze"),
     TrapEntry("boost_blocker",    "Boost Blocker",    3, True, "freeze"),
     TrapEntry("wireframe",        "Wireframe",        2, True, "freeze"),
-    TrapEntry("nitro",            "Nitro Drop",       5, True, "freeze"),
-    TrapEntry("reverse_steering", "Reverse Steering", 4, True, "freeze"),
+    TrapEntry("nitro",            "Nitro Drop",       4, True, "freeze"),
+    TrapEntry("reverse_steering", "Reverse Steering", 3, True, "freeze"),
     TrapEntry("red_potion",       "Red Potion",       3, True, "freeze"),
     # Native AP_TrapEffect 16-19, minted by #280, ids 35010190-35010193.
     # upside_down defaults to weight 0 (off): still selectable, still weighted
@@ -99,10 +99,10 @@ TRAP_REGISTRY: Tuple[TrapEntry, ...] = (
     TrapEntry("reverse_camera",   "Reverse Camera",   2, True, "030"),
     # Native AP_TrapEffect 22-28, the alpha3 data package (ruled 2026-11-06),
     # ids 35010208-35010214. Stuck Steering is low weight on purpose.
-    TrapEntry("always_jumping",   "Always Jumping",   3, True, "alpha3"),
+    TrapEntry("always_jumping",   "Always Jumping",   2, True, "alpha3"),
     TrapEntry("no_drifting",      "No Drifting",      3, True, "alpha3"),
     TrapEntry("rival_surge",      "Rival Surge",      3, True, "alpha3"),
-    TrapEntry("mud_season",       "Mud Season",       3, True, "alpha3"),
+    TrapEntry("mud_season",       "Mud Season",       2, True, "alpha3"),
     TrapEntry("limp_mode",        "Limp Mode",        3, True, "alpha3"),
     TrapEntry("stuck_steering",   "Stuck Steering",   1, True, "alpha3"),
     TrapEntry("wumpa_leak",       "Wumpa Leak",       4, True, "alpha3"),
