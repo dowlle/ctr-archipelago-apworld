@@ -106,3 +106,17 @@ class TestObjectRulings(unittest.TestCase):
             with mock.patch.object(object_rulings.pkgutil, "get_data", return_value=json.dumps(
                     dict(version=1, rulings=rows)).encode()), self.assertRaises(ValueError):
                 object_rulings._load()
+
+    def test_selection_settings_are_paired_and_agree_with_capability(self):
+        original = make_world(options(), seed=52, stop_before="pre_fill").ctr_content_plan
+        for key, value in (("logic_difficulty", True), ("logic_difficulty", 2),
+                           ("boost_blue_fire", 1), ("boost_blue_fire", True)):
+            forged = copy.deepcopy(original)
+            forged["sanity"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(OptionError):
+                content_plan.validate(forged)
+        for key in ("logic_difficulty", "boost_blue_fire"):
+            forged = copy.deepcopy(original)
+            del forged["sanity"][key]
+            with self.subTest(missing=key), self.assertRaises(OptionError):
+                content_plan.validate(forged)
