@@ -12,7 +12,7 @@ from random import Random
 
 from Options import OptionError
 
-from . import box_spots, content_item_boxes, crate_exclusions, destinations
+from . import box_spots, content_item_boxes, crate_exclusions, destinations, object_rulings
 from .item_boxes import BOX_TRACKS
 from .location_class import LocationClass
 
@@ -62,7 +62,9 @@ SANITY_CLASS = SanityLocations()
 
 def settings(options):
     count, wumpa = int(options.itemboxsanity.value), int(options.wumpasanity.value)
-    return dict(itemboxsanity=count, wumpasanity=wumpa, tracks=[]) if count or wumpa else None
+    return dict(itemboxsanity=count, wumpasanity=wumpa, tracks=[],
+                logic_difficulty=int(options.logic_difficulty.value),
+                boost_blue_fire=bool(options.progressive_boost.value and options.progressive_boost_blue_fire.value)) if count or wumpa else None
 
 
 def inventory(track, package=None):
@@ -83,7 +85,7 @@ def inventory(track, package=None):
     return None
 
 
-def eligible(track, family, record, item_boxes, package):
+def eligible(track, family, record, item_boxes, package, capability=None):
     inv = inventory(track, package)
     if inv is None:
         return []  # No measured revision, no invented objects.
@@ -100,12 +102,22 @@ def eligible(track, family, record, item_boxes, package):
             excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
-    return [n for n in out if inv.get("needs", {}).get(KINDS[family], {}).get(str(n), {}).get("shortcut", 0) <= tier]
+    return [n for n in out if inv.get("needs", {}).get(KINDS[family], {}).get(str(n), {}).get("shortcut", 0) <= tier
+            and object_rulings.rank(track, package, KINDS[family], n, record if "logic_difficulty" in record else capability) is not None]
 
 
-def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standalone=()):
+def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standalone=(), capability=None):
     if record is None:
         return
+    # Carry selection settings only for a raced, enabled family with a project
+    # ruling. Unrelated tracks and disabled Wumpasanity preserve their wire.
+    contents = {packages.get(t.get("package_id"), {}).get("content_id") for t in tracks if t["origin"] == "custom"}
+    enabled = {kind for kind, on in zip(KINDS, (record["itemboxsanity"], record["wumpasanity"] & 1,
+                                               record["wumpasanity"] & 2)) if on}
+    ruled = any(content in contents and kind in enabled for content, kind, ordinal in object_rulings.RULINGS)
+    if not ruled:
+        record.pop("logic_difficulty", None)
+        record.pop("boost_blue_fire", None)
     record["shortcut_knowledge"] = tier
     seen = set()
     for track in tracks:
@@ -118,7 +130,7 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
             continue
         row = dict(track_id=track["id"], lev_sha256=inv["lev_sha256"], counts=inv["counts"][:])
         for f, kind in enumerate(KINDS):
-            numbers = eligible(track, f, record, item_boxes if track["id"] in standalone else None, package)
+            numbers = eligible(track, f, record, item_boxes if track["id"] in standalone else None, package, capability)
             if f == 0:
                 key = f"{seed}:{player}:itemboxsanity:{track['id']}".encode()
                 rng = Random(int.from_bytes(hashlib.sha256(key).digest(), "big"))
@@ -142,7 +154,7 @@ def routes(tracks, entries, pads, encounters):
     return out
 
 
-def checks(record, tracks, entries, pads, encounters, capability):
+def checks(record, tracks, entries, pads, encounters, capability, packages=None):
     if record is None:
         return []
     by_id = {t["id"]: t for t in tracks}
@@ -160,6 +172,10 @@ def checks(record, tracks, entries, pads, encounters, capability):
                 fields = (need or {}).get("needs", {}).get(kind, {}).get(str(n), {})
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
+                rank = object_rulings.rank(t, (packages or {}).get(t.get("package_id")), kind, n,
+                                           record if "logic_difficulty" in record else capability)
+                if rank and (capability or {}).get("boost_mode"):
+                    c["boost"] = max(c.get("boost", 0), rank)
                 if capability and capability.get("stats_mode") and fields.get("shortcut") == 2:
                     c["stats"] = True
                 out.append(c)
@@ -183,7 +199,15 @@ def validate(record, plan):
     def require(ok, why):
         if not ok:
             raise OptionError("CTR sanity: " + why)
-    require(type(record) is dict and set(record) == {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}, "record shape")
+    base = {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}
+    context = {"logic_difficulty", "boost_blue_fire"}
+    require(type(record) is dict and set(record) in (base, base | context), "record shape")
+    if "logic_difficulty" in record:
+        require(type(record["logic_difficulty"]) is int and record["logic_difficulty"] in (0, 1, 2), "logic difficulty")
+        require(type(record["boost_blue_fire"]) is bool, "Blue Fire setting")
+        cap = plan.get("capability", {})
+        require(not cap or all(record[k] == cap[k] for k in context), "object settings mismatch")
+        require(not record["boost_blue_fire"] or cap.get("boost_mode"), "Blue Fire needs boost")
     require(type(record["itemboxsanity"]) is int and 0 <= record["itemboxsanity"] <= 50, "crate count")
     require(type(record["wumpasanity"]) is int and 0 <= record["wumpasanity"] <= 3, "Wumpasanity mode")
     require(record["itemboxsanity"] or record["wumpasanity"], "empty feature")
@@ -207,7 +231,7 @@ def validate(record, plan):
             numbers = row[kind]
             standalone = any(e["kind"] == "track" and e.get("track_id") == tid and e["id"] in
                              {p["entry_id"] for p in plan["pads"]} for e in plan["entries"])
-            pool = eligible(t, f, record, plan.get("item_boxes") if standalone else None, package)
+            pool = eligible(t, f, record, plan.get("item_boxes") if standalone else None, package, plan.get("capability"))
             require(type(numbers) is list and all(type(n) is int for n in numbers) and numbers == sorted(set(numbers)), "ordinal shape")
             count = min(len(pool), record["itemboxsanity"]) if f == 0 else len(pool) if record["wumpasanity"] & f else 0
             require(len(numbers) == count and set(numbers) <= set(pool), "ordinal pick mismatch")
