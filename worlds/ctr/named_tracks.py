@@ -41,6 +41,12 @@ Sid's House, Specter Station, Tizi Challenge: the new entries of the LRG2Pancho
 pack). The file then holds 86 `mint` entries. The 15 LRG2 revisions of existing
 tracks only add revision ids to their rows.
 
+MINTED (fourth step, A4-62b, 2026-11-11): registry commit
+70e2885c4013393c366da1f727e91506a89afb15 adds block 89 (Gossamer's Castle, key
+gossamer-s-castle, promoted so its box spot file can ship). The file then holds
+87 `mint` entries. The same commit adds Country Speedway 1.3.1 as a revision of
+block 17, which only adds its content id.
+
 DATAPACKAGE STABILITY
 
 Every row's complete family registers unconditionally (all LOCATION_OFFSETS

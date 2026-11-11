@@ -20,12 +20,13 @@ from ..crystal_checks import CRYSTAL_ARENAS
 from ..item_boxes import BOX_TRACKS
 from ..Locations import CTR_LOCATION_CLASSES
 from ..minted_items_030 import ITEM_DATA, MINTED_TRAP_KEYS
+from .. import destinations
 from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "9f61917477b48c59d97862a1ef602239d41533d0"
-REGISTRY_DIGEST = "0ced7b087966941aafdf451244cf4206d6b51238193a85031e1828206ae20ae0"
+REGISTRY_COMMIT = "70e2885c4013393c366da1f727e91506a89afb15"
+REGISTRY_DIGEST = "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")
@@ -201,12 +202,12 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(doc["registry"], {"repository": "https://github.com/dowlle/ctr-track-registry",
                                            "commit": REGISTRY_COMMIT, "digest": REGISTRY_DIGEST})
         blocks = [row["block_index"] for row in doc["tracks"]]
-        self.assertEqual(blocks, sorted(set(range(89)) - {14, 16, 68}))
+        self.assertEqual(blocks, sorted(set(range(90)) - {14, 16, 68}))
         keys = {row["track_key"] for row in doc["tracks"]}
         # 14 and 68 are `reserved` (hubs, no race mode confirmed); 16 is
         # `builtin` (the hard-coded Cortex Vortex block).
         self.assertFalse(keys & {"christmas-hub", "st-patricks-day-hub-world", "cortex-vortex"})
-        self.assertEqual(len(nt.NAMED_TRACKS), 86)
+        self.assertEqual(len(nt.NAMED_TRACKS), 87)
 
     def test_offset_layout_of_the_0_3_0_step(self):
         self.assertEqual(L["Baby T Park: Cup Leg Victory"], nt.location_code(8, "cup_leg_victory"))
@@ -246,8 +247,33 @@ class TestThirdPassLrg2Blocks(unittest.TestCase):
         self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
         self.assertNotIn("sid-s-house", {r.track_key for r in nt.NAMED_TRACKS})
 
-    def test_block_89_and_up_are_not_minted(self):
-        self.assertNotIn(89, {r.block_index for r in nt.NAMED_TRACKS})
+
+
+class TestFourthPassGossamersCastle(unittest.TestCase):
+    """The fourth id step (A4-62b, 2026-11-11): block 89, Gossamer's Castle,
+    promoted in the track registry so its box spot file can ship. The registry
+    commit also adds Country Speedway 1.3.1 as a revision of block 17, which only
+    adds its content id. No other name or id changes."""
+
+    def test_block_key_and_names(self):
+        row = {r.block_index: r for r in nt.NAMED_TRACKS}[89]
+        name = "Gossamer's Castle"
+        # The key keeps the registry's title rule, so it equals the catalogue
+        # package content_id that player YAMLs carry.
+        self.assertEqual((row.track_key, row.ap_name), ("gossamer-s-castle", name))
+        self.assertEqual(L[f"{name}: Trophy Race"], 35217800)
+        self.assertEqual(nt.location_code(89, "trophy"), 35217800)
+        self.assertEqual(L[f"{name}: Item Box 15"], 35217834)
+        self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"], [35100445, 35100446, 35100447])
+        self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)
+
+    def test_country_speedway_1_3_1_is_a_revision_of_block_17(self):
+        row = destinations.named_track("country-speedway")
+        self.assertEqual(row.block_index, 17)
+        self.assertIn("9cf03bb8d60c7c675c25bbbc97e269e5cadccb91ab40bfce7072ed7558a045b6", row.revisions)
+
+    def test_block_90_and_up_are_not_minted(self):
+        self.assertNotIn(90, {r.block_index for r in nt.NAMED_TRACKS})
 
 
 class TestMintedItems(unittest.TestCase):
