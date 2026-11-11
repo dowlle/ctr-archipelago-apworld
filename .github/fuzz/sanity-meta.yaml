@@ -4,7 +4,24 @@ Crash Team Racing:
   item_box_count: {0: 2, 50: 2}
   exclude_locations: [Weapon Crates, Wumpa Crates, Loose Wumpa Fruit]
   accessibility: full
-  custom_tracks: []
+  # A4-52: include the ruled upper-room crates in both sanity and sanity-ut.
+  logic_difficulty: {easy: 1, medium: 1, hard: 1}
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost_blue_fire: {true: 1, false: 1}
+  custom_tracks:
+    - id: package/tv-world/1.1.0
+      content_id: tv-world
+      uuid: 54532a25-e512-53a5-a74e-98a5d74a4c9f
+      revision: "1.1.0"
+      display_name: TV World
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: true, weapon_crates: 19, fruit_crates: 9, loose_fruit: 0, checkpoints: 159, ai_nav: true}
+      files:
+        - {role: lev, sha256: e3d765e824a2de96d06d1f34951b6d2ab51c027fb3353c62d8e7086b8ce1e33a, bytes: 913816, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: b78491bf70e067e5149814c32a658e8e7ec99932d6c97ed0d5820f6403f456cc, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [tv-world]
   retail_tracks: [all]
   crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]
   boss_garages: true
