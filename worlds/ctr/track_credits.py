@@ -34,7 +34,7 @@ REGISTRY_CREDITS = _load()
 
 def split_author(label: str):
     """The names in one package `author` label."""
-    return [part for part in _SPLIT.split(label or "") if part]
+    return [part.strip() for part in _SPLIT.split(label or "") if part.strip()]
 
 
 def authors_of(track: Mapping, package: Optional[Mapping] = None) -> FrozenSet[str]:
@@ -47,4 +47,4 @@ def authors_of(track: Mapping, package: Optional[Mapping] = None) -> FrozenSet[s
     else:
         return frozenset()
     names = list(REGISTRY_CREDITS.get(key, ())) + split_author(label)
-    return frozenset(name.lower() for name in names)
+    return frozenset(name.strip().lower() for name in names)

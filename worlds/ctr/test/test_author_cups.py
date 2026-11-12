@@ -36,6 +36,9 @@ class TestAuthors(unittest.TestCase):
         label = track_credits.authors_of(_custom(2, "no-such-key"), dict(content_id="no-such-key",
                                                                           author="Boxic & PanchoPew"))
         self.assertEqual(label, {"boxic", "panchopew"})
+        padded = track_credits.authors_of(_custom(3, "no-such-key"), dict(content_id="no-such-key", author=" Boxic "))
+        self.assertEqual(padded, {"boxic"})
+        self.assertEqual(track_credits.split_author("Lolothesamurai and PanchoPew"), ["Lolothesamurai", "PanchoPew"])
         self.assertEqual(track_credits.authors_of(_retail(3)), frozenset())
 
     def test_credits_share_the_named_tracks_pin(self):
