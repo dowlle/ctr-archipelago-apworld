@@ -80,7 +80,36 @@ class TestCortexVortexTrack(unittest.TestCase):
     def test_old_room_without_standalone_laps_validates(self):
         plan = make_world(cv_options(), seed=4).ctr_content_plan
         track_of(plan, CV).pop("standalone_laps")
+        track_of(plan, CV).pop("relic_laps")
         content_plan.validate(plan)
+
+    def test_three_generations_of_room_validate(self):
+        # Before A4-13: neither key (three laps throughout). A4-13: standalone_laps
+        # alone (two laps throughout). A4-70: both keys (Trophy Race and CTR
+        # Challenge two laps, Relic Race three). Tracker restoration accepts all three.
+        plan = make_world(cv_options(), seed=4).ctr_content_plan
+        current = track_of(plan, CV)
+        self.assertEqual((current["standalone_laps"], current["relic_laps"]), (2, 3))
+        content_plan.validate(plan)
+        a413 = copy.deepcopy(plan)
+        track_of(a413, CV).pop("relic_laps")
+        content_plan.validate(a413)
+        old = copy.deepcopy(plan)
+        track_of(old, CV).pop("relic_laps")
+        track_of(old, CV).pop("standalone_laps")
+        content_plan.validate(old)
+
+    def test_relic_laps_is_only_three_and_needs_standalone_laps(self):
+        plan = make_world(cv_options(), seed=4).ctr_content_plan
+        for laps in (1, 2, 4, 7, "3", 3.5):
+            bad = copy.deepcopy(plan)
+            track_of(bad, CV)["relic_laps"] = laps
+            with self.subTest(laps=laps), self.assertRaises(OptionError):
+                content_plan.validate(bad)
+        bad = copy.deepcopy(plan)
+        track_of(bad, CV).pop("standalone_laps")
+        with self.assertRaises(OptionError):
+            content_plan.validate(bad)
 
     def test_standalone_laps_is_only_two(self):
         plan = make_world(cv_options(), seed=4).ctr_content_plan
@@ -94,9 +123,11 @@ class TestCortexVortexTrack(unittest.TestCase):
         # A4-13 (ruling of 2026-11-09): standalone races are two laps; the
         # authored laps stay three, so cup legs keep the cup lap rule.
         self.assertNotIn("standalone_laps", content_plan.cortex_track())
+        self.assertNotIn("relic_laps", content_plan.cortex_track())
         track = content_plan.cortex_track(standalone=True)
         self.assertEqual(track["laps"], 3)
         self.assertEqual(track["standalone_laps"], 2)
+        self.assertEqual(track["relic_laps"], 3)
         self.assertEqual(content_cups.leg_laps(track, False), 3)
         self.assertEqual(content_cups.leg_laps(track, True), 1)
 
@@ -106,7 +137,7 @@ class TestCortexVortexTrack(unittest.TestCase):
         plan = world.ctr_content_plan
         track = track_of(plan, CV)
         self.assertEqual(track, dict(id=CV, origin="cortex_vortex", package_id="bundled/cortex-vortex",
-                                     display_name="Cortex Vortex", laps=3, standalone_laps=2,
+                                     display_name="Cortex Vortex", laps=3, standalone_laps=2, relic_laps=3,
                                      modes=["trophy", "ctr", "relic"],
                                      capabilities=["trophy", "ctr", "relic"], field_size=8))
         self.assertNotIn("custom_slot", track)

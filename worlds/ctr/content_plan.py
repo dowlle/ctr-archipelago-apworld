@@ -123,6 +123,13 @@ CORTEX_LAPS = 3
 #: record; a plan from before the ruling has no key and races three laps,
 #: exactly as it did.
 CORTEX_STANDALONE_LAPS = 2
+#: The standalone Relic Race on the pad is three laps again (ruling of
+#: 2026-11-12, A4-70): `relic_laps` rides the track record beside
+#: `standalone_laps`, so the Trophy Race and CTR Challenge stay two laps. Three
+#: generations of room exist: before A4-13 (neither key, three laps
+#: throughout), A4-13 (`standalone_laps` alone, two laps throughout, scaled
+#: relic targets) and A4-70 (both keys). Only the third is ever emitted.
+CORTEX_RELIC_LAPS = 3
 #: `cortex_vortex_track: in_pool` and `own_pad`.
 CORTEX_IN_POOL = 1
 CORTEX_OWN_PAD = 2
@@ -179,6 +186,7 @@ def cortex_track(standalone=False):
                  display_name=destinations.CORTEX_VORTEX, laps=CORTEX_LAPS)
     if standalone:
         track["standalone_laps"] = CORTEX_STANDALONE_LAPS
+        track["relic_laps"] = CORTEX_RELIC_LAPS
     return track
 #: Aggregate manual rule -> the counted item names it sums, in wire order.
 #: Native holds the same three lists; the parity fixtures compare them.
@@ -2834,8 +2842,9 @@ def validate(plan):
         elif track["origin"] == CORTEX_ORIGIN:
             # The bundled pair under its own identity; one per plan.
             require({k: v for k, v in track.items()
-                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps", "relic_laps")}
                      == cortex_track(), "Cortex Vortex track metadata mismatch")
+            require("relic_laps" not in track or "standalone_laps" in track, "relic_laps without standalone_laps")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
@@ -2881,8 +2890,9 @@ def validate(plan):
                     "retail track metadata mismatch")
         elif track["origin"] == CORTEX_ORIGIN:
             require({k: v for k, v in track.items()
-                     if k not in ("modes", "capabilities", "field_size", "standalone_laps")}
+                     if k not in ("modes", "capabilities", "field_size", "standalone_laps", "relic_laps")}
                     == cortex_track(), "Cortex Vortex track metadata mismatch")
+            require("relic_laps" not in track or "standalone_laps" in track, "relic_laps without standalone_laps")
         else:
             require(track["origin"] == "custom" and track["package_id"] in packages, "unknown custom package")
             package = packages[track["package_id"]]
