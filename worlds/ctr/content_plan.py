@@ -2921,7 +2921,14 @@ def validate(plan):
     for track_id, venue in boss_tracks.items():
         if track_id in used_tracks:
             continue
-        require(tracks.get(track_id) == venue, "a boss venue raced nowhere else is not its trophy-only record")
+        # `standalone_laps` and `relic_laps` are inert on a Cortex Vortex venue
+        # raced nowhere else (native accepts and ignores them); the generator
+        # never emits them there.
+        record = tracks.get(track_id)
+        if record is not None and record.get("origin") == CORTEX_ORIGIN:
+            require("relic_laps" not in record or "standalone_laps" in record, "relic_laps without standalone_laps")
+            record = {k: v for k, v in record.items() if k not in ("standalone_laps", "relic_laps")}
+        require(record == venue, "a boss venue raced nowhere else is not its trophy-only record")
         if venue["origin"] == "retail":
             require(venue["retail_id"] not in retail_ids, "unknown or duplicate retail track")
             retail_ids.add(venue["retail_id"])

@@ -111,6 +111,32 @@ class TestCortexVortexTrack(unittest.TestCase):
         with self.assertRaises(OptionError):
             content_plan.validate(bad)
 
+    def test_schema_requires_standalone_laps_beside_relic_laps(self):
+        from .. import content_plan_schema
+        plan = make_world(cv_options(), seed=4).ctr_content_plan
+        content_plan_schema.validate_shape(plan)
+        bad = copy.deepcopy(plan)
+        track_of(bad, CV).pop("standalone_laps")
+        with self.assertRaises(ValueError):
+            content_plan_schema.validate_shape(bad)
+
+    def test_boss_only_venue_record_may_carry_the_inert_lap_fields(self):
+        # Native accepts and ignores both fields on a Cortex Vortex venue raced nowhere else, so
+        # the validator does too (the generator never emits them there).
+        from .test_content_bosses import boss_options
+        plan = make_world(boss_options()).ctr_content_plan
+        venue = track_of(plan, CV)
+        self.assertEqual(venue["modes"], ["trophy"])
+        self.assertNotIn("relic_laps", venue)
+        content_plan.validate(plan)
+        both = copy.deepcopy(plan)
+        track_of(both, CV).update(standalone_laps=2, relic_laps=3)
+        content_plan.validate(both)
+        lone = copy.deepcopy(plan)
+        track_of(lone, CV)["relic_laps"] = 3
+        with self.assertRaises(OptionError):
+            content_plan.validate(lone)
+
     def test_standalone_laps_is_only_two(self):
         plan = make_world(cv_options(), seed=4).ctr_content_plan
         for laps in (1, 3, 7):

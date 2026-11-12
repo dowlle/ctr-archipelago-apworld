@@ -42,6 +42,8 @@ def validate_shape(plan):
             require(type(value) is types[kind], path, "expected " + kind)
         if kind == "object":
             require(set(shape.get("required", ())) <= set(value), path, "missing required fields")
+            for key, needed in shape.get("dependentRequired", {}).items():
+                require(key not in value or set(needed) <= set(value), path, "missing fields a present field depends on")
             if shape.get("additionalProperties") is False:
                 require(set(value) <= set(shape["properties"]), path, "unknown fields")
             for key, field in value.items():

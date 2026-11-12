@@ -739,6 +739,11 @@
             "origin",
             "package_id"
           ],
+          "dependentRequired": {
+            "relic_laps": [
+              "standalone_laps"
+            ]
+          },
           "additionalProperties": false
         }
       ]
