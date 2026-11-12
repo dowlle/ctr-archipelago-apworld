@@ -1353,7 +1353,8 @@ def draw_plan(world, key_estimate=True):
         # The first five are the Gem Cups; a sixth cup onward takes a name
         # from the pool (#133 PR 5). They are seated with the other entries.
         cups = content_cups.draw_cups(world, cup_count, legs_other, legs_custom, cup_spec,
-                                      bool(o.one_lap_cups.value), fixed_legs, bool(o.purple_cup_boss_gauntlet.value))
+                                      bool(o.one_lap_cups.value), fixed_legs, bool(o.purple_cup_boss_gauntlet.value),
+                                      content_cups.track_authors(legs_custom, package_by_id))
     # Room titles of the seed's custom tracks, also those raced only as cup legs.
     raced = [t for t in chosen if t.get("origin") == "custom"]
     for cup in cups:

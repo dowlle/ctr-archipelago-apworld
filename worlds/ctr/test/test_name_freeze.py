@@ -77,8 +77,8 @@ EXPECTED_CLASSES = [
     ("named_track", 87 * 67, tuple(range(35200000, 35218000, 1000))),
     # The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST), appended
     # after the named blocks. All inert until their feature PRs.
-    ("cup_win", 41, (35027000,)),
-    ("cup_sweep", 46, (35027200, 35028300)),
+    ("cup_win", 44, (35027000,)),
+    ("cup_sweep", 49, (35027200, 35028300)),
     ("cup_leg_victory", 151, (35016800, 35027000)),
     ("lap_completion", 151, (35028000, 35026000)),
     ("crystalsanity", 80, (35028400,)),
@@ -172,7 +172,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + four Discord cup names (A4-16c): Win and Win All Legs each.
         # + 11,558 ordinary pickup sanity names (A4-23).
         # + the fourth step (A4-62b, 2026-11-11): block 89, 67 block names and 128 pickup names.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35 + 9 * 2 + 2 + 4 * 2 + 11558 + 67 + 128)
+        # + three track author cup names (A4-71, 2026-11-12): Win and Win All Legs each.
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35 + 9 * 2 + 2 + 4 * 2 + 11558 + 67 + 128 + 3 * 2)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:

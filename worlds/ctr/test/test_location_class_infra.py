@@ -85,6 +85,9 @@ FIXTURE_PATHS = (
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_dex_cup.json",
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_sanity.json",
     FIXTURE_DIR / "location_class_id_stability_2026_11_09_discord_cups.json",
+    # Three track author cup names (A4-71, 2026-11-12): Boxic, Lolothesamurai
+    # and PanchoPew Cup at the growth codes 35027114..6 and 35027314..6.
+    FIXTURE_DIR / "location_class_id_stability_2026_11_12_author_cups.json",
 )
 
 PODIUM_TOGGLES = (
@@ -421,7 +424,8 @@ class TestLocationClassIdStability(unittest.TestCase):
         # + 2 Win and Win All Legs names of Dex Cup (A4-16, 2026-11-09).
         # + 8 Win and Win All Legs names of the four Discord cups (A4-16c).
         # + 11,558 ordinary pickup sanity names (A4-23).
-        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2 + 8 + 11558)
+        # + 6 Win and Win All Legs names of the three track author cups (A4-71).
+        self.assertEqual(len(frozen), 505 + 6306 + 63 + 125 + 3640 + 18 + 2 + 8 + 11558 + 6)
         current = {name for name, _c, _r in CTR_LOCATION_CLASSES.all_locations()}
         missing = set(frozen) - current
         self.assertEqual(
