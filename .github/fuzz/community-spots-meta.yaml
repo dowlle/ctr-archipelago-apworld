@@ -1,5 +1,6 @@
-# The first community box spot files (A3-45): DK Pass 1.0.0 and Ancient Lake 1.1.0, exact LEV pins,
-# so both tracks stand their boxes at the shipped spots. Progressive Boost on, so Ancient Lake 2 (boost) matters.
+# The community box spot files: DK Pass 1.0.0 and Ancient Lake 1.1.0 (A3-45), Country Speedway 1.3.1 and
+# Gossamer's Castle 1.0.0 (A4-62b), exact LEV pins, so every track stands its boxes at the shipped spots.
+# Progressive Boost on, so the boost spots matter. Country Speedway has no weapon crates: its boxes come only from its file.
 Crash Team Racing:
   accessibility: full
   box_locations: true
@@ -29,7 +30,31 @@ Crash Team Racing:
         - {role: lev, sha256: 21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee, bytes: 413804, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: 57c14cc95b6080f0095f303817fbec8ca1cb885a2a254ed0e99d4536294ed0e2, bytes: 458808, format: ctr-vrm, format_version: 1}
       evidence: []
-  required_entries: [dk-pass, ancient-lake]
+    - id: package/country-speedway/1.3.1
+      content_id: country-speedway
+      uuid: 11111111-2222-4333-8444-555555555538
+      revision: "1.3.1"
+      display_name: Country Speedway
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: false, weapon_crates: 0, checkpoints: 130, ai_nav: true}
+      files:
+        - {role: lev, sha256: 504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996, bytes: 814372, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 0e99718c43d5c612128f29750f29b1fd9d9399c8ad13026361e5fae24f308d60, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+    - id: package/gossamer-s-castle/1.0.0
+      content_id: gossamer-s-castle
+      uuid: 11111111-2222-4333-8444-555555555539
+      revision: "1.0.0"
+      display_name: Gossamer's Castle
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 20, checkpoints: 185, ai_nav: true}
+      files:
+        - {role: lev, sha256: 82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c, bytes: 1414492, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: c515e1d6deccf52fa53ac26e6e9c24b1230baa1682272c0e7d9353ea3957a31a, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [dk-pass, ancient-lake, country-speedway, gossamer-s-castle]
   retail_tracks: [all]
   track_modes: {default: [trophy]}
   crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]

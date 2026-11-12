@@ -33,7 +33,18 @@ CRASH_COVE = 3
 COMMUNITY = {
     "ancient-lake": (1, "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee", {2: "boost"}),
     "dk-pass": (25, "cf29d61f8e7b9a5d210a060ffbc4da22b04483d25d85c6a01bff855f312c09ef", {}),
+    # A4-62b: Country Speedway 1.3.1 (spot 6 of the submission dropped: it sits
+    # on a wall top) and Gossamer's Castle 1.0.0 (block 89).
+    "country-speedway": (17, "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996",
+                         {2: "boost", 3: "boost", 4: "boost", 11: "boost", 14: "boost"}),
+    "gossamer-s-castle": (89, "82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c", {6: "boost"}),
 }
+#: Spot numbers per file; every other file holds 1 to 15.
+COMMUNITY_NUMBERS = {"country-speedway": [n for n in range(1, 16) if n != 6]}
+
+
+def community_numbers(key):
+    return COMMUNITY_NUMBERS.get(key, list(range(1, 16)))
 
 
 def fixture(path):
@@ -359,7 +370,7 @@ class TestCommunitySpotFiles(unittest.TestCase):
             doc = box_spots.CUSTOM_FILES[key]["doc"]
             self.assertEqual(destinations.named_track(key).block_index, block)
             self.assertEqual(doc["track"]["lev_sha256"], [pin])
-            self.assertEqual([s["number"] for s in doc["spots"]], list(range(1, 16)))
+            self.assertEqual([s["number"] for s in doc["spots"]], community_numbers(key))
             self.assertEqual(doc["retired"], [])
             for spot in doc["spots"]:
                 self.assertEqual(spot["source"], "community")
@@ -375,16 +386,33 @@ class TestCommunitySpotFiles(unittest.TestCase):
             track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == block)
             record = spot_set(plan, track_id)
             self.assertEqual(record["lev_sha256"], pin)
-            self.assertEqual((record["pool"], record["picked"]), (15, list(range(1, 16))))
+            numbers = community_numbers(key)
+            self.assertEqual((record["pool"], record["picked"]), (len(numbers), numbers))
             spots = box_spots.spots_by_number(box_spots.CUSTOM_FILES[key])
             own = boxes(plan, track_id)
-            self.assertEqual([c["spot"]["number"] for c in own], list(range(1, 16)))
+            self.assertEqual([c["spot"]["number"] for c in own], numbers)
             for check in own:
                 n = check["spot"]["number"]
                 self.assertEqual(check["spot"], box_spots.wire_spot(spots[n]))
                 self.assertEqual(check["location"], named_tracks.location_code(block, f"item_box_{n}"))
                 self.assertEqual(check.get("boost", 0), box_spots.NEEDS[needs.get(n, "none")])
         self.assertFalse(refused(plan))
+
+    def test_country_speedway_without_crates_stands_its_spots(self):
+        """Country Speedway 1.3.1 has no weapon crates (catalogue capability
+        weapon_crates 0), so crate seating gives it no boxes; its file gives 14."""
+        plan = first_world(box_options(custom=[community_package("country-speedway", 0)],
+                                       progressive_boost="shared_global")).ctr_content_plan
+        track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == 17)
+        numbers = community_numbers("country-speedway")
+        self.assertEqual(spot_set(plan, track_id)["picked"], numbers)
+        own = boxes(plan, track_id)
+        self.assertEqual([c["spot"]["number"] for c in own], numbers)
+        self.assertEqual([c["spot"]["number"] for c in own if c.get("boost", 0)], [2, 3, 4, 11, 14])
+        other = first_world(box_options(custom=[community_package("country-speedway", 0, "01" * 32)])).ctr_content_plan
+        other_id = next(t["id"] for t in other["tracks"] if t.get("named_block") == 17)
+        self.assertIsNone(spot_set(other, other_id))
+        self.assertEqual(boxes(other, other_id), [])
 
     def test_other_revisions_keep_crate_seating(self):
         # The xdelta-import Ancient Lake LEV keeps its reviewed crate exclusion.

@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "9f61917477b48c59d97862a1ef602239d41533d0",
-    "digest": "0ced7b087966941aafdf451244cf4206d6b51238193a85031e1828206ae20ae0"
+    "commit": "70e2885c4013393c366da1f727e91506a89afb15",
+    "digest": "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
   },
   "tracks": [
     {
@@ -168,7 +168,8 @@
         "c87e79818be537c261f0d223fe75443c9a728b4675233a5432bf69e287622cd2",
         "15416baffd043b0d6386899de2343791ab7d9083ddd92d849d7733a1d6572a70",
         "07a627e0d2163470935a74d638e1fd530c12dfb3fd1d6a590f59d9a312d81095",
-        "94a58f3526e117412aa2ae136af93c0b2334b45f70e238561bc7dad0ec05b472"
+        "94a58f3526e117412aa2ae136af93c0b2334b45f70e238561bc7dad0ec05b472",
+        "9cf03bb8d60c7c675c25bbbc97e269e5cadccb91ab40bfce7072ed7558a045b6"
       ]
     },
     {
@@ -846,6 +847,15 @@
       "shipped_in": null,
       "revisions": [
         "977c2b0b9f7f3e36d6fb97becff20a33df3118a7a9474bd4f16023ad0aa89589"
+      ]
+    },
+    {
+      "track_key": "gossamer-s-castle",
+      "block_index": 89,
+      "ap_name": "Gossamer's Castle",
+      "shipped_in": null,
+      "revisions": [
+        "fcdaaf4adf278c38a347b8442980c4d8444bd2ec7c4217d264c089257c55e7f7"
       ]
     }
   ]

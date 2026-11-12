@@ -102,7 +102,7 @@ class TestItemGroups(CTRTestBase):
         every item named "Letter <C|T|R> (<track>)", and nothing else."""
         letters = {name for name in self.world.item_name_to_id
                    if re.fullmatch(r"Letter [CTR] \(.+\)", name)}
-        self.assertEqual(len(letters), 711)
+        self.assertEqual(len(letters), 714)
         self.assertEqual(set(self.world.item_name_groups["CTR Letters"]),
                          letters)
         for sample in ("Letter C (Crash Cove)", "Letter R (Tizi Challenge)",

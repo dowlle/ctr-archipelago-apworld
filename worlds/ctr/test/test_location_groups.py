@@ -61,7 +61,7 @@ class TestLocationGroups(CTRTestBase):
             self.assertIn(group, self.groups)
         named = set(self.groups) - set(KIND_GROUPS) - set(RETAIL_TRACKS) \
             - set(OTHER_TRACKS) - {"Itemsanity Checks", "Everywhere"}
-        self.assertEqual(len(named), 86)
+        self.assertEqual(len(named), 87)
         self.assertIn("Acid Lake", named)
 
     def test_every_track_group_is_that_tracks_prefix(self) -> None:
@@ -74,9 +74,9 @@ class TestLocationGroups(CTRTestBase):
                     members, {n for n in self.names if n.startswith(f"{group}: ")})
 
     def test_group_counts(self) -> None:
-        # 31 retail and special tracks + 86 named blocks + 13 kind groups
+        # 31 retail and special tracks + 87 named blocks + 13 kind groups
         # + Itemsanity Checks + Everywhere.
-        self.assertEqual(len(self.groups), 31 + 86 + 16 + 1 + 1)
+        self.assertEqual(len(self.groups), 31 + 87 + 16 + 1 + 1)
         self.assertEqual(len(self.groups["Crash Cove"]), 34 + 35 + 18 + 3)
         self.assertEqual(len(self.groups["Cortex Vortex"]), 17 + 69 + 7)
 
@@ -86,13 +86,13 @@ class TestLocationGroups(CTRTestBase):
     def test_held_placements(self) -> None:
         want = self._where(lambda t, s: re.fullmatch(r"Held \d+(st|nd|rd|th)", s))
         self.assertEqual(self.groups["Held Placements"], want)
-        self.assertEqual(len(want), 711)
+        self.assertEqual(len(want), 714)
 
     def test_finish_podium(self) -> None:
         want = self._where(lambda t, s: s in (
             "Finish on Podium", "Finish 1st", "Finish 2nd or 3rd"))
         self.assertEqual(self.groups["Finish Podium"], want)
-        self.assertEqual(len(want), 269)
+        self.assertEqual(len(want), 270)
         self.assertNotIn("Crash Cove: Finish (Any Position)", want)
 
     def test_trophy_race_and_ctr_challenge(self) -> None:
@@ -100,8 +100,8 @@ class TestLocationGroups(CTRTestBase):
                          self._where(lambda t, s: s == "Trophy Race"))
         self.assertEqual(self.groups["CTR Challenge"],
                          self._where(lambda t, s: s == "CTR Token Challenge"))
-        self.assertEqual(len(self.groups["Trophy Race"]), 237)
-        self.assertEqual(len(self.groups["CTR Challenge"]), 237)
+        self.assertEqual(len(self.groups["Trophy Race"]), 238)
+        self.assertEqual(len(self.groups["CTR Challenge"]), 238)
 
     def test_relic_race_and_tiers(self) -> None:
         tiers = {}
@@ -109,11 +109,11 @@ class TestLocationGroups(CTRTestBase):
             tiers[tier] = self._where(lambda t, s, tier=tier:
                                       s == f"{tier} Time Trial")
             self.assertEqual(self.groups[f"Relic Race {tier}"], tiers[tier])
-            self.assertEqual(len(tiers[tier]), 237)
+            self.assertEqual(len(tiers[tier]), 238)
         perfect = self._where(lambda t, s: s == "Relic Race Perfect")
         self.assertEqual(self.groups["Relic Race"],
                          set().union(*tiers.values()) | perfect)
-        self.assertEqual(len(self.groups["Relic Race"]), 948)
+        self.assertEqual(len(self.groups["Relic Race"]), 952)
 
     def test_battle_arenas_gem_cups_boss_races(self) -> None:
         self.assertEqual(self.groups["Battle Arenas"],
@@ -136,8 +136,9 @@ class TestLocationGroups(CTRTestBase):
         self.assertEqual(self.groups["Item Boxes"],
                          self._where(lambda t, s: re.fullmatch(r"Item Box \d+", s)))
         # 270 retail + 86 x 15 named + 132 x 15 generic, plus the alpha3 Item
-        # Box 16 to 50 for 18 retail tracks and 86 named blocks.
-        self.assertEqual(len(self.groups["Item Boxes"]), 3540 + 18 * 35 + 86 * 35)
+        # Box 16 to 50 for 18 retail tracks and 86 named blocks; A4-62b adds
+        # block 89 (Item Box 1 to 50).
+        self.assertEqual(len(self.groups["Item Boxes"]), 3540 + 18 * 35 + 86 * 35 + 15 + 35)
 
     def test_itemsanity_checks_is_kept(self) -> None:
         self.assertEqual(self.groups["Itemsanity Checks"],

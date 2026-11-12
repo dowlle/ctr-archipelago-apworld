@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "gossamer-s-castle", "name": "Gossamer's Castle", "lev_sha256": ["82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c"]},
+  "spots": [
+    {"number": 1, "pos": [4838, -10, 5366], "rot_y": 563, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 2, "pos": [9918, -12, 4233], "rot_y": 3795, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 3, "pos": [10387, -211, 2463], "rot_y": 1324, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 4, "pos": [10932, -211, 1662], "rot_y": 1007, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 5, "pos": [11764, -210, 2867], "rot_y": 2666, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 6, "pos": [9346, 412, -1609], "rot_y": 2666, "needs": "boost", "source": "community", "credit": "Discord community", "review": "apworld PR #247", "note": "In the air about 210 above the floor of the passage; a jump; marked boost until checked in game"},
+    {"number": 7, "pos": [7795, 210, -6016], "rot_y": 2047, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 8, "pos": [85, 1342, -4471], "rot_y": 3040, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 9, "pos": [-5180, 1395, -7359], "rot_y": 2950, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 10, "pos": [-8788, 972, -8460], "rot_y": 2933, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 11, "pos": [-14939, 293, -7588], "rot_y": 539, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 12, "pos": [-15268, 293, 1192], "rot_y": 1541, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 13, "pos": [-8056, -9, 4016], "rot_y": 1528, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 14, "pos": [-5989, -9, 999], "rot_y": 1434, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"},
+    {"number": 15, "pos": [6541, 626, -9849], "rot_y": 3991, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #247"}
+  ],
+  "retired": []
+}
