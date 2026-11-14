@@ -79,7 +79,7 @@ unchanged. The encounter's own requirement:
     terms when `oxide_goal` is `any_percent` (the 2026-09-03 contract);
   * N. Oxide's Final Challenge: `oxide:final`, the companion terms when Oxide
     is the goal, and the relic term of `oxide_final_challenge_unlock` and its
-    count (lowered to 18 in a one-tier mode and then to the base supply of the
+    count (0 asks no relic term; lowered to 18 in a one-tier mode and then to the base supply of the
     tiers it names, the 2026-09-18 and 2026-10-01 rulings, with the same
     notices).
 
@@ -252,8 +252,8 @@ def check_settings(record):
         error("bosses.repeats must be false: boss encounters never repeat.")
     if type(unlock) is not int or not 0 <= unlock <= UNLOCK_TOTAL:
         error("bosses.oxide_final_unlock must be 0 to 4.")
-    if type(count) is not int or not 1 <= count <= (54 if unlock == UNLOCK_TOTAL else SINGLE_TIER_MAX):
-        error("bosses.oxide_final_count must be 1 to 18, or to 54 with total_relics.")
+    if type(count) is not int or not 0 <= count <= (54 if unlock == UNLOCK_TOTAL else SINGLE_TIER_MAX):
+        error("bosses.oxide_final_count must be 0 to 18, or to 54 with total_relics (0 asks no relic).")
     if not isinstance(record["cups"], list) or len(record["cups"]) > 4 or \
             any(type(g) is not int or not 0 <= g < 4 for g in record["cups"]) or record["cups"] != sorted(set(record["cups"])):
         error("bosses.cups must list distinct ordinary garages 0 to 3 in order.")
@@ -297,6 +297,10 @@ def resolve_relic_count(world, record, rows):
               f"CTR ({slot_label(world)}): Oxide's Final Challenge Relic Count lowered from {count} to 18, "
               "the most a one-tier mode allows.")
         count = SINGLE_TIER_MAX
+    if count == 0:
+        # A count of 0 asks no relic (2026-11-14), so no relic need exist, so no relic need exist.
+        # The count stays 0 and the pool is untouched.
+        return
     ceiling = _ceilings(rows)
     tiers = [ceiling.get(RELIC_ITEMS[t], 0) for t in _named_tiers(unlock)]
     supply = sum(tiers) if unlock == UNLOCK_TOTAL else max(tiers)
@@ -314,8 +318,10 @@ def resolve_relic_count(world, record, rows):
 def relic_term(record, rows):
     """The Final Challenge's relic predicate on the plan's base supply,
     refusing a count above what its tiers hold (`resolve_relic_count` lowers
-    a generated count first)."""
+    a generated count first). A count of 0 asks no relic: None, no term."""
     unlock, count = record["oxide_final_unlock"], record["oxide_final_count"]
+    if count == 0:
+        return None
     ceiling = _ceilings(rows)
     tiers = [ceiling.get(RELIC_ITEMS[t], 0) for t in _named_tiers(unlock)]
     if not 1 <= count <= (sum(tiers) if unlock == UNLOCK_TOTAL else max(tiers)):
@@ -685,9 +691,11 @@ def build(record, venues, final_track, rows, gem_term, capability, track_records
                 requirements.append(dict(id=rid, predicate=_all(companions)))
         else:
             rid = "oxide:final"
+            relic = relic_term(record, rows)
             terms = (list(companions) if record["oxide_goal"] in (GOAL_ANY, GOAL_FINAL) else []) \
-                + [relic_term(record, rows)]
-            requirements.append(dict(id=rid, predicate=_all(terms)))
+                + ([relic] if relic is not None else [])
+            # Count 0 and no companion arm: nothing to ask, the door is free.
+            requirements.append(dict(id=rid, predicate=_all(terms) if terms else dict(FREE_GARAGE)))
         opponent_record = opponent_entry(*(opponents[g] if opponents else (opponent, None)))
         cup = g < OXIDE_GARAGE and g in cups
         if cup:
