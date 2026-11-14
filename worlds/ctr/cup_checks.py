@@ -34,10 +34,20 @@ RETIRED NAMES (ruled 2026-11-09). A released name is never removed or
 renamed, but it can leave the draw: it stays in CUP_NAMES and the data
 package with its ids, so old rooms keep working, and new seeds never draw
 it. "Venusyprime Cup" retired when its tester asked to be credited as Dex.
-The drawable pool stays at 36; four generic names retired when four more
-tester names were appended. All retired names keep their frozen identities.
+The drawable pool stayed at 36 in A4-16c: four generic names retired when four
+more tester names were appended. All retired names keep their frozen identities.
+A4-71 (2026-11-12) appends three track author names and retires nothing, so
+39 names can be drawn.
+
+TRACK AUTHOR CUPS (ruled 2026-11-12 19:40 CET). A cup named after a track
+author who gave permission lists that author in CUP_TRACK_AUTHORS. When a seed
+draws such a cup and its track pool holds tracks credited to that author, the
+cup races them first (content_cups.prefer_author_tracks). Adding a later author
+is data only: append "<Name> Cup" to CUP_NAMES, add one CUP_TRACK_AUTHORS row,
+then regenerate the manifest, add a stability fixture and sync the native
+registry (the A4-71 implementation note lists every file).
 """
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from . import destinations
 from .custom_check_namespace import CUSTOM_SLOT_COUNT
@@ -56,6 +66,7 @@ CUP_NAMES: Tuple[str, ...] = (
     "MisterShaokahn Cup", "Sturg Cup", "Prototyp_002 Cup", "Em Cup",
     "Dex Cup",
     "Hiru Cup", "Spark Cup", "Sido Cup", "DM3 Productions Cup",
+    "Boxic Cup", "Lolothesamurai Cup", "PanchoPew Cup",
 )
 #: Names no seed draws any more (ruled 2026-11-09). They stay in CUP_NAMES
 #: and the data package so alpha3 rooms keep working; only the draw skips
@@ -67,6 +78,16 @@ CUP_NAMES_RETIRED: Tuple[str, ...] = (
 #: The pool indices a seed may draw: every name minus the retired ones.
 CUP_DRAW_INDICES: Tuple[int, ...] = tuple(
     i for i, name in enumerate(CUP_NAMES) if name not in CUP_NAMES_RETIRED)
+#: Cup name -> the track author credit it is named after (A4-71). Only authors
+#: who gave permission are listed; a tester or collaborator cup is absent and
+#: is filled as before. The credit is matched case-insensitively against a
+#: track's package author and its pinned registry credits (track_credits).
+CUP_TRACK_AUTHORS: Dict[str, str] = {
+    "Lockheart Cup": "Lockheart",
+    "Boxic Cup": "Boxic",
+    "Lolothesamurai Cup": "Lolothesamurai",
+    "PanchoPew Cup": "PanchoPew",
+}
 #: Room reserved for later cup names, ruled 2026-10-13 21:47 CEST.
 CUP_NAME_CAPACITY = 127
 
@@ -86,6 +107,7 @@ assert GEM_CUPS == ("Red Gem Cup", "Green Gem Cup", "Blue Gem Cup",
 assert len(set(CUP_NAMES)) == len(CUP_NAMES) <= CUP_NAME_CAPACITY
 assert set(CUP_NAMES_RETIRED) <= set(CUP_NAMES)
 assert len(CUP_DRAW_INDICES) == len(CUP_NAMES) - len(CUP_NAMES_RETIRED)
+assert set(CUP_TRACK_AUTHORS) <= set(CUP_NAMES) - set(CUP_NAMES_RETIRED)
 
 
 def _pool_code(base: int, growth_base: int, index: int) -> int:

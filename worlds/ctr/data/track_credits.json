@@ -1,0 +1,284 @@
+{
+  "format": 1,
+  "registry": {
+    "repository": "https://github.com/dowlle/ctr-track-registry",
+    "commit": "70e2885c4013393c366da1f727e91506a89afb15",
+    "digest": "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
+  },
+  "credits": {
+    "acid-lake": [
+      "Lolothesamurai"
+    ],
+    "ancient-lake": [
+      "PanchoPew"
+    ],
+    "android-alley-n-gage": [
+      "Anfrost"
+    ],
+    "arabian-heights-day": [
+      "Lockheart"
+    ],
+    "arabian-heights-night": [
+      "Lockheart"
+    ],
+    "arcane-garden": [
+      "N.Hanced Team"
+    ],
+    "arctic-alleyway": [
+      "Lolothesamurai"
+    ],
+    "assembly-lane-n-gage": [
+      "Anfrost"
+    ],
+    "baby-t-park": [
+      "Lockheart"
+    ],
+    "big-forest": [
+      "Lolothesamurai"
+    ],
+    "bowser-castle-1": [
+      "Lolothesamurai"
+    ],
+    "breeze-harbor": [
+      "Boxic"
+    ],
+    "chasqui-rally": [
+      "Lolothesamurai"
+    ],
+    "choco-island-2": [
+      "Lolothesamurai"
+    ],
+    "christmas-hub": [
+      "Lolothesamurai"
+    ],
+    "coco-park-2025": [
+      "PanchoPew"
+    ],
+    "cortex-vortex": [
+      "Lockheart"
+    ],
+    "country-speedway": [
+      "PanchoPew"
+    ],
+    "crystal-caves": [
+      "PanchoPew"
+    ],
+    "cubic-circuit": [
+      "MisterM"
+    ],
+    "cursed-trial-roulette": [
+      "Blounard"
+    ],
+    "dark-ruins": [
+      "Boxic"
+    ],
+    "deep-sea-driving-n-gage": [
+      "Anfrost"
+    ],
+    "diwali": [
+      "Lolothesamurai"
+    ],
+    "diwali-no-usf": [
+      "Lolothesamurai"
+    ],
+    "dk-pass": [
+      "Blounard"
+    ],
+    "draculas-castle": [
+      "Lolothesamurai"
+    ],
+    "dreamy-heights": [
+      "Boxic"
+    ],
+    "drive-thru-danger": [
+      "Boxic"
+    ],
+    "ds-rainbow-road": [
+      "Anfrost"
+    ],
+    "dust-keepers": [
+      "daviddg"
+    ],
+    "frozen-depths": [
+      "Boxic"
+    ],
+    "garden-speedway": [
+      "PanchoPew"
+    ],
+    "glacier-lagoon": [
+      "EarlGrey"
+    ],
+    "glazed-dessert": [
+      "daviddg"
+    ],
+    "gossamer-s-castle": [
+      "Anfrost"
+    ],
+    "green-hill-raceway": [
+      "Boxic"
+    ],
+    "hangtime-harbor": [
+      "Justin Zimmermann"
+    ],
+    "hasty-hedges": [
+      "Lolothesamurai"
+    ],
+    "haven-stadium": [
+      "Lockheart"
+    ],
+    "haven-stadium-reverse": [
+      "Lockheart"
+    ],
+    "holiday-hills": [
+      "N.Hanced Team"
+    ],
+    "inferno-island": [
+      "Boxic"
+    ],
+    "jungle-boogie-n-gage": [
+      "Anfrost"
+    ],
+    "kong-dungeon": [
+      "N.Hanced Team"
+    ],
+    "lava-lane": [
+      "Lolothesamurai"
+    ],
+    "lights-out": [
+      "Tramadolls"
+    ],
+    "mario-circuit-1": [
+      "Lolothesamurai"
+    ],
+    "mario-circuit-2": [
+      "Mnesiq"
+    ],
+    "mario-raceway-n64": [
+      "PanchoPew"
+    ],
+    "matsuri": [
+      "Lockheart"
+    ],
+    "namek": [
+      "Lolothesamurai"
+    ],
+    "neon-paradise": [
+      "Boxic"
+    ],
+    "neonstadion": [
+      "Lolothesamurai"
+    ],
+    "north-pole": [
+      "Lockheart"
+    ],
+    "out-of-time-n-gage": [
+      "Anfrost"
+    ],
+    "papu-cave": [
+      "Papu_persia"
+    ],
+    "papu-s-sg-temple": [
+      "PanchoPew"
+    ],
+    "pepsi-city": [
+      "PanchoPew"
+    ],
+    "redrock-ravine": [
+      "Lockheart"
+    ],
+    "royal-raceway": [
+      "PanchoPew"
+    ],
+    "sampa-run": [
+      "Lockheart"
+    ],
+    "sewer-baby-park": [
+      "Lolothesamurai",
+      "PanchoPew"
+    ],
+    "sid-house": [
+      "PanchoPew"
+    ],
+    "sids-house": [
+      "Lolothesamurai",
+      "PanchoPew"
+    ],
+    "skater-s-retreat": [
+      "Boxic"
+    ],
+    "skull-cave": [
+      "PanchoPew"
+    ],
+    "snes-bowser-s-castle-2": [
+      "Boxic"
+    ],
+    "snowfall-keep": [
+      "Late_One"
+    ],
+    "snowy-valley": [
+      "PanchoPew"
+    ],
+    "space-labs": [
+      "Blounard"
+    ],
+    "specter-station": [
+      "Lolothesamurai",
+      "PanchoPew"
+    ],
+    "st-patricks-day-hub-world": [
+      "Lolothesamurai"
+    ],
+    "sunken-sprint": [
+      "Boxic"
+    ],
+    "sunset-vista": [
+      "Tramadolls"
+    ],
+    "super-snocross-2": [
+      "Lockheart"
+    ],
+    "the-dairy-track": [
+      "Lolothesamurai"
+    ],
+    "the-lab": [
+      "Tramadolls"
+    ],
+    "tizi-challenge": [
+      "Lolothesamurai",
+      "PanchoPew"
+    ],
+    "toasty-terrace": [
+      "PanchoPew"
+    ],
+    "tomb-temple": [
+      "Lolothesamurai"
+    ],
+    "towers": [
+      "LittleHelper"
+    ],
+    "tribal-trials": [
+      "N.Hanced Team"
+    ],
+    "tv-world": [
+      "Boxic"
+    ],
+    "ursa-glacier": [
+      "N.Hanced Team"
+    ],
+    "vanilla-lake-2": [
+      "Lolothesamurai"
+    ],
+    "wario-stadium": [
+      "Lolothesamurai"
+    ],
+    "wumpa-world": [
+      "Lolothesamurai"
+    ],
+    "yoshi-circuit": [
+      "Boxic"
+    ],
+    "yoshi-circuit-legacy": [
+      "Boxic"
+    ]
+  }
+}

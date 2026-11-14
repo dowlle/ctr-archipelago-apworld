@@ -25,6 +25,10 @@ What it does:
 5. Writes the apworld file with the registry repository, commit and digest for
    provenance. With --check it writes nothing and fails if the committed file
    differs from what the pinned commit produces.
+6. Writes data/track_credits.json from the same commit (A4-71): every entry's
+   track key and the names in its `credits`, whatever its mint status, so a
+   track author cup can find that author's tracks (Cortex Vortex is `builtin`
+   and is listed too). Same provenance block, same --check rule.
 
 Append only: a block already in the apworld file must come back unchanged
 (test_named_tracks.py enforces the same rule against the published lock).
@@ -41,6 +45,7 @@ from pathlib import Path
 REPOSITORY = "https://github.com/dowlle/ctr-track-registry"
 WORLD = Path(__file__).resolve().parent.parent
 OUTPUT = WORLD / "data" / "named_tracks.json"
+CREDITS_OUTPUT = WORLD / "data" / "track_credits.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 MINT_STATUSES = ("mint", "reserved", "builtin")
 
@@ -91,6 +96,27 @@ def mint_rows(registry):
     return rows
 
 
+def credit_rows(registry):
+    """{track key: [credit names in registry order]} for every entry with
+    at least one credit, sorted by key."""
+    out = {}
+    for t in registry.get("tracks", []):
+        names = [c["name"] for c in t.get("credits", []) if isinstance(c, dict) and c.get("name")]
+        if names:
+            out[t["track_key"]] = names
+    return dict(sorted(out.items()))
+
+
+def build_credits(repo: Path, commit: str):
+    files = read_commit(repo, commit)
+    registry = json.loads(files["registry.json"])
+    return {
+        "format": 1,
+        "registry": {"repository": REPOSITORY, "commit": commit, "digest": digest_of(files)},
+        "credits": credit_rows(registry),
+    }
+
+
 def build(repo: Path, commit: str):
     files = read_commit(repo, commit)
     registry = json.loads(files["registry.json"])
@@ -139,6 +165,7 @@ def main(argv=None) -> int:
         raise SystemExit("--commit must be a full 40-character lowercase sha")
     document = build(args.registry, args.commit)
     text = render(document)
+    credits_text = render(build_credits(args.registry, args.commit))
     previous = json.loads(OUTPUT.read_text(encoding="utf-8")) if OUTPUT.exists() else {}
     problems = append_only_problems(previous, document)
     if problems:
@@ -148,10 +175,15 @@ def main(argv=None) -> int:
         if OUTPUT.read_text(encoding="utf-8") != text:
             print(f"{OUTPUT} differs from registry commit {args.commit}", file=sys.stderr)
             return 1
+        if not CREDITS_OUTPUT.exists() or CREDITS_OUTPUT.read_text(encoding="utf-8") != credits_text:
+            print(f"{CREDITS_OUTPUT} differs from registry commit {args.commit}", file=sys.stderr)
+            return 1
         print(f"{OUTPUT} matches registry commit {args.commit} ({len(document['tracks'])} tracks)")
         return 0
     OUTPUT.write_text(text, encoding="utf-8")
+    CREDITS_OUTPUT.write_text(credits_text, encoding="utf-8")
     print(f"wrote {OUTPUT}: {len(document['tracks'])} tracks from {args.commit}")
+    print(f"wrote {CREDITS_OUTPUT} from {args.commit}")
     return 0
 
 

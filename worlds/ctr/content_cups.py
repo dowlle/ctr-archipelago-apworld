@@ -57,6 +57,20 @@ CHECKS.
     Trophy Race rank of its own leg (ordered prefix); the routes carry no
     `boost` on the wire, the rule is recomputed from the plan.
 
+TRACK AUTHOR CUPS (A4-71, maintainer ruling 2026-11-12 19:40 CET: "preferably we give
+preference to their tracks in those specific cups if possible and not too much
+of a drag on the generator"). A drawn cup named after a track author
+(cup_checks.CUP_TRACK_AUTHORS) races that author's tracks first, when the
+seed's custom leg pool holds any: prefer_author_tracks swaps them into the
+cup's already drawn legs, up to `cup_custom_legs`, before the plan is built.
+It is one pass over the drawn cups with no retry. The cup keeps its name, the
+other cups and the pads are untouched, and a seed whose pool holds none of
+the author's tracks draws exactly as before (no extra random call). Every
+result is a leg set the ordinary draw could also have produced, so logic and
+the checks are computed from the plan as for any other cup. Authors come from
+the package's `author` and the pinned registry credits (track_credits); a
+track with two credited authors counts for both.
+
 A plan without cups draws nothing here and keeps its wire exactly.
 """
 import json
@@ -64,7 +78,7 @@ import pkgutil
 
 from Options import OptionError
 
-from . import cup_checks, named_tracks
+from . import cup_checks, named_tracks, track_credits
 from .content_capability import check_boost, finish_boost
 from .Locations import CTR_LOCATION_IDS
 
@@ -257,19 +271,63 @@ def leg_laps(track, shortened):
     return max(1, base_laps(track) // 2) if shortened else base_laps(track)
 
 
-def draw_cups(world, count, other, custom, spec, shortened, fixed=None, gauntlet=False):
+def track_authors(custom, packages):
+    """{track id: frozenset of lower-case author names} for the custom leg
+    pool (custom tracks and Cortex Vortex), from data the apworld holds."""
+    return {t["id"]: track_credits.authors_of(t, packages.get(t.get("package_id"))) for t in custom}
+
+
+def prefer_author_tracks(world, cups, custom, spec, authors):
+    """Give each drawn author cup that author's tracks first (A4-71), in place.
+
+    For a cup whose name is in CUP_TRACK_AUTHORS, `wanted` is the author's
+    tracks in the custom leg pool, capped by `cup_custom_legs`. Legs already
+    racing one of them stay. The missing ones are sampled from the author's
+    other tracks and replace, in leg order, the cup's custom legs by other
+    authors first and then its original legs, so the cup's custom leg count
+    never passes `cup_custom_legs` and its four legs stay distinct under
+    `random_no_repeats`. Nothing is drawn when the pool has none of the
+    author's tracks or the cup already races enough of them. Skipped when
+    tracks may not repeat across cups, which no option sets today."""
+    if not authors or not spec["repeats"]["across_cups"]:
+        return
+    cap = spec["custom_legs"][1]
+    for cup in cups:
+        index = cup.get("cup_index")
+        author = None if index is None else cup_checks.CUP_TRACK_AUTHORS.get(cup_checks.CUP_NAMES[index])
+        if author is None:
+            continue
+        key = author.lower()
+        theirs = [t for t in custom if key in authors.get(t["id"], ())]
+        legs = cup["legs"]
+        held = [n for n, leg in enumerate(legs) if leg in theirs]
+        need = min(len(theirs), cap) - len(held)
+        if need <= 0:
+            continue
+        free = ([n for n, leg in enumerate(legs) if leg.get("origin") != "retail" and n not in held]
+                + [n for n, leg in enumerate(legs) if leg.get("origin") == "retail"])
+        picks = world.random.sample([t for t in theirs if t not in legs], need)
+        for n, track in zip(free, picks):
+            legs[n] = track
+
+
+def draw_cups(world, count, other, custom, spec, shortened, fixed=None, gauntlet=False, authors=None):
     """The seed's cups as plan candidates: {cup_index, id, legs, shortened}. The
     first five are the Gem Cups, Red first (Purple first with `gauntlet`), with
     `gem_cup` their colour and `cup_index` None. The drawn legs come first, then a sample of the pool's
-    drawable name indices (retired names are never drawn) for a sixth cup onward. `fixed` is fixed_legs."""
+    drawable name indices (retired names are never drawn) for a sixth cup onward. `fixed` is fixed_legs.
+    `authors` is track_authors: a drawn track author cup then races that
+    author's tracks first (prefer_author_tracks)."""
     gems = min(count, len(GEM_CUPS))
     kept = (fixed or [])[:gems]
     legs = kept + draw_legs(world, count - len(kept), other, custom, spec)
     names = world.random.sample(cup_checks.CUP_DRAW_INDICES, count - gems)
-    return ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[place], shortened=shortened)
+    cups = ([dict(gem_cup=colour, cup_index=None, id=gem_owner(colour), legs=legs[place], shortened=shortened)
              for place, colour in enumerate(gem_order(gauntlet)[:gems])]
-            + [dict(cup_index=index, id=f"cup:{index}", legs=cup_legs, shortened=shortened)
+            + [dict(cup_index=index, id=f"cup:{index}", legs=list(cup_legs), shortened=shortened)
                for index, cup_legs in zip(names, legs[gems:])])
+    prefer_author_tracks(world, cups, custom, spec, authors)
+    return cups
 
 
 def entry_id(index):

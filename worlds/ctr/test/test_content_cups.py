@@ -151,9 +151,10 @@ class TestCupDraw(unittest.TestCase):
         self.assertFalse(seen & retired)
         self.assertEqual(seen, set(cup_checks.CUP_DRAW_INDICES))
         self.assertIn(cup_checks.CUP_NAMES.index("Dex Cup"), seen)
-        for name in ("Hiru Cup", "Spark Cup", "Sido Cup", "DM3 Productions Cup"):
+        for name in ("Hiru Cup", "Spark Cup", "Sido Cup", "DM3 Productions Cup",
+                     "Boxic Cup", "Lolothesamurai Cup", "PanchoPew Cup"):
             self.assertIn(cup_checks.CUP_NAMES.index(name), seen)
-        self.assertEqual(len(cup_checks.CUP_DRAW_INDICES), 36)
+        self.assertEqual(len(cup_checks.CUP_DRAW_INDICES), 39)
 
     def test_feasible_pairs(self):
         spec = dict(bounds=(25, 27), repeats=dict(content_cups.DEFAULT_REPEATS), custom_legs=(0, 4))
