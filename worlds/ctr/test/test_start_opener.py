@@ -129,6 +129,15 @@ class TestNoStartProgressionSpot(unittest.TestCase):
         self.assertIn("no check at the start that can hold progression", str(raised.exception))
         self.assertIn("exclude_locations", str(raised.exception))
 
+    def test_manual_warp_pad_rules_keep_their_refusal(self):
+        # warp_pad_rules are never helped with a free item (Rulebook, manual rules).
+        real = sphere0_guard.start_opener
+        with mock.patch.object(sphere0_guard, "start_opener", return_value=None):
+            world = generate(fixture(), 1, until="generate_early")
+        self.assertEqual(real(world, world.ctr_content_plan), BOOST)
+        world.options.warp_pad_rules.value = {"Crash Cove": {"item": "Trophy", "count": 1}}
+        self.assertIsNone(real(world, world.ctr_content_plan))
+
     def test_tracker_rebuilds_the_granted_start(self):
         world = generate(fixture(), 1, until="generate_basic")
         wire = json.loads(json.dumps(world.fill_slot_data()))

@@ -104,13 +104,16 @@ def sphere0_breadth(world, placeable=False) -> int:
 # seeds, 13 of A4-65's). Such a slot starts with the starting racer's first
 # boost, taken from its pool, exactly as `start_inventory_from_pool` would.
 # This replaces, for this case only, the 2026-10-01 ruling to refuse rather
-# than give a starting item. Logic, gates and exclusions stay as drawn.
+# than give a starting item. Logic, gates and exclusions stay as drawn. A slot
+# with manual warp_pad_rules keeps that rule's own ruling: it is refused with
+# its rules named, and no item is given.
 def start_opener(world, plan):
     """The boost item a finished plan should start with, or None. Only when
     no check open at the start can hold progression, Progressive Boost is on,
-    a copy is left in the pool, and that copy opens such a check."""
+    no warp_pad_rules are set, a copy is left in the pool, and that copy opens
+    such a check."""
     from . import content_opening
-    if not plan.get("capability", {}).get("boost_mode"):
+    if not plan.get("capability", {}).get("boost_mode") or world.options.warp_pad_rules.value:
         return None
     reach = content_opening.plan_reach(world, plan)
     item = reach.boost_item
