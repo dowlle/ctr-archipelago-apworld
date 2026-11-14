@@ -41,7 +41,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               turbo_grant)
+               turbo_grant, pad_budget)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -1330,6 +1330,13 @@ def draw_plan(world, key_estimate=True):
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
     required = required_ids(o, candidates, arena_candidates, package_by_id)
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
+    # The 27 normal pads are one budget (A4-83): over it, the cup and Crystal
+    # Challenge counts are shared out as weights. A seed that fits is untouched.
+    shared = pad_budget.resolve(world, len(required) - len(chosen_arenas), len(chosen_arenas))
+    if shared != (cup_spec["bounds"][0], arena_count):
+        cup_spec["bounds"] = (shared[0], shared[0])
+        arena_count = shared[1]
+        crystal_range = (arena_count, arena_count)
     cup_count = 0
     if cup_spec["bounds"][1]:
         # Whether the cups fit, and their legs (#133 PR 5).

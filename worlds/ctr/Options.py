@@ -1506,7 +1506,7 @@ class CortexVortexTrack(Choice):
     - **off** (default): no warp pad or cup race. N. Oxide's Final Challenge
       can still race there.
     - **in_pool**: it may get a warp pad or a cup race, or neither.
-    - **own_pad**: it always gets a warp pad."""
+    - **own_pad**: it always gets a warp pad, one of the 27 (see Cup Count)."""
     # alias_false: a YAML `off` reaches us as false. `true` has no alias: the old
     # true meant a dropped destination, which is gone.
     display_name = "Cortex Vortex Track"
@@ -1520,7 +1520,9 @@ class CortexVortexTrack(Choice):
 class RequiredEntries(OptionList):
     """List original tracks, arenas or custom track keys that must get a warp pad.
     Leave it empty (default) for no guarantees. To guarantee Cortex Vortex, set
-    Cortex Vortex Track to `own_pad` instead."""
+    Cortex Vortex Track to `own_pad` instead. Each listed track takes one of the
+    27 warp pads first; cups and Crystal Challenges share the rest (see Cup
+    Count). A listed arena is one of the Crystal Challenges."""
     display_name = "Guaranteed Warp Pads"
     default = []
 
@@ -1528,7 +1530,19 @@ class RequiredEntries(OptionList):
 class CupCount(Range):
     """Choose how many cups the seed has, from 0 to 27. The default, 5, is the
     original Gem Cups, starting with Red, each with its Gem check. A sixth cup
-    and later take other cup names. 0 means no cups."""
+    and later take other cup names. 0 means no cups.
+
+    Pad budget: the hub has 27 warp pads. Cups, Crystal Challenges, the tracks
+    in Guaranteed Warp Pads and Cortex Vortex on `own_pad` all take one each;
+    other tracks fill the pads that are left. When cups and Crystal Challenges
+    ask for more pads than are left, the two counts act as weights: the free
+    pads are shared out in proportion to them, rounded so the larger
+    remainder gets the last pad, and the generator warns with the counts it
+    used. Guaranteed tracks and arenas, and the Gem Cups a Gems goal needs,
+    always keep their place. Example: 27 cups, 4 Crystal Challenges and
+    Cortex Vortex on `own_pad` leave 26 pads for 31 asked, so the seed gets
+    23 cups and 3 Crystal Challenges. A seed that fits gets exactly what it
+    asks."""
     display_name = "Cup Count"
     range_start = 0
     range_end = 27
@@ -1572,7 +1586,12 @@ class CupCustomLegs(Range):
 class CrystalChallengeCount(Range):
     """Choose how many Crystal Challenges the seed has, from 0 to 7, drawn from
     Crystal Arenas. The default is 4. 0 removes the arena checks; Purple CTR
-    Tokens stay in the item pool and can still be found elsewhere."""
+    Tokens stay in the item pool and can still be found elsewhere.
+
+    Crystal Challenges share the 27 warp pads with cups and guaranteed
+    tracks. When they do not all fit, this count and Cup Count act as
+    weights (see Cup Count for how and an example). Arenas named in
+    Guaranteed Warp Pads always keep their Crystal Challenge."""
     display_name = "Crystal Challenge Count"
     range_start = 0
     range_end = 7
