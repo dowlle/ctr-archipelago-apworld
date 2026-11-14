@@ -253,6 +253,8 @@ class TestCapCrystals(unittest.TestCase):
         doc = " ".join(CrystalChallengeCount.__doc__.split())
         self.assertIn("not refused: the seed uses as many Crystal Challenges as there are arenas", doc)
         self.assertNotIn("cannot be higher", " ".join(CrystalArenas.__doc__.split()))
+        from ..Options import CupCount
+        self.assertIn("first lowered to the number of arenas in Crystal Arenas", " ".join(CupCount.__doc__.split()))
 
 
 class TestPadBudgetText(unittest.TestCase):

@@ -1546,7 +1546,8 @@ class CupCount(Range):
     always keep their place. Example: 27 cups, 4 Crystal Challenges and
     Cortex Vortex on `own_pad` leave 26 pads for 31 asked, so the seed gets
     23 cups and 3 Crystal Challenges. A seed that fits gets exactly what it
-    asks."""
+    asks, except that Crystal Challenge Count is first lowered to the number
+    of arenas in Crystal Arenas when it is higher."""
     display_name = "Cup Count"
     range_start = 0
     range_end = 27
