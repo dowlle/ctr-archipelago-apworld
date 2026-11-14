@@ -1328,7 +1328,8 @@ def draw_plan(world, key_estimate=True):
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
         candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
-    required = required_ids(o, candidates, arena_candidates, package_by_id)
+    # A track named twice (its title and its key) is one pad, not two (A4-83 review).
+    required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id)))
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
     # The 27 normal pads are one budget (A4-83): over it, the cup and Crystal
     # Challenge counts are shared out as weights. A seed that fits is untouched.

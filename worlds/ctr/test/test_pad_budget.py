@@ -140,6 +140,16 @@ class TestPadBudgetSeeds(unittest.TestCase):
         self.assertEqual(counts(plan), (20, 3))
         self.assertEqual(track_pads(plan), 4)
 
+    def test_one_track_named_twice_takes_one_pad(self):
+        """A custom track listed by title and by key is one required pad: 22 cups,
+        4 Crystal Challenges and one required track fit the 27 pads exactly."""
+        from .. import content_plan as plan_module
+        package = plan_module.PACKAGES[1]
+        world = make_world(dict(cup_count=22, custom_tracks=[package], accessibility="full",
+                                required_entries=[package["display_name"], package["content_id"]]), seed=7)
+        self.assertEqual(counts(world.ctr_content_plan), (22, 4))
+        self.assertFalse(hasattr(world, "ctr_pad_budget"))
+
     def test_fitting_seeds_draw_as_before(self):
         """22 cups with own_pad (A4-80's largest fit) and 26 with no crystals stay as asked."""
         for options, want in ((a4_80_options(cup_count=22), (22, 4)),
