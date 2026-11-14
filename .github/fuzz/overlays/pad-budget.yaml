@@ -1,0 +1,17 @@
+# Pad budget (0.3.0-alpha4 job A4-83, ruled 2026-11-14): cups, Crystal
+# Challenges and required track pads ask for more than the 27 normal pads, so
+# the generator shares the cup and Crystal Challenge counts out as weights.
+# Cortex Vortex on its own pad takes a pad first, like the two required custom
+# tracks. With few track pads left the logic is loosened as on the 27-cup arms.
+  cup_count: {20: 1, 23: 1, 25: 1, 27: 2}
+  crystal_challenge_count: {0: 1, 2: 1, 4: 2}
+  cortex_vortex_track: {in_pool: 1, own_pad: 2}
+  itemsanity: {true: 3, false: 1}
+  hit_character: {true: 3, false: 1}
+  wumpa_shop_slots: {15: 2, 20: 1}
+  wumpa_shop_progression: allowed
+  goal_wumpa: {0: 2, 300: 1, 2500: 1}
+  wumpa_check: {"off": 1, global: 1, per_track: 2}
+  box_locations: {true: 1, false: 1}
+  logic_difficulty: {hard: 2, medium: 1}
+  remove_playable_oxide: {"false": 3, "true": 1}

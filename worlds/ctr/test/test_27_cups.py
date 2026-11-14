@@ -10,7 +10,6 @@ import json
 import unittest
 
 from BaseClasses import CollectionState
-from Options import OptionError
 
 from .. import content_cups, content_plan, content_wumpa
 from .test_content_plan import make_world
@@ -144,8 +143,11 @@ class TestTwentySevenCups(unittest.TestCase):
                 self.assertTrue(location.can_reach(state))
 
     def test_crystals_still_take_pads(self):
-        with self.assertRaisesRegex(OptionError, "27 cups do not fit"):
-            make_world(dict(cup_count=27), seed=1)
+        """Crystal Challenges share the 27 pads with the cups. Since A4-83 an over-budget
+        request is shared out as weights (test_pad_budget): 27 + 4 asked, 24 + 3 seated."""
+        plan = make_world(dict(cup_count=27), seed=1).ctr_content_plan
+        kinds = [e["kind"] for e in plan["entries"]]
+        self.assertEqual((kinds.count(content_cups.KIND), kinds.count("crystal")), (24, 3))
 
 
 if __name__ == "__main__":

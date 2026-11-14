@@ -440,6 +440,12 @@ class ctrAPWorld(World):
             spoiler_handle.write("CTR Cortex Vortex: the downloaded copy (" + ", ".join(self.ctr_cortex_swap)
                                  + ") was replaced by the Cortex Vortex that comes with CTR AP "
                                  "(cortex_vortex_track " + self.ctr_cortex_swap_mode + ").\n")
+        # The pad budget (A4-83): only when the counts were shared out.
+        budget = getattr(self, "ctr_pad_budget", None)
+        if budget:
+            spoiler_handle.write("CTR pad budget: asked for {} cups and {} Crystal Challenges, {} of the 27 normal "
+                                 "pads left after required tracks, shared out as {} cups and {} Crystal Challenges.\n"
+                                 .format(*budget["requested"], 27 - budget["required_tracks"], *budget["final"]))
         # Boss opponent and kit shuffle on content plans.
         from . import content_bosses
         _lines = content_bosses.spoiler_lines(self.ctr_content_plan)
