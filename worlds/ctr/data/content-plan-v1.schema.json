@@ -722,6 +722,11 @@
               "type": "integer",
               "const": 2,
               "description": "Laps of a standalone race on this track (A4-13, ruling of 2026-11-09). Absent on plans from before the ruling: those race the authored laps. Cup legs keep the authored laps either way."
+            },
+            "relic_laps": {
+              "type": "integer",
+              "const": 3,
+              "description": "Laps of the Relic Race on this track when they differ from standalone_laps (A4-70, ruling of 2026-11-12). Only beside standalone_laps. Absent: the Relic Race runs the standalone laps (A4-13 plans) or the authored laps (older plans)."
             }
           },
           "required": [
@@ -734,6 +739,11 @@
             "origin",
             "package_id"
           ],
+          "dependentRequired": {
+            "relic_laps": [
+              "standalone_laps"
+            ]
+          },
           "additionalProperties": false
         }
       ]
