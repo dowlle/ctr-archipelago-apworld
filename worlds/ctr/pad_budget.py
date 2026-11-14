@@ -34,6 +34,13 @@ Example: `cup_count: 27`, `crystal_challenge_count: 4` and
 22 and 3, the last pad goes to the cups (0.65 > 0.35): 23 cups and 3 Crystal
 Challenges.
 
+ARENA CAP (A4-83b, maintainer ruling 2026-11-14, "Scale down"). A
+`crystal_challenge_count` above the arenas `crystal_arenas` lists is the number
+of arenas, before any sharing: it used to be refused. `cap_crystals` writes the
+count back and records it for the one spoiler line; it logs nothing (no new
+generator output, ruling 2026-11-14 15:25 CET). A YAML that never asked for
+more than its arenas is untouched.
+
 The final counts are written back to the options, so the rest of the
 generator, the spoiler and later draws see them, and a generator warning names
 the requested and the final counts. The plan wire has no new field.
@@ -76,6 +83,18 @@ def share(available, requests, floors):
     for i in open_:
         out[i] = whole[i]
     return out
+
+
+def cap_crystals(world, arenas):
+    """Scale `crystal_challenge_count` down to the `arenas` that `crystal_arenas`
+    lists. No-op when it fits (and on a redraw, which sees the written-back
+    count). Records the request for the spoiler line; no log message."""
+    o = world.options
+    asked = int(o.crystal_challenge_count.value)
+    if asked <= arenas:
+        return
+    o.crystal_challenge_count.value = arenas
+    world.ctr_crystal_cap = dict(requested=asked, arenas=arenas)
 
 
 def resolve(world, required_tracks, required_arenas):

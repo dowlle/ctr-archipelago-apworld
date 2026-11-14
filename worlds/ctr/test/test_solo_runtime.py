@@ -409,12 +409,13 @@ class TestChecklists(SoloTestCase):
                 if not accepted:
                     self.assertEqual(last(events)["kind"], "option", last(events))
 
-    def test_crystal_count_guard_matches_generation(self):
+    def test_crystal_count_above_the_arenas_is_no_guard_and_generates(self):
         four = json.dumps(["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"])
         self.check_guard_cases([
-            (["crystal_challenge_count=5", "crystal_arenas=" + four], False),
+            # A count above the arenas listed scales down (A4-83b), so no guard refuses it.
+            (["crystal_challenge_count=5", "crystal_arenas=" + four], True),
             (["crystal_challenge_count=4", "crystal_arenas=" + four], True),
-            (["crystal_challenge_count=1", "crystal_arenas=[]"], False),
+            (["crystal_challenge_count=1", "crystal_arenas=[]"], True),
             (["crystal_challenge_count=0", "crystal_arenas=[]"], True),
         ])
 

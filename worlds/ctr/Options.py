@@ -1546,7 +1546,8 @@ class CupCount(Range):
     always keep their place. Example: 27 cups, 4 Crystal Challenges and
     Cortex Vortex on `own_pad` leave 26 pads for 31 asked, so the seed gets
     23 cups and 3 Crystal Challenges. A seed that fits gets exactly what it
-    asks."""
+    asks, except that Crystal Challenge Count is first lowered to the number
+    of arenas in Crystal Arenas when it is higher."""
     display_name = "Cup Count"
     range_start = 0
     range_end = 27
@@ -1595,7 +1596,12 @@ class CrystalChallengeCount(Range):
     Crystal Challenges share the 27 normal warp pads with cups and guaranteed
     tracks. When they do not all fit, this count and Cup Count act as
     weights (see Cup Count for how and an example). Arenas named in
-    Guaranteed Warp Pads always keep their Crystal Challenge."""
+    Guaranteed Warp Pads always keep their Crystal Challenge.
+
+    A count higher than the number of arenas in Crystal Arenas is not
+    refused: the seed uses as many Crystal Challenges as there are arenas
+    listed, and that happens before the pads are shared. The spoiler log
+    says so."""
     display_name = "Crystal Challenge Count"
     range_start = 0
     range_end = 7
@@ -1611,8 +1617,9 @@ class CrystalArenas(OptionSet):
     Parking Lot, The North Bowl and Lab Basement are the new arenas. Each of
     those uses a warp pad, has 20 crystals and gives no Purple CTR Token. To
     keep only the four original arenas, list Rocky Road, Rampage Ruins, Skull
-    Rock and Nitro Court. Crystal Challenge Count cannot be higher than the
-    number of arenas listed."""
+    Rock and Nitro Court. When Crystal Challenge Count is higher than the
+    number of arenas listed, the seed uses as many Crystal Challenges as there
+    are arenas."""
     display_name = "Crystal Arenas"
     valid_keys = sorted(ARENA_NAMES)
     default = frozenset(ARENA_NAMES)

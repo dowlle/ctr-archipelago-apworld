@@ -94,7 +94,9 @@ class TestArcadeArenas(unittest.TestCase):
             w=make_world(o,seed=seed)
             levels={e['arena_id'] for e in w.ctr_content_plan['entries'] if e['kind']=='crystal'}
             self.assertEqual(len(levels),2);self.assertIn(24,levels);self.assertTrue(levels<={20,22,24})
-        with self.assertRaisesRegex(OptionError,'crystal_arenas lists 4'):make_world({'crystal_challenge_count':5,'crystal_arenas':['Rocky Road','Rampage Ruins','Skull Rock','Nitro Court']})
+        # Above the arenas listed it scales down instead of being refused (A4-83b).
+        w=make_world({'crystal_challenge_count':5,'crystal_arenas':['Rocky Road','Rampage Ruins','Skull Rock','Nitro Court']})
+        self.assertEqual(sum(1 for e in w.ctr_content_plan['entries'] if e['kind']=='crystal'),4)
 
     def test_refuses_forged_runtime_contract(self):
         original=make_world(arena_options()).fill_slot_data()
