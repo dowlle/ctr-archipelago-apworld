@@ -1521,7 +1521,7 @@ class RequiredEntries(OptionList):
     """List original tracks, arenas or custom track keys that must get a warp pad.
     Leave it empty (default) for no guarantees. To guarantee Cortex Vortex, set
     Cortex Vortex Track to `own_pad` instead. Each listed track takes one of the
-    27 warp pads first; cups and Crystal Challenges share the rest (see Cup
+    27 normal warp pads first; cups and Crystal Challenges share the rest (see Cup
     Count). A listed arena is one of the Crystal Challenges."""
     display_name = "Guaranteed Warp Pads"
     default = []
@@ -1532,9 +1532,10 @@ class CupCount(Range):
     original Gem Cups, starting with Red, each with its Gem check. A sixth cup
     and later take other cup names. 0 means no cups.
 
-    Pad budget: the hub has 27 warp pads. Cups, Crystal Challenges, the tracks
-    in Guaranteed Warp Pads and Cortex Vortex on `own_pad` all take one each;
-    other tracks fill the pads that are left. When cups and Crystal Challenges
+    Pad budget: the hub has 27 normal warp pads; the boss garages are extra.
+    Cups, Crystal Challenges, the tracks in Guaranteed Warp Pads and Cortex
+    Vortex on `own_pad` all take one each; other tracks fill the pads that
+    are left. When cups and Crystal Challenges
     ask for more pads than are left, the two counts act as weights: the free
     pads are shared out in proportion to them, rounded so the larger
     remainder gets the last pad, and the generator warns with the counts it
@@ -1588,7 +1589,7 @@ class CrystalChallengeCount(Range):
     Crystal Arenas. The default is 4. 0 removes the arena checks; Purple CTR
     Tokens stay in the item pool and can still be found elsewhere.
 
-    Crystal Challenges share the 27 warp pads with cups and guaranteed
+    Crystal Challenges share the 27 normal warp pads with cups and guaranteed
     tracks. When they do not all fit, this count and Cup Count act as
     weights (see Cup Count for how and an example). Arenas named in
     Guaranteed Warp Pads always keep their Crystal Challenge."""

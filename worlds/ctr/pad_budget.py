@@ -85,12 +85,16 @@ def resolve(world, required_tracks, required_arenas):
     o = world.options
     cups, crystals = int(o.cup_count.value), int(o.crystal_challenge_count.value)
     available = PADS - required_tracks
+    if available < 0:
+        raise OptionError(
+            f"CTR content plan: {required_tracks} required track pads (required_entries and cortex_vortex_track: "
+            f"own_pad) do not fit the 27 normal pads. List fewer required_entries.")
     if cups + crystals <= available:
         return cups, crystals
     cup_floor = int(o.gems_required_goal.value)
     if o.purple_cup_boss_gauntlet.value:
         cup_floor = max(cup_floor, 1)
-    result = share(max(available, 0), [cups, crystals], [cup_floor, required_arenas])
+    result = share(available, [cups, crystals], [cup_floor, required_arenas])
     if result is None:
         raise OptionError(
             f"CTR content plan: the 27 normal pads cannot hold what must have a pad: {required_tracks} required "

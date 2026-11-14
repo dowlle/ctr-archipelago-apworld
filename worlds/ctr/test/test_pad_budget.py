@@ -88,6 +88,8 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(pad_budget.resolve(world, 26, 0), (1, 0))
 
     def test_hard_needs_that_do_not_fit_are_refused(self):
+        with self.assertRaisesRegex(OptionError, "28 required track pads"):
+            pad_budget.resolve(fake_world(0, 0), 28, 0)
         with self.assertRaisesRegex(OptionError, "cannot hold what must have a pad"):
             pad_budget.resolve(fake_world(3, 4, gems=3), 26, 0)
 
@@ -164,7 +166,7 @@ class TestPadBudgetText(unittest.TestCase):
     def test_yaml_text_states_the_budget_and_the_example(self):
         from ..Options import CortexVortexTrack, CrystalChallengeCount, CupCount, RequiredEntries
         cup = " ".join(CupCount.__doc__.split())
-        self.assertIn("the hub has 27 warp pads", cup)
+        self.assertIn("the hub has 27 normal warp pads; the boss garages are extra", cup)
         self.assertIn("act as weights", cup)
         self.assertIn("so the seed gets 23 cups and 3 Crystal Challenges", cup)
         self.assertEqual(pad_budget.share(26, [27, 4], [0, 0]), [23, 3])
