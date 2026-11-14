@@ -1,6 +1,7 @@
 """The 27 normal pads as one budget (A4-83, maintainer ruling 2026-11-14 about
 15:16 CET): over it, `cup_count` and `crystal_challenge_count` act as weights
 (pad_budget). A seed that fits is untouched."""
+import io
 import json
 import unittest
 from types import SimpleNamespace
@@ -160,6 +161,98 @@ class TestPadBudgetSeeds(unittest.TestCase):
                 world = make_world(options, seed=6)
                 self.assertEqual(counts(world.ctr_content_plan), want)
                 self.assertFalse(hasattr(world, "ctr_pad_budget"))
+
+
+FOUR = ["Rocky Road", "Rampage Ruins", "Skull Rock", "Nitro Court"]
+
+
+def spoiler_text(world):
+    out = io.StringIO()
+    world.write_spoiler(out)
+    return out.getvalue()
+
+
+def budget_lines(world):
+    return [line for line in spoiler_text(world).splitlines() if line.startswith("CTR pad budget:")]
+
+
+class TestCapCrystals(unittest.TestCase):
+    """A4-83b (maintainer ruling 2026-11-14, "Scale down"): a Crystal Challenge
+    count above the arenas listed is the number of arenas, before the sharing."""
+
+    def test_unit(self):
+        world = fake_world(5, 7)
+        pad_budget.cap_crystals(world, 4)
+        self.assertEqual(world.options.crystal_challenge_count.value, 4)
+        self.assertEqual(world.ctr_crystal_cap, dict(requested=7, arenas=4))
+        for count, arenas in ((4, 4), (3, 4), (0, 0)):
+            world = fake_world(5, count)
+            pad_budget.cap_crystals(world, arenas)
+            self.assertEqual(world.options.crystal_challenge_count.value, count)
+            self.assertFalse(hasattr(world, "ctr_crystal_cap"))
+
+    def test_scales_down_with_one_spoiler_line_and_no_warning(self):
+        world = make_world(dict(crystal_challenge_count=7, crystal_arenas=FOUR, accessibility="full"), seed=3)
+        self.assertEqual(counts(world.ctr_content_plan)[1], 4)
+        self.assertEqual(int(world.options.crystal_challenge_count.value), 4)
+        self.assertEqual(budget_lines(world), [
+            "CTR pad budget: asked for 7 Crystal Challenges, but crystal_arenas lists 4 arenas, so the seed has "
+            "4 Crystal Challenges."])
+        self.assertFalse(hasattr(world, "ctr_pad_budget"))
+
+    def test_no_new_console_warning(self):
+        import logging
+        with self.assertNoLogs("CTR", logging.WARNING):
+            make_world(dict(crystal_challenge_count=6, crystal_arenas=FOUR, accessibility="full"), seed=3)
+
+    def test_same_seed_as_asking_for_the_arenas(self):
+        """The capped YAML is the YAML that asked for 4: same plan, same slot_data."""
+        capped = make_world(dict(crystal_challenge_count=7, crystal_arenas=FOUR, accessibility="full"), seed=9)
+        asked = make_world(dict(crystal_challenge_count=4, crystal_arenas=FOUR, accessibility="full"), seed=9)
+        self.assertEqual(json.dumps(capped.fill_slot_data(), sort_keys=True),
+                         json.dumps(asked.fill_slot_data(), sort_keys=True))
+        self.assertEqual(budget_lines(asked), [])
+
+    def test_fitting_yaml_has_no_line(self):
+        world = make_world(dict(crystal_challenge_count=4, crystal_arenas=FOUR, accessibility="full"), seed=3)
+        self.assertFalse(hasattr(world, "ctr_crystal_cap"))
+        self.assertEqual(budget_lines(world), [])
+
+    def test_no_arenas_means_no_crystal_challenges(self):
+        world = make_world(dict(crystal_challenge_count=3, crystal_arenas=[], accessibility="full"), seed=3)
+        self.assertEqual(counts(world.ctr_content_plan)[1], 0)
+        self.assertEqual(len(budget_lines(world)), 1)
+
+    def test_cap_then_sharing_is_one_line(self):
+        """27 cups and 7 asked with 4 arenas and own_pad: capped to 4, then 26 pads for 27 + 4 give 23 + 3."""
+        world = make_world(a4_80_options(crystal_challenge_count=7, crystal_arenas=FOUR), seed=2)
+        self.assertEqual(counts(world.ctr_content_plan), (23, 3))
+        self.assertEqual(budget_lines(world), [
+            "CTR pad budget: asked for 27 cups and 7 Crystal Challenges, crystal_arenas lists 4 arenas so the "
+            "Crystal Challenges are capped at 4, 26 of the 27 normal pads left after required tracks, shared out "
+            "as 23 cups and 3 Crystal Challenges."])
+
+    def test_sharing_alone_keeps_its_line(self):
+        world = make_world(a4_80_options(), seed=2)
+        self.assertEqual(budget_lines(world), [
+            "CTR pad budget: asked for 27 cups and 4 Crystal Challenges, 26 of the 27 normal pads left after "
+            "required tracks, shared out as 23 cups and 3 Crystal Challenges."])
+
+    def test_required_arena_inside_a_capped_count(self):
+        world = make_world(dict(crystal_challenge_count=7, crystal_arenas=FOUR, required_entries=["Skull Rock"],
+                                accessibility="full"), seed=4)
+        self.assertEqual(counts(world.ctr_content_plan)[1], 4)
+
+    def test_universal_tracker_restore(self):
+        world = make_world(dict(crystal_challenge_count=7, crystal_arenas=FOUR, accessibility="full"), seed=5)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        self.assertEqual(make_world({}, passthrough=wire).ctr_content_plan, world.ctr_content_plan)
+
+    def test_yaml_text_states_the_cap(self):
+        from ..Options import CrystalArenas, CrystalChallengeCount
+        doc = " ".join(CrystalChallengeCount.__doc__.split())
+        self.assertIn("not refused: the seed uses as many Crystal Challenges as there are arenas", doc)
+        self.assertNotIn("cannot be higher", " ".join(CrystalArenas.__doc__.split()))
 
 
 class TestPadBudgetText(unittest.TestCase):

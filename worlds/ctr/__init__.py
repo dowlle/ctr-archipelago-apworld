@@ -440,12 +440,24 @@ class ctrAPWorld(World):
             spoiler_handle.write("CTR Cortex Vortex: the downloaded copy (" + ", ".join(self.ctr_cortex_swap)
                                  + ") was replaced by the Cortex Vortex that comes with CTR AP "
                                  "(cortex_vortex_track " + self.ctr_cortex_swap_mode + ").\n")
-        # The pad budget (A4-83): only when the counts were shared out.
+        # The pad budget (A4-83) and the arena cap (A4-83b): one line, only when
+        # a count was changed.
         budget = getattr(self, "ctr_pad_budget", None)
-        if budget:
+        cap = getattr(self, "ctr_crystal_cap", None)
+        if budget and not cap:
             spoiler_handle.write("CTR pad budget: asked for {} cups and {} Crystal Challenges, {} of the 27 normal "
                                  "pads left after required tracks, shared out as {} cups and {} Crystal Challenges.\n"
                                  .format(*budget["requested"], 27 - budget["required_tracks"], *budget["final"]))
+        elif cap and not budget:
+            spoiler_handle.write("CTR pad budget: asked for {} Crystal Challenges, but crystal_arenas lists {} "
+                                 "arenas, so the seed has {} Crystal Challenges.\n"
+                                 .format(cap["requested"], cap["arenas"], cap["arenas"]))
+        elif cap:
+            spoiler_handle.write("CTR pad budget: asked for {} cups and {} Crystal Challenges, crystal_arenas lists "
+                                 "{} arenas so the Crystal Challenges are capped at {}, {} of the 27 normal pads "
+                                 "left after required tracks, shared out as {} cups and {} Crystal Challenges.\n"
+                                 .format(budget["requested"][0], cap["requested"], cap["arenas"], cap["arenas"],
+                                         27 - budget["required_tracks"], *budget["final"]))
         # Boss opponent and kit shuffle on content plans.
         from . import content_bosses
         _lines = content_bosses.spoiler_lines(self.ctr_content_plan)

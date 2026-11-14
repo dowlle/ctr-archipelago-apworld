@@ -1110,13 +1110,10 @@ def mode_gates(modes, first_requirement, stages, physical):
 
 def crystal_settings(options):
     """(eligible arena LevelIDs, count) from `crystal_arenas` and
-    `crystal_challenge_count`."""
+    `crystal_challenge_count`. A count above the arenas listed is the number of
+    arenas (A4-83b); `pad_budget.cap_crystals` writes that back and records it."""
     eligible = [lid for lid, name in arena_content.ARENAS.items() if name in options.crystal_arenas.value]
-    count = int(options.crystal_challenge_count.value)
-    if count > len(eligible):
-        error(f"crystal_challenge_count is {count}, but crystal_arenas lists {len(eligible)} arenas. List more "
-              "arenas or lower the count.")
-    return eligible, count
+    return eligible, min(int(options.crystal_challenge_count.value), len(eligible))
 
 
 def track_modes(options):
@@ -1288,6 +1285,7 @@ def draw_plan(world, key_estimate=True):
     with_cortex = bool(o.cortex_vortex_track.value)
     cup_spec = content_cups.settings(o)
     arena_pool, arena_count = crystal_settings(o)
+    pad_budget.cap_crystals(world, len(arena_pool))
     crystal_range = (arena_count, arena_count)
     # Boss garages (#133 PR 6): the encounter settings, or None with bosses off.
     boss_record = content_bosses.settings(world)
