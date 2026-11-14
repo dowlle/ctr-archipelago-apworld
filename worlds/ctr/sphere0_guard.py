@@ -30,7 +30,11 @@ Locations. Held rungs are not difficulty-gated, so that margin kept sphere 0
 non-empty as a side effect. The ruling removed the margin from the refusal
 path; this guard refuses exactly the seeds it used to protect that cannot
 start. The 2026-10-01 ruling refuses them rather than giving the slot a
-starting item.
+starting item. Since A4-82 (ruling 2026-11-14: such YAMLs must generate) a plan
+with Progressive Boost whose start holds no check that can take progression
+starts with its first boost instead (start_opener, in generate_early), so the
+guard sees such a start only when the grant cannot help. Checks the player
+excluded do not count as starting checks (A4-76): they hold filler only.
 
 Runs in `generate_basic`, after every rule exists. Takes no random draw.
 """
@@ -39,14 +43,18 @@ from Options import OptionError
 from . import content_opening
 
 
-def _reachable_empty(world, state) -> int:
+def _reachable_empty(world, state, placeable=False) -> int:
     """Empty coded locations reachable in `state`. Wumpa Shop slots never
     count: a paid or delayed shelf must not disguise a narrow start (#249,
-    design review 2026-10-16: two non-shop starting checks)."""
+    design review 2026-10-16: two non-shop starting checks). With `placeable`,
+    excluded locations do not count either: they hold filler only, so the
+    fill cannot seat the item that opens the next check on one (A4-76)."""
+    from BaseClasses import LocationProgressType
     from .wumpa_shop import LOCATION_TYPE as SHOP
     return sum(1 for loc in world.multiworld.get_locations(world.player)
                if loc.item is None and loc.address is not None
                and getattr(loc, "type", None) != SHOP
+               and not (placeable and loc.progress_type == LocationProgressType.EXCLUDED)
                and loc.can_reach(state))
 
 
@@ -80,9 +88,35 @@ def _base_state(world):
     return state
 
 
-def sphere0_breadth(world) -> int:
-    """Empty locations of this slot reachable from its starting inventory."""
-    return _reachable_empty(world, _base_state(world))
+def sphere0_breadth(world, placeable=False) -> int:
+    """Empty locations of this slot reachable from its starting inventory;
+    with `placeable`, only those that can hold progression."""
+    return _reachable_empty(world, _base_state(world), placeable)
+
+
+# A start with no check that can hold progression (A4-82, ruling 2026-11-14:
+# "This seems like a bigger problem that we need to fix though"). With Item Box
+# Count 0, Progressive Boost and logic difficulty easy or medium, every race
+# check needs the first boost, so the only checks open at the start are pickups
+# and Wumpa Shop slots. When the player excludes those (exclude_locations, or
+# wumpa_shop_progression: excluded), nothing at the start can take the first
+# boost and AP's fill fails on every AP seed (A4-76: 39 of 250 nightly sanity
+# seeds, 13 of A4-65's). Such a slot starts with the starting racer's first
+# boost, taken from its pool, exactly as `start_inventory_from_pool` would.
+# This replaces, for this case only, the 2026-10-01 ruling to refuse rather
+# than give a starting item. Logic, gates and exclusions stay as drawn.
+def start_opener(world, plan):
+    """The boost item a finished plan should start with, or None. Only when
+    no check open at the start can hold progression, Progressive Boost is on,
+    a copy is left in the pool, and that copy opens such a check."""
+    from . import content_opening
+    if not plan.get("capability", {}).get("boost_mode"):
+        return None
+    reach = content_opening.plan_reach(world, plan)
+    item = reach.boost_item
+    if reach.room(()) or not reach.pool.get(item, 0) or not reach.room((item,)):
+        return None
+    return item
 
 
 def openers(world):
@@ -312,12 +346,22 @@ def raise_if_narrow(world) -> None:
     """Refuse the slot when fewer than MIN_STARTING_CHECKS locations are
     reachable from its starting inventory."""
     breadth = sphere0_breadth(world)
-    if breadth >= MIN_STARTING_CHECKS:
+    placeable = sphere0_breadth(world, placeable=True)
+    if breadth >= MIN_STARTING_CHECKS and placeable:
         return
     name = world.multiworld.player_name[world.player]
     fix = ("Usual fix: turn on Item Box Locations, turn on Held-Position "
            "Rungs (or more Podium Rung categories), or set logic_difficulty "
            "to hard.")
+    if breadth and not placeable:
+        # Every open check is excluded (A4-76): they hold filler only.
+        raise OptionError(
+            f"CTR: {name} has no check at the start that can hold progression: "
+            f"the {breadth} check{'' if breadth == 1 else 's'} open at the start "
+            f"{'is' if breadth == 1 else 'are all'} in exclude_locations, so the "
+            f"item fill cannot place the item that opens the next check. {fix} "
+            f"Or exclude fewer of the checks open at the start."
+            f"{_manual_rules_note(world)}")
     if breadth == 0:
         raise OptionError(
             f"CTR: {name} has no check it can reach at the start: "
