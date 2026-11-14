@@ -513,16 +513,27 @@ class PlanReach:
         return counts.get(self.code[name], 0) > 0
 
 
-def fit(world, plan):
-    """(how the plan's best opening does, what fits), both (spots it leaves, spots to
-    spare in front of a fixed Key), so they compare. With Keys fixed the opening has
-    to reach the first Key, or it leaves none. Neither counts above what fits."""
-    from .content_plan import ITEM_BY_CODE, LOCATION_BY_CODE
-    from .sphere0_guard import BOOTSTRAP_START_CHECKS, starting_boost_item
+def plan_reach(world, plan):
+    """PlanReach of this slot's finished plan, with its exclude_locations and the
+    starting racer's first boost item (`boost_item`, None without boost)."""
+    from .content_plan import LOCATION_BY_CODE
+    from .sphere0_guard import starting_boost_item
     excluded = set(world.options.exclude_locations.value)
     excluded = {code for code, name in LOCATION_BY_CODE.items() if name in excluded}
     boost = starting_boost_item(world) if plan.get("capability", {}).get("boost_mode") else None
     reach = PlanReach(plan, world.ctr_content_items.rows, excluded, boost)
+    reach.boost_item = boost
+    return reach
+
+
+def fit(world, plan):
+    """(how the plan's best opening does, what fits), both (spots it leaves, spots to
+    spare in front of a fixed Key), so they compare. With Keys fixed the opening has
+    to reach the first Key, or it leaves none. Neither counts above what fits."""
+    from .content_plan import ITEM_BY_CODE
+    from .sphere0_guard import BOOTSTRAP_START_CHECKS
+    reach = plan_reach(world, plan)
+    boost = reach.boost_item
     checks = sum(check["kind"] != content_wumpa.KIND for check in plan["checks"])
     need = min(FIT_ROOM, BOOTSTRAP_START_CHECKS, checks // 4)
     gates = gate_names(plan, ITEM_BY_CODE, boost)

@@ -53,6 +53,14 @@ def make_world(options, seed=420, passthrough=None, stop_before=None):
         if step == stop_before:
             break
         call_all(mw, step)
+        if step == "generate_early":
+            # Main.py grants the start inventory here (A4-82 grants a from-pool
+            # start in generate_early); gen_steps alone would drop it.
+            world = mw.worlds[1]
+            for option in (world.options.start_inventory, world.options.start_inventory_from_pool):
+                for name, count in option.value.items():
+                    for _ in range(count):
+                        mw.push_precollected(mw.create_item(name, 1))
     return mw.worlds[1]
 
 

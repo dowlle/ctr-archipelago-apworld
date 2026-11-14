@@ -1182,7 +1182,42 @@ OPENING_REDRAWS = 64
 def generate(world):
     """Draw the plan. One whose opening does not fit draws again, as the layout is
     what decides it (content_opening), and the best draw stands: no seed is refused
-    for this. A plan that fits at once takes no extra draw, so it is unchanged."""
+    for this. A plan that fits at once takes no extra draw, so it is unchanged.
+
+    A plan whose start holds no check that can take progression gets its first
+    boost as a start (sphere0_guard.start_opener, A4-82), and the whole draw runs
+    again from the same random state, as if the YAML had asked for that start."""
+    state = world.random.getstate()
+    plan = _draw_fitting(world)
+    opener = sphere0_guard.start_opener(world, plan)
+    if opener is not None:
+        world.random.setstate(state)
+        starts = dict(world.options.start_inventory_from_pool.value)
+        starts[opener] = starts.get(opener, 0) + 1
+        world.options.start_inventory_from_pool.value = starts
+        world.ctr_start_opener = opener
+        logging.info(f"CTR: {world.multiworld.player_name[world.player]} has no check at the start "
+                     f"that can hold progression, so the slot starts with {opener}.")
+        plan = _draw_fitting(world)
+    validate(plan)
+    # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
+    # draw, and the fallback from the plan's checks. Itemsanity: one weapon
+    # type marked early, the legacy draw (item_creation.create_items). Neither
+    # draws while its option is off, so other plans are unchanged.
+    global_checks = plan.get("global_checks", {})
+    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
+    if global_checks.get("hit_character"):
+        content_global_checks.encounter_block(world, plan)
+    if global_checks.get("itemsanity"):
+        from .itemsanity import WEAPONS
+        early_count = world.random.randint(1, 2)
+        weapon = world.random.sample(WEAPONS, early_count)[0]
+        world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
+    return plan
+
+
+def _draw_fitting(world):
+    """The plan whose opening fits, or the best of OPENING_REDRAWS draws."""
     from . import content_opening
     best_state, best_estimate = world.random.getstate(), True
     plan = draw_plan(world)
@@ -1202,20 +1237,6 @@ def generate(world):
         else:
             world.random.setstate(best_state)
             plan = draw_plan(world, best_estimate)
-    validate(plan)
-    # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
-    # draw, and the fallback from the plan's checks. Itemsanity: one weapon
-    # type marked early, the legacy draw (item_creation.create_items). Neither
-    # draws while its option is off, so other plans are unchanged.
-    global_checks = plan.get("global_checks", {})
-    world.ctr_hit_character_encounters, world.ctr_hit_character_fallback = None, {}
-    if global_checks.get("hit_character"):
-        content_global_checks.encounter_block(world, plan)
-    if global_checks.get("itemsanity"):
-        from .itemsanity import WEAPONS
-        early_count = world.random.randint(1, 2)
-        weapon = world.random.sample(WEAPONS, early_count)[0]
-        world.multiworld.early_items.setdefault(world.player, {})[weapon] = 1
     return plan
 
 
