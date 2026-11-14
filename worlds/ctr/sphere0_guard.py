@@ -127,10 +127,13 @@ def _unseen_checks_shut(world, plan) -> bool:
     counts them as shut, so a start it finds empty could still hold one. Stat
     term checks are left to the guard. Itemsanity, Hit Character and Tiger
     Temple door checks need a weapon while Itemsanity is on, so they are shut
-    when the slot starts with none; without Itemsanity a Hit check may be open."""
-    from .content_plan import starting_counts
+    when the slot starts with none; without Itemsanity a Hit check may be open.
+    Excluded checks hold no progression, so they never count here. Anything
+    else unseen keeps the grant off: the guard then decides on the real rules."""
+    from .content_plan import LOCATION_BY_CODE, starting_counts
     from .itemsanity import WEAPONS
-    checks = plan["checks"]
+    excluded = set(world.options.exclude_locations.value)
+    checks = [check for check in plan["checks"] if LOCATION_BY_CODE.get(check["location"]) not in excluded]
     if any(check.get("stats") for check in checks):
         return False
     if not plan.get("global_checks", {}).get("itemsanity"):
