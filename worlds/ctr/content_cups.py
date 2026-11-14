@@ -1,6 +1,7 @@
 """Cups on content plans (#133 PR 5).
 
-A content plan seats `cup_count` cups on its 27 normal pads. Tracks fill the
+A content plan seats `cup_count` cups on its 27 normal pads (pad_budget shares a
+request above them out as weights, A4-83). Tracks fill the
 remaining pads.
 
 LEGS. A cup has exactly four ordered legs, drawn from the seed's own tracks:
