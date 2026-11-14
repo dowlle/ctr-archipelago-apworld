@@ -1943,7 +1943,7 @@
         },
         "oxide_final_count": {
           "type": "integer",
-          "minimum": 1,
+          "minimum": 0,
           "maximum": 54
         },
         "track_shuffle": {

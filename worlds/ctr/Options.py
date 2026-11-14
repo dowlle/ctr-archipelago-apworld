@@ -142,17 +142,20 @@ class FinalOxideUnlock(Choice):
 
 
 class FinalOxideRelicCount(NamedRange):
-    """Set how many relics open N. Oxide's Final Challenge, from 1 to 54. The
+    """Set how many relics open N. Oxide's Final Challenge, from 0 to 54. The
     default is 18.
 
     With `total_relics` up to 54 count. Every other choice counts one colour,
-    so a value above 18 counts as 18. `all` means 18 in every mode."""
+    so a value above 18 counts as 18. `all` means 18 in every mode. 0 needs
+    no relics: the Final Challenge opens once N. Oxide's Challenge is beaten
+    (and, with `101_percent`, the other goal conditions are met). Relics stay
+    in the item pool and the location list."""
     # Above 18 in a single-tier mode, forced_options resolves the count to 18
     # and logs a warning naming the mode and the requested value (2026-09-18
     # ruling). `all` keeps its 0.2.0 meaning; total_relics players who want
     # every relic of every tier write 54.
     display_name = "Oxide's Final Challenge Relic Count"
-    range_start = 1
+    range_start = 0
     range_end = 54
     default = 18
     special_range_names = {"all": 18}
