@@ -43,18 +43,28 @@ from Options import OptionError
 from . import content_opening
 
 
-def _reachable_empty(world, state, placeable=False) -> int:
+def _reachable_empty(world, state) -> int:
     """Empty coded locations reachable in `state`. Wumpa Shop slots never
     count: a paid or delayed shelf must not disguise a narrow start (#249,
-    design review 2026-10-16: two non-shop starting checks). With `placeable`,
-    excluded locations do not count either: they hold filler only, so the
-    fill cannot seat the item that opens the next check on one (A4-76)."""
-    from BaseClasses import LocationProgressType
+    design review 2026-10-16: two non-shop starting checks)."""
     from .wumpa_shop import LOCATION_TYPE as SHOP
     return sum(1 for loc in world.multiworld.get_locations(world.player)
                if loc.item is None and loc.address is not None
                and getattr(loc, "type", None) != SHOP
-               and not (placeable and loc.progress_type == LocationProgressType.EXCLUDED)
+               and loc.can_reach(state))
+
+
+def _progression_spots(world, state) -> int:
+    """Empty coded locations reachable in `state` that can hold progression:
+    not excluded (an excluded check holds filler only, A4-76), and a Wumpa Shop
+    slot only while wumpa_shop_progression allows progression there."""
+    from BaseClasses import LocationProgressType
+    from .wumpa_shop import LOCATION_TYPE as SHOP
+    shop = not int(world.options.wumpa_shop_progression.value)
+    return sum(1 for loc in world.multiworld.get_locations(world.player)
+               if loc.item is None and loc.address is not None
+               and loc.progress_type != LocationProgressType.EXCLUDED
+               and (shop or getattr(loc, "type", None) != SHOP)
                and loc.can_reach(state))
 
 
@@ -88,10 +98,15 @@ def _base_state(world):
     return state
 
 
-def sphere0_breadth(world, placeable=False) -> int:
-    """Empty locations of this slot reachable from its starting inventory;
-    with `placeable`, only those that can hold progression."""
-    return _reachable_empty(world, _base_state(world), placeable)
+def sphere0_breadth(world) -> int:
+    """Empty locations of this slot reachable from its starting inventory."""
+    return _reachable_empty(world, _base_state(world))
+
+
+def sphere0_progression_spots(world) -> int:
+    """Locations of this slot reachable from its starting inventory that can
+    hold progression (_progression_spots)."""
+    return _progression_spots(world, _base_state(world))
 
 
 # A start with no check that can hold progression (A4-82, ruling 2026-11-14:
@@ -107,13 +122,32 @@ def sphere0_breadth(world, placeable=False) -> int:
 # than give a starting item. Logic, gates and exclusions stay as drawn. A slot
 # with manual warp_pad_rules keeps that rule's own ruling: it is refused with
 # its rules named, and no item is given.
+def _unseen_checks_shut(world, plan) -> bool:
+    """Are the checks PlanReach does not model surely shut at the start? It
+    counts them as shut, so a start it finds empty could still hold one. Stat
+    term checks are left to the guard. Itemsanity, Hit Character and Tiger
+    Temple door checks need a weapon while Itemsanity is on, so they are shut
+    when the slot starts with none; without Itemsanity a Hit check may be open."""
+    from .content_plan import starting_counts
+    from .itemsanity import WEAPONS
+    checks = plan["checks"]
+    if any(check.get("stats") for check in checks):
+        return False
+    if not plan.get("global_checks", {}).get("itemsanity"):
+        return not any(check["kind"] == "hit" for check in checks)
+    held = starting_counts(world.options)
+    return not any(held.get(weapon) for weapon in WEAPONS)
+
+
 def start_opener(world, plan):
     """The boost item a finished plan should start with, or None. Only when
     no check open at the start can hold progression, Progressive Boost is on,
-    no warp_pad_rules are set, a copy is left in the pool, and that copy opens
-    such a check."""
+    no warp_pad_rules are set, every check the plan model cannot see is shut,
+    a copy is left in the pool, and that copy opens such a check."""
     from . import content_opening
     if not plan.get("capability", {}).get("boost_mode") or world.options.warp_pad_rules.value:
+        return None
+    if not _unseen_checks_shut(world, plan):
         return None
     reach = content_opening.plan_reach(world, plan)
     item = reach.boost_item
@@ -349,7 +383,7 @@ def raise_if_narrow(world) -> None:
     """Refuse the slot when fewer than MIN_STARTING_CHECKS locations are
     reachable from its starting inventory."""
     breadth = sphere0_breadth(world)
-    placeable = sphere0_breadth(world, placeable=True)
+    placeable = sphere0_progression_spots(world)
     if breadth >= MIN_STARTING_CHECKS and placeable:
         return
     name = world.multiworld.player_name[world.player]

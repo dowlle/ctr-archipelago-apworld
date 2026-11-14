@@ -95,7 +95,7 @@ class TestNoStartProgressionSpot(unittest.TestCase):
 
     def test_the_granted_start_has_room_for_progression(self):
         world = generate(fixture(), 1, until="generate_basic")
-        self.assertGreaterEqual(sphere0_guard.sphere0_breadth(world, placeable=True),
+        self.assertGreaterEqual(sphere0_guard.sphere0_progression_spots(world),
                                 sphere0_guard.MIN_STARTING_CHECKS)
 
     def test_same_seed_as_a_written_from_pool_start(self):
@@ -129,14 +129,32 @@ class TestNoStartProgressionSpot(unittest.TestCase):
         self.assertIn("no check at the start that can hold progression", str(raised.exception))
         self.assertIn("exclude_locations", str(raised.exception))
 
-    def test_manual_warp_pad_rules_keep_their_refusal(self):
-        # warp_pad_rules are never helped with a free item (Rulebook, manual rules).
+    def test_start_opener_needs_no_manual_rules(self):
+        # warp_pad_rules are never helped with a free item (Rulebook, manual
+        # rules): the same empty start gets the boost without rules and none
+        # with them. The guard then refuses it with the rules named.
         real = sphere0_guard.start_opener
         with mock.patch.object(sphere0_guard, "start_opener", return_value=None):
             world = generate(fixture(), 1, until="generate_early")
         self.assertEqual(real(world, world.ctr_content_plan), BOOST)
         world.options.warp_pad_rules.value = {"Crash Cove": {"item": "Trophy", "count": 1}}
         self.assertIsNone(real(world, world.ctr_content_plan))
+
+    def test_shop_that_can_hold_progression_is_a_start(self):
+        # Wumpa Shop slots that allow progression can take the first boost:
+        # no grant and no refusal.
+        world = generate(fixture(wumpa_shop_progression="allowed"), 1)
+        self.assertFalse(hasattr(world, "ctr_start_opener"))
+        self.assertEqual(world.multiworld.precollected_items[1], [])
+        self.assertTrue(world.multiworld.fulfills_accessibility())
+
+    def test_a_starting_weapon_opens_itemsanity_checks(self):
+        # The plan model cannot see Itemsanity checks, so a slot that starts
+        # with a weapon gets no grant: its weapon's checks are open.
+        world = generate(fixture(start_inventory={"Bomb": 1}), 1)
+        self.assertFalse(hasattr(world, "ctr_start_opener"))
+        self.assertEqual([item.name for item in world.multiworld.precollected_items[1]], ["Bomb"])
+        self.assertTrue(world.multiworld.fulfills_accessibility())
 
     def test_tracker_rebuilds_the_granted_start(self):
         world = generate(fixture(), 1, until="generate_basic")
