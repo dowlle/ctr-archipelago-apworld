@@ -117,12 +117,26 @@ class TestHardOnly(unittest.TestCase):
             with self.subTest(name=name):
                 options = options_with([tizi_descriptor(), copy.deepcopy(content_plan.PACKAGES[1])],
                                        required=[name, "custom/baby-t-park/1.0.2"])
-                options.update(shortcut_knowledge=0, track_modes={name: ["trophy"]})
+                options.update(shortcut_knowledge=0)
+                options["content_pool"]["tracks"]["overrides"] = {name: ["trophy"]}
                 world = make_world(options, seed=3)
                 self.assertFalse(plan_has(world.ctr_content_plan, tizi_descriptor()))
                 self.assertEqual(len(world.options.required_entries.value), 1)
                 self.assertFalse({"Tizi Madness", "cocoteamracing-track-3"} & set(world.options.required_entries.value))
                 self.assertNotIn(name, world.options.track_modes.value)
+
+    def test_a_shared_title_keeps_the_other_tracks_options(self):
+        # An impostor titled "Tizi Madness" stays in an easy seed, and so does
+        # a track_modes entry by that title, which may mean it.
+        options = options_with([tizi_descriptor(), impostor()], required=["tizi-madness"])
+        options.update(shortcut_knowledge=0)
+        options["content_pool"]["tracks"]["overrides"] = {"Tizi Madness": ["relic"], "cocoteamracing-track-3": ["trophy"]}
+        world = make_world(options, seed=5)
+        self.assertTrue(plan_has(world.ctr_content_plan, impostor()))
+        self.assertFalse(plan_has(world.ctr_content_plan, tizi_descriptor()))
+        self.assertIn("Tizi Madness", world.options.track_modes.value)
+        self.assertNotIn("cocoteamracing-track-3", world.options.track_modes.value)
+        self.assertEqual(world.options.required_entries.value, ["tizi-madness"])
 
     def test_the_rest_of_the_seed_is_unchanged(self):
         # Easy with Tizi Madness listed draws exactly the seed without it.
@@ -148,12 +162,12 @@ class TestHardOnly(unittest.TestCase):
 
 
 def items_but(world, *left_out):
-    """Ten copies of every item this world knows, except `left_out`: more than
+    """Forty copies of every item this world knows, except `left_out`: more than
     any gate asks for, so only the left-out item can close one."""
     state = CollectionState(world.multiworld)
     for name in world.item_name_to_id:
         if name not in left_out:
-            for _ in range(10):
+            for _ in range(40):
                 state.collect(world.create_item(name), True)
     return state
 
@@ -181,7 +195,9 @@ class TestMaskLogic(unittest.TestCase):
         world = world_with(tizi_descriptor(), "hard", itemsanity=True)
         mw, player = world.multiworld, world.player
         pad, entry = self.tizi_pad(world)
-        self.assertEqual(tizi_madness.mask_gated_entries(world.ctr_content_plan), {entry["id"]})
+        gates = tizi_madness.MaskGates(world.ctr_content_plan)
+        self.assertEqual(gates.regions, {entry["id"]})
+        self.assertTrue(gates.region(entry["id"]))
         entrance = mw.get_entrance(pad["id"], player)
         self.assertFalse(entrance.access_rule(items_but(world, "Mask")))
         self.assertTrue(entrance.access_rule(items_but(world)))
@@ -205,7 +221,7 @@ class TestMaskLogic(unittest.TestCase):
 
     def test_without_itemsanity_no_item_is_needed(self):
         world = world_with(tizi_descriptor(), "hard", itemsanity=False)
-        self.assertEqual(tizi_madness.mask_gated_entries(world.ctr_content_plan), frozenset())
+        self.assertFalse(tizi_madness.MaskGates(world.ctr_content_plan))
         pad, _entry = self.tizi_pad(world)
         self.assertTrue(world.multiworld.get_entrance(pad["id"], world.player).access_rule(items_but(world)))
 
@@ -221,38 +237,67 @@ class TestMaskLogic(unittest.TestCase):
         self.assertNotIn("Mask", names_in(logic_terms.term_of(plain.multiworld.get_entrance(pad["id"], plain.player))))
 
 
-class TestBossAndCupRoutes(unittest.TestCase):
-    """A boss race or Gem Cup on Tizi Madness waits for the Mask too."""
+class TestEveryCheck(unittest.TestCase):
+    """Every check of a plan with Tizi Madness on a pad, in cups and as a boss
+    venue: a check whose every route races Tizi Madness waits for the Mask,
+    and a check raced only on cup legs before the Tizi Madness leg does not.
+    (Other checks may still wait for it through an event, such as a boss
+    beaten on the track that a later race needs: that is the logic's own
+    chain, not this gate.)"""
 
-    def test_boss_and_cup_entries_on_the_track_need_the_mask(self):
+    @staticmethod
+    def options(seed):
         from .test_content_bosses import boss_options
+        options = boss_options(boss_track_shuffle=True, itemsanity=True, shortcut_knowledge=SK["hard"],
+                               podium_placement_checks=True, wumpa_check=["global", "per_track"][seed % 2])
+        options["item_pool"]["base"]["trophies"] = 12
+        options["content_pool"]["cups"] = dict(count=dict(min=3, max=4))
+        descriptor = tizi_descriptor()
+        descriptor["capabilities"].update(checkpoints=35, ai_nav=True)
+        options["content_pool"]["tracks"]["custom"] = [descriptor]
+        options["content_pool"]["required_entries"] = []
+        return options
+
+    @staticmethod
+    def cups27(seed):
+        """Every pad a cup (test_27_cups), so every leg is cup-only."""
+        return dict(cup_count=27, crystal_challenge_count=0, accessibility="full", itemsanity=True,
+                    shortcut_knowledge=SK["hard"], custom_tracks=[tizi_descriptor()],
+                    wumpa_check=["global", "per_track"][seed % 2])
+
+    def test_every_check(self):
         seen = set()
         for seed in range(40):
-            options = boss_options(boss_track_shuffle=True, itemsanity=True, shortcut_knowledge=SK["hard"])
-            options["item_pool"]["base"]["trophies"] = 12
-            options["content_pool"]["cups"] = dict(count=dict(min=2, max=3))
-            descriptor = tizi_descriptor()
-            descriptor["capabilities"].update(checkpoints=35, ai_nav=True)
-            options["content_pool"]["tracks"]["custom"] = [descriptor]
-            options["content_pool"]["required_entries"] = []
-            world = make_world(options, seed=seed)
+            world = make_world(self.options(seed) if seed % 2 == 0 else self.cups27(seed), seed=seed)
             plan, mw, player = world.ctr_content_plan, world.multiworld, world.player
-            gated = tizi_madness.mask_gated_entries(plan)
+            gates = tizi_madness.MaskGates(plan)
+            if not gates:
+                continue
             without, with_all = items_but(world, "Mask"), items_but(world)
-            for enc in plan["encounters"]:
-                if enc["entry_id"] in gated:
+            for check in plan["checks"]:
+                if not check["routes"] or check["display_name"].startswith("Itemsanity: Mask"):
+                    continue  # no route, or the Mask's own use check
+                needs = all(gates.region(r["entry_id"]) or gates.route(r) for r in check["routes"])
+                gem_cups = {e["id"] for e in plan["entries"] if e["kind"] == content_cups.KIND}
+                cups = [r for r in check["routes"] if r["entry_id"] in gates.cups & gem_cups]
+                cup_only = bool(cups) and len(cups) == len(check["routes"])
+                location = mw.get_location(content_plan.LOCATION_BY_CODE[check["location"]], player)
+                with self.subTest(seed=seed, check=check["display_name"]):
+                    self.assertTrue(location.can_reach(with_all))
+                    if needs:
+                        self.assertFalse(location.can_reach(without))
+                    elif cup_only:
+                        # A Gem Cup leg before the Tizi Madness leg: the cup's
+                        # pad and earlier legs need nothing new. (A boss cup's
+                        # way in can wait on boss events, see above.)
+                        self.assertTrue(location.can_reach(without))
+                if cup_only:
+                    seen.add("cup-gated" if needs else "cup-free")
+                if any(gates.region(r["entry_id"]) and r["encounter_id"] for r in check["routes"]):
                     seen.add("boss")
-                    entrance = mw.get_entrance(enc["id"], player)
-                    self.assertFalse(entrance.access_rule(without), enc["id"])
-                    self.assertTrue(entrance.access_rule(with_all), enc["id"])
-            for pad in plan["pads"]:
-                entry = next((e for e in plan["entries"] if e["id"] == pad["entry_id"]), None)
-                if entry is not None and entry["kind"] == content_cups.KIND and entry["id"] in gated:
-                    seen.add("cup")
-                    self.assertFalse(mw.get_entrance(pad["id"], player).access_rule(without), pad["id"])
-            if seen == {"boss", "cup"}:
+            if seed >= 5 and seen >= {"boss", "cup-free", "cup-gated"}:
                 break
-        self.assertEqual(seen, {"boss", "cup"})
+        self.assertGreaterEqual(seen, {"boss", "cup-free", "cup-gated"})
 
 
 class TestGatedEntries(unittest.TestCase):
@@ -272,12 +317,21 @@ class TestGatedEntries(unittest.TestCase):
                    dict(id="e/impostor", kind="track", track_id="custom/tizi-madness/1.0"),
                    dict(id="e/retail", kind="track", track_id="retail:0"),
                    dict(id="e/cup", kind=content_cups.KIND,
-                        legs=[dict(id="e/cup/leg:0", track_id="retail:0"), dict(id="e/cup/leg:1", track_id=TIZI_ID)]),
+                        legs=[dict(id="e/cup/leg:0", track_id="retail:0"), dict(id="e/cup/leg:1", track_id=TIZI_ID),
+                              dict(id="e/cup/leg:2", track_id="retail:0")]),
                    dict(id="e/cup2", kind=content_cups.KIND, legs=[dict(id="e/cup2/leg:0", track_id="retail:0")]),
                    dict(id="e/boss", kind="boss_race", track_id=TIZI_ID),
                    dict(id="e/arena", kind="crystal", arena_id=1)]
-        self.assertEqual(tizi_madness.mask_gated_entries(self.plan(entries)), {"e/track", "e/cup", "e/boss"})
-        self.assertEqual(tizi_madness.mask_gated_entries(self.plan(entries, itemsanity=False)), frozenset())
+        gates = tizi_madness.MaskGates(self.plan(entries))
+        self.assertEqual(gates.regions, {"e/track", "e/boss"})
+        self.assertEqual(gates.cups, {"e/cup"})
+        route = lambda entry, leg=None: dict(entry_id=entry, leg_id=leg)
+        self.assertFalse(gates.route(route("e/cup", "e/cup/leg:0")), "a leg before Tizi Madness")
+        self.assertTrue(gates.route(route("e/cup", "e/cup/leg:1")), "the Tizi Madness leg")
+        self.assertTrue(gates.route(route("e/cup", "e/cup/leg:2")), "a leg after it needs it finished")
+        self.assertTrue(gates.route(route("e/cup")), "the whole cup")
+        self.assertFalse(gates.route(route("e/cup2")) or gates.route(route("e/track")), "routes elsewhere")
+        self.assertFalse(tizi_madness.MaskGates(self.plan(entries, itemsanity=False)))
 
 
 if __name__ == "__main__":

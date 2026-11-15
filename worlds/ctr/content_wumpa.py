@@ -355,11 +355,13 @@ def income_term(world):
     return world.ctr_income_term
 
 
-def install(world, plan, menu, stage_gate, stage_term):
+def install(world, plan, menu, stage_gate, stage_term, mask_gates=None):
     """The `Wumpa Income` event (in Menu, any income route) and the shop
     locations (in Menu, the hub's Key floor and `Wumpa Income`), with the
     `excluded` item rule. `stage_gate(route)` gives the test of a route's
-    later race, or None for a pad's first race; `stage_term` its term."""
+    later race, or None for a pad's first race; `stage_term` its term.
+    `mask_gates` (tizi_madness.MaskGates) adds the Mask to a cup leg income
+    route that races Tizi Madness (A4-96); a track route has it on its pad."""
     if not banking(plan):
         return
     from BaseClasses import Location
@@ -394,9 +396,15 @@ def install(world, plan, menu, stage_gate, stage_term):
         lock = pads[pad_id]["racer_lock"]
         racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
         need = cup_income_need(plan, entry_id, leg_id)
-        routes.append((entry_id, None, need, racer))
+        mask = None
+        if mask_gates is not None:
+            from . import tizi_madness
+            mask = tizi_madness.with_mask(world, mask_gates, None, dict(entry_id=entry_id, leg_id=leg_id))
+        routes.append((entry_id, None if mask is None else mask.compile(), need, racer))
         terms = [logic_terms.ReachRegion(world, entry_id) if hints else
                  logic_terms.term_of(world.multiworld.get_region(entry_id, player).entrances[0])]
+        if mask is not None:
+            terms.append(mask)
         if need:
             terms.append(logic_terms.Cap(world, need, racer))
         wires.append(logic_terms.all_of(*terms))

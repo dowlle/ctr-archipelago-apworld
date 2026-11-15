@@ -16,12 +16,12 @@ What this module owns, on the apworld side:
    venue or any other use, the same way a box above the chosen shortcut level
    is left out rather than put out of logic. A `required_entries` or
    `track_modes` name for it goes with it. With `hard` nothing changes.
-2. Logic (`mask_gated_entries`). With Itemsanity on, every check raced on the
-   track also needs the `Mask` weapon item: the region of every pad, Gem Cup
-   and boss race that races it is gated on the Mask (content_plan
-   create_regions, content_bosses.install). A Gem Cup with a Tizi Madness leg
-   gates the whole cup, also its legs before that one: stricter than needed,
-   never looser. With Itemsanity off there is no Mask item and no extra term.
+2. Logic (`MaskGates`). With Itemsanity on, every check raced on the track
+   also needs the `Mask` weapon item: the region of its track pad or boss
+   race, and every cup route from its first Tizi Madness leg on, plus the
+   cup's own checks (content_plan create_regions, content_bosses.install,
+   content_wumpa.install). Earlier legs of a cup on other tracks stay free.
+   With Itemsanity off there is no Mask item and no extra term.
 
 The game side (native `ap/ap_tizi_madness.c`) refills the weapon slot with a
 Mask while the track is raced, once the Mask item has arrived on an Itemsanity
@@ -77,11 +77,19 @@ def leave_out_below_hard(world):
             continue
         if is_tizi_madness(package):
             dropped.append(package["id"])
-            names.update((package["display_name"], package["content_id"]))
+            names.update((package["display_name"], package["content_id"],
+                          f"custom/{package['content_id']}/{package['revision']}"))
         else:
             kept.append(raw)
     if not dropped:
         return []
+    # A title another listed track shares stays: it may name that track.
+    for raw in kept:
+        try:
+            other = custom_packages.admit(raw, "custom_tracks")
+        except custom_packages.PackageError:
+            continue
+        names.discard(other["display_name"])
     o.custom_tracks.value = kept
     o.required_entries.value = [n for n in o.required_entries.value if n not in names]
     o.track_modes.value = {k: v for k, v in o.track_modes.value.items() if k not in names}
@@ -97,22 +105,61 @@ def tizi_track_ids(plan):
             if t.get("package_id") is not None and is_tizi_madness(packages.get(t["package_id"]))}
 
 
-def mask_gated_entries(plan):
-    """Rule 2. Entry ids whose race is on Tizi Madness: a track pad's entry,
-    a boss race on it, or a Gem Cup or boss cup with it as a leg. Empty without
-    Itemsanity, because then the game needs no item to give the Mask."""
-    if not plan.get("global_checks", {}).get("itemsanity"):
-        return frozenset()
-    tracks = tizi_track_ids(plan)
-    if not tracks:
-        return frozenset()
-    out = set()
-    for entry in plan.get("entries", ()):
-        if entry.get("track_id") in tracks or any(leg.get("track_id") in tracks for leg in entry.get("legs", ())):
-            out.add(entry["id"])
-    return frozenset(out)
+class MaskGates:
+    """Rule 2: which parts of a plan race Tizi Madness and so need the Mask.
+    Empty without Itemsanity, because then the game needs no item to give it.
+
+    - `region(entry_id)`: a track pad's entry or a single boss race on the
+      track. Its whole region is gated: every check there is raced on it.
+    - `route(route)`: a route into a Gem Cup or boss cup. A leg route needs the
+      Mask from the first Tizi Madness leg on, because a leg also needs every
+      earlier leg finished; a route of the whole cup (no leg) needs it when
+      any leg is Tizi Madness. Earlier legs on other tracks stay free.
+    """
+
+    def __init__(self, plan):
+        self.regions, self.cups, self.legs = set(), set(), set()
+        if not plan.get("global_checks", {}).get("itemsanity"):
+            return
+        tracks = tizi_track_ids(plan)
+        if not tracks:
+            return
+        for entry in plan.get("entries", ()):
+            legs = entry.get("legs")
+            if legs is None:
+                if entry.get("track_id") in tracks:
+                    self.regions.add(entry["id"])
+                continue
+            first = next((i for i, leg in enumerate(legs) if leg.get("track_id") in tracks), None)
+            if first is not None:
+                self.cups.add(entry["id"])
+                self.legs.update(leg["id"] for leg in legs[first:])
+
+    def __bool__(self):
+        return bool(self.regions or self.cups)
+
+    def region(self, entry_id):
+        return entry_id in self.regions
+
+    def cup(self, entry_id):
+        """A cup with a Tizi Madness leg: its whole-cup checks need the Mask."""
+        return entry_id in self.cups
+
+    def route(self, route):
+        if route.get("entry_id") not in self.cups:
+            return False
+        leg = route.get("leg_id")
+        return leg in self.legs if leg is not None else True
 
 
 def mask_term(world):
     from . import logic_terms
     return logic_terms.Has(MASK_ITEM, 1, world.player)
+
+
+def with_mask(world, gates, term, route):
+    """`term` (or None) and the Mask when `route` needs it, else `term`."""
+    if not gates.route(route):
+        return term
+    from . import logic_terms
+    return mask_term(world) if term is None else logic_terms.And(term, mask_term(world))
