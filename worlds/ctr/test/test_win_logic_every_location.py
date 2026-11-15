@@ -122,7 +122,7 @@ class TestWinLogicEveryLocation(unittest.TestCase):
         box.access_rule = lambda state: state.has("Foreign Unlock", 2) and previous(state)
         with self.assertRaises(ForeignRuleError):
             wire_block(world)
-        with self.assertLogs("worlds.ctr.slot_data", level="WARNING"):
+        with self.assertLogs("worlds.ctr.slot_data", level="DEBUG"):
             block = world.fill_slot_data()["win_logic"]
         self.assertEqual(block, wire_block(world, include_hints=False))
         self.assertEqual(block["version"], 1)

@@ -90,7 +90,7 @@ class _Collector(logging.Handler):
 
 def _messages_for(seed=1, **options):
     messages = []
-    log = logging.getLogger("worlds.ctr.forced_options")
+    log = logging.getLogger("CTR")
     handler = _Collector(messages)
     log.addHandler(handler)
     try:

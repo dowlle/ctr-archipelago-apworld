@@ -27,12 +27,12 @@ def win_logic_block(world) -> Dict[str, object]:
     try:
         return {"win_logic": wire_block(world)}
     except ForeignRuleError as error:
-        log.warning("%s: win_logic sent without non-win rows, pads keep their"
-                    " open look for those checks: %s", world.player_name, error)
+        log.debug("%s: win_logic sent without non-win rows, pads keep their"
+                  " open look for those checks: %s", world.player_name, error)
     try:
         return {"win_logic": wire_block(world, include_hints=False)}
     except ForeignRuleError as error:
-        log.warning(
+        log.debug(
             "%s: win_logic omitted, race-loss DeathLink sends on every loss: %s",
             world.player_name, error)
         return {}

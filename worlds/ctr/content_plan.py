@@ -25,7 +25,6 @@ plan: the options' defaults are the original game's counts.
 import copy
 import itertools
 import json
-import logging
 import pkgutil
 import random
 
@@ -1193,8 +1192,10 @@ def generate(world):
         starts[opener] = starts.get(opener, 0) + 1
         world.options.start_inventory_from_pool.value = starts
         world.ctr_start_opener = opener
-        logging.info(f"CTR: {world.multiworld.player_name[world.player]} has no check at the start "
-                     f"that can hold progression, so the slot starts with {opener}.")
+        from .notices import adjusted
+        adjusted(world, "start_opener",
+                 f"Starting items: no check open at the start can hold progression, so the slot starts "
+                 f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
     # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
@@ -1262,17 +1263,24 @@ def swap_in_bundled_cortex(world):
                              if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
+    moved_modes = False
     for name in sorted(names - {destinations.CORTEX_VORTEX}):
         if name in modes:
+            # An entry already under the bundled track's own name wins; the copy's is dropped.
+            moved_modes = moved_modes or destinations.CORTEX_VORTEX not in modes
             modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
     o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins
     world.ctr_cortex_swap_mode = "own_pad" if pinned else "in_pool"
-    logging.getLogger("CTR").info(
-        "CTR: %s replaced the downloaded Cortex Vortex (%s) with the Cortex Vortex that comes with CTR AP "
-        "(cortex_vortex_track %s).", world.multiworld.player_name[world.player], ", ".join(twins),
-        world.ctr_cortex_swap_mode)
+    from .notices import adjusted
+    carried = [what for what, moved in (("its Guaranteed Warp Pads entry", pinned), ("its Track Modes entry", moved_modes))
+               if moved]
+    adjusted(world, "cortex_swap",
+             f"Cortex Vortex Track: the downloaded Cortex Vortex ({', '.join(twins)}) was replaced by the "
+             f"Cortex Vortex that comes with CTR AP, "
+             f"{'on its own pad' if pinned else 'drawn into the pool like any other track'}."
+             + (f" {' and '.join(carried)} carried over.".replace(" its ", " Its ", 1) if carried else ""))
 
 
 def draw_plan(world, key_estimate=True):

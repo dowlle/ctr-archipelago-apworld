@@ -285,6 +285,24 @@ class TestCortexVortexTrack(unittest.TestCase):
         content_plan.generate(world)
         self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["relic"])
 
+    def test_the_swap_is_one_line_of_the_generator_summary(self):
+        import logging
+        from ..notices import summary_lines
+        with self.assertLogs("CTR", logging.WARNING) as logs:
+            world = make_world(self.swap_options(), seed=6)
+        self.assertEqual(len(logs.records), 1)
+        (line,) = summary_lines(world)
+        self.assertIn("Cortex Vortex Track: the downloaded Cortex Vortex (package/cortex-vortex/1.1.2) was replaced", line)
+        self.assertIn("drawn into the pool", line)
+        self.assertNotIn("cortex_vortex_track", line)
+        with self.assertLogs("CTR", logging.WARNING):
+            world = make_world(self.swap_options(pinned=True), seed=6)
+        (line,) = summary_lines(world)
+        self.assertIn("on its own pad", line)
+        self.assertIn("Its Guaranteed Warp Pads entry carried over.", line)
+        with self.assertNoLogs("CTR", logging.WARNING):
+            make_world(cv_options(cortex=False), seed=6)
+
     def test_the_swap_is_written_to_the_spoiler(self):
         import io
         out = io.StringIO()

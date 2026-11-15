@@ -193,7 +193,7 @@ class TestQuietOutput(unittest.TestCase):
                        editable_stats="global", progressive_stats="shared_global", penta_stats="pal",
                        racer_locked_pads=3, character_unlocks=False, remove_playable_oxide=True,
                        letters_per_track=1, warppad_unlock_requirements="vanilla",
-                       requirement_weights=dict(Key=50), death_link_send=["mask_grab"])
+                       requirement_weights=dict(Key=50))
         with self.assertNoLogs(level=logging.INFO):
             make_world(options, stop_before="create_regions")
 

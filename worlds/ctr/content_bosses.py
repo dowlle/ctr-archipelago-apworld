@@ -289,13 +289,11 @@ def resolve_relic_count(world, record, rows):
     each with its notice. Refuses a mode whose tiers hold no relic."""
     if record is None or record["oxide_goal"] == GOAL_DISABLED:
         return
-    from .forced_options import _warn
-    from .notices import slot_label
+    from .notices import adjusted
     unlock, count = record["oxide_final_unlock"], record["oxide_final_count"]
+    asked, reasons = count, []
     if unlock != UNLOCK_TOTAL and count > SINGLE_TIER_MAX:
-        _warn(world, "content_bosses_relic_mode",
-              f"CTR ({slot_label(world)}): Oxide's Final Challenge Relic Count lowered from {count} to 18, "
-              "the most a one-tier mode allows.")
+        reasons.append(f"a one-tier mode allows at most {SINGLE_TIER_MAX}")
         count = SINGLE_TIER_MAX
     if count == 0:
         # A count of 0 asks no relic (2026-11-14), so no relic need exist, so no relic need exist.
@@ -308,10 +306,13 @@ def resolve_relic_count(world, record, rows):
         error("oxide_final_challenge_unlock names relic tiers with no base relic in item_pool.base.relics, so "
               "N. Oxide's Final Challenge could never open. Add relics or choose another mode.")
     if count > supply:
-        _warn(world, "content_bosses_relic_supply",
-              f"CTR ({slot_label(world)}): Oxide's Final Challenge Relic Count lowered from {count} to {supply}, "
-              "the base relics its mode can count.")
+        reasons.append(f"its mode can count {supply} base relics")
         count = supply
+    if reasons:
+        # One line for the option, however many steps lowered it.
+        adjusted(world, "content_bosses_relic_count",
+                 f"Oxide's Final Challenge Relic Count: lowered from {asked} to {count}, because "
+                 + " and ".join(reasons) + ".")
     record["oxide_final_count"] = count
 
 

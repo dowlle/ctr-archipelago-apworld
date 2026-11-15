@@ -41,7 +41,7 @@ class TestForeignRuleWrap(unittest.TestCase):
         _slotlock_wrap(self.world)
         with self.assertRaises(ForeignRuleError):
             wire_block(self.world)
-        with self.assertLogs("worlds.ctr.slot_data", level="WARNING"):
+        with self.assertLogs("worlds.ctr.slot_data", level="DEBUG"):
             slot_data = self.world.fill_slot_data()
         self.assertNotIn("win_logic", slot_data)
 

@@ -203,6 +203,8 @@ class ctrAPWorld(World):
             # A4-96: Tizi Madness only with hard shortcut knowledge.
             tizi_madness.leave_out_below_hard(self)
             content_plan.generate(self)
+        from .notices import emit_summary
+        emit_summary(self)
 
     def create_regions(self):
         from . import content_plan

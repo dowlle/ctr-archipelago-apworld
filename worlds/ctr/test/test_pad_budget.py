@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from Options import OptionError
 
 from .. import content_cups, content_plan, pad_budget
+from ..notices import summary_lines
 from .test_content_plan import make_world
 
 
@@ -75,10 +76,11 @@ class TestResolve(unittest.TestCase):
 
     def test_over_budget_warns_and_writes_back(self):
         world = fake_world(27, 4)
-        with self.assertLogs("CTR", "WARNING") as logs:
+        with self.assertNoLogs("CTR", "WARNING"):
             self.assertEqual(pad_budget.resolve(world, 1, 0), (23, 3))
-        self.assertIn("27 cups and 4 Crystal Challenges", logs.output[0])
-        self.assertIn("23 cups and 3 Crystal Challenges", logs.output[0])
+        (line,) = summary_lines(world)
+        self.assertIn("27 cups and 4 Crystal Challenges", line)
+        self.assertIn("23 cups and 3 Crystal Challenges", line)
         self.assertEqual((world.options.cup_count.value, world.options.crystal_challenge_count.value), (23, 3))
         self.assertEqual(world.ctr_pad_budget, dict(requested=(27, 4), final=(23, 3), required_tracks=1))
 
@@ -200,10 +202,11 @@ class TestCapCrystals(unittest.TestCase):
             "4 Crystal Challenges."])
         self.assertFalse(hasattr(world, "ctr_pad_budget"))
 
-    def test_no_new_console_warning(self):
-        import logging
-        with self.assertNoLogs("CTR", logging.WARNING):
+    def test_one_summary_line_on_the_console(self):
+        with self.assertLogs("CTR", "WARNING") as logs:
             make_world(dict(crystal_challenge_count=6, crystal_arenas=FOUR, accessibility="full"), seed=3)
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn("Crystal Challenge Count: lowered from 6 to 4", logs.output[0])
 
     def test_same_seed_as_asking_for_the_arenas(self):
         """The capped YAML is the YAML that asked for 4: same plan, same slot_data."""

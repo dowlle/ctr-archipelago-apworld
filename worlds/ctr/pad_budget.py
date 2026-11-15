@@ -45,7 +45,6 @@ The final counts are written back to the options, so the rest of the
 generator, the spoiler and later draws see them, and a generator warning names
 the requested and the final counts. The plan wire has no new field.
 """
-import logging
 from fractions import Fraction
 
 from Options import OptionError
@@ -88,13 +87,16 @@ def share(available, requests, floors):
 def cap_crystals(world, arenas):
     """Scale `crystal_challenge_count` down to the `arenas` that `crystal_arenas`
     lists. No-op when it fits (and on a redraw, which sees the written-back
-    count). Records the request for the spoiler line; no log message."""
+    count). Records the request for the spoiler line and the slot's summary."""
     o = world.options
     asked = int(o.crystal_challenge_count.value)
     if asked <= arenas:
         return
     o.crystal_challenge_count.value = arenas
     world.ctr_crystal_cap = dict(requested=asked, arenas=arenas)
+    from .notices import adjusted
+    adjusted(world, "pad_budget_crystal_cap",
+             f"Crystal Challenge Count: lowered from {asked} to {arenas}, the arenas Crystal Arenas lists.")
 
 
 def resolve(world, required_tracks, required_arenas):
@@ -123,9 +125,10 @@ def resolve(world, required_tracks, required_arenas):
     o.cup_count.value, o.crystal_challenge_count.value = final_cups, final_crystals
     world.ctr_pad_budget = dict(requested=(cups, crystals), final=(final_cups, final_crystals),
                                 required_tracks=required_tracks)
-    logging.getLogger("CTR").warning(
-        "CTR: %s asks for %d cups and %d Crystal Challenges, but only %d of the 27 normal pads are left after "
-        "%d required track pads. The counts are shared out as weights: %d cups and %d Crystal Challenges.",
-        world.multiworld.player_name[world.player], cups, crystals, available, required_tracks,
-        final_cups, final_crystals)
+    from .notices import adjusted
+    adjusted(world, "pad_budget",
+             f"Cup Count and Crystal Challenge Count: asked for {cups} cups and {crystals} Crystal Challenges, "
+             f"but only {available} of the 27 normal pads are left after {required_tracks} required track "
+             f"pad{'' if required_tracks == 1 else 's'}. "
+             f"The counts are shared out as weights: {final_cups} cups and {final_crystals} Crystal Challenges.")
     return final_cups, final_crystals
