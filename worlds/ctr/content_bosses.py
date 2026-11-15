@@ -835,6 +835,8 @@ def install(world, plan, menu, predicate_term, with_boost, oxide_event=None):
     checks = {c["location"]: c for c in plan["checks"]}
     record = plan["bosses"]
     goal_code = goal_location(record)
+    from . import tizi_madness
+    mask_gated = tizi_madness.mask_gated_entries(plan)
     for enc in plan["encounters"]:
         region = Region(enc["entry_id"], player, mw)
         mw.regions.append(region)
@@ -842,6 +844,10 @@ def install(world, plan, menu, predicate_term, with_boost, oxide_event=None):
                  predicate_term(world, req[enc["requirement_id"]])]
         if oxide_event and enc["completion_location"] == goal_code:
             gates.append(logic_terms.EventTerm(oxide_event, player, lambda: income_term(world)))
+        # A4-96: a boss race or boss cup on Tizi Madness needs the Mask with
+        # Itemsanity on.
+        if enc["entry_id"] in mask_gated:
+            gates.append(tizi_madness.mask_term(world))
         logic_terms.set_term(menu.connect(region, enc["id"]), logic_terms.all_of(*gates))
         code = enc["completion_location"]
         check = checks[code]

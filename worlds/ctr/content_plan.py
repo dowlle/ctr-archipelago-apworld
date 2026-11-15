@@ -2250,6 +2250,8 @@ def create_regions(world):
     track_by_id = {t["id"]: t for t in plan["tracks"]}
     package_by_id = {p["id"]: p for p in plan["packages"]}
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
+    from . import tizi_madness
+    mask_gated = tizi_madness.mask_gated_entries(plan)
 
     from .progressive_capability import STAT_CHAINS
 
@@ -2369,6 +2371,10 @@ def create_regions(world):
         # place of them (Rules.add_racer_lock_rules on the legacy path).
         if pad["racer_lock"] is not None:
             gates.append(logic_terms.Has(characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]], 1, player))
+        # A4-96: a pad or Gem Cup that races Tizi Madness needs the Mask with
+        # Itemsanity on (tizi_madness.mask_gated_entries).
+        if pad["entry_id"] in mask_gated:
+            gates.append(tizi_madness.mask_term(world))
         logic_terms.set_term(menu.connect(region, pad["id"]), logic_terms.all_of(*gates))
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
