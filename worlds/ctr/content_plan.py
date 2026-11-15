@@ -2250,6 +2250,12 @@ def create_regions(world):
     track_by_id = {t["id"]: t for t in plan["tracks"]}
     package_by_id = {p["id"]: p for p in plan["packages"]}
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
+    # A4-96: what races Tizi Madness needs the Mask with Itemsanity on.
+    from . import tizi_madness
+    mask_gates = tizi_madness.MaskGates(plan)
+
+    def with_mask(term, route):
+        return tizi_madness.with_mask(world, mask_gates, term, route)
 
     from .progressive_capability import STAT_CHAINS
 
@@ -2307,6 +2313,11 @@ def create_regions(world):
 
     def stage_gate(route):
         term = stage_term(route)
+        return None if term is None else term.compile()
+
+    def route_gate(route):
+        """stage_gate and, on a cup route that races Tizi Madness, the Mask."""
+        term = with_mask(stage_term(route), route)
         return None if term is None else term.compile()
 
     def with_letters(term, check):
@@ -2369,13 +2380,17 @@ def create_regions(world):
         # place of them (Rules.add_racer_lock_rules on the legacy path).
         if pad["racer_lock"] is not None:
             gates.append(logic_terms.Has(characters.CHARACTER_ID_TO_NAME[pad["racer_lock"]], 1, player))
+        # A4-96: a track pad that races Tizi Madness needs the Mask with
+        # Itemsanity on (tizi_madness.MaskGates).
+        if mask_gates.region(pad["entry_id"]):
+            gates.append(tizi_madness.mask_term(world))
         logic_terms.set_term(menu.connect(region, pad["id"]), logic_terms.all_of(*gates))
         for check in by_pad.get(pad['id'], ()):
             location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], region)
             placed[check["location"]] = location
             # A check with several routes on its pad (per-track Wumpa) is open
             # when any of them is: a stage-1 route opens it with the pad.
-            tests = [stage_term(r) for r in check["routes"]]
+            tests = [with_mask(stage_term(r), r) for r in check["routes"]]
             term = None
             if all(test is not None for test in tests):
                 term = tests[0] if len(tests) == 1 else logic_terms.Or(*tests)
@@ -2401,17 +2416,17 @@ def create_regions(world):
         location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
         opens = []
         for r in check["routes"]:
-            opens.append((r["entry_id"], stage_gate(r)))
+            opens.append((r["entry_id"], route_gate(r)))
         if check["kind"] in ("itemsanity", "hit"):
-            world.ctr_global_routes.append((check, location, [(entry, stage_term(r), r) for (entry, _test), r
-                                                              in zip(opens, check["routes"])]))
+            world.ctr_global_routes.append((check, location, [(entry, with_mask(stage_term(r), r), r)
+                                                              for (entry, _test), r in zip(opens, check["routes"])]))
 
         def any_route(state, opens=tuple(opens)):
             return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
                        for entry, test in opens)
         location.access_rule = with_boost(with_letters(any_route, check), check)
         route_term = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, r["entry_id"]),
-                                                        stage_term(r) or logic_terms.TRUE)
+                                                        with_mask(stage_term(r), r) or logic_terms.TRUE)
                                      for r in check["routes"]))
         export = with_boost(with_letters(route_term, check), check)
         logic_terms.set_term(location, logic_terms.SerializedRule(location.access_rule, export))
@@ -2429,16 +2444,18 @@ def create_regions(world):
                                             package_by_id)
             lock = pad_by_id[r["own_pad_id"]]["racer_lock"]
             racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
-            tests.append((r["entry_id"], need, racer))
+            tests.append((r["entry_id"], need, racer, with_mask(None, r)))
 
-        def any_leg(state, tests=tuple(tests)):
+        def any_leg(state, tests=tuple((e, n, c, m and m.compile()) for e, n, c, m in tests)):
             return any(state.can_reach(entry, "Region", player)
                        and (not need or gate_satisfied(world, state, player, boost_min=need, required_character=racer))
-                       for entry, need, racer in tests)
+                       and (mask is None or mask(state))
+                       for entry, need, racer, mask in tests)
         location.access_rule = any_leg
         export = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, entry),
-                                                      logic_terms.Cap(world, need, racer) if need else logic_terms.TRUE)
-                                   for entry, need, racer in tests))
+                                                      logic_terms.Cap(world, need, racer) if need else logic_terms.TRUE,
+                                                      mask or logic_terms.TRUE)
+                                   for entry, need, racer, mask in tests))
         logic_terms.set_term(location, logic_terms.SerializedRule(any_leg, export))
         menu.locations.append(location)
     # Complete One Lap (#344, content_laps): any route. A standalone route
@@ -2459,6 +2476,9 @@ def create_regions(world):
                                                            capability, package_by_id))
             elif r["encounter_id"] is None:
                 gate = stage_gate(r)
+            mask = with_mask(None, r)
+            if mask is not None:
+                gate = mask.compile() if gate is None else (lambda state, g=gate, m=mask.compile(): g(state) and m(state))
             lock = pad_by_id[r["own_pad_id"]]["racer_lock"]
             racer = characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None
             tests.append((r["entry_id"], gate, need, racer))
@@ -2469,7 +2489,10 @@ def create_regions(world):
                        for entry, gate, need, racer in tests)
         location.access_rule = any_lap
         export = logic_terms.any_of(*(logic_terms.all_of(logic_terms.ReachRegion(world, entry),
-                                                      stage_term(route) or logic_terms.TRUE if gate is not None else logic_terms.TRUE,
+                                                      (stage_term(route) or logic_terms.TRUE)
+                                                      if gate is not None and route["leg_id"] is None
+                                                      and route["encounter_id"] is None else logic_terms.TRUE,
+                                                      with_mask(None, route) or logic_terms.TRUE,
                                                       logic_terms.Cap(world, need, racer) if need else logic_terms.TRUE)
                                    for (entry, gate, need, racer), route in zip(tests, check["routes"])))
         logic_terms.set_term(location, logic_terms.SerializedRule(any_lap, export))
@@ -2488,7 +2511,7 @@ def create_regions(world):
             if r["leg_id"] is not None:
                 need = max(need, content_cups.prefix_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id,
                                                            capability, package_by_id))
-            rank = with_boost(None, dict(check, boost=need, routes=[r]))
+            rank = with_mask(with_boost(None, dict(check, boost=need, routes=[r])), r)
             exports.append(logic_terms.all_of(logic_terms.ReachRegion(world, r["entry_id"]),
                                                 logic_terms.TRUE if content_race_routes.is_race_route(r) else stage_term(r) or logic_terms.TRUE,
                                                 rank or logic_terms.TRUE))
@@ -2502,7 +2525,7 @@ def create_regions(world):
         logic_terms.set_term(location, logic_terms.SerializedRule(any_race, logic_terms.any_of(*exports)))
         menu.locations.append(location)
     # The Wumpa Shop and the Wumpa goal: the `Wumpa Income` event and the slots.
-    content_wumpa.install(world, plan, menu, stage_gate, stage_term)
+    content_wumpa.install(world, plan, menu, stage_gate, stage_term, mask_gates)
     from .custom_track_presentation import location_aliases
     world.location_id_to_alias = location_aliases(world)
 

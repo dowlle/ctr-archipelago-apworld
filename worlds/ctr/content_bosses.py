@@ -835,6 +835,8 @@ def install(world, plan, menu, predicate_term, with_boost, oxide_event=None):
     checks = {c["location"]: c for c in plan["checks"]}
     record = plan["bosses"]
     goal_code = goal_location(record)
+    from . import tizi_madness
+    mask_gates = tizi_madness.MaskGates(plan)
     for enc in plan["encounters"]:
         region = Region(enc["entry_id"], player, mw)
         mw.regions.append(region)
@@ -842,11 +844,19 @@ def install(world, plan, menu, predicate_term, with_boost, oxide_event=None):
                  predicate_term(world, req[enc["requirement_id"]])]
         if oxide_event and enc["completion_location"] == goal_code:
             gates.append(logic_terms.EventTerm(oxide_event, player, lambda: income_term(world)))
+        # A4-96: a boss race on Tizi Madness needs the Mask with Itemsanity on.
+        # A boss cup with a Tizi Madness leg asks for it on the cup's own check
+        # below and on its leg routes (content_plan), not on the way in.
+        if mask_gates.region(enc["entry_id"]):
+            gates.append(tizi_madness.mask_term(world))
         logic_terms.set_term(menu.connect(region, enc["id"]), logic_terms.all_of(*gates))
         code = enc["completion_location"]
         check = checks[code]
         location = Location(player, LOCATION_BY_CODE[code], code, region)
-        term = with_boost(None, check) or logic_terms.TRUE
+        term = with_boost(None, check)
+        if mask_gates.cup(enc["entry_id"]):
+            term = tizi_madness.mask_term(world) if term is None else logic_terms.And(term, tizi_madness.mask_term(world))
+        term = term or logic_terms.TRUE
         logic_terms.set_term(location, term)
         if code == goal_code:
             location.progress_type = LocationProgressType.EXCLUDED
