@@ -355,6 +355,32 @@ class TestOpeningEstimate(unittest.TestCase):
         self.assertFalse(reach._pad_open(pad, everything))
 
 
+class TestOpeningEstimateCups(unittest.TestCase):
+    def test_the_estimate_matches_the_rules_on_cup_routes(self):
+        # Review round 3: PlanReach counted cup checks past the Tizi Madness leg
+        # as open. With every item but the Mask, the estimate opens exactly
+        # the checks the installed rules open (27 cups, every leg cup-only).
+        world = make_world(TestEveryCheck.cups27(0), seed=0)
+        plan, mw, player = world.ctr_content_plan, world.multiworld, world.player
+        self.assertTrue(tizi_madness.MaskGates(plan).cups)
+        reach = content_opening.PlanReach(plan, world.ctr_content_items.rows, set(), None)
+        held = {row.item: 40 for row in world.ctr_content_items.rows}
+        held[reach.mask] = 0
+        opened = reach._open(dict(held))
+        state = items_but(world, "Mask")
+        checked = 0
+        for code, _spot, _floor, routes in reach.checks:
+            if routes is None:
+                continue
+            gated = all(reach.mask_gates.route(route) for _own, _late, route, _need, _boost in routes)
+            if not gated:
+                continue
+            checked += 1
+            self.assertNotIn(code, opened, content_plan.LOCATION_BY_CODE[code])
+            self.assertFalse(mw.get_location(content_plan.LOCATION_BY_CODE[code], player).can_reach(state))
+        self.assertGreater(checked, 0)
+
+
 class TestGatedEntries(unittest.TestCase):
     """mask_gated_entries on hand-made plans: cups and boss races."""
 

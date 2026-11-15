@@ -393,7 +393,8 @@ class PlanReach:
                        for _entry, pad_id, mode, track in content_wumpa.income_routes(plan)]
         # A plan with no Trophy or CTR income route banks in its cup legs (A3-7).
         self.income += [dict(own_pad_id=pad_id, mode="cup", later=False, boost=boost_of(dict(own_pad_id=pad_id)),
-                             need=content_wumpa.cup_income_need(plan, entry_id, leg_id))
+                             need=content_wumpa.cup_income_need(plan, entry_id, leg_id),
+                             mask=self.mask_gates.route(dict(entry_id=entry_id, leg_id=leg_id)))
                         for entry_id, pad_id, leg_id, _track in content_wumpa.cup_income_routes(plan)]
 
     def _met(self, requirement, held):
@@ -401,6 +402,10 @@ class PlanReach:
 
     def _mask_held(self, entry_id, held):
         return not self.mask_gates.region(entry_id) or (self.mask is not None and held.get(self.mask, 0) > 0)
+
+    def _route_mask(self, route, held):
+        """A cup route from the Tizi Madness leg on needs the Mask (A4-96)."""
+        return not self.mask_gates.route(route) or (self.mask is not None and held.get(self.mask, 0) > 0)
 
     def _pad_open(self, pad, held):
         if not self._met(pad["entrance_req"], held):
@@ -448,7 +453,7 @@ class PlanReach:
             if letters and not all(held.get(item, 0) for item in letters):
                 continue
             usable = [(later, route) for own, later, route, need, boost in routes
-                      if need <= held.get(boost, 0) and region_open[own]]
+                      if need <= held.get(boost, 0) and region_open[own] and self._route_mask(route, held)]
             if any(not later for later, _route in usable):
                 opened.update(codes)
             elif usable:
@@ -459,7 +464,9 @@ class PlanReach:
                 opened.update(codes)
         opened -= {code for code, trophy in self.merged.items() if trophy not in opened}
         income = any(route["need"] <= held.get(route["boost"], 0) and region_open[route["own_pad_id"]]
-                     and (not route["later"] or stage_met(route, first)) for route in self.income)
+                     and (not route["later"] or stage_met(route, first))
+                     and (not route.get("mask") or (self.mask is not None and held.get(self.mask, 0) > 0))
+                     for route in self.income)
         key = self.code.get("Key")
         opened.update(code for code, floor in self.shop_checks if income and held.get(key, 0) >= floor)
         return opened
