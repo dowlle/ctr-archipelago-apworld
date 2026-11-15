@@ -72,6 +72,8 @@ def warn_racer_locked_pads_boolean_normalized(world):
     Not a downgrade: nothing is lost, the old spelling is simply translated."""
     if not characters.legacy_boolean_request(world):
         return
+    if not characters.unlocks_enabled(world):
+        return  # no unlock item exists, so the request is inert and nothing was translated
     from .notices import adjusted
     adjusted(world, "warn_racer_locked_pads_boolean_normalized",
              "Racer-Locked Warp Pads: 'true' is read the Alpha 6 way, as a quarter of the eligible pads "

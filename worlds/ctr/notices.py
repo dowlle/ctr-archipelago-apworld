@@ -72,8 +72,6 @@ def emit_summary(world) -> bool:
     if not lines:
         return False
     state["emitted"] = True
-    noun = "setting" if len(lines) == 1 else "settings"
-    logger.warning("CTR (%s): the generator changed %d %s for this slot:\n%s",
-                   slot_label(world), len(lines), noun,
-                   "\n".join("  - " + line for line in lines))
+    logger.warning("CTR (%s): the generator adjusted these settings for this slot:\n%s",
+                   slot_label(world), "\n".join("  - " + line for line in lines))
     return True

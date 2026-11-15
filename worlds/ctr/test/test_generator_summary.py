@@ -54,10 +54,16 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(summary_lines(world), [])
 
     def test_ignored_options_print_nothing_above_debug(self):
-        world, records = build(profile_options())
-        note_ignored(world, "Boss Track Allowlist (Boss Track Shuffle off)")
-        self.assertFalse(emit_summary(world))
+        handler = _Records()
+        logging.getLogger().addHandler(handler)
+        try:
+            world, records = build(profile_options())
+            note_ignored(world, "Boss Track Allowlist (Boss Track Shuffle off)")
+            self.assertFalse(emit_summary(world))
+        finally:
+            logging.getLogger().removeHandler(handler)
         self.assertEqual(records, [])
+        self.assertEqual([r for r in handler.records if r.name == "CTR" or r.name.startswith("worlds.ctr")], [])
 
     def test_one_message_lists_every_adjustment(self):
         world, records = build(heavy_options())
@@ -66,7 +72,7 @@ class TestSummary(unittest.TestCase):
         self.assertEqual(record.levelno, logging.WARNING)
         message = record.getMessage()
         self.assertIn("(ContentPlan)", message)
-        self.assertIn("changed 3 settings", message)
+        self.assertIn("adjusted these settings for this slot:", message)
         self.assertIn("Oxide's Final Challenge Relic Count: lowered from 30 to 18, because a one-tier mode allows at most 18", message)
         self.assertIn("Crystal Challenge Count: lowered from 7 to 4", message)
         self.assertIn("Racer-Locked Warp Pads: 'true' is read the Alpha 6 way", message)
@@ -85,10 +91,30 @@ class TestSummary(unittest.TestCase):
         self.assertEqual([r for r in handler.records if r.name == "CTR"], [])
         self.assertEqual(len(summary_lines(world)), 3)
 
+    def test_a_racer_lock_request_that_does_nothing_prints_nothing(self):
+        """`true` with Character Unlocks off is inert: no unlock item exists, so nothing was translated."""
+        _, records = build(dict(racer_locked_pads=True, character_unlocks=False, accessibility="full"))
+        self.assertEqual(records, [])
+
     def test_the_pad_budget_is_one_line_in_the_summary(self):
         world, records = build(dict(cup_count=27, cortex_vortex_track="own_pad", accessibility="full"))
         self.assertEqual(len(records), 1)
         self.assertIn("Cup Count and Crystal Challenge Count: asked for 27 cups", records[0].getMessage())
+
+    def test_two_ctr_slots_print_one_message_each(self):
+        from .. import ctrAPWorld
+        from . import setup_multiworld
+        handler = _Records()
+        root = logging.getLogger()
+        root.addHandler(handler)
+        try:
+            multiworld = setup_multiworld([ctrAPWorld, ctrAPWorld], seed=5,
+                                          options=[heavy_options(), dict(accessibility="full")])
+        finally:
+            root.removeHandler(handler)
+        ours = [r for r in handler.records if r.name == "CTR"]
+        self.assertEqual(len(ours), 1, [r.getMessage() for r in ours])
+        self.assertIn(f"CTR ({multiworld.player_name[1]})", ours[0].getMessage())
 
     def test_the_library_part_of_the_message(self):
         fake = SimpleNamespace(options=SimpleNamespace(), player=2,
@@ -101,7 +127,7 @@ class TestSummary(unittest.TestCase):
             self.assertTrue(emit_summary(fake))
             self.assertFalse(emit_summary(fake))
         self.assertEqual(len(logs.records), 1)
-        self.assertIn("CTR (Two): the generator changed 2 settings for this slot:", logs.records[0].getMessage())
+        self.assertIn("CTR (Two): the generator adjusted these settings for this slot:", logs.records[0].getMessage())
 
     def test_the_universal_tracker_rebuild_prints_nothing(self):
         fake = SimpleNamespace(options=SimpleNamespace(), player=1,

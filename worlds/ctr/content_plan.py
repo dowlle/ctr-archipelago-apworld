@@ -1263,17 +1263,23 @@ def swap_in_bundled_cortex(world):
                              if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
+    moved_modes = False
     for name in sorted(names - {destinations.CORTEX_VORTEX}):
         if name in modes:
             modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+            moved_modes = True
     o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins
     world.ctr_cortex_swap_mode = "own_pad" if pinned else "in_pool"
     from .notices import adjusted
+    carried = [what for what, moved in (("its Required Entries entry", pinned), ("its Track Modes entry", moved_modes))
+               if moved]
     adjusted(world, "cortex_swap",
              f"Cortex Vortex Track: the downloaded Cortex Vortex ({', '.join(twins)}) was replaced by the "
-             f"Cortex Vortex that comes with CTR AP (cortex_vortex_track {world.ctr_cortex_swap_mode}).")
+             f"Cortex Vortex that comes with CTR AP, "
+             f"{'on its own pad' if pinned else 'drawn into the pool like any other track'}."
+             + (f" {' and '.join(carried).capitalize()} carried over." if carried else ""))
 
 
 def draw_plan(world, key_estimate=True):
