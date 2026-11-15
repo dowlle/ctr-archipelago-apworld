@@ -29,7 +29,7 @@ from .. import ctrAPWorld
 
 EARLY = ("generate_early",)
 STEPS = ("generate_early", "create_regions", "create_items", "set_rules")
-LOGGER_NAME = "worlds.ctr.forced_options"
+LOGGER_NAME = "CTR"
 PLAYER = 1
 FINAL = "N. Oxide Garage: N. Oxide's Final Challenge"
 

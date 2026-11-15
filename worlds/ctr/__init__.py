@@ -201,6 +201,8 @@ class ctrAPWorld(World):
             from . import content_item_boxes
             content_item_boxes.settings(self.options)
             content_plan.generate(self)
+        from .notices import emit_summary
+        emit_summary(self)
 
     def create_regions(self):
         from . import content_plan

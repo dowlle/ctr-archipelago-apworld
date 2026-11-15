@@ -35,7 +35,7 @@ from . import CTRTestBase
 
 EARLY = ("generate_early",)
 FULL = ("generate_early", "create_regions", "create_items", "set_rules")
-LOGGER_NAME = "worlds.ctr.forced_options"
+LOGGER_NAME = "CTR"
 PLAYER = 1
 
 

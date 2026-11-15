@@ -86,7 +86,7 @@ class _WarningCollector(logging.Handler):
 
 def _build_with_warnings(seed=1, **options):
     messages = []
-    log = logging.getLogger("worlds.ctr.forced_options")
+    log = logging.getLogger("CTR")
     handler = _WarningCollector(messages)
     log.addHandler(handler)
     try:
@@ -325,12 +325,12 @@ class TestAlpha6BooleanCompatibility(unittest.TestCase):
 
     def test_the_normalization_is_logged_exactly_once(self):
         messages = _forced_option_warnings(1, racer_locked_pads=True)
-        said = [m for m in messages if "'true' is read the Alpha 6 way" in m]
-        self.assertEqual(len(said), 1, messages)
-        message = said[0]
+        self.assertEqual(len(messages), 1, messages)
+        message = messages[0]
+        self.assertIn("'true' is read the Alpha 6 way", message)
         # It must name what it did and what to write instead, not merely warn.
         self.assertIn("a quarter of the eligible pads", message)
-        self.assertIn("write a number instead", message)
+        self.assertIn("Write a number instead", message)
         self.assertIn("0 turns racer locks off", message)
 
     def test_false_says_nothing_because_off_means_the_same_thing(self):

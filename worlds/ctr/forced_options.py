@@ -1,8 +1,8 @@
 """Option interactions the content plan still resolves (issue #178 convention).
 
 RAISE when a combination has no reading the player would recognise as their
-own seed; WARN once, through notices.say_once, when an old spelling is
-translated. One generator row 12 deleted the original generator's entries;
+own seed; NOTE it in the slot's one summary (notices.adjusted) when an old
+spelling is translated. One generator row 12 deleted the original generator's entries;
 the plan owns its own refusals (content_plan.generate). What stays:
 
 - `resolve_death_link_off_when_send_conditions_set`: no one-way DeathLink
@@ -11,35 +11,14 @@ the plan owns its own refusals (content_plan.generate). What stays:
   Character Nitros Oxide (#426).
 - `warn_racer_locked_pads_boolean_normalized`: the Alpha 6 `true` spelling of
   Racer-Locked Warp Pads (ruling 2026-08-29).
-- `_warn`, which content_bosses also uses.
 """
-import logging
-
 from Options import OptionError
 
 from . import characters
 
-logger = logging.getLogger(__name__)
-
 
 def _who(world):
     return f"player {world.player} ({world.multiworld.player_name[world.player]})"
-
-
-def _name(world):
-    from .notices import slot_label
-    return slot_label(world)
-
-
-def _warn(world, key: str, message: str) -> None:
-    """Log `message` once per slot (`notices.say_once`).
-
-    Anything that runs `generate_early` again on the same option objects
-    reaches every warning in this module again. The player generated one seed
-    and asked one question; telling them the same thing twice reads like two
-    different problems."""
-    from .notices import say_once
-    say_once(world, key, message, logger)
 
 
 def resolve_death_link_off_when_send_conditions_set(world):
@@ -89,11 +68,11 @@ def warn_racer_locked_pads_boolean_normalized(world):
     number without changing what it asked for: `bool` is an `int` subclass, so
     it would land on 1 -- a single lock, where Alpha 6 gave a quarter of the
     eligible pads. The 2026-08-29 ruling forbids that silent reinterpretation,
-    so `true` keeps its Alpha 6 meaning and says so, exactly once.
+    so `true` keeps its Alpha 6 meaning and says so in the slot's summary.
     Not a downgrade: nothing is lost, the old spelling is simply translated."""
     if not characters.legacy_boolean_request(world):
         return
-    _warn(world, "warn_racer_locked_pads_boolean_normalized",
-          f"CTR ({_name(world)}): Racer-Locked Warp Pads 'true' is read the "
-          f"Alpha 6 way, as a quarter of the eligible pads (1 to 6); write a "
-          f"number instead, where 0 turns racer locks off.")
+    from .notices import adjusted
+    adjusted(world, "warn_racer_locked_pads_boolean_normalized",
+             "Racer-Locked Warp Pads: 'true' is read the Alpha 6 way, as a quarter of the eligible pads "
+             "(1 to 6). Write a number instead, where 0 turns racer locks off.")

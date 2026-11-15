@@ -25,7 +25,6 @@ plan: the options' defaults are the original game's counts.
 import copy
 import itertools
 import json
-import logging
 import pkgutil
 import random
 
@@ -1193,8 +1192,10 @@ def generate(world):
         starts[opener] = starts.get(opener, 0) + 1
         world.options.start_inventory_from_pool.value = starts
         world.ctr_start_opener = opener
-        logging.info(f"CTR: {world.multiworld.player_name[world.player]} has no check at the start "
-                     f"that can hold progression, so the slot starts with {opener}.")
+        from .notices import adjusted
+        adjusted(world, "start_opener",
+                 f"Starting items: no check open at the start can hold progression, so the slot starts "
+                 f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
     # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
@@ -1269,10 +1270,10 @@ def swap_in_bundled_cortex(world):
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins
     world.ctr_cortex_swap_mode = "own_pad" if pinned else "in_pool"
-    logging.getLogger("CTR").info(
-        "CTR: %s replaced the downloaded Cortex Vortex (%s) with the Cortex Vortex that comes with CTR AP "
-        "(cortex_vortex_track %s).", world.multiworld.player_name[world.player], ", ".join(twins),
-        world.ctr_cortex_swap_mode)
+    from .notices import adjusted
+    adjusted(world, "cortex_swap",
+             f"Cortex Vortex Track: the downloaded Cortex Vortex ({', '.join(twins)}) was replaced by the "
+             f"Cortex Vortex that comes with CTR AP (cortex_vortex_track {world.ctr_cortex_swap_mode}).")
 
 
 def draw_plan(world, key_estimate=True):
