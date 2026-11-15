@@ -38,6 +38,10 @@ def resolve_death_link_off_when_send_conditions_set(world):
     if o.death_link.value == 0 \
             and o.death_link_send.send_mask(o.death_link.value) != 0:
         o.death_link.value = o.death_link.option_mask_reset
+        from .notices import adjusted
+        adjusted(world, "death_link_send_turns_death_link_on",
+                 "DeathLink: turned on as mask_reset, because DeathLink Send lists a trigger and a slot that "
+                 "sends deaths also takes them.")
 
 
 def raise_if_starting_as_removed_oxide(world):

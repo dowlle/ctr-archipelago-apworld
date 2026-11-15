@@ -299,7 +299,7 @@ class TestCortexVortexTrack(unittest.TestCase):
             world = make_world(self.swap_options(pinned=True), seed=6)
         (line,) = summary_lines(world)
         self.assertIn("on its own pad", line)
-        self.assertIn("Its required entries entry carried over.", line.replace("Required Entries", "required entries"))
+        self.assertIn("Its Guaranteed Warp Pads entry carried over.", line)
         with self.assertNoLogs("CTR", logging.WARNING):
             make_world(cv_options(cortex=False), seed=6)
 

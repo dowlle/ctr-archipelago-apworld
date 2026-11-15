@@ -91,6 +91,12 @@ class TestSummary(unittest.TestCase):
         self.assertEqual([r for r in handler.records if r.name == "CTR"], [])
         self.assertEqual(len(summary_lines(world)), 3)
 
+    def test_death_link_send_without_death_link_is_one_line(self):
+        world, records = build(dict(death_link_send=["weapon_hit"], accessibility="full"))
+        self.assertEqual(len(records), 1)
+        self.assertIn("DeathLink: turned on as mask_reset", records[0].getMessage())
+        self.assertEqual(world.options.death_link.value, world.options.death_link.option_mask_reset)
+
     def test_a_racer_lock_request_that_does_nothing_prints_nothing(self):
         """`true` with Character Unlocks off is inert: no unlock item exists, so nothing was translated."""
         _, records = build(dict(racer_locked_pads=True, character_unlocks=False, accessibility="full"))
@@ -109,12 +115,15 @@ class TestSummary(unittest.TestCase):
         root.addHandler(handler)
         try:
             multiworld = setup_multiworld([ctrAPWorld, ctrAPWorld], seed=5,
-                                          options=[heavy_options(), dict(accessibility="full")])
+                                          options=[heavy_options(), dict(death_link_send=["mask_grab"], accessibility="full")])
         finally:
             root.removeHandler(handler)
         ours = [r for r in handler.records if r.name == "CTR"]
-        self.assertEqual(len(ours), 1, [r.getMessage() for r in ours])
-        self.assertIn(f"CTR ({multiworld.player_name[1]})", ours[0].getMessage())
+        self.assertEqual(len(ours), 2, [r.getMessage() for r in ours])
+        for player, record in zip((1, 2), ours):
+            self.assertIn(f"CTR ({multiworld.player_name[player]})", record.getMessage())
+        self.assertIn("Crystal Challenge Count", ours[0].getMessage())
+        self.assertIn("DeathLink: turned on as mask_reset", ours[1].getMessage())
 
     def test_the_library_part_of_the_message(self):
         fake = SimpleNamespace(options=SimpleNamespace(), player=2,
