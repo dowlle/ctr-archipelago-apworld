@@ -145,6 +145,14 @@ class MaskGates:
         """A cup with a Tizi Madness leg: its whole-cup checks need the Mask."""
         return entry_id in self.cups
 
+    def opens_on(self, entry_id):
+        """Does the first race of this entry need the Mask: a track pad or
+        boss race on Tizi Madness, or a cup whose first leg is it? A racer can
+        be hit on any leg, so a cup that starts elsewhere needs nothing."""
+        if entry_id in self.regions:
+            return True
+        return entry_id in self.cups and f"{entry_id}/leg:0" in self.legs
+
     def route(self, route):
         if route.get("entry_id") not in self.cups:
             return False

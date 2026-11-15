@@ -404,6 +404,11 @@ def install(world, check, location, route_tests):
             triggers = tuple(world.multiworld.get_location(names[code], player) for code in wins if code in present)
     weapons = bool(plan.get("global_checks", {}).get("itemsanity"))
     unlocks = characters.unlocks_enabled(world)
+    # A4-96: a boss race on Tizi Madness, or a boss cup that starts on it,
+    # needs the Mask before its boss can be hit (tizi_madness.MaskGates).
+    from . import tizi_madness
+    mask_gates = tizi_madness.MaskGates(plan)
+    masked = frozenset(region for region in boss if mask_gates.opens_on(region))
 
     def selectable(state, name):
         return (not unlocks or name == world.ctr_starting_character
@@ -412,7 +417,9 @@ def install(world, check, location, route_tests):
     def rule(state):
         if weapons and not state.has_any(hit_character.HIT_METHOD_ITEMS, player):
             return False
-        if boss and any(state.can_reach(region, "Region", player) for region in boss):
+        if boss and any(state.can_reach(region, "Region", player)
+                        and (region not in masked or state.has(tizi_madness.MASK_ITEM, player))
+                        for region in boss):
             return True
         if fallback_keys is not None:
             if not state.has(hit_character.KEY_ITEM, player, fallback_keys):
@@ -430,7 +437,9 @@ def install(world, check, location, route_tests):
              else alternatives(logic_terms.Ref(trigger, player) for trigger in triggers) if triggers
              else logic_terms.TRUE)
     ordinary = logic_terms.And(guest, alternatives(leg_terms))
-    paths = [ordinary] + [logic_terms.ReachRegion(world, region) for region in boss]
+    paths = [ordinary] + [logic_terms.ReachRegion(world, region) if region not in masked
+                          else logic_terms.And(logic_terms.ReachRegion(world, region), tizi_madness.mask_term(world))
+                          for region in boss]
     term = alternatives(paths)
     if weapons:
         term = logic_terms.And(logic_terms.HasAny(hit_character.HIT_METHOD_ITEMS, player), term)

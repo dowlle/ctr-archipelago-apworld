@@ -10,7 +10,7 @@ import unittest
 
 from BaseClasses import CollectionState
 
-from .. import content_cups, content_plan, custom_packages, tizi_madness
+from .. import content_bosses, content_cups, content_opening, content_plan, custom_packages, tizi_madness
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, options_with
 
@@ -237,6 +237,14 @@ class TestMaskLogic(unittest.TestCase):
         self.assertNotIn("Mask", names_in(logic_terms.term_of(plain.multiworld.get_entrance(pad["id"], plain.player))))
 
 
+def route_needs(gates, check, route):
+    """Does this route race Tizi Madness? A Hit Character boss route only
+    needs the boss's first race, since the boss can be hit on any leg."""
+    if check["kind"] == "hit" and route["mode"] in content_bosses.MODES:
+        return gates.opens_on(route["entry_id"])
+    return gates.region(route["entry_id"]) or gates.route(route)
+
+
 class TestEveryCheck(unittest.TestCase):
     """Every check of a plan with Tizi Madness on a pad, in cups and as a boss
     venue: a check whose every route races Tizi Madness waits for the Mask,
@@ -249,7 +257,8 @@ class TestEveryCheck(unittest.TestCase):
     def options(seed):
         from .test_content_bosses import boss_options
         options = boss_options(boss_track_shuffle=True, itemsanity=True, shortcut_knowledge=SK["hard"],
-                               podium_placement_checks=True, wumpa_check=["global", "per_track"][seed % 2])
+                               podium_placement_checks=True, wumpa_check=["global", "per_track"][seed % 2],
+                               hit_character=True, boss_cups=4 if seed % 4 == 0 else 0)
         options["item_pool"]["base"]["trophies"] = 12
         options["content_pool"]["cups"] = dict(count=dict(min=3, max=4))
         descriptor = tizi_descriptor()
@@ -277,7 +286,7 @@ class TestEveryCheck(unittest.TestCase):
             for check in plan["checks"]:
                 if not check["routes"] or check["display_name"].startswith("Itemsanity: Mask"):
                     continue  # no route, or the Mask's own use check
-                needs = all(gates.region(r["entry_id"]) or gates.route(r) for r in check["routes"])
+                needs = all(route_needs(gates, check, r) for r in check["routes"])
                 gem_cups = {e["id"] for e in plan["entries"] if e["kind"] == content_cups.KIND}
                 cups = [r for r in check["routes"] if r["entry_id"] in gates.cups & gem_cups]
                 cup_only = bool(cups) and len(cups) == len(check["routes"])
@@ -295,9 +304,55 @@ class TestEveryCheck(unittest.TestCase):
                     seen.add("cup-gated" if needs else "cup-free")
                 if any(gates.region(r["entry_id"]) and r["encounter_id"] for r in check["routes"]):
                     seen.add("boss")
-            if seed >= 5 and seen >= {"boss", "cup-free", "cup-gated"}:
+                if check["kind"] == "hit" and any(r["mode"] in content_bosses.MODES and r["entry_id"] in gates.cups
+                                                  for r in check["routes"]):
+                    seen.add("hit-in-boss-cup")
+            if seed >= 5 and seen >= {"boss", "cup-free", "cup-gated", "hit-in-boss-cup"}:
                 break
-        self.assertGreaterEqual(seen, {"boss", "cup-free", "cup-gated"})
+        self.assertGreaterEqual(seen, {"boss", "cup-free", "cup-gated", "hit-in-boss-cup"})
+
+
+class TestHitInBossCupStart(unittest.TestCase):
+    def test_a_boss_cup_that_starts_on_tizi_madness_hides_its_boss_without_the_mask(self):
+        # Review round 2: Hit Character's boss path read only the region.
+        for seed in range(80):
+            options = TestEveryCheck.options(0)
+            options.update(boss_cups=4)
+            world = make_world(options, seed=seed)
+            plan, mw, player = world.ctr_content_plan, world.multiworld, world.player
+            gates = tizi_madness.MaskGates(plan)
+            starts = [e["id"] for e in plan["entries"] if e["kind"] == content_bosses.CUP_KIND and gates.opens_on(e["id"])]
+            if not starts:
+                continue
+            without, with_all = items_but(world, "Mask"), items_but(world)
+            # The boss of that cup: its other routes wait for the boss beaten.
+            bosses = [r for c in plan["checks"] if c["kind"] == "hit"
+                      for r in c["routes"] if r["mode"] in content_bosses.MODES]
+            hits = [c for c in plan["checks"] if c["kind"] == "hit"
+                    and {r["entry_id"] for r in c["routes"] if r["mode"] in content_bosses.MODES}
+                    and {r["entry_id"] for r in c["routes"] if r["mode"] in content_bosses.MODES} <= set(starts)]
+            self.assertTrue(bosses)
+            self.assertTrue(hits)
+            for check in hits:
+                location = mw.get_location(content_plan.LOCATION_BY_CODE[check["location"]], player)
+                self.assertFalse(location.can_reach(without), check["display_name"])
+                self.assertTrue(location.can_reach(with_all), check["display_name"])
+            return
+        self.fail("no seed drew a boss cup that starts on Tizi Madness")
+
+
+class TestOpeningEstimate(unittest.TestCase):
+    def test_the_estimate_keeps_a_tizi_madness_pad_closed_without_the_mask(self):
+        # Review round 2: the opening estimate (content_opening.PlanReach) saw
+        # the pad open with no items.
+        world = world_with(tizi_descriptor(), "hard", itemsanity=True)
+        plan = world.ctr_content_plan
+        reach = content_opening.PlanReach(plan, world.ctr_content_items.rows, set(), None)
+        pad = next(p for p in plan["pads"] if tizi_madness.MaskGates(plan).region(p["entry_id"]))
+        everything = {row.item: 40 for row in world.ctr_content_items.rows}
+        self.assertTrue(reach._pad_open(pad, everything))
+        everything[reach.mask] = 0
+        self.assertFalse(reach._pad_open(pad, everything))
 
 
 class TestGatedEntries(unittest.TestCase):

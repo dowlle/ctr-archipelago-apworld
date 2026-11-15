@@ -283,6 +283,11 @@ class PlanReach:
         self.pads = {pad["id"]: pad for pad in plan["pads"]}
         self.encounters = {e["id"]: e for e in plan["encounters"]}
         self.code = {row.name: row.item for row in rows}
+        # A4-96: a track pad or boss race on Tizi Madness opens only with the
+        # Mask on an Itemsanity seed (tizi_madness.MaskGates).
+        from . import tizi_madness
+        self.mask_gates = tizi_madness.MaskGates(plan)
+        self.mask = self.code.get(tizi_madness.MASK_ITEM)
         self.boost = self.code.get(boost_item)
         self.base = {row.item: row.start_from_pool + row.start_additional for row in rows}
         self.pool = {row.name: row.remaining for row in rows if row.remaining > 0}
@@ -394,8 +399,13 @@ class PlanReach:
     def _met(self, requirement, held):
         return term_met(self.req[requirement], held)
 
+    def _mask_held(self, entry_id, held):
+        return not self.mask_gates.region(entry_id) or (self.mask is not None and held.get(self.mask, 0) > 0)
+
     def _pad_open(self, pad, held):
         if not self._met(pad["entrance_req"], held):
+            return False
+        if not self._mask_held(pad["entry_id"], held):
             return False
         if pad["racer_lock"] is not None:
             from .characters import CHARACTER_ID_TO_NAME
@@ -421,7 +431,8 @@ class PlanReach:
                        for pad_id, pad in self.pads.items()}
         for encounter in self.encounters.values():
             region_open[encounter["id"]] = (self._met(self.pads[encounter["pad_id"]]["entrance_req"], held)
-                                            and self._met(encounter["requirement_id"], held))
+                                            and self._met(encounter["requirement_id"], held)
+                                            and self._mask_held(encounter["entry_id"], held))
 
         def stage_met(route, opened):
             pad = self.pads[route["own_pad_id"]]
