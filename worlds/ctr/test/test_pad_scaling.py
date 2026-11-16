@@ -105,3 +105,32 @@ class TestPadScaling(unittest.TestCase):
         predicate = dict(op="count", item=content_item_pool.ITEMS["Trophy"], count=8)
         self.assertEqual(ps.predicate_cap(predicate, 1, rows), 8)
         self.assertEqual(ps.predicate_cap(predicate, 2, rows), 4)
+
+    def test_singleton_any_of_matches_the_native_predicate(self):
+        for any_item, concrete in (("AnyRelic", "Sapphire Relic"), ("AnyCtrToken", "Red CTR Token"),
+                                   ("AnyGem", "Red Gem")):
+            one = {concrete: 9}
+            self.assertTrue(cp.stage2_met_by_stage1((any_item, 2), (concrete, 1), one))
+            self.assertTrue(cp.stage2_met_by_stage1((concrete, 2), (any_item, 1), one))
+            self.assertFalse(cp.stage2_met_by_stage1((any_item, 1), (concrete, 2), one))
+        self.assertFalse(cp.stage2_met_by_stage1(("AnyRelic", 2), ("Sapphire Relic", 1), supply()))
+
+    def test_small_single_tier_pool_generates_real_distinct_second_stages(self):
+        pool = {"base": {"trophies": 4, "tokens": dict.fromkeys(content_item_pool.COLOURS, 1),
+                         "relics": {"sapphire": 9, "gold": 0, "platinum": 0}}}
+        weights = {"Trophy": 1, **dict.fromkeys(cp.TOKEN_ITEMS + cp.RELIC_ITEMS, 1000)}
+        for seed in (0, 1, 2, 6):
+            world = make_world(options(item_pool=pool, item_box_count=15, requirement_weights=weights), seed=seed)
+            plan = world.ctr_content_plan
+            self.assertTrue(content_plan.validate(plan))
+            first = records(plan, "stage1:")
+            for pad, after in records(plan, "stage2:").items():
+                before = first.get(pad)
+                if before is not None:
+                    a = set(before.get("items", [before.get("item")]))
+                    b = set(after.get("items", [after.get("item")]))
+                    self.assertFalse(a <= b and after["count"] <= before["count"])
+            if seed == 0:
+                mw = filled(world)
+                state = mw.get_all_state(False)
+                self.assertTrue(all(loc.can_reach(state) for loc in mw.get_locations(1)))

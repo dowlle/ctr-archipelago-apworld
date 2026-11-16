@@ -481,7 +481,7 @@ def _req_family(item):
 _ANY_ITEMS = ("AnyCtrToken", "AnyRelic", "AnyGem")
 
 
-def stage2_met_by_stage1(s1, s2):
+def stage2_met_by_stage1(s1, s2, supply=None):
     """True when owning stage 1 always satisfies stage 2 as well, so the stage 2
     gate can never block a player who has opened the pad (issue #342). That is
     the same item at an equal or lower count, or an Any* aggregate of stage 1's
@@ -490,6 +490,12 @@ def stage2_met_by_stage1(s1, s2):
     if s1 is None or s2 is None:
         return False
     (item1, count1), (item2, count2) = s1, s2
+    if supply is not None:
+        # Native compares masks of the family's positive-base identities. With
+        # one tier/colour, Any* and that concrete item are the same predicate.
+        before = {name for name in pad_scaling.FAMILIES.get(item1, (item1,)) if supply.get(name, 0)}
+        after = {name for name in pad_scaling.FAMILIES.get(item2, (item2,)) if supply.get(name, 0)}
+        return bool(before) and before <= after and count2 <= count1
     if item1 == item2 or (item2 in _ANY_ITEMS
                           and _req_family(item1) == _req_family(item2)):
         return count2 <= count1
@@ -1265,7 +1271,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         if dest in s2_collapsed:
             continue
         s1 = pad_reqs.get(s1_host.get(dest, dest))
-        if not stage2_met_by_stage1(s1, stage2_reqs[dest]):
+        if not stage2_met_by_stage1(s1, stage2_reqs[dest], supply):
             continue
         drawn_from = Inv(supply)
         drawn_from.items = dict(s2_inv_at_draw[dest])
