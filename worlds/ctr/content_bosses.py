@@ -1067,12 +1067,20 @@ def _draw_racers(world, record, pools):
     be = _be()
     o = world.options
     regions = [row[1] for row in boss_track_shuffle.GARAGES]
+    # Use the already-filtered per-garage pools, including inherited-attack
+    # certification and boss-cup exceptions. Reporting takes no random draw.
+    home_advice = ""
+    if home_paired(record):
+        fitting = [name for name in be.opponent_pool(o) if any(name in pool for pool in pools)]
+        home_advice = (" With boss_track_assignment: character_home_track, a racer only fits a track garage"
+                       " when their home track is in boss_track_pool and supports that garage's attack."
+                       " Boss cup garages use their cup legs instead."
+                       " Racers that fit at least one of the four garages: " + (", ".join(fitting) or "none")
+                       + ". Add matching home tracks or racers, or set boss_track_assignment: independent_track.")
     for g in range(4):
         if not pools[g]:
             error(f"boss_opponent_shuffle has no racer left for {regions[g]} in boss_character_pool"
-                  + (" whose home track is in the boss track pool. Allow more racers or "
-                                                "tracks, or set boss_track_assignment: independent_track."
-                                                if home_paired(record) else "."))
+                  + "." + home_advice)
     lists = [list(pools[g]) for g in range(4)]
     with_final = _with_final(record)
     if with_final:
@@ -1084,7 +1092,7 @@ def _draw_racers(world, record, pools):
         error("boss_opponent_shuffle cannot give the "
               + ("four boss garages and N. Oxide's garage five" if with_final else "four boss garages four")
               + " different racers from the allowed pool (" + ", ".join(be.opponent_pool(o))
-              + f"). Bosses never repeat, so allow at least {len(lists)} racers that fit.")
+              + f"). Bosses never repeat, so allow at least {len(lists)} racers that fit." + home_advice)
     return {g: picked[g] for g in range(4)}, (picked[4] if with_final else be.OXIDE_NAME)
 
 
