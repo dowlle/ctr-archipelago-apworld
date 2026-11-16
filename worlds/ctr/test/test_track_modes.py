@@ -151,6 +151,11 @@ class TestCheckIdentities(unittest.TestCase):
 
 class TestStagesAndOrders(unittest.TestCase):
     def test_two_stages_draw_one_gate_per_multi_mode_pad(self):
+        # mode_pool is non-default: 6 Trophies, 54 Relics and 5 Tokens.
+        # Stage 2 caps scale to 2, 6 and 1; Gems and Keys retain four.
+        ceilings = {35010000: 2, **dict.fromkeys(range(35010001, 35010004), 6),
+                    **dict.fromkeys(range(35010004, 35010009), 1),
+                    **dict.fromkeys(range(35010009, 35010015), 4)}
         for seed in range(12):
             plan = make_world(mode_options(custom=[copy.deepcopy(UNKNOWN), relic_only()]), seed=seed).ctr_content_plan
             records = {r["id"]: r["predicate"] for r in plan["requirements"]}
@@ -171,7 +176,7 @@ class TestStagesAndOrders(unittest.TestCase):
                 predicate = records[stage2]
                 items = predicate.get("items", [predicate.get("item")])
                 supply = sum(rows[i]["requirement_ceiling"] for i in items)
-                ceiling = 4 if 35010014 not in items else supply
+                ceiling = ceilings[items[0]]
                 self.assertTrue(1 <= predicate["count"] <= min(ceiling, supply))
 
     def test_single_stage_uses_the_entrance_gate_for_every_mode(self):
@@ -346,7 +351,9 @@ class TestNarrowStartEarlyOpener(unittest.TestCase):
     def test_a_narrow_start_places_an_early_key_and_fills(self):
         from Fill import distribute_items_restrictive
         from .. import sphere0_guard
-        world = make_world(artifact_244_options(), seed=716, stop_before="pre_fill")
+        # Pool-scaled small counts widen the former seed 716 to four checks.
+        # Seed 700 retains the three-check start this regression needs.
+        world = make_world(artifact_244_options(), seed=700, stop_before="pre_fill")
         mw = world.multiworld
         start = [loc for loc in mw.get_reachable_locations(CollectionState(mw), 1) if loc.address]
         self.assertLess(len(start), sphere0_guard.NARROW_START_CHECKS)
