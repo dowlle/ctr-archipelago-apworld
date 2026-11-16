@@ -22,7 +22,7 @@ import json
 import pkgutil
 
 from . import (arena_content, content_bosses, content_cups, content_item_pool, destinations, sphere0_guard,
-               content_playthrough, warp_pad_rules)
+               content_playthrough, pad_scaling, warp_pad_rules)
 
 FEATURE = "pad_requirements_v1"
 #: `warppad_unlock_requirements` values and their names on the plan.
@@ -394,6 +394,9 @@ class ReferenceWorld:
         self.random = world.random
         self.options = _Options(world.options)
         self.player = world.player
+        self._ctr_requirement_supply = {row.name: row.requirement_ceiling
+                                        for row in world.ctr_content_items.rows
+                                        if row.name in content_item_pool.COUNTED_NAMES}
         self._ctr_relic_created = relics
         self._ctr_pad_rules = getattr(world, "_ctr_pad_rules", None)
         self.stands, self.pins = stands, pins
@@ -522,11 +525,11 @@ def check_record(plan, stage1, stage2, manual, rows, require):
     first = {int(rid.split(":")[1]): row["predicate"] for rid, row in {**stage1, **manual}.items()}
     for row in stage1.values():
         predicate = row["predicate"]
-        require(predicate.get("item") == key or predicate["count"] <= content_playthrough._STAGE1_COUNT_CEILING,
+        require(predicate["count"] <= pad_scaling.admission_cap(predicate, 1, rows),
                 "a drawn stage 1 asks above its count ceiling")
     for rid, row in stage2.items():
         predicate = row["predicate"]
-        require(predicate.get("item") == key or predicate["count"] <= content_playthrough._STAGE2_COUNT_CEILING,
+        require(predicate["count"] <= pad_scaling.admission_cap(predicate, 2, rows),
                 "a drawn stage 2 asks above its count ceiling")
         before = first.get(int(rid.split(":")[1]))
         require(before is None or predicate["count"] > before["count"]

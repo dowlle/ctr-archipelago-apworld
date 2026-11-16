@@ -1,0 +1,3 @@
+  item_pool: {base: {trophies: 4, tokens: {red: 1, green: 1, blue: 1, yellow: 1, purple: 1}, relics: {sapphire: 9, gold: 0, platinum: 0}}}
+  item_box_count: 1
+  requirement_weights: {Trophy: 1, Red CTR Token: 1000, Green CTR Token: 1000, Blue CTR Token: 1000, Yellow CTR Token: 1000, Purple CTR Token: 1000, Sapphire Relic: 1000}

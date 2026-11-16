@@ -25,7 +25,7 @@ import math
 import pkgutil
 import re
 
-from . import destinations, warp_pad_rules
+from . import destinations, pad_scaling, warp_pad_rules
 from .destinations import CORTEX_VORTEX
 
 
@@ -114,11 +114,14 @@ class Inv:
     _RELICS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
     _GEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
 
-    def __init__(self):
+    def __init__(self, supply=None):
+        self.supply = supply
+        self.caps = self.CAPS if supply is None else {k: min(4, supply.get(k, 0)) if k == "Key"
+                                                    else supply.get(k, 0) for k in self.CAPS}
         self.items = {k: 0 for k in self.CAPS}
 
     def add(self, item):
-        if item in self.CAPS and self.items[item] < self.CAPS[item]:
+        if item in self.caps and self.items[item] < self.caps[item]:
             self.items[item] += 1
 
     def count(self, name):
@@ -588,7 +591,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             total = sum(inv.items[c] for c in colours)
             cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
             if _TOKEN_COLLAPSE_CAP is not None:
-                cnt = min(cnt, _TOKEN_COLLAPSE_CAP)
+                cnt = min(cnt, pad_scaling.count_cap("AnyCtrToken", _TOKEN_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyCtrToken", cnt
     elif req_item in RELIC_ITEMS:
         if rnd.randrange(100) < _RELIC_COLLAPSE_CHANCE:
@@ -596,7 +599,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             total = sum(inv.items[r] for r in tiers)
             cnt = max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
             if _RELIC_COLLAPSE_CAP is not None:
-                cnt = min(cnt, _RELIC_COLLAPSE_CAP)
+                cnt = min(cnt, pad_scaling.count_cap("AnyRelic", _RELIC_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyRelic", cnt
     elif req_item in GEM_ITEMS:
         if rnd.randrange(100) < _GEM_COLLAPSE_CHANCE:
@@ -606,7 +609,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             if _GEM_COLLAPSE_CAP is None:
                 cnt = max(1, total - 1)
             else:
-                cnt = max(1, min(total, _GEM_COLLAPSE_CAP))
+                cnt = max(1, min(total, pad_scaling.count_cap("AnyGem", _GEM_COLLAPSE_CAP, inv.supply)))
             req_item, req_cnt = "AnyGem", cnt
     return (req_item, req_cnt)
 
@@ -747,7 +750,7 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups, held=()):
     pad_reqs = {t: out[t][1] for t in out}
     s2_by_region = {reward_track_for(t): out[t][2] for t in out}
     stage2_dests = _stage2_set(world)
-    inv = Inv()
+    inv = Inv(getattr(world, "_ctr_requirement_supply", None))
     for item in held:
         inv.add(item)
 
@@ -1133,7 +1136,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         dest_to_phys.setdefault(sweep_resolver(_p), _p)
         dest_to_phys_real.setdefault(reward_track_for(_p), _p)
 
-    inv = Inv()
+    inv = Inv(getattr(world, "_ctr_requirement_supply", None))
     collected = set()
     _reachable_pads_and_collect(
         inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
@@ -1244,9 +1247,10 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # Manual rules (#463) are set aside so the post-pass neither lowers nor
     # caps them, and takes no draw for them. With none, this is the old call.
     held = {t: pad_reqs.pop(t) for t in fixed}
-    _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
+    supply = inv.supply
+    _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING, supply=supply)
     pad_reqs.update(held)
-    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
+    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
 
     # 3a) Issue #342: a REAL stage 2 must add a gate beyond its own pad's stage 1.
     # The two stages are drawn and lowered independently (and stage 2 has the
@@ -1263,7 +1267,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         s1 = pad_reqs.get(s1_host.get(dest, dest))
         if not stage2_met_by_stage1(s1, stage2_reqs[dest]):
             continue
-        drawn_from = Inv()
+        drawn_from = Inv(supply)
         drawn_from.items = dict(s2_inv_at_draw[dest])
         family = _req_family(s1[0])
         other = {it for it in allowed if _req_family(it) != family}
@@ -1272,7 +1276,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             s2_collapsed.add(dest)
             continue
         one = {dest: redrawn}
-        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING)
+        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
         stage2_reqs[dest] = one[dest]
 
     # 3b) Re-key every COLLAPSED stage 2 to its host pad's FINAL stage 1: a
@@ -1658,12 +1662,12 @@ def deny_four_key_gate(req, mode):
     return req
 
 
-def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
+def _post_process(rnd, pad_reqs, mode, count_ceiling=None, supply=None):
     """66% lower count *0.6 ceil (when count != 0); else if mode==2 and req is
     ('Key',4) -> ('Key',3). Iterate a SORTED copy for determinism. When
-    count_ceiling is given (stage 2), clamp the final count to it AFTER the random
-    reduction -- a pure LOWERING, so the solvable DAG is preserved (Key counts are
-    left uncapped: a Key gate maxes at 4 and is cheap to satisfy)."""
+    count_ceiling is given, scale it to the seed's base family supply and clamp
+    AFTER the random reduction, a pure lowering of the owned count. With no
+    supply the historical 8/4 caps stand. Keys never exceed four."""
     for track in sorted(pad_reqs):
         req = pad_reqs[track]
         if req is None:
@@ -1678,8 +1682,10 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
             if lowered != (item, cnt):
                 pad_reqs[track] = lowered
                 item, cnt = lowered
-        if count_ceiling is not None and item != "Key" and cnt > count_ceiling:
-            pad_reqs[track] = (item, count_ceiling)
+        if count_ceiling is not None:
+            cap = pad_scaling.count_cap(item, count_ceiling, supply)
+            if cnt > cap:
+                pad_reqs[track] = (item, cap)
 
 
 # (trophy floor, boss keys already earned). Keys come only from bosses when

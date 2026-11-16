@@ -94,6 +94,9 @@
 - {check_name: pads-density-standard,      check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-standard'}
 - {check_name: pads-density-deep,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-deep'}
 - {check_name: pads-density-full,          check_runs: 500,  check_hook: '',                                                          check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full'}
+- {check_name: pads-pool-large,            check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-pool-large'}
+- {check_name: pads-pool-large-ut,         check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-random_without_4_keys-shuffle-full-none-pool-large'}
+- {check_name: pads-pool-small,            check_runs: 500, check_hook: '', check_mode: fuzz, check_meta: 'pads-randomized-shuffle-full-none-pool-small'}
 - {check_name: pads-ut,                     check_runs: 500,  check_hook: 'hooks.ctr_ut_hook:Hook',                                    check_mode: fuzz, check_tracker: 'yes', check_meta: 'pads-vanilla-shuffle-full'}
 # One generator row 4: items fixed to their own check, with vanilla and
 # random requirements, on the pads meta at accessibility full. The last

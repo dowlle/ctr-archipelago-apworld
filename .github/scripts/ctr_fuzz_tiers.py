@@ -36,6 +36,7 @@ PR_ARMS = {
     "gem-cups-7-random": "cups",
     "gem-cups-2-random-gauntlet": "cups",
     "pads-all-ut": "pads",
+    "pads-pool-large": "pads",
 }
 FAMILIES = {"default", "content plan", "cups", "bosses", "pads", "ut", "determinism"}
 
