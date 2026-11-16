@@ -158,6 +158,8 @@ class SoloTestCase(unittest.TestCase):
     def preset(self, name: str) -> str:
         return os.path.join(self.client, "solo-runtime", "presets", name)
 
+
+class TestBootstrap(SoloTestCase):
     def test_bootstrap_keeps_dependency_updates_disabled(self):
         runtime = os.path.join(self.client, "solo-runtime")
         code = '''
