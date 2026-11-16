@@ -207,12 +207,24 @@ class TestContentBossShuffleDraws(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn("four boss garages four different racers", message)
         self.assertIn("boss_track_assignment: character_home_track", message)
-        self.assertIn("their home track is in boss_track_pool", message)
+        self.assertIn("their home track is allowed by boss_track_pool and retail_tracks", message)
         self.assertIn("Racers that fit at least one of the four garages: Neo Cortex, Komodo Joe, Pinstripe.", message)
         self.assertIn("boss_track_assignment: independent_track", message)
         # The other weighted option in the reported YAML remains valid.
         options["boss_track_assignment"] = "independent_track"
         self.assertTrue(content_plan.validate(make_world(options, seed=11).ctr_content_plan))
+
+    def test_home_track_refusal_explains_the_empty_default_pool(self):
+        options = boss_options(
+            boss_opponent_shuffle=True, boss_track_shuffle=True,
+            boss_track_assignment="character_home_track", wumpa_shop_slots=0,
+            boss_track_pool=[], boss_character_pool=["Neo Cortex", "Komodo Joe", "Pinstripe"])
+        with self.assertRaises(OptionError) as raised:
+            make_world(options, seed=11)
+        self.assertIn("An empty boss_track_pool means all eligible tracks.", str(raised.exception))
+        self.assertIn("boss_track_pool and retail_tracks", str(raised.exception))
+        self.assertIn("Racers that fit at least one of the four garages: Neo Cortex, Komodo Joe, Pinstripe.",
+                      str(raised.exception))
 
     def test_custom_venue_maps_the_kit_on_its_restart_points(self):
         """independent_track with Baby T Park (35 restart points) and Cortex

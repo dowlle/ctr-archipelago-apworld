@@ -1073,10 +1073,11 @@ def _draw_racers(world, record, pools):
     if home_paired(record):
         fitting = [name for name in be.opponent_pool(o) if any(name in pool for pool in pools)]
         home_advice = (" With boss_track_assignment: character_home_track, a racer only fits a track garage"
-                       " when their home track is in boss_track_pool and supports that garage's attack."
+                       " when their home track is allowed by boss_track_pool and retail_tracks"
+                       " and supports that garage's attack. An empty boss_track_pool means all eligible tracks."
                        " Boss cup garages use their cup legs instead."
                        " Racers that fit at least one of the four garages: " + (", ".join(fitting) or "none")
-                       + ". Add matching home tracks or racers, or set boss_track_assignment: independent_track.")
+                       + ". Allow more matching home tracks or racers, or set boss_track_assignment: independent_track.")
     for g in range(4):
         if not pools[g]:
             error(f"boss_opponent_shuffle has no racer left for {regions[g]} in boss_character_pool"
