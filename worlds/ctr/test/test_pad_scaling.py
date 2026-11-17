@@ -2,6 +2,7 @@
 import copy
 import random
 import unittest
+from unittest.mock import patch
 
 from Options import OptionError
 
@@ -25,6 +26,58 @@ def big_options():
 
 
 class TestPadScaling(unittest.TestCase):
+    def test_shuffled_redraws_use_selected_inventory_and_caps(self):
+        track = "Crash Cove"
+        for total, cap in ((4, 2), (64, 32)):
+            for path in ("frontier", "pinned", "critical"):
+                with self.subTest(total=total, path=path):
+                    # The same owned Trophy inventory backs all three relaxation
+                    # paths. A static Key gate forces the two completeness paths.
+                    exits = {"start": [(cp._pad_exit_name(track), track,
+                                        [] if path == "frontier" else [("Key", 4)])]}
+                    locations = {f"reward {i}": dict(region="start", gate=[],
+                                 is_tt_or_token=False, reward="Trophy") for i in range(total)}
+                    pads = {track: ("Key", 4)}
+                    relaxed, _ = cp._revalidate_against_shuffle(
+                        random.Random(0), exits, locations, pads, {}, {}, "start",
+                        {"Trophy"}, {}, pinned_items={"Key"} if path == "pinned" else set(),
+                        critical_regions={"unreached"} if path == "critical" else set(),
+                        supply={"Trophy": total})
+                    self.assertEqual(pads[track], ("Trophy", cap))
+                    self.assertEqual(relaxed[track], (("Key", 4), pads[track]))
+
+    def test_shuffled_singleton_redraw_collapses_implied_stage2(self):
+        original = cp._revalidate_against_shuffle
+        original_run = cp._run_sphere_search_once
+        redraws = []
+
+        def force_singleton_redraw(*args, **kwargs):
+            result = original(*args, **kwargs)
+            pads, second, hosts = args[3:6]
+            dest = sorted(second)[0]
+            # Reproduce the redraw outcome after the earlier stage-2 check:
+            # AnyRelic and Sapphire are equivalent in this selected pool.
+            pads[hosts[dest]] = ("AnyRelic", 2)
+            second[dest] = ("Sapphire Relic", 1)
+            redraws.append(hosts[dest])
+            return result
+
+        def run_shuffled(view, *args, **kwargs):
+            # ReferenceWorld normally already uses physical-pad regions. Enter
+            # the retained shuffled-graph pass explicitly to test its final check.
+            view.warp_pad_map = {"Crash Cove Warp Pad": 6}
+            out = original_run(view, *args, **kwargs)
+            self.assertEqual(out[redraws[-1]][2], out[redraws[-1]][1])
+            return out
+
+        pool = {"base": {"trophies": 4, "tokens": dict.fromkeys(content_item_pool.COLOURS, 1),
+                         "relics": {"sapphire": 9, "gold": 0, "platinum": 0}}}
+        with patch.object(cp, "_revalidate_against_shuffle", side_effect=force_singleton_redraw), \
+                patch.object(cp, "_run_sphere_search_once", side_effect=run_shuffled):
+            world = make_world(options(item_pool=pool, item_box_count=15), seed=0)
+        self.assertTrue(redraws)
+        self.assertTrue(content_plan.validate(world.ctr_content_plan))
+
     def test_caps_default_large_small_and_display_limit(self):
         for item in ("Trophy", "AnyCtrToken", "AnyRelic", "AnyGem", "Gold Relic", "Red CTR Token"):
             for stage, old in ((1, 8), (2, 4)):

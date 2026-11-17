@@ -1355,7 +1355,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
             dest_to_phys_real, start, allowed, keygate,
-            frozenset(pinned_items), critical_regions, mode, fixed)
+            frozenset(pinned_items), critical_regions, mode, fixed, supply=supply)
         world._ctr_s2_relaxed_s1 = relaxed_s1
         world._ctr_s2_relaxed_s2 = relaxed_s2
         # A relaxed stage 1 is redrawn from the fixed-point inventory and can
@@ -1366,7 +1366,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         for _dest in sorted(stage2_reqs):
             _s1 = pad_reqs.get(dest_to_phys_real.get(_dest, _dest))
             if (stage2_reqs[_dest] != _s1
-                    and stage2_met_by_stage1(_s1, stage2_reqs[_dest])):
+                    and stage2_met_by_stage1(_s1, stage2_reqs[_dest], supply)):
                 stage2_reqs[_dest] = _s1
 
     # 4) assemble {track: {1: stage1, 2: stage2}}. Stage-2 eligibility keys off the
@@ -1445,7 +1445,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                                 dest_to_phys, start, allowed, keygate,
                                 pinned_items=frozenset(),
                                 critical_regions=frozenset(), mode=1,
-                                fixed=None):
+                                fixed=None, supply=None):
     """Verify the identity-topology requirement DAG against the ACTUAL shuffled
     graph; relax ONLY the requirements that fail there.
 
@@ -1498,6 +1498,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     cannot open them. The sweep under-approximates real fill, so a manual rule
     it cannot open is left to fill and the accessibility check; the item
     supply ceiling is checked up front (warp_pad_rules.check_supply).
+    `supply` owns this sweep's selected base inventory and scaled redraw caps.
     Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
     fixed = fixed or {}
     relaxed_s1 = {}
@@ -1508,7 +1509,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         guard += 1
         if guard > len(HUB_STATIC) + len(TROPHY_TRACKS) + 8:
             raise RuntimeError("CTR stage-2 re-validation failed to converge")
-        inv = Inv()
+        inv = Inv(supply)
         collected = set()
         _reachable_pads_and_collect(
             inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
@@ -1548,9 +1549,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
             track = min(blocked_s1,
                         key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
             new = _assign_from_inv(rnd, inv, allowed)
-            if (new is not None and new[0] != "Key"
-                    and new[1] > _STAGE1_COUNT_CEILING):
-                new = (new[0], _STAGE1_COUNT_CEILING)
+            if new is not None and new[0] != "Key":
+                cap = pad_scaling.count_cap(new[0], _STAGE1_COUNT_CEILING, supply)
+                new = (new[0], min(new[1], cap))
             new = deny_four_key_gate(new, mode)
             relaxed_s1[track] = (pad_reqs.get(track), new)
             pad_reqs[track] = new
@@ -1604,9 +1605,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 track = min(pinned_s1,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
-                if (new_req is not None and new_req[0] != "Key"
-                        and new_req[1] > _STAGE1_COUNT_CEILING):
-                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                if new_req is not None and new_req[0] != "Key":
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
@@ -1637,9 +1638,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 track = min(unvalidated,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
-                if (new_req is not None and new_req[0] != "Key"
-                        and new_req[1] > _STAGE1_COUNT_CEILING):
-                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                if new_req is not None and new_req[0] != "Key":
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
