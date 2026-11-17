@@ -145,7 +145,8 @@ class TestRacerLocks(unittest.TestCase):
                 self.assertTrue(set(locks) <= set(eligible))
                 for pad_id in locks:
                     self.assertTrue(pads[pad_id]["entrance_req"] != "free"
-                                    or any(g["requirement_id"].startswith("manual:") for g in pads[pad_id]["mode_gates"]))
+                                    or any(g["stage"] == 1 and g["requirement_id"].startswith(("manual:", "stage1:"))
+                                           for g in pads[pad_id]["mode_gates"]))
                 self.assertNotIn(start, locks.values())
                 counts = [list(locks.values()).count(characters.ROSTER_CHARACTER_ID[n])
                           for n in ROSTER if characters.ROSTER_CHARACTER_ID[n] != start]
@@ -157,7 +158,8 @@ class TestRacerLocks(unittest.TestCase):
     def test_free_starting_pads_never_lock(self):
         plan = make_world(racer_options(locks=27), seed=3).ctr_content_plan
         for pad in plan["pads"]:
-            if pad["entry_id"] is not None and pad["entrance_req"] == "free":
+            if (pad["entry_id"] is not None and pad["entrance_req"] == "free"
+                    and pad["mode_gates"][0]["requirement_id"] == "free"):
                 self.assertIsNone(pad["racer_lock"], pad["id"])
 
     def test_start_breadth_is_the_same_with_locks(self):

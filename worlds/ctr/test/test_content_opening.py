@@ -293,7 +293,9 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
     # racers: 58 before the nine tester cup names joined the pool (A3-42), 65 from A3-42 to A4-16c, and 58
     # again since the three track author names (A4-71) grew the draw to 39; seed 83 draws other cup names.
     # The A4-71 author preference changes no cup of this seed (it has no custom tracks).
-    cases = (("letters", 169, 52), ("racers", 83, 58))
+    # Whole-family hub bands give letters seed 169 enough paid slack (12).
+    # Seed 170 still advertises 43 checks while paid support leaves only six.
+    cases = (("letters", 170, 43), ("racers", 83, 58))
 
     def options(self, name):
         path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"
