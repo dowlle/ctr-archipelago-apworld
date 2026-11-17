@@ -1,0 +1,5 @@
+  item_pool: {base: {trophies: 64, tokens: {red: 16, green: 16, blue: 16, yellow: 16, purple: 16}, relics: {sapphire: 72, gold: 72, platinum: 0}}}
+  item_box_count: 50
+  wumpasanity: both
+  lettersanity: locations_only
+  requirement_weights: {Trophy: 1, Red CTR Token: 1000, Green CTR Token: 1000, Blue CTR Token: 1000, Yellow CTR Token: 1000, Purple CTR Token: 1000, Sapphire Relic: 1000, Gold Relic: 1000, Platinum Relic: 1000}

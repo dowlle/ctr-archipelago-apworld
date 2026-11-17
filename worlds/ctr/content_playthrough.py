@@ -25,7 +25,7 @@ import math
 import pkgutil
 import re
 
-from . import destinations, warp_pad_rules
+from . import destinations, pad_scaling, warp_pad_rules
 from .destinations import CORTEX_VORTEX
 
 
@@ -114,11 +114,14 @@ class Inv:
     _RELICS = ("Sapphire Relic", "Gold Relic", "Platinum Relic")
     _GEMS = ("Red Gem", "Green Gem", "Blue Gem", "Yellow Gem", "Purple Gem")
 
-    def __init__(self):
+    def __init__(self, supply=None):
+        self.supply = supply
+        self.caps = self.CAPS if supply is None else {k: min(4, supply.get(k, 0)) if k == "Key"
+                                                    else supply.get(k, 0) for k in self.CAPS}
         self.items = {k: 0 for k in self.CAPS}
 
     def add(self, item):
-        if item in self.CAPS and self.items[item] < self.CAPS[item]:
+        if item in self.caps and self.items[item] < self.caps[item]:
             self.items[item] += 1
 
     def count(self, name):
@@ -478,7 +481,7 @@ def _req_family(item):
 _ANY_ITEMS = ("AnyCtrToken", "AnyRelic", "AnyGem")
 
 
-def stage2_met_by_stage1(s1, s2):
+def stage2_met_by_stage1(s1, s2, supply=None):
     """True when owning stage 1 always satisfies stage 2 as well, so the stage 2
     gate can never block a player who has opened the pad (issue #342). That is
     the same item at an equal or lower count, or an Any* aggregate of stage 1's
@@ -487,6 +490,12 @@ def stage2_met_by_stage1(s1, s2):
     if s1 is None or s2 is None:
         return False
     (item1, count1), (item2, count2) = s1, s2
+    if supply is not None:
+        # Native compares masks of the family's positive-base identities. With
+        # one tier/colour, Any* and that concrete item are the same predicate.
+        before = {name for name in pad_scaling.FAMILIES.get(item1, (item1,)) if supply.get(name, 0)}
+        after = {name for name in pad_scaling.FAMILIES.get(item2, (item2,)) if supply.get(name, 0)}
+        return bool(before) and before <= after and count2 <= count1
     if item1 == item2 or (item2 in _ANY_ITEMS
                           and _req_family(item1) == _req_family(item2)):
         return count2 <= count1
@@ -588,7 +597,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             total = sum(inv.items[c] for c in colours)
             cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
             if _TOKEN_COLLAPSE_CAP is not None:
-                cnt = min(cnt, _TOKEN_COLLAPSE_CAP)
+                cnt = min(cnt, pad_scaling.count_cap("AnyCtrToken", _TOKEN_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyCtrToken", cnt
     elif req_item in RELIC_ITEMS:
         if rnd.randrange(100) < _RELIC_COLLAPSE_CHANCE:
@@ -596,7 +605,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             total = sum(inv.items[r] for r in tiers)
             cnt = max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
             if _RELIC_COLLAPSE_CAP is not None:
-                cnt = min(cnt, _RELIC_COLLAPSE_CAP)
+                cnt = min(cnt, pad_scaling.count_cap("AnyRelic", _RELIC_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyRelic", cnt
     elif req_item in GEM_ITEMS:
         if rnd.randrange(100) < _GEM_COLLAPSE_CHANCE:
@@ -606,7 +615,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             if _GEM_COLLAPSE_CAP is None:
                 cnt = max(1, total - 1)
             else:
-                cnt = max(1, min(total, _GEM_COLLAPSE_CAP))
+                cnt = max(1, min(total, pad_scaling.count_cap("AnyGem", _GEM_COLLAPSE_CAP, inv.supply)))
             req_item, req_cnt = "AnyGem", cnt
     return (req_item, req_cnt)
 
@@ -747,7 +756,7 @@ def _sphere0_breadth(world, out, reward_track_for, include_gem_cups, held=()):
     pad_reqs = {t: out[t][1] for t in out}
     s2_by_region = {reward_track_for(t): out[t][2] for t in out}
     stage2_dests = _stage2_set(world)
-    inv = Inv()
+    inv = Inv(getattr(world, "_ctr_requirement_supply", None))
     for item in held:
         inv.add(item)
 
@@ -1133,7 +1142,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         dest_to_phys.setdefault(sweep_resolver(_p), _p)
         dest_to_phys_real.setdefault(reward_track_for(_p), _p)
 
-    inv = Inv()
+    inv = Inv(getattr(world, "_ctr_requirement_supply", None))
     collected = set()
     _reachable_pads_and_collect(
         inv, exits, locations, pad_reqs, stage2_reqs, collected, start,
@@ -1244,9 +1253,10 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
     # Manual rules (#463) are set aside so the post-pass neither lowers nor
     # caps them, and takes no draw for them. With none, this is the old call.
     held = {t: pad_reqs.pop(t) for t in fixed}
-    _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING)
+    supply = inv.supply
+    _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING, supply=supply)
     pad_reqs.update(held)
-    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING)
+    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
 
     # 3a) Issue #342: a REAL stage 2 must add a gate beyond its own pad's stage 1.
     # The two stages are drawn and lowered independently (and stage 2 has the
@@ -1261,9 +1271,9 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         if dest in s2_collapsed:
             continue
         s1 = pad_reqs.get(s1_host.get(dest, dest))
-        if not stage2_met_by_stage1(s1, stage2_reqs[dest]):
+        if not stage2_met_by_stage1(s1, stage2_reqs[dest], supply):
             continue
-        drawn_from = Inv()
+        drawn_from = Inv(supply)
         drawn_from.items = dict(s2_inv_at_draw[dest])
         family = _req_family(s1[0])
         other = {it for it in allowed if _req_family(it) != family}
@@ -1272,7 +1282,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             s2_collapsed.add(dest)
             continue
         one = {dest: redrawn}
-        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING)
+        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
         stage2_reqs[dest] = one[dest]
 
     # 3b) Re-key every COLLAPSED stage 2 to its host pad's FINAL stage 1: a
@@ -1345,7 +1355,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         relaxed_s1, relaxed_s2 = _revalidate_against_shuffle(
             rnd, exits_real, locations_real, pad_reqs, stage2_reqs,
             dest_to_phys_real, start, allowed, keygate,
-            frozenset(pinned_items), critical_regions, mode, fixed)
+            frozenset(pinned_items), critical_regions, mode, fixed, supply=supply)
         world._ctr_s2_relaxed_s1 = relaxed_s1
         world._ctr_s2_relaxed_s2 = relaxed_s2
         # A relaxed stage 1 is redrawn from the fixed-point inventory and can
@@ -1356,7 +1366,7 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
         for _dest in sorted(stage2_reqs):
             _s1 = pad_reqs.get(dest_to_phys_real.get(_dest, _dest))
             if (stage2_reqs[_dest] != _s1
-                    and stage2_met_by_stage1(_s1, stage2_reqs[_dest])):
+                    and stage2_met_by_stage1(_s1, stage2_reqs[_dest], supply)):
                 stage2_reqs[_dest] = _s1
 
     # 4) assemble {track: {1: stage1, 2: stage2}}. Stage-2 eligibility keys off the
@@ -1435,7 +1445,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                                 dest_to_phys, start, allowed, keygate,
                                 pinned_items=frozenset(),
                                 critical_regions=frozenset(), mode=1,
-                                fixed=None):
+                                fixed=None, supply=None):
     """Verify the identity-topology requirement DAG against the ACTUAL shuffled
     graph; relax ONLY the requirements that fail there.
 
@@ -1488,6 +1498,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
     cannot open them. The sweep under-approximates real fill, so a manual rule
     it cannot open is left to fill and the accessibility check; the item
     supply ceiling is checked up front (warp_pad_rules.check_supply).
+    `supply` owns this sweep's selected base inventory and scaled redraw caps.
     Returns ({track: (old, new)}, {dest: (old, new)}) for the relaxations."""
     fixed = fixed or {}
     relaxed_s1 = {}
@@ -1498,7 +1509,7 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
         guard += 1
         if guard > len(HUB_STATIC) + len(TROPHY_TRACKS) + 8:
             raise RuntimeError("CTR stage-2 re-validation failed to converge")
-        inv = Inv()
+        inv = Inv(supply)
         collected = set()
         _reachable_pads_and_collect(
             inv, exits, locations, pad_reqs, stage2_reqs, collected, start)
@@ -1538,9 +1549,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
             track = min(blocked_s1,
                         key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
             new = _assign_from_inv(rnd, inv, allowed)
-            if (new is not None and new[0] != "Key"
-                    and new[1] > _STAGE1_COUNT_CEILING):
-                new = (new[0], _STAGE1_COUNT_CEILING)
+            if new is not None and new[0] != "Key":
+                cap = pad_scaling.count_cap(new[0], _STAGE1_COUNT_CEILING, supply)
+                new = (new[0], min(new[1], cap))
             new = deny_four_key_gate(new, mode)
             relaxed_s1[track] = (pad_reqs.get(track), new)
             pad_reqs[track] = new
@@ -1594,9 +1605,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 track = min(pinned_s1,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
-                if (new_req is not None and new_req[0] != "Key"
-                        and new_req[1] > _STAGE1_COUNT_CEILING):
-                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                if new_req is not None and new_req[0] != "Key":
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
@@ -1627,9 +1638,9 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                 track = min(unvalidated,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
-                if (new_req is not None and new_req[0] != "Key"
-                        and new_req[1] > _STAGE1_COUNT_CEILING):
-                    new_req = (new_req[0], _STAGE1_COUNT_CEILING)
+                if new_req is not None and new_req[0] != "Key":
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
                 pad_reqs[track] = new_req
@@ -1658,12 +1669,12 @@ def deny_four_key_gate(req, mode):
     return req
 
 
-def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
+def _post_process(rnd, pad_reqs, mode, count_ceiling=None, supply=None):
     """66% lower count *0.6 ceil (when count != 0); else if mode==2 and req is
     ('Key',4) -> ('Key',3). Iterate a SORTED copy for determinism. When
-    count_ceiling is given (stage 2), clamp the final count to it AFTER the random
-    reduction -- a pure LOWERING, so the solvable DAG is preserved (Key counts are
-    left uncapped: a Key gate maxes at 4 and is cheap to satisfy)."""
+    count_ceiling is given, scale it to the seed's base family supply and clamp
+    AFTER the random reduction, a pure lowering of the owned count. With no
+    supply the historical 8/4 caps stand. Keys never exceed four."""
     for track in sorted(pad_reqs):
         req = pad_reqs[track]
         if req is None:
@@ -1678,8 +1689,10 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None):
             if lowered != (item, cnt):
                 pad_reqs[track] = lowered
                 item, cnt = lowered
-        if count_ceiling is not None and item != "Key" and cnt > count_ceiling:
-            pad_reqs[track] = (item, count_ceiling)
+        if count_ceiling is not None:
+            cap = pad_scaling.count_cap(item, count_ceiling, supply)
+            if cnt > cap:
+                pad_reqs[track] = (item, cap)
 
 
 # (trophy floor, boss keys already earned). Keys come only from bosses when

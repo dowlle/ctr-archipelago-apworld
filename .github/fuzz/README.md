@@ -7,7 +7,7 @@
 | Tier | Arms | When |
 |---|---|---|
 | none | no fuzz; pytest and pack still run | a draft pull request, and a pull request that changes only safe paths |
-| pr | the 17 arms in `PR_ARMS` | every other pull request, every push to `main`, and every push to `dev/**` |
+| pr | the 18 arms in `PR_ARMS` | every other pull request, every push to `main`, and every push to `dev/**` |
 | full | every arm in `ctr-world-matrix.yml` | pushes to `release/**` and `ci/**`, the nightly run, manual runs (including the run before a tag), and pull requests with the `full-fuzz` label |
 
 A draft gets its fuzz arms when it is marked ready for review; a `full-fuzz` label on a draft still selects the full tier. A newer push to a pull request or to `main` cancels the older run. The fuzz job runs at most 12 arms at once, because the account's 20 hosted runners are shared with native CI. Full coverage of `main` comes from the nightly run and from the manual full run required before every tag (below).
@@ -23,7 +23,7 @@ The pr tier covers each generation family at least once:
 | content plan | `content-plan-vanilla`, `content-plan-full`, `content-plan-132` |
 | cups | `gem-cups-7-random`, `gem-cups-2-random-gauntlet` |
 | bosses | `content-plan-bosses` |
-| pads | `pads-all-ut` (every pad overlay at once, through Universal Tracker) |
+| pads | `pads-all-ut` (every pad overlay at once, through Universal Tracker), `pads-pool-large` (fourfold counted pool and high token/relic weights) |
 | Universal Tracker | `check-ut` |
 | determinism | `check-determinism`, `check-static-output` |
 
