@@ -522,6 +522,16 @@ def check_record(plan, stage1, stage2, manual, rows, require):
         require({int(rid.split(":")[1]): row["predicate"] for rid, row in stage2.items()} == want2,
                 "vanilla stage 2 requirements do not match the physical pads")
         return
+    # Cap calculation looks up ledger identities. Refuse malformed restored
+    # predicates before that lookup, using the same controlled admission error.
+    counted = {row.item for row in rows if row.name in content_item_pool.COUNTED_NAMES}
+    for row in (*stage1.values(), *stage2.values()):
+        predicate = row["predicate"]
+        require(predicate["op"] in ("count", "sum", "distinct"),
+                f"{row['id']}: drawn pad rule must count ledger items")
+        items = [predicate["item"]] if predicate["op"] == "count" else predicate["items"]
+        require(items and all(item in counted for item in items),
+                f"{row['id']}: drawn pad rule names an unknown or non-counted item")
     first = {int(rid.split(":")[1]): row["predicate"] for rid, row in {**stage1, **manual}.items()}
     for row in stage1.values():
         predicate = row["predicate"]

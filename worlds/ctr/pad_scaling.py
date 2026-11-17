@@ -35,7 +35,7 @@ def count_cap(item, base_cap, supply=None):
 
 
 def predicate_cap(predicate, stage, rows):
-    """The same cap on a restored plan, including sums over a family subset."""
+    """Cap for a predicate whose counted-ledger identities were checked first."""
     names = {row.item: row.name for row in rows}
     supply = {row.name: row.requirement_ceiling for row in rows}
     item = names[predicate["item"]] if predicate["op"] == "count" else names[predicate["items"][0]]

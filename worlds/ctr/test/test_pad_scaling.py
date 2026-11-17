@@ -3,6 +3,8 @@ import copy
 import random
 import unittest
 
+from Options import OptionError
+
 from .. import content_item_pool, content_plan, content_playthrough as cp, pad_scaling as ps
 from .test_content_plan import make_world
 from .test_content_plan_row3 import options, records, filled
@@ -105,6 +107,26 @@ class TestPadScaling(unittest.TestCase):
         predicate = dict(op="count", item=content_item_pool.ITEMS["Trophy"], count=8)
         self.assertEqual(ps.predicate_cap(predicate, 1, rows), 8)
         self.assertEqual(ps.predicate_cap(predicate, 2, rows), 4)
+
+    def test_restored_drawn_rules_refuse_unknown_or_non_counted_items(self):
+        wire = make_world(options(), seed=1).fill_slot_data()
+        token = content_item_pool.ITEMS["Red CTR Token"]
+        malformed = [dict(op="count", item=999999, count=1),
+                     dict(op="count", item=999999999, count=1),
+                     dict(op="count", item=content_item_pool.ITEMS["Wumpa Fruit"], count=1),
+                     dict(op="sum", items=[999999, token], count=1),
+                     dict(op="sum", items=[token, 999999999], count=1),
+                     dict(op="always")]
+        for prefix in ("stage1:", "stage2:"):
+            for predicate in malformed:
+                forged = copy.deepcopy(wire)
+                row = next(r for r in forged["content_plan"]["requirements"] if r["id"].startswith(prefix))
+                row["predicate"] = predicate
+                with self.subTest(stage=prefix, predicate=predicate):
+                    with self.assertRaises(OptionError):
+                        content_plan.validate(forged["content_plan"])
+                    with self.assertRaises(OptionError):
+                        make_world({}, passthrough=forged)
 
     def test_singleton_any_of_matches_the_native_predicate(self):
         for any_item, concrete in (("AnyRelic", "Sapphire Relic"), ("AnyCtrToken", "Red CTR Token"),
