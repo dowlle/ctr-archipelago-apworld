@@ -28,6 +28,25 @@ def spots(start, gates):
 
 
 class TestSearch(unittest.TestCase):
+    def test_many_free_checks_do_not_enumerate_impossible_item_groups(self):
+        class GuardedPool(dict):
+            reads = 0
+
+            def get(self, name, default=None):
+                self.reads += 1
+                if self.reads > 4 * content_opening.PROBES:
+                    raise AssertionError("Search enumerated unavailable item copies")
+                return super().get(name, default)
+
+        # Three single copies can open the goal together. Neither a pair nor
+        # thousands of copies of one item can. Keep a deterministic work guard
+        # instead of a machine-dependent timing assertion or an enormous list.
+        pool = GuardedPool(A=1, B=1, C=1)
+        room = spots(10_000, [(dict(A=1, B=1, C=1), 4)])
+        held, free = content_opening.search(pool, room, 10_001)
+        self.assertEqual(sorted(held), ["A", "B", "C"])
+        self.assertEqual(free, 10_001)
+
     def test_key_goal_grouped_fallback_reaches_goal_after_default_fails(self):
         pool = {"Aux": 1, "Boost": 2}
         room = spots(2, [(dict(Boost=2), 8)])
@@ -293,7 +312,9 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
     # racers: 58 before the nine tester cup names joined the pool (A3-42), 65 from A3-42 to A4-16c, and 58
     # again since the three track author names (A4-71) grew the draw to 39; seed 83 draws other cup names.
     # The A4-71 author preference changes no cup of this seed (it has no custom tracks).
-    cases = (("letters", 169, 52), ("racers", 83, 58))
+    # Whole-family hub bands give letters seed 169 enough paid slack (12).
+    # Seed 170 still advertises 43 checks while paid support leaves only six.
+    cases = (("letters", 170, 43), ("racers", 83, 58))
 
     def options(self, name):
         path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"

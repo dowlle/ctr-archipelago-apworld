@@ -116,17 +116,28 @@ def search(pool, room, target, reached=None, probes=PROBES, bundles=(), goals=()
         # One kind first, then two: a garage asks that, at any count. Then any mix.
         # Copies of one kind come at every count before any pair, or the pairs of
         # many kinds (a boost per racer) spend the probes before three of a kind.
-        found = opening(held, spots, [(name,) * size for size in range(2, spots + 1) for name in needed
-                                      if fits(held, (name,) * size)])
+        # Only valid groups reach opening() and spend probes. Enumerate that
+        # same prefix lazily, bounded by copies left rather than open checks:
+        # a wide sanity layout can have thousands of spots but one copy of
+        # each needed item. Building/filtering every impossible large group
+        # first used unbounded work outside the probe budget.
+        available = {name: left(held, name) for name in needed}
+        live = [name for name in needed if available[name] > 0]
+        most = max(available.values(), default=0)
+        found = opening(held, spots, ((name,) * size for size in range(2, min(spots, most) + 1)
+                                      for name in live if size <= available[name]))
         if found or spent[0] >= probes:
             return auxiliary + found
-        for size in range(2, spots + 1):
-            groups = [(a,) * n + (b,) * (size - n) for a, b in itertools.combinations(needed, 2) for n in range(1, size)]
-            found = opening(held, spots, [group for group in groups if fits(held, group)])
+        pairs = list(itertools.combinations(live, 2))
+        most = max((available[a] + available[b] for a, b in pairs), default=0)
+        for size in range(2, min(spots, most) + 1):
+            groups = ((a,) * n + (b,) * (size - n) for a, b in pairs
+                      for n in range(max(1, size - available[b]), min(size - 1, available[a]) + 1))
+            found = opening(held, spots, groups)
             if found or spent[0] >= probes:
                 return auxiliary + found
         for size in range(3, min(spots, MIXED_GROUP) + 1):
-            found = opening(held, spots, (group for group in itertools.combinations_with_replacement(needed, size)
+            found = opening(held, spots, (group for group in itertools.combinations_with_replacement(live, size)
                                           if len(set(group)) > 2 and fits(held, group)))
             if found or spent[0] >= probes:
                 return auxiliary + found

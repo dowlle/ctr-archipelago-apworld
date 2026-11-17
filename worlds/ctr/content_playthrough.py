@@ -595,7 +595,7 @@ def _choose_requirement(rnd, inv, allowed=None):
             # inv.count("AnyCtrToken"), and no extra RNG is drawn either way.
             colours = [c for c in TOKEN_ITEMS if allowed is None or c in allowed]
             total = sum(inv.items[c] for c in colours)
-            cnt = max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
+            cnt = total if inv.supply is not None else max(1, math.ceil(total * _TOKEN_COLLAPSE_SCALE))
             if _TOKEN_COLLAPSE_CAP is not None:
                 cnt = min(cnt, pad_scaling.count_cap("AnyCtrToken", _TOKEN_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyCtrToken", cnt
@@ -603,7 +603,7 @@ def _choose_requirement(rnd, inv, allowed=None):
         if rnd.randrange(100) < _RELIC_COLLAPSE_CHANCE:
             tiers = [r for r in RELIC_ITEMS if allowed is None or r in allowed]
             total = sum(inv.items[r] for r in tiers)
-            cnt = max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
+            cnt = total if inv.supply is not None else max(1, math.ceil(total * _RELIC_COLLAPSE_SCALE))
             if _RELIC_COLLAPSE_CAP is not None:
                 cnt = min(cnt, pad_scaling.count_cap("AnyRelic", _RELIC_COLLAPSE_CAP, inv.supply))
             req_item, req_cnt = "AnyRelic", cnt
@@ -924,16 +924,11 @@ _STAGE2_COLLAPSE_CHANCE = 35
 _STAGE2_REAL_CAP = 6
 
 
-# Hard ceiling on a tier-2 requirement count (non-Key items). See _post_process /
-# run_sphere_search step 3 for the rationale (gameplay + fill-capacity).
+# Historical simulation API caps when no selected base supply is supplied.
+# Content-plan generation uses the same physical-hub family ceiling at both stages.
 _STAGE2_COUNT_CEILING = 4
 
 
-# Generous ceiling on a tier-1 entry count (non-Key items): only trims the extreme
-# Icebound outliers (e.g. "14 trophies to open one pad") that both play as a wall
-# and starve fill_restrictive of ordering freedom in maximally tight seeds; the
-# vast majority of stage-1 reqs sit well below it, so fidelity is essentially
-# preserved. Pure lowering -> solvable DAG preserved.
 _STAGE1_COUNT_CEILING = 8
 
 
@@ -1243,30 +1238,25 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
 
     # 3) post-pass (ports lines 465-510), over a sorted copy. Only LOWERS counts,
     # so it cannot break the solvable DAG built above. Applied to both stages.
-    # Stage 2 additionally gets a hard count CEILING: a tier-2 gate of "14 trophies"
-    # or "8 platinum relics" both plays badly (it is barely a second stage, just a
-    # near-endgame wall) AND is the dominant fill_restrictive killer in maximally
-    # tight seeds (it forces almost the whole pool to be seated before that one
-    # location opens). Capping tier-2 counts keeps a real, distinct second stage
-    # while leaving fill enough ordering freedom. Counts only ever drop, so the
-    # solvable-by-construction DAG is preserved.
+    # Both stages use the same physical-hub share of the selected base family.
+    # Counts only drop, preserving the reference placement's solvable DAG.
     # Manual rules (#463) are set aside so the post-pass neither lowers nor
     # caps them, and takes no draw for them. With none, this is the old call.
     held = {t: pad_reqs.pop(t) for t in fixed}
     supply = inv.supply
     _post_process(rnd, pad_reqs, mode, count_ceiling=_STAGE1_COUNT_CEILING, supply=supply)
     pad_reqs.update(held)
-    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
+    s1_host = dest_to_phys_real if shuffle_active else dest_to_phys
+    _post_process(rnd, stage2_reqs, mode, count_ceiling=_STAGE2_COUNT_CEILING,
+                  supply=supply, hosts=s1_host)
 
     # 3a) Issue #342: a REAL stage 2 must add a gate beyond its own pad's stage 1.
-    # The two stages are drawn and lowered independently (and stage 2 has the
-    # lower count ceiling), so "8 trophies, then 4 trophies" used to come out
+    # The two stages are drawn and lowered independently, so redundant gates used to come out
     # regularly: a stage 2 already met the moment the pad opens. Same item type
     # stays allowed when stage 2 ends up strictly higher; otherwise stage 2 is
     # redrawn from another item family, from the inventory owned when it was
     # first drawn (so it stays satisfiable by construction). With nothing else
     # owned at that point it becomes a normal collapse.
-    s1_host = dest_to_phys_real if shuffle_active else dest_to_phys
     for dest in sorted(stage2_reqs):
         if dest in s2_collapsed:
             continue
@@ -1282,7 +1272,8 @@ def _run_sphere_search_once(world, mode, reward_track_for=None,
             s2_collapsed.add(dest)
             continue
         one = {dest: redrawn}
-        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING, supply=supply)
+        _post_process(rnd, one, mode, count_ceiling=_STAGE2_COUNT_CEILING,
+                      supply=supply, hosts=s1_host)
         stage2_reqs[dest] = one[dest]
 
     # 3b) Re-key every COLLAPSED stage 2 to its host pad's FINAL stage 1: a
@@ -1550,7 +1541,8 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                         key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
             new = _assign_from_inv(rnd, inv, allowed)
             if new is not None and new[0] != "Key":
-                cap = pad_scaling.count_cap(new[0], _STAGE1_COUNT_CEILING, supply)
+                cap = pad_scaling.count_cap(new[0], _STAGE1_COUNT_CEILING, supply,
+                                            pad_scaling.hub_rank(track))
                 new = (new[0], min(new[1], cap))
             new = deny_four_key_gate(new, mode)
             relaxed_s1[track] = (pad_reqs.get(track), new)
@@ -1606,7 +1598,8 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
                 if new_req is not None and new_req[0] != "Key":
-                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply,
+                                                pad_scaling.hub_rank(track))
                     new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
@@ -1639,7 +1632,8 @@ def _revalidate_against_shuffle(rnd, exits, locations, pad_reqs, stage2_reqs,
                             key=lambda t: (keygate.get(_pad_exit_name(t), 0), t))
                 new_req = _assign_from_inv(rnd, inv, allowed)
                 if new_req is not None and new_req[0] != "Key":
-                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply)
+                    cap = pad_scaling.count_cap(new_req[0], _STAGE1_COUNT_CEILING, supply,
+                                                pad_scaling.hub_rank(track))
                     new_req = (new_req[0], min(new_req[1], cap))
                 new_req = deny_four_key_gate(new_req, mode)
                 relaxed_s1[track] = (pad_reqs.get(track), new_req)
@@ -1669,10 +1663,10 @@ def deny_four_key_gate(req, mode):
     return req
 
 
-def _post_process(rnd, pad_reqs, mode, count_ceiling=None, supply=None):
+def _post_process(rnd, pad_reqs, mode, count_ceiling=None, supply=None, hosts=None):
     """66% lower count *0.6 ceil (when count != 0); else if mode==2 and req is
     ('Key',4) -> ('Key',3). Iterate a SORTED copy for determinism. When
-    count_ceiling is given, scale it to the seed's base family supply and clamp
+    count_ceiling is given, use the physical hub's base family share and clamp
     AFTER the random reduction, a pure lowering of the owned count. With no
     supply the historical 8/4 caps stand. Keys never exceed four."""
     for track in sorted(pad_reqs):
@@ -1690,7 +1684,9 @@ def _post_process(rnd, pad_reqs, mode, count_ceiling=None, supply=None):
                 pad_reqs[track] = lowered
                 item, cnt = lowered
         if count_ceiling is not None:
-            cap = pad_scaling.count_cap(item, count_ceiling, supply)
+            physical = (hosts or {}).get(track, track)
+            hub = pad_scaling.hub_rank(physical) if supply is not None else 4
+            cap = pad_scaling.count_cap(item, count_ceiling, supply, hub)
             if cnt > cap:
                 pad_reqs[track] = (item, cap)
 

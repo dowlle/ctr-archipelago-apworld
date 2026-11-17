@@ -128,12 +128,17 @@ class TestRandomRequirements(unittest.TestCase):
     def test_every_other_pad_has_a_requirement_within_the_ceilings(self):
         plan = make_world(options(), seed=2).ctr_content_plan
         rows = {r["item"]: r for r in plan["items"]["rows"]}
-        for predicate in records(plan, "stage1:").values():
-            self.assertLessEqual(predicate["count"], 8 if predicate.get("item") != KEY else 4)
-        for predicate in records(plan, "stage2:").values():
-            self.assertLessEqual(predicate["count"], 4)
-            for item in predicate.get("items", [predicate.get("item")]):
-                self.assertGreater(rows[item]["requirement_ceiling"], 0)
+        from .. import pad_scaling
+        from ..content_item_pool import ITEMS
+        base = {name: rows[code]["requirement_ceiling"] for name, code in ITEMS.items() if code in rows}
+        for stage in (1, 2):
+            for physical, predicate in records(plan, f"stage{stage}:").items():
+                ids = predicate.get("items", [predicate.get("item")])
+                item = next(name for name, code in ITEMS.items() if code == ids[0])
+                cap = pad_scaling.count_cap(item, 8, base, pad_scaling.hub_rank(cr.KEY_BY_PHYSICAL[physical]))
+                self.assertLessEqual(predicate["count"], cap)
+                for item in ids:
+                    self.assertGreater(rows[item]["requirement_ceiling"], 0)
 
     def test_a_tier_the_seed_lacks_is_never_asked(self):
         for seed in range(12):
@@ -188,12 +193,12 @@ class TestRandomRequirements(unittest.TestCase):
         plan = make_world(options(), seed=1).ctr_content_plan
         forged = copy.deepcopy(plan)
         row = next(r for r in forged["requirements"] if r["id"].startswith("stage2:"))
-        row["predicate"] = dict(op="count", item=35010000, count=5)
+        row["predicate"] = dict(op="count", item=35010000, count=17)
         with self.assertRaisesRegex(OptionError, "above its count ceiling"):
             content_plan.validate(forged)
         forged = copy.deepcopy(plan)
         row = next(r for r in forged["requirements"] if r["id"].startswith("stage1:"))
-        row["predicate"] = dict(op="count", item=35010000, count=9)
+        row["predicate"] = dict(op="count", item=35010000, count=17)
         with self.assertRaisesRegex(OptionError, "above its count ceiling"):
             content_plan.validate(forged)
 

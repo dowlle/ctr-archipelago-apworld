@@ -1,4 +1,4 @@
-"""Pool-scaled pad counts retain the default draw and enforce real gates."""
+"""Whole-pool physical hub bands enforce real gates and retain old admission."""
 import copy
 import random
 import unittest
@@ -28,7 +28,7 @@ def big_options():
 class TestPadScaling(unittest.TestCase):
     def test_shuffled_redraws_use_selected_inventory_and_caps(self):
         track = "Crash Cove"
-        for total, cap in ((4, 2), (64, 32)):
+        for total, cap in ((4, 1), (64, 16)):
             for path in ("frontier", "pinned", "critical"):
                 with self.subTest(total=total, path=path):
                     # The same owned Trophy inventory backs all three relaxation
@@ -80,16 +80,19 @@ class TestPadScaling(unittest.TestCase):
 
     def test_caps_default_large_small_and_display_limit(self):
         for item in ("Trophy", "AnyCtrToken", "AnyRelic", "AnyGem", "Gold Relic", "Red CTR Token"):
-            for stage, old in ((1, 8), (2, 4)):
-                self.assertEqual(ps.count_cap(item, old, supply()), old)
-                self.assertEqual(ps.count_cap(item, old, supply(4)), old * 4)
-                self.assertEqual(ps.count_cap(item, old, supply(100)), 99)
+            total = ps.DEFAULT_SUPPLY[ps.FAMILY_OF[item]]
+            for old in (8, 4):
+                for hub in range(1, 5):
+                    self.assertEqual(ps.count_cap(item, old, supply(), hub), (total * hub + 3) // 4)
+                    self.assertEqual(ps.count_cap(item, old, supply(4), hub), (min(99, total * 4) * hub + 3) // 4)
+                    self.assertEqual(ps.count_cap(item, old, supply(100), hub), (99 * hub + 3) // 4)
         small = supply()
         small.update({"Trophy": 4, **dict.fromkeys(cp.TOKEN_ITEMS, 1),
                       "Sapphire Relic": 9, "Gold Relic": 0})
         for item in ("Trophy", "AnyCtrToken", "AnyRelic"):
-            self.assertEqual(ps.count_cap(item, 8, small), 2)
-            self.assertEqual(ps.count_cap(item, 4, small), 1)
+            total = sum(small.get(n, 0) for n in ps.FAMILIES[ps.FAMILY_OF[item]])
+            self.assertEqual(ps.count_cap(item, 8, small), total)
+            self.assertEqual(ps.count_cap(item, 4, small), total)
         for pool in (small, supply(), supply(100)):
             self.assertEqual(ps.count_cap("Key", 8, pool), 4)
             self.assertEqual(ps.count_cap("Key", 4, pool), 4)
@@ -97,8 +100,42 @@ class TestPadScaling(unittest.TestCase):
     def test_missing_family_and_fractional_rounding(self):
         self.assertEqual(ps.count_cap("Platinum Relic", 8, {"Platinum Relic": 1}), 1)
         self.assertEqual(ps.count_cap("AnyRelic", 4, {}), 0)
-        self.assertEqual(ps.count_cap("Trophy", 8, {"Trophy": 17}), 9)
-        self.assertEqual(ps.count_cap("Trophy", 4, {"Trophy": 17}), 5)
+        self.assertEqual(ps.count_cap("Trophy", 8, {"Trophy": 17}, 1), 5)
+        self.assertEqual(ps.count_cap("Trophy", 4, {"Trophy": 17}, 3), 13)
+
+    def test_physical_hubs_include_valley_trials_and_cups_in_last_band(self):
+        from ..destinations import DESTINATIONS
+        for d in DESTINATIONS:
+            expected = 4 if d.kind in ("trial", "cup") else (d.hub_keys or 0) + 1
+            self.assertEqual(ps.hub_rank(d.key), expected)
+        self.assertEqual(ps.hub_rank("Slide Coliseum"), 4)
+        self.assertEqual(ps.hub_rank("Red Cup"), 4)
+
+    def test_aggregate_can_reach_whole_owned_family_before_reduction(self):
+        # Force each existing aggregate roll and the unchanged 34% unreduced
+        # post-pass. Token/Relic percentage pre-caps must not hide the new maximum.
+        class Rolls:
+            def choices(self, population, weights, k=1):
+                return [population[0]]
+            def randrange(self, limit):
+                return 0
+        class Unreduced:
+            def randrange(self, limit):
+                return 99
+        world = make_world({"item_box_count": 15}, seed=0)
+        from ..content_requirements import _Options
+        from types import SimpleNamespace
+        cp._load_requirement_preset(SimpleNamespace(options=_Options(world.options)))
+        for family, names in (("AnyCtrToken", cp.TOKEN_ITEMS), ("AnyRelic", cp.RELIC_ITEMS),
+                              ("AnyGem", cp.GEM_ITEMS)):
+            inv = cp.Inv(supply())
+            inv.items.update({name: inv.caps[name] for name in names})
+            rule = cp._choose_requirement(Rolls(), inv, set(names))
+            self.assertEqual(rule, (family, inv.count(family)))
+            for old in (8, 4):
+                reqs = {"Turbo Track": rule}
+                cp._post_process(Unreduced(), reqs, 1, old, supply())
+                self.assertEqual(reqs["Turbo Track"], rule)
 
     def test_inventory_collects_above_retail_and_does_not_leak_to_next_seed(self):
         inv = cp.Inv(supply(4))
@@ -114,9 +151,9 @@ class TestPadScaling(unittest.TestCase):
         self.assertEqual((small.count("Trophy"), small.count("Gold Relic")), (2, 0))
         self.assertEqual(cp.Inv().caps["Trophy"], 16)
 
-    def test_default_postpass_consumes_identical_rng(self):
-        original = {"a": ("Trophy", 16), "b": ("AnyRelic", 27), "c": ("Key", 4),
-                    "d": ("AnyCtrToken", 16), "e": None}
+    def test_postpass_keeps_reduction_rolls_and_uses_physical_host_for_both_stages(self):
+        original = {"Crash Cove": ("Trophy", 16), "Coco Park": ("AnyRelic", 36),
+                    "Tiny Arena": ("Key", 4), "Turbo Track": ("AnyCtrToken", 20), "Red Cup": None}
         for seed in range(30):
             for mode in (1, 2):
                 for cap in (4, 8):
@@ -124,8 +161,15 @@ class TestPadScaling(unittest.TestCase):
                     r1, r2 = random.Random(seed), random.Random(seed)
                     cp._post_process(r1, a, mode, cap)
                     cp._post_process(r2, b, mode, cap, supply())
-                    self.assertEqual(a, b)
                     self.assertEqual(r1.getstate(), r2.getstate())
+                    for title, req in b.items():
+                        if req:
+                            self.assertLessEqual(req[1], ps.count_cap(req[0], cap, supply(), ps.hub_rank(title)))
+        # A later destination shuffled onto Beach must use Beach's band at stage 2.
+        for cap in (4, 8):
+            reqs = {"Turbo Track": ("Trophy", 16)}
+            cp._post_process(random.Random(0), reqs, 1, cap, supply(), {"Turbo Track": "Crash Cove"})
+            self.assertEqual(reqs["Turbo Track"], ("Trophy", 4))
 
     def test_large_pool_draws_high_counts_validates_fills_and_restores(self):
         seen = {1: 0, 2: 0}
@@ -138,6 +182,14 @@ class TestPadScaling(unittest.TestCase):
                     seen[stage] = max(seen[stage], p["count"])
                     rows = world.ctr_content_items.rows
                     self.assertLessEqual(p["count"], ps.predicate_cap(p, stage, rows))
+            from ..content_requirements import KEY_BY_PHYSICAL
+            for stage in (1, 2):
+                for physical, predicate in records(plan, f"stage{stage}:").items():
+                    item = next(row.name for row in world.ctr_content_items.rows
+                                if row.item == predicate.get("item", predicate.get("items", [None])[0]))
+                    base = {row.name: row.requirement_ceiling for row in world.ctr_content_items.rows}
+                    self.assertLessEqual(predicate["count"], ps.count_cap(item, 8, base,
+                                              ps.hub_rank(KEY_BY_PHYSICAL[physical])))
             if seed == 0:
                 mw = filled(world)
                 state = mw.get_all_state(False)
@@ -158,8 +210,8 @@ class TestPadScaling(unittest.TestCase):
                                            additional={"Trophy": 100})
         rows = ledger.rows
         predicate = dict(op="count", item=content_item_pool.ITEMS["Trophy"], count=8)
-        self.assertEqual(ps.predicate_cap(predicate, 1, rows), 8)
-        self.assertEqual(ps.predicate_cap(predicate, 2, rows), 4)
+        self.assertEqual(ps.predicate_cap(predicate, 1, rows), 16)
+        self.assertEqual(ps.predicate_cap(predicate, 2, rows), 16)
 
     def test_restored_drawn_rules_refuse_unknown_or_non_counted_items(self):
         wire = make_world(options(), seed=1).fill_slot_data()
