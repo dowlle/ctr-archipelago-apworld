@@ -10,6 +10,8 @@ name: CTR world
 
 on:
   pull_request:
+    # ready_for_review starts the fuzz arms a draft skipped.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'worlds/ctr/**'
       - '.github/workflows/ctr-world.yml'
@@ -42,9 +44,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request or to main cancels the older run: only the
+# newest head matters there. Every other run (manual, nightly, other branches)
+# gets its own group and is never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 env:
   AP_VERSION: '0.6.7'
@@ -86,6 +91,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           GIT_REF: ${{ github.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -120,6 +126,7 @@ jobs:
             --event "$EVENT_NAME" \
             --ref "$GIT_REF" \
             --labels-json "$labels" \
+            --draft "$PR_DRAFT" \
             --paths-file "$paths" \
             --matrix-file .github/fuzz/ctr-world-matrix.yml \
             --output "$GITHUB_OUTPUT"
@@ -195,6 +202,9 @@ jobs:
     timeout-minutes: 120
     strategy:
       fail-fast: false
+      # The account shares 20 hosted runners across repositories; 12 leaves
+      # room for native CI while a full apworld matrix runs.
+      max-parallel: 12
       matrix: ${{ fromJSON(needs.classify.outputs.matrix) }}
     steps:
       - name: Checkout index repo scripts (canonical generation check)
