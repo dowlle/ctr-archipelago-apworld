@@ -6,9 +6,11 @@
 
 | Tier | Arms | When |
 |---|---|---|
-| none | no fuzz; pytest and pack still run | a pull request that changes only safe paths |
-| pr | the 18 arms in `PR_ARMS` | every other pull request, and every push to `dev/**` |
-| full | every arm in `ctr-world-matrix.yml` | pushes to `main`, `release/**` and `ci/**`, the nightly dev run, manual runs, and pull requests with the `full-fuzz` label |
+| none | no fuzz; pytest and pack still run | a draft pull request, and a pull request that changes only safe paths |
+| pr | the 18 arms in `PR_ARMS` | every other pull request, every push to `main`, and every push to `dev/**` |
+| full | every arm in `ctr-world-matrix.yml` | pushes to `release/**` and `ci/**`, the nightly run, manual runs (including the run before a tag), and pull requests with the `full-fuzz` label |
+
+A draft gets its fuzz arms when it is marked ready for review; a `full-fuzz` label on a draft still selects the full tier. A newer push to a pull request or to `main` cancels the older run. The fuzz job runs at most 12 arms at once, because the account's 20 hosted runners are shared with native CI. Full coverage of `main` comes from the nightly run and from the manual full run required before every tag (below).
 
 Safe paths are `worlds/ctr/solo/`, `worlds/ctr/docs/`, `worlds/ctr/test/`, any `.md` file, and the version files `worlds/ctr/version.py`, `worlds/ctr/archipelago.json` and `worlds/ctr/datapackage_manifest.json`. A pull request is classified on its whole file list, so one generation file anywhere in it selects the pr tier. A push is never tier none.
 

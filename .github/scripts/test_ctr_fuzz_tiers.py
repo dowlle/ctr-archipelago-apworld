@@ -31,7 +31,7 @@ class ClassifyTests(unittest.TestCase):
         ]
         self.assertEqual(tiers.classify("pull_request", paths), "none")
         self.assertEqual(tiers.classify("push", paths, DEV), "pr")
-        self.assertEqual(tiers.classify("push", paths, MAIN), "full")
+        self.assertEqual(tiers.classify("push", paths, MAIN), "pr")
         for path in paths:
             with self.subTest(path=path):
                 self.assertEqual(tiers.classify("push", [path], DEV), "pr")
@@ -41,7 +41,7 @@ class ClassifyTests(unittest.TestCase):
         for path in ("worlds/ctr/Rules.py", ".github/workflows/ctr-world.yml"):
             self.assertEqual(tiers.classify("pull_request", [path]), "pr")
             self.assertEqual(tiers.classify("push", [path], DEV), "pr")
-            self.assertEqual(tiers.classify("push", [path], MAIN), "full")
+            self.assertEqual(tiers.classify("push", [path], MAIN), "pr")
             self.assertEqual(tiers.classify("push", [path], "refs/heads/ci/x"), "full")
 
     def test_full_fuzz_label(self):
@@ -49,11 +49,21 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(tiers.classify("pull_request", ["worlds/ctr/Rules.py"], labels=["bug", "full-fuzz"]), "full")
         self.assertEqual(tiers.classify("pull_request", ["worlds/ctr/Rules.py"], labels=["bug"]), "pr")
 
+    def test_drafts_skip_fuzz_unless_labelled(self):
+        rules = ["worlds/ctr/Rules.py"]
+        self.assertEqual(tiers.classify("pull_request", rules, draft=True), "none")
+        self.assertEqual(tiers.classify("pull_request", [], draft=True), "none")
+        self.assertEqual(tiers.classify("pull_request", rules, labels=["full-fuzz"], draft=True), "full")
+        self.assertEqual(tiers.classify("pull_request", rules, draft=False), "pr")
+        # The draft flag only exists on pull requests; pushes and manual runs ignore it.
+        self.assertEqual(tiers.classify("push", rules, MAIN, draft=True), "pr")
+        self.assertEqual(tiers.classify("workflow_dispatch", rules, MAIN, draft=True), "full")
+
     def test_mixed_and_empty_diffs_are_conservative(self):
         self.assertEqual(tiers.classify("pull_request", ["README.md", "worlds/ctr/Options.py"]), "pr")
         self.assertEqual(tiers.classify("pull_request", []), "pr")
         self.assertEqual(tiers.classify("push", [], DEV), "pr")
-        self.assertEqual(tiers.classify("push", [], MAIN), "full")
+        self.assertEqual(tiers.classify("push", [], MAIN), "pr")
         with self.assertRaises(ValueError):
             tiers.classify("push", [], "refs/tags/v0.3.0")
 

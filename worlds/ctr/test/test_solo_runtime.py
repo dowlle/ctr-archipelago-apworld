@@ -64,6 +64,11 @@ def build_client() -> str:
     trim_core.copy(REPO, os.path.join(runtime, "archipelago"))
     for name in ("ctr_solo.py", "options-overlay.json"):
         shutil.copyfile(os.path.join(SOLO, name), os.path.join(runtime, name))
+    # This entrypoint exists only in the test fixture, never in ctr.apworld or
+    # a release runtime. Production has no command-line port-range bypass.
+    with open(os.path.join(runtime, "test_entry.py"), "w", encoding="utf-8") as handle:
+        handle.write("import os, sys\nsys.path.insert(0, os.path.dirname(__file__))\n"
+                     "import ctr_solo\nsys.exit(ctr_solo.main(allow_test_ports=True))\n")
     shutil.copytree(os.path.join(SOLO, "presets"), os.path.join(runtime, "presets"))
     subprocess.run([sys.executable, os.path.join(WORLD, "tools", "build_apworld.py"),
                     os.path.join(client, "ctr.apworld")], check=True, stdout=subprocess.DEVNULL)
@@ -74,7 +79,7 @@ def build_client() -> str:
 def env(home: str | None = None) -> dict:
     result = dict(os.environ)
     result["PYTHONDONTWRITEBYTECODE"] = "1"
-    result["CTR_SOLO_TEST_PORTS"] = "1"  # parallel test runs use their own port ranges
+    result.pop("SKIP_REQUIREMENTS_UPDATE", None)  # exercise the bundled updater bypass
     result.pop("PYTHONPATH", None)
     if home:
         result["HOME"] = home
@@ -85,7 +90,7 @@ def env(home: str | None = None) -> dict:
 
 def run(client: str, *args, solo: str | None = None, home: str | None = None, prelude: str | None = None,
         timeout: int = 180) -> tuple[list[dict], int]:
-    script = os.path.join(client, "solo-runtime", "ctr_solo.py")
+    script = os.path.join(client, "solo-runtime", "test_entry.py")
     base = ["--solo", solo] if solo else []
     if prelude:
         cmd = [sys.executable, "-I", "-c",
@@ -152,6 +157,33 @@ class SoloTestCase(unittest.TestCase):
 
     def preset(self, name: str) -> str:
         return os.path.join(self.client, "solo-runtime", "presets", name)
+
+
+class TestBootstrap(SoloTestCase):
+    def test_bootstrap_keeps_dependency_updates_disabled(self):
+        runtime = os.path.join(self.client, "solo-runtime")
+        code = '''
+import sys
+sys.path.insert(0, sys.argv[1])
+import ctr_solo
+assert ctr_solo.main(["--solo", sys.argv[2], "describe"]) == 0
+import ModuleUpdate
+from unittest.mock import patch
+ModuleUpdate.requirements_files.add("must-not-install.txt")
+ModuleUpdate.requirements_files.update(["also-must-not-install.txt"])
+assert ModuleUpdate._skip_update and ModuleUpdate.update_ran
+with patch.object(ModuleUpdate, "install_pkg_resources", side_effect=AssertionError("updater ran")):
+    ModuleUpdate.update()
+'''
+        result = subprocess.run([sys.executable, "-I", "-c", code, runtime, self.solo],
+                                capture_output=True, text=True, timeout=120, env=env(self.home))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_test_port_override_still_validates_bounds(self):
+        for ports in ((1023, 40000), (40001, 40000), (40000, 65536)):
+            with self.assertRaises(ctr_solo.SoloError):
+                ctr_solo.check_ports(ports, allow_test_ports=True)
+        self.assertEqual(ctr_solo.check_ports((40000, 40002), allow_test_ports=True), (40000, 40002))
 
 
 class TestTrimCore(unittest.TestCase):
@@ -1612,7 +1644,7 @@ class TestServe(SoloTestCase):
 
     def start(self, room_id: str, first: int, last_port: int,
               password: str | None = None) -> tuple[subprocess.Popen, dict]:
-        script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        script = os.path.join(self.client, "solo-runtime", "test_entry.py")
         extra = ["--password", password] if password else []
         proc = subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room_id,
                                  "--game-pid", str(os.getpid()), "--port-first", str(first),
@@ -1808,7 +1840,7 @@ class TestServe(SoloTestCase):
             proc.wait(10)
         script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
         no_hook = env(self.home)
-        no_hook.pop("CTR_SOLO_TEST_PORTS")
+        no_hook["CTR_SOLO_TEST_PORTS"] = "1"  # legacy environment hook must have no effect
         out = subprocess.run([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room", room["room_id"],
                               "--port-first", "39000", "--port-last", "39000"],
                              capture_output=True, text=True, timeout=120, env=no_hook)
@@ -1817,7 +1849,7 @@ class TestServe(SoloTestCase):
     def test_simultaneous_starts_serve_once(self):
         room = self.generate_room()
         base = free_ports(6)
-        script = os.path.join(self.client, "solo-runtime", "ctr_solo.py")
+        script = os.path.join(self.client, "solo-runtime", "test_entry.py")
         procs = [subprocess.Popen([sys.executable, "-I", script, "--solo", self.solo, "serve", "--room",
                                    room["room_id"], "--port-first", str(base), "--port-last", str(base + 5)],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,

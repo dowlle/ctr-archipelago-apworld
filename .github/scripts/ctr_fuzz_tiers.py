@@ -1,10 +1,13 @@
 """Select CTR fuzz arms from the workflow's single matrix definition.
 
 Tiers (documented in .github/fuzz/README.md):
-- none: pull requests that change only safe paths. pytest and pack still run.
-- pr:   the arms in PR_ARMS. Every other pull request and every dev push.
-- full: every arm. Pushes to main and release branches, scheduled and manual
-        runs, and pull requests with the full-fuzz label.
+- none: draft pull requests, and pull requests that change only safe paths.
+        pytest and pack still run.
+- pr:   the arms in PR_ARMS. Every other pull request, every push to main
+        and every dev push.
+- full: every arm. Pushes to release and ci branches, scheduled and manual
+        runs (the nightly run and the run before a tag), and pull requests
+        with the full-fuzz label.
 """
 
 import argparse
@@ -52,20 +55,25 @@ def is_safe(path: str) -> bool:
     return path.startswith(SAFE_PREFIXES) or path.endswith(".md") or path in VERSION_FILES
 
 
-def classify(event: str, paths: list[str], ref: str = "", labels: list[str] = ()) -> str:
+def classify(event: str, paths: list[str], ref: str = "", labels: list[str] = (), draft: bool = False) -> str:
     if event in ("schedule", "workflow_dispatch"):
         return "full"
     if event == "push":
-        # A push never skips fuzz, whatever it changed.
-        if ref == "refs/heads/main" or ref.startswith(("refs/heads/release/", "refs/heads/ci/")):
+        # A push never skips fuzz, whatever it changed. main gets the pr tier:
+        # the nightly run and the manual full run before a tag cover every arm
+        # (README "Nightly and before a tag").
+        if ref.startswith(("refs/heads/release/", "refs/heads/ci/")):
             return "full"
-        if ref.startswith("refs/heads/dev/"):
+        if ref == "refs/heads/main" or ref.startswith("refs/heads/dev/"):
             return "pr"
         raise ValueError(f"unsupported push ref: {ref}")
     if event != "pull_request":
         raise ValueError(f"unsupported event: {event}")
     if FULL_LABEL in labels:
         return "full"
+    # Drafts still run pytest and pack; fuzz starts when the PR is marked ready.
+    if draft:
+        return "none"
     if paths and all(is_safe(path) for path in paths):
         return "none"
     return "pr"
@@ -96,12 +104,13 @@ def main() -> None:
     parser.add_argument("--labels-json", default="[]", help="JSON list of label names")
     parser.add_argument("--matrix-file", type=Path, required=True)
     parser.add_argument("--paths-file", type=Path)
+    parser.add_argument("--draft", default="false", help="pull request draft flag, true or false")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     paths = args.paths_file.read_bytes().split(b"\0") if args.paths_file else []
     paths = [path.decode() for path in paths if path]
     labels = json.loads(args.labels_json)
-    tier = classify(args.event, paths, args.ref, labels)
+    tier = classify(args.event, paths, args.ref, labels, args.draft.strip().lower() == "true")
     matrix = matrix_for_tier(tier, args.matrix_file)
     with args.output.open("a") as output:
         print(f"tier={tier}", file=output)

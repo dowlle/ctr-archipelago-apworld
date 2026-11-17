@@ -215,7 +215,6 @@ def bootstrap_core(paths: Paths, load_worlds: bool) -> None:
     folder. load_worlds also loads the world registry and checks it."""
     global _archipelago_ready
     if not _archipelago_ready:
-        os.environ["SKIP_REQUIREMENTS_UPDATE"] = "1"
         # The bundled dependencies, then the core, ahead of anything else.
         site = os.path.join(paths.runtime, "site-packages")
         for folder in (site, paths.core):
@@ -226,6 +225,12 @@ def bootstrap_core(paths: Paths, load_worlds: bool) -> None:
         # into the user's home. The runtime never compiles: use the pure
         # Python fallback.
         sys.modules["pyximport"] = None
+        # Dependencies are bundled by the runtime builder. Disable the core's
+        # updater before importing any module that calls it. RequirementsSet
+        # additions consult _skip_update and can reset update_ran, so set both.
+        import ModuleUpdate
+        ModuleUpdate._skip_update = True
+        ModuleUpdate.update_ran = True
         import Utils  # noqa: E402  (bundled core)
         if os.path.normcase(os.path.dirname(os.path.abspath(Utils.__file__))) != os.path.normcase(paths.core):
             raise SoloError("runtime", f"Archipelago was imported from {Utils.__file__}, not the solo runtime")
@@ -1665,11 +1670,10 @@ def room_file_path(room: str, meta: dict) -> str:
     return path
 
 
-def check_ports(ports: tuple[int, int]) -> tuple[int, int]:
-    """The solo range is 38301 to 38320. Tests may pick another range with
-    CTR_SOLO_TEST_PORTS=1 (parallel test runs); the client never sets it."""
+def check_ports(ports: tuple[int, int], *, allow_test_ports: bool = False) -> tuple[int, int]:
+    """Keep the production range fixed; tests inject an explicit Python argument."""
     first, last = ports
-    if (first, last) != (PORT_FIRST, PORT_LAST) and os.environ.get("CTR_SOLO_TEST_PORTS") != "1":
+    if (first, last) != (PORT_FIRST, PORT_LAST) and not allow_test_ports:
         raise SoloError("ports", f"The solo port range is {PORT_FIRST} to {PORT_LAST}.")
     if not (1024 <= first <= last <= 65535):
         raise SoloError("ports", "Invalid port range.")
@@ -1677,8 +1681,8 @@ def check_ports(ports: tuple[int, int]) -> tuple[int, int]:
 
 
 def serve(paths: Paths, room_id: str, game_pid: int | None, ports: tuple[int, int],
-          password: str | None) -> int:
-    ports = check_ports(ports)
+          password: str | None, *, allow_test_ports: bool = False) -> int:
+    ports = check_ports(ports, allow_test_ports=allow_test_ports)
     room = paths.room_dir(room_id)
     meta_path = os.path.join(room, "room.json")
     if not os.path.isfile(meta_path):
@@ -1864,7 +1868,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, allow_test_ports: bool = False) -> int:
     args = build_parser().parse_args(argv)
     runtime = os.path.abspath(args.runtime)
     client = os.path.dirname(runtime)
@@ -1880,7 +1884,8 @@ def main(argv: list[str] | None = None) -> int:
         apworld_sha = check_apworld(paths, args.apworld_sha256)
         if args.command == "serve":
             bootstrap_core(paths, load_worlds=True)
-            return serve(paths, args.room, args.game_pid, (args.port_first, args.port_last), args.password)
+            return serve(paths, args.room, args.game_pid, (args.port_first, args.port_last), args.password,
+                         allow_test_ports=allow_test_ports)
         emit("progress", phase="Starting runtime")
         if args.command in ("validate", "generate", "import-yaml", "import-room"):
             clear_tmp(paths)
