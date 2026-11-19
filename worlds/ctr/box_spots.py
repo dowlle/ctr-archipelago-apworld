@@ -44,6 +44,8 @@ import pkgutil
 import random
 import re
 
+from . import destinations
+
 FORMAT = "ctr-ap-box-spots"
 VERSION = 1
 FEATURE = "box_spots_v1"
@@ -209,7 +211,7 @@ def file_for(track, package=None):
     if track.get("origin") == "retail":
         return RETAIL_FILES.get(track["retail_id"])
     if track.get("origin") == "custom" and "named_block" in track and package:
-        entry = CUSTOM_FILES.get(package.get("content_id"))
+        entry = CUSTOM_FILES.get(destinations.canonical_track_key(package.get("content_id")))
         if entry and lev_pin(package) in entry["doc"]["track"]["lev_sha256"]:
             return entry
     return None

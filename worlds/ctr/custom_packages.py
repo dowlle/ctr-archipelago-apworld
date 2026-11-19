@@ -252,12 +252,14 @@ def admit(descriptor, where="package"):
 
 def admit_all(raw, where="tracks.custom"):
     """Admit a whole descriptor list, sorted by package id; refuse duplicates."""
+    from .destinations import canonical_track_key
+
     if type(raw) is not list or len(raw) > MAX_PACKAGES:
         _fail(where, f"must be a list of at most {MAX_PACKAGES} complete package descriptors")
     result, seen = [], {}
     for i, descriptor in enumerate(raw):
         package = admit(descriptor, f"{where}[{i}]")
-        for label, value in (("track key", package["content_id"]), ("package uuid", package["uuid"]),
+        for label, value in (("track key", canonical_track_key(package["content_id"])), ("package uuid", package["uuid"]),
                              ("LEV and VRM pair", (package["files"][0]["sha256"], package["files"][1]["sha256"]))):
             if (label, value) in seen:
                 _fail(f"{where}[{i}]", f"repeats the {label} of {where}[{seen[label, value]}]; "

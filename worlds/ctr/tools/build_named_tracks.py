@@ -132,10 +132,15 @@ def build(repo: Path, commit: str):
     rows = mint_rows(registry)
     if named.get("format") != 1 or named.get("tracks") != rows:
         raise SystemExit(f"named_tracks.json at {commit} does not list exactly the mint entries")
+    keys = {row["track_key"] for row in rows}
+    aliases = {key: target for key, target in registry.get("track_key_aliases", {}).items() if target in keys}
+    if named.get("track_key_aliases", {}) != aliases:
+        raise SystemExit(f"named_tracks.json at {commit} does not list the aliases for mint entries")
     return {
         "format": 1,
         "registry": {"repository": REPOSITORY, "commit": commit, "digest": digest},
         "tracks": rows,
+        **({"track_key_aliases": aliases} if aliases else {}),
     }
 
 

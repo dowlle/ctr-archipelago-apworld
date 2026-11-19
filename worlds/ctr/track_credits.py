@@ -19,6 +19,8 @@ import pkgutil
 import re
 from typing import FrozenSet, Mapping, Optional
 
+from .destinations import canonical_track_key
+
 CORTEX_VORTEX_KEY = "cortex-vortex"
 _SPLIT = re.compile(r"\s*(?:,|&|/|\+|\band\b)\s*", re.IGNORECASE)
 
@@ -43,7 +45,7 @@ def authors_of(track: Mapping, package: Optional[Mapping] = None) -> FrozenSet[s
     if origin == "cortex_vortex":
         key, label = CORTEX_VORTEX_KEY, ""
     elif origin == "custom" and package is not None:
-        key, label = package.get("content_id"), package.get("author", "")
+        key, label = canonical_track_key(package.get("content_id")), package.get("author", "")
     else:
         return frozenset()
     names = list(REGISTRY_CREDITS.get(key, ())) + split_author(label)

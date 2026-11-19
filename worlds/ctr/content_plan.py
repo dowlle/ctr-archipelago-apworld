@@ -2249,15 +2249,20 @@ def global_wumpa_routes(tracks, entries, pads, packages):
     return out
 
 
-def generic_room_titles(tracks, packages):
+def generic_room_titles(tracks, packages, *, carried_aliases=False):
     """{custom_slot: room title} for the generic-slot (B+) tracks among `tracks`.
 
     Only the seed's own tracks take part, in slot order, so a title clashes
     only with names in the same room: retail stems, every named block and an
     earlier generic track (custom_track_titles.seed_titles). A track with no
     usable title keeps its generic name."""
-    rows = [(t["custom_slot"], packages[t["package_id"]]) for t in tracks
-            if destinations.named_track(packages[t["package_id"]]["content_id"]) is None]
+    rows = []
+    for track in tracks:
+        package = packages[track["package_id"]]
+        key = package["content_id"]
+        if destinations.named_track(key) is None or (
+                carried_aliases and "named_block" not in track and key in destinations.TRACK_KEY_ALIASES):
+            rows.append((track["custom_slot"], package))
     titles = seed_titles([(slot, p["display_name"], p["author"], p["content_id"]) for slot, p in rows])
     return {slot: titles.get(slot, f"Custom Track {slot}") for slot, _ in rows}
 
@@ -2915,7 +2920,7 @@ def validate(plan):
     try:
         expected_titles = generic_room_titles([t for t in plan["tracks"] if t["origin"] == "custom"
                                                and t["package_id"] in packages
-                                               and type(t["custom_slot"]) is int], packages)
+                                               and type(t["custom_slot"]) is int], packages, carried_aliases=True)
     except (KeyError, TypeError):
         expected_titles = {}
     arena_ids=set()
@@ -2997,7 +3002,8 @@ def validate(plan):
                 require(block is not None and track["named_block"] == block.block_index and
                         track.get("room_title") == block.ap_name, "named block does not match this build's registry")
             else:
-                require(block is None, "a track with a named block must use it")
+                require(block is None or package["content_id"] in destinations.TRACK_KEY_ALIASES,
+                        "a track with a named block must use it")
                 require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
                 require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
                         "room title is not the seed's clash-suffixed title for this track")
@@ -3045,7 +3051,8 @@ def validate(plan):
                 require(block is not None and track["named_block"] == block.block_index and
                         track.get("room_title") == block.ap_name, "named block does not match this build's registry")
             else:
-                require(block is None, "a track with a named block must use it")
+                require(block is None or package["content_id"] in destinations.TRACK_KEY_ALIASES,
+                        "a track with a named block must use it")
                 require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
                 require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
                         "room title is not the seed's clash-suffixed title for this track")

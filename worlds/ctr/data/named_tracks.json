@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "3c55186270a3cb125e03a2d5a91dada4f54248b0",
-    "digest": "da77a7d9671febcbbfb55f6432cf59ac3a3233691748539ec9d7ca76c027c9dc"
+    "commit": "aa43e00154e99c50d82051b19254b2e900607048",
+    "digest": "e81e8730522855d55276586f98c57af4cf9cea00eaac2bfe7469d07b60ee47d2"
   },
   "tracks": [
     {
@@ -859,5 +859,36 @@
         "fcdaaf4adf278c38a347b8442980c4d8444bd2ec7c4217d264c089257c55e7f7"
       ]
     }
-  ]
+  ],
+  "track_key_aliases": {
+    "boss-race-2": "gossamer-s-castle",
+    "crash-30anniversary-adventure-track-16": "papu-s-sg-temple",
+    "crash-30anniversary-adventure-track-19": "drive-thru-danger",
+    "dracula-s-castle": "draculas-castle",
+    "green-hill-raceway-v2-0-slot-25": "green-hill-raceway",
+    "lockbox-adventure-track-14": "inferno-island",
+    "lockbox-adventure-track-20": "arabian-heights-night",
+    "lockbox-adventure-track-27": "drive-thru-danger",
+    "lockbox-adventure-track-3": "matsuri",
+    "lockbox-adventure-track-4": "north-pole",
+    "lockbox-adventure-track-9": "haven-stadium",
+    "n-gage-android-alley": "android-alley-n-gage",
+    "n-gage-assembly-lane": "assembly-lane-n-gage",
+    "n-gage-deep-sea-driving": "deep-sea-driving-n-gage",
+    "n-gage-jungle-boogie": "jungle-boogie-n-gage",
+    "n-gage-out-of-time": "out-of-time-n-gage",
+    "release-st-patrick-adventure-slot-135": "jungle-boogie-n-gage",
+    "release-st-patrick-adventure-slot-143": "green-hill-raceway",
+    "release-st-patrick-adventure-slot-23": "yoshi-circuit-legacy",
+    "release-st-patrick-adventure-slot-31": "hasty-hedges",
+    "release-st-patrick-adventure-slot-41": "mario-raceway-n64",
+    "release-st-patrick-adventure-slot-9": "toasty-terrace",
+    "release-st-patrick-adventure-track-15": "green-hill-raceway",
+    "release-st-patrick-adventure-track-2": "toasty-terrace",
+    "release-st-patrick-adventure-track-4": "yoshi-circuit-legacy",
+    "release-st-patrick-adventure-track-7": "mario-raceway-n64",
+    "sid-s-house": "sids-house",
+    "sunken-sprint-v1-0-slot-113": "sunken-sprint",
+    "vl2-slot-1": "vanilla-lake-2"
+  }
 }

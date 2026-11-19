@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 from worlds.AutoWorld import data_package_checksum
 
-from . import named_tracks
+from . import destinations, named_tracks
 
 FEATURE = "origin_letters_v1"
 DEFAULT = "CTR"
@@ -19,7 +19,7 @@ _CATALOGUE = json.loads(pkgutil.get_data(__package__, "data/origins.json"))
 
 def letters_for_package(package):
     """Stage 1 requires models in the exact LEV the seed pins."""
-    row = _CATALOGUE["tracks"].get(package["content_id"])
+    row = _CATALOGUE["tracks"].get(destinations.canonical_track_key(package["content_id"]))
     if not row or row["review"] != "verified" or row["relation"] not in ("port", "remake"):
         return DEFAULT
     game = _CATALOGUE["games"][row["origin_game"]]

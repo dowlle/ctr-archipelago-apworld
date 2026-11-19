@@ -7,10 +7,11 @@ applies the same rules (native tools/test-content-plan-parity.py).
 import copy
 import json
 import unittest
+from unittest.mock import patch
 
 from Options import OptionError
 
-from .. import content_plan, custom_packages, named_tracks
+from .. import box_spots, content_plan, custom_packages, destinations, named_tracks
 from .test_content_plan import make_world, profile_options
 
 #: Test data only: a track key with no named block, so it takes path B+.
@@ -45,6 +46,48 @@ def options_with(custom, required=None):
 
 
 class TestAdmission(unittest.TestCase):
+    def test_historical_key_uses_the_canonical_block_for_new_rooms(self):
+        alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
+        descriptor = copy.deepcopy(UNKNOWN)
+        descriptor.update(content_id=alias, id=f"package/{alias}/{descriptor['revision']}",
+                          display_name="N-Gage Assembly Lane")
+        options = options_with([descriptor])
+        block = destinations.named_track(key)
+        self.assertIs(destinations.named_track(alias), block)
+        world = make_world(options, seed=3)
+        track = next(t for t in world.ctr_content_plan["tracks"] if t.get("package_id") == descriptor["id"])
+        self.assertEqual((track["named_block"], track["room_title"]), (block.block_index, block.ap_name))
+        self.assertEqual(world.ctr_content_plan["packages"][0]["content_id"], alias)
+        tracker = make_world(options, passthrough=world.fill_slot_data())
+        tracker.generate_basic()
+        address = named_tracks.location_code(block.block_index, "trophy")
+        self.assertEqual(tracker.location_id_to_name[address], block.ap_name + ": Trophy Race")
+
+        with patch.dict(destinations.TRACK_KEY_ALIASES, {}, clear=True):
+            old_world = make_world(options, seed=3)
+            wire = old_world.fill_slot_data()
+            track = next(t for t in wire["content_plan"]["tracks"] if t.get("package_id") == descriptor["id"])
+            self.assertNotIn("named_block", track)
+            saved = next(c for c in wire["content_plan"]["checks"] if c["owner"] == track["id"])
+        restored = make_world(options, passthrough=wire)
+        restored.generate_basic()
+        self.assertEqual(restored.location_id_to_name[saved["location"]], saved["display_name"])
+
+        canonical = copy.deepcopy(descriptor)
+        canonical.update(content_id=key, id=f"package/{key}/{canonical['revision']}")
+        with self.assertRaisesRegex(custom_packages.PackageError, "repeats the track key"):
+            custom_packages.admit_all([descriptor, canonical])
+
+    def test_alias_does_not_grant_box_spots_without_the_lev_pin(self):
+        key = "gossamer-s-castle"
+        track = {"origin": "custom", "named_block": destinations.named_track(key).block_index}
+        package = copy.deepcopy(UNKNOWN)
+        package["content_id"] = "boss-race-2"
+        self.assertIsNone(box_spots.file_for(track, package))
+        entry = box_spots.CUSTOM_FILES[key]
+        package["files"][0]["sha256"] = entry["doc"]["track"]["lev_sha256"][0]
+        self.assertIs(box_spots.file_for(track, package), entry)
+
     def test_known_profiles_and_unknown_descriptors_admit(self):
         for descriptor in (*content_plan.PACKAGES, UNKNOWN, named_fixture()):
             with self.subTest(descriptor=descriptor["id"]):
