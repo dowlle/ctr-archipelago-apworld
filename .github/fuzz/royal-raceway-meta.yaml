@@ -1,0 +1,25 @@
+Crash Team Racing:
+  accessibility: full
+  itemboxsanity: {0: 1, 5: 1, 50: 2}
+  wumpasanity: {"off": 1, crates: 2, both: 1}
+  item_box_count: {0: 1, 1: 1, 5: 1, 15: 1, 50: 1}
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost_blue_fire: {true: 1, false: 1}
+  logic_difficulty: {easy: 1, medium: 1, hard: 1}
+  shortcut_knowledge: {easy: 1, medium: 1, hard: 1}
+  lap_completion_checks: true
+  custom_tracks:
+    - id: package/royal-raceway/1.0.0
+      content_id: royal-raceway
+      uuid: 6bbc779b-2f99-5292-a136-becc373258e6
+      revision: "1.0.0"
+      display_name: Royal Raceway
+      author: PanchoPew
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, weapon_crates: 28, fruit_crates: 6, loose_fruit: 0, checkpoints: 128, ai_nav: true}
+      files:
+        - {role: lev, sha256: fca9e96a57c850e68e0226382645b4d6df5b4e7ebeb61459269ec2427ffab96b, bytes: 1000000, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 1b3afef3926f7c486ab90706992dba54f0b72dac2b1464c1bff61d6a4ba1051f, bytes: 400000, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [royal-raceway]
+  retail_tracks: [all]

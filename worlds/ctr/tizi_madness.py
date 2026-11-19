@@ -105,6 +105,9 @@ def tizi_track_ids(plan):
             if t.get("package_id") is not None and is_tizi_madness(packages.get(t["package_id"]))}
 
 
+FEATURE = "tizi_mask_v1"
+
+
 class MaskGates:
     """Rule 2: which parts of a plan race Tizi Madness and so need the Mask.
     Empty without Itemsanity, because then the game needs no item to give it.

@@ -1,0 +1,24 @@
+Crash Team Racing:
+  accessibility: full
+  itemboxsanity: {0: 1, 5: 1, 50: 2}
+  wumpasanity: {"off": 1, crates: 2, both: 1}
+  item_box_count: {0: 1, 1: 1, 5: 1, 15: 1, 50: 1}
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost_blue_fire: {true: 1, false: 1}
+  logic_difficulty: {easy: 1, medium: 1, hard: 1}
+  shortcut_knowledge: {easy: 1, medium: 1, hard: 1}
+  custom_tracks:
+    - id: package/country-speedway/1.3.0
+      content_id: country-speedway
+      uuid: c4da9cec-990e-5890-9f41-b4c2023b9595
+      revision: "1.3.0"
+      display_name: Country Speedway
+      author: PanchoPew
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: false, weapon_crates: 25, fruit_crates: 5, loose_fruit: 0, checkpoints: 130, ai_nav: true}
+      files:
+        - {role: lev, sha256: 9fa73436daaf91434ede1d6fb036a8e6dff225c55533cc0be5723d229b5e53bd, bytes: 818324, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: e02c94ff5fd7685c63ba107581b0bc8625cd50e6f601f6fbae0bf1b71af7ef8e, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [country-speedway]
+  retail_tracks: [all]

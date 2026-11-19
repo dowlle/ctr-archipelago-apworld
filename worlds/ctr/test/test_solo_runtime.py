@@ -92,13 +92,15 @@ def run(client: str, *args, solo: str | None = None, home: str | None = None, pr
         timeout: int = 180) -> tuple[list[dict], int]:
     script = os.path.join(client, "solo-runtime", "test_entry.py")
     base = ["--solo", solo] if solo else []
+    # Isolated mode ignores PYTHONDONTWRITEBYTECODE. Prevent the test entry's
+    # first import of ctr_solo from writing into the client directory.
     if prelude:
-        cmd = [sys.executable, "-I", "-c",
+        cmd = [sys.executable, "-I", "-B", "-c",
                prelude + "\nimport runpy, sys\nsys.argv = sys.argv[1:]\n"
                "sys.path.insert(0, __import__('os').path.dirname(sys.argv[0]))\n"
                "runpy.run_path(sys.argv[0], run_name='__main__')", script, *base, *args]
     else:
-        cmd = [sys.executable, "-I", script, *base, *args]
+        cmd = [sys.executable, "-I", "-B", script, *base, *args]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env(home))
     events = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
     return events, proc.returncode
