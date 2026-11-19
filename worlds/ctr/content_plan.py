@@ -461,7 +461,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
-            # Lap completion checks (#344) last.
+            # Lap completion checks (#344).
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
             + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else []))
 
@@ -1709,8 +1709,13 @@ def draw_plan(world, key_estimate=True):
         selected_sanity = {sanity.code(by_id[row["track_id"]], family, number)
                            for row in (sanity_record or {}).get("tracks", ())
                            for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
+        selected_origin_checks = {letter_code(chosen[index], slot)
+                                  for index, slots in letters.items() if "letters" in chosen[index]
+                                  for slot in slots}
         filler_exclusions = {name for name in filler_exclusions
-                             if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
+                             if (name not in frozen_sanity or frozen_sanity[name] in selected_sanity)
+                             and (not track_origins.is_origin_location(CTR_LOCATION_IDS.get(name))
+                                  or CTR_LOCATION_IDS[name] in selected_origin_checks)}
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(

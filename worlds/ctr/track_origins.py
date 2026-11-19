@@ -10,7 +10,7 @@ from . import named_tracks
 FEATURE = "origin_letters_v1"
 DEFAULT = "CTR"
 
-# Source: https://github.com/dowlle/ctr-track-registry/blob/4740cbb917169810cf2cc6bf114f3e9b4b0920b6/origins.json
+# Pinned together with named_tracks.json by tools/build_named_tracks.py.
 _CATALOGUE = json.loads(pkgutil.get_data(__package__, "data/origins.json"))
 
 
@@ -33,9 +33,25 @@ def _origin_item(code):
     return first <= code <= last
 
 
-def _origin_location(code):
+def is_origin_location(code):
     row = named_tracks.block_of_location(code)
     return row is not None and 141 <= row[1] <= 176
+
+
+def prune_unused_option_names(world):
+    """Group expansion may include the reserved letter names for other rooms."""
+    plan = world.ctr_content_plan
+    locations = {row["location"] for row in plan["checks"]}
+    items = {row["item"] for row in plan["items"]["rows"]}
+    for option in (world.options.exclude_locations, world.options.priority_locations,
+                   world.options.start_location_hints):
+        option.value = {name for name in option.value
+                        if not is_origin_location(world.location_name_to_id.get(name))
+                        or world.location_name_to_id[name] in locations}
+    for option in (world.options.start_hints, world.options.local_items, world.options.non_local_items):
+        option.value = {name for name in option.value
+                        if not _origin_item(world.item_name_to_id.get(name, 0))
+                        or world.item_name_to_id[name] in items}
 
 
 def preserve_legacy_package(multiworld, multidata, game):
@@ -45,7 +61,7 @@ def preserve_legacy_package(multiworld, multidata, game):
            for slot, wire in multidata["slot_data"].items() if slot in ctr_slots):
         return
     for slot, placements in multidata["locations"].items():
-        if slot in ctr_slots and any(map(_origin_location, placements)):
+        if slot in ctr_slots and any(map(is_origin_location, placements)):
             return
         if any(owner in ctr_slots and _origin_item(code) for code, owner, _flags in placements.values()):
             return
@@ -58,7 +74,7 @@ def preserve_legacy_package(multiworld, multidata, game):
     package = multidata["datapackage"][game]
     result = package.copy()
     result.pop("checksum")
-    for kind, is_origin in (("item", _origin_item), ("location", _origin_location)):
+    for kind, is_origin in (("item", _origin_item), ("location", is_origin_location)):
         names, groups = f"{kind}_name_to_id", f"{kind}_name_groups"
         removed = {name for name, code in package[names].items() if is_origin(code)}
         result[groups] = {group: [name for name in members if name not in removed]

@@ -29,6 +29,8 @@ What it does:
    track key and the names in its `credits`, whatever its mint status, so a
    track author cup can find that author's tracks (Cortex Vortex is `builtin`
    and is listed too). Same provenance block, same --check rule.
+7. Copies data/origins.json byte for byte from that commit when present.
+   Older registry snapshots predate this file and still build.
 
 Append only: a block already in the apworld file must come back unchanged
 (test_named_tracks.py enforces the same rule against the published lock).
@@ -46,6 +48,7 @@ REPOSITORY = "https://github.com/dowlle/ctr-track-registry"
 WORLD = Path(__file__).resolve().parent.parent
 OUTPUT = WORLD / "data" / "named_tracks.json"
 CREDITS_OUTPUT = WORLD / "data" / "track_credits.json"
+ORIGINS_OUTPUT = WORLD / "data" / "origins.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 MINT_STATUSES = ("mint", "reserved", "builtin")
 
@@ -166,6 +169,8 @@ def main(argv=None) -> int:
     document = build(args.registry, args.commit)
     text = render(document)
     credits_text = render(build_credits(args.registry, args.commit))
+    has_origins = _git(args.registry, "ls-tree", args.commit, "origins.json")
+    origins_bytes = _git(args.registry, "show", f"{args.commit}:origins.json") if has_origins else None
     previous = json.loads(OUTPUT.read_text(encoding="utf-8")) if OUTPUT.exists() else {}
     problems = append_only_problems(previous, document)
     if problems:
@@ -178,10 +183,15 @@ def main(argv=None) -> int:
         if not CREDITS_OUTPUT.exists() or CREDITS_OUTPUT.read_text(encoding="utf-8") != credits_text:
             print(f"{CREDITS_OUTPUT} differs from registry commit {args.commit}", file=sys.stderr)
             return 1
+        if origins_bytes is not None and (not ORIGINS_OUTPUT.exists() or ORIGINS_OUTPUT.read_bytes() != origins_bytes):
+            print(f"{ORIGINS_OUTPUT} differs from registry commit {args.commit}", file=sys.stderr)
+            return 1
         print(f"{OUTPUT} matches registry commit {args.commit} ({len(document['tracks'])} tracks)")
         return 0
     OUTPUT.write_text(text, encoding="utf-8")
     CREDITS_OUTPUT.write_text(credits_text, encoding="utf-8")
+    if origins_bytes is not None:
+        ORIGINS_OUTPUT.write_bytes(origins_bytes)
     print(f"wrote {OUTPUT}: {len(document['tracks'])} tracks from {args.commit}")
     print(f"wrote {CREDITS_OUTPUT} from {args.commit}")
     return 0

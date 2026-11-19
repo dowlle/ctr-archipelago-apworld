@@ -1,10 +1,14 @@
 """Generation contract for the comfort-only surface items (issues #14/#15)."""
+import unittest
 
-from BaseClasses import ItemClassification
+from BaseClasses import ItemClassification, PlandoOptions
+from Options import ExcludeLocations, StartHints
 
 from worlds.ctr.Items import load_item_table
 
 from . import CTRTestBase
+from .test_content_plan import make_world
+from .. import ctrAPWorld
 
 
 SURFACE_ITEMS = {
@@ -54,4 +58,22 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
     # all-unlocked mode is the named fix. Keeps this fixture about the
     # comfort-pack trim rather than about the character item economy.
     options = {"podium_placement_checks": False, "character_unlocks": False, "wumpa_shop_slots": 0}
+
+
+class TestOriginLetterGroups(unittest.TestCase):
+    def test_legacy_group_expansion_preserves_the_tight_item_pool_and_hint_text(self):
+        excluded = ExcludeLocations.from_any(["Acid Lake"])
+        hints = StartHints.from_any(["CTR Letters"])
+        for option in (excluded, hints):
+            option.verify(ctrAPWorld, "ContentPlan", PlandoOptions.none)
+        legacy_excluded = excluded.value - {"Acid Lake: Letter K", "Acid Lake: Letter N"}
+        legacy_hints = {name for name in hints.value if not name.startswith(("Letter K (", "Letter N ("))}
+        options = dict(accessibility="full", track_origin_letters=False, lettersanity="locations_and_items",
+                       letters_per_track=3, item_pool={"extra": {"trophies": 40}},
+                       start_inventory={"Ignore Dirt": 1})
+        control = make_world(dict(options, exclude_locations=legacy_excluded, start_hints=legacy_hints), seed=123)
+        world = make_world(dict(options, exclude_locations=excluded.value, start_hints=hints.value), seed=123)
+        self.assertEqual(world.fill_slot_data(), control.fill_slot_data())
+        self.assertEqual(world.options.exclude_locations.current_option_name, control.options.exclude_locations.current_option_name)
+        self.assertEqual(world.options.start_hints.current_option_name, control.options.start_hints.current_option_name)
 

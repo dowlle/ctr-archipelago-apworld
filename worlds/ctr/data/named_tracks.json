@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "70e2885c4013393c366da1f727e91506a89afb15",
-    "digest": "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
+    "commit": "4740cbb917169810cf2cc6bf114f3e9b4b0920b6",
+    "digest": "da77a7d9671febcbbfb55f6432cf59ac3a3233691748539ec9d7ca76c027c9dc"
   },
   "tracks": [
     {
@@ -401,7 +401,8 @@
         "210f27d55db40060705efad2523d2659f41ca39826215fb683570b589e108329",
         "c4c52dd3000c952b1143d4bb01e1e37b90b19d6d5c05cb45eca745a2740c607d",
         "73c9fd66879523f6faefb43782c3dcadfa0102661cccf016cc431f77f6efbe8e",
-        "5f9c0e5e249c7afb66982c439c501149c356d08eec2d6aff1a60518a638ce483"
+        "5f9c0e5e249c7afb66982c439c501149c356d08eec2d6aff1a60518a638ce483",
+        "1e204f0baff8b300abeea470ec5b74e3e2dd2e655de1c33e8d7a4851002e20ed"
       ]
     },
     {
