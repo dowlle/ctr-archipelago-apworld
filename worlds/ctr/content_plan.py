@@ -113,6 +113,7 @@ CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 #: The track key of Cortex Vortex. A downloaded Cortex Vortex package (the Saphi
 #: release) carries it too: it is the same track, so a seed takes one or the other.
 CORTEX_TRACK_KEY = "cortex-vortex"
+CORTEX_VRM_SHA256 = "4131444b9d1d53971befcfd11349efceaf887c20b795c8890fdcb2c36bdff07d"
 CORTEX_LAPS = 3
 #: Standalone Cortex Vortex races are two laps (ruling of 2026-11-09, A4-13):
 #: the pad's Trophy Race, CTR Challenge and Relic Race, with the client's
@@ -1245,11 +1246,10 @@ def _draw_fitting(world):
 
 
 def swap_in_bundled_cortex(world):
-    """`cortex_vortex_track: off` with a downloaded Cortex Vortex in `custom_tracks`
-    (maintainer ruling of 2026-11-05: "Bundled replaces it"). The downloaded copy leaves
-    the list and the seed behaves as `in_pool`: the bundled Cortex Vortex is a drawn
-    candidate exactly where the copy was, so the player keeps the track they asked
-    for and every player races the same certified bytes and boxes. `in_pool` and not
+    """Replace an exact copy of the bundled Cortex Vortex files when the option is off.
+
+    Other copies can share the registry key and still carry different pickups or files.
+    The seed with an exact duplicate behaves as `in_pool`. `in_pool` and not
     `own_pad`, because a listed custom track is never promised a pad either. A copy that
     `required_entries` names keeps that promise: the swap is `own_pad` and the entry leaves the list.
     Runs before the plan is drawn or restored, so both see the same options."""
@@ -1257,7 +1257,9 @@ def swap_in_bundled_cortex(world):
     if o.cortex_vortex_track.value:
         return
     packages = resolve_packages(list(o.custom_tracks.value))
-    copies = [p for p in packages if p["content_id"] == CORTEX_TRACK_KEY]
+    copies = [p for p in packages if destinations.canonical_track_key(p["content_id"]) == CORTEX_TRACK_KEY
+              and p["files"][0]["sha256"] == sanity.CORTEX_LEV_SHA256
+              and p["files"][1]["sha256"] == CORTEX_VRM_SHA256]
     if not copies:
         return
     twins = [p["id"] for p in copies]
@@ -1266,7 +1268,7 @@ def swap_in_bundled_cortex(world):
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
     o.custom_tracks.value = [raw for raw in o.custom_tracks.value
-                             if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
+                             if custom_packages.admit(raw, "custom_tracks")["id"] not in twins]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
     moved_modes = False
@@ -1320,7 +1322,8 @@ def draw_plan(world, key_estimate=True):
     for package in packages:
         if country_speedway.matches(package) or toasty_terrace.matches(package):
             package["capabilities"]["super_turbo_pads"] = False
-    twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
+    twin = next((p for p in packages if destinations.canonical_track_key(p["content_id"]) == CORTEX_TRACK_KEY),
+                None) if with_cortex else None
     if twin is not None:
         error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
               "Cortex Vortex that comes with CTR AP. A seed has one Cortex Vortex: remove it from custom_tracks, "

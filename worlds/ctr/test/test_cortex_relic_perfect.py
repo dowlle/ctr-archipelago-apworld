@@ -16,7 +16,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 
-from .. import content_cups, content_plan, cortex_vortex, named_tracks, relic_perfect
+from .. import content_cups, content_plan, cortex_vortex, named_tracks, relic_perfect, sanity
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, named_fixture
 from .test_track_checks import check_options, checks_of, track_of
@@ -211,7 +211,8 @@ class TestCortexVortexTrack(unittest.TestCase):
         saphi = copy.deepcopy(UNKNOWN)
         saphi.update(id="package/cortex-vortex/1.1.2", content_id="cortex-vortex", revision="1.1.2",
                      uuid="f1a619f0-9176-5e75-ad96-00db77d8cf2b", display_name="Cortex Vortex", author="Lockheart")
-        saphi["files"] = [dict(f, sha256=h * 32) for f, h in zip(saphi["files"], ("aa", "bb"))]
+        saphi["files"] = [dict(f, sha256=h) for f, h in zip(
+            saphi["files"], (sanity.CORTEX_LEV_SHA256, content_plan.CORTEX_VRM_SHA256))]
         return saphi
 
     def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):
@@ -259,6 +260,17 @@ class TestCortexVortexTrack(unittest.TestCase):
             self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
             self.assertIn(CV, {t["id"] for t in world.ctr_content_plan["tracks"]})
             self.assertEqual(world.ctr_cortex_swap_mode, "own_pad")
+
+    def test_identified_copy_with_different_pins_keeps_its_own_files(self):
+        options = self.swap_options(pinned=True)
+        package = options["content_pool"]["tracks"]["custom"][-1]
+        package["files"][0]["sha256"] = "cd" * 32
+        package["capabilities"].update(weapon_crates=0, fruit_crates=0, wumpa=False)
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertNotIn(CV, {track["id"] for track in plan["tracks"]})
+        self.assertIn(package, plan["packages"])
+        self.assertEqual(world.options.cortex_vortex_track.value, 0)
 
     def test_the_swap_matches_in_pool_without_the_copy(self):
         swapped = make_world(self.swap_options(), seed=4).ctr_content_plan
