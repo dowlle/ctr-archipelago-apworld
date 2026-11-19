@@ -457,6 +457,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
             + ([sanity.FEATURES[0]] if sanity_record and sanity_record["itemboxsanity"] else [])
             + ([sanity.FEATURES[1]] if sanity_record and sanity_record["wumpasanity"] else [])
+            + ([sanity.EXCLUSIONS_FEATURE] if sanity_record and "exclusion_version" in sanity_record else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
