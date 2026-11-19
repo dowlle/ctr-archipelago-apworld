@@ -439,6 +439,11 @@ class ctrAPWorld(World):
         link accounting, and the Hit Character Key fallback."""
         spoiler_handle.write("\nCTR independent content/item plan:\n")
         json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
+        from . import track_rulings
+        if track_rulings.enabled(self.ctr_content_plan):
+            for package in self.ctr_content_plan["packages"]:
+                for family, (revision, digest) in track_rulings.carried_sources(package).items():
+                    spoiler_handle.write(f"\nCTR rulings for {package['id']}: {family} from {revision} ({digest})")
         spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
         if getattr(self, "ctr_cortex_swap", None):
             spoiler_handle.write("CTR Cortex Vortex: the downloaded copy (" + ", ".join(self.ctr_cortex_swap)

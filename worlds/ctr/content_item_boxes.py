@@ -62,7 +62,7 @@ import json
 
 from Options import OptionError
 
-from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace
+from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace, track_rulings
 from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
@@ -97,10 +97,14 @@ def settings(options):
     return record
 
 
+PICKUP_RULE_PINS = {country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256,
+                    royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256}
+
+
 def reviewed_pickups(package):
-    """Exact LEVs with reviewed physical pickup ranks (the `pickup_rules` marker)."""
-    return (country_speedway.matches(package) or toasty_terrace.matches(package)
-            or royal_raceway.matches(package) or green_hill_raceway.matches(package))
+    """LEV that supplies the physical pickup rank, if one has a ruling."""
+    pin = track_rulings.source(package, PICKUP_RULE_PINS)
+    return pin if pin in PICKUP_RULE_PINS else None
 
 
 def add_spot_sets(record, tracks, package_by_id, seed, player):
@@ -330,11 +334,11 @@ def box_terms(track, slot, capability, package=None, record=None):
     if track["origin"] == "retail":
         boost_min, needs_stats = BOX_RULES.get((track["display_name"], slot), (0, False))
         return (boost_min if boost_on else 0), bool(needs_stats and stats_on)
-    if (track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ())
-            and (toasty_terrace.matches(package) or royal_raceway.matches(package)
-                 or green_hill_raceway.matches(package))):
-        return 0, False
-    if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()) and country_speedway.matches(package):
-        rank = country_speedway.rank("weapon_crate", physical_seat(track, record, package, slot))
-        return (rank if boost_on else 0), False
+    if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()):
+        pin = reviewed_pickups(package)
+        if pin == country_speedway.LEV_SHA256:
+            rank = country_speedway.rank("weapon_crate", physical_seat(track, record, package, slot))
+            return (rank if boost_on else 0), False
+        if pin:
+            return 0, False
     return (finish_boost(track, capability, package) if boost_on else 0), False

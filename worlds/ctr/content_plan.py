@@ -40,7 +40,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               tizi_madness, turbo_grant, pad_budget)
+               tizi_madness, turbo_grant, pad_budget, track_rulings)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -414,7 +414,7 @@ def relic_races(entries):
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
-                      repeatable_pickups=False, tizi_mask=False):
+                      repeatable_pickups=False, tizi_mask=False, carried_rulings=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -464,7 +464,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             # Lap completion, then the versioned optional pickup semantics.
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
-            + ([tizi_madness.FEATURE] if tizi_mask else []))
+            + ([tizi_madness.FEATURE] if tizi_mask else [])
+            + ([track_rulings.FEATURE] if carried_rulings else []))
 
 
 def family_settings(options):
@@ -1178,6 +1179,7 @@ def required_ids(options, candidates, arenas, packages):
 OPENING_REDRAWS = 64
 
 
+@track_rulings.generation
 def generate(world):
     """Draw the plan. One whose opening does not fit draws again, as the layout is
     what decides it (content_opening), and the best draw stands: no seed is refused
@@ -1286,6 +1288,7 @@ def swap_in_bundled_cortex(world):
              + (f" {' and '.join(carried)} carried over.".replace(" its ", " Its ", 1) if carried else ""))
 
 
+@track_rulings.generation
 def draw_plan(world, key_estimate=True):
     """One draw of the plan. `key_estimate` lets the first Key's estimate pick the
     layout. It knows no boss rank and no Relic Race first, so a redraw goes without
@@ -2053,6 +2056,8 @@ def draw_plan(world, key_estimate=True):
         plan["global_checks"] = global_checks
         if tizi_madness.MaskGates(plan):
             plan["required_features"].append(tizi_madness.FEATURE)
+    if any(track_rulings.carried_sources(package) for package in plan["packages"]):
+        plan["required_features"].append(track_rulings.FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
     if sanity_record:
@@ -2282,6 +2287,7 @@ def predicate(world, node):
     return predicate_term(world, node).compile()
 
 
+@track_rulings.regions
 def create_regions(world):
     mw, player, plan = world.multiworld, world.player, world.ctr_content_plan
     menu = Region("Menu", player, mw)
@@ -2733,6 +2739,7 @@ def goal_envelope(plan):
                 goal_bosses=record["bosses_required"] if record else 0, goal_gems=gem["count"] if gem else 0)
 
 
+@track_rulings.validation
 def validate(plan):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
     from .content_plan_schema import validate_shape
@@ -2819,7 +2826,7 @@ def validate(plan):
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
-                                                         content_pickups.enabled(plan), tizi_mask),
+                                                         content_pickups.enabled(plan), tizi_mask, track_rulings.enabled(plan)),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")

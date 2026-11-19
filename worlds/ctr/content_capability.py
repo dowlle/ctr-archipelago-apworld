@@ -59,7 +59,7 @@ from types import SimpleNamespace
 
 from Options import OptionError
 
-from . import capability_contract, progressive_capability
+from . import capability_contract, progressive_capability, track_rulings
 from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, FIRST_BOOST_COUNT, USF_BOOST_COUNT,
                          relic_perfect_boost_min, relic_tier_boost_min)
 
@@ -119,8 +119,9 @@ def _load_letter_rulings():
         raise ValueError("letter_boost_rulings.json: version must be 1")
     out = {}
     for row in raw["rulings"]:
-        key = (row.get("content_id"), row.get("letter"))
-        if (set(row) != {"content_id", "letter", "rank", "ruling"}
+        scope = track_rulings.scope(row)
+        key = (row.get("content_id"), row.get("letter"), *scope)
+        if (set(row) != {"content_id", "letter", "rank", "ruling"} | ({"revision", "lev_sha256"} if scope else set())
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("letter_c", "letter_t", "letter_r")
                 or type(row.get("rank")) is not int or row["rank"] not in (1, 2)
@@ -138,7 +139,7 @@ LETTER_BOOST_RULINGS = _load_letter_rulings()
 def letter_boost(track, award, package=None):
     """Letter floor, independent of the finish rank and logic difficulty."""
     if track["origin"] == "custom":
-        return LETTER_BOOST_RULINGS.get(((package or {}).get("content_id"), award), 0)
+        return track_rulings.ruled_value(package, LETTER_BOOST_RULINGS, award) or 0
     return LETTER_BOOST.get((_name(track), award), 0)
 
 
@@ -147,10 +148,15 @@ def ruled_finish(package):
     A row for the package's exact revision and LEV pin wins over a row for
     every revision of its content id."""
     content = package.get("content_id")
-    lev = next((pin.get("sha256") for pin in package.get("files", ()) if isinstance(pin, dict)
-                and pin.get("role") == "lev"), None)
-    exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev)) if lev else None
-    return exact if exact is not None else USF_FINISH_RULINGS.get((content, None, None))
+    lev = track_rulings.lev_pin(package)
+    exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev))
+    if exact is not None:
+        return exact
+    ranks = {digest: rank for (key, _, digest), rank in USF_FINISH_RULINGS.items() if key == content and digest}
+    source = track_rulings.source(package, ranks)
+    if source != lev:
+        return ranks[source]
+    return USF_FINISH_RULINGS.get((content, None, None))
 
 
 def error(message):
@@ -233,7 +239,8 @@ FLOORS_KEY = "finish_floors"
 def finish_floor_tracks(pairs):
     """Sorted ids of the (track, package) pairs a reviewed finish floor covers."""
     from . import royal_raceway
-    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and royal_raceway.matches(package)})
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom"
+                   and track_rulings.source(package, (royal_raceway.LEV_SHA256,)) == royal_raceway.LEV_SHA256})
 
 
 #: Optional `capability` member (Green Hill Raceway 2.0.0): ids of exact reviewed
@@ -245,7 +252,8 @@ FREE_KEY = "finish_free"
 def finish_free_tracks(pairs):
     """Sorted ids of the (track, package) pairs a reviewed free finish covers."""
     from . import green_hill_raceway
-    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and green_hill_raceway.matches(package)})
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom"
+                   and track_rulings.source(package, (green_hill_raceway.LEV_SHA256,)) == green_hill_raceway.LEV_SHA256})
 
 
 def has_free_finish(track, record):

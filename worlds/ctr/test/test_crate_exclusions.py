@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from Options import OptionError
-from .. import crate_exclusions, content_item_boxes, content_plan, box_spots
+from .. import crate_exclusions, content_item_boxes, content_plan, box_spots, track_rulings
 from .test_content_item_boxes import btp, box_options, first_world, boxes
 from .test_content_plan import make_world
 
@@ -173,13 +173,23 @@ class TestCrateExclusions(unittest.TestCase):
                 self.assertEqual(json.loads(json.dumps(current_restored.fill_slot_data())), current_wire)
                 self.assertEqual(len(boxes(current_restored.ctr_content_plan, track_id)), min(count - 1, 15))
 
-    def test_unknown_revision_and_north_pole_are_unchanged(self):
+    def test_unknown_revision_uses_ordinals_from_the_reviewed_revision(self):
         for digest in ("01" * 32, "17eafea488" + "0" * 54):
             p = ancient(3, digest)
             self.assertEqual(content_item_boxes.crate_count(p), 3)
-            plan = first_world(box_options(custom=[p])).ctr_content_plan
-            self.assertNotIn(crate_exclusions.KEY, plan["item_boxes"])
-            self.assertNotIn(crate_exclusions.FEATURE, plan["required_features"])
+            world = first_world(box_options(custom=[p]))
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            plan = wire["content_plan"]
+            self.assertIn(track_rulings.FEATURE, plan["required_features"])
+            row, = plan["item_boxes"][crate_exclusions.KEY]
+            self.assertEqual(row["lev_sha256"], digest)
+            self.assertEqual(row["crates"], [{"ordinal": 1, "pos": None}])
+            self.assertEqual(len(boxes(plan, row["track_id"])), 2)
+            restored = make_world({}, seed=999, passthrough=wire)
+            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+            plan["required_features"].remove(track_rulings.FEATURE)
+            with self.assertRaises(OptionError):
+                content_plan.validate(plan)
 
     def test_forged_list_refused(self):
         plan = first_world(box_options(custom=[ancient()])).ctr_content_plan

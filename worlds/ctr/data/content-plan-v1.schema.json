@@ -103,13 +103,14 @@
           "lap_checks_v1",
           "repeatable_pickups_v1",
           "tizi_mask_v1",
+          "carried_track_rulings_v1",
           "box_spots_v1",
           "box_count_v1",
           "itemboxsanity_v1",
           "wumpasanity_v1"
         ]
       },
-      "maxItems": 37,
+      "maxItems": 38,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -1903,7 +1904,7 @@
                   "required": ["ordinal", "pos"],
                   "properties": {
                     "ordinal": {"type": "integer", "minimum": 1, "maximum": 65536},
-                    "pos": {"type": "array", "minItems": 3, "maxItems": 3,
+                    "pos": {"type": ["array", "null"], "minItems": 3, "maxItems": 3,
                       "items": {"type": "integer", "minimum": -32768, "maximum": 32767}}
                   }
                 }

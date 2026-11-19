@@ -2,6 +2,8 @@
 import json
 import pkgutil
 
+from . import track_rulings
+
 
 def _load():
     raw = json.loads(pkgutil.get_data(__package__, "data/object_rulings.json"))
@@ -9,8 +11,10 @@ def _load():
         raise ValueError("object_rulings.json: version must be 1")
     out = {}
     for row in raw["rulings"]:
-        key = (row.get("content_id"), row.get("kind"), row.get("ordinal"))
+        scope = track_rulings.scope(row)
+        key = (row.get("content_id"), row.get("kind"), row.get("ordinal"), *scope)
         if (set(row) != {"content_id", "kind", "ordinal", "hard_rank", "blue_fire_rank", "ruling"}
+                | ({"revision", "lev_sha256"} if scope else set())
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("weapon_crate", "wumpa_crate", "wumpa_fruit")
                 or type(key[2]) is not int or not 1 <= key[2] <= 65536
@@ -33,7 +37,7 @@ def rank(track, package, kind, ordinal, capability):
     """
     if track["origin"] != "custom":
         return 0
-    row = RULINGS.get(((package or {}).get("content_id"), kind, ordinal))
+    row = track_rulings.ruled_value(package, RULINGS, kind, ordinal)
     if row is None:
         return 0
     if (capability or {}).get("logic_difficulty", 2) == 2:

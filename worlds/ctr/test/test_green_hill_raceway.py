@@ -149,19 +149,17 @@ class TestGreenHillRaceway(unittest.TestCase):
         self.assertEqual(boxes.box_terms(track, 1, legacy, PACKAGE, dict(shortcut_knowledge=1))[0], 2)
         self.assertEqual(boxes.box_terms(track, 1, p["capability"], PACKAGE, dict(shortcut_knowledge=1, pickup_rules=[TRACK]))[0], 0)
 
-    def test_unrecognised_revision_keeps_generic_terms(self):
+    def test_unrecognised_revision_inherits_pickup_and_finish_rules(self):
         options = green_options()
         options["content_pool"]["tracks"]["custom"][0]["files"][0]["sha256"] = "ab" * 32
         w = make_world(options, seed=3, stop_before="pre_fill")
         p = w.ctr_content_plan
-        self.assertLess(p["sanity"].get("rules_version", 0), 6)
-        self.assertNotIn("pickup_rules", p.get("item_boxes", {}))
-        self.assertNotIn("finish_free", p["capability"])
-        self.assertTrue(all(c.get("boost", 0) == 2 for c in own(p, PICKUPS)))
-        # The lap rank rides the pad route: out of logic until two ranks, as before the ruling.
+        self.assertEqual(p["sanity"]["rules_version"], 6)
+        self.assertIn(TRACK, p["item_boxes"]["pickup_rules"])
+        self.assertEqual(p["capability"]["finish_free"], [TRACK])
+        self.assertTrue(all(c.get("boost", 0) == 0 for c in own(p, PICKUPS)))
         lap = own(p, ("lap",))[0]["display_name"]
-        for rank, reach in ((0, False), (1, False), (2, True)):
-            self.assertEqual(w.multiworld.get_location(lap, 1).can_reach(state_at(w, rank)), reach, rank)
+        self.assertTrue(w.multiworld.get_location(lap, 1).can_reach(state_at(w, 0)))
 
     def test_free_pad_room_and_gated_pad_control(self):
         # Free pad: no racer lock on the Green Hill pad.

@@ -14,7 +14,7 @@ from Options import OptionError
 
 from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
-               royal_raceway, toasty_terrace)
+               royal_raceway, toasty_terrace, track_rulings)
 from .item_boxes import BOX_TRACKS
 from .location_class import LocationClass
 
@@ -84,22 +84,25 @@ def inventory(track, package=None, record=None):
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
-            if royal_raceway.matches(package):
+            source = track_rulings.source(package, CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS)
+            if source in CATALOG:
+                return dict(lev_sha256=pin, counts=counts, needs=CATALOG[source]["needs"])
+            if source == royal_raceway.LEV_SHA256:
                 # Crates are Boost 0 from the Royal rules version; loose fruit, if any, keeps the generic term.
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: ({str(n): dict(since=royal_raceway.RULES_VERSION) for n in range(1, count + 1)}
                                           if kind in ("weapon_crate", "wumpa_crate")
                                           else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
                                    for kind, count, budget in zip(KINDS, counts, BUDGETS)})
-            if green_hill_raceway.matches(package):
+            if source == green_hill_raceway.LEV_SHA256:
                 # Crates are Boost 0 from the Green Hill rules version; loose fruit, if any, keeps the generic term.
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: ({str(n): dict(since=green_hill_raceway.RULES_VERSION) for n in range(1, count + 1)}
                                           if kind in ("weapon_crate", "wumpa_crate")
                                           else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
                                    for kind, count, budget in zip(KINDS, counts, BUDGETS)})
-            if country_speedway.matches(package) or toasty_terrace.matches(package):
-                since = toasty_terrace.RULES_VERSION if toasty_terrace.matches(package) else 3
+            if source in (country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256):
+                since = toasty_terrace.RULES_VERSION if source == toasty_terrace.LEV_SHA256 else 3
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: {str(n): dict(since=since) for n in range(1, count + 1)}
                                    for kind, count in zip(KINDS, counts)})
@@ -125,7 +128,8 @@ def eligible(track, family, record, item_boxes, package, capability=None):
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
     # Reviewed exclusions are keyed by exact LEV and model family: custom revisions, the retail Roo's
     # Tubes weapon crate and the Hot Air Skyway Wumpa crate. Fruit has none.
-    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family])
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family],
+                                         package if track["origin"] == "custom" else None)
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
@@ -147,7 +151,7 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
     contents = {packages.get(t.get("package_id"), {}).get("content_id") for t in tracks if t["origin"] == "custom"}
     enabled = {kind for kind, on in zip(KINDS, (record["itemboxsanity"], record["wumpasanity"] & 1,
                                                record["wumpasanity"] & 2)) if on}
-    ruled = any(content in contents and kind in enabled for content, kind, ordinal in object_rulings.RULINGS)
+    ruled = any(row[0] in contents and row[1] in enabled for row in object_rulings.RULINGS)
     if not ruled:
         record.pop("logic_difficulty", None)
         record.pop("boost_blue_fire", None)
@@ -206,23 +210,26 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(row["lev_sha256"])
+                package = (packages or {}).get(t.get("package_id"))
+                source = (track_rulings.source(package, CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS)
+                          if package else row["lev_sha256"])
+                need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(source)
                 if need is None:
                     need = dict(needs={kind: {str(n): dict(needs="usf") for n in row[kind]} for kind in KINDS})
                 fields = object_needs(need or {}, kind, n, record)
-                if row["lev_sha256"] == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
+                if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
-                if row["lev_sha256"] == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
+                if source == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
                     fields = dict(needs="none")
-                if (row["lev_sha256"] == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (source == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= royal_raceway.RULES_VERSION):
                     fields = dict(needs="none")
-                if (row["lev_sha256"] == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (source == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= green_hill_raceway.RULES_VERSION):
                     fields = dict(needs="none")
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
-                rank = object_rulings.rank(t, (packages or {}).get(t.get("package_id")), kind, n,
+                rank = object_rulings.rank(t, package, kind, n,
                                            record if "logic_difficulty" in record else capability)
                 if rank and (capability or {}).get("boost_mode"):
                     c["boost"] = max(c.get("boost", 0), rank)

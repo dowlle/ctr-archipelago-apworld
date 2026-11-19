@@ -13,6 +13,7 @@ import json
 import pkgutil
 
 from .box_spots import lev_pin
+from . import track_rulings
 
 KEY = "crate_exclusions"
 FEATURE = "crate_exclusions_v1"
@@ -22,14 +23,21 @@ EXCLUSIONS = json.loads(pkgutil.get_data(__package__, "data/crate_exclusions.jso
 WEAPON = "weapon_crate"
 
 
-def ordinals(lev_sha256, kind=WEAPON):
-    """Excluded one-based ordinals of one model family for an exact LEV."""
+def ordinals(lev_sha256, kind=WEAPON, package=None):
+    """Excluded one-based ordinals of one model family."""
+    if package:
+        lev_sha256 = track_rulings.source(package, EXCLUSIONS)
     return {c["ordinal"] for c in EXCLUSIONS.get(lev_sha256, ()) if c.get("family", WEAPON) == kind}
 
 
 def entries(package):
     """Weapon-crate entries only: the wire and the fallback seating never see other families."""
-    return copy.deepcopy([c for c in EXCLUSIONS.get(lev_pin(package), []) if c.get("family", WEAPON) == WEAPON])
+    pin = track_rulings.source(package, EXCLUSIONS)
+    crates = [c for c in EXCLUSIONS.get(pin, ()) if c.get("family", WEAPON) == WEAPON]
+    if pin == lev_pin(package):
+        return copy.deepcopy(crates)
+    count = (package or {}).get("capabilities", {}).get("weapon_crates", 0)
+    return [{"ordinal": c["ordinal"], "pos": None} for c in crates if c["ordinal"] <= count]
 
 
 def count(package, excluded=()):
@@ -44,8 +52,14 @@ def count(package, excluded=()):
 
 def records(tracks, packages, spots):
     """Only pad tracks using fallback seating, never hand-placed spots."""
-    return [dict(track_id=t["id"], lev_sha256=lev_pin(packages.get(t.get("package_id"))),
-                 crates=entries(packages[t["package_id"]]))
-            for t in tracks if t.get("origin") == "custom" and t["id"] not in spots
-            and (packages.get(t.get("package_id")) or {}).get("capabilities", {}).get("weapon_crates")
-            and entries(packages.get(t.get("package_id")))]
+    out = []
+    for track in tracks:
+        if track.get("origin") != "custom" or track["id"] in spots:
+            continue
+        package = packages.get(track.get("package_id"))
+        if not (package or {}).get("capabilities", {}).get("weapon_crates"):
+            continue
+        crates = entries(package)
+        if crates:
+            out.append(dict(track_id=track["id"], lev_sha256=lev_pin(package), crates=crates))
+    return out

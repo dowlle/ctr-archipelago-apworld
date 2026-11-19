@@ -1,0 +1,35 @@
+Crash Team Racing:
+  accessibility: full
+  item_box_count: 5
+  box_locations: true
+  itemboxsanity: {5: 1, 50: 1}
+  wumpasanity: both
+  progressive_boost: {shared_global: 1, per_character: 1}
+  lap_completion_checks: true
+  custom_tracks:
+    - id: package/ancient-lake/9.0.0
+      content_id: ancient-lake
+      uuid: 11111111-2222-4333-8444-555555555535
+      revision: "9.0.0"
+      display_name: Ancient Lake
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 17, fruit_crates: 2, loose_fruit: 0, checkpoints: 58, ai_nav: true}
+      files:
+        - {role: lev, sha256: '1212121212121212121212121212121212121212121212121212121212121212', bytes: 445556, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 57c14cc95b6080f0095f303817fbec8ca1cb885a2a254ed0e99d4536294ed0e2, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+    - id: package/royal-raceway/9.0.0
+      content_id: royal-raceway
+      uuid: 6bbc779b-2f99-5292-a136-becc373258e6
+      revision: "9.0.0"
+      display_name: Royal Raceway
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, weapon_crates: 28, fruit_crates: 6, loose_fruit: 0, checkpoints: 128, ai_nav: true}
+      files:
+        - {role: lev, sha256: '3434343434343434343434343434343434343434343434343434343434343434', bytes: 1000000, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 1b3afef3926f7c486ab90706992dba54f0b72dac2b1464c1bff61d6a4ba1051f, bytes: 400000, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [ancient-lake, royal-raceway]
+  retail_tracks: [all]
