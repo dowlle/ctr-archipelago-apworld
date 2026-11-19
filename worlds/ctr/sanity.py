@@ -16,6 +16,7 @@ from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
                royal_raceway, toasty_terrace)
 from .item_boxes import BOX_TRACKS
+from .cortex_vortex import CORTEX_LEV_SHA256
 from .location_class import LocationClass
 
 KINDS = ("weapon_crate", "wumpa_crate", "wumpa_fruit")
@@ -29,7 +30,6 @@ COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
-CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
 
 
 def code(track, family, number):

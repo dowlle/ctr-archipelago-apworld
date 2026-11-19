@@ -16,7 +16,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 
-from .. import content_cups, content_plan, cortex_vortex, named_tracks, relic_perfect, sanity
+from .. import content_cups, content_plan, cortex_vortex, named_tracks, relic_perfect
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, named_fixture
 from .test_track_checks import check_options, checks_of, track_of
@@ -212,7 +212,7 @@ class TestCortexVortexTrack(unittest.TestCase):
         saphi.update(id="package/cortex-vortex/1.1.2", content_id="cortex-vortex", revision="1.1.2",
                      uuid="f1a619f0-9176-5e75-ad96-00db77d8cf2b", display_name="Cortex Vortex", author="Lockheart")
         saphi["files"] = [dict(f, sha256=h) for f, h in zip(
-            saphi["files"], (sanity.CORTEX_LEV_SHA256, content_plan.CORTEX_VRM_SHA256))]
+            saphi["files"], (cortex_vortex.CORTEX_LEV_SHA256, cortex_vortex.CORTEX_VRM_SHA256))]
         return saphi
 
     def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):

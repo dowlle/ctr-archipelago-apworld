@@ -1246,6 +1246,7 @@ def installed_tracks(paths: Paths, assets: str) -> list:
     """Admitted revisions resolved from the shared store or legacy room folders."""
     admit = _world_module("custom_packages").admit
     supported = _world_module("content_plan").supported_modes
+    destinations = _world_module("destinations")
     tracks_root = os.path.join(assets, "tracks")
     seen, result = set(), []
     for raw, source in _descriptor_sources(paths):
@@ -1256,8 +1257,11 @@ def installed_tracks(paths: Paths, assets: str) -> list:
         if descriptor["id"] in seen:
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
-        folders = [os.path.join(tracks_root, key, "original"),
-                   os.path.join(tracks_root, f"{key}-{revision}", "original")]
+        canonical = destinations.canonical_track_key(key)
+        equivalent = dict.fromkeys([key, canonical, *(alias for alias, target in destinations.TRACK_KEY_ALIASES.items()
+                                                     if target == canonical)])
+        folders = [os.path.join(tracks_root, folder, "original")
+                   for candidate in equivalent for folder in (candidate, f"{candidate}-{revision}")]
         shared = _shared_package_folder(tracks_root, descriptor)
         if shared is None and not all(_pinned_file(folders, pin) for pin in descriptor["files"]):
             continue
@@ -1291,10 +1295,12 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
             for t in tracks]
     cortex = _cortex_pick(section)
     if cortex or _cortex_installed(assets):
-        # A downloaded Cortex Vortex is the same track as the bundled one: the page
-        # shows one Cortex Vortex row, which starts as the YAML has either copy.
-        copies = [row for row in rows if row["content_id"] == CORTEX_ID]
-        rows = [row for row in rows if row["content_id"] != CORTEX_ID]
+        # Collapse byte-identical copies. Different pins remain selectable so
+        # a YAML asking for a patched copy keeps the files it pins.
+        bundled_copy = _world_module("cortex_vortex").bundled_copy
+        ids = {t["id"] for t in tracks if bundled_copy(t["descriptor"])}
+        copies = [row for row in rows if row["id"] in ids]
+        rows = [row for row in rows if row["id"] not in ids]
         cortex = max([cortex] + [row["start"] for row in copies])
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
                         "modes": ["trophy", "ctr", "relic"], "race_modes": ["trophy", "ctr", "relic", "time_trial"],
@@ -1352,11 +1358,12 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     unusable = next((p for p in packages if not by_id[p]["seed_usable"]), None)
     if unusable:
         raise SoloError("track", f"{by_id[unusable]['display_name']} supports Time Trial only and cannot use an Adventure pad.", track=unusable)
-    keys = [by_id[p]["content_id"] for p in packages]
+    canonical_key = _world_module("destinations").canonical_track_key
+    keys = [canonical_key(by_id[p]["content_id"]) for p in packages]
     if CORTEX_ID in keys and CORTEX_ID in picked:
         raise SoloError("track", "Pick one Cortex Vortex: the one that comes with CTR AP is already picked.",
                         track=packages[keys.index(CORTEX_ID)])
-    twice = next((p for p in packages if keys.count(by_id[p]["content_id"]) > 1), None)
+    twice = next((p for p, key in zip(packages, keys) if keys.count(key) > 1), None)
     if twice:
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
     import copy
@@ -1378,7 +1385,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     # twice, and a guarantee the YAML already has is not repeated.
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
-        other = next((d for d in custom if isinstance(d, dict) and d.get("content_id") == descriptor["content_id"]
+        key = canonical_key(descriptor["content_id"])
+        other = next((d for d in custom if isinstance(d, dict) and isinstance(d.get("content_id"), str)
+                      and canonical_key(d["content_id"]) == key
                       and not _same_package(d, descriptor)), None)
         if other is not None:
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "

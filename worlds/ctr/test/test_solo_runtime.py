@@ -1275,9 +1275,7 @@ class TestCustomTracks(SoloTestCase):
             self.assertEqual(code, 0, events)
             self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
 
-    def test_a_downloaded_cortex_vortex_is_the_same_row_as_the_bundled_one(self):
-        # A tester report (alpha2, 2026-11-04): Play Solo offered the bundled Cortex
-        # Vortex and a downloaded copy as two rows, and the seed got both.
+    def test_cortex_vortex_with_other_pins_stays_selectable(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
@@ -1285,24 +1283,47 @@ class TestCustomTracks(SoloTestCase):
         for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
             with open(os.path.join(folder, name), "wb") as handle:
                 handle.write(b"x")
-        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", loop["id"]])
+        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", saphi["id"], loop["id"]])
         source = write_yaml(self.work, "both.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
             custom_tracks=[saphi, loop], required_entries=["cortex-vortex"])}))
         events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
         self.assertEqual(code, 0, events)
-        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]}, {"cortex-vortex": 2, loop["id"]: 1})
+        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]},
+                         {"cortex-vortex": 0, saphi["id"]: 2, loop["id"]: 1})
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "3",
-                                 "--tracks-page", "--track", "cortex-vortex", "--guarantee", "cortex-vortex",
+                                 "--tracks-page", "--track", saphi["id"], "--guarantee", saphi["id"],
                                  "--track", loop["id"])
         self.assertEqual(code, 0, events)
         section = self.room_section(events)
-        self.assertEqual(section["custom_tracks"], [loop])
-        self.assertNotIn("required_entries", section)
-        self.assertEqual(section["cortex_vortex_track"], "own_pad")
+        self.assertEqual(section["custom_tracks"], [saphi, loop])
+        self.assertEqual(section["required_entries"], ["cortex-vortex"])
+        self.assertEqual(section.get("cortex_vortex_track", "off"), "off")
         events, code = self.call("validate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
                                  "--track", "cortex-vortex", "--track", saphi["id"])
         self.assertNotEqual(code, 0, events)
         self.assertEqual((last(events)["kind"], last(events)["track"]), ("track", saphi["id"]))
+
+    def test_exact_cortex_vortex_duplicate_has_one_row(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from .. import cortex_vortex
+
+        descriptor = {"id": "package/lockbox-adventure-track-11/1.0",
+                      "content_id": "lockbox-adventure-track-11",
+                      "files": [{"sha256": cortex_vortex.CORTEX_LEV_SHA256},
+                                {"sha256": cortex_vortex.CORTEX_VRM_SHA256}]}
+        with patch.object(ctr_solo, "installed_tracks", return_value=[
+                {"id": descriptor["id"], "descriptor": descriptor}]), \
+                patch.object(ctr_solo, "_cortex_installed", return_value=True):
+            rows = ctr_solo.list_tracks(SimpleNamespace(tracks=self.work), self.assets)["tracks"]
+        self.assertEqual([row["id"] for row in rows], ["cortex-vortex"])
+
+    def test_historical_key_reads_the_canonical_original_folder(self):
+        alias = "n-gage-assembly-lane"
+        descriptor = self.install(alias, "1.0", "Assembly Lane N-Gage")
+        root = os.path.join(self.assets, "tracks")
+        os.rename(os.path.join(root, alias), os.path.join(root, "assembly-lane-n-gage"))
+        self.assertIn(descriptor["id"], [track["id"] for track in self.tracks()])
 
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml

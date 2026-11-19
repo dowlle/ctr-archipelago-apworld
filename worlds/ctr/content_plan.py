@@ -112,8 +112,7 @@ CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 #: The track key of Cortex Vortex. A downloaded Cortex Vortex package (the Saphi
 #: release) carries it too: it is the same track, so a seed takes one or the other.
-CORTEX_TRACK_KEY = "cortex-vortex"
-CORTEX_VRM_SHA256 = "4131444b9d1d53971befcfd11349efceaf887c20b795c8890fdcb2c36bdff07d"
+CORTEX_TRACK_KEY = cortex_vortex.CORTEX_TRACK_KEY
 CORTEX_LAPS = 3
 #: Standalone Cortex Vortex races are two laps (ruling of 2026-11-09, A4-13):
 #: the pad's Trophy Race, CTR Challenge and Relic Race, with the client's
@@ -1257,9 +1256,7 @@ def swap_in_bundled_cortex(world):
     if o.cortex_vortex_track.value:
         return
     packages = resolve_packages(list(o.custom_tracks.value))
-    copies = [p for p in packages if destinations.canonical_track_key(p["content_id"]) == CORTEX_TRACK_KEY
-              and p["files"][0]["sha256"] == sanity.CORTEX_LEV_SHA256
-              and p["files"][1]["sha256"] == CORTEX_VRM_SHA256]
+    copies = [p for p in packages if cortex_vortex.bundled_copy(p)]
     if not copies:
         return
     twins = [p["id"] for p in copies]
