@@ -46,6 +46,11 @@ def options_with(custom, required=None):
 
 
 class TestAdmission(unittest.TestCase):
+    def test_alias_for_a_builtin_has_identity_without_a_custom_block(self):
+        key = "lockbox-adventure-track-11"
+        self.assertEqual(destinations.canonical_track_key(key), "cortex-vortex")
+        self.assertIsNone(destinations.named_track(key))
+
     def test_historical_key_uses_the_canonical_block_for_new_rooms(self):
         alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
         descriptor = copy.deepcopy(UNKNOWN)

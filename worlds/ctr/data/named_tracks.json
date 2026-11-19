@@ -2,7 +2,7 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "aa43e00154e99c50d82051b19254b2e900607048",
+    "commit": "aead7be3a7fe9d32ac95253d59afdb47e183486d",
     "digest": "e81e8730522855d55276586f98c57af4cf9cea00eaac2bfe7469d07b60ee47d2"
   },
   "tracks": [
@@ -862,10 +862,13 @@
   ],
   "track_key_aliases": {
     "boss-race-2": "gossamer-s-castle",
+    "crash-30anniversary-adventure-track-12": "cortex-vortex",
     "crash-30anniversary-adventure-track-16": "papu-s-sg-temple",
     "crash-30anniversary-adventure-track-19": "drive-thru-danger",
+    "crash-30anniversary-adventure-track-2": "cortex-vortex",
     "dracula-s-castle": "draculas-castle",
     "green-hill-raceway-v2-0-slot-25": "green-hill-raceway",
+    "lockbox-adventure-track-11": "cortex-vortex",
     "lockbox-adventure-track-14": "inferno-island",
     "lockbox-adventure-track-20": "arabian-heights-night",
     "lockbox-adventure-track-27": "drive-thru-danger",

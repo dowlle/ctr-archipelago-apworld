@@ -355,7 +355,8 @@ def parse_named_tracks(document: Mapping) -> Tuple[NamedTrack, ...]:
 
 def parse_track_aliases(document, tracks):
     aliases = document.get("track_key_aliases", {})
-    keys = {track.track_key for track in tracks}
+    # Cortex Vortex has a registry identity and its own built-in checks.
+    keys = {track.track_key for track in tracks} | {"cortex-vortex"}
     if not isinstance(aliases, dict) or any(
         not isinstance(alias, str) or not 1 <= len(alias) <= 64
         or set(alias) - _TRACK_KEY_CHARS or alias.startswith("-") or alias.endswith("-")
