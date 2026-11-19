@@ -74,7 +74,8 @@ EXPECTED_CLASSES = [
     # the third step (2026-10-29) added blocks 85 to 88 from registry commit 9f61917;
     # the alpha3 data package (ruled 2026-11-06) added Item Box 16 to 50 (offsets 35..69);
     # the fourth step (A4-62b, 2026-11-11) added block 89 from registry commit 70e2885.
-    ("named_track", 87 * 67, tuple(range(35200000, 35218000, 1000))),
+    # A6-18 appends the K and N name families to each named block.
+    ("named_track", 87 * 69, tuple(range(35200000, 35218000, 1000))),
     # The rest of the 0.3.0 id step (ruled 2026-10-13 22:02 CEST), appended
     # after the named blocks. All inert until their feature PRs.
     ("cup_win", 44, (35027000,)),
@@ -158,7 +159,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the third step (2026-10-29): 4 x 3 letters of the LRG2 blocks 85 to 88.
         # + the alpha3 data package (2026-11-06): seven traps.
         # + the fourth step (A4-62b, 2026-11-11): 3 letters of block 89.
-        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7 + 3)
+        # + two origin letter families for all 87 named blocks (A6-18).
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7 + 3 + 87 * 2)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
@@ -173,7 +175,9 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + 11,558 ordinary pickup sanity names (A4-23).
         # + the fourth step (A4-62b, 2026-11-11): block 89, 67 block names and 128 pickup names.
         # + three track author cup names (A4-71, 2026-11-12): Win and Win All Legs each.
-        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35 + 9 * 2 + 2 + 4 * 2 + 11558 + 67 + 128 + 3 * 2)
+        # + two origin letter families for all 87 named blocks (A6-18).
+        self.assertEqual(len(world_type.location_name_to_id), 1361 + 3682 + 86 * 32 + 63 + 125 + 18 * 35 + 86 * 35
+                         + 9 * 2 + 2 + 4 * 2 + 11558 + 67 + 128 + 3 * 2 + 87 * 2)
 
     def test_each_class_codes_sit_inside_its_declared_blocks(self) -> None:
         for location_class in CTR_LOCATION_CLASSES:

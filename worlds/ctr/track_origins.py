@@ -10,7 +10,7 @@ from . import named_tracks
 FEATURE = "origin_letters_v1"
 DEFAULT = "CTR"
 
-# Source: https://github.com/dowlle/ctr-track-registry/blob/59e2a83c18490d388b50b6b943326db34a4d2d2c/origins.json
+# Source: https://github.com/dowlle/ctr-track-registry/blob/4740cbb917169810cf2cc6bf114f3e9b4b0920b6/origins.json
 _CATALOGUE = json.loads(pkgutil.get_data(__package__, "data/origins.json"))
 
 

@@ -2959,6 +2959,7 @@ def validate(plan):
     # A track raced only in cups is checked like a standalone one (#133 PR 5).
     for track_id in sorted(leg_tracks - used_tracks):
         track = tracks[track_id]
+        require("letters" not in track, "origin letters require a standalone CTR Challenge")
         if track["origin"] == "retail":
             i = track["retail_id"]
             require(i in RETAIL and i not in retail_ids, "unknown or duplicate retail track")

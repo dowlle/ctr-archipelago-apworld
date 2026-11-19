@@ -104,8 +104,11 @@ class TestItemIdStability(unittest.TestCase):
                  for row in named_doc["tracks"]
                  for li, letter in enumerate(("C", "T", "R"))}
         self.assertEqual(len(named), 87 * 3)  # 82 + the four LRG2 blocks 85 to 88 (2026-10-29) + block 89 (A4-62b)
+        origin_letters = {f"Letter {letter} ({row['ap_name']})": 38500000 + 36 * row["block_index"] + glyph
+                          for row in named_doc["tracks"] for letter, glyph in (("K", 10), ("N", 13))}
+        self.assertEqual(len(origin_letters), 87 * 2)
         self.assertEqual(world_type.item_name_to_id,
-                         {**explicit, **custom, **vortex, **minted, **named})
+                         {**explicit, **custom, **vortex, **minted, **named, **origin_letters})
 
     def test_existing_items_keep_their_frozen_id(self) -> None:
         frozen: dict = {}

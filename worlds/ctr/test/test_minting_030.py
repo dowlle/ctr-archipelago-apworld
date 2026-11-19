@@ -153,9 +153,11 @@ class TestReservedNotMinted(unittest.TestCase):
         for track in nt.NAMED_TRACKS:
             base = nt.NAMED_LOCATION_BASE + nt.LOCATION_BUDGET * track.block_index
             used = {code - base for _n, code in nt.track_locations(track)}
-            self.assertEqual(used, set(range(0, 17)) | set(range(20, 70)))
+            self.assertEqual(used, set(range(0, 17)) | set(range(20, 70)) | {151, 154})
+            self.assertEqual(L[f"{track.ap_name}: Letter K"], base + 151)
+            self.assertEqual(L[f"{track.ap_name}: Letter N"], base + 154)
         self.assertEqual([(lo, hi) for lo, hi, _l in nt.RESERVED_LOCATION_OFFSETS],
-                         [(17, 19), (70, 119), (120, 140), (141, 199)])
+                         [(17, 19), (70, 119), (120, 140), (141, 150), (152, 153), (155, 176), (177, 199)])
 
     def test_arcade_names_belong_to_the_separate_259_mint(self):
         for a,arena in enumerate(("Parking Lot", "The North Bowl", "Lab Basement")):
@@ -246,7 +248,7 @@ class TestThirdPassLrg2Blocks(unittest.TestCase):
                 self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
                 self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
                                  [first_letter, first_letter + 1, first_letter + 2])
-                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)  # Ordinary pickups own a separate range.
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 69 + 128)  # Ordinary pickups own a separate range.
 
     def test_sids_house_key_has_no_dash_before_the_s(self):
         self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
@@ -270,7 +272,7 @@ class TestFourthPassGossamersCastle(unittest.TestCase):
         self.assertEqual(nt.location_code(89, "trophy"), 35217800)
         self.assertEqual(L[f"{name}: Item Box 15"], 35217834)
         self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"], [35100445, 35100446, 35100447])
-        self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)
+        self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 69 + 128)
 
     def test_country_speedway_1_3_1_is_a_revision_of_block_17(self):
         row = destinations.named_track("country-speedway")
