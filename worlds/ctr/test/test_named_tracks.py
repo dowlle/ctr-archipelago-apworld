@@ -72,6 +72,7 @@ class TestIdMath(unittest.TestCase):
         self.assertEqual((nt.NAMED_ITEM_BASE, nt.ITEM_BUDGET), (35100000, 5))
         self.assertEqual(nt.NAMED_LOCATION_RANGE, (35200000, 37199999))
         self.assertEqual(nt.NAMED_ITEM_RANGE, (35100000, 35149999))
+        self.assertEqual(nt.ORIGIN_ITEM_RANGE, (38500000, 38859999))
 
     def test_codes(self):
         self.assertEqual(nt.location_code(0, "trophy"), 35200000)
@@ -219,7 +220,7 @@ class TestRegistryRows(unittest.TestCase):
 
     def test_named_ranges_clear_every_reservation(self):
         for first, last, label in nt.RESERVED_ID_RANGES:
-            for lo, hi in (nt.NAMED_LOCATION_RANGE, nt.NAMED_ITEM_RANGE):
+            for lo, hi in (nt.NAMED_LOCATION_RANGE, nt.NAMED_ITEM_RANGE, nt.ORIGIN_ITEM_RANGE):
                 self.assertTrue(last < lo or first > hi, label)
         # Named ids belong to their own ranges; every other live id must sit in
         # the reservation table. Pinning the registry export mints named ids,
@@ -232,7 +233,7 @@ class TestRegistryRows(unittest.TestCase):
                                 f"named location {name!r} has {code} outside its range")
         for name, code in ctrAPWorld.item_name_to_id.items():
             if name in named_items:
-                self.assertTrue(nt.NAMED_ITEM_RANGE[0] <= code <= nt.NAMED_ITEM_RANGE[1],
+                self.assertTrue(any(lo <= code <= hi for lo, hi in (nt.NAMED_ITEM_RANGE, nt.ORIGIN_ITEM_RANGE)),
                                 f"named item {name!r} has {code} outside its range")
         other_locations, other_items = live_ids()
         for code in list(other_locations.values()) + list(other_items.values()):

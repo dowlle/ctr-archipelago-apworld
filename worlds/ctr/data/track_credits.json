@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "70e2885c4013393c366da1f727e91506a89afb15",
-    "digest": "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
+    "commit": "3c55186270a3cb125e03a2d5a91dada4f54248b0",
+    "digest": "da77a7d9671febcbbfb55f6432cf59ac3a3233691748539ec9d7ca76c027c9dc"
   },
   "credits": {
     "acid-lake": [

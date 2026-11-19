@@ -79,6 +79,9 @@ NAMED_LOCATION_BASE = 35200000
 LOCATION_BUDGET = 200
 ITEM_BUDGET = 5
 NAMED_TRACK_LIMIT = destinations.NAMED_TRACK_LIMIT
+ORIGIN_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+ORIGIN_ITEM_BASE = 38500000
+MINTED_ORIGIN_GLYPHS = "KN"
 
 #: (key, offset, name suffix). APPEND ONLY. The podium rungs follow
 #: podium.SLOT_ORDER; the relic tiers and letters follow Cortex Vortex.
@@ -103,15 +106,20 @@ LOCATION_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
     ("cup_leg_victory", 15, "Cup Leg Victory"),
     ("lap", 16, "Complete One Lap"),
 ) + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(1, 16)) \
-  + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(16, 51))  # alpha3 data package
+  + tuple((f"item_box_{n}", 19 + n, f"Item Box {n}") for n in range(16, 51)) \
+  + tuple((f"letter_{glyph.lower()}", 141 + ORIGIN_GLYPHS.index(glyph), f"Letter {glyph}")
+          for glyph in MINTED_ORIGIN_GLYPHS)
 #: Offsets reserved in the 0.3.0 layout and not minted: 17 to 19 spare race
 #: checks, Item Box 51 to 100 at 70 to 119 (16 to 50 minted in alpha3), 120 to 140 certified custom arenas
-#: (crystals and completion; a race block never carries them), 141 to 199 spare.
+#: (crystals and completion; a race block never carries them), then origin letters.
 RESERVED_LOCATION_OFFSETS: Tuple[Tuple[int, int, str], ...] = (
     (17, 19, "spare per-track race checks"),
     (70, 119, "Item Box 51 to Item Box 100"),
     (120, 140, "certified custom arenas only"),
-    (141, 199, "spare"),
+    (141, 150, "reserved origin letters"),
+    (152, 153, "reserved origin letters"),
+    (155, 176, "reserved origin letters"),
+    (177, 199, "spare"),
 )
 #: (key, offset, letter). APPEND ONLY.
 ITEM_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
@@ -121,6 +129,8 @@ ITEM_OFFSETS: Tuple[Tuple[str, int, str], ...] = (
 )
 _LOCATION_OFFSET = {key: (offset, suffix) for key, offset, suffix in LOCATION_OFFSETS}
 _ITEM_OFFSET = {key: (offset, letter) for key, offset, letter in ITEM_OFFSETS}
+_ORIGIN_ITEM_OFFSET = {f"letter_{glyph.lower()}": ORIGIN_GLYPHS.index(glyph)
+                       for glyph in MINTED_ORIGIN_GLYPHS}
 
 assert all(0 <= o < LOCATION_BUDGET for _k, o, _s in LOCATION_OFFSETS)
 assert all(0 <= o < ITEM_BUDGET for _k, o, _s in ITEM_OFFSETS)
@@ -133,6 +143,7 @@ assert not {o for _k, o, _s in LOCATION_OFFSETS} & {
 NAMED_LOCATION_RANGE = (NAMED_LOCATION_BASE,
                         NAMED_LOCATION_BASE + NAMED_TRACK_LIMIT * LOCATION_BUDGET - 1)
 NAMED_ITEM_RANGE = (NAMED_ITEM_BASE, NAMED_ITEM_BASE + NAMED_TRACK_LIMIT * ITEM_BUDGET - 1)
+ORIGIN_ITEM_RANGE = (ORIGIN_ITEM_BASE, ORIGIN_ITEM_BASE + NAMED_TRACK_LIMIT * len(ORIGIN_GLYPHS) - 1)
 
 #: Every other CTR id range, minted or only reserved, inclusive. Mirrors the
 #: register in "CTR Archipelago - Considered datapackage unfreezes" so a named
@@ -172,7 +183,7 @@ RESERVED_ID_RANGES: Tuple[Tuple[int, int, str], ...] = (
     (37200000, 38479999, "named-track sanity, 128 codes per block"),
 )
 for _first, _last, _label in RESERVED_ID_RANGES:
-    for _lo, _hi in (NAMED_LOCATION_RANGE, NAMED_ITEM_RANGE):
+    for _lo, _hi in (NAMED_LOCATION_RANGE, NAMED_ITEM_RANGE, ORIGIN_ITEM_RANGE):
         assert _last < _lo or _first > _hi, f"named block overlaps {_label}"
 assert NAMED_ITEM_RANGE[1] < NAMED_LOCATION_RANGE[0]
 assert NAMED_LOCATION_RANGE[1] < 2 ** 31, "keep named ids in a signed 32-bit range"
@@ -191,6 +202,8 @@ def location_code(block_index: int, key: str) -> int:
 
 
 def item_code(block_index: int, key: str) -> int:
+    if key in _ORIGIN_ITEM_OFFSET:
+        return ORIGIN_ITEM_BASE + _block(block_index) * len(ORIGIN_GLYPHS) + _ORIGIN_ITEM_OFFSET[key]
     return NAMED_ITEM_BASE + _block(block_index) * ITEM_BUDGET + _ITEM_OFFSET[key][0]
 
 
@@ -199,7 +212,8 @@ def location_name(ap_name: str, key: str) -> str:
 
 
 def item_name(ap_name: str, key: str) -> str:
-    return f"Letter {_ITEM_OFFSET[key][1]} ({ap_name})"
+    glyph = ORIGIN_GLYPHS[_ORIGIN_ITEM_OFFSET[key]] if key in _ORIGIN_ITEM_OFFSET else _ITEM_OFFSET[key][1]
+    return f"Letter {glyph} ({ap_name})"
 
 
 def block_of_location(code: int) -> Optional[Tuple[int, int]]:
@@ -216,7 +230,7 @@ def track_locations(track: NamedTrack) -> List[Tuple[str, int]]:
 
 def track_items(track: NamedTrack) -> List[Tuple[str, int]]:
     return [(item_name(track.ap_name, key), item_code(track.block_index, key))
-            for key, _offset, _letter in ITEM_OFFSETS]
+            for key in (*_ITEM_OFFSET, *_ORIGIN_ITEM_OFFSET)]
 
 
 # -- validation ---------------------------------------------------------------
@@ -247,7 +261,8 @@ def validate_tracks(tracks: Sequence[NamedTrack],
                                  f"already {codes[code]!r}")
         stray = [n for n, c in other.items() if c is not None and (
             NAMED_LOCATION_RANGE[0] <= c <= NAMED_LOCATION_RANGE[1]
-            or NAMED_ITEM_RANGE[0] <= c <= NAMED_ITEM_RANGE[1])]
+            or NAMED_ITEM_RANGE[0] <= c <= NAMED_ITEM_RANGE[1]
+            or ORIGIN_ITEM_RANGE[0] <= c <= ORIGIN_ITEM_RANGE[1])]
         if stray:
             raise ValueError(f"named tracks: {stray[:3]} sit inside a named block range")
 

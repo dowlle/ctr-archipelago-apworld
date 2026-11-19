@@ -31,11 +31,11 @@ from .named_tracks import NAMED_TRACK_ITEM_DATA
 IGNORE_PREFIX = "Ignore "
 
 
-def letter_item_names() -> Set[str]:
+def letter_item_names(named_items=NAMED_TRACK_ITEM_DATA) -> Set[str]:
     return (set(lettersanity.ALL_ITEM_NAMES)
             | {row["name"] for row in CUSTOM_LETTER_ITEM_DATA}
             | {row["name"] for row in CORTEX_VORTEX_LETTER_ITEM_DATA}
-            | {row["name"] for row in NAMED_TRACK_ITEM_DATA})
+            | {row["name"] for row in named_items})
 
 
 def build_item_name_groups(item_data_by_name: Mapping[str, Mapping]
