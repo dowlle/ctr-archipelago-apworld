@@ -81,9 +81,10 @@ def _load_rulings():
     per-package rulings on the custom track finish rank (ruling 2026-10-18:
     "they require USF UNLESS I say otherwise"; per-revision rows and the
     first-boost rank since A2-22). A row without revision is keyed
-    (content id, None, None) and covers every revision. Project-owned data,
-    never a descriptor field; every entry cites its ruling. A package no row
-    matches keeps the measured default (`super_turbo_pads`)."""
+    (content id, None, None) and covers every revision. New rows include the
+    catalog version as a fourth key. Project-owned data, never a descriptor
+    field; every entry cites its ruling. A package no row matches keeps the
+    measured default (`super_turbo_pads`)."""
     raw = json.loads(pkgutil.get_data(__package__, "data/usf_finish_rulings.json"))
     if raw.get("version") != 2:
         raise ValueError("usf_finish_rulings.json: version must be 2")
@@ -92,6 +93,12 @@ def _load_rulings():
         scoped = "revision" in row or "lev_sha256" in row
         keys = {"content_id", "finish_rank", "ruling"} | ({"revision", "lev_sha256"} if scoped else set())
         key = (row.get("content_id"), row.get("revision"), row.get("lev_sha256"))
+        if "since" in row:
+            scope, fields = track_rulings.scope_keys(row)
+            if not scope:
+                raise ValueError("usf_finish_rulings.json: a catalog version needs a revision and LEV sha256")
+            keys |= fields
+            key = (*key, row["since"])
         if (set(row) != keys or type(row["finish_rank"]) is not int
                 or row["finish_rank"] not in (0, FIRST_BOOST_COUNT, USF_BOOST_COUNT)
                 or type(row["content_id"]) is not str or not row["content_id"]
@@ -108,7 +115,8 @@ def _load_rulings():
 
 
 #: the project's per-package rulings: {(content id, revision, LEV sha256):
-#: finish rank}, revision and LEV sha256 None on a row for every revision.
+#: finish rank}, with an optional catalog version. Revision and LEV sha256
+#: are None on a baseline row that applies to every revision.
 USF_FINISH_RULINGS = _load_rulings()
 
 # These exact revisions normalize a measured descriptor field at generation.
@@ -150,15 +158,23 @@ def letter_boost(track, award, package=None):
 def ruled_finish(package):
     """Resolve the exact finish rank, inherited rank or unscoped default."""
     content = package.get("content_id")
-    refs = {(revision, digest) for key, revision, digest in USF_FINISH_RULINGS if key == content and digest}
-    scoped = USF_FINISH_RULINGS.get((content, *track_rulings.scoped_source(package, refs)),
-                                   USF_FINISH_RULINGS.get((content, None, None)))
+    rows = finish_ruling_rows(content)
+    scoped = rows.get(track_rulings.scoped_source(package, rows),
+                      USF_FINISH_RULINGS.get((content, None, None)))
     if scoped is not None:
         return scoped
     source = track_rulings.source(package, CARRY_FREE_FINISH_PINS)
     if source in CARRY_FREE_FINISH_PINS and track_rulings.inherits(package):
         return 0
     return None
+
+
+def finish_ruling_rows(content):
+    """Finish ranks available in the room's catalog version, by revision and LEV."""
+    version = track_rulings.scoped_version()
+    applicable = [(row, rank) for row, rank in USF_FINISH_RULINGS.items()
+                  if row[0] == content and row[2] and (len(row) == 3 or row[3] <= version)]
+    return {row[1:3]: rank for row, rank in sorted(applicable, key=lambda entry: entry[0][3:])}
 
 
 def error(message):

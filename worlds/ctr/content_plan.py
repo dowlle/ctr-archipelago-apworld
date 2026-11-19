@@ -1318,7 +1318,9 @@ def draw_plan(world, key_estimate=True):
     # rooms keep their descriptor, including the historical missing-field floor.
     from . import country_speedway, toasty_terrace
     for package in packages:
-        if country_speedway.matches(package) or toasty_terrace.matches(package):
+        if package["revision"] == "1.3.0" and (
+                (package["content_id"] == "country-speedway" and country_speedway.matches(package))
+                or (package["content_id"] == "toasty-terrace" and toasty_terrace.matches(package))):
             package["capabilities"]["super_turbo_pads"] = False
     twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
     if twin is not None:

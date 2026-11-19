@@ -11,7 +11,7 @@ FEATURE = "carried_track_rulings_v1"
 # The initial rows omit the version, which is 1. Keep prior rows in order.
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
-# Version 0 is the original markerless lookup, before scoped pickup and letter rows.
+# Version 0 is the original markerless lookup, before versioned ruling rows.
 RULING_VERSION = 1
 _history = ContextVar("ctr_track_ruling_history", default=None)
 
@@ -61,20 +61,11 @@ def reviewed(package, version=None):
                  if (row[2] if len(row) > 2 else 1) <= version)
 
 
-def _legacy_asset(package, reviews):
-    # Older local imports can have an exact geometry entry under another key.
-    from . import crate_exclusions, sanity
-    pin = lev_pin(package)
-    return not any(pin == old for _, old in reviews) and (
-        pin in crate_exclusions.EXCLUSIONS or pin in sanity.REVIEWED_PICKUP_PINS)
-
-
 def _reviews(package):
     history = _history.get()
     if history is not True:
         return history[1].get((package or {}).get("id"), ()) if history else ()
-    reviews = reviewed(package)
-    return () if reviews and _legacy_asset(package, reviews) else reviews
+    return reviewed(package)
 
 
 def revision_ref(package):
@@ -170,8 +161,7 @@ def carried_sources(package):
         previous = next((ref for ref in reviews if ref[1] == selected), None)
         if previous:
             result[family] = previous
-    finish_refs = {(revision, digest) for key, revision, digest in content_capability.USF_FINISH_RULINGS
-                   if key == content and digest}
+    finish_refs = content_capability.finish_ruling_rows(content)
     finish_source = scoped_source(package, finish_refs)
     if finish_source in finish_refs and finish_source != current:
         result["finish"] = finish_source
@@ -246,6 +236,6 @@ def valid_sources(plan, packages):
         package = packages[row["package_id"]]
         known = reviewed(package, record["version"])
         refs = tuple((r["revision"], r["lev_sha256"]) for r in row["reviews"])
-        if refs != known and (refs or not _legacy_asset(package, known)):
+        if refs != known:
             return False
     return True

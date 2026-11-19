@@ -6,7 +6,7 @@ from unittest import mock
 
 from BaseClasses import CollectionState
 from Options import OptionError
-from .. import content_plan, object_rulings, sanity
+from .. import content_capability, content_plan, object_rulings, sanity
 from .test_content_plan import make_world
 from .test_custom_packages import named_fixture
 from .test_track_checks import check_options
@@ -144,6 +144,26 @@ class TestObjectRulings(unittest.TestCase):
                 selected = next(r["wumpa_crate"] for r in new_plan["sanity"]["tracks"]
                                 if r["track_id"].startswith("custom/tv-world/"))
                 self.assertIn(3, selected)
+
+    def test_finish_ruling_added_to_a_previous_source_preserves_saved_rooms(self):
+        from .. import track_rulings
+
+        for revision, pin in (("1.1.0", PIN), ("9.0.0", "ab" * 32)):
+            opts = options("hard")
+            package = opts["content_pool"]["tracks"]["custom"][0]
+            package.update(id=f"package/tv-world/{revision}", revision=revision)
+            package["files"][0]["sha256"] = pin
+            track = f"custom/tv-world/{revision}"
+            opts["content_pool"]["required_entries"] = [track]
+            world = make_world(opts, seed=52, stop_before="pre_fill")
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            with (mock.patch.dict(content_capability.USF_FINISH_RULINGS, {("tv-world", "1.1.0", PIN, 2): 2}),
+                  mock.patch.object(track_rulings, "RULING_VERSION", 2)):
+                restored = make_world({}, passthrough=wire, seed=99, stop_before="pre_fill")
+                self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+                new_plan = make_world(opts, seed=52, stop_before="pre_fill").ctr_content_plan
+                trophy = next(c for c in new_plan["checks"] if c["kind"] == "trophy" and c["owner"] == track)
+                self.assertEqual(trophy["boost"], 2)
 
     def test_selection_settings_are_paired_and_agree_with_capability(self):
         original = make_world(options(), seed=52, stop_before="pre_fill").ctr_content_plan

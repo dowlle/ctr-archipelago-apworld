@@ -53,6 +53,8 @@ class TestCrateExclusions(unittest.TestCase):
 
     def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
         p = ancient(24, HOT_AIR_SKYWAY)
+        p.update(content_id="hot-air-skyway", display_name="Hot Air Skyway",
+                 id="package/hot-air-skyway/1.1.0")
         self.assertEqual(crate_exclusions.entries(p), [])
         self.assertEqual(content_item_boxes.crate_count(p), 24)
         plan = first_world(box_options(custom=[p])).ctr_content_plan
@@ -136,7 +138,8 @@ class TestCrateExclusions(unittest.TestCase):
 
     def test_exact_revision_counts_and_generation(self):
         for digest in (*ANCIENT_LAKE, NORTH_POLE):  # custom revisions; the retail Roo's Tubes and Skyway pins are sanity only
-            p = ancient(digest=digest)
+            package = north_pole if digest == NORTH_POLE else lambda count: ancient(count, digest)
+            p = package(17)
             self.assertEqual(content_item_boxes.crate_count(p), 17)
             world = first_world(box_options(custom=[p]))
             plan = world.ctr_content_plan
@@ -148,14 +151,14 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(len(boxes(plan, row["track_id"])), 15)
             self.assertTrue(content_plan.validate(plan))
             # The count crosses the 15-seat ceiling only with a smaller fixture.
-            small = first_world(box_options(custom=[ancient(3, digest)]))
+            small = first_world(box_options(custom=[package(3)]))
             track_id = small.ctr_content_plan["item_boxes"][crate_exclusions.KEY][0]["track_id"]
             self.assertEqual(len(boxes(small.ctr_content_plan, track_id)), 2)
 
     def test_tracker_restores_legacy_and_current_seating(self):
         for digest in (*ANCIENT_LAKE, NORTH_POLE):
             for count in (3, 17):
-                p = ancient(count, digest)
+                p = north_pole(count) if digest == NORTH_POLE else ancient(count, digest)
                 # Generate the historical wire with no catalog, rather than
                 # merely stripping the field from a seed with fewer checks.
                 with patch.dict(crate_exclusions.EXCLUSIONS, {}, clear=True):
