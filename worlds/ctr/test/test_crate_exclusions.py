@@ -104,6 +104,15 @@ class TestCrateExclusions(unittest.TestCase):
         self.assertNotIn("exclusion_version", plan["sanity"])
         self.assertNotIn(sanity.EXCLUSIONS_FEATURE, plan["required_features"])
 
+    def test_current_sanity_seats_use_package_weapon_count(self):
+        inventory = dict(lev_sha256=MATSURI, counts=[26, 3, 0], needs={})
+        with patch.dict(sanity.CATALOG, {MATSURI: inventory}):
+            plan = first_world(box_options(custom=[matsuri()], itemboxsanity=50)).ctr_content_plan
+        row = next(r for r in plan["sanity"]["tracks"] if r["lev_sha256"] == MATSURI)
+        eligible = list(range(2, 28))
+        seated = {eligible[i] for i in content_item_boxes.seat_indices(26, 15)}
+        self.assertEqual(row["weapon_crate"], sorted(set(range(2, 27)) - seated))
+
     def test_lockbox_north_pole_emits_its_own_pin(self):
         p = ancient(29, LOCKBOX_4)
         p.update(content_id="lockbox-adventure-track-4", display_name="Lockbox Adventure track 4",
