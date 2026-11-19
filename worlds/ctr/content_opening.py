@@ -17,7 +17,7 @@ import heapq
 import itertools
 from collections import Counter
 
-from . import content_bosses, content_capability, content_cups, content_fixed, content_laps, content_wumpa
+from . import content_bosses, content_capability, content_cups, content_fixed, content_laps, content_pickups, content_wumpa
 
 #: Spots an opening has to leave, or a quarter of the plan's checks on a small one.
 FIT_ROOM = 5
@@ -372,6 +372,7 @@ class PlanReach:
         # Like Itemsanity's own checks, these need a weapon this conservative
         # opening model does not simulate. Do not budget their spots for free.
         door_codes = sanity.door_codes(plan) if plan.get("global_checks", {}).get("itemsanity") else set()
+        repeatable = content_pickups.enabled(plan)
         for check in plan["checks"]:
             code = check["location"]
             if check.get("stats") or check["kind"] in ("itemsanity", "hit") or code in door_codes:
@@ -382,7 +383,7 @@ class PlanReach:
                 self.checks.append((code, spot, floors[code], None))
             else:
                 self.checks.append((code, spot, None, [(region(route), later(route), route, rank(check, route), boost_of(route))
-                                                       for route in check["routes"]]))
+                                                       for route in content_pickups.logic_routes(check, repeatable)]))
         # A track can have many pickup codes with identical access. Evaluate
         # each immutable route/letter predicate once per sweep, then retain all
         # of its individual codes for fixed rewards and first-race proofs.

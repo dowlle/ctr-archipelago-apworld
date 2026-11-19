@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from BaseClasses import CollectionState, ItemClassification
 from Fill import distribute_items_restrictive
-from .. import content_plan as cp, content_pickups as pickups
+from .. import content_opening, content_plan as cp, content_pickups as pickups
 from .test_content_plan import make_world
 
 
@@ -122,6 +122,17 @@ class TestOxidePickups(unittest.TestCase):
             state.collect(world.create_item("Progressive Boost"), True)
         self.assertTrue(all(locations[c["location"]].can_reach(state) for c in checks))
 
+    def test_opening_estimator_uses_only_repeatable_oxide_routes(self):
+        world = yellow_fixture()
+        plan = world.ctr_content_plan
+        reach = content_opening.plan_reach(world, plan)
+        pickup_codes = {c["location"] for c in oxide_checks(plan)}
+        held = ("Key",) * 4 + ("Trophy",) * 3
+        first = next(encounter for encounter in plan["encounters"] if encounter["id"] == pickups.FIRST)
+        self.assertTrue(reach.encounter_reached(first, held))
+        self.assertFalse(pickup_codes & reach._open(reach._held(held)))
+        self.assertTrue(pickup_codes <= reach._open(reach._held(held + ("Trophy",))))
+
     def test_no_repeatable_route_omits_pickups_but_keeps_lap_and_victory(self):
         for optional in ("mandatory", "optional", "filler"):
             with self.subTest(optional=optional):
@@ -200,6 +211,14 @@ class TestOxidePickups(unittest.TestCase):
         world = make_world(options(priority_locations={"Oxide Station: Weapon Crate 1"},
                                    exclude_locations={"Oxide Station: Wumpa Crate 1"}), seed=3)
         self.assertFalse(oxide_checks(world.ctr_content_plan))
+
+    def test_omitted_reach_ten_wumpa_exclusion_reserves_no_filler(self):
+        opts = options(item_pool={"base": {"trophies": 15}})
+        base = make_world(opts, seed=1).ctr_content_plan
+        excluded = make_world(dict(opts, exclude_locations={"Oxide Station: Reach 10 Wumpa"}), seed=1).ctr_content_plan
+        self.assertFalse(oxide_checks(base))
+        self.assertFalse(oxide_checks(excluded))
+        self.assertEqual(base["items"], excluded["items"])
 
     def test_loose_fruit_and_ordinary_boss_routes_are_unchanged(self):
         world = make_world(options(), seed=3)

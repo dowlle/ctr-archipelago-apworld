@@ -1728,6 +1728,10 @@ def draw_plan(world, key_estimate=True):
                            for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
         filler_exclusions = {name for name in filler_exclusions
                              if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
+        if repeatable_pickups and settings.get("wumpa") == "per_track":
+            oxide_track = venue_record(content_bosses.OXIDE_STATION)
+            if not any(track["id"] == oxide_track["id"] for track in sanity_tracks):
+                filler_exclusions.discard(LOCATION_BY_CODE[wumpa_location(oxide_track)])
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
