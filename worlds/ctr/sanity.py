@@ -12,7 +12,9 @@ from random import Random
 
 from Options import OptionError
 
-from . import box_spots, content_item_boxes, crate_exclusions, destinations, object_rulings
+from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
+               crate_exclusions, destinations, green_hill_raceway, object_rulings,
+               royal_raceway, toasty_terrace)
 from .item_boxes import BOX_TRACKS
 from .location_class import LocationClass
 
@@ -27,6 +29,7 @@ COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
+CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
 
 
 def code(track, family, number):
@@ -62,16 +65,18 @@ SANITY_CLASS = SanityLocations()
 
 def settings(options):
     count, wumpa = int(options.itemboxsanity.value), int(options.wumpasanity.value)
-    return dict(itemboxsanity=count, wumpasanity=wumpa, tracks=[],
+    return dict(itemboxsanity=count, wumpasanity=wumpa, tracks=[], rules_version=4,
                 logic_difficulty=int(options.logic_difficulty.value),
                 boost_blue_fire=bool(options.progressive_boost.value and options.progressive_boost_blue_fire.value)) if count or wumpa else None
 
 
-def inventory(track, package=None):
+def inventory(track, package=None, record=None):
     if track["origin"] == "retail":
         return CATALOG.get("retail:" + str(track["retail_id"]))
     if track["origin"] == "cortex_vortex":
-        return CATALOG.get("cortex_vortex")
+        # Unversioned persisted rooms retain their historical asset identity.
+        key = CORTEX_LEV_SHA256 if record is None or record.get("rules_version", 0) >= 2 else "cortex_vortex"
+        return CATALOG.get(key)
     if "named_block" in track:
         pin = box_spots.lev_pin(package)
         if pin in CATALOG:
@@ -79,14 +84,42 @@ def inventory(track, package=None):
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
+            if royal_raceway.matches(package):
+                # Crates are Boost 0 from the Royal rules version; loose fruit, if any, keeps the generic term.
+                return dict(lev_sha256=pin, counts=counts,
+                            needs={kind: ({str(n): dict(since=royal_raceway.RULES_VERSION) for n in range(1, count + 1)}
+                                          if kind in ("weapon_crate", "wumpa_crate")
+                                          else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
+                                   for kind, count, budget in zip(KINDS, counts, BUDGETS)})
+            if green_hill_raceway.matches(package):
+                # Crates are Boost 0 from the Green Hill rules version; loose fruit, if any, keeps the generic term.
+                return dict(lev_sha256=pin, counts=counts,
+                            needs={kind: ({str(n): dict(since=green_hill_raceway.RULES_VERSION) for n in range(1, count + 1)}
+                                          if kind in ("weapon_crate", "wumpa_crate")
+                                          else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
+                                   for kind, count, budget in zip(KINDS, counts, BUDGETS)})
+            if country_speedway.matches(package) or toasty_terrace.matches(package):
+                since = toasty_terrace.RULES_VERSION if toasty_terrace.matches(package) else 3
+                return dict(lev_sha256=pin, counts=counts,
+                            needs={kind: {str(n): dict(since=since) for n in range(1, count + 1)}
+                                   for kind, count in zip(KINDS, counts)})
             return dict(lev_sha256=pin, counts=counts,
                         needs={kind: {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)}
                                for kind, count, budget in zip(KINDS, counts, BUDGETS)})
     return None
 
 
+def object_needs(inv, kind, ordinal, record):
+    """New catalog corrections apply only to rooms carrying that rules version.
+
+    A persisted room keeps its original picks and capability terms on restore.
+    """
+    fields = inv.get("needs", {}).get(kind, {}).get(str(ordinal), {})
+    return fields if fields.get("since", 0) <= record.get("rules_version", 0) else {}
+
+
 def eligible(track, family, record, item_boxes, package, capability=None):
-    inv = inventory(track, package)
+    inv = inventory(track, package, record)
     if inv is None:
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
@@ -102,7 +135,7 @@ def eligible(track, family, record, item_boxes, package, capability=None):
             excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
-    return [n for n in out if inv.get("needs", {}).get(KINDS[family], {}).get(str(n), {}).get("shortcut", 0) <= tier
+    return [n for n in out if object_needs(inv, KINDS[family], n, record).get("shortcut", 0) <= tier
             and object_rulings.rank(track, package, KINDS[family], n, record if "logic_difficulty" in record else capability) is not None]
 
 
@@ -118,6 +151,13 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
     if not ruled:
         record.pop("logic_difficulty", None)
         record.pop("boost_blue_fire", None)
+    version = max((fields.get("since", 0) for t in tracks
+               for kind, needs in (inventory(t, packages.get(t.get("package_id")), record) or {}).get("needs", {}).items()
+               if kind in enabled for fields in needs.values()), default=0)
+    if version:
+        record["rules_version"] = version
+    else:
+        record.pop("rules_version", None)
     record["shortcut_knowledge"] = tier
     seen = set()
     for track in tracks:
@@ -125,7 +165,7 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
             continue
         seen.add(track["id"])
         package = packages.get(track.get("package_id"))
-        inv = inventory(track, package)
+        inv = inventory(track, package, record)
         if inv is None:
             continue
         row = dict(track_id=track["id"], lev_sha256=inv["lev_sha256"], counts=inv["counts"][:])
@@ -166,10 +206,20 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                need = inventory(t) if t["origin"] != "custom" else CATALOG.get(row["lev_sha256"])
+                need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(row["lev_sha256"])
                 if need is None:
                     need = dict(needs={kind: {str(n): dict(needs="usf") for n in row[kind]} for kind in KINDS})
-                fields = (need or {}).get("needs", {}).get(kind, {}).get(str(n), {})
+                fields = object_needs(need or {}, kind, n, record)
+                if row["lev_sha256"] == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
+                    fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
+                if row["lev_sha256"] == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
+                    fields = dict(needs="none")
+                if (row["lev_sha256"] == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                        and record.get("rules_version", 0) >= royal_raceway.RULES_VERSION):
+                    fields = dict(needs="none")
+                if (row["lev_sha256"] == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                        and record.get("rules_version", 0) >= green_hill_raceway.RULES_VERSION):
+                    fields = dict(needs="none")
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
                 rank = object_rulings.rank(t, (packages or {}).get(t.get("package_id")), kind, n,
@@ -201,7 +251,10 @@ def validate(record, plan):
             raise OptionError("CTR sanity: " + why)
     base = {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}
     context = {"logic_difficulty", "boost_blue_fire"}
-    require(type(record) is dict and set(record) in (base, base | context), "record shape")
+    require(type(record) is dict and set(record) in (base, base | context, base | {"rules_version"},
+                                                   base | context | {"rules_version"}), "record shape")
+    if "rules_version" in record:
+        require(type(record["rules_version"]) is int and record["rules_version"] in (1, 2, 3, 4, 5, 6), "rules version")
     if "logic_difficulty" in record:
         require(type(record["logic_difficulty"]) is int and record["logic_difficulty"] in (0, 1, 2), "logic difficulty")
         require(type(record["boost_blue_fire"]) is bool, "Blue Fire setting")
@@ -216,7 +269,9 @@ def validate(record, plan):
     packages = {p["id"]: p for p in plan["packages"]}
     by_id = {t["id"]: t for t in plan["tracks"]}
     uses = routes(plan["tracks"], plan["entries"], plan["pads"], plan["encounters"])
-    expected = {t["id"] for t in plan["tracks"] if uses[t["id"]] and inventory(t, packages.get(t.get("package_id"))) is not None}
+    expected = {t["id"] for t in plan["tracks"]
+                if any(content_pickups.repeatable(r) or not content_pickups.enabled(plan) for r in uses[t["id"]])
+                and inventory(t, packages.get(t.get("package_id")), record) is not None}
     require(type(record["tracks"]) is list and len(record["tracks"]) == len(expected), "track count")
     seen = set()
     for row in record["tracks"]:
@@ -225,7 +280,7 @@ def validate(record, plan):
         require(tid in expected and tid not in seen, "unknown or duplicate track")
         seen.add(tid)
         t, package = by_id[tid], packages.get(by_id[tid].get("package_id"))
-        inv = inventory(t, package)
+        inv = inventory(t, package, record)
         require(row["lev_sha256"] == inv["lev_sha256"] and row["counts"] == inv["counts"], "revision or counts mismatch")
         for f, kind in enumerate(KINDS):
             numbers = row[kind]

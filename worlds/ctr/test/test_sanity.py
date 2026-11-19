@@ -77,6 +77,8 @@ class TestSanity(unittest.TestCase):
                     if row["track_id"].startswith("retail:"):
                         # Maintainer ruling, 2026-11-10: Roo's Tubes Weapon Crate 9 is outside the track and never a check.
                         eligible = row["counts"][0] - (1 if row["track_id"] == "retail:6" else 0)
+                        if row["track_id"] == "retail:8" and plan["sanity"]["shortcut_knowledge"] == 0:
+                            eligible -= 4  # The raised bridge follows authored AP boxes 2 and 3.
                         self.assertEqual(len(row["weapon_crate"]), min(boxes, eligible))
                         # A4-41: Hot Air Skyway Wumpa Crate 4 is excluded as well.
                         crates = row["counts"][1] - (1 if row["track_id"] == "retail:7" else 0)
@@ -155,6 +157,99 @@ class TestSanity(unittest.TestCase):
         # The same ordinal in another family or on another track is not affected.
         self.assertEqual(sanity.eligible(dict(origin="retail", retail_id=4, display_name="Tiger Temple"), 1, record, None, None),
                          list(range(1, 12)))
+
+    def test_sewer_bridge_matches_authored_boxes(self):
+        from .. import content_item_boxes
+        track = dict(id="retail:8", origin="retail", retail_id=8, display_name="Sewer Speedway")
+        inv = sanity.inventory(track)
+        self.assertEqual(inv, sanity.CATALOG[inv["lev_sha256"]])
+        for tier in range(3):
+            record = dict(shortcut_knowledge=tier, rules_version=1)
+            pool = sanity.eligible(track, 0, record, None, None)
+            self.assertEqual(pool, [n for n in range(1, 21) if tier or n not in range(8, 12)])
+            self.assertEqual(sanity.eligible(track, 1, record, None, None), list(range(1, 7)))
+            self.assertEqual(sanity.eligible(dict(origin="retail", retail_id=0), 0, record, None, None),
+                             list(range(1, 17)))
+            for boost in range(3):
+                cap = dict(boost_mode=boost, stats_mode=0)
+                selected = dict(rules_version=1, tracks=[dict(track_id=track["id"], lev_sha256=inv["lev_sha256"],
+                                            weapon_crate=pool, wumpa_crate=[], wumpa_fruit=[])])
+                entry = dict(id="entry/sewer", kind="track", track_id=track["id"], modes=["trophy"])
+                pad = dict(id="pad:0", entry_id=entry["id"])
+                checks = sanity.checks(selected, [track], [entry], [pad], [], cap)
+                by_name = {c["display_name"]: c for c in checks}
+                for n in pool:
+                    self.assertEqual(by_name[f"Sewer Speedway: Weapon Crate {n}"].get("boost", 0),
+                                     1 if boost and 8 <= n <= 11 else 0)
+                if tier:
+                    for slot in (2, 3):
+                        self.assertEqual(content_item_boxes.box_terms(track, slot, cap), (int(bool(boost)), False))
+
+    def test_sewer_bridge_boost_boundary_and_tracker(self):
+        from BaseClasses import CollectionState
+        for mode in ("off", "shared_global", "per_character"):
+            for tier in (0, 1, 2):
+                world = make_world(dict(profile_options(), itemboxsanity=50, item_box_count=0,
+                                        shortcut_knowledge=tier, progressive_boost=mode,
+                                        progressive_stats="off", character_unlocks=False),
+                                   seed=3, stop_before="pre_fill")
+                wire = json.loads(json.dumps(world.fill_slot_data()))
+                self.assertEqual(wire["content_plan"]["sanity"]["rules_version"], 1)
+                tracker = make_world({}, passthrough=wire, stop_before="pre_fill")
+                locations = {loc.name: loc for loc in world.multiworld.get_locations(1)}
+                all_items = world.multiworld.get_all_state()
+                for rank in range(3):
+                    state = CollectionState(world.multiworld)
+                    for name, count in all_items.prog_items[1].items():
+                        if not name.startswith("Progressive Boost"):
+                            for _ in range(count):
+                                state.collect(world.create_item(name), True)
+                    for item in world.multiworld.itempool:
+                        if item.name.startswith("Progressive Boost") and state.count(item.name, 1) < rank:
+                            state.collect(item, True)
+                    other = CollectionState(tracker.multiworld)
+                    for name, count in state.prog_items[1].items():
+                        for _ in range(count):
+                            other.collect(tracker.create_item(name), True)
+                    for n in range(1, 21):
+                        name = f"Sewer Speedway: Weapon Crate {n}"
+                        bridge = 8 <= n <= 11
+                        if not tier and bridge:
+                            self.assertNotIn(name, locations)
+                            continue
+                        expected = not bridge or mode == "off" or rank >= 1
+                        with self.subTest(mode=mode, tier=tier, rank=rank, crate=n):
+                            self.assertEqual(locations[name].can_reach(state), expected)
+                            self.assertEqual(tracker.multiworld.get_location(name, 1).can_reach(other), expected)
+
+    def test_older_sewer_room_keeps_its_picks_and_terms(self):
+        world = make_world(dict(profile_options(), itemboxsanity=50, item_box_count=0,
+                                shortcut_knowledge=0, progressive_boost="shared_global"),
+                           seed=3, stop_before="pre_fill")
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        plan = wire["content_plan"]
+        del plan["sanity"]["rules_version"]
+        row = next(r for r in plan["sanity"]["tracks"] if r["track_id"] == "retail:8")
+        row["weapon_crate"] = list(range(1, 21))
+        # Recreate the original unranked bridge checks, without redrawing anything.
+        plan["checks"] = [c for c in plan["checks"] if c["kind"] not in sanity.KINDS]
+        plan["checks"].extend(sanity.checks(plan["sanity"], plan["tracks"], plan["entries"], plan["pads"],
+                                            plan["encounters"], plan.get("capability"),
+                                            {p["id"]: p for p in plan["packages"]}))
+        # The item ledger needs four more filler slots for the four restored checks.
+        plan["items"]["filler_count"] += 4
+        plan["items"]["coded_checks"] += 4
+        self.assertTrue(content_plan.validate(plan))
+        tracker = make_world({}, passthrough=wire, stop_before="pre_fill")
+        self.assertEqual(tracker.ctr_content_plan, plan)
+        for c in plan["checks"]:
+            if c["owner"] == "retail:8" and c["kind"] == "weapon_crate":
+                self.assertNotIn("boost", c)
+        for bad in (0, 5, True, "1"):
+            forged = copy.deepcopy(plan)
+            forged["sanity"]["rules_version"] = bad
+            with self.subTest(version=bad), self.assertRaises(OptionError):
+                content_plan.validate(forged)
 
     def test_hot_air_skyway_crate_4_never_picked_or_accepted(self):
         for seed in range(3):

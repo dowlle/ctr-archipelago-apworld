@@ -172,8 +172,24 @@ def settings(options):
 
 def check_settings(record):
     """Shape and values of a plan's `capability` record."""
-    if not isinstance(record, dict) or set(record) != set(KEYS):
+    if not isinstance(record, dict) or set(record) - {FLOORS_KEY, FREE_KEY} != set(KEYS):
         error("capability must be a mapping of exactly " + ", ".join(KEYS) + ".")
+    if FLOORS_KEY in record:
+        ids = record[FLOORS_KEY]
+        if (not isinstance(ids, list) or not ids or any(type(t) is not str for t in ids)
+                or len(set(ids)) != len(ids) or ids != sorted(ids)):
+            error("capability.finish_floors must be a nonempty sorted list of unique track ids.")
+        if not record["boost_mode"]:
+            error("capability.finish_floors needs Progressive Boost.")
+    if FREE_KEY in record:
+        ids = record[FREE_KEY]
+        if (not isinstance(ids, list) or not ids or any(type(t) is not str for t in ids)
+                or len(set(ids)) != len(ids) or ids != sorted(ids)):
+            error("capability.finish_free must be a nonempty sorted list of unique track ids.")
+        if not record["boost_mode"]:
+            error("capability.finish_free needs Progressive Boost.")
+        if set(ids) & set(record.get(FLOORS_KEY, ())):
+            error("capability.finish_free and finish_floors name the same track.")
     for key in ("boost_mode", "stats_mode", "logic_difficulty", "shortcut_knowledge"):
         if type(record[key]) is not int or record[key] not in (0, 1, 2):
             error(f"capability.{key} must be 0, 1 or 2.")
@@ -208,8 +224,48 @@ def _name(track):
     return None if track["origin"] == "custom" else track["display_name"]
 
 
+#: Optional `capability` member (Royal Raceway 1.0.0): ids of exact reviewed custom
+#: tracks whose every finished-race check needs the full finish rank. Absent in
+#: rooms from before the ruling, which keep their recorded ranks.
+FLOORS_KEY = "finish_floors"
+
+
+def finish_floor_tracks(pairs):
+    """Sorted ids of the (track, package) pairs a reviewed finish floor covers."""
+    from . import royal_raceway
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and royal_raceway.matches(package)})
+
+
+#: Optional `capability` member (Green Hill Raceway 2.0.0): ids of exact reviewed
+#: custom tracks whose finish line needs no rank of its own. Absent in rooms from
+#: before the ruling, which keep their recorded ranks.
+FREE_KEY = "finish_free"
+
+
+def finish_free_tracks(pairs):
+    """Sorted ids of the (track, package) pairs a reviewed free finish covers."""
+    from . import green_hill_raceway
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and green_hill_raceway.matches(package)})
+
+
+def has_free_finish(track, record):
+    return bool(record) and track.get("id") in record.get(FREE_KEY, ())
+
+
+def has_floor(track, record):
+    return bool(record) and track.get("id") in record.get(FLOORS_KEY, ())
+
+
 def finish_boost(track, record, package=None):
-    """F: the ranks crossing this track's finish line needs."""
+    """F: the ranks crossing this track's finish line needs. A reviewed floor
+    (`finish_floors`) is two ranks whatever the descriptor says."""
+    if has_free_finish(track, record):
+        return 0
+    need = _finish_boost(track, record, package)
+    return max(need, USF_BOOST_COUNT) if has_floor(track, record) else need
+
+
+def _finish_boost(track, record, package=None):
     name = _name(track)
     if name is None:
         package = package or {}
@@ -239,7 +295,21 @@ def _held_first_usf(track, record):
     return USF_BOOST_COUNT
 
 
+#: Check kinds that need a finished race (a lap, a win or any finishing place).
+RACE_KINDS = ("trophy", "podium", "ctr", "letter", "relic", "perfect")
+
+
 def check_boost(track, kind, award, record, package=None, letters=None):
+    """Ranks one check of `track` needs. A reviewed finish floor (Royal Raceway:
+    two ranks for every check that needs a finished race, a low place included)
+    applies last, only to a track the plan's capability record names."""
+    need = _check_boost(track, kind, award, record, package, letters)
+    if kind in RACE_KINDS and record and record["boost_mode"] and has_floor(track, record):
+        return max(need, USF_BOOST_COUNT)
+    return need
+
+
+def _check_boost(track, kind, award, record, package=None, letters=None):
     """Ranks one check of `track` needs. `kind` and `award` are the check's
     plan kind and route award; `letters` is the set of letter keys the track's
     CTR Challenge must pick up (None: all three)."""

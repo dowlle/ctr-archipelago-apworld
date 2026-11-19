@@ -1,0 +1,25 @@
+Crash Team Racing:
+  accessibility: full
+  itemboxsanity: {0: 1, 5: 1, 50: 2}
+  wumpasanity: {"off": 1, crates: 2, both: 1}
+  item_box_count: {0: 1, 1: 1, 5: 1, 15: 1, 50: 1}
+  progressive_boost: {"off": 1, shared_global: 2, per_character: 2}
+  progressive_boost_blue_fire: {true: 1, false: 1}
+  logic_difficulty: {easy: 1, medium: 1, hard: 1}
+  shortcut_knowledge: {easy: 1, medium: 1, hard: 1}
+  lap_completion_checks: true
+  custom_tracks:
+    - id: package/green-hill-raceway/2.0.0
+      content_id: green-hill-raceway
+      uuid: 02de7c49-5203-5912-84e0-a29bea99e2e5
+      revision: "2.0.0"
+      display_name: Green Hill Raceway
+      author: Boxic
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, weapon_crates: 20, fruit_crates: 9, loose_fruit: 0, checkpoints: 128, ai_nav: true}
+      files:
+        - {role: lev, sha256: 50250966e9b31d13b140aaafa9433ffce19269898a0850edd0a1e8cf1207c760, bytes: 1000000, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 3e1d941bc88470fd7b414fb629aba1859f1325ac414f923baa2ddd2fa9001915, bytes: 400000, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [green-hill-raceway]
+  retail_tracks: [all]
