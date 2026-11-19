@@ -2,6 +2,8 @@
 
 import json
 import pkgutil
+from functools import cache
+from typing import NamedTuple
 
 from worlds.AutoWorld import data_package_checksum
 
@@ -38,6 +40,28 @@ def is_origin_location(code):
     return row is not None and 141 <= row[1] <= 176
 
 
+class _OptionWorld(NamedTuple):
+    game: str
+    item_names: frozenset
+    location_names: frozenset
+    item_name_groups: dict
+    location_name_groups: dict
+
+
+@cache
+def legacy_option_world(world):
+    """The old alphabet of registered names for options rolled before the plan."""
+    from .item_groups import letter_item_names
+
+    item_names = frozenset(name for name, code in world.item_name_to_id.items() if not _origin_item(code))
+    locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
+    named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
+    item_groups = dict(world.item_name_groups)
+    item_groups["Everything"] = item_names
+    item_groups["CTR Letters"] = frozenset(letter_item_names(named_items))
+    return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
+
+
 def prune_unused_option_names(world):
     """Group expansion may include the reserved letter names for other rooms."""
     plan = world.ctr_content_plan
@@ -52,6 +76,34 @@ def prune_unused_option_names(world):
         option.value = {name for name in option.value
                         if not _origin_item(world.item_name_to_id.get(name, 0))
                         or world.item_name_to_id[name] in items}
+    links = world.options.item_links
+    if FEATURE not in plan["required_features"] and hasattr(links, "legacy_value"):
+        links.value = links.legacy_value
+
+
+def restore_legacy_link_pools(multiworld, world_type):
+    """Restore the old registered pool order for links between legacy slots."""
+    for group in multiworld.groups.values():
+        if group["game"] != world_type.game:
+            continue
+        worlds = [multiworld.worlds[s] for s in sorted(group["players"])]
+        if any(FEATURE in w.ctr_content_plan["required_features"] for w in worlds):
+            continue
+        links = [link for w in worlds for link in w.options.item_links.value if link["name"] == group["name"]]
+        if not links or not any(hasattr(w.options.item_links, "legacy_value") for w in worlds):
+            continue
+        shared = set(links[0]["item_pool"])
+        excluded = set(links[0].get("exclude", ()))
+        for link in links[1:]:
+            shared &= set(link["item_pool"])
+            excluded |= set(link.get("exclude", ()))
+        groups = legacy_option_world(world_type).item_name_groups
+        pool = set()
+        for name in shared:
+            pool |= groups.get(name, {name})
+        for name in excluded:
+            pool -= groups.get(name, {name})
+        group["item_pool"] = pool
 
 
 def preserve_legacy_package(multiworld, multidata, game):

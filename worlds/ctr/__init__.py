@@ -207,6 +207,11 @@ class ctrAPWorld(World):
         from .notices import emit_summary
         emit_summary(self)
 
+    @classmethod
+    def stage_generate_early(cls, multiworld):
+        from .track_origins import restore_legacy_link_pools
+        restore_legacy_link_pools(multiworld, cls)
+
     def create_regions(self):
         from . import content_plan
         content_plan.create_regions(self)
