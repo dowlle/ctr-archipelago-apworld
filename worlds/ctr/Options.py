@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
                      Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool, Visibility)
 
-from . import characters, legacy_yaml
+from . import characters, custom_packages, legacy_yaml
 from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
 from .traps import (DEFAULT_TRAP_WEIGHTS, TRAP_WEIGHT_KEYS,
                     validate_trap_weights)
@@ -1498,7 +1498,19 @@ class CustomTracks(OptionList):
                                   "gone. Use Save YAML for a room on the Play Solo > Custom Tracks page "
                                   "to get a list of track packages.")
             return cls([])
+        if isinstance(data, list):
+            # Translate track_key to content_id once, here, so every reader of
+            # the option sees one shape. An entry whose two names disagree stays
+            # as written and is refused at admission with the usual message.
+            data = [_normalized_track_entry(entry) for entry in data]
         return super().from_any(data)
+
+
+def _normalized_track_entry(entry):
+    try:
+        return custom_packages.yaml_track_entry(entry, "custom_tracks")
+    except custom_packages.PackageError:
+        return entry
 
 
 class CortexVortexTrack(Choice):
