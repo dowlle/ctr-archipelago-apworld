@@ -1340,6 +1340,8 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [descriptor["id"]], [descriptor["id"]],
                                               page=True)[GAME], doc[GAME])
         self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)[GAME], {"track_modes": {}})
+        broken = {"id": "package/other/1.0", "files": [{"role": None}, {"role": "lev"}]}
+        self.assertFalse(ctr_solo._same_package(broken, descriptor))
 
     def test_historical_room_copy_does_not_replace_active_alias_row(self):
         current = self.install("assembly-lane-n-gage", "2.1", "Assembly Lane N-Gage")

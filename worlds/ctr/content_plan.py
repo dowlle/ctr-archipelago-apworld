@@ -1144,7 +1144,10 @@ def track_names(track, package):
     """The title and equivalent keys a YAML may use to select this track."""
     title = track["display_name"]
     if package:
-        return tuple(dict.fromkeys((title, *destinations.equivalent_track_keys(package["content_id"]))))
+        names = (title, *destinations.equivalent_track_keys(package["content_id"]))
+        if cortex_vortex.bundled_copy(package):
+            names += (destinations.CORTEX_VORTEX,)
+        return tuple(dict.fromkeys(names))
     if track.get("id") == CORTEX_TRACK_ID:
         return (title, *destinations.equivalent_track_keys(CORTEX_TRACK_KEY))
     return (title,)
@@ -1157,7 +1160,8 @@ def required_ids(options, candidates, arenas, packages):
         for name in track_names(item, packages.get(item.get("package_id"))):
             names[name] = item["id"]
     wanted = list(options.required_entries.value)
-    if any(name == destinations.CORTEX_VORTEX or names.get(name) == CORTEX_TRACK_ID for name in wanted):
+    if (any(names.get(name) == CORTEX_TRACK_ID for name in wanted)
+            or (destinations.CORTEX_VORTEX in wanted and destinations.CORTEX_VORTEX not in names)):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
             or len(wanted) > content_cups.PADS):

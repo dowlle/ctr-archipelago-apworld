@@ -1314,19 +1314,20 @@ def _section(doc: dict | None) -> dict:
 
 def _pins(descriptor: dict) -> list:
     files = descriptor.get("files")
-    return sorted((pin.get("role"), pin.get("sha256"), pin.get("bytes")) for pin in files
-                  if isinstance(pin, dict)) if isinstance(files, list) else []
+    return sorted(((pin.get("role"), pin.get("sha256"), pin.get("bytes")) for pin in files if isinstance(pin, dict)),
+                  key=lambda pin: str(pin[0])) if isinstance(files, list) else []
 
 
 def _same_package(listed, descriptor: dict) -> bool:
     """Match a YAML entry to this installed revision of the track by exact file pins."""
-    if not isinstance(listed, dict) or _pins(listed) != _pins(descriptor):
+    if not isinstance(listed, dict):
         return False
-    if listed.get("id") == descriptor["id"]:
-        return True
-    return (listed.get("revision") == descriptor["revision"]
-            and isinstance(listed.get("content_id"), str)
-            and listed["content_id"] in _world_module("destinations").equivalent_track_keys(descriptor["content_id"]))
+    same_key = (listed.get("id") == descriptor["id"]
+                or (listed.get("revision") == descriptor["revision"]
+                    and isinstance(listed.get("content_id"), str)
+                    and listed["content_id"] in
+                    _world_module("destinations").equivalent_track_keys(descriptor["content_id"])))
+    return same_key and _pins(listed) == _pins(descriptor)
 
 
 def _pick_names(descriptor: dict, existing: list) -> set:
