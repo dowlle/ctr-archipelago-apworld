@@ -1,14 +1,14 @@
 """Reviewed fallback crate exclusions, keyed only by exact LEV SHA-256.
 
 Ordinals are one-based in instance-table order within a model family. An entry
-without a "family" is a weapon crate; "wumpa_crate" names a Wumpa crate (A4-41).
+without a "family" is a weapon crate. A "sanity_since" entry starts with the
+specified sanity catalog version so older seeds keep their original checks.
 Only weapon-crate entries ever reach the custom fallback seating or the seed's
 crate_exclusions record. Wumpa-crate entries matter to Wumpasanity only. Positions
 are signed LEV coordinates, checked again before native touches any crate.
 The world ships the list and carries the applicable entries in the seed. The
 geometry report tool never updates this list or changes generation.
 """
-import copy
 import json
 import pkgutil
 
@@ -20,16 +20,19 @@ EXCLUSIONS = json.loads(pkgutil.get_data(__package__, "data/crate_exclusions.jso
 
 
 WEAPON = "weapon_crate"
+SANITY_VERSION = 2
 
 
-def ordinals(lev_sha256, kind=WEAPON):
+def ordinals(lev_sha256, kind=WEAPON, sanity_version=SANITY_VERSION):
     """Excluded one-based ordinals of one model family for an exact LEV."""
-    return {c["ordinal"] for c in EXCLUSIONS.get(lev_sha256, ()) if c.get("family", WEAPON) == kind}
+    return {c["ordinal"] for c in EXCLUSIONS.get(lev_sha256, ())
+            if c.get("family", WEAPON) == kind and c.get("sanity_since", 1) <= sanity_version}
 
 
 def entries(package):
     """Weapon-crate entries only: the wire and the fallback seating never see other families."""
-    return copy.deepcopy([c for c in EXCLUSIONS.get(lev_pin(package), []) if c.get("family", WEAPON) == WEAPON])
+    return [dict(ordinal=c["ordinal"], pos=c["pos"][:])
+            for c in EXCLUSIONS.get(lev_pin(package), ()) if c.get("family", WEAPON) == WEAPON]
 
 
 def count(package, excluded=()):
