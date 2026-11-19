@@ -129,7 +129,7 @@ def carried_sources(package):
         "ordinary pickups": sanity.CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS,
         "AP box pickup ranks": content_item_boxes.PICKUP_RULE_PINS,
         "crate exclusions": crate_exclusions.EXCLUSIONS,
-        "finish": {royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256},
+        "finish": content_capability.CARRY_FREE_FINISH_PINS | {royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256},
     }
     result = {}
     for family, pins in families.items():

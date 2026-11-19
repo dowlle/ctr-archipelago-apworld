@@ -23,6 +23,17 @@ def country_options(**extra):
 
 
 class TestCountrySpeedway(unittest.TestCase):
+    def test_a_new_revision_keeps_the_finish_ruling_and_its_own_pad_measurement(self):
+        options = country_options(logic_difficulty="hard")
+        package = options["content_pool"]["tracks"]["custom"][0]
+        package["files"][0]["sha256"] = "ab" * 32
+        package["capabilities"]["super_turbo_pads"] = True
+        world = make_world(options, seed=3, stop_before="pre_fill")
+        plan = world.ctr_content_plan
+        self.assertTrue(plan["packages"][0]["capabilities"]["super_turbo_pads"])
+        trophy = next(c for c in plan["checks"] if c["kind"] == "trophy" and c["owner"] == "custom/country-speedway/1.3.0")
+        self.assertEqual(trophy.get("boost", 0), 0)
+
     def test_country_version_is_separate_from_older_corrections(self):
         for version in (1, 2):
             w = make_world(country_options(), seed=3, stop_before="pre_fill")

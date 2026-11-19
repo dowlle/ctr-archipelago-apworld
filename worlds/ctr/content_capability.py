@@ -59,7 +59,7 @@ from types import SimpleNamespace
 
 from Options import OptionError
 
-from . import capability_contract, progressive_capability, track_rulings
+from . import capability_contract, country_speedway, progressive_capability, toasty_terrace, track_rulings
 from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, FIRST_BOOST_COUNT, USF_BOOST_COUNT,
                          relic_perfect_boost_min, relic_tier_boost_min)
 
@@ -111,6 +111,10 @@ def _load_rulings():
 #: finish rank}, revision and LEV sha256 None on a row for every revision.
 USF_FINISH_RULINGS = _load_rulings()
 
+# These exact revisions normalize a measured descriptor field at generation.
+# A revised package keeps its own measurement and inherits the finish logic.
+CARRY_FREE_FINISH_PINS = {country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256}
+
 
 def _load_letter_rulings():
     """Project-owned minimum ranks, keyed by package content id and AP letter."""
@@ -147,8 +151,14 @@ def ruled_finish(package):
     """Resolve the exact finish rank, inherited rank or unscoped default."""
     content = package.get("content_id")
     refs = {(revision, digest) for key, revision, digest in USF_FINISH_RULINGS if key == content and digest}
-    return USF_FINISH_RULINGS.get((content, *track_rulings.scoped_source(package, refs)),
-                                  USF_FINISH_RULINGS.get((content, None, None)))
+    scoped = USF_FINISH_RULINGS.get((content, *track_rulings.scoped_source(package, refs)),
+                                   USF_FINISH_RULINGS.get((content, None, None)))
+    if scoped is not None:
+        return scoped
+    source = track_rulings.source(package, CARRY_FREE_FINISH_PINS)
+    if source in CARRY_FREE_FINISH_PINS and source != track_rulings.lev_pin(package):
+        return 0
+    return None
 
 
 def error(message):
