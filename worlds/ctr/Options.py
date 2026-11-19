@@ -1473,9 +1473,10 @@ class CustomTracks(OptionList):
     """List the custom tracks this seed may use on warp pads, in cups and in boss
     races. Leave it empty (default) to use none.
 
-    Copy each track's complete entry from its download or the AP-Pie track
-    picker. Play Solo can also write the entries into a YAML for you. Keep each
-    entry unchanged: the game checks the installed files against it.
+    Use Export YAML in Options > Custom Tracks for one track, or Save YAML for
+    a room on the Play Solo > Custom Tracks page for your selections. The
+    entry uses track_key (older YAMLs can still use content_id). Keep its file
+    pins unchanged so the game can verify the installed files.
 
     A custom track takes the place of an original track on a warp pad. If there
     are more tracks than pads, some are left out; list a track key in

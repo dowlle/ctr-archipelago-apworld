@@ -20,7 +20,7 @@ Crash Team Racing:
     default: [trophy]
   custom_tracks:
     - id: package/baby-t-park/1.0.2
-      content_id: baby-t-park
+      track_key: baby-t-park
       uuid: 2c7c7846-2ead-5b8f-a218-beca5792106e
       revision: "1.0.2"
       display_name: Baby T Park
