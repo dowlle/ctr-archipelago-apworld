@@ -299,10 +299,10 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw, where="custom_tracks"):
+def resolve_packages(raw, where="custom_tracks", *, historical=False):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where)
+        return custom_packages.admit_all(raw, where, historical=historical)
     except custom_packages.PackageError as exc:
         error(f"{exc}. Export the package descriptor again from the Custom Content page "
               "or the AP-Pie track picker; legacy Gem Cup placement descriptors are not this format.")
@@ -2772,7 +2772,8 @@ def validate(plan):
 
     packages = table("packages")
     # The wire is canonical: an admitted copy of each record must equal it.
-    require(resolve_packages(plan["packages"], "content_plan.packages") == sorted(plan["packages"], key=lambda p: p["id"])
+    require(resolve_packages(plan["packages"], "content_plan.packages", historical=True) ==
+            sorted(plan["packages"], key=lambda p: p["id"])
             and [p["id"] for p in plan["packages"]] == sorted(packages),
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")

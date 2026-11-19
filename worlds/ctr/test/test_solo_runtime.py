@@ -1324,6 +1324,11 @@ class TestCustomTracks(SoloTestCase):
         root = os.path.join(self.assets, "tracks")
         os.rename(os.path.join(root, alias), os.path.join(root, "assembly-lane-n-gage"))
         self.assertIn(descriptor["id"], [track["id"] for track in self.tracks()])
+        original = os.path.join(root, alias, "original")
+        os.makedirs(original)
+        os.rename(os.path.join(root, "assembly-lane-n-gage", "original", "b-1.0.vrm"),
+                  os.path.join(original, "b-1.0.vrm"))
+        self.assertNotIn(descriptor["id"], [track["id"] for track in self.tracks()])
 
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml

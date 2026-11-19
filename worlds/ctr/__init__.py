@@ -192,13 +192,13 @@ class ctrAPWorld(World):
         one comes from v0.2.x and is refused with the client's sentence."""
         passthrough = getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game)
         from . import content_plan
-        content_plan.swap_in_bundled_cortex(self)
         if passthrough:
             if "content_plan" not in passthrough:
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
             from . import content_item_boxes, tizi_madness, track_origins
+            content_plan.swap_in_bundled_cortex(self)
             content_item_boxes.settings(self.options)
             # A4-96: Tizi Madness only with hard shortcut knowledge.
             tizi_madness.leave_out_below_hard(self)

@@ -1263,7 +1263,8 @@ def installed_tracks(paths: Paths, assets: str) -> list:
         folders = [os.path.join(tracks_root, folder, "original")
                    for candidate in equivalent for folder in (candidate, f"{candidate}-{revision}")]
         shared = _shared_package_folder(tracks_root, descriptor)
-        if shared is None and not all(_pinned_file(folders, pin) for pin in descriptor["files"]):
+        if shared is None and not any(all(_pinned_file([folder], pin) for pin in descriptor["files"])
+                                      for folder in folders):
             continue
         seen.add(descriptor["id"])
         modes = supported("custom", descriptor)

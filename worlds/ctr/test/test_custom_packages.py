@@ -93,6 +93,22 @@ class TestAdmission(unittest.TestCase):
         package["files"][0]["sha256"] = entry["doc"]["track"]["lev_sha256"][0]
         self.assertIs(box_spots.file_for(track, package), entry)
 
+    def test_older_rooms_keep_two_raw_keys_that_now_share_an_identity(self):
+        first, second = copy.deepcopy(UNKNOWN), copy.deepcopy(UNKNOWN)
+        first.update(content_id="crash-30anniversary-adventure-track-2",
+                     id="package/crash-30anniversary-adventure-track-2/2.1", display_name="Archived One")
+        second.update(content_id="crash-30anniversary-adventure-track-12",
+                      id="package/crash-30anniversary-adventure-track-12/2.1", display_name="Archived Two",
+                      uuid="1f0e0d0c-0b0a-4908-8706-050403020100")
+        second["files"][0]["sha256"] = "f2" * 32
+        options = options_with([first, second])
+        with patch.dict(destinations.TRACK_KEY_ALIASES, {}, clear=True):
+            old = make_world(options, seed=3).fill_slot_data()
+        restored = make_world(options, passthrough=old)
+        self.assertEqual(restored.ctr_content_plan["packages"], old["content_plan"]["packages"])
+        with self.assertRaisesRegex(custom_packages.PackageError, "repeats the track key"):
+            custom_packages.admit_all([first, second])
+
     def test_known_profiles_and_unknown_descriptors_admit(self):
         for descriptor in (*content_plan.PACKAGES, UNKNOWN, named_fixture()):
             with self.subTest(descriptor=descriptor["id"]):
