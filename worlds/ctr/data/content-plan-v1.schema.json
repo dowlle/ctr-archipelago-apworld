@@ -108,7 +108,7 @@
           "sanity_exclusions_v2"
         ]
       },
-      "maxItems": 35,
+      "maxItems": 36,
       "minItems": 1,
       "uniqueItems": true
     },
