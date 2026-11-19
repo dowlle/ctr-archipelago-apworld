@@ -382,6 +382,13 @@ def canonical_track_key(track_key: str) -> str:
     return TRACK_KEY_ALIASES.get(track_key, track_key)
 
 
+def equivalent_track_keys(track_key: str) -> Tuple[str, ...]:
+    """The supplied key first, followed by the canonical key and its other aliases."""
+    canonical = canonical_track_key(track_key)
+    return tuple(dict.fromkeys((track_key, canonical, *(alias for alias, target in TRACK_KEY_ALIASES.items()
+                                                       if target == canonical))))
+
+
 def named_track(track_key: str) -> Optional[NamedTrack]:
     """The named block row for `track_key`, or None (the generic fallback)."""
     return NAMED_BY_KEY.get(canonical_track_key(track_key))

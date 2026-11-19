@@ -1141,8 +1141,13 @@ def retail_selection(options):
 
 
 def track_names(track, package):
-    """The names a YAML may call a track by: its title, and a custom track's key."""
-    return {track["display_name"]} | ({package["content_id"]} if package else set())
+    """The title and equivalent keys a YAML may use to select this track."""
+    title = track["display_name"]
+    if package:
+        return tuple(dict.fromkeys((title, *destinations.equivalent_track_keys(package["content_id"]))))
+    if track.get("id") == CORTEX_TRACK_ID:
+        return (title, *destinations.equivalent_track_keys(CORTEX_TRACK_KEY))
+    return (title,)
 
 
 def required_ids(options, candidates, arenas, packages):
@@ -1152,7 +1157,7 @@ def required_ids(options, candidates, arenas, packages):
         for name in track_names(item, packages.get(item.get("package_id"))):
             names[name] = item["id"]
     wanted = list(options.required_entries.value)
-    if destinations.CORTEX_VORTEX in wanted:
+    if any(name == destinations.CORTEX_VORTEX or names.get(name) == CORTEX_TRACK_ID for name in wanted):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
             or len(wanted) > content_cups.PADS):
@@ -1244,6 +1249,16 @@ def _draw_fitting(world):
     return plan
 
 
+def move_bundled_cortex_modes(modes, names):
+    """Carry a copy's mode override to the bundled row; an explicit bundled override wins."""
+    moved = False
+    for name in sorted(set(names) - {destinations.CORTEX_VORTEX}):
+        if name in modes:
+            moved = moved or destinations.CORTEX_VORTEX not in modes
+            modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+    return moved
+
+
 def swap_in_bundled_cortex(world):
     """Replace an exact copy of the bundled Cortex Vortex files when the option is off.
 
@@ -1251,7 +1266,7 @@ def swap_in_bundled_cortex(world):
     The seed with an exact duplicate behaves as `in_pool`. `in_pool` and not
     `own_pad`, because a listed custom track is never promised a pad either. A copy that
     `required_entries` names keeps that promise: the swap is `own_pad` and the entry leaves the list.
-    Runs before the plan is drawn or restored, so both see the same options."""
+    Runs before a new plan is drawn."""
     o = world.options
     if o.cortex_vortex_track.value:
         return
@@ -1260,7 +1275,7 @@ def swap_in_bundled_cortex(world):
     if not copies:
         return
     twins = [p["id"] for p in copies]
-    names = {n for p in copies for n in (p["display_name"], p["content_id"])}
+    names = {n for p in copies for n in track_names(p, p)}
     kept = [n for n in o.required_entries.value if n not in names]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
@@ -1268,12 +1283,7 @@ def swap_in_bundled_cortex(world):
                              if custom_packages.admit(raw, "custom_tracks")["id"] not in twins]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
-    moved_modes = False
-    for name in sorted(names - {destinations.CORTEX_VORTEX}):
-        if name in modes:
-            # An entry already under the bundled track's own name wins; the copy's is dropped.
-            moved_modes = moved_modes or destinations.CORTEX_VORTEX not in modes
-            modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+    moved_modes = move_bundled_cortex_modes(modes, names)
     o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins

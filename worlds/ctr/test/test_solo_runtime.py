@@ -1308,15 +1308,51 @@ class TestCustomTracks(SoloTestCase):
         from unittest.mock import patch
         from .. import cortex_vortex
 
-        descriptor = {"id": "package/lockbox-adventure-track-11/1.0",
-                      "content_id": "lockbox-adventure-track-11",
-                      "files": [{"sha256": cortex_vortex.CORTEX_LEV_SHA256},
-                                {"sha256": cortex_vortex.CORTEX_VRM_SHA256}]}
+        alias = "lockbox-adventure-track-11"
+        descriptor = self.install(alias, "1.0", "Lockbox Adventure track 11")
+        descriptor["files"][0]["sha256"] = cortex_vortex.CORTEX_LEV_SHA256
+        descriptor["files"][1]["sha256"] = cortex_vortex.CORTEX_VRM_SHA256
+        doc = {GAME: dict(custom_tracks=[descriptor], required_entries=["cortex-vortex"],
+                          track_modes={alias: ["trophy"]})}
+        paths = SimpleNamespace(tracks=self.work)
         with patch.object(ctr_solo, "installed_tracks", return_value=[
                 {"id": descriptor["id"], "descriptor": descriptor}]), \
-                patch.object(ctr_solo, "_cortex_installed", return_value=True):
-            rows = ctr_solo.list_tracks(SimpleNamespace(tracks=self.work), self.assets)["tracks"]
-        self.assertEqual([row["id"] for row in rows], ["cortex-vortex"])
+                patch.object(ctr_solo, "_cortex_installed", return_value=True), \
+                patch.object(ctr_solo, "read_player_yaml", return_value=doc):
+            rows = ctr_solo.list_tracks(paths, self.assets, "fixture.yaml")["tracks"]
+            self.assertEqual([(row["id"], row["start"]) for row in rows], [("cortex-vortex", 2)])
+            result = ctr_solo.apply_tracks(paths, doc, self.assets, ["cortex-vortex"], ["cortex-vortex"], page=True)
+        self.assertEqual(result[GAME], {"cortex_vortex_track": "own_pad", "track_modes": {"Cortex Vortex": ["trophy"]}})
+
+    def test_corrected_title_keeps_or_removes_yaml_picks(self):
+        import yaml
+        key = "assembly-lane-n-gage"
+        descriptor = self.install(key, "1.0", "Assembly Lane N-Gage")
+        old_title = "N-Gage Assembly Lane"
+        yaml_entry = dict(descriptor, display_name=old_title)
+        source = write_yaml(self.work, "renamed.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[yaml_entry], required_entries=[old_title], track_modes={old_title: ["trophy"]})}))
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        rows = ctr_solo.list_tracks(paths, self.assets, source)["tracks"]
+        self.assertEqual([(row["id"], row["start"]) for row in rows], [(descriptor["id"], 2)])
+        doc = ctr_solo.read_player_yaml(source)
+        self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [descriptor["id"]], [descriptor["id"]],
+                                              page=True)[GAME], doc[GAME])
+        self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)[GAME], {"track_modes": {}})
+
+    def test_historical_room_copy_does_not_replace_active_alias_row(self):
+        current = self.install("assembly-lane-n-gage", "2.1", "Assembly Lane N-Gage")
+        old = self.install("n-gage-assembly-lane", "2.1", "Old title", write_descriptor=False)
+        rooms = os.path.join(self.solo, "rooms", "old-room")
+        os.makedirs(rooms)
+        room = os.path.join(rooms, "room.json")
+        saved = json.dumps({"custom_tracks": [old]})
+        with open(room, "w", encoding="utf-8") as handle:
+            handle.write(saved)
+        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
+        with open(room, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), saved)
 
     def test_historical_key_reads_the_canonical_original_folder(self):
         alias = "n-gage-assembly-lane"

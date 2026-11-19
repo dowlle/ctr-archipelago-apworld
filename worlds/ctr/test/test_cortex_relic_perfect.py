@@ -261,6 +261,17 @@ class TestCortexVortexTrack(unittest.TestCase):
             self.assertIn(CV, {t["id"] for t in world.ctr_content_plan["tracks"]})
             self.assertEqual(world.ctr_cortex_swap_mode, "own_pad")
 
+    def test_a_canonical_selector_swaps_an_exact_copy_stored_under_an_alias(self):
+        options = self.swap_options()
+        package = options["content_pool"]["tracks"]["custom"][-1]
+        alias = "lockbox-adventure-track-11"
+        package.update(content_id=alias, id=f"package/{alias}/{package['revision']}")
+        options["content_pool"]["required_entries"].append("cortex-vortex")
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["trophy"]}
+        world = make_world(options, seed=3)
+        self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
+        self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["trophy"])
+
     def test_identified_copy_with_different_pins_keeps_its_own_files(self):
         options = self.swap_options(pinned=True)
         package = options["content_pool"]["tracks"]["custom"][-1]

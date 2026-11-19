@@ -68,6 +68,13 @@ class TestAdmission(unittest.TestCase):
         address = named_tracks.location_code(block.block_index, "trophy")
         self.assertEqual(tracker.location_id_to_name[address], block.ap_name + ": Trophy Race")
 
+        options["content_pool"]["required_entries"] = [key]
+        options["content_pool"]["tracks"]["overrides"] = {key: ["trophy"]}
+        alias_world = make_world(options, seed=3)
+        alias_track = next(t for t in alias_world.ctr_content_plan["tracks"] if t.get("package_id") == descriptor["id"])
+        self.assertEqual(alias_track["modes"], ["trophy"])
+        options = options_with([descriptor])
+
         with patch.dict(destinations.TRACK_KEY_ALIASES, {}, clear=True):
             old_world = make_world(options, seed=3)
             wire = old_world.fill_slot_data()

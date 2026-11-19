@@ -1254,19 +1254,17 @@ def installed_tracks(paths: Paths, assets: str) -> list:
             descriptor = admit(json.loads(json.dumps(raw)))
         except Exception:
             continue
-        if descriptor["id"] in seen:
-            continue
         key, revision = descriptor["content_id"], descriptor["revision"]
-        canonical = destinations.canonical_track_key(key)
-        equivalent = dict.fromkeys([key, canonical, *(alias for alias, target in destinations.TRACK_KEY_ALIASES.items()
-                                                     if target == canonical)])
+        identity = (destinations.canonical_track_key(key), revision)
+        if identity in seen:
+            continue
         folders = [os.path.join(tracks_root, folder, "original")
-                   for candidate in equivalent for folder in (candidate, f"{candidate}-{revision}")]
+                   for candidate in destinations.equivalent_track_keys(key) for folder in (candidate, f"{candidate}-{revision}")]
         shared = _shared_package_folder(tracks_root, descriptor)
         if shared is None and not any(all(_pinned_file([folder], pin) for pin in descriptor["files"])
                                       for folder in folders):
             continue
-        seen.add(descriptor["id"])
+        seen.add(identity)
         modes = supported("custom", descriptor)
         result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
                        "revision": revision, "display_name": descriptor["display_name"],
@@ -1321,18 +1319,30 @@ def _pins(descriptor: dict) -> list:
 
 
 def _same_package(listed, descriptor: dict) -> bool:
-    """A YAML's entry for this installed package: the same id and files. The rest
-    of a descriptor, such as its author, does not name another package."""
-    return (isinstance(listed, dict) and listed.get("id") == descriptor["id"]
-            and _pins(listed) == _pins(descriptor))
+    """Match a YAML entry to this installed revision of the track by exact file pins."""
+    if not isinstance(listed, dict) or _pins(listed) != _pins(descriptor):
+        return False
+    if listed.get("id") == descriptor["id"]:
+        return True
+    return (listed.get("revision") == descriptor["revision"]
+            and isinstance(listed.get("content_id"), str)
+            and listed["content_id"] in _world_module("destinations").equivalent_track_keys(descriptor["content_id"]))
+
+
+def _pick_names(descriptor: dict, existing: list) -> set:
+    """All selectors for this installed package, including its title in the loaded YAML."""
+    names = set(_world_module("content_plan").track_names(descriptor, descriptor))
+    names.update(d["display_name"] for d in existing if isinstance(d.get("display_name"), str))
+    return names
 
 
 def _start_pick(section: dict, descriptor: dict) -> int:
     """How a YAML already has a custom track: 0 off, PICK_POOL or PICK_OWN_PAD."""
-    if not any(_same_package(listed, descriptor) for listed in _custom_tracks({GAME: section})):
+    existing = [d for d in _custom_tracks({GAME: section}) if _same_package(d, descriptor)]
+    if not existing:
         return 0
     required = section.get("required_entries")
-    names = {descriptor["content_id"], descriptor["display_name"]}
+    names = _pick_names(descriptor, existing)
     return PICK_OWN_PAD if isinstance(required, list) and names & set(map(str, required)) else PICK_POOL
 
 
@@ -1396,11 +1406,21 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                             f"{by_id[track_id]['revision']}. Remove it from the YAML or leave the track off.",
                             track=track_id)
     if page:  # a row the page showed leaves the YAML as the player set it
+        bundled_copy = _world_module("cortex_vortex").bundled_copy
+        modes = section.get("track_modes")
         for entry in by_id.values():
+            descriptor = entry["descriptor"]
+            existing = [d for d in custom if _same_package(d, descriptor)]
+            names = _pick_names(descriptor, existing)
             if entry["id"] not in picked:
-                custom[:] = [d for d in custom if not _same_package(d, entry["descriptor"])]
-            if entry["id"] not in guaranteed:
-                names = (entry["content_id"], entry["display_name"])
+                custom[:] = [d for d in custom if not _same_package(d, descriptor)]
+                if existing and isinstance(modes, dict):
+                    if cortex and bundled_copy(descriptor):
+                        _world_module("content_plan").move_bundled_cortex_modes(modes, names)
+                    else:
+                        for name in names:
+                            modes.pop(name, None)
+            if existing and entry["id"] not in guaranteed:
                 required[:] = [name for name in required if name not in names]
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
