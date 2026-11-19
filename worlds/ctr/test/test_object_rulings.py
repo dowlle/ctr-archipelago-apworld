@@ -107,6 +107,18 @@ class TestObjectRulings(unittest.TestCase):
                     dict(version=1, rulings=rows)).encode()), self.assertRaises(ValueError):
                 object_rulings._load()
 
+    def test_exact_review_can_clear_an_unscoped_ruling(self):
+        good = next(iter(object_rulings.RULINGS.values()))
+        reviewed = dict(good, revision="9.0.0", lev_sha256=PIN, hard_rank=0, blue_fire_rank=0)
+        with mock.patch.object(object_rulings.pkgutil, "get_data", return_value=json.dumps(
+                dict(version=1, rulings=[good, reviewed])).encode()):
+            rulings = object_rulings._load()
+        package = dict(named_fixture(), revision="9.0.0", files=[dict(role="lev", sha256=PIN)])
+        with mock.patch.object(object_rulings, "RULINGS", rulings):
+            rank = object_rulings.rank({"origin": "custom"}, package, good["kind"], good["ordinal"],
+                                       {"logic_difficulty": 0, "boost_blue_fire": False})
+            self.assertEqual(rank, 0)
+
     def test_selection_settings_are_paired_and_agree_with_capability(self):
         original = make_world(options(), seed=52, stop_before="pre_fill").ctr_content_plan
         for key, value in (("logic_difficulty", True), ("logic_difficulty", 2),

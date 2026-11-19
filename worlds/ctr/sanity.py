@@ -80,12 +80,12 @@ def inventory(track, package=None, record=None):
         return CATALOG.get(key)
     if "named_block" in track:
         pin = box_spots.lev_pin(package)
-        if pin in CATALOG:
+        source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
+        if source == pin and pin in CATALOG:
             return CATALOG[pin]
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
-            source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
             if source in CATALOG:
                 return dict(lev_sha256=pin, counts=counts, needs=CATALOG[source]["needs"])
             if source == royal_raceway.LEV_SHA256:

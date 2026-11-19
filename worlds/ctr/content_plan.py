@@ -2064,7 +2064,9 @@ def draw_plan(world, key_estimate=True):
         plan["bosses"] = boss_record
     if shop:
         plan["wumpa_shop"] = shop
-    if any(track_rulings.plan_sources(plan)):
+    sources = track_rulings.wire_sources(plan)
+    if sources:
+        plan["track_ruling_sources"] = sources
         plan["required_features"].append(track_rulings.FEATURE)
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
@@ -2758,6 +2760,7 @@ def validate(plan):
         return result
 
     packages = table("packages")
+    require(track_rulings.valid_sources(plan, packages), "invalid carried ruling sources")
     # The wire is canonical: an admitted copy of each record must equal it.
     require(resolve_packages(plan["packages"], "content_plan.packages") == sorted(plan["packages"], key=lambda p: p["id"])
             and [p["id"] for p in plan["packages"]] == sorted(packages),
@@ -2794,15 +2797,17 @@ def validate(plan):
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
-    if content_capability.FLOORS_KEY in capability:
+    carried_rulings = track_rulings.enabled(plan)
+    require(not carried_rulings or any(track_rulings.plan_sources(plan)), "carried rulings without an applicable track")
+    if content_capability.FLOORS_KEY in capability or (carried_rulings and capability.get("boost_mode")):
         reviewed = content_capability.finish_floor_tracks(
             [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
-        require(capability[content_capability.FLOORS_KEY] == reviewed,
+        require(capability.get(content_capability.FLOORS_KEY, []) == reviewed,
                 "capability.finish_floors does not name exactly the reviewed tracks")
-    if content_capability.FREE_KEY in capability:
+    if content_capability.FREE_KEY in capability or (carried_rulings and capability.get("boost_mode")):
         reviewed = content_capability.finish_free_tracks(
             [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
-        require(capability[content_capability.FREE_KEY] == reviewed,
+        require(capability.get(content_capability.FREE_KEY, []) == reviewed,
                 "capability.finish_free does not name exactly the reviewed tracks")
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
@@ -2822,8 +2827,6 @@ def validate(plan):
     guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
     tizi_mask = tizi_madness.FEATURE in plan["required_features"]
     require(not tizi_mask or tizi_madness.MaskGates(plan), "Tizi Mask feature without a raced Tizi track and Itemsanity")
-    carried_rulings = track_rulings.enabled(plan)
-    require(not carried_rulings or any(track_rulings.plan_sources(plan)), "carried rulings without an applicable track")
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,

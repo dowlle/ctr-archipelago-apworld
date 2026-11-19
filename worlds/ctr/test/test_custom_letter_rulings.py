@@ -92,6 +92,11 @@ class TestCustomLetterRulings(unittest.TestCase):
                     dict(version=1, rulings=rows)).encode()):
                 return cap._load_letter_rulings()
         self.assertEqual(load([good]), {("tv-world", "letter_r"): 2})
+        scoped = dict(good, revision="9.0.0", lev_sha256="ab" * 32, rank=0)
+        rulings = load([good, scoped])
+        package = dict(packages()[0], revision="9.0.0", files=[dict(role="lev", sha256="ab" * 32)])
+        with mock.patch.object(cap, "LETTER_BOOST_RULINGS", rulings):
+            self.assertEqual(cap.letter_boost({"origin": "custom"}, "letter_r", package), 0)
         for bad in (dict(good, letter="T"), dict(good, rank=True), dict(good, rank=3),
                     dict(good, content_id=""), dict(good, ruling="undated"), dict(good, extra=1)):
             with self.subTest(bad=bad), self.assertRaises(ValueError):

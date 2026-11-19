@@ -27,7 +27,7 @@ def main():
             continue
         latest = max(candidates, key=version_key)
         pin = latest["files"]["lev"]["sha256"]
-        if any(pin == reviewed for reviewed, _ in known):
+        if [pin, latest["revision"]] in known:
             continue
         if not found:
             print()

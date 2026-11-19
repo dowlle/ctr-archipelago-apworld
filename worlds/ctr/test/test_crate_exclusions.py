@@ -185,8 +185,11 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(row["lev_sha256"], digest)
             self.assertEqual(row["crates"], [{"ordinal": 1, "pos": None}])
             self.assertEqual(len(boxes(plan, row["track_id"])), 2)
-            restored = make_world({}, seed=999, passthrough=wire)
-            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+            for reviews in (track_rulings.REVIEWS["ancient-lake"],
+                            [[digest, p["revision"]], *track_rulings.REVIEWS["ancient-lake"]]):
+                with patch.dict(track_rulings.REVIEWS, {"ancient-lake": reviews}):
+                    restored = make_world({}, seed=999, passthrough=wire)
+                    self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
             plan["required_features"].remove(track_rulings.FEATURE)
             with self.assertRaises(OptionError):
                 content_plan.validate(plan)

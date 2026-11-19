@@ -441,7 +441,7 @@ class ctrAPWorld(World):
         json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
         from . import track_rulings
         if track_rulings.enabled(self.ctr_content_plan):
-            for package, family, revision, digest in track_rulings.plan_sources(self.ctr_content_plan):
+            for package, family, revision, digest in track_rulings.spoiler_sources(self.ctr_content_plan):
                 spoiler_handle.write(f"\nCTR rulings for {package}: {family} from {revision} ({digest})")
         spoiler_handle.write("\nOriginal from-pool starts: " + repr(self.ctr_content_original_starts) + "\n")
         if getattr(self, "ctr_cortex_swap", None):

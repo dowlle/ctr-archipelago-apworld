@@ -18,8 +18,9 @@ def _load():
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("weapon_crate", "wumpa_crate", "wumpa_fruit")
                 or type(key[2]) is not int or not 1 <= key[2] <= 65536
-                or type(row["hard_rank"]) is not int or row["hard_rank"] not in (1, 2)
-                or type(row["blue_fire_rank"]) is not int or row["blue_fire_rank"] != 3
+                or type(row["hard_rank"]) is not int or type(row["blue_fire_rank"]) is not int
+                or (row["hard_rank"], row["blue_fire_rank"]) not in (((0, 0), (1, 3), (2, 3))
+                                                                   if scope else ((1, 3), (2, 3)))
                 or type(row["ruling"]) is not str or "2026-" not in row["ruling"] or key in out):
             raise ValueError("object_rulings.json: invalid or duplicate object ruling")
         out[key] = row
@@ -38,7 +39,7 @@ def rank(track, package, kind, ordinal, capability):
     if track["origin"] != "custom":
         return 0
     row = track_rulings.ruled_value(package, RULINGS, kind, ordinal)
-    if row is None:
+    if row is None or row["hard_rank"] == 0:
         return 0
     if (capability or {}).get("logic_difficulty", 2) == 2:
         return row["hard_rank"]

@@ -322,6 +322,24 @@ class TestRanks(unittest.TestCase):
                      files=[dict(role="lev", sha256="256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb8")])
         self.assertEqual(content_capability.finish_boost(track, RECORD, other), 2)
 
+    def test_new_revision_can_inherit_a_finish_ruling_on_the_same_lev(self):
+        from .. import track_rulings
+        from .test_crate_exclusions import ancient
+        from .test_content_item_boxes import box_options
+
+        lev = track_rulings.REVIEWS["lights-out"][0][0]
+        package = ancient(17, lev)
+        package.update(content_id="lights-out", display_name="Lights Out", revision="9.0.0",
+                       id="package/lights-out/9.0.0")
+        package["capabilities"]["super_turbo_pads"] = False
+        options = box_options(custom=[package], progressive_boost="shared_global", logic_difficulty="hard")
+        world = make_world(options, seed=3, stop_before="pre_fill")
+        plan = world.ctr_content_plan
+        self.assertTrue(track_rulings.enabled(plan))
+        self.assertEqual(plan["track_ruling_sources"][0]["reviews"], [{"revision": "1.0.0", "lev_sha256": lev}])
+        trophy = next(c for c in plan["checks"] if c["owner"] == "custom/lights-out/9.0.0" and c["kind"] == "trophy")
+        self.assertEqual(trophy["boost"], 1)
+
     def test_malformed_rulings_are_refused(self):
         lev = "ab" * 32
         good = dict(content_id="loop", finish_rank=0, ruling="ruling 2026-11-05")

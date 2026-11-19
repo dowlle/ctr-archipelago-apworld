@@ -124,7 +124,7 @@ def _load_letter_rulings():
         if (set(row) != {"content_id", "letter", "rank", "ruling"} | ({"revision", "lev_sha256"} if scope else set())
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("letter_c", "letter_t", "letter_r")
-                or type(row.get("rank")) is not int or row["rank"] not in (1, 2)
+                or type(row.get("rank")) is not int or row["rank"] not in ((0, 1, 2) if scope else (1, 2))
                 or type(row.get("ruling")) is not str or "2026-" not in row["ruling"]
                 or key in out):
             raise ValueError("letter_boost_rulings.json: expected a unique content id and AP letter, "
@@ -146,15 +146,9 @@ def letter_boost(track, award, package=None):
 def ruled_finish(package):
     """Resolve the exact finish rank, inherited rank or unscoped default."""
     content = package.get("content_id")
-    lev = track_rulings.lev_pin(package)
-    exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev))
-    if exact is not None:
-        return exact
-    ranks = {digest: rank for (key, _, digest), rank in USF_FINISH_RULINGS.items() if key == content and digest}
-    source = track_rulings.source(package, ranks)
-    if source != lev:
-        return ranks[source]
-    return USF_FINISH_RULINGS.get((content, None, None))
+    refs = {(revision, digest) for key, revision, digest in USF_FINISH_RULINGS if key == content and digest}
+    return USF_FINISH_RULINGS.get((content, *track_rulings.scoped_source(package, refs)),
+                                  USF_FINISH_RULINGS.get((content, None, None)))
 
 
 def error(message):
