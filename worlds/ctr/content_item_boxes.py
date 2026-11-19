@@ -183,8 +183,7 @@ def check_settings(record, capability=None):
 
 
 def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False):
-    """A plan's spot sets: exactly the pad tracks with a spot file of this
-    build, each a valid pick from that file."""
+    """Validate saved picks and crate exclusions, or match the source catalog."""
     if not record:
         return
     by_id = {t["id"]: t for t in tracks}
@@ -192,7 +191,7 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False)
     for tid in record.get(country_speedway.BOX_RULES_KEY, ()):
         track = by_id.get(tid)
         if (not track or track.get("origin") != "custom" or tid in sets
-                or (not carried and not reviewed_pickups(packages.get(track.get("package_id"))))):
+                or not reviewed_pickups(packages.get(track.get("package_id")))):
             error("item_boxes.pickup_rules names an unsupported physical pickup revision.")
     if carried:
         for row in record.get(crate_exclusions.KEY, ()):

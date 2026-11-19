@@ -52,3 +52,10 @@ def test_room_still_needs_consistent_codes_and_spot_numbers():
     room["content_plan"]["room_compatibility"] = 2
     with pytest.raises(OptionError, match=r"generated with .*this build is .*room_compatibility"):
         make_world({}, passthrough=room)
+
+
+def test_format_does_not_admit_unreviewed_physical_pickup_rules():
+    room = saved_room()
+    room["content_plan"]["item_boxes"]["pickup_rules"] = ["custom/fixture-loop/2.1"]
+    with pytest.raises(OptionError, match="unsupported physical pickup revision"):
+        make_world({}, passthrough=room)
