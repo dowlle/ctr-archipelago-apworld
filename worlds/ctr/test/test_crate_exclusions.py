@@ -82,6 +82,16 @@ class TestCrateExclusions(unittest.TestCase):
             with self.assertRaises(OptionError):
                 content_plan.validate(bad)
 
+    def test_restore_keeps_carried_exclusions_after_review_changes(self):
+        wire = first_world(box_options(custom=[north_pole(3)])).fill_slot_data()
+        with patch.dict(crate_exclusions.EXCLUSIONS, {}, clear=True):
+            restored = make_world({}, passthrough=wire)
+        self.assertEqual(restored.fill_slot_data(), wire)
+        row, = wire["content_plan"]["item_boxes"][crate_exclusions.KEY]
+        row["crates"][0]["ordinal"] = 4
+        with self.assertRaisesRegex(OptionError, "pinned fallback track"):
+            make_world({}, passthrough=wire)
+
     def test_north_pole_box_terms_unchanged(self):
         p = north_pole()
         plan = first_world(box_options(custom=[p], progressive_boost="shared_global", progressive_stats="shared_global")).ctr_content_plan

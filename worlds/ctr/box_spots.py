@@ -227,7 +227,7 @@ def spot_set(track, package, knowledge, seed, player, count=PICK):
     return out
 
 
-def check_spot_set(track, package, knowledge, record, count=PICK):
+def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True):
     """A plan's spot set against this build's file; returns the file entry."""
     entry = file_for(track, package)
     if entry is None:
@@ -235,7 +235,7 @@ def check_spot_set(track, package, knowledge, record, count=PICK):
     keys = {"file_sha256", "pool", "picked"} | ({"lev_sha256"} if track.get("origin") == "custom" else set())
     if not isinstance(record, dict) or set(record) != keys:
         raise SpotFileError(f"box spots for {track['id']}: the record must hold exactly {sorted(keys)}")
-    if record["file_sha256"] != entry["sha256"]:
+    if compare_digest and record["file_sha256"] != entry["sha256"]:
         raise SpotFileError(f"box spots for {track['id']}: the seed was built with a different spot file")
     if track.get("origin") == "custom" and record["lev_sha256"] != lev_pin(package):
         raise SpotFileError(f"box spots for {track['id']}: the LEV pin differs from the package")
