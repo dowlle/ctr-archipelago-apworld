@@ -213,6 +213,8 @@ class ctrAPWorld(World):
     @classmethod
     def stage_modify_multidata(cls, multiworld, multidata):
         from .custom_track_datapackage import embed_track_names
+        from .track_origins import preserve_legacy_package
+        preserve_legacy_package(multiworld, multidata, cls.game)
         embed_track_names(multiworld, multidata, cls.game)
 
     def set_rules(self):

@@ -2732,7 +2732,6 @@ def validate(plan):
             code = track["letters"]
             require(track.get("origin") == "custom" and "named_block" in track and "ctr" in track.get("modes", ())
                     and isinstance(code, str) and len(code) == len(set(code)) == 3
-                    and code != track_origins.DEFAULT
                     and set(code) <= set(track_origins.DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS),
                     "invalid origin letter code")
     checks, requirements = table("checks", "location"), table("requirements")

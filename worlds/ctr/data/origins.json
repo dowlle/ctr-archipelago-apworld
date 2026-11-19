@@ -183,12 +183,12 @@
     "android-alley-n-gage": {
       "evidence": [
         {
-          "note": "Android alley reimagined from cnk n-gage version Play multiple gamemodes in its custom rom:",
+          "note": "Anfrost identifies the N-Gage version of Android Alley as the source.",
           "url": "https://www.projectsaphi.com/tracks/11"
         },
         {
           "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
-          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=1321s"
+          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=962s"
         }
       ],
       "origin_game": "crash-nitro-kart-n-gage",
@@ -214,7 +214,7 @@
         },
         {
           "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
-          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=962s"
+          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=1321s"
         }
       ],
       "origin_game": "crash-nitro-kart-n-gage",
@@ -437,7 +437,7 @@
     "inferno-island": {
       "evidence": [
         {
-          "note": "Course title: Inferno Island.",
+          "note": "Boxic identifies this as a PS1 remake of Inferno Island from Crash Nitro Kart.",
           "url": "https://www.projectsaphi.com/tracks/26"
         }
       ],

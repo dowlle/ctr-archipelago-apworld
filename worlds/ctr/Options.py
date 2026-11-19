@@ -528,6 +528,8 @@ class RelicPerfectChecks(Toggle):
 class TrackOriginLetters(DefaultOnToggle):
     """Use the origin game's letters on verified custom tracks that ship those models."""
     display_name = "Track Origin Letters"
+    # The emitted track code is already shown in the content-plan spoiler.
+    visibility = Visibility.all & ~Visibility.spoiler
 
 
 class Lettersanity(Choice):
