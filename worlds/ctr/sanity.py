@@ -21,6 +21,7 @@ SUFFIXES = ("Weapon Crate", "Wumpa Crate", "Wumpa Fruit")
 BUDGETS = (80, 16, 32)
 NAMED_BASE = 37200000
 FEATURES = ("itemboxsanity_v1", "wumpasanity_v1")
+EXCLUSIONS_FEATURE = "sanity_exclusions_v2"
 # Retail LevelID order, not the datapackage's BOX_TRACKS order.
 COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 2, 9), (13, 2, 0), (24, 4, 0), (20, 6, 0), (22, 3, 0),
@@ -90,9 +91,8 @@ def eligible(track, family, record, item_boxes, package, capability=None):
     if inv is None:
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
-    # Reviewed exclusions are keyed by exact LEV and model family: custom revisions, the retail Roo's
-    # Tubes weapon crate and the Hot Air Skyway Wumpa crate. Fruit has none.
-    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family])
+    # Older rooms selected their picks using the original exclusion catalog.
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], record.get("exclusion_version", 1))
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
@@ -118,6 +118,13 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
     if not ruled:
         record.pop("logic_difficulty", None)
         record.pop("boost_blue_fire", None)
+    for track in tracks:
+        inv = inventory(track, packages.get(track.get("package_id")))
+        if inv and any(c.get("sanity_since", 1) == crate_exclusions.SANITY_VERSION
+                       and c.get("family", KINDS[0]) in enabled
+                       for c in crate_exclusions.EXCLUSIONS.get(inv["lev_sha256"], ())):
+            record["exclusion_version"] = crate_exclusions.SANITY_VERSION
+            break
     record["shortcut_knowledge"] = tier
     seen = set()
     for track in tracks:
@@ -201,7 +208,10 @@ def validate(record, plan):
             raise OptionError("CTR sanity: " + why)
     base = {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}
     context = {"logic_difficulty", "boost_blue_fire"}
-    require(type(record) is dict and set(record) in (base, base | context), "record shape")
+    require(type(record) is dict and set(record) - {"exclusion_version"} in (base, base | context), "record shape")
+    if "exclusion_version" in record:
+        require(type(record["exclusion_version"]) is int and record["exclusion_version"] == crate_exclusions.SANITY_VERSION,
+                "exclusion version")
     if "logic_difficulty" in record:
         require(type(record["logic_difficulty"]) is int and record["logic_difficulty"] in (0, 1, 2), "logic difficulty")
         require(type(record["boost_blue_fire"]) is bool, "Blue Fire setting")

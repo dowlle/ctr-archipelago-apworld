@@ -3,5 +3,7 @@
   "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee": [{"ordinal": 1, "pos": [0, 0, 0]}],
   "17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c": [{"ordinal": 1, "pos": [0, 0, 0]}],
   "d62e91af717d1ed16459f181e9bf944cc1c5e3ff272a89cb244bb59a87c3bfcc": [{"ordinal": 9, "pos": [0, 0, 0]}],
-  "7347cd50591736199bca22dceca9d32af82fde9fd079cc7b61c4a401a8cb7b3a": [{"family": "wumpa_crate", "ordinal": 4, "pos": [4884, -1699, 5680]}]
+  "7347cd50591736199bca22dceca9d32af82fde9fd079cc7b61c4a401a8cb7b3a": [{"family": "wumpa_crate", "ordinal": 4, "pos": [4884, -1699, 5680]}],
+  "467f83758d3a0b6aef9f340b144d0d76eb6ca04617aa87d6bc7727fb1d119c96": [{"ordinal": 1, "pos": [0, 0, 0], "sanity_since": 2}],
+  "c978c26a86f5c85d37a665f62ba8b3efd11cb93b71e931b2787f7c7e9f105ae2": [{"ordinal": 1, "pos": [0, 0, 0], "sanity_since": 2}]
 }

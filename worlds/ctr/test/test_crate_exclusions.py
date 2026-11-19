@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from Options import OptionError
-from .. import crate_exclusions, content_item_boxes, content_plan, box_spots
+from .. import crate_exclusions, content_item_boxes, content_plan, box_spots, sanity
 from .test_content_item_boxes import btp, box_options, first_world, boxes
 from .test_content_plan import make_world
 
@@ -25,6 +25,15 @@ ANCIENT_LAKE = ("256d1ed4597aacd081d2806130c28969681ce35df5a5ba53200545cbd1835eb
 NORTH_POLE = "17eafea4884285d2d1b6e684519081955347b96196783d06d984f06d72105e3c"
 ROOS_TUBES = "d62e91af717d1ed16459f181e9bf944cc1c5e3ff272a89cb244bb59a87c3bfcc"
 HOT_AIR_SKYWAY = "7347cd50591736199bca22dceca9d32af82fde9fd079cc7b61c4a401a8cb7b3a"
+MATSURI = "467f83758d3a0b6aef9f340b144d0d76eb6ca04617aa87d6bc7727fb1d119c96"
+LOCKBOX_4 = "c978c26a86f5c85d37a665f62ba8b3efd11cb93b71e931b2787f7c7e9f105ae2"
+
+
+def matsuri():
+    p = ancient(27, MATSURI)
+    p.update(content_id="matsuri", display_name="Matsuri", id="package/matsuri/1.0.0", revision="1.0.0")
+    p["capabilities"].update(fruit_crates=3, loose_fruit=0)
+    return p
 
 
 def north_pole(crates=29):
@@ -41,7 +50,8 @@ def north_pole(crates=29):
 @patch.dict(box_spots.CUSTOM_FILES, {}, clear=True)
 class TestCrateExclusions(unittest.TestCase):
     def test_catalog_pins_exact_digests(self):
-        self.assertEqual(set(crate_exclusions.EXCLUSIONS), {*ANCIENT_LAKE, NORTH_POLE, ROOS_TUBES, HOT_AIR_SKYWAY})
+        self.assertTrue({*ANCIENT_LAKE, NORTH_POLE, ROOS_TUBES, HOT_AIR_SKYWAY, MATSURI}
+                        <= crate_exclusions.EXCLUSIONS.keys())
         # Maintainer ruling, 2026-11-10: the dev-placed Roo's Tubes crate 9 lies fully outside the track.
         self.assertEqual(crate_exclusions.EXCLUSIONS[ROOS_TUBES], [{"ordinal": 9, "pos": [0, 0, 0]}])
         self.assertEqual(crate_exclusions.EXCLUSIONS[NORTH_POLE], [{"ordinal": 1, "pos": [0, 0, 0]}])
@@ -50,6 +60,48 @@ class TestCrateExclusions(unittest.TestCase):
                          [{"family": "wumpa_crate", "ordinal": 4, "pos": [4884, -1699, 5680]}])
         self.assertEqual(crate_exclusions.ordinals(HOT_AIR_SKYWAY, "wumpa_crate"), {4})
         self.assertEqual(crate_exclusions.ordinals(HOT_AIR_SKYWAY), set())  # not a weapon crate
+
+    def test_matsuri_seats_and_legacy_sanity_restore(self):
+        options = box_options(custom=[matsuri()], itemboxsanity=50, wumpasanity="both")
+        with patch.dict(crate_exclusions.EXCLUSIONS, {MATSURI: []}):
+            legacy = json.loads(json.dumps(first_world(options).fill_slot_data()))
+        fresh = json.loads(json.dumps(first_world(options).fill_slot_data()))
+        plan = fresh["content_plan"]
+        row, = plan["item_boxes"][crate_exclusions.KEY]
+        self.assertEqual(row["lev_sha256"], MATSURI)
+        self.assertEqual(row["crates"], [{"ordinal": 1, "pos": [0, 0, 0]}])
+        self.assertEqual(len(boxes(plan, row["track_id"])), 15)
+        self.assertEqual(plan["sanity"]["exclusion_version"], 2)
+        self.assertIn(sanity.EXCLUSIONS_FEATURE, plan["required_features"])
+        self.assertNotIn("exclusion_version", legacy["content_plan"]["sanity"])
+        for wire, eligible in ((legacy, list(range(1, 28))), (fresh, list(range(2, 28)))):
+            current = wire["content_plan"]
+            track = next(t for t in current["sanity"]["tracks"] if t["lev_sha256"] == MATSURI)
+            seated = {eligible[i] for i in content_item_boxes.seat_indices(len(eligible), 15)}
+            self.assertEqual(track["weapon_crate"], sorted(set(eligible) - seated))
+            self.assertEqual(track["wumpa_crate"], [1, 2, 3])
+            restored = make_world({}, seed=999, passthrough=wire)
+            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        for version in (True, 1, 3):
+            bad = copy.deepcopy(plan)
+            bad["sanity"]["exclusion_version"] = version
+            with self.assertRaises(OptionError):
+                content_plan.validate(bad)
+
+    def test_matsuri_wumpa_only_uses_original_sanity_version(self):
+        plan = first_world(box_options(custom=[matsuri()], wumpasanity="both")).ctr_content_plan
+        self.assertNotIn("exclusion_version", plan["sanity"])
+        self.assertNotIn(sanity.EXCLUSIONS_FEATURE, plan["required_features"])
+
+    def test_lockbox_north_pole_emits_its_own_pin(self):
+        p = ancient(29, LOCKBOX_4)
+        p.update(content_id="lockbox-adventure-track-4", display_name="Lockbox Adventure track 4",
+                 id="package/lockbox-adventure-track-4/1.0.0", revision="1.0.0")
+        plan = first_world(box_options(custom=[p])).ctr_content_plan
+        row, = plan["item_boxes"][crate_exclusions.KEY]
+        self.assertEqual(row["lev_sha256"], LOCKBOX_4)
+        self.assertEqual(row["crates"], [{"ordinal": 1, "pos": [0, 0, 0]}])
+        self.assertEqual(content_item_boxes.crate_count(p, plan["item_boxes"], row["track_id"]), 28)
 
     def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
         p = ancient(24, HOT_AIR_SKYWAY)
