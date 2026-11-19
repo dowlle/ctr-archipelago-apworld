@@ -53,7 +53,8 @@ def legacy_option_world(world):
     """The old alphabet of registered names for options rolled before the plan."""
     from .item_groups import letter_item_names
 
-    item_names = frozenset(name for name, code in world.item_name_to_id.items() if not _origin_item(code))
+    item_ids = {name: code for name, code in world.item_name_to_id.items() if not _origin_item(code)}
+    item_names = frozenset(item_ids)
     locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
     named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
     item_groups = dict(world.item_name_groups)
@@ -79,6 +80,8 @@ def prune_unused_option_names(world):
     links = world.options.item_links
     if FEATURE not in plan["required_features"] and hasattr(links, "legacy_value"):
         links.value = links.legacy_value
+    elif hasattr(links, "legacy_value"):
+        links.verify_origin_locality(type(world), {world.item_id_to_name[code] for code in items if _origin_item(code)})
 
 
 def restore_legacy_link_pools(multiworld, world_type):
@@ -104,6 +107,8 @@ def restore_legacy_link_pools(multiworld, world_type):
         for name in excluded:
             pool -= groups.get(name, {name})
         group["item_pool"] = pool
+        group["local_items"] &= pool
+        group["non_local_items"] &= pool
 
 
 def preserve_legacy_package(multiworld, multidata, game):

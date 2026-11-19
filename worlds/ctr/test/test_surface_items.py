@@ -3,7 +3,7 @@ import random
 import unittest
 
 from BaseClasses import ItemClassification, PlandoOptions
-from Options import ExcludeLocations, PlandoItem, StartHints
+from Options import ExcludeLocations, OptionError, PlandoItem, StartHints
 
 from worlds.ctr.Items import load_item_table
 
@@ -62,6 +62,23 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
 
 
 class TestOriginLetterGroups(unittest.TestCase):
+    def test_item_links_ignore_locality_conflicts_for_unused_origin_letters(self):
+        from ..named_tracks import ORIGIN_ITEM_RANGE
+
+        first, last = ORIGIN_ITEM_RANGE
+        legacy_letters = sorted(name for name in ctrAPWorld.item_name_groups["CTR Letters"]
+                                if not first <= ctrAPWorld.item_name_to_id[name] <= last)
+        link_type = ctrAPWorld.options_dataclass.type_hints["item_links"]
+        option = link_type.from_any([{
+            "name": "Letters", "item_pool": ["Everything"], "exclude": legacy_letters,
+            "local_items": ["CTR Letters"], "non_local_items": ["CTR Letters"], "replacement_item": None,
+        }])
+        option.verify(ctrAPWorld, "ContentPlan", PlandoOptions.none)
+        self.assertNotIn("Letter N (Inferno Island)", option.legacy_value[0]["item_pool"])
+        option.verify_origin_locality(ctrAPWorld, set())
+        with self.assertRaisesRegex(OptionError, "Letter N .*local_items and non_local_items"):
+            option.verify_origin_locality(ctrAPWorld, {"Letter N (Inferno Island)"})
+
     def test_legacy_group_expansion_preserves_the_tight_item_pool_and_hint_text(self):
         excluded = ExcludeLocations.from_any(["Acid Lake"])
         hints = StartHints.from_any(["CTR Letters"])

@@ -1,7 +1,7 @@
 """Keep early YAML rolls stable when the origin-letter registry grows."""
 from dataclasses import dataclass
 
-from Options import (ExcludeLocations, ItemLinks, LocalItems, NonLocalItems,
+from Options import (ExcludeLocations, ItemLinks, LocalItems, NonLocalItems, OptionError,
                      PerGameCommonOptions as APCommonOptions, PlandoItems,
                      PriorityLocations, StartHints, StartLocationHints)
 
@@ -60,7 +60,27 @@ class CTRItemLinks(ItemLinks):
             old = ItemLinks.from_any(self.value)
             old.verify(old_view._replace(item_names=world.item_names), player_name, plando_options)
             self.legacy_value = old.value
+            # The stock verifier has already checked both locality lists against
+            # the legacy pool. Newly registered letters can be checked when the
+            # plan tells us which of them are actually in this slot's pool.
+            non_local = [link.pop("non_local_items", None) for link in self.value]
+            super().verify(world, player_name, plando_options)
+            for link, names in zip(self.value, non_local):
+                if names is not None:
+                    link["non_local_items"] = names
+            return
         super().verify(world, player_name, plando_options)
+
+    def verify_origin_locality(self, world, origin_items):
+        if not origin_items:
+            return
+        for link in self.value:
+            local = self.verify_items(link.get("local_items", ()), link["name"], "local_items", world)
+            non_local = self.verify_items(link.get("non_local_items", ()), link["name"], "non_local_items", world)
+            overlap = local & non_local & origin_items & set(link["item_pool"])
+            if overlap:
+                raise OptionError(f"item_link {link['name']} has {sorted(overlap)} items in both its local_items "
+                                  "and non_local_items pool.")
 
 
 @dataclass
