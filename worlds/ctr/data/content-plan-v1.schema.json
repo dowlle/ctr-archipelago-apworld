@@ -140,7 +140,7 @@
           "wumpasanity_v1"
         ]
       },
-      "maxItems": 38,
+      "maxItems": 39,
       "minItems": 1,
       "uniqueItems": true
     },
