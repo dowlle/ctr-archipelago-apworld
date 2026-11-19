@@ -101,6 +101,7 @@
           "wumpa_goal_v1",
           "pad_client_v1",
           "lap_checks_v1",
+          "origin_letters_v1",
           "box_spots_v1",
           "box_count_v1",
           "itemboxsanity_v1",
@@ -638,6 +639,12 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 9999
+            },
+            "letters": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z0-9]{3}$"
             },
             "room_title": {
               "type": "string",

@@ -525,6 +525,11 @@ class RelicPerfectChecks(Toggle):
     display_name = "Relic Race Perfect Checks"
 
 
+class TrackOriginLetters(DefaultOnToggle):
+    """Use the origin game's letters on verified custom tracks that ship those models."""
+    display_name = "Track Origin Letters"
+
+
 class Lettersanity(Choice):
     """Choose whether the C, T and R letters are checks, items, or both. Every
     track with a CTR Challenge has the three letters.
@@ -1832,6 +1837,7 @@ class ctrAPOptions(PerGameCommonOptions):
     cup_only_podium_rungs: CupOnlyPodiumRungs
     relic_perfect_checks: RelicPerfectChecks
     lettersanity: Lettersanity
+    track_origin_letters: TrackOriginLetters
     letters_per_track: LettersPerTrack
     cup_sweep_checks: CupSweepChecks
     lap_completion_checks: LapCompletionChecks
@@ -1904,7 +1910,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
+    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],

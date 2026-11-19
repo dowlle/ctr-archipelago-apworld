@@ -1,0 +1,753 @@
+{
+  "format": 1,
+  "games": {
+    "crash-bandicoot": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Crash Bandicoot"
+    },
+    "crash-bandicoot-nitro-kart-2": {
+      "code": "CNK",
+      "racing_game": true,
+      "title": "Crash Bandicoot Nitro Kart 2"
+    },
+    "crash-bandicoot-warped": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Crash Bandicoot Warped"
+    },
+    "crash-nitro-kart": {
+      "code": "CNK",
+      "racing_game": true,
+      "title": "Crash Nitro Kart"
+    },
+    "crash-nitro-kart-gba": {
+      "code": "CNK",
+      "racing_game": true,
+      "title": "Crash Nitro Kart (Game Boy Advance)"
+    },
+    "crash-nitro-kart-n-gage": {
+      "code": "CNK",
+      "racing_game": true,
+      "title": "Crash Nitro Kart (N-Gage)"
+    },
+    "crash-team-racing": {
+      "code": "CTR",
+      "racing_game": true,
+      "title": "Crash Team Racing"
+    },
+    "crash-wrath-of-cortex": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Crash Bandicoot: The Wrath of Cortex"
+    },
+    "ctr-nitro-fueled": {
+      "code": "CTR",
+      "racing_game": true,
+      "title": "Crash Team Racing Nitro-Fueled"
+    },
+    "deltarune": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Deltarune"
+    },
+    "diddy-kong-racing": {
+      "code": "DKR",
+      "racing_game": true,
+      "title": "Diddy Kong Racing"
+    },
+    "jak-ii": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Jak II"
+    },
+    "lolo-racing-gp": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Lolo Racing GP"
+    },
+    "looney-tunes-racing": {
+      "code": "LTR",
+      "racing_game": true,
+      "title": "Looney Tunes Racing"
+    },
+    "mario-kart-64": {
+      "code": "M64",
+      "racing_game": true,
+      "title": "Mario Kart 64"
+    },
+    "mario-kart-7": {
+      "code": "MK7",
+      "racing_game": true,
+      "title": "Mario Kart 7"
+    },
+    "mario-kart-8": {
+      "code": "MK8",
+      "racing_game": true,
+      "title": "Mario Kart 8"
+    },
+    "mario-kart-double-dash": {
+      "code": "MKG",
+      "racing_game": true,
+      "title": "Mario Kart: Double Dash!!"
+    },
+    "mario-kart-ds": {
+      "code": "MDS",
+      "racing_game": true,
+      "title": "Mario Kart DS"
+    },
+    "mario-kart-super-circuit": {
+      "code": "MSC",
+      "racing_game": true,
+      "title": "Mario Kart Super Circuit"
+    },
+    "mario-kart-wii": {
+      "code": "MKW",
+      "racing_game": true,
+      "title": "Mario Kart Wii"
+    },
+    "mashup": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Mixed origins"
+    },
+    "original": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Original course"
+    },
+    "sled-storm": {
+      "code": "SLD",
+      "racing_game": true,
+      "title": "Sled Storm"
+    },
+    "spyro-2": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Spyro 2"
+    },
+    "spyro-3": {
+      "code": "CTR",
+      "racing_game": false,
+      "title": "Spyro 3"
+    },
+    "super-mario-kart": {
+      "code": "SMK",
+      "racing_game": true,
+      "title": "Super Mario Kart"
+    },
+    "the-karters-2": {
+      "code": "CTR",
+      "racing_game": true,
+      "title": "The Karters 2"
+    },
+    "toy-story-racer": {
+      "code": "TSR",
+      "racing_game": true,
+      "title": "Toy Story Racer"
+    },
+    "virtua-racing": {
+      "code": "VRC",
+      "racing_game": true,
+      "title": "Virtua Racing"
+    },
+    "wipeout-3": {
+      "code": "WO3",
+      "racing_game": true,
+      "title": "Wip3out"
+    }
+  },
+  "tracks": {
+    "acid-lake": {
+      "evidence": [
+        {
+          "note": "Based on the unused Crash 1 level",
+          "url": "https://www.projectsaphi.com/tracks/121"
+        }
+      ],
+      "origin_game": "crash-bandicoot",
+      "relation": "level",
+      "review": "verified"
+    },
+    "ancient-lake": {
+      "evidence": [
+        {
+          "note": "Port from diddy kong racing",
+          "url": "https://www.projectsaphi.com/tracks/56"
+        }
+      ],
+      "origin_game": "diddy-kong-racing",
+      "relation": "port",
+      "review": "verified"
+    },
+    "android-alley-n-gage": {
+      "evidence": [
+        {
+          "note": "Android alley reimagined from cnk n-gage version Play multiple gamemodes in its custom rom:",
+          "url": "https://www.projectsaphi.com/tracks/11"
+        },
+        {
+          "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
+          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=1321s"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-n-gage",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "arctic-alleyway": {
+      "evidence": [
+        {
+          "note": "Track based off the first level of TWOC",
+          "url": "https://www.projectsaphi.com/tracks/38"
+        }
+      ],
+      "origin_game": "crash-wrath-of-cortex",
+      "relation": "level",
+      "review": "verified"
+    },
+    "assembly-lane-n-gage": {
+      "evidence": [
+        {
+          "note": "Course title: Assembly Lane N-Gage.",
+          "url": "https://www.projectsaphi.com/tracks/63"
+        },
+        {
+          "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
+          "url": "https://www.youtube.com/watch?v=jZSO_8r5hLw&t=962s"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-n-gage",
+      "relation": "port",
+      "review": "verified"
+    },
+    "big-forest": {
+      "evidence": [
+        {
+          "note": "From Virtua Racing",
+          "url": "https://www.projectsaphi.com/tracks/49"
+        }
+      ],
+      "origin_game": "virtua-racing",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "bowser-castle-1": {
+      "evidence": [
+        {
+          "note": "Old track #2. Not as pretty as Choco Island 2 but I'm still OK enough to upload this one. Bowser Castle 1 from SNES SMK.",
+          "url": "https://www.projectsaphi.com/tracks/65"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "breeze-harbor": {
+      "evidence": [
+        {
+          "note": "Breeze Harbor from Spyro 2 but reimagined as a CTR track. v1.2.0 - added minimap v1.1.0 - added vistree - added z-depth corrections",
+          "url": "https://www.projectsaphi.com/tracks/3"
+        }
+      ],
+      "origin_game": "spyro-2",
+      "relation": "level",
+      "review": "verified"
+    },
+    "choco-island-2": {
+      "evidence": [
+        {
+          "note": "Old track #1. Don't like most of these but this and the other track I will upload are the exceptions. Video is the old version.",
+          "url": "https://www.projectsaphi.com/tracks/64"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "coco-park-2025": {
+      "evidence": [
+        {
+          "note": "Course title: Coco Park 2025.",
+          "url": "https://www.projectsaphi.com/tracks/14"
+        }
+      ],
+      "origin_game": "crash-team-racing",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "country-speedway": {
+      "evidence": [
+        {
+          "note": "Country Speedway from spyro 3",
+          "url": "https://www.projectsaphi.com/tracks/24"
+        }
+      ],
+      "origin_game": "spyro-3",
+      "relation": "level",
+      "review": "verified"
+    },
+    "cursed-trial-roulette": {
+      "evidence": [
+        {
+          "note": "It's gambling time. Track inspired from :",
+          "url": "https://www.projectsaphi.com/tracks/35"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "deep-sea-driving-n-gage": {
+      "evidence": [
+        {
+          "note": "Course title: Deep Sea Driving N-Gage.",
+          "url": "https://www.projectsaphi.com/tracks/12"
+        },
+        {
+          "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
+          "url": "https://www.youtube.com/watch?v=kbH0sRLNCqQ&t=868s"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-n-gage",
+      "relation": "port",
+      "review": "verified"
+    },
+    "dk-pass": {
+      "evidence": [
+        {
+          "note": "DK Pass from Mario Kart DS.",
+          "url": "https://www.projectsaphi.com/tracks/122"
+        }
+      ],
+      "origin_game": "mario-kart-ds",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "drive-thru-danger": {
+      "evidence": [
+        {
+          "note": "A faithful recreation of the bonus track from CTR: Nitro Fueled - adjusted slightly for OG CTR's gameplay.",
+          "url": "https://www.projectsaphi.com/tracks/1"
+        }
+      ],
+      "origin_game": "ctr-nitro-fueled",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "ds-rainbow-road": {
+      "evidence": [
+        {
+          "note": "Course title: DS Rainbow Road.",
+          "url": "https://www.projectsaphi.com/tracks/32"
+        }
+      ],
+      "origin_game": "mario-kart-ds",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "dust-keepers": {
+      "evidence": [
+        {
+          "note": "Track inspired by Counters Strike map Dust II and Peacekeepers world from Spyro the Dragon. Layout closely resembles that of Dust II while being adjusted for racing purposes.",
+          "url": "https://www.projectsaphi.com/tracks/50"
+        }
+      ],
+      "origin_game": "mashup",
+      "relation": "mashup",
+      "review": "verified"
+    },
+    "garden-speedway": {
+      "evidence": [
+        {
+          "note": "Looney tunes racing port",
+          "url": "https://www.projectsaphi.com/tracks/103"
+        }
+      ],
+      "origin_game": "looney-tunes-racing",
+      "relation": "port",
+      "review": "verified"
+    },
+    "glacier-lagoon": {
+      "evidence": [
+        {
+          "note": "Icy Track in style of Polar Pass",
+          "url": "https://www.projectsaphi.com/tracks/118"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "glazed-dessert": {
+      "evidence": [
+        {
+          "note": "Originaly created for The Karters 2 as a CTR-esque track, it now lives in CTR proper. My first foray in CTR track making.",
+          "url": "https://www.projectsaphi.com/tracks/45"
+        }
+      ],
+      "origin_game": "the-karters-2",
+      "relation": "original",
+      "review": "verified"
+    },
+    "green-hill-raceway": {
+      "evidence": [
+        {
+          "note": "A track inspired by Green Hill Zone from the Sonic series. v1.1.0 (Time trial) - added minimap - fixed zdepth v2.0.0 (Other modes) - Complete visual overhaul thanks to lockheart (see video) - not compatible with current replays, so no time trial on this version, sorry.",
+          "url": "https://www.projectsaphi.com/tracks/6"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "hasty-hedges": {
+      "evidence": [
+        {
+          "note": "Beginner track in Lolo Racing GP.",
+          "url": "https://www.projectsaphi.com/tracks/113"
+        }
+      ],
+      "origin_game": "lolo-racing-gp",
+      "relation": "original",
+      "review": "verified"
+    },
+    "haven-stadium": {
+      "evidence": [
+        {
+          "note": "Attention all citizens, the Class 3 race is about to begin. From the world of Jak II, it’s the Haven City hoverbike race in CTR! The class 3 race layout has been completely de-made into a PS1 format Be sure to check out the standalone release for additional features, such as a reverse layout, and boss battles against Jak and Daxter!",
+          "url": "https://www.projectsaphi.com/tracks/22"
+        }
+      ],
+      "origin_game": "jak-ii",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "haven-stadium-reverse": {
+      "evidence": [
+        {
+          "note": "Reverse layout of the Class 3 race from Jak II",
+          "url": "https://www.projectsaphi.com/tracks/29"
+        }
+      ],
+      "origin_game": "jak-ii",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "inferno-island": {
+      "evidence": [
+        {
+          "note": "Course title: Inferno Island.",
+          "url": "https://www.projectsaphi.com/tracks/26"
+        }
+      ],
+      "origin_game": "crash-nitro-kart",
+      "own_letter_models": {
+        "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32": "CNK"
+      },
+      "relation": "remake",
+      "review": "verified"
+    },
+    "jungle-boogie-n-gage": {
+      "evidence": [
+        {
+          "note": "Course title: Jungle Boogie N-Gage.",
+          "url": "https://www.projectsaphi.com/tracks/8"
+        },
+        {
+          "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
+          "url": "https://www.youtube.com/watch?v=tK5w1C5ExsA&t=1050s"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-n-gage",
+      "relation": "port",
+      "review": "verified"
+    },
+    "lava-lane": {
+      "evidence": [
+        {
+          "note": "A Volcano track with some familiar ruins from the OG Crash trilogy",
+          "url": "https://www.projectsaphi.com/tracks/37"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "lights-out": {
+      "evidence": [
+        {
+          "note": "Dive into the depths of Cortex Island's tower for a frantic race through the darkness, across the narrow and iconic corridors of the original level.",
+          "url": "https://www.projectsaphi.com/tracks/28"
+        }
+      ],
+      "origin_game": "crash-bandicoot",
+      "relation": "level",
+      "review": "verified"
+    },
+    "mario-circuit-1": {
+      "evidence": [
+        {
+          "note": "Based off Super Mario Kart - beginner track as intended.",
+          "url": "https://www.projectsaphi.com/tracks/53"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "mario-circuit-2": {
+      "code_override": "CTR",
+      "corrected_by": "maintainer",
+      "evidence": [
+        {
+          "note": "If Turbo Track and Mario Circuit had a baby",
+          "url": "https://www.projectsaphi.com/tracks/27"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "mashup",
+      "review": "verified"
+    },
+    "mario-raceway-n64": {
+      "evidence": [
+        {
+          "note": "Port from mario kart 64",
+          "url": "https://www.projectsaphi.com/tracks/36"
+        }
+      ],
+      "origin_game": "mario-kart-64",
+      "relation": "port",
+      "review": "verified"
+    },
+    "neonstadion": {
+      "evidence": [
+        {
+          "note": "Futuristic Tiny Arena",
+          "url": "https://www.projectsaphi.com/tracks/61"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "out-of-time-n-gage": {
+      "evidence": [
+        {
+          "note": "Course title: Out Of Time N-Gage.",
+          "url": "https://www.projectsaphi.com/tracks/43"
+        },
+        {
+          "note": "Original N-Gage gameplay shows landmarks matching Anfrost's course.",
+          "url": "https://www.youtube.com/watch?v=EkZ5Y5Ypm4U&t=1422s"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-n-gage",
+      "relation": "port",
+      "review": "verified"
+    },
+    "royal-raceway": {
+      "evidence": [
+        {
+          "note": "Course title: Royal Raceway.",
+          "url": "https://www.projectsaphi.com/tracks/120"
+        }
+      ],
+      "origin_game": "mario-kart-64",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "sampa-run": {
+      "evidence": [
+        {
+          "note": "The Sampa Run racetrack from the PS1 game Wip3out",
+          "url": "https://www.projectsaphi.com/tracks/31"
+        }
+      ],
+      "origin_game": "wipeout-3",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "sewer-baby-park": {
+      "evidence": [
+        {
+          "note": "Course title: Sewer Baby Park.",
+          "url": "https://github.com/dowlle/ctr-track-registry/blob/main/tracks/sewer-baby-park.json"
+        }
+      ],
+      "origin_game": "mashup",
+      "relation": "mashup",
+      "review": "unverified"
+    },
+    "sid-house": {
+      "evidence": [
+        {
+          "note": "Port from toy story racer",
+          "url": "https://www.projectsaphi.com/tracks/59"
+        }
+      ],
+      "origin_game": "toy-story-racer",
+      "relation": "port",
+      "review": "verified"
+    },
+    "sids-house": {
+      "evidence": [
+        {
+          "note": "Course title: Sid's House.",
+          "url": "https://github.com/dowlle/ctr-track-registry/blob/main/tracks/sids-house.json"
+        }
+      ],
+      "origin_game": "toy-story-racer",
+      "relation": "port",
+      "review": "unverified"
+    },
+    "skater-s-retreat": {
+      "evidence": [
+        {
+          "note": "A chill skate park track on the city coast inspired by the likes of the tony hawk game series, with custom original music. This track is very open and gives creative freedom to the player on how they want to traverse it, with many different ramps, pools and even rails for you to use. Have fun and don't forget to do a kickflip (you can't) v1.1.0 - added minimap",
+          "url": "https://www.projectsaphi.com/tracks/42"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "snes-bowser-s-castle-2": {
+      "evidence": [
+        {
+          "note": "This is not a new update. I'm just putting this up so folks can play it. This was my second ever custom track that I made in December 2024, and then I updated it some months later. That version is what's here. I do not plan on updating this any further.",
+          "url": "https://www.projectsaphi.com/tracks/52"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "snowfall-keep": {
+      "evidence": [
+        {
+          "note": "A unique remake of CNK GBA's Meteor Gorge, set in an abandoned castle on a snowy night, surrounded by a lake.",
+          "url": "https://www.projectsaphi.com/tracks/54"
+        }
+      ],
+      "origin_game": "crash-nitro-kart-gba",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "sunken-sprint": {
+      "evidence": [
+        {
+          "note": "So my last track, TV World, was a pretty long track. In fact, my longest track yet. So what do I decide to do next? Make an even longer one. This is Sunken Sprint, a deep sea underwater track that takes elements and inspiration from Crash 3's underwater levels, and the level \"Beach Ball\" from Crash Bash. This is my first track to feature ANIMATED INSTANCE MODELS! I learned how to animate in blender for this track, and it's going to allow me to do so much more in future tracks, so look forward to that. The music this time around was made by the talented aRBee!",
+          "url": "https://www.projectsaphi.com/tracks/123"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "super-snocross-2": {
+      "evidence": [
+        {
+          "note": "The Super Snocross 2 racetrack from the PS1 game, Sled Storm",
+          "url": "https://www.projectsaphi.com/tracks/30"
+        }
+      ],
+      "origin_game": "sled-storm",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "toasty-terrace": {
+      "evidence": [
+        {
+          "note": "Inspired spyro track",
+          "url": "https://www.projectsaphi.com/tracks/39"
+        }
+      ],
+      "origin_game": "original",
+      "relation": "inspired",
+      "review": "verified"
+    },
+    "tomb-temple": {
+      "evidence": [
+        {
+          "note": "Based off Crash Bandicoot Warped.",
+          "url": "https://www.projectsaphi.com/tracks/51"
+        }
+      ],
+      "origin_game": "crash-bandicoot-warped",
+      "relation": "level",
+      "review": "verified"
+    },
+    "tv-world": {
+      "evidence": [
+        {
+          "note": "A track based on a location in Deltarune Chapter 3. v1.1.0 - Added relic race and CTR challenge game modes (video coming soon) - Updated minimap - Fixed problematic kill plane Warning: v1.0.0 replays will desync on this version",
+          "url": "https://www.projectsaphi.com/tracks/100"
+        }
+      ],
+      "origin_game": "deltarune",
+      "relation": "level",
+      "review": "verified"
+    },
+    "vanilla-lake-2": {
+      "evidence": [
+        {
+          "note": "Made by NiikCTR/Nyxx, textured by Lolo",
+          "url": "https://www.projectsaphi.com/tracks/117"
+        }
+      ],
+      "origin_game": "super-mario-kart",
+      "relation": "remake",
+      "review": "unverified"
+    },
+    "wario-stadium": {
+      "corrected_by": "maintainer",
+      "evidence": [
+        {
+          "note": "Track made by PanchoPewPew, retextured by Lolo.",
+          "url": "https://www.projectsaphi.com/tracks/55"
+        },
+        {
+          "note": "Recorded as the Mario Kart 64 course. Mario Kart DS has a course with the same title.",
+          "url": "https://www.mariowiki.com/Wario_Stadium"
+        }
+      ],
+      "origin_game": "mario-kart-64",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "wumpa-world": {
+      "evidence": [
+        {
+          "note": "Lolo Racing GP track",
+          "url": "https://www.projectsaphi.com/tracks/114"
+        }
+      ],
+      "origin_game": "lolo-racing-gp",
+      "relation": "original",
+      "review": "verified"
+    },
+    "yoshi-circuit": {
+      "evidence": [
+        {
+          "note": "A long overdue update to the Yoshi Circuit track I made all the way back in January 2025. Now with several game modes! The reason this is a separate track is that there are several changes to the track that make it play differently to the old one, so if folks prefer how the old one plays, it's still there. These changes are things such as: - Restricted USF: Now you can only keep USF until the first tunnel. This aims to help even the competitive playing field and make the track more viable for eventual online play. - Mesh adjustments: Alongside being vastly cleaned up, there are some small changes to the track's mesh to make it easier to play and for certain tricks to be more consistent. For the most part though, it is the same as the original. Custom music by Oscrashbandicoot Video soon™ Changelog v1.1.0 - patched a way to skip the turbo pad in the tunnel with USF - removed a few turbo pads to make getting saffi harder",
+          "url": "https://www.projectsaphi.com/tracks/110"
+        }
+      ],
+      "origin_game": "mario-kart-double-dash",
+      "relation": "remake",
+      "review": "verified"
+    },
+    "yoshi-circuit-legacy": {
+      "evidence": [
+        {
+          "note": "A recreation of Yoshi Circuit from double dash - tweaked to fit with CTR gameplay. v1.1.0 - added minimap - fixed some zdepth",
+          "url": "https://www.projectsaphi.com/tracks/7"
+        }
+      ],
+      "origin_game": "mario-kart-double-dash",
+      "relation": "remake",
+      "review": "verified"
+    }
+  }
+}

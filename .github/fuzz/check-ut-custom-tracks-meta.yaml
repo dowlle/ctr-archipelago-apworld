@@ -1,10 +1,14 @@
 # Universal Tracker arm with a custom track (check-ut-custom-tracks in
-# .github/workflows/ctr-world.yml). Every seed gives Baby T Park a pad, with the
-# package descriptor of the published files. Everything else is randomized by the
+# .github/workflows/ctr-world.yml). Every seed gives Baby T Park and Inferno
+# Island a pad with their published package descriptors. The rest is randomized by the
 # fuzzer, as in the check-ut arm. accessibility: full makes a tracker
 # divergence show up as checks the server reached and the tracker did not.
 Crash Team Racing:
   accessibility: full
+  lettersanity: locations_and_items
+  letters_per_track: 3
+  track_origin_letters: true
+  track_modes: {default: [trophy, ctr, relic], inferno-island: [trophy, ctr]}
   custom_tracks:
     - id: package/baby-t-park/1.0.2
       content_id: baby-t-park
@@ -18,7 +22,19 @@ Crash Team Racing:
         - {role: lev, sha256: be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8, bytes: 2558168, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: 1a0ff56b51562292ecc30c14e7a2e6d315f641feaa00990d4242abe46434f692, bytes: 458808, format: ctr-vrm, format_version: 1}
       evidence: []
-  required_entries: [baby-t-park]
+    - id: package/inferno-island/1.3.0
+      content_id: inferno-island
+      uuid: 8727e109-c839-5382-9547-e2730ac77906
+      revision: "1.3.0"
+      display_name: Inferno Island
+      author: Boxic
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: true, wumpa: true, super_turbo_pads: false, weapon_crates: 17, checkpoints: 70, ai_nav: true}
+      files:
+        - {role: lev, sha256: d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32, bytes: 870760, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 9231bdf31d37808e6951d34bd808da7c7ea9cbc417fcd4d80f956b413b3b95e2, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [baby-t-park, inferno-island]
   # Random sets and switches here refuse most seeds, and a refused seed tests
   # nothing: Crystal Challenge Count above the listed arenas, cups the listed
   # tracks cannot fill, a boss pool too small, a gauntlet without its parts, and
