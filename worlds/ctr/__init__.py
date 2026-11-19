@@ -198,13 +198,19 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
-            from . import content_item_boxes, tizi_madness
+            from . import content_item_boxes, tizi_madness, track_origins
             content_item_boxes.settings(self.options)
             # A4-96: Tizi Madness only with hard shortcut knowledge.
             tizi_madness.leave_out_below_hard(self)
             content_plan.generate(self)
+            track_origins.prune_unused_option_names(self)
         from .notices import emit_summary
         emit_summary(self)
+
+    @classmethod
+    def stage_generate_early(cls, multiworld):
+        from .track_origins import restore_legacy_link_pools
+        restore_legacy_link_pools(multiworld, cls)
 
     def create_regions(self):
         from . import content_plan
@@ -213,6 +219,8 @@ class ctrAPWorld(World):
     @classmethod
     def stage_modify_multidata(cls, multiworld, multidata):
         from .custom_track_datapackage import embed_track_names
+        from .track_origins import preserve_legacy_package
+        preserve_legacy_package(multiworld, multidata, cls.game)
         embed_track_names(multiworld, multidata, cls.game)
 
     def set_rules(self):

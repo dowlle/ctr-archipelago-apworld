@@ -99,15 +99,16 @@ class TestItemGroups(CTRTestBase):
 
     def test_ctr_letters_is_every_letter_item(self) -> None:
         """Retail, trial, custom slot, Cortex Vortex and named-track letters:
-        every item named "Letter <C|T|R> (<track>)", and nothing else."""
+        every item named "Letter <glyph> (<track>)", and nothing else."""
         letters = {name for name in self.world.item_name_to_id
-                   if re.fullmatch(r"Letter [CTR] \(.+\)", name)}
-        self.assertEqual(len(letters), 714)
+                   if re.fullmatch(r"Letter [A-Z0-9] \(.+\)", name)}
+        self.assertEqual(len(letters), 714 + 87 * 2)
         self.assertEqual(set(self.world.item_name_groups["CTR Letters"]),
                          letters)
         for sample in ("Letter C (Crash Cove)", "Letter R (Tizi Challenge)",
                        "Letter T (Custom Track 1)",
-                       "Letter C (Cortex Vortex)", "Letter T (Acid Lake)"):
+                       "Letter C (Cortex Vortex)", "Letter T (Acid Lake)",
+                       "Letter N (Inferno Island)", "Letter K (Inferno Island)"):
             self.assertIn(sample, letters)
 
     def test_group_sizes(self) -> None:
