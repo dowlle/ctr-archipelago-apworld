@@ -29,6 +29,7 @@ COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
+REVIEWED_PICKUP_PINS = CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS
 CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
 
 
@@ -84,7 +85,7 @@ def inventory(track, package=None, record=None):
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
-            source = track_rulings.source(package, CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS)
+            source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
             if source in CATALOG:
                 return dict(lev_sha256=pin, counts=counts, needs=CATALOG[source]["needs"])
             if source == royal_raceway.LEV_SHA256:
@@ -206,17 +207,15 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
     out = []
     for row in record["tracks"]:
         t = by_id[row["track_id"]]
+        package = (packages or {}).get(t.get("package_id"))
+        source = track_rulings.source(package, REVIEWED_PICKUP_PINS) if package else row["lev_sha256"]
+        need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(source)
         for f, kind in enumerate(KINDS):
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                package = (packages or {}).get(t.get("package_id"))
-                source = (track_rulings.source(package, CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS)
-                          if package else row["lev_sha256"])
-                need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(source)
-                if need is None:
-                    need = dict(needs={kind: {str(n): dict(needs="usf") for n in row[kind]} for kind in KINDS})
-                fields = object_needs(need or {}, kind, n, record)
+                fields = (dict(needs="usf") if need is None or (source != row["lev_sha256"] and n > need["counts"][f])
+                          else object_needs(need, kind, n, record))
                 if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
                 if source == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:

@@ -7,6 +7,8 @@ from functools import wraps
 from .box_spots import lev_pin
 
 FEATURE = "carried_track_rulings_v1"
+# Rows are [LEV SHA-256, revision], latest reviewed first. Preserve the order in
+# the paired native table. Append a reviewed revision through a paired update.
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 _carry = ContextVar("ctr_carry_track_rulings", default=False)
 
@@ -71,8 +73,8 @@ def ruled_value(package, rulings, *selector):
 
 def carried_sources(package):
     """Ruling families inherited by an unreviewed revision."""
-    from . import content_capability, crate_exclusions, sanity
-    from . import country_speedway, green_hill_raceway, royal_raceway, toasty_terrace
+    from . import content_capability, content_item_boxes, crate_exclusions, sanity
+    from . import green_hill_raceway, royal_raceway
 
     content = package.get("content_id")
     pin = lev_pin(package)
@@ -80,9 +82,8 @@ def carried_sources(package):
     if not pin or not reviews or any(pin == reviewed for reviewed, _ in reviews):
         return {}
     families = {
-        "ordinary pickups": set(sanity.CATALOG) | {
-            country_speedway.LEV_SHA256, green_hill_raceway.LEV_SHA256,
-            royal_raceway.LEV_SHA256, toasty_terrace.LEV_SHA256},
+        "ordinary pickups": sanity.CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS,
+        "AP box pickup ranks": content_item_boxes.PICKUP_RULE_PINS,
         "crate exclusions": crate_exclusions.EXCLUSIONS,
         "finish": {digest for key, _, digest in content_capability.USF_FINISH_RULINGS if key == content and digest}
                   | {royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256},
@@ -93,10 +94,15 @@ def carried_sources(package):
         if reviewed:
             result[family] = reviewed
     latest = reviews[0]
-    if any(row[0] == content for row in content_capability.LETTER_BOOST_RULINGS):
-        result["letters"] = (latest[1], latest[0])
-    if any(row[0] == content for row in sanity.object_rulings.RULINGS):
-        result["objects"] = (latest[1], latest[0])
+    for family, rulings, key_size in (("letters", content_capability.LETTER_BOOST_RULINGS, 2),
+                                      ("objects", sanity.object_rulings.RULINGS, 3)):
+        keys = [row for row in rulings if row[0] == content]
+        pins = {row[-1] for row in keys if len(row) > key_size}
+        reviewed = next(((revision, digest) for digest, revision in reviews if digest in pins), None)
+        if reviewed:
+            result[family] = reviewed
+        elif any(len(row) == key_size for row in keys):
+            result[family] = (latest[1], latest[0])
     if "finish" not in result and (content, None, None) in content_capability.USF_FINISH_RULINGS:
         result["finish"] = (latest[1], latest[0])
     return result

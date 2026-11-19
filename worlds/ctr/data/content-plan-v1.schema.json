@@ -1904,8 +1904,11 @@
                   "required": ["ordinal", "pos"],
                   "properties": {
                     "ordinal": {"type": "integer", "minimum": 1, "maximum": 65536},
-                    "pos": {"type": ["array", "null"], "minItems": 3, "maxItems": 3,
-                      "items": {"type": "integer", "minimum": -32768, "maximum": 32767}}
+                    "pos": {"oneOf": [
+                      {"type": "array", "minItems": 3, "maxItems": 3,
+                        "items": {"type": "integer", "minimum": -32768, "maximum": 32767}},
+                      {"type": "null"}
+                    ]}
                   }
                 }
               }
