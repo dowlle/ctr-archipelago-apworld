@@ -72,12 +72,16 @@
         "Acid Lake: Item Box 47": 35200066,
         "Acid Lake: Item Box 48": 35200067,
         "Acid Lake: Item Box 49": 35200068,
-        "Acid Lake: Item Box 50": 35200069
+        "Acid Lake: Item Box 50": 35200069,
+        "Acid Lake: Letter K": 35200151,
+        "Acid Lake: Letter N": 35200154
       },
       "items": {
         "Letter C (Acid Lake)": 35100000,
         "Letter T (Acid Lake)": 35100001,
-        "Letter R (Acid Lake)": 35100002
+        "Letter R (Acid Lake)": 35100002,
+        "Letter K (Acid Lake)": 38500010,
+        "Letter N (Acid Lake)": 38500013
       }
     },
     {
@@ -151,12 +155,16 @@
         "Ancient Lake: Item Box 47": 35200266,
         "Ancient Lake: Item Box 48": 35200267,
         "Ancient Lake: Item Box 49": 35200268,
-        "Ancient Lake: Item Box 50": 35200269
+        "Ancient Lake: Item Box 50": 35200269,
+        "Ancient Lake: Letter K": 35200351,
+        "Ancient Lake: Letter N": 35200354
       },
       "items": {
         "Letter C (Ancient Lake)": 35100005,
         "Letter T (Ancient Lake)": 35100006,
-        "Letter R (Ancient Lake)": 35100007
+        "Letter R (Ancient Lake)": 35100007,
+        "Letter K (Ancient Lake)": 38500046,
+        "Letter N (Ancient Lake)": 38500049
       }
     },
     {
@@ -230,12 +238,16 @@
         "Android Alley N-Gage: Item Box 47": 35200466,
         "Android Alley N-Gage: Item Box 48": 35200467,
         "Android Alley N-Gage: Item Box 49": 35200468,
-        "Android Alley N-Gage: Item Box 50": 35200469
+        "Android Alley N-Gage: Item Box 50": 35200469,
+        "Android Alley N-Gage: Letter K": 35200551,
+        "Android Alley N-Gage: Letter N": 35200554
       },
       "items": {
         "Letter C (Android Alley N-Gage)": 35100010,
         "Letter T (Android Alley N-Gage)": 35100011,
-        "Letter R (Android Alley N-Gage)": 35100012
+        "Letter R (Android Alley N-Gage)": 35100012,
+        "Letter K (Android Alley N-Gage)": 38500082,
+        "Letter N (Android Alley N-Gage)": 38500085
       }
     },
     {
@@ -309,12 +321,16 @@
         "Arabian Heights Day: Item Box 47": 35200666,
         "Arabian Heights Day: Item Box 48": 35200667,
         "Arabian Heights Day: Item Box 49": 35200668,
-        "Arabian Heights Day: Item Box 50": 35200669
+        "Arabian Heights Day: Item Box 50": 35200669,
+        "Arabian Heights Day: Letter K": 35200751,
+        "Arabian Heights Day: Letter N": 35200754
       },
       "items": {
         "Letter C (Arabian Heights Day)": 35100015,
         "Letter T (Arabian Heights Day)": 35100016,
-        "Letter R (Arabian Heights Day)": 35100017
+        "Letter R (Arabian Heights Day)": 35100017,
+        "Letter K (Arabian Heights Day)": 38500118,
+        "Letter N (Arabian Heights Day)": 38500121
       }
     },
     {
@@ -388,12 +404,16 @@
         "Arabian Heights Night: Item Box 47": 35200866,
         "Arabian Heights Night: Item Box 48": 35200867,
         "Arabian Heights Night: Item Box 49": 35200868,
-        "Arabian Heights Night: Item Box 50": 35200869
+        "Arabian Heights Night: Item Box 50": 35200869,
+        "Arabian Heights Night: Letter K": 35200951,
+        "Arabian Heights Night: Letter N": 35200954
       },
       "items": {
         "Letter C (Arabian Heights Night)": 35100020,
         "Letter T (Arabian Heights Night)": 35100021,
-        "Letter R (Arabian Heights Night)": 35100022
+        "Letter R (Arabian Heights Night)": 35100022,
+        "Letter K (Arabian Heights Night)": 38500154,
+        "Letter N (Arabian Heights Night)": 38500157
       }
     },
     {
@@ -467,12 +487,16 @@
         "Arcane Garden: Item Box 47": 35201066,
         "Arcane Garden: Item Box 48": 35201067,
         "Arcane Garden: Item Box 49": 35201068,
-        "Arcane Garden: Item Box 50": 35201069
+        "Arcane Garden: Item Box 50": 35201069,
+        "Arcane Garden: Letter K": 35201151,
+        "Arcane Garden: Letter N": 35201154
       },
       "items": {
         "Letter C (Arcane Garden)": 35100025,
         "Letter T (Arcane Garden)": 35100026,
-        "Letter R (Arcane Garden)": 35100027
+        "Letter R (Arcane Garden)": 35100027,
+        "Letter K (Arcane Garden)": 38500190,
+        "Letter N (Arcane Garden)": 38500193
       }
     },
     {
@@ -546,12 +570,16 @@
         "Arctic Alleyway: Item Box 47": 35201266,
         "Arctic Alleyway: Item Box 48": 35201267,
         "Arctic Alleyway: Item Box 49": 35201268,
-        "Arctic Alleyway: Item Box 50": 35201269
+        "Arctic Alleyway: Item Box 50": 35201269,
+        "Arctic Alleyway: Letter K": 35201351,
+        "Arctic Alleyway: Letter N": 35201354
       },
       "items": {
         "Letter C (Arctic Alleyway)": 35100030,
         "Letter T (Arctic Alleyway)": 35100031,
-        "Letter R (Arctic Alleyway)": 35100032
+        "Letter R (Arctic Alleyway)": 35100032,
+        "Letter K (Arctic Alleyway)": 38500226,
+        "Letter N (Arctic Alleyway)": 38500229
       }
     },
     {
@@ -625,12 +653,16 @@
         "Assembly Lane N-Gage: Item Box 47": 35201466,
         "Assembly Lane N-Gage: Item Box 48": 35201467,
         "Assembly Lane N-Gage: Item Box 49": 35201468,
-        "Assembly Lane N-Gage: Item Box 50": 35201469
+        "Assembly Lane N-Gage: Item Box 50": 35201469,
+        "Assembly Lane N-Gage: Letter K": 35201551,
+        "Assembly Lane N-Gage: Letter N": 35201554
       },
       "items": {
         "Letter C (Assembly Lane N-Gage)": 35100035,
         "Letter T (Assembly Lane N-Gage)": 35100036,
-        "Letter R (Assembly Lane N-Gage)": 35100037
+        "Letter R (Assembly Lane N-Gage)": 35100037,
+        "Letter K (Assembly Lane N-Gage)": 38500262,
+        "Letter N (Assembly Lane N-Gage)": 38500265
       }
     },
     {
@@ -704,12 +736,16 @@
         "Baby T Park: Item Box 47": 35201666,
         "Baby T Park: Item Box 48": 35201667,
         "Baby T Park: Item Box 49": 35201668,
-        "Baby T Park: Item Box 50": 35201669
+        "Baby T Park: Item Box 50": 35201669,
+        "Baby T Park: Letter K": 35201751,
+        "Baby T Park: Letter N": 35201754
       },
       "items": {
         "Letter C (Baby T Park)": 35100040,
         "Letter T (Baby T Park)": 35100041,
-        "Letter R (Baby T Park)": 35100042
+        "Letter R (Baby T Park)": 35100042,
+        "Letter K (Baby T Park)": 38500298,
+        "Letter N (Baby T Park)": 38500301
       }
     },
     {
@@ -783,12 +819,16 @@
         "Big Forest: Item Box 47": 35201866,
         "Big Forest: Item Box 48": 35201867,
         "Big Forest: Item Box 49": 35201868,
-        "Big Forest: Item Box 50": 35201869
+        "Big Forest: Item Box 50": 35201869,
+        "Big Forest: Letter K": 35201951,
+        "Big Forest: Letter N": 35201954
       },
       "items": {
         "Letter C (Big Forest)": 35100045,
         "Letter T (Big Forest)": 35100046,
-        "Letter R (Big Forest)": 35100047
+        "Letter R (Big Forest)": 35100047,
+        "Letter K (Big Forest)": 38500334,
+        "Letter N (Big Forest)": 38500337
       }
     },
     {
@@ -862,12 +902,16 @@
         "Bowser Castle 1: Item Box 47": 35202066,
         "Bowser Castle 1: Item Box 48": 35202067,
         "Bowser Castle 1: Item Box 49": 35202068,
-        "Bowser Castle 1: Item Box 50": 35202069
+        "Bowser Castle 1: Item Box 50": 35202069,
+        "Bowser Castle 1: Letter K": 35202151,
+        "Bowser Castle 1: Letter N": 35202154
       },
       "items": {
         "Letter C (Bowser Castle 1)": 35100050,
         "Letter T (Bowser Castle 1)": 35100051,
-        "Letter R (Bowser Castle 1)": 35100052
+        "Letter R (Bowser Castle 1)": 35100052,
+        "Letter K (Bowser Castle 1)": 38500370,
+        "Letter N (Bowser Castle 1)": 38500373
       }
     },
     {
@@ -941,12 +985,16 @@
         "Breeze Harbor: Item Box 47": 35202266,
         "Breeze Harbor: Item Box 48": 35202267,
         "Breeze Harbor: Item Box 49": 35202268,
-        "Breeze Harbor: Item Box 50": 35202269
+        "Breeze Harbor: Item Box 50": 35202269,
+        "Breeze Harbor: Letter K": 35202351,
+        "Breeze Harbor: Letter N": 35202354
       },
       "items": {
         "Letter C (Breeze Harbor)": 35100055,
         "Letter T (Breeze Harbor)": 35100056,
-        "Letter R (Breeze Harbor)": 35100057
+        "Letter R (Breeze Harbor)": 35100057,
+        "Letter K (Breeze Harbor)": 38500406,
+        "Letter N (Breeze Harbor)": 38500409
       }
     },
     {
@@ -1020,12 +1068,16 @@
         "Chasqui Rally: Item Box 47": 35202466,
         "Chasqui Rally: Item Box 48": 35202467,
         "Chasqui Rally: Item Box 49": 35202468,
-        "Chasqui Rally: Item Box 50": 35202469
+        "Chasqui Rally: Item Box 50": 35202469,
+        "Chasqui Rally: Letter K": 35202551,
+        "Chasqui Rally: Letter N": 35202554
       },
       "items": {
         "Letter C (Chasqui Rally)": 35100060,
         "Letter T (Chasqui Rally)": 35100061,
-        "Letter R (Chasqui Rally)": 35100062
+        "Letter R (Chasqui Rally)": 35100062,
+        "Letter K (Chasqui Rally)": 38500442,
+        "Letter N (Chasqui Rally)": 38500445
       }
     },
     {
@@ -1099,12 +1151,16 @@
         "Choco Island 2: Item Box 47": 35202666,
         "Choco Island 2: Item Box 48": 35202667,
         "Choco Island 2: Item Box 49": 35202668,
-        "Choco Island 2: Item Box 50": 35202669
+        "Choco Island 2: Item Box 50": 35202669,
+        "Choco Island 2: Letter K": 35202751,
+        "Choco Island 2: Letter N": 35202754
       },
       "items": {
         "Letter C (Choco Island 2)": 35100065,
         "Letter T (Choco Island 2)": 35100066,
-        "Letter R (Choco Island 2)": 35100067
+        "Letter R (Choco Island 2)": 35100067,
+        "Letter K (Choco Island 2)": 38500478,
+        "Letter N (Choco Island 2)": 38500481
       }
     },
     {
@@ -1178,12 +1234,16 @@
         "Coco Park 2025: Item Box 47": 35203066,
         "Coco Park 2025: Item Box 48": 35203067,
         "Coco Park 2025: Item Box 49": 35203068,
-        "Coco Park 2025: Item Box 50": 35203069
+        "Coco Park 2025: Item Box 50": 35203069,
+        "Coco Park 2025: Letter K": 35203151,
+        "Coco Park 2025: Letter N": 35203154
       },
       "items": {
         "Letter C (Coco Park 2025)": 35100075,
         "Letter T (Coco Park 2025)": 35100076,
-        "Letter R (Coco Park 2025)": 35100077
+        "Letter R (Coco Park 2025)": 35100077,
+        "Letter K (Coco Park 2025)": 38500550,
+        "Letter N (Coco Park 2025)": 38500553
       }
     },
     {
@@ -1257,12 +1317,16 @@
         "Country Speedway: Item Box 47": 35203466,
         "Country Speedway: Item Box 48": 35203467,
         "Country Speedway: Item Box 49": 35203468,
-        "Country Speedway: Item Box 50": 35203469
+        "Country Speedway: Item Box 50": 35203469,
+        "Country Speedway: Letter K": 35203551,
+        "Country Speedway: Letter N": 35203554
       },
       "items": {
         "Letter C (Country Speedway)": 35100085,
         "Letter T (Country Speedway)": 35100086,
-        "Letter R (Country Speedway)": 35100087
+        "Letter R (Country Speedway)": 35100087,
+        "Letter K (Country Speedway)": 38500622,
+        "Letter N (Country Speedway)": 38500625
       }
     },
     {
@@ -1336,12 +1400,16 @@
         "Crystal Caves: Item Box 47": 35203666,
         "Crystal Caves: Item Box 48": 35203667,
         "Crystal Caves: Item Box 49": 35203668,
-        "Crystal Caves: Item Box 50": 35203669
+        "Crystal Caves: Item Box 50": 35203669,
+        "Crystal Caves: Letter K": 35203751,
+        "Crystal Caves: Letter N": 35203754
       },
       "items": {
         "Letter C (Crystal Caves)": 35100090,
         "Letter T (Crystal Caves)": 35100091,
-        "Letter R (Crystal Caves)": 35100092
+        "Letter R (Crystal Caves)": 35100092,
+        "Letter K (Crystal Caves)": 38500658,
+        "Letter N (Crystal Caves)": 38500661
       }
     },
     {
@@ -1415,12 +1483,16 @@
         "Cubic Circuit: Item Box 47": 35203866,
         "Cubic Circuit: Item Box 48": 35203867,
         "Cubic Circuit: Item Box 49": 35203868,
-        "Cubic Circuit: Item Box 50": 35203869
+        "Cubic Circuit: Item Box 50": 35203869,
+        "Cubic Circuit: Letter K": 35203951,
+        "Cubic Circuit: Letter N": 35203954
       },
       "items": {
         "Letter C (Cubic Circuit)": 35100095,
         "Letter T (Cubic Circuit)": 35100096,
-        "Letter R (Cubic Circuit)": 35100097
+        "Letter R (Cubic Circuit)": 35100097,
+        "Letter K (Cubic Circuit)": 38500694,
+        "Letter N (Cubic Circuit)": 38500697
       }
     },
     {
@@ -1494,12 +1566,16 @@
         "Cursed Trial Roulette: Item Box 47": 35204066,
         "Cursed Trial Roulette: Item Box 48": 35204067,
         "Cursed Trial Roulette: Item Box 49": 35204068,
-        "Cursed Trial Roulette: Item Box 50": 35204069
+        "Cursed Trial Roulette: Item Box 50": 35204069,
+        "Cursed Trial Roulette: Letter K": 35204151,
+        "Cursed Trial Roulette: Letter N": 35204154
       },
       "items": {
         "Letter C (Cursed Trial Roulette)": 35100100,
         "Letter T (Cursed Trial Roulette)": 35100101,
-        "Letter R (Cursed Trial Roulette)": 35100102
+        "Letter R (Cursed Trial Roulette)": 35100102,
+        "Letter K (Cursed Trial Roulette)": 38500730,
+        "Letter N (Cursed Trial Roulette)": 38500733
       }
     },
     {
@@ -1573,12 +1649,16 @@
         "Dark Ruins: Item Box 47": 35204266,
         "Dark Ruins: Item Box 48": 35204267,
         "Dark Ruins: Item Box 49": 35204268,
-        "Dark Ruins: Item Box 50": 35204269
+        "Dark Ruins: Item Box 50": 35204269,
+        "Dark Ruins: Letter K": 35204351,
+        "Dark Ruins: Letter N": 35204354
       },
       "items": {
         "Letter C (Dark Ruins)": 35100105,
         "Letter T (Dark Ruins)": 35100106,
-        "Letter R (Dark Ruins)": 35100107
+        "Letter R (Dark Ruins)": 35100107,
+        "Letter K (Dark Ruins)": 38500766,
+        "Letter N (Dark Ruins)": 38500769
       }
     },
     {
@@ -1652,12 +1732,16 @@
         "Deep Sea Driving N-Gage: Item Box 47": 35204466,
         "Deep Sea Driving N-Gage: Item Box 48": 35204467,
         "Deep Sea Driving N-Gage: Item Box 49": 35204468,
-        "Deep Sea Driving N-Gage: Item Box 50": 35204469
+        "Deep Sea Driving N-Gage: Item Box 50": 35204469,
+        "Deep Sea Driving N-Gage: Letter K": 35204551,
+        "Deep Sea Driving N-Gage: Letter N": 35204554
       },
       "items": {
         "Letter C (Deep Sea Driving N-Gage)": 35100110,
         "Letter T (Deep Sea Driving N-Gage)": 35100111,
-        "Letter R (Deep Sea Driving N-Gage)": 35100112
+        "Letter R (Deep Sea Driving N-Gage)": 35100112,
+        "Letter K (Deep Sea Driving N-Gage)": 38500802,
+        "Letter N (Deep Sea Driving N-Gage)": 38500805
       }
     },
     {
@@ -1731,12 +1815,16 @@
         "Diwali: Item Box 47": 35204666,
         "Diwali: Item Box 48": 35204667,
         "Diwali: Item Box 49": 35204668,
-        "Diwali: Item Box 50": 35204669
+        "Diwali: Item Box 50": 35204669,
+        "Diwali: Letter K": 35204751,
+        "Diwali: Letter N": 35204754
       },
       "items": {
         "Letter C (Diwali)": 35100115,
         "Letter T (Diwali)": 35100116,
-        "Letter R (Diwali)": 35100117
+        "Letter R (Diwali)": 35100117,
+        "Letter K (Diwali)": 38500838,
+        "Letter N (Diwali)": 38500841
       }
     },
     {
@@ -1810,12 +1898,16 @@
         "Diwali (no USF): Item Box 47": 35204866,
         "Diwali (no USF): Item Box 48": 35204867,
         "Diwali (no USF): Item Box 49": 35204868,
-        "Diwali (no USF): Item Box 50": 35204869
+        "Diwali (no USF): Item Box 50": 35204869,
+        "Diwali (no USF): Letter K": 35204951,
+        "Diwali (no USF): Letter N": 35204954
       },
       "items": {
         "Letter C (Diwali (no USF))": 35100120,
         "Letter T (Diwali (no USF))": 35100121,
-        "Letter R (Diwali (no USF))": 35100122
+        "Letter R (Diwali (no USF))": 35100122,
+        "Letter K (Diwali (no USF))": 38500874,
+        "Letter N (Diwali (no USF))": 38500877
       }
     },
     {
@@ -1889,12 +1981,16 @@
         "DK Pass: Item Box 47": 35205066,
         "DK Pass: Item Box 48": 35205067,
         "DK Pass: Item Box 49": 35205068,
-        "DK Pass: Item Box 50": 35205069
+        "DK Pass: Item Box 50": 35205069,
+        "DK Pass: Letter K": 35205151,
+        "DK Pass: Letter N": 35205154
       },
       "items": {
         "Letter C (DK Pass)": 35100125,
         "Letter T (DK Pass)": 35100126,
-        "Letter R (DK Pass)": 35100127
+        "Letter R (DK Pass)": 35100127,
+        "Letter K (DK Pass)": 38500910,
+        "Letter N (DK Pass)": 38500913
       }
     },
     {
@@ -1968,12 +2064,16 @@
         "Draculas Castle: Item Box 47": 35205266,
         "Draculas Castle: Item Box 48": 35205267,
         "Draculas Castle: Item Box 49": 35205268,
-        "Draculas Castle: Item Box 50": 35205269
+        "Draculas Castle: Item Box 50": 35205269,
+        "Draculas Castle: Letter K": 35205351,
+        "Draculas Castle: Letter N": 35205354
       },
       "items": {
         "Letter C (Draculas Castle)": 35100130,
         "Letter T (Draculas Castle)": 35100131,
-        "Letter R (Draculas Castle)": 35100132
+        "Letter R (Draculas Castle)": 35100132,
+        "Letter K (Draculas Castle)": 38500946,
+        "Letter N (Draculas Castle)": 38500949
       }
     },
     {
@@ -2047,12 +2147,16 @@
         "Dreamy Heights: Item Box 47": 35205466,
         "Dreamy Heights: Item Box 48": 35205467,
         "Dreamy Heights: Item Box 49": 35205468,
-        "Dreamy Heights: Item Box 50": 35205469
+        "Dreamy Heights: Item Box 50": 35205469,
+        "Dreamy Heights: Letter K": 35205551,
+        "Dreamy Heights: Letter N": 35205554
       },
       "items": {
         "Letter C (Dreamy Heights)": 35100135,
         "Letter T (Dreamy Heights)": 35100136,
-        "Letter R (Dreamy Heights)": 35100137
+        "Letter R (Dreamy Heights)": 35100137,
+        "Letter K (Dreamy Heights)": 38500982,
+        "Letter N (Dreamy Heights)": 38500985
       }
     },
     {
@@ -2126,12 +2230,16 @@
         "Drive Thru Danger: Item Box 47": 35205666,
         "Drive Thru Danger: Item Box 48": 35205667,
         "Drive Thru Danger: Item Box 49": 35205668,
-        "Drive Thru Danger: Item Box 50": 35205669
+        "Drive Thru Danger: Item Box 50": 35205669,
+        "Drive Thru Danger: Letter K": 35205751,
+        "Drive Thru Danger: Letter N": 35205754
       },
       "items": {
         "Letter C (Drive Thru Danger)": 35100140,
         "Letter T (Drive Thru Danger)": 35100141,
-        "Letter R (Drive Thru Danger)": 35100142
+        "Letter R (Drive Thru Danger)": 35100142,
+        "Letter K (Drive Thru Danger)": 38501018,
+        "Letter N (Drive Thru Danger)": 38501021
       }
     },
     {
@@ -2205,12 +2313,16 @@
         "DS Rainbow Road: Item Box 47": 35205866,
         "DS Rainbow Road: Item Box 48": 35205867,
         "DS Rainbow Road: Item Box 49": 35205868,
-        "DS Rainbow Road: Item Box 50": 35205869
+        "DS Rainbow Road: Item Box 50": 35205869,
+        "DS Rainbow Road: Letter K": 35205951,
+        "DS Rainbow Road: Letter N": 35205954
       },
       "items": {
         "Letter C (DS Rainbow Road)": 35100145,
         "Letter T (DS Rainbow Road)": 35100146,
-        "Letter R (DS Rainbow Road)": 35100147
+        "Letter R (DS Rainbow Road)": 35100147,
+        "Letter K (DS Rainbow Road)": 38501054,
+        "Letter N (DS Rainbow Road)": 38501057
       }
     },
     {
@@ -2284,12 +2396,16 @@
         "Dust Keepers: Item Box 47": 35206066,
         "Dust Keepers: Item Box 48": 35206067,
         "Dust Keepers: Item Box 49": 35206068,
-        "Dust Keepers: Item Box 50": 35206069
+        "Dust Keepers: Item Box 50": 35206069,
+        "Dust Keepers: Letter K": 35206151,
+        "Dust Keepers: Letter N": 35206154
       },
       "items": {
         "Letter C (Dust Keepers)": 35100150,
         "Letter T (Dust Keepers)": 35100151,
-        "Letter R (Dust Keepers)": 35100152
+        "Letter R (Dust Keepers)": 35100152,
+        "Letter K (Dust Keepers)": 38501090,
+        "Letter N (Dust Keepers)": 38501093
       }
     },
     {
@@ -2363,12 +2479,16 @@
         "Frozen Depths: Item Box 47": 35206266,
         "Frozen Depths: Item Box 48": 35206267,
         "Frozen Depths: Item Box 49": 35206268,
-        "Frozen Depths: Item Box 50": 35206269
+        "Frozen Depths: Item Box 50": 35206269,
+        "Frozen Depths: Letter K": 35206351,
+        "Frozen Depths: Letter N": 35206354
       },
       "items": {
         "Letter C (Frozen Depths)": 35100155,
         "Letter T (Frozen Depths)": 35100156,
-        "Letter R (Frozen Depths)": 35100157
+        "Letter R (Frozen Depths)": 35100157,
+        "Letter K (Frozen Depths)": 38501126,
+        "Letter N (Frozen Depths)": 38501129
       }
     },
     {
@@ -2442,12 +2562,16 @@
         "Garden Speedway: Item Box 47": 35206466,
         "Garden Speedway: Item Box 48": 35206467,
         "Garden Speedway: Item Box 49": 35206468,
-        "Garden Speedway: Item Box 50": 35206469
+        "Garden Speedway: Item Box 50": 35206469,
+        "Garden Speedway: Letter K": 35206551,
+        "Garden Speedway: Letter N": 35206554
       },
       "items": {
         "Letter C (Garden Speedway)": 35100160,
         "Letter T (Garden Speedway)": 35100161,
-        "Letter R (Garden Speedway)": 35100162
+        "Letter R (Garden Speedway)": 35100162,
+        "Letter K (Garden Speedway)": 38501162,
+        "Letter N (Garden Speedway)": 38501165
       }
     },
     {
@@ -2521,12 +2645,16 @@
         "Glacier Lagoon: Item Box 47": 35206666,
         "Glacier Lagoon: Item Box 48": 35206667,
         "Glacier Lagoon: Item Box 49": 35206668,
-        "Glacier Lagoon: Item Box 50": 35206669
+        "Glacier Lagoon: Item Box 50": 35206669,
+        "Glacier Lagoon: Letter K": 35206751,
+        "Glacier Lagoon: Letter N": 35206754
       },
       "items": {
         "Letter C (Glacier Lagoon)": 35100165,
         "Letter T (Glacier Lagoon)": 35100166,
-        "Letter R (Glacier Lagoon)": 35100167
+        "Letter R (Glacier Lagoon)": 35100167,
+        "Letter K (Glacier Lagoon)": 38501198,
+        "Letter N (Glacier Lagoon)": 38501201
       }
     },
     {
@@ -2600,12 +2728,16 @@
         "Glazed Dessert: Item Box 47": 35206866,
         "Glazed Dessert: Item Box 48": 35206867,
         "Glazed Dessert: Item Box 49": 35206868,
-        "Glazed Dessert: Item Box 50": 35206869
+        "Glazed Dessert: Item Box 50": 35206869,
+        "Glazed Dessert: Letter K": 35206951,
+        "Glazed Dessert: Letter N": 35206954
       },
       "items": {
         "Letter C (Glazed Dessert)": 35100170,
         "Letter T (Glazed Dessert)": 35100171,
-        "Letter R (Glazed Dessert)": 35100172
+        "Letter R (Glazed Dessert)": 35100172,
+        "Letter K (Glazed Dessert)": 38501234,
+        "Letter N (Glazed Dessert)": 38501237
       }
     },
     {
@@ -2679,12 +2811,16 @@
         "Green Hill Raceway: Item Box 47": 35207066,
         "Green Hill Raceway: Item Box 48": 35207067,
         "Green Hill Raceway: Item Box 49": 35207068,
-        "Green Hill Raceway: Item Box 50": 35207069
+        "Green Hill Raceway: Item Box 50": 35207069,
+        "Green Hill Raceway: Letter K": 35207151,
+        "Green Hill Raceway: Letter N": 35207154
       },
       "items": {
         "Letter C (Green Hill Raceway)": 35100175,
         "Letter T (Green Hill Raceway)": 35100176,
-        "Letter R (Green Hill Raceway)": 35100177
+        "Letter R (Green Hill Raceway)": 35100177,
+        "Letter K (Green Hill Raceway)": 38501270,
+        "Letter N (Green Hill Raceway)": 38501273
       }
     },
     {
@@ -2758,12 +2894,16 @@
         "Hangtime Harbor: Item Box 47": 35207266,
         "Hangtime Harbor: Item Box 48": 35207267,
         "Hangtime Harbor: Item Box 49": 35207268,
-        "Hangtime Harbor: Item Box 50": 35207269
+        "Hangtime Harbor: Item Box 50": 35207269,
+        "Hangtime Harbor: Letter K": 35207351,
+        "Hangtime Harbor: Letter N": 35207354
       },
       "items": {
         "Letter C (Hangtime Harbor)": 35100180,
         "Letter T (Hangtime Harbor)": 35100181,
-        "Letter R (Hangtime Harbor)": 35100182
+        "Letter R (Hangtime Harbor)": 35100182,
+        "Letter K (Hangtime Harbor)": 38501306,
+        "Letter N (Hangtime Harbor)": 38501309
       }
     },
     {
@@ -2837,12 +2977,16 @@
         "Hasty Hedges: Item Box 47": 35207466,
         "Hasty Hedges: Item Box 48": 35207467,
         "Hasty Hedges: Item Box 49": 35207468,
-        "Hasty Hedges: Item Box 50": 35207469
+        "Hasty Hedges: Item Box 50": 35207469,
+        "Hasty Hedges: Letter K": 35207551,
+        "Hasty Hedges: Letter N": 35207554
       },
       "items": {
         "Letter C (Hasty Hedges)": 35100185,
         "Letter T (Hasty Hedges)": 35100186,
-        "Letter R (Hasty Hedges)": 35100187
+        "Letter R (Hasty Hedges)": 35100187,
+        "Letter K (Hasty Hedges)": 38501342,
+        "Letter N (Hasty Hedges)": 38501345
       }
     },
     {
@@ -2916,12 +3060,16 @@
         "Haven Stadium: Item Box 47": 35207666,
         "Haven Stadium: Item Box 48": 35207667,
         "Haven Stadium: Item Box 49": 35207668,
-        "Haven Stadium: Item Box 50": 35207669
+        "Haven Stadium: Item Box 50": 35207669,
+        "Haven Stadium: Letter K": 35207751,
+        "Haven Stadium: Letter N": 35207754
       },
       "items": {
         "Letter C (Haven Stadium)": 35100190,
         "Letter T (Haven Stadium)": 35100191,
-        "Letter R (Haven Stadium)": 35100192
+        "Letter R (Haven Stadium)": 35100192,
+        "Letter K (Haven Stadium)": 38501378,
+        "Letter N (Haven Stadium)": 38501381
       }
     },
     {
@@ -2995,12 +3143,16 @@
         "Haven Stadium - Reverse: Item Box 47": 35207866,
         "Haven Stadium - Reverse: Item Box 48": 35207867,
         "Haven Stadium - Reverse: Item Box 49": 35207868,
-        "Haven Stadium - Reverse: Item Box 50": 35207869
+        "Haven Stadium - Reverse: Item Box 50": 35207869,
+        "Haven Stadium - Reverse: Letter K": 35207951,
+        "Haven Stadium - Reverse: Letter N": 35207954
       },
       "items": {
         "Letter C (Haven Stadium - Reverse)": 35100195,
         "Letter T (Haven Stadium - Reverse)": 35100196,
-        "Letter R (Haven Stadium - Reverse)": 35100197
+        "Letter R (Haven Stadium - Reverse)": 35100197,
+        "Letter K (Haven Stadium - Reverse)": 38501414,
+        "Letter N (Haven Stadium - Reverse)": 38501417
       }
     },
     {
@@ -3074,12 +3226,16 @@
         "Holiday Hills: Item Box 47": 35208066,
         "Holiday Hills: Item Box 48": 35208067,
         "Holiday Hills: Item Box 49": 35208068,
-        "Holiday Hills: Item Box 50": 35208069
+        "Holiday Hills: Item Box 50": 35208069,
+        "Holiday Hills: Letter K": 35208151,
+        "Holiday Hills: Letter N": 35208154
       },
       "items": {
         "Letter C (Holiday Hills)": 35100200,
         "Letter T (Holiday Hills)": 35100201,
-        "Letter R (Holiday Hills)": 35100202
+        "Letter R (Holiday Hills)": 35100202,
+        "Letter K (Holiday Hills)": 38501450,
+        "Letter N (Holiday Hills)": 38501453
       }
     },
     {
@@ -3153,12 +3309,16 @@
         "Inferno Island: Item Box 47": 35208266,
         "Inferno Island: Item Box 48": 35208267,
         "Inferno Island: Item Box 49": 35208268,
-        "Inferno Island: Item Box 50": 35208269
+        "Inferno Island: Item Box 50": 35208269,
+        "Inferno Island: Letter K": 35208351,
+        "Inferno Island: Letter N": 35208354
       },
       "items": {
         "Letter C (Inferno Island)": 35100205,
         "Letter T (Inferno Island)": 35100206,
-        "Letter R (Inferno Island)": 35100207
+        "Letter R (Inferno Island)": 35100207,
+        "Letter K (Inferno Island)": 38501486,
+        "Letter N (Inferno Island)": 38501489
       }
     },
     {
@@ -3232,12 +3392,16 @@
         "Jungle Boogie N-Gage: Item Box 47": 35208466,
         "Jungle Boogie N-Gage: Item Box 48": 35208467,
         "Jungle Boogie N-Gage: Item Box 49": 35208468,
-        "Jungle Boogie N-Gage: Item Box 50": 35208469
+        "Jungle Boogie N-Gage: Item Box 50": 35208469,
+        "Jungle Boogie N-Gage: Letter K": 35208551,
+        "Jungle Boogie N-Gage: Letter N": 35208554
       },
       "items": {
         "Letter C (Jungle Boogie N-Gage)": 35100210,
         "Letter T (Jungle Boogie N-Gage)": 35100211,
-        "Letter R (Jungle Boogie N-Gage)": 35100212
+        "Letter R (Jungle Boogie N-Gage)": 35100212,
+        "Letter K (Jungle Boogie N-Gage)": 38501522,
+        "Letter N (Jungle Boogie N-Gage)": 38501525
       }
     },
     {
@@ -3311,12 +3475,16 @@
         "Kong Dungeon: Item Box 47": 35208666,
         "Kong Dungeon: Item Box 48": 35208667,
         "Kong Dungeon: Item Box 49": 35208668,
-        "Kong Dungeon: Item Box 50": 35208669
+        "Kong Dungeon: Item Box 50": 35208669,
+        "Kong Dungeon: Letter K": 35208751,
+        "Kong Dungeon: Letter N": 35208754
       },
       "items": {
         "Letter C (Kong Dungeon)": 35100215,
         "Letter T (Kong Dungeon)": 35100216,
-        "Letter R (Kong Dungeon)": 35100217
+        "Letter R (Kong Dungeon)": 35100217,
+        "Letter K (Kong Dungeon)": 38501558,
+        "Letter N (Kong Dungeon)": 38501561
       }
     },
     {
@@ -3390,12 +3558,16 @@
         "Lava Lane: Item Box 47": 35208866,
         "Lava Lane: Item Box 48": 35208867,
         "Lava Lane: Item Box 49": 35208868,
-        "Lava Lane: Item Box 50": 35208869
+        "Lava Lane: Item Box 50": 35208869,
+        "Lava Lane: Letter K": 35208951,
+        "Lava Lane: Letter N": 35208954
       },
       "items": {
         "Letter C (Lava Lane)": 35100220,
         "Letter T (Lava Lane)": 35100221,
-        "Letter R (Lava Lane)": 35100222
+        "Letter R (Lava Lane)": 35100222,
+        "Letter K (Lava Lane)": 38501594,
+        "Letter N (Lava Lane)": 38501597
       }
     },
     {
@@ -3469,12 +3641,16 @@
         "Lights Out: Item Box 47": 35209066,
         "Lights Out: Item Box 48": 35209067,
         "Lights Out: Item Box 49": 35209068,
-        "Lights Out: Item Box 50": 35209069
+        "Lights Out: Item Box 50": 35209069,
+        "Lights Out: Letter K": 35209151,
+        "Lights Out: Letter N": 35209154
       },
       "items": {
         "Letter C (Lights Out)": 35100225,
         "Letter T (Lights Out)": 35100226,
-        "Letter R (Lights Out)": 35100227
+        "Letter R (Lights Out)": 35100227,
+        "Letter K (Lights Out)": 38501630,
+        "Letter N (Lights Out)": 38501633
       }
     },
     {
@@ -3548,12 +3724,16 @@
         "Mario Circuit 1: Item Box 47": 35209266,
         "Mario Circuit 1: Item Box 48": 35209267,
         "Mario Circuit 1: Item Box 49": 35209268,
-        "Mario Circuit 1: Item Box 50": 35209269
+        "Mario Circuit 1: Item Box 50": 35209269,
+        "Mario Circuit 1: Letter K": 35209351,
+        "Mario Circuit 1: Letter N": 35209354
       },
       "items": {
         "Letter C (Mario Circuit 1)": 35100230,
         "Letter T (Mario Circuit 1)": 35100231,
-        "Letter R (Mario Circuit 1)": 35100232
+        "Letter R (Mario Circuit 1)": 35100232,
+        "Letter K (Mario Circuit 1)": 38501666,
+        "Letter N (Mario Circuit 1)": 38501669
       }
     },
     {
@@ -3627,12 +3807,16 @@
         "Mario Circuit 2: Item Box 47": 35209466,
         "Mario Circuit 2: Item Box 48": 35209467,
         "Mario Circuit 2: Item Box 49": 35209468,
-        "Mario Circuit 2: Item Box 50": 35209469
+        "Mario Circuit 2: Item Box 50": 35209469,
+        "Mario Circuit 2: Letter K": 35209551,
+        "Mario Circuit 2: Letter N": 35209554
       },
       "items": {
         "Letter C (Mario Circuit 2)": 35100235,
         "Letter T (Mario Circuit 2)": 35100236,
-        "Letter R (Mario Circuit 2)": 35100237
+        "Letter R (Mario Circuit 2)": 35100237,
+        "Letter K (Mario Circuit 2)": 38501702,
+        "Letter N (Mario Circuit 2)": 38501705
       }
     },
     {
@@ -3706,12 +3890,16 @@
         "Mario Raceway N64: Item Box 47": 35209666,
         "Mario Raceway N64: Item Box 48": 35209667,
         "Mario Raceway N64: Item Box 49": 35209668,
-        "Mario Raceway N64: Item Box 50": 35209669
+        "Mario Raceway N64: Item Box 50": 35209669,
+        "Mario Raceway N64: Letter K": 35209751,
+        "Mario Raceway N64: Letter N": 35209754
       },
       "items": {
         "Letter C (Mario Raceway N64)": 35100240,
         "Letter T (Mario Raceway N64)": 35100241,
-        "Letter R (Mario Raceway N64)": 35100242
+        "Letter R (Mario Raceway N64)": 35100242,
+        "Letter K (Mario Raceway N64)": 38501738,
+        "Letter N (Mario Raceway N64)": 38501741
       }
     },
     {
@@ -3785,12 +3973,16 @@
         "Matsuri: Item Box 47": 35209866,
         "Matsuri: Item Box 48": 35209867,
         "Matsuri: Item Box 49": 35209868,
-        "Matsuri: Item Box 50": 35209869
+        "Matsuri: Item Box 50": 35209869,
+        "Matsuri: Letter K": 35209951,
+        "Matsuri: Letter N": 35209954
       },
       "items": {
         "Letter C (Matsuri)": 35100245,
         "Letter T (Matsuri)": 35100246,
-        "Letter R (Matsuri)": 35100247
+        "Letter R (Matsuri)": 35100247,
+        "Letter K (Matsuri)": 38501774,
+        "Letter N (Matsuri)": 38501777
       }
     },
     {
@@ -3864,12 +4056,16 @@
         "Namek: Item Box 47": 35210066,
         "Namek: Item Box 48": 35210067,
         "Namek: Item Box 49": 35210068,
-        "Namek: Item Box 50": 35210069
+        "Namek: Item Box 50": 35210069,
+        "Namek: Letter K": 35210151,
+        "Namek: Letter N": 35210154
       },
       "items": {
         "Letter C (Namek)": 35100250,
         "Letter T (Namek)": 35100251,
-        "Letter R (Namek)": 35100252
+        "Letter R (Namek)": 35100252,
+        "Letter K (Namek)": 38501810,
+        "Letter N (Namek)": 38501813
       }
     },
     {
@@ -3943,12 +4139,16 @@
         "Neon Paradise: Item Box 47": 35210266,
         "Neon Paradise: Item Box 48": 35210267,
         "Neon Paradise: Item Box 49": 35210268,
-        "Neon Paradise: Item Box 50": 35210269
+        "Neon Paradise: Item Box 50": 35210269,
+        "Neon Paradise: Letter K": 35210351,
+        "Neon Paradise: Letter N": 35210354
       },
       "items": {
         "Letter C (Neon Paradise)": 35100255,
         "Letter T (Neon Paradise)": 35100256,
-        "Letter R (Neon Paradise)": 35100257
+        "Letter R (Neon Paradise)": 35100257,
+        "Letter K (Neon Paradise)": 38501846,
+        "Letter N (Neon Paradise)": 38501849
       }
     },
     {
@@ -4022,12 +4222,16 @@
         "Neonstadion: Item Box 47": 35210466,
         "Neonstadion: Item Box 48": 35210467,
         "Neonstadion: Item Box 49": 35210468,
-        "Neonstadion: Item Box 50": 35210469
+        "Neonstadion: Item Box 50": 35210469,
+        "Neonstadion: Letter K": 35210551,
+        "Neonstadion: Letter N": 35210554
       },
       "items": {
         "Letter C (Neonstadion)": 35100260,
         "Letter T (Neonstadion)": 35100261,
-        "Letter R (Neonstadion)": 35100262
+        "Letter R (Neonstadion)": 35100262,
+        "Letter K (Neonstadion)": 38501882,
+        "Letter N (Neonstadion)": 38501885
       }
     },
     {
@@ -4101,12 +4305,16 @@
         "North Pole: Item Box 47": 35210666,
         "North Pole: Item Box 48": 35210667,
         "North Pole: Item Box 49": 35210668,
-        "North Pole: Item Box 50": 35210669
+        "North Pole: Item Box 50": 35210669,
+        "North Pole: Letter K": 35210751,
+        "North Pole: Letter N": 35210754
       },
       "items": {
         "Letter C (North Pole)": 35100265,
         "Letter T (North Pole)": 35100266,
-        "Letter R (North Pole)": 35100267
+        "Letter R (North Pole)": 35100267,
+        "Letter K (North Pole)": 38501918,
+        "Letter N (North Pole)": 38501921
       }
     },
     {
@@ -4180,12 +4388,16 @@
         "Out Of Time N-Gage: Item Box 47": 35210866,
         "Out Of Time N-Gage: Item Box 48": 35210867,
         "Out Of Time N-Gage: Item Box 49": 35210868,
-        "Out Of Time N-Gage: Item Box 50": 35210869
+        "Out Of Time N-Gage: Item Box 50": 35210869,
+        "Out Of Time N-Gage: Letter K": 35210951,
+        "Out Of Time N-Gage: Letter N": 35210954
       },
       "items": {
         "Letter C (Out Of Time N-Gage)": 35100270,
         "Letter T (Out Of Time N-Gage)": 35100271,
-        "Letter R (Out Of Time N-Gage)": 35100272
+        "Letter R (Out Of Time N-Gage)": 35100272,
+        "Letter K (Out Of Time N-Gage)": 38501954,
+        "Letter N (Out Of Time N-Gage)": 38501957
       }
     },
     {
@@ -4259,12 +4471,16 @@
         "Papu Cave: Item Box 47": 35211066,
         "Papu Cave: Item Box 48": 35211067,
         "Papu Cave: Item Box 49": 35211068,
-        "Papu Cave: Item Box 50": 35211069
+        "Papu Cave: Item Box 50": 35211069,
+        "Papu Cave: Letter K": 35211151,
+        "Papu Cave: Letter N": 35211154
       },
       "items": {
         "Letter C (Papu Cave)": 35100275,
         "Letter T (Papu Cave)": 35100276,
-        "Letter R (Papu Cave)": 35100277
+        "Letter R (Papu Cave)": 35100277,
+        "Letter K (Papu Cave)": 38501990,
+        "Letter N (Papu Cave)": 38501993
       }
     },
     {
@@ -4338,12 +4554,16 @@
         "Papu's SG Temple: Item Box 47": 35211266,
         "Papu's SG Temple: Item Box 48": 35211267,
         "Papu's SG Temple: Item Box 49": 35211268,
-        "Papu's SG Temple: Item Box 50": 35211269
+        "Papu's SG Temple: Item Box 50": 35211269,
+        "Papu's SG Temple: Letter K": 35211351,
+        "Papu's SG Temple: Letter N": 35211354
       },
       "items": {
         "Letter C (Papu's SG Temple)": 35100280,
         "Letter T (Papu's SG Temple)": 35100281,
-        "Letter R (Papu's SG Temple)": 35100282
+        "Letter R (Papu's SG Temple)": 35100282,
+        "Letter K (Papu's SG Temple)": 38502026,
+        "Letter N (Papu's SG Temple)": 38502029
       }
     },
     {
@@ -4417,12 +4637,16 @@
         "Pepsi City: Item Box 47": 35211466,
         "Pepsi City: Item Box 48": 35211467,
         "Pepsi City: Item Box 49": 35211468,
-        "Pepsi City: Item Box 50": 35211469
+        "Pepsi City: Item Box 50": 35211469,
+        "Pepsi City: Letter K": 35211551,
+        "Pepsi City: Letter N": 35211554
       },
       "items": {
         "Letter C (Pepsi City)": 35100285,
         "Letter T (Pepsi City)": 35100286,
-        "Letter R (Pepsi City)": 35100287
+        "Letter R (Pepsi City)": 35100287,
+        "Letter K (Pepsi City)": 38502062,
+        "Letter N (Pepsi City)": 38502065
       }
     },
     {
@@ -4496,12 +4720,16 @@
         "Redrock Ravine: Item Box 47": 35211666,
         "Redrock Ravine: Item Box 48": 35211667,
         "Redrock Ravine: Item Box 49": 35211668,
-        "Redrock Ravine: Item Box 50": 35211669
+        "Redrock Ravine: Item Box 50": 35211669,
+        "Redrock Ravine: Letter K": 35211751,
+        "Redrock Ravine: Letter N": 35211754
       },
       "items": {
         "Letter C (Redrock Ravine)": 35100290,
         "Letter T (Redrock Ravine)": 35100291,
-        "Letter R (Redrock Ravine)": 35100292
+        "Letter R (Redrock Ravine)": 35100292,
+        "Letter K (Redrock Ravine)": 38502098,
+        "Letter N (Redrock Ravine)": 38502101
       }
     },
     {
@@ -4575,12 +4803,16 @@
         "Royal Raceway: Item Box 47": 35211866,
         "Royal Raceway: Item Box 48": 35211867,
         "Royal Raceway: Item Box 49": 35211868,
-        "Royal Raceway: Item Box 50": 35211869
+        "Royal Raceway: Item Box 50": 35211869,
+        "Royal Raceway: Letter K": 35211951,
+        "Royal Raceway: Letter N": 35211954
       },
       "items": {
         "Letter C (Royal Raceway)": 35100295,
         "Letter T (Royal Raceway)": 35100296,
-        "Letter R (Royal Raceway)": 35100297
+        "Letter R (Royal Raceway)": 35100297,
+        "Letter K (Royal Raceway)": 38502134,
+        "Letter N (Royal Raceway)": 38502137
       }
     },
     {
@@ -4654,12 +4886,16 @@
         "Sampa Run: Item Box 47": 35212066,
         "Sampa Run: Item Box 48": 35212067,
         "Sampa Run: Item Box 49": 35212068,
-        "Sampa Run: Item Box 50": 35212069
+        "Sampa Run: Item Box 50": 35212069,
+        "Sampa Run: Letter K": 35212151,
+        "Sampa Run: Letter N": 35212154
       },
       "items": {
         "Letter C (Sampa Run)": 35100300,
         "Letter T (Sampa Run)": 35100301,
-        "Letter R (Sampa Run)": 35100302
+        "Letter R (Sampa Run)": 35100302,
+        "Letter K (Sampa Run)": 38502170,
+        "Letter N (Sampa Run)": 38502173
       }
     },
     {
@@ -4733,12 +4969,16 @@
         "Sid House: Item Box 47": 35212266,
         "Sid House: Item Box 48": 35212267,
         "Sid House: Item Box 49": 35212268,
-        "Sid House: Item Box 50": 35212269
+        "Sid House: Item Box 50": 35212269,
+        "Sid House: Letter K": 35212351,
+        "Sid House: Letter N": 35212354
       },
       "items": {
         "Letter C (Sid House)": 35100305,
         "Letter T (Sid House)": 35100306,
-        "Letter R (Sid House)": 35100307
+        "Letter R (Sid House)": 35100307,
+        "Letter K (Sid House)": 38502206,
+        "Letter N (Sid House)": 38502209
       }
     },
     {
@@ -4812,12 +5052,16 @@
         "Skater's Retreat: Item Box 47": 35212466,
         "Skater's Retreat: Item Box 48": 35212467,
         "Skater's Retreat: Item Box 49": 35212468,
-        "Skater's Retreat: Item Box 50": 35212469
+        "Skater's Retreat: Item Box 50": 35212469,
+        "Skater's Retreat: Letter K": 35212551,
+        "Skater's Retreat: Letter N": 35212554
       },
       "items": {
         "Letter C (Skater's Retreat)": 35100310,
         "Letter T (Skater's Retreat)": 35100311,
-        "Letter R (Skater's Retreat)": 35100312
+        "Letter R (Skater's Retreat)": 35100312,
+        "Letter K (Skater's Retreat)": 38502242,
+        "Letter N (Skater's Retreat)": 38502245
       }
     },
     {
@@ -4891,12 +5135,16 @@
         "Skull Cave: Item Box 47": 35212666,
         "Skull Cave: Item Box 48": 35212667,
         "Skull Cave: Item Box 49": 35212668,
-        "Skull Cave: Item Box 50": 35212669
+        "Skull Cave: Item Box 50": 35212669,
+        "Skull Cave: Letter K": 35212751,
+        "Skull Cave: Letter N": 35212754
       },
       "items": {
         "Letter C (Skull Cave)": 35100315,
         "Letter T (Skull Cave)": 35100316,
-        "Letter R (Skull Cave)": 35100317
+        "Letter R (Skull Cave)": 35100317,
+        "Letter K (Skull Cave)": 38502278,
+        "Letter N (Skull Cave)": 38502281
       }
     },
     {
@@ -4970,12 +5218,16 @@
         "SNES Bowser's Castle 2: Item Box 47": 35212866,
         "SNES Bowser's Castle 2: Item Box 48": 35212867,
         "SNES Bowser's Castle 2: Item Box 49": 35212868,
-        "SNES Bowser's Castle 2: Item Box 50": 35212869
+        "SNES Bowser's Castle 2: Item Box 50": 35212869,
+        "SNES Bowser's Castle 2: Letter K": 35212951,
+        "SNES Bowser's Castle 2: Letter N": 35212954
       },
       "items": {
         "Letter C (SNES Bowser's Castle 2)": 35100320,
         "Letter T (SNES Bowser's Castle 2)": 35100321,
-        "Letter R (SNES Bowser's Castle 2)": 35100322
+        "Letter R (SNES Bowser's Castle 2)": 35100322,
+        "Letter K (SNES Bowser's Castle 2)": 38502314,
+        "Letter N (SNES Bowser's Castle 2)": 38502317
       }
     },
     {
@@ -5049,12 +5301,16 @@
         "Snowfall Keep: Item Box 47": 35213066,
         "Snowfall Keep: Item Box 48": 35213067,
         "Snowfall Keep: Item Box 49": 35213068,
-        "Snowfall Keep: Item Box 50": 35213069
+        "Snowfall Keep: Item Box 50": 35213069,
+        "Snowfall Keep: Letter K": 35213151,
+        "Snowfall Keep: Letter N": 35213154
       },
       "items": {
         "Letter C (Snowfall Keep)": 35100325,
         "Letter T (Snowfall Keep)": 35100326,
-        "Letter R (Snowfall Keep)": 35100327
+        "Letter R (Snowfall Keep)": 35100327,
+        "Letter K (Snowfall Keep)": 38502350,
+        "Letter N (Snowfall Keep)": 38502353
       }
     },
     {
@@ -5128,12 +5384,16 @@
         "Snowy Valley: Item Box 47": 35213266,
         "Snowy Valley: Item Box 48": 35213267,
         "Snowy Valley: Item Box 49": 35213268,
-        "Snowy Valley: Item Box 50": 35213269
+        "Snowy Valley: Item Box 50": 35213269,
+        "Snowy Valley: Letter K": 35213351,
+        "Snowy Valley: Letter N": 35213354
       },
       "items": {
         "Letter C (Snowy Valley)": 35100330,
         "Letter T (Snowy Valley)": 35100331,
-        "Letter R (Snowy Valley)": 35100332
+        "Letter R (Snowy Valley)": 35100332,
+        "Letter K (Snowy Valley)": 38502386,
+        "Letter N (Snowy Valley)": 38502389
       }
     },
     {
@@ -5207,12 +5467,16 @@
         "Space Labs: Item Box 47": 35213466,
         "Space Labs: Item Box 48": 35213467,
         "Space Labs: Item Box 49": 35213468,
-        "Space Labs: Item Box 50": 35213469
+        "Space Labs: Item Box 50": 35213469,
+        "Space Labs: Letter K": 35213551,
+        "Space Labs: Letter N": 35213554
       },
       "items": {
         "Letter C (Space Labs)": 35100335,
         "Letter T (Space Labs)": 35100336,
-        "Letter R (Space Labs)": 35100337
+        "Letter R (Space Labs)": 35100337,
+        "Letter K (Space Labs)": 38502422,
+        "Letter N (Space Labs)": 38502425
       }
     },
     {
@@ -5286,12 +5550,16 @@
         "Sunken Sprint: Item Box 47": 35213866,
         "Sunken Sprint: Item Box 48": 35213867,
         "Sunken Sprint: Item Box 49": 35213868,
-        "Sunken Sprint: Item Box 50": 35213869
+        "Sunken Sprint: Item Box 50": 35213869,
+        "Sunken Sprint: Letter K": 35213951,
+        "Sunken Sprint: Letter N": 35213954
       },
       "items": {
         "Letter C (Sunken Sprint)": 35100345,
         "Letter T (Sunken Sprint)": 35100346,
-        "Letter R (Sunken Sprint)": 35100347
+        "Letter R (Sunken Sprint)": 35100347,
+        "Letter K (Sunken Sprint)": 38502494,
+        "Letter N (Sunken Sprint)": 38502497
       }
     },
     {
@@ -5365,12 +5633,16 @@
         "Sunset Vista: Item Box 47": 35214066,
         "Sunset Vista: Item Box 48": 35214067,
         "Sunset Vista: Item Box 49": 35214068,
-        "Sunset Vista: Item Box 50": 35214069
+        "Sunset Vista: Item Box 50": 35214069,
+        "Sunset Vista: Letter K": 35214151,
+        "Sunset Vista: Letter N": 35214154
       },
       "items": {
         "Letter C (Sunset Vista)": 35100350,
         "Letter T (Sunset Vista)": 35100351,
-        "Letter R (Sunset Vista)": 35100352
+        "Letter R (Sunset Vista)": 35100352,
+        "Letter K (Sunset Vista)": 38502530,
+        "Letter N (Sunset Vista)": 38502533
       }
     },
     {
@@ -5444,12 +5716,16 @@
         "Super Snocross 2: Item Box 47": 35214266,
         "Super Snocross 2: Item Box 48": 35214267,
         "Super Snocross 2: Item Box 49": 35214268,
-        "Super Snocross 2: Item Box 50": 35214269
+        "Super Snocross 2: Item Box 50": 35214269,
+        "Super Snocross 2: Letter K": 35214351,
+        "Super Snocross 2: Letter N": 35214354
       },
       "items": {
         "Letter C (Super Snocross 2)": 35100355,
         "Letter T (Super Snocross 2)": 35100356,
-        "Letter R (Super Snocross 2)": 35100357
+        "Letter R (Super Snocross 2)": 35100357,
+        "Letter K (Super Snocross 2)": 38502566,
+        "Letter N (Super Snocross 2)": 38502569
       }
     },
     {
@@ -5523,12 +5799,16 @@
         "The Dairy Track: Item Box 47": 35214466,
         "The Dairy Track: Item Box 48": 35214467,
         "The Dairy Track: Item Box 49": 35214468,
-        "The Dairy Track: Item Box 50": 35214469
+        "The Dairy Track: Item Box 50": 35214469,
+        "The Dairy Track: Letter K": 35214551,
+        "The Dairy Track: Letter N": 35214554
       },
       "items": {
         "Letter C (The Dairy Track)": 35100360,
         "Letter T (The Dairy Track)": 35100361,
-        "Letter R (The Dairy Track)": 35100362
+        "Letter R (The Dairy Track)": 35100362,
+        "Letter K (The Dairy Track)": 38502602,
+        "Letter N (The Dairy Track)": 38502605
       }
     },
     {
@@ -5602,12 +5882,16 @@
         "The Lab: Item Box 47": 35214666,
         "The Lab: Item Box 48": 35214667,
         "The Lab: Item Box 49": 35214668,
-        "The Lab: Item Box 50": 35214669
+        "The Lab: Item Box 50": 35214669,
+        "The Lab: Letter K": 35214751,
+        "The Lab: Letter N": 35214754
       },
       "items": {
         "Letter C (The Lab)": 35100365,
         "Letter T (The Lab)": 35100366,
-        "Letter R (The Lab)": 35100367
+        "Letter R (The Lab)": 35100367,
+        "Letter K (The Lab)": 38502638,
+        "Letter N (The Lab)": 38502641
       }
     },
     {
@@ -5681,12 +5965,16 @@
         "Toasty Terrace: Item Box 47": 35214866,
         "Toasty Terrace: Item Box 48": 35214867,
         "Toasty Terrace: Item Box 49": 35214868,
-        "Toasty Terrace: Item Box 50": 35214869
+        "Toasty Terrace: Item Box 50": 35214869,
+        "Toasty Terrace: Letter K": 35214951,
+        "Toasty Terrace: Letter N": 35214954
       },
       "items": {
         "Letter C (Toasty Terrace)": 35100370,
         "Letter T (Toasty Terrace)": 35100371,
-        "Letter R (Toasty Terrace)": 35100372
+        "Letter R (Toasty Terrace)": 35100372,
+        "Letter K (Toasty Terrace)": 38502674,
+        "Letter N (Toasty Terrace)": 38502677
       }
     },
     {
@@ -5760,12 +6048,16 @@
         "Tomb Temple: Item Box 47": 35215066,
         "Tomb Temple: Item Box 48": 35215067,
         "Tomb Temple: Item Box 49": 35215068,
-        "Tomb Temple: Item Box 50": 35215069
+        "Tomb Temple: Item Box 50": 35215069,
+        "Tomb Temple: Letter K": 35215151,
+        "Tomb Temple: Letter N": 35215154
       },
       "items": {
         "Letter C (Tomb Temple)": 35100375,
         "Letter T (Tomb Temple)": 35100376,
-        "Letter R (Tomb Temple)": 35100377
+        "Letter R (Tomb Temple)": 35100377,
+        "Letter K (Tomb Temple)": 38502710,
+        "Letter N (Tomb Temple)": 38502713
       }
     },
     {
@@ -5839,12 +6131,16 @@
         "Towers: Item Box 47": 35215266,
         "Towers: Item Box 48": 35215267,
         "Towers: Item Box 49": 35215268,
-        "Towers: Item Box 50": 35215269
+        "Towers: Item Box 50": 35215269,
+        "Towers: Letter K": 35215351,
+        "Towers: Letter N": 35215354
       },
       "items": {
         "Letter C (Towers)": 35100380,
         "Letter T (Towers)": 35100381,
-        "Letter R (Towers)": 35100382
+        "Letter R (Towers)": 35100382,
+        "Letter K (Towers)": 38502746,
+        "Letter N (Towers)": 38502749
       }
     },
     {
@@ -5918,12 +6214,16 @@
         "Tribal Trials: Item Box 47": 35215466,
         "Tribal Trials: Item Box 48": 35215467,
         "Tribal Trials: Item Box 49": 35215468,
-        "Tribal Trials: Item Box 50": 35215469
+        "Tribal Trials: Item Box 50": 35215469,
+        "Tribal Trials: Letter K": 35215551,
+        "Tribal Trials: Letter N": 35215554
       },
       "items": {
         "Letter C (Tribal Trials)": 35100385,
         "Letter T (Tribal Trials)": 35100386,
-        "Letter R (Tribal Trials)": 35100387
+        "Letter R (Tribal Trials)": 35100387,
+        "Letter K (Tribal Trials)": 38502782,
+        "Letter N (Tribal Trials)": 38502785
       }
     },
     {
@@ -5997,12 +6297,16 @@
         "TV World: Item Box 47": 35215666,
         "TV World: Item Box 48": 35215667,
         "TV World: Item Box 49": 35215668,
-        "TV World: Item Box 50": 35215669
+        "TV World: Item Box 50": 35215669,
+        "TV World: Letter K": 35215751,
+        "TV World: Letter N": 35215754
       },
       "items": {
         "Letter C (TV World)": 35100390,
         "Letter T (TV World)": 35100391,
-        "Letter R (TV World)": 35100392
+        "Letter R (TV World)": 35100392,
+        "Letter K (TV World)": 38502818,
+        "Letter N (TV World)": 38502821
       }
     },
     {
@@ -6076,12 +6380,16 @@
         "Ursa Glacier: Item Box 47": 35215866,
         "Ursa Glacier: Item Box 48": 35215867,
         "Ursa Glacier: Item Box 49": 35215868,
-        "Ursa Glacier: Item Box 50": 35215869
+        "Ursa Glacier: Item Box 50": 35215869,
+        "Ursa Glacier: Letter K": 35215951,
+        "Ursa Glacier: Letter N": 35215954
       },
       "items": {
         "Letter C (Ursa Glacier)": 35100395,
         "Letter T (Ursa Glacier)": 35100396,
-        "Letter R (Ursa Glacier)": 35100397
+        "Letter R (Ursa Glacier)": 35100397,
+        "Letter K (Ursa Glacier)": 38502854,
+        "Letter N (Ursa Glacier)": 38502857
       }
     },
     {
@@ -6155,12 +6463,16 @@
         "Vanilla Lake 2: Item Box 47": 35216066,
         "Vanilla Lake 2: Item Box 48": 35216067,
         "Vanilla Lake 2: Item Box 49": 35216068,
-        "Vanilla Lake 2: Item Box 50": 35216069
+        "Vanilla Lake 2: Item Box 50": 35216069,
+        "Vanilla Lake 2: Letter K": 35216151,
+        "Vanilla Lake 2: Letter N": 35216154
       },
       "items": {
         "Letter C (Vanilla Lake 2)": 35100400,
         "Letter T (Vanilla Lake 2)": 35100401,
-        "Letter R (Vanilla Lake 2)": 35100402
+        "Letter R (Vanilla Lake 2)": 35100402,
+        "Letter K (Vanilla Lake 2)": 38502890,
+        "Letter N (Vanilla Lake 2)": 38502893
       }
     },
     {
@@ -6234,12 +6546,16 @@
         "Wario Stadium: Item Box 47": 35216266,
         "Wario Stadium: Item Box 48": 35216267,
         "Wario Stadium: Item Box 49": 35216268,
-        "Wario Stadium: Item Box 50": 35216269
+        "Wario Stadium: Item Box 50": 35216269,
+        "Wario Stadium: Letter K": 35216351,
+        "Wario Stadium: Letter N": 35216354
       },
       "items": {
         "Letter C (Wario Stadium)": 35100405,
         "Letter T (Wario Stadium)": 35100406,
-        "Letter R (Wario Stadium)": 35100407
+        "Letter R (Wario Stadium)": 35100407,
+        "Letter K (Wario Stadium)": 38502926,
+        "Letter N (Wario Stadium)": 38502929
       }
     },
     {
@@ -6313,12 +6629,16 @@
         "Wumpa World: Item Box 47": 35216466,
         "Wumpa World: Item Box 48": 35216467,
         "Wumpa World: Item Box 49": 35216468,
-        "Wumpa World: Item Box 50": 35216469
+        "Wumpa World: Item Box 50": 35216469,
+        "Wumpa World: Letter K": 35216551,
+        "Wumpa World: Letter N": 35216554
       },
       "items": {
         "Letter C (Wumpa World)": 35100410,
         "Letter T (Wumpa World)": 35100411,
-        "Letter R (Wumpa World)": 35100412
+        "Letter R (Wumpa World)": 35100412,
+        "Letter K (Wumpa World)": 38502962,
+        "Letter N (Wumpa World)": 38502965
       }
     },
     {
@@ -6392,12 +6712,16 @@
         "Yoshi Circuit: Item Box 47": 35216666,
         "Yoshi Circuit: Item Box 48": 35216667,
         "Yoshi Circuit: Item Box 49": 35216668,
-        "Yoshi Circuit: Item Box 50": 35216669
+        "Yoshi Circuit: Item Box 50": 35216669,
+        "Yoshi Circuit: Letter K": 35216751,
+        "Yoshi Circuit: Letter N": 35216754
       },
       "items": {
         "Letter C (Yoshi Circuit)": 35100415,
         "Letter T (Yoshi Circuit)": 35100416,
-        "Letter R (Yoshi Circuit)": 35100417
+        "Letter R (Yoshi Circuit)": 35100417,
+        "Letter K (Yoshi Circuit)": 38502998,
+        "Letter N (Yoshi Circuit)": 38503001
       }
     },
     {
@@ -6471,12 +6795,16 @@
         "Yoshi Circuit Legacy: Item Box 47": 35216866,
         "Yoshi Circuit Legacy: Item Box 48": 35216867,
         "Yoshi Circuit Legacy: Item Box 49": 35216868,
-        "Yoshi Circuit Legacy: Item Box 50": 35216869
+        "Yoshi Circuit Legacy: Item Box 50": 35216869,
+        "Yoshi Circuit Legacy: Letter K": 35216951,
+        "Yoshi Circuit Legacy: Letter N": 35216954
       },
       "items": {
         "Letter C (Yoshi Circuit Legacy)": 35100420,
         "Letter T (Yoshi Circuit Legacy)": 35100421,
-        "Letter R (Yoshi Circuit Legacy)": 35100422
+        "Letter R (Yoshi Circuit Legacy)": 35100422,
+        "Letter K (Yoshi Circuit Legacy)": 38503034,
+        "Letter N (Yoshi Circuit Legacy)": 38503037
       }
     },
     {
@@ -6550,12 +6878,16 @@
         "Sewer Baby Park: Item Box 47": 35217066,
         "Sewer Baby Park: Item Box 48": 35217067,
         "Sewer Baby Park: Item Box 49": 35217068,
-        "Sewer Baby Park: Item Box 50": 35217069
+        "Sewer Baby Park: Item Box 50": 35217069,
+        "Sewer Baby Park: Letter K": 35217151,
+        "Sewer Baby Park: Letter N": 35217154
       },
       "items": {
         "Letter C (Sewer Baby Park)": 35100425,
         "Letter T (Sewer Baby Park)": 35100426,
-        "Letter R (Sewer Baby Park)": 35100427
+        "Letter R (Sewer Baby Park)": 35100427,
+        "Letter K (Sewer Baby Park)": 38503070,
+        "Letter N (Sewer Baby Park)": 38503073
       }
     },
     {
@@ -6629,12 +6961,16 @@
         "Sid's House: Item Box 47": 35217266,
         "Sid's House: Item Box 48": 35217267,
         "Sid's House: Item Box 49": 35217268,
-        "Sid's House: Item Box 50": 35217269
+        "Sid's House: Item Box 50": 35217269,
+        "Sid's House: Letter K": 35217351,
+        "Sid's House: Letter N": 35217354
       },
       "items": {
         "Letter C (Sid's House)": 35100430,
         "Letter T (Sid's House)": 35100431,
-        "Letter R (Sid's House)": 35100432
+        "Letter R (Sid's House)": 35100432,
+        "Letter K (Sid's House)": 38503106,
+        "Letter N (Sid's House)": 38503109
       }
     },
     {
@@ -6708,12 +7044,16 @@
         "Specter Station: Item Box 47": 35217466,
         "Specter Station: Item Box 48": 35217467,
         "Specter Station: Item Box 49": 35217468,
-        "Specter Station: Item Box 50": 35217469
+        "Specter Station: Item Box 50": 35217469,
+        "Specter Station: Letter K": 35217551,
+        "Specter Station: Letter N": 35217554
       },
       "items": {
         "Letter C (Specter Station)": 35100435,
         "Letter T (Specter Station)": 35100436,
-        "Letter R (Specter Station)": 35100437
+        "Letter R (Specter Station)": 35100437,
+        "Letter K (Specter Station)": 38503142,
+        "Letter N (Specter Station)": 38503145
       }
     },
     {
@@ -6787,12 +7127,16 @@
         "Tizi Challenge: Item Box 47": 35217666,
         "Tizi Challenge: Item Box 48": 35217667,
         "Tizi Challenge: Item Box 49": 35217668,
-        "Tizi Challenge: Item Box 50": 35217669
+        "Tizi Challenge: Item Box 50": 35217669,
+        "Tizi Challenge: Letter K": 35217751,
+        "Tizi Challenge: Letter N": 35217754
       },
       "items": {
         "Letter C (Tizi Challenge)": 35100440,
         "Letter T (Tizi Challenge)": 35100441,
-        "Letter R (Tizi Challenge)": 35100442
+        "Letter R (Tizi Challenge)": 35100442,
+        "Letter K (Tizi Challenge)": 38503178,
+        "Letter N (Tizi Challenge)": 38503181
       }
     },
     {
@@ -6866,12 +7210,16 @@
         "Gossamer's Castle: Item Box 47": 35217866,
         "Gossamer's Castle: Item Box 48": 35217867,
         "Gossamer's Castle: Item Box 49": 35217868,
-        "Gossamer's Castle: Item Box 50": 35217869
+        "Gossamer's Castle: Item Box 50": 35217869,
+        "Gossamer's Castle: Letter K": 35217951,
+        "Gossamer's Castle: Letter N": 35217954
       },
       "items": {
         "Letter C (Gossamer's Castle)": 35100445,
         "Letter T (Gossamer's Castle)": 35100446,
-        "Letter R (Gossamer's Castle)": 35100447
+        "Letter R (Gossamer's Castle)": 35100447,
+        "Letter K (Gossamer's Castle)": 38503214,
+        "Letter N (Gossamer's Castle)": 38503217
       }
     }
   ],
@@ -6943,7 +7291,9 @@
       ["item_box_47", 66, "Item Box 47"],
       ["item_box_48", 67, "Item Box 48"],
       ["item_box_49", 68, "Item Box 49"],
-      ["item_box_50", 69, "Item Box 50"]
+      ["item_box_50", 69, "Item Box 50"],
+      ["letter_k", 151, "Letter K"],
+      ["letter_n", 154, "Letter N"]
     ],
     "items": [
       ["letter_c", 0, "C"],

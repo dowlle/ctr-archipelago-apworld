@@ -25,8 +25,8 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "70e2885c4013393c366da1f727e91506a89afb15"
-REGISTRY_DIGEST = "eef5668c327a9e716059f6d65a8d6a36ab1f27f4e27d30a3377ec28aa8ba00e4"
+REGISTRY_COMMIT = "3c55186270a3cb125e03a2d5a91dada4f54248b0"
+REGISTRY_DIGEST = "da77a7d9671febcbbfb55f6432cf59ac3a3233691748539ec9d7ca76c027c9dc"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")
@@ -153,9 +153,11 @@ class TestReservedNotMinted(unittest.TestCase):
         for track in nt.NAMED_TRACKS:
             base = nt.NAMED_LOCATION_BASE + nt.LOCATION_BUDGET * track.block_index
             used = {code - base for _n, code in nt.track_locations(track)}
-            self.assertEqual(used, set(range(0, 17)) | set(range(20, 70)))
+            self.assertEqual(used, set(range(0, 17)) | set(range(20, 70)) | {151, 154})
+            self.assertEqual(L[f"{track.ap_name}: Letter K"], base + 151)
+            self.assertEqual(L[f"{track.ap_name}: Letter N"], base + 154)
         self.assertEqual([(lo, hi) for lo, hi, _l in nt.RESERVED_LOCATION_OFFSETS],
-                         [(17, 19), (70, 119), (120, 140), (141, 199)])
+                         [(17, 19), (70, 119), (120, 140), (141, 150), (152, 153), (155, 176), (177, 199)])
 
     def test_arcade_names_belong_to_the_separate_259_mint(self):
         for a,arena in enumerate(("Parking Lot", "The North Bowl", "Lab Basement")):
@@ -246,7 +248,7 @@ class TestThirdPassLrg2Blocks(unittest.TestCase):
                 self.assertEqual(L[f"{name}: Item Box 15"], first_location + 34)
                 self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"],
                                  [first_letter, first_letter + 1, first_letter + 2])
-                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)  # Ordinary pickups own a separate range.
+                self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 69 + 128)  # Ordinary pickups own a separate range.
 
     def test_sids_house_key_has_no_dash_before_the_s(self):
         self.assertIn("sids-house", {r.track_key for r in nt.NAMED_TRACKS})
@@ -270,7 +272,7 @@ class TestFourthPassGossamersCastle(unittest.TestCase):
         self.assertEqual(nt.location_code(89, "trophy"), 35217800)
         self.assertEqual(L[f"{name}: Item Box 15"], 35217834)
         self.assertEqual([I[f"Letter {c} ({name})"] for c in "CTR"], [35100445, 35100446, 35100447])
-        self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 67 + 128)
+        self.assertEqual(sum(1 for n in L if n.startswith(f"{name}: ")), 69 + 128)
 
     def test_country_speedway_1_3_1_is_a_revision_of_block_17(self):
         row = destinations.named_track("country-speedway")
@@ -357,6 +359,19 @@ class TestBuildScript(unittest.TestCase):
         b, root, commit, _digest = self._repo(tamper=True)
         with self.assertRaises(SystemExit):
             b.build(root, commit)
+
+    def test_cli_refuses_a_pin_without_an_origin_catalogue(self):
+        from unittest.mock import patch
+
+        b, root, commit, _digest = self._repo()
+        outputs = {name: root / name for name in ("OUTPUT", "CREDITS_OUTPUT", "ORIGINS_OUTPUT")}
+        for path in outputs.values():
+            path.write_bytes(b"{}\n")
+        with patch.multiple(b, **outputs):
+            for mode in ([], ["--check"]):
+                with self.subTest(mode=mode), self.assertRaisesRegex(SystemExit, "lacks origins.json"):
+                    b.main(["--registry", str(root), "--commit", commit, *mode])
+        self.assertTrue(all(path.read_bytes() == b"{}\n" for path in outputs.values()))
 
     def test_dropping_a_shipped_block_is_refused(self):
         b, root, commit, _digest = self._repo()

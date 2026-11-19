@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from Options import (Choice, OptionError, OptionGroup, OptionDict, OptionList, OptionSet, DefaultOnToggle,
-                     Toggle, NamedRange, Range, PerGameCommonOptions, StartInventoryPool, Visibility)
+                     Toggle, NamedRange, Range, StartInventoryPool, Visibility)
 
 from . import characters, legacy_yaml
 from .content_playthrough import DEFAULT_REQUIREMENT_WEIGHTS
@@ -11,6 +11,7 @@ from .boss_track_shuffle import VENUES as BOSS_VENUE_TRACKS
 from .boss_encounters import (OPPONENT_NAMES as BOSS_GARAGE_OPPONENTS, POOL_NAMES as BOSS_OPPONENT_NAMES,
                               GARAGE_FAMILIES as BOSS_ATTACK_FAMILIES, FAMILIES as OXIDE_ATTACK_FAMILIES)
 from .arena_content import ARENAS, ARCADE
+from .origin_options import NAME_OPTION_TYPES, PerGameCommonOptions
 
 ARENA_NAMES = tuple(ARENAS.values())
 ORIGINAL_ARENA_NAMES = tuple(name for level, name in ARENAS.items() if level not in ARCADE)
@@ -523,6 +524,13 @@ class RelicPerfectChecks(Toggle):
     You get the check even when your time does not earn a relic, and it
     never changes which relic you get."""
     display_name = "Relic Race Perfect Checks"
+
+
+class TrackOriginLetters(DefaultOnToggle):
+    """Use the origin game's letters on verified custom tracks that ship those models."""
+    display_name = "Track Origin Letters"
+    # The emitted track code is already shown in the content-plan spoiler.
+    visibility = Visibility.all & ~Visibility.spoiler
 
 
 class Lettersanity(Choice):
@@ -1832,6 +1840,7 @@ class ctrAPOptions(PerGameCommonOptions):
     cup_only_podium_rungs: CupOnlyPodiumRungs
     relic_perfect_checks: RelicPerfectChecks
     lettersanity: Lettersanity
+    track_origin_letters: TrackOriginLetters
     letters_per_track: LettersPerTrack
     cup_sweep_checks: CupSweepChecks
     lap_completion_checks: LapCompletionChecks
@@ -1904,7 +1913,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, LettersPerTrack, CupSweepChecks,
+    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
@@ -1926,4 +1935,4 @@ def create_option_groups() -> List[OptionGroup]:
     return [
         OptionGroup(name=x, options=y)
         for x, y in ap_ctr_option_groups.items()
-    ]
+    ] + [OptionGroup("Item & Location Options", list(NAME_OPTION_TYPES), start_collapsed=True)]

@@ -40,7 +40,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               tizi_madness, turbo_grant, pad_budget)
+               tizi_madness, turbo_grant, pad_budget, track_origins)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -414,7 +414,7 @@ def relic_races(entries):
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
-                      repeatable_pickups=False, tizi_mask=False):
+                      repeatable_pickups=False, tizi_mask=False, tracks=()):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -461,8 +461,9 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
-            # Lap completion, then the versioned optional pickup semantics.
+            # Lap completion, origin letters, then the versioned optional pickup semantics.
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
+            + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
             + ([tizi_madness.FEATURE] if tizi_mask else []))
 
@@ -884,12 +885,13 @@ def draw_relic_checks(world, tracks, totals):
     return out
 
 
-def letter_suffix(index):
-    return f"Letter {LETTERS[index]}"
+def letter_glyph(track, index):
+    return track.get("letters", track_origins.DEFAULT)[index]
 
 
 def letter_code(track, index):
-    return track_location(track, LETTER_KEYS[index], letter_suffix(index))[1]
+    glyph = letter_glyph(track, index)
+    return track_location(track, f"letter_{glyph.lower()}", f"Letter {glyph}")[1]
 
 
 def letter_item(track, index):
@@ -898,8 +900,9 @@ def letter_item(track, index):
     Vortex's `Letter C (Cortex Vortex)` items, or the retail
     `Letter C (<track>)` item."""
     if track["origin"] == "custom" and "named_block" in track:
-        return (named_tracks.item_name(track["room_title"], LETTER_KEYS[index]),
-                named_tracks.item_code(track["named_block"], LETTER_KEYS[index]))
+        key = f"letter_{letter_glyph(track, index).lower()}"
+        return (named_tracks.item_name(track["room_title"], key),
+                named_tracks.item_code(track["named_block"], key))
     if track["origin"] == "custom":
         return (custom_check_name("letter_item", track["custom_slot"], index),
                 custom_check_code("letter_item", track["custom_slot"], index))
@@ -1041,7 +1044,7 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
                                  RUNG_SUFFIX[key], [(race_mode("trophy"), key)]))
         if mode == "ctr":
             for index in letter_layout(track, settings, letters)[0]:
-                out.append(check(letter_code(track, index), "letter", letter_suffix(index),
+                out.append(check(letter_code(track, index), "letter", f"Letter {letter_glyph(track, index)}",
                                  [("ctr", LETTER_KEYS[index])]))
         if mode == "relic" and settings.get("relic_perfect"):
             out.append(check(track_location(track, "relic_perfect", PERFECT_SUFFIX)[1], "perfect",
@@ -1570,6 +1573,12 @@ def draw_plan(world, key_estimate=True):
     # Per-track check families (#133 PR 3b). Lettersanity modes 1 and 2 draw
     # letters_per_track letters per CTR Challenge here, before the ledger is
     # sized, in pad order; nothing is drawn when Lettersanity is off.
+    if o.track_origin_letters.value:
+        for track in chosen:
+            if "named_block" in track and "ctr" in track["modes"]:
+                code = track_origins.letters_for_package(package_by_id[track["package_id"]])
+                if code != track_origins.DEFAULT:
+                    track["letters"] = code
     letters = {}
     if settings.get("lettersanity") in (1, 2):
         for index, track in enumerate(chosen):
@@ -1745,8 +1754,13 @@ def draw_plan(world, key_estimate=True):
         selected_sanity = {sanity.code(by_id[row["track_id"]], family, number)
                            for row in (sanity_record or {}).get("tracks", ())
                            for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
+        selected_origin_checks = {letter_code(chosen[index], slot)
+                                  for index, slots in letters.items() if "letters" in chosen[index]
+                                  for slot in slots}
         filler_exclusions = {name for name in filler_exclusions
-                             if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
+                             if (name not in frozen_sanity or frozen_sanity[name] in selected_sanity)
+                             and (not track_origins.is_origin_location(CTR_LOCATION_IDS.get(name))
+                                  or CTR_LOCATION_IDS[name] in selected_origin_checks)}
         if repeatable_pickups and settings.get("wumpa") == "per_track":
             oxide_track = venue_record(content_bosses.OXIDE_STATION)
             if not any(track["id"] == oxide_track["id"] for track in sanity_tracks):
@@ -2050,7 +2064,8 @@ def draw_plan(world, key_estimate=True):
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes,boss_record,
                                                     world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
-                                                    ctr_first, shop, bool(wumpa_goal), True, sanity_record, repeatable_pickups),
+                                                    ctr_first, shop, bool(wumpa_goal), True, sanity_record,
+                                                    repeatable_pickups=repeatable_pickups, tracks=plan_tracks),
                 pad_requirements=pad_record, pad_client=pad_client(o))
     if ctr_first:
         plan["adventure_structure"] = CTR_FIRST
@@ -2776,6 +2791,13 @@ def validate(plan, *, restoring=False):
             and [p["id"] for p in plan["packages"]] == sorted(packages),
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
+    for track in tracks.values():
+        if "letters" in track:
+            code = track["letters"]
+            require(track.get("origin") == "custom" and "named_block" in track and "ctr" in track.get("modes", ())
+                    and isinstance(code, str) and len(code) == len(set(code)) == 3
+                    and set(code) <= set(track_origins.DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS),
+                    "invalid origin letter code")
     checks, requirements = table("checks", "location"), table("requirements")
     carried_boxes = checks if restoring and "room_compatibility" in plan else None
     # Boss garages (#133 PR 6): encounters exist exactly with the `bosses`
@@ -2840,7 +2862,8 @@ def validate(plan, *, restoring=False):
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
-                                                         content_pickups.enabled(plan), tizi_mask),
+                                                         repeatable_pickups=content_pickups.enabled(plan),
+                                                         tizi_mask=tizi_mask, tracks=plan["tracks"]),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -3025,6 +3048,7 @@ def validate(plan, *, restoring=False):
     # A track raced only in cups is checked like a standalone one (#133 PR 5).
     for track_id in sorted(leg_tracks - used_tracks):
         track = tracks[track_id]
+        require("letters" not in track, "origin letters require a standalone CTR Challenge")
         if track["origin"] == "retail":
             i = track["retail_id"]
             require(i in RETAIL and i not in retail_ids, "unknown or duplicate retail track")
