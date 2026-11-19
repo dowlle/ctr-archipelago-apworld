@@ -40,7 +40,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               turbo_grant, pad_budget)
+               tizi_madness, turbo_grant, pad_budget)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -414,7 +414,7 @@ def relic_races(entries):
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
-                      repeatable_pickups=False):
+                      repeatable_pickups=False, tizi_mask=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -463,7 +463,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
             # Lap completion, then the versioned optional pickup semantics.
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
-            + ([content_pickups.FEATURE] if repeatable_pickups else []))
+            + ([content_pickups.FEATURE] if repeatable_pickups else [])
+            + ([tizi_madness.FEATURE] if tizi_mask else []))
 
 
 def family_settings(options):
@@ -2050,6 +2051,8 @@ def draw_plan(world, key_estimate=True):
         plan["capability"] = capability
     if global_checks:
         plan["global_checks"] = global_checks
+        if tizi_madness.MaskGates(plan):
+            plan["required_features"].append(tizi_madness.FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
     if sanity_record:
@@ -2296,7 +2299,6 @@ def create_regions(world):
     package_by_id = {p["id"]: p for p in plan["packages"]}
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
     # A4-96: what races Tizi Madness needs the Mask with Itemsanity on.
-    from . import tizi_madness
     mask_gates = tizi_madness.MaskGates(plan)
 
     def with_mask(term, route):
@@ -2811,11 +2813,13 @@ def validate(plan):
     wumpa_arm = content_wumpa.goal_arm(plan["goal"])
     fixed = content_fixed.check_settings(plan) if "fixed_items" in plan else {}
     guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
+    tizi_mask = tizi_madness.FEATURE in plan["required_features"]
+    require(not tizi_mask or tizi_madness.MaskGates(plan), "Tizi Mask feature without a raced Tizi track and Itemsanity")
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
-                                                         content_pickups.enabled(plan)),
+                                                         content_pickups.enabled(plan), tizi_mask),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")

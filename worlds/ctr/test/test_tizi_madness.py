@@ -222,8 +222,22 @@ class TestMaskLogic(unittest.TestCase):
     def test_without_itemsanity_no_item_is_needed(self):
         world = world_with(tizi_descriptor(), "hard", itemsanity=False)
         self.assertFalse(tizi_madness.MaskGates(world.ctr_content_plan))
+        self.assertNotIn(tizi_madness.FEATURE, world.ctr_content_plan["required_features"])
         pad, _entry = self.tizi_pad(world)
         self.assertTrue(world.multiworld.get_entrance(pad["id"], world.player).access_rule(items_but(world)))
+
+    def test_mask_feature_survives_win_logic_export_fallback(self):
+        world = world_with(tizi_descriptor(), "hard", itemsanity=True)
+        plan = world.ctr_content_plan
+        trophy = next(c for c in plan["checks"] if c["owner"] == TIZI_ID and c["kind"] == "trophy")
+        location = world.multiworld.get_location(content_plan.LOCATION_BY_CODE[trophy["location"]], world.player)
+        original = location.access_rule
+        location.access_rule = lambda state: original(state)
+        self.assertFalse(location.can_reach(items_but(world, "Mask")))
+        wire = world.fill_slot_data()
+        self.assertNotIn("win_logic", wire)
+        self.assertEqual(wire["content_plan"]["required_features"][-1], tizi_madness.FEATURE)
+        self.assertTrue(content_plan.validate(wire["content_plan"]))
 
     def test_the_gate_is_in_the_exported_win_logic(self):
         # Native's DeathLink stakes read the exported terms (Contract 7m): the

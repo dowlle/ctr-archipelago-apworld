@@ -102,13 +102,14 @@
           "pad_client_v1",
           "lap_checks_v1",
           "repeatable_pickups_v1",
+          "tizi_mask_v1",
           "box_spots_v1",
           "box_count_v1",
           "itemboxsanity_v1",
           "wumpasanity_v1"
         ]
       },
-      "maxItems": 36,
+      "maxItems": 37,
       "minItems": 1,
       "uniqueItems": true
     },
