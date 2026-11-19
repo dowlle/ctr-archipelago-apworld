@@ -62,7 +62,7 @@ import json
 
 from Options import OptionError
 
-from . import box_spots, named_tracks, crate_exclusions
+from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace
 from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
@@ -97,6 +97,12 @@ def settings(options):
     return record
 
 
+def reviewed_pickups(package):
+    """Exact LEVs with reviewed physical pickup ranks (the `pickup_rules` marker)."""
+    return (country_speedway.matches(package) or toasty_terrace.matches(package)
+            or royal_raceway.matches(package) or green_hill_raceway.matches(package))
+
+
 def add_spot_sets(record, tracks, package_by_id, seed, player):
     """Put `spot_sets` into a record from settings(): the pick of every track
     in `tracks` that has a spot file. Draws nothing from the world's random
@@ -110,6 +116,11 @@ def add_spot_sets(record, tracks, package_by_id, seed, player):
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
+    pickups = [t["id"] for t in tracks if t.get("origin") == "custom"
+               and t["id"] not in {s["track_id"] for s in sets}
+               and reviewed_pickups(package_by_id.get(t.get("package_id")))]
+    if pickups:
+        record[country_speedway.BOX_RULES_KEY] = pickups
     excluded = crate_exclusions.records(tracks, package_by_id, {s["track_id"] for s in sets})
     if excluded:
         record[crate_exclusions.KEY] = excluded
@@ -123,6 +134,12 @@ def spot_sets(record):
 
 def keep_spot_sets(record, track_ids):
     """Drop the spot sets of tracks that hold no pad of the plan."""
+    if record and country_speedway.BOX_RULES_KEY in record:
+        kept = [tid for tid in record[country_speedway.BOX_RULES_KEY] if tid in track_ids]
+        if kept:
+            record[country_speedway.BOX_RULES_KEY] = kept
+        else:
+            del record[country_speedway.BOX_RULES_KEY]
     if record and SPOT_KEY in record:
         record[SPOT_KEY] = [s for s in record[SPOT_KEY] if s["track_id"] in track_ids]
     if record and crate_exclusions.KEY in record:
@@ -138,9 +155,14 @@ def check_settings(record, capability=None):
     """Shape and values of a plan's `item_boxes` record. With the capability
     record (#133 PR 4c) present, the two Shortcut Knowledge tiers agree. The
     spot sets are checked against their tracks by check_spot_sets."""
-    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY, "box_count"} != set(KEYS):
+    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY, "box_count", country_speedway.BOX_RULES_KEY} != set(KEYS):
         error("item_boxes must be a mapping of shortcut_knowledge and, with box spots, spot_sets.")
     tier = record["shortcut_knowledge"]
+    if country_speedway.BOX_RULES_KEY in record:
+        ids = record[country_speedway.BOX_RULES_KEY]
+        if (not isinstance(ids, list) or not ids or any(type(tid) is not str for tid in ids)
+                or len(set(ids)) != len(ids)):
+            error("item_boxes.pickup_rules must be a nonempty list of unique track ids.")
     if "box_count" in record and (type(record["box_count"]) is not int or not 1 <= record["box_count"] <= 50
                                   or record["box_count"] == 15):
         error("item_boxes.box_count must be 1 to 50, omitting the default 15.")
@@ -165,6 +187,12 @@ def check_spot_sets(record, tracks, packages):
     build, each a valid pick from that file."""
     if not record:
         return
+    by_id = {t["id"]: t for t in tracks}
+    for tid in record.get(country_speedway.BOX_RULES_KEY, ()):
+        track = by_id.get(tid)
+        if (not track or track.get("origin") != "custom" or tid in spot_sets(record)
+                or not reviewed_pickups(packages.get(track.get("package_id")))):
+            error("item_boxes.pickup_rules names an unsupported physical pickup revision.")
     if crate_exclusions.KEY in record:
         expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, spot_sets(record))}
         # A room generated before a later catalog entry carries only the rows
@@ -249,6 +277,17 @@ def seat_indices(crates, slots=SLOTS_PER_TRACK):
     return [i * crates // seats for i in range(seats)]
 
 
+def physical_seat(track, record, package, number):
+    """One-based native weapon ordinal after this room's exclusions and spread."""
+    excluded = next((row["crates"] for row in record.get(crate_exclusions.KEY, ())
+                     if row["track_id"] == track["id"]), ())
+    omitted = {row["ordinal"] for row in excluded}
+    raw = package["capabilities"]["weapon_crates"]
+    crates = [n for n in range(1, raw + 1) if n not in omitted]
+    seats = seat_indices(len(crates), min(record.get("box_count", 15), 15))
+    return crates[seats[number - 1]]
+
+
 def retail_slots(track_name, tier):
     """The 1-based retail box slots a track creates at a Shortcut Knowledge tier."""
     return [slot for slot in range(1, PLACED_COUNTS[track_name] + 1)
@@ -291,4 +330,11 @@ def box_terms(track, slot, capability, package=None, record=None):
     if track["origin"] == "retail":
         boost_min, needs_stats = BOX_RULES.get((track["display_name"], slot), (0, False))
         return (boost_min if boost_on else 0), bool(needs_stats and stats_on)
+    if (track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ())
+            and (toasty_terrace.matches(package) or royal_raceway.matches(package)
+                 or green_hill_raceway.matches(package))):
+        return 0, False
+    if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()) and country_speedway.matches(package):
+        rank = country_speedway.rank("weapon_crate", physical_seat(track, record, package, slot))
+        return (rank if boost_on else 0), False
     return (finish_boost(track, capability, package) if boost_on else 0), False

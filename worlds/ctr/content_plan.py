@@ -38,9 +38,9 @@ from . import (content_item_pool, characters, cortex_vortex, destinations, named
 from .custom_check_namespace import custom_check_code, custom_check_name
 from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
-from . import (sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
+from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               turbo_grant, pad_budget)
+               tizi_madness, turbo_grant, pad_budget)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -413,7 +413,8 @@ def relic_races(entries):
 
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
-                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None):
+                      guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
+                      repeatable_pickups=False, tizi_mask=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -460,8 +461,10 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
             + ([PAD_CLIENT_FEATURE] if pad_client else [])
-            # Lap completion checks (#344) last.
-            + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else []))
+            # Lap completion, then the versioned optional pickup semantics.
+            + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
+            + ([content_pickups.FEATURE] if repeatable_pickups else [])
+            + ([tizi_madness.FEATURE] if tizi_mask else []))
 
 
 def family_settings(options):
@@ -1308,6 +1311,12 @@ def draw_plan(world, key_estimate=True):
     forced_options.raise_if_starting_as_removed_oxide(world)
     forced_options.warn_racer_locked_pads_boolean_normalized(world)
     packages = resolve_packages(list(o.custom_tracks.value))
+    # New rooms carry measured turbo metadata for this exact LEV. Persisted
+    # rooms keep their descriptor, including the historical missing-field floor.
+    from . import country_speedway, toasty_terrace
+    for package in packages:
+        if country_speedway.matches(package) or toasty_terrace.matches(package):
+            package["capabilities"]["super_turbo_pads"] = False
     twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
     if twin is not None:
         error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
@@ -1428,6 +1437,16 @@ def draw_plan(world, key_estimate=True):
               "No content or items were added.")
     settings = family_settings(o)
     capability = content_capability.settings(o)
+    if capability.get("boost_mode"):
+        # Royal Raceway 1.0.0 (driven 2026-11-18): every finished-race check needs
+        # two ranks. Candidates only; the record is cut to the chosen tracks below.
+        floors = content_capability.finish_floor_tracks([(t, pkg) for t, pkg, _ in pool])
+        if floors:
+            capability[content_capability.FLOORS_KEY] = floors
+        # Green Hill Raceway 2.0.0 (driven 2026-11-18): the finish line needs no rank.
+        free = content_capability.finish_free_tracks([(t, pkg) for t, pkg, _ in pool])
+        if free:
+            capability[content_capability.FREE_KEY] = free
     held = starting_counts(o)
     # Base counts, for the colours Turbo Track's vanilla rule asks (row 10i).
     start_base = content_item_pool.normalize(o.item_pool.value)[0]
@@ -1626,9 +1645,18 @@ def draw_plan(world, key_estimate=True):
     venue_record = lambda name: content_bosses.venue_record(name, RETAIL, cortex_track(),
                                                             {t["id"]: t for t in candidates if t.get("origin") == "custom"})
     sanity_record = sanity.settings(o)
+    repeatable_pickups = bool(boss_record is not None
+                             and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED
+                             and (sanity_record or settings.get("wumpa") == "per_track"))
+    # Ordinary garages, boss cups and the Final Challenge remain repeatable.
+    # Remove only the First Challenge's contribution to optional pickups.
+    pickup_venues = ([v for g, v in boss_venues.items() if g not in boss_cups]
+                     + [leg for g in sorted(boss_cups) for leg in boss_cups[g]]
+                     + ([boss_final] if boss_record is not None
+                        and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []))
     sanity_tracks = ([t for t in chosen if is_track(t) and any(m in t["modes"] for m in ("trophy", "ctr"))]
                      + [leg for t in chosen if "cup_index" in t for leg in t["legs"]]
-                     + [venue_record(name) for name in venue_names])
+                     + [venue_record(name) for name in pickup_venues])
     sanity.add_tracks(sanity_record, sanity_tracks, package_by_id, item_boxes, world.multiworld.seed, world.player,
                       int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)}, capability)
     if sanity_record:
@@ -1639,7 +1667,7 @@ def draw_plan(world, key_estimate=True):
     # that only those races reach.
     check_count += content_race_routes.count(
         [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
-        [venue_record(name) for name in venue_names], settings,
+        [venue_record(name) for name in pickup_venues], settings,
         lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
         lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
     # Rungs of cup leg tracks without a Trophy Race: no pad, or a pad without
@@ -1701,6 +1729,10 @@ def draw_plan(world, key_estimate=True):
                            for family, kind in enumerate(sanity.KINDS) for number in row[kind]}
         filler_exclusions = {name for name in filler_exclusions
                              if name not in frozen_sanity or frozen_sanity[name] in selected_sanity}
+        if repeatable_pickups and settings.get("wumpa") == "per_track":
+            oxide_track = venue_record(content_bosses.OXIDE_STATION)
+            if not any(track["id"] == oxide_track["id"] for track in sanity_tracks):
+                filler_exclusions.discard(LOCATION_BY_CODE[wumpa_location(oxide_track)])
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
@@ -1937,6 +1969,7 @@ def draw_plan(world, key_estimate=True):
         checks.extend(content_laps.checks({t["id"]: t for t in plan_tracks}, entries + boss_entries, pads, encounters,
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
     checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability, package_by_id))
+    checks = content_pickups.omit_unrepeatable(checks)
     # Wumpa Shop slots (job J11), last, each with its drawn price.
     checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
@@ -1999,7 +2032,7 @@ def draw_plan(world, key_estimate=True):
                 required_features=required_features(requirements,entries,checks,settings,packs,racers,capability,
                                                     global_checks,item_boxes,boss_record,
                                                     world.ctr_content_items.wire()["rows"], pad_record, fixed, guarded,
-                                                    ctr_first, shop, bool(wumpa_goal), True, sanity_record),
+                                                    ctr_first, shop, bool(wumpa_goal), True, sanity_record, repeatable_pickups),
                 pad_requirements=pad_record, pad_client=pad_client(o))
     if ctr_first:
         plan["adventure_structure"] = CTR_FIRST
@@ -2010,9 +2043,16 @@ def draw_plan(world, key_estimate=True):
     if packs:
         plan["item_packs"] = packs
     if capability:
+        chosen = {t["id"] for t in plan_tracks}
+        marked = {key: [tid for tid in capability.get(key, ()) if tid in chosen]
+                  for key in (content_capability.FLOORS_KEY, content_capability.FREE_KEY)}
+        capability = {k: v for k, v in capability.items() if k not in marked}
+        capability.update({key: kept for key, kept in marked.items() if kept})
         plan["capability"] = capability
     if global_checks:
         plan["global_checks"] = global_checks
+        if tizi_madness.MaskGates(plan):
+            plan["required_features"].append(tizi_madness.FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
     if sanity_record:
@@ -2259,7 +2299,6 @@ def create_regions(world):
     package_by_id = {p["id"]: p for p in plan["packages"]}
     from .itemsanity import USEFUL_WEAPON_FAMILIES, family_count
     # A4-96: what races Tizi Madness needs the Mask with Itemsanity on.
-    from . import tizi_madness
     mask_gates = tizi_madness.MaskGates(plan)
 
     def with_mask(term, route):
@@ -2514,7 +2553,7 @@ def create_regions(world):
         location = Location(player, LOCATION_BY_CODE[check['location']], check['location'], menu)
         tests = []
         exports = []
-        for r in check["routes"]:
+        for r in content_pickups.logic_routes(check, content_pickups.enabled(plan)):
             need = check.get("boost", 0)
             if r["leg_id"] is not None:
                 need = max(need, content_cups.prefix_boost(entry_by_id[r["entry_id"]], r["leg_id"], track_by_id,
@@ -2748,11 +2787,25 @@ def validate(plan):
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
+    if content_capability.FLOORS_KEY in capability:
+        reviewed = content_capability.finish_floor_tracks(
+            [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
+        require(capability[content_capability.FLOORS_KEY] == reviewed,
+                "capability.finish_floors does not name exactly the reviewed tracks")
+    if content_capability.FREE_KEY in capability:
+        reviewed = content_capability.finish_free_tracks(
+            [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
+        require(capability[content_capability.FREE_KEY] == reviewed,
+                "capability.finish_free does not name exactly the reviewed tracks")
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
                   if "item_boxes" in plan else {})
     sanity_record = plan.get("sanity")
     sanity.validate(sanity_record, plan)
+    require(not content_pickups.enabled(plan) or (boss_record is not None
+            and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED
+            and (sanity_record or settings.get("wumpa") == "per_track")),
+            "repeatable pickup feature without Oxide pickup families")
     # Row 5: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
     ctr_first = plan.get("adventure_structure") == CTR_FIRST
     require("adventure_structure" not in plan or ctr_first, "adventure_structure must be ctr_first when present")
@@ -2760,10 +2813,13 @@ def validate(plan):
     wumpa_arm = content_wumpa.goal_arm(plan["goal"])
     fixed = content_fixed.check_settings(plan) if "fixed_items" in plan else {}
     guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
+    tizi_mask = tizi_madness.FEATURE in plan["required_features"]
+    require(not tizi_mask or tizi_madness.MaskGates(plan), "Tizi Mask feature without a raced Tizi track and Itemsanity")
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
-                                                         ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record),
+                                                         ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
+                                                         content_pickups.enabled(plan), tizi_mask),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -3018,6 +3074,8 @@ def validate(plan):
     for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters, capability, packages):
         require(check["location"] not in expected_checks, "duplicate sanity identity")
         expected_checks[check["location"]] = check
+    if content_pickups.enabled(plan):
+        expected_checks = {c["location"]: c for c in content_pickups.omit_unrepeatable(list(expected_checks.values()))}
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
