@@ -1495,7 +1495,8 @@ class CustomTracks(OptionList):
         if isinstance(data, dict):
             if data:
                 raise OptionError("CTR custom_tracks: the mapping that puts a custom track on the Purple Gem Cup is "
-                                  "gone. Use a list of track packages.")
+                                  "gone. Use Save YAML for a room on the Play Solo > Custom Tracks page "
+                                  "to get a list of track packages.")
             return cls([])
         return super().from_any(data)
 

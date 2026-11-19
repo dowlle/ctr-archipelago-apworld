@@ -1435,10 +1435,12 @@ def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: lis
             if not isinstance(source, dict) or source.get("schema_version") != 1:
                 continue
             provider = source.get("provider")
-            if (file["path"], provider) in (("metadata/saphi-source.json", "projectsaphi"),
-                                             ("metadata/seed-source.json", "ctr-seed")):
-                track_id = source.get("track_id" if provider == "projectsaphi" else "saphi_track_id")
-                public |= type(track_id) is int and track_id > 0
+            if file["path"] == "metadata/saphi-source.json" and provider == "projectsaphi":
+                ids = [source.get(key) for key in ("track_id", "lev_media_id", "vrm_media_id")]
+                public |= source.get("version") == entry["revision"] and all(type(i) is int and i > 0 for i in ids)
+            elif file["path"] == "metadata/seed-source.json" and provider == "ctr-seed":
+                track_id = source.get("saphi_track_id")
+                public |= type(track_id) is int and 0 < track_id <= 100000000
             elif file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
                 locator = dict(kind="xdelta", patch_sha256=source.get("patch_sha256"),
                                bigfile_index=source.get("bigfile_index"), source_url=source.get("source_url"))

@@ -1,5 +1,5 @@
 # A custom track seed. Requires a client built with custom tracks.
-# Any complete package descriptor is accepted: track key (content_id), file pins,
+# Any complete package descriptor is accepted: track_key, file pins,
 # authored laps and measured capability flags. relic: true also needs
 # relic_targets {sapphire, gold, platinum} in ticks (960 per second).
 # Optional measured weapon_crates: with box_locations on, a track on a named block
