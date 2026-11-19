@@ -1,10 +1,11 @@
-"""Reviewed fallback crate exclusions, keyed only by exact LEV SHA-256.
+"""Reviewed fallback crate exclusions, indexed by the source LEV SHA-256.
 
 Ordinals are one-based in instance-table order within a model family. An entry
 without a "family" is a weapon crate; "wumpa_crate" names a Wumpa crate (A4-41).
 Only weapon-crate entries ever reach the custom fallback seating or the seed's
 crate_exclusions record. Wumpa-crate entries matter to Wumpasanity only. Positions
 are signed LEV coordinates, checked again before native touches any crate.
+Carried exclusions use the new LEV pin and omit the source position.
 The world ships the list and carries the applicable entries in the seed. The
 geometry report tool never updates this list or changes generation.
 """

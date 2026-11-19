@@ -2056,8 +2056,6 @@ def draw_plan(world, key_estimate=True):
         plan["global_checks"] = global_checks
         if tizi_madness.MaskGates(plan):
             plan["required_features"].append(tizi_madness.FEATURE)
-    if any(track_rulings.carried_sources(package) for package in plan["packages"]):
-        plan["required_features"].append(track_rulings.FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
     if sanity_record:
@@ -2066,6 +2064,8 @@ def draw_plan(world, key_estimate=True):
         plan["bosses"] = boss_record
     if shop:
         plan["wumpa_shop"] = shop
+    if any(track_rulings.plan_sources(plan)):
+        plan["required_features"].append(track_rulings.FEATURE)
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -2822,11 +2822,13 @@ def validate(plan):
     guarded = content_fixed.guarded_track(plan.get("pad_requirements", {}).get("mode"), fixed, plan["pads"], plan["entries"])
     tizi_mask = tizi_madness.FEATURE in plan["required_features"]
     require(not tizi_mask or tizi_madness.MaskGates(plan), "Tizi Mask feature without a raced Tizi track and Itemsanity")
+    carried_rulings = track_rulings.enabled(plan)
+    require(not carried_rulings or any(track_rulings.plan_sources(plan)), "carried rulings without an applicable track")
     require(plan['required_features']==required_features(plan['requirements'],plan['entries'],plan['checks'],settings,packs,racers,capability,
                                                          global_checks,item_boxes,boss_record,plan['items']['rows'],
                                                          plan.get("pad_requirements"), fixed, guarded,
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
-                                                         content_pickups.enabled(plan), tizi_mask, track_rulings.enabled(plan)),
+                                                         content_pickups.enabled(plan), tizi_mask, carried_rulings),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")

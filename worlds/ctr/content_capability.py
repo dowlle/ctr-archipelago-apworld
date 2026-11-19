@@ -144,9 +144,7 @@ def letter_boost(track, award, package=None):
 
 
 def ruled_finish(package):
-    """The ruled finish rank of a custom package, or None when no row matches.
-    A row for the package's exact revision and LEV pin wins over a row for
-    every revision of its content id."""
+    """Resolve the exact finish rank, inherited rank or unscoped default."""
     content = package.get("content_id")
     lev = track_rulings.lev_pin(package)
     exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev))

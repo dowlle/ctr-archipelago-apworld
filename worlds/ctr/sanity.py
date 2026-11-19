@@ -127,8 +127,7 @@ def eligible(track, family, record, item_boxes, package, capability=None):
     if inv is None:
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
-    # Reviewed exclusions are keyed by exact LEV and model family: custom revisions, the retail Roo's
-    # Tubes weapon crate and the Hot Air Skyway Wumpa crate. Fruit has none.
+    # Exclusions are independent of seating and grouped by model family.
     excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family],
                                          package if track["origin"] == "custom" else None)
     if family == 0:

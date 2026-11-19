@@ -106,3 +106,27 @@ def carried_sources(package):
     if "finish" not in result and (content, None, None) in content_capability.USF_FINISH_RULINGS:
         result["finish"] = (latest[1], latest[0])
     return result
+
+
+def plan_sources(plan):
+    """List the inherited sources used by this room's selected check families."""
+    boost = plan.get("capability", {}).get("boost_mode", 0)
+    sanity = {row["track_id"] for row in plan.get("sanity", {}).get("tracks", ())}
+    boxes = plan.get("item_boxes", {})
+    excluded = {row["track_id"] for row in boxes.get("crate_exclusions", ())}
+    pickup_ranks = set(boxes.get("pickup_rules", ()))
+    letters = {check["owner"] for check in plan["checks"] if check["kind"] in ("ctr", "letter")}
+    tracks = {track.get("package_id"): track["id"] for track in plan["tracks"] if track["origin"] == "custom"}
+    for package in plan["packages"]:
+        tid = tracks.get(package["id"])
+        used = {
+            "AP box pickup ranks": tid in pickup_ranks,
+            "crate exclusions": tid in excluded or tid in sanity,
+            "ordinary pickups": tid in sanity,
+            "objects": tid in sanity,
+            "finish": boost,
+            "letters": boost and tid in letters,
+        }
+        for family, (revision, digest) in carried_sources(package).items():
+            if used[family]:
+                yield package["id"], family, revision, digest
