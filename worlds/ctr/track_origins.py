@@ -2,6 +2,7 @@
 
 import json
 import pkgutil
+from copy import copy
 from functools import cache
 from typing import NamedTuple
 
@@ -63,23 +64,33 @@ def legacy_option_world(world):
     return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
 
 
+def _set_slot_option(options, name, value):
+    """The generator may share the rolled option object across multiple slots."""
+    option = getattr(options, name)
+    if value != option.value:
+        option = copy(option)
+        option.value = value
+        setattr(options, name, option)
+
+
 def prune_unused_option_names(world):
     """Group expansion may include the reserved letter names for other rooms."""
     plan = world.ctr_content_plan
     locations = {row["location"] for row in plan["checks"]}
     items = {row["item"] for row in plan["items"]["rows"]}
-    for option in (world.options.exclude_locations, world.options.priority_locations,
-                   world.options.start_location_hints):
-        option.value = {name for name in option.value
-                        if not is_origin_location(world.location_name_to_id.get(name))
-                        or world.location_name_to_id[name] in locations}
-    for option in (world.options.start_hints, world.options.local_items, world.options.non_local_items):
-        option.value = {name for name in option.value
-                        if not _origin_item(world.item_name_to_id.get(name, 0))
-                        or world.item_name_to_id[name] in items}
+    for field in ("exclude_locations", "priority_locations", "start_location_hints"):
+        names = {name for name in getattr(world.options, field).value
+                 if not is_origin_location(world.location_name_to_id.get(name))
+                 or world.location_name_to_id[name] in locations}
+        _set_slot_option(world.options, field, names)
+    for field in ("start_hints", "local_items", "non_local_items"):
+        names = {name for name in getattr(world.options, field).value
+                 if not _origin_item(world.item_name_to_id.get(name, 0))
+                 or world.item_name_to_id[name] in items}
+        _set_slot_option(world.options, field, names)
     links = world.options.item_links
     if FEATURE not in plan["required_features"] and hasattr(links, "legacy_value"):
-        links.value = links.legacy_value
+        _set_slot_option(world.options, "item_links", links.legacy_value)
     elif hasattr(links, "legacy_value"):
         links.verify_origin_locality(type(world), {world.item_id_to_name[code] for code in items if _origin_item(code)})
 

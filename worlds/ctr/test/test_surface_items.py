@@ -1,6 +1,7 @@
 """Generation contract for the comfort-only surface items (issues #14/#15)."""
 import random
 import unittest
+from types import SimpleNamespace
 
 from BaseClasses import ItemClassification, PlandoOptions
 from Options import ExcludeLocations, OptionError, PlandoItem, StartHints
@@ -62,6 +63,34 @@ class TestSurfaceItemCapacityFallback(CTRTestBase):
 
 
 class TestOriginLetterGroups(unittest.TestCase):
+    def test_pruning_keeps_shared_rolled_options_independent(self):
+        from ..track_origins import FEATURE, prune_unused_option_names
+
+        types = ctrAPWorld.options_dataclass.type_hints
+        item_names = {f"Letter {glyph} (Inferno Island)" for glyph in "NK"}
+        check_names = {f"Inferno Island: Letter {glyph}" for glyph in "NK"}
+        rolled = {field: types[field].from_any(names) for field, names in
+                  (("exclude_locations", check_names), ("start_location_hints", check_names),
+                   ("priority_locations", check_names), ("start_hints", item_names),
+                   ("local_items", item_names), ("non_local_items", item_names), ("item_links", []))}
+        for glyph in "NK":
+            item = f"Letter {glyph} (Inferno Island)"
+            check = f"Inferno Island: Letter {glyph}"
+            slot = SimpleNamespace(
+                options=SimpleNamespace(**rolled),
+                item_name_to_id=ctrAPWorld.item_name_to_id, location_name_to_id=ctrAPWorld.location_name_to_id,
+                ctr_content_plan={"required_features": [FEATURE],
+                                  "checks": [{"location": ctrAPWorld.location_name_to_id[check]}],
+                                  "items": {"rows": [{"item": ctrAPWorld.item_name_to_id[item]}]}},
+            )
+            prune_unused_option_names(slot)
+            self.assertEqual(slot.options.start_hints.value, {item})
+            self.assertEqual(slot.options.local_items.value, {item})
+            self.assertEqual(slot.options.exclude_locations.value, {check})
+            self.assertEqual(slot.options.start_location_hints.value, {check})
+        self.assertEqual(rolled["start_hints"].value, item_names)
+        self.assertEqual(rolled["exclude_locations"].value, check_names)
+
     def test_item_links_ignore_locality_conflicts_for_unused_origin_letters(self):
         from ..named_tracks import ORIGIN_ITEM_RANGE
 

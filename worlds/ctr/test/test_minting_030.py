@@ -360,6 +360,19 @@ class TestBuildScript(unittest.TestCase):
         with self.assertRaises(SystemExit):
             b.build(root, commit)
 
+    def test_cli_refuses_a_pin_without_an_origin_catalogue(self):
+        from unittest.mock import patch
+
+        b, root, commit, _digest = self._repo()
+        outputs = {name: root / name for name in ("OUTPUT", "CREDITS_OUTPUT", "ORIGINS_OUTPUT")}
+        for path in outputs.values():
+            path.write_bytes(b"{}\n")
+        with patch.multiple(b, **outputs):
+            for mode in ([], ["--check"]):
+                with self.subTest(mode=mode), self.assertRaisesRegex(SystemExit, "lacks origins.json"):
+                    b.main(["--registry", str(root), "--commit", commit, *mode])
+        self.assertTrue(all(path.read_bytes() == b"{}\n" for path in outputs.values()))
+
     def test_dropping_a_shipped_block_is_refused(self):
         b, root, commit, _digest = self._repo()
         doc = b.build(root, commit)
