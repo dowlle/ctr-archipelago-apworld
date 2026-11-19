@@ -35,7 +35,7 @@ def entries(package):
     """Weapon-crate entries only: the wire and the fallback seating never see other families."""
     pin = track_rulings.source(package, EXCLUSIONS)
     crates = [c for c in EXCLUSIONS.get(pin, ()) if c.get("family", WEAPON) == WEAPON]
-    if pin == lev_pin(package):
+    if not track_rulings.inherits(package):
         return copy.deepcopy(crates)
     count = (package or {}).get("capabilities", {}).get("weapon_crates", 0)
     return [{"ordinal": c["ordinal"], "pos": None} for c in crates if c["ordinal"] <= count]

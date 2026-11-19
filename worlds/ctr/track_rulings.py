@@ -10,6 +10,9 @@ FEATURE = "carried_track_rulings_v1"
 # Rows are [LEV SHA-256, revision], latest reviewed first. Preserve the order in
 # the paired native table. Append a reviewed revision through a paired update.
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
+# Future scoped additions bump this on both sides and cite it as their "since".
+# Version 0 is the original markerless lookup, before scoped pickup and letter rows.
+RULING_VERSION = 1
 _history = ContextVar("ctr_track_ruling_history", default=None)
 
 
@@ -33,13 +36,17 @@ def enabled(plan):
 
 def _recorded(plan):
     """Read the optional room record. Shape and references are validated separately."""
-    if not enabled(plan) or not isinstance(plan.get("track_ruling_sources"), list):
-        return {}
-    return {row["package_id"]: tuple((r["revision"], r["lev_sha256"]) for r in row["reviews"]
-                                     if isinstance(r, dict) and {"revision", "lev_sha256"} <= r.keys())
-            for row in plan["track_ruling_sources"]
-            if isinstance(row, dict) and isinstance(row.get("package_id"), str)
-            and isinstance(row.get("reviews"), list)}
+    record = plan.get("track_ruling_sources") if enabled(plan) else None
+    if not isinstance(record, dict) or not isinstance(record.get("packages"), list):
+        return 0, {}
+    history = {}
+    for row in record["packages"]:
+        if (isinstance(row, dict) and isinstance(row.get("package_id"), str)
+                and isinstance(row.get("reviews"), list)):
+            history[row["package_id"]] = tuple(
+                (r["revision"], r["lev_sha256"]) for r in row["reviews"]
+                if isinstance(r, dict) and {"revision", "lev_sha256"} <= r.keys())
+    return record.get("version", 0), history
 
 
 generation = _scoped(lambda world: True)
@@ -55,7 +62,7 @@ def reviewed(package):
 def _reviews(package):
     history = _history.get()
     if history is not True:
-        return (history or {}).get((package or {}).get("id"), ())
+        return history[1].get((package or {}).get("id"), ()) if history else ()
     reviews = reviewed(package)
     if not reviews:
         return ()
@@ -73,14 +80,17 @@ def revision_ref(package):
     return (package or {}).get("revision"), lev_pin(package)
 
 
+def inherits(package):
+    reviews = _reviews(package)
+    return bool(reviews and revision_ref(package) not in reviews)
+
+
 def source(package, pins):
     """Resolve rows originally keyed by LEV, including the recorded old source."""
     current = revision_ref(package)
     pin = current[1]
     reviews = _reviews(package)
     if not reviews or current in reviews:
-        return pin
-    if pin in pins and any(pin == old for _, old in reviews):
         return pin
     return next((old for _, old in reviews if old in pins), None)
 
@@ -105,13 +115,33 @@ def scope(row):
     return revision, pin
 
 
+def scoped_version():
+    history = _history.get()
+    if history is True:
+        return RULING_VERSION
+    return history[0] if history else 0
+
+
+def scope_keys(row):
+    """Scoped additions carry the catalog version that first enables them."""
+    ref = scope(row)
+    if not ref:
+        return (), set()
+    if type(row.get("since")) is not int or not 2 <= row["since"] <= 65535:
+        raise ValueError("a scoped track ruling needs its catalog version")
+    return (*ref, row["since"]), {"revision", "lev_sha256", "since"}
+
+
 def ruled_value(package, rulings, *selector):
     """Scoped data wins, with old unscoped rulings as a track-wide default."""
     package = package or {}
     key = (package.get("content_id"), *selector)
-    refs = {row[-2:] for row in rulings if row[:-2] == key}
+    version = scoped_version()
+    applicable = [(row, value) for row, value in rulings.items() if row[:-3] == key and row[-1] <= version]
+    rows = {row[-3:-1]: value for row, value in sorted(applicable, key=lambda entry: entry[0][-1])}
+    refs = rows.keys()
     source_ref = scoped_source(package, refs)
-    return rulings.get((*key, *source_ref), rulings.get(key))
+    return rows.get(source_ref, rulings.get(key))
 
 
 def carried_sources(package):
@@ -123,7 +153,9 @@ def carried_sources(package):
     current = revision_ref(package)
     pin = current[1]
     reviews = _reviews(package)
-    if not pin or not reviews or current in reviews:
+    if not pin or not reviews:
+        return {}
+    if current in reviews:
         return {}
     families = {
         "ordinary pickups": sanity.CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS,
@@ -134,10 +166,9 @@ def carried_sources(package):
     result = {}
     for family, pins in families.items():
         selected = source(package, pins)
-        if selected != pin:
-            previous = next((ref for ref in reviews if ref[1] == selected), None)
-            if previous:
-                result[family] = previous
+        previous = next((ref for ref in reviews if ref[1] == selected), None)
+        if previous:
+            result[family] = previous
     finish_refs = {(revision, digest) for key, revision, digest in content_capability.USF_FINISH_RULINGS
                    if key == content and digest}
     finish_source = scoped_source(package, finish_refs)
@@ -147,7 +178,7 @@ def carried_sources(package):
     for family, rulings, key_size in (("letters", content_capability.LETTER_BOOST_RULINGS, 2),
                                       ("objects", sanity.object_rulings.RULINGS, 3)):
         keys = [row for row in rulings if row[0] == content]
-        refs = {row[-2:] for row in keys if len(row) > key_size}
+        refs = {row[-3:-1] for row in keys if len(row) > key_size and row[-1] <= scoped_version()}
         selected = scoped_source(package, refs)
         if selected in refs and selected != current:
             result[family] = selected
@@ -184,10 +215,12 @@ def plan_sources(plan):
 
 def wire_sources(plan):
     """Save the ordered review identities that produced this room's logic."""
-    used = {pid for pid, _, _, _ in plan_sources(plan)}
-    return [{"package_id": package["id"], "reviews": [
-        {"revision": rev, "lev_sha256": pin} for rev, pin in reviewed(package)]}
-        for package in plan["packages"] if package["id"] in used]
+    if not (RULING_VERSION > 1 and plan["packages"]) and not any(plan_sources(plan)):
+        return None
+    return {"version": RULING_VERSION, "packages": [
+        {"package_id": package["id"], "reviews": [
+            {"revision": rev, "lev_sha256": pin} for rev, pin in _reviews(package)]}
+        for package in plan["packages"]]}
 
 
 @validation
@@ -197,17 +230,22 @@ def spoiler_sources(plan):
 
 def valid_sources(plan, packages):
     """Every pinned identity belongs to this track's review history."""
-    records = plan.get("track_ruling_sources", ())
-    if enabled(plan) != bool(records):
+    record = plan.get("track_ruling_sources")
+    if enabled(plan) != bool(record):
         return False
+    if not record:
+        return True
+    if not 1 <= record["version"] <= RULING_VERSION:
+        return False
+    records = record["packages"]
     ids = [row["package_id"] for row in records]
-    if ids != sorted(set(ids)) or not set(ids) <= packages.keys():
+    if ids != sorted(packages):
         return False
     for row in records:
         package = packages[row["package_id"]]
         known = reviewed(package)
         refs = [(r["revision"], r["lev_sha256"]) for r in row["reviews"]]
         known_subset = [ref for ref in known if ref in refs]
-        if refs != known_subset or revision_ref(package) in refs:
+        if refs != known_subset:
             return False
     return True

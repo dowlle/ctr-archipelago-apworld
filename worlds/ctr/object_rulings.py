@@ -11,10 +11,9 @@ def _load():
         raise ValueError("object_rulings.json: version must be 1")
     out = {}
     for row in raw["rulings"]:
-        scope = track_rulings.scope(row)
+        scope, scope_fields = track_rulings.scope_keys(row)
         key = (row.get("content_id"), row.get("kind"), row.get("ordinal"), *scope)
-        if (set(row) != {"content_id", "kind", "ordinal", "hard_rank", "blue_fire_rank", "ruling"}
-                | ({"revision", "lev_sha256"} if scope else set())
+        if (set(row) != {"content_id", "kind", "ordinal", "hard_rank", "blue_fire_rank", "ruling"} | scope_fields
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("weapon_crate", "wumpa_crate", "wumpa_fruit")
                 or type(key[2]) is not int or not 1 <= key[2] <= 65536

@@ -108,16 +108,42 @@ class TestObjectRulings(unittest.TestCase):
                 object_rulings._load()
 
     def test_exact_review_can_clear_an_unscoped_ruling(self):
+        from .. import track_rulings
         good = next(iter(object_rulings.RULINGS.values()))
-        reviewed = dict(good, revision="9.0.0", lev_sha256=PIN, hard_rank=0, blue_fire_rank=0)
+        reviewed = dict(good, revision="9.0.0", lev_sha256=PIN, hard_rank=0, blue_fire_rank=0, since=2)
         with mock.patch.object(object_rulings.pkgutil, "get_data", return_value=json.dumps(
                 dict(version=1, rulings=[good, reviewed])).encode()):
             rulings = object_rulings._load()
         package = dict(named_fixture(), revision="9.0.0", files=[dict(role="lev", sha256=PIN)])
         with mock.patch.object(object_rulings, "RULINGS", rulings):
-            rank = object_rulings.rank({"origin": "custom"}, package, good["kind"], good["ordinal"],
-                                       {"logic_difficulty": 0, "boost_blue_fire": False})
-            self.assertEqual(rank, 0)
+            args = ({"origin": "custom"}, package, good["kind"], good["ordinal"],
+                    {"logic_difficulty": 0, "boost_blue_fire": False})
+            self.assertIsNone(object_rulings.rank(*args))
+            with mock.patch.object(track_rulings, "RULING_VERSION", 2):
+                self.assertEqual(track_rulings.generation(object_rulings.rank)(*args), 0)
+
+    def test_rule_added_to_a_previous_source_does_not_change_saved_rooms(self):
+        from .. import track_rulings
+
+        exact = options()
+        carried = copy.deepcopy(exact)
+        package = carried["content_pool"]["tracks"]["custom"][0]
+        package.update(id="package/tv-world/9.0.0", revision="9.0.0")
+        package["files"][0]["sha256"] = "ab" * 32
+        carried["content_pool"]["required_entries"] = ["custom/tv-world/9.0.0"]
+        for opts in (exact, carried):
+            room = make_world(opts, seed=52, stop_before="pre_fill")
+            wire = json.loads(json.dumps(room.fill_slot_data()))
+            key = ("tv-world", "wumpa_crate", 3)
+            rule = dict(object_rulings.RULINGS[key], hard_rank=0, blue_fire_rank=0)
+            with (mock.patch.dict(object_rulings.RULINGS, {(*key, "1.1.0", PIN, 2): rule}),
+                  mock.patch.object(track_rulings, "RULING_VERSION", 2)):
+                restored = make_world({}, passthrough=wire, seed=99, stop_before="pre_fill")
+                self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+                new_plan = make_world(opts, seed=52, stop_before="pre_fill").ctr_content_plan
+                selected = next(r["wumpa_crate"] for r in new_plan["sanity"]["tracks"]
+                                if r["track_id"].startswith("custom/tv-world/"))
+                self.assertIn(3, selected)
 
     def test_selection_settings_are_paired_and_agree_with_capability(self):
         original = make_world(options(), seed=52, stop_before="pre_fill").ctr_content_plan

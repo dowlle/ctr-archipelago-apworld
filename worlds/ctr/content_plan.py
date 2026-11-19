@@ -2798,7 +2798,8 @@ def validate(plan):
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
     carried_rulings = track_rulings.enabled(plan)
-    require(not carried_rulings or any(track_rulings.plan_sources(plan)), "carried rulings without an applicable track")
+    require(not carried_rulings or track_rulings.scoped_version() > 1 or any(track_rulings.plan_sources(plan)),
+            "carried rulings without an applicable track")
     if content_capability.FLOORS_KEY in capability or (carried_rulings and capability.get("boost_mode")):
         reviewed = content_capability.finish_floor_tracks(
             [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])

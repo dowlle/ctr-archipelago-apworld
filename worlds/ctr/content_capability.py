@@ -123,9 +123,9 @@ def _load_letter_rulings():
         raise ValueError("letter_boost_rulings.json: version must be 1")
     out = {}
     for row in raw["rulings"]:
-        scope = track_rulings.scope(row)
+        scope, scope_fields = track_rulings.scope_keys(row)
         key = (row.get("content_id"), row.get("letter"), *scope)
-        if (set(row) != {"content_id", "letter", "rank", "ruling"} | ({"revision", "lev_sha256"} if scope else set())
+        if (set(row) != {"content_id", "letter", "rank", "ruling"} | scope_fields
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("letter_c", "letter_t", "letter_r")
                 or type(row.get("rank")) is not int or row["rank"] not in ((0, 1, 2) if scope else (1, 2))
@@ -156,7 +156,7 @@ def ruled_finish(package):
     if scoped is not None:
         return scoped
     source = track_rulings.source(package, CARRY_FREE_FINISH_PINS)
-    if source in CARRY_FREE_FINISH_PINS and source != track_rulings.lev_pin(package):
+    if source in CARRY_FREE_FINISH_PINS and track_rulings.inherits(package):
         return 0
     return None
 

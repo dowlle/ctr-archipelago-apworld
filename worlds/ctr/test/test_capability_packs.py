@@ -336,7 +336,7 @@ class TestRanks(unittest.TestCase):
         world = make_world(options, seed=3, stop_before="pre_fill")
         plan = world.ctr_content_plan
         self.assertTrue(track_rulings.enabled(plan))
-        self.assertEqual(plan["track_ruling_sources"][0]["reviews"], [{"revision": "1.0.0", "lev_sha256": lev}])
+        self.assertEqual(plan["track_ruling_sources"]["packages"][0]["reviews"], [{"revision": "1.0.0", "lev_sha256": lev}])
         trophy = next(c for c in plan["checks"] if c["owner"] == "custom/lights-out/9.0.0" and c["kind"] == "trophy")
         self.assertEqual(trophy["boost"], 1)
 

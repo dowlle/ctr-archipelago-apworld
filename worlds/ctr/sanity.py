@@ -81,7 +81,7 @@ def inventory(track, package=None, record=None):
     if "named_block" in track:
         pin = box_spots.lev_pin(package)
         source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
-        if source == pin and pin in CATALOG:
+        if not track_rulings.inherits(package) and pin in CATALOG:
             return CATALOG[pin]
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
@@ -209,11 +209,12 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
         package = (packages or {}).get(t.get("package_id"))
         source = track_rulings.source(package, REVIEWED_PICKUP_PINS) if package else row["lev_sha256"]
         need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(source)
+        inherited = track_rulings.inherits(package)
         for f, kind in enumerate(KINDS):
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                fields = (dict(needs="usf") if need is None or (source != row["lev_sha256"] and n > need["counts"][f])
+                fields = (dict(needs="usf") if need is None or (inherited and n > need["counts"][f])
                           else object_needs(need, kind, n, record))
                 if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
