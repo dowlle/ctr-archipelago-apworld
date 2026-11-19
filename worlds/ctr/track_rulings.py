@@ -7,8 +7,8 @@ from functools import wraps
 from .box_spots import lev_pin
 
 FEATURE = "carried_track_rulings_v1"
-# Rows are [LEV SHA-256, revision], latest reviewed first. Preserve the order in
-# the paired native table. Append a reviewed revision through a paired update.
+# Rows are [LEV SHA-256, revision, first catalog version], latest reviewed first.
+# The initial rows omit the version, which is 1. Keep prior rows in order.
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before scoped pickup and letter rows.
@@ -54,9 +54,19 @@ validation = _scoped(_recorded)
 regions = _scoped(lambda world: _recorded(world.ctr_content_plan))
 
 
-def reviewed(package):
+def reviewed(package, version=None):
     """Ordered project review identities for a track key."""
-    return tuple((revision, pin) for pin, revision in REVIEWS.get((package or {}).get("content_id"), ()))
+    version = RULING_VERSION if version is None else version
+    return tuple((row[1], row[0]) for row in REVIEWS.get((package or {}).get("content_id"), ())
+                 if (row[2] if len(row) > 2 else 1) <= version)
+
+
+def _legacy_asset(package, reviews):
+    # Older local imports can have an exact geometry entry under another key.
+    from . import crate_exclusions, sanity
+    pin = lev_pin(package)
+    return not any(pin == old for _, old in reviews) and (
+        pin in crate_exclusions.EXCLUSIONS or pin in sanity.REVIEWED_PICKUP_PINS)
 
 
 def _reviews(package):
@@ -64,16 +74,7 @@ def _reviews(package):
     if history is not True:
         return history[1].get((package or {}).get("id"), ()) if history else ()
     reviews = reviewed(package)
-    if not reviews:
-        return ()
-    pin = lev_pin(package)
-    if not any(pin == old for _, old in reviews):
-        # Exact asset data predates the index, including local imports and
-        # renamed copies. Preserve its previous geometry-based generation.
-        from . import crate_exclusions, sanity
-        if pin in crate_exclusions.EXCLUSIONS or pin in sanity.REVIEWED_PICKUP_PINS:
-            return ()
-    return reviews
+    return () if reviews and _legacy_asset(package, reviews) else reviews
 
 
 def revision_ref(package):
@@ -243,9 +244,8 @@ def valid_sources(plan, packages):
         return False
     for row in records:
         package = packages[row["package_id"]]
-        known = reviewed(package)
-        refs = [(r["revision"], r["lev_sha256"]) for r in row["reviews"]]
-        known_subset = [ref for ref in known if ref in refs]
-        if refs != known_subset:
+        known = reviewed(package, record["version"])
+        refs = tuple((r["revision"], r["lev_sha256"]) for r in row["reviews"])
+        if refs != known and (refs or not _legacy_asset(package, known)):
             return False
     return True

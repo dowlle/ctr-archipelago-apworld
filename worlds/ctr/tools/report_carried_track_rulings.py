@@ -27,7 +27,7 @@ def main():
             continue
         latest = max(candidates, key=version_key)
         pin = latest["files"]["lev"]["sha256"]
-        if [pin, latest["revision"]] in known:
+        if any(row[:2] == [pin, latest["revision"]] for row in known):
             continue
         if not found:
             print()
