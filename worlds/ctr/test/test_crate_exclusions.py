@@ -91,7 +91,7 @@ class TestCrateExclusions(unittest.TestCase):
         missing = copy.deepcopy(plan)
         missing["item_boxes"].pop(crate_exclusions.KEY)
         missing["required_features"].remove(crate_exclusions.FEATURE)
-        with self.assertRaisesRegex(OptionError, "ordinal pick mismatch"):
+        with self.assertRaisesRegex(OptionError, "missing or mismatched reviewed fallback exclusions"):
             content_plan.validate(missing)
 
         mixed = copy.deepcopy(legacy["content_plan"])
@@ -104,6 +104,21 @@ class TestCrateExclusions(unittest.TestCase):
         plan = first_world(box_options(custom=[matsuri()], wumpasanity="both")).ctr_content_plan
         self.assertNotIn("exclusion_version", plan["sanity"])
         self.assertNotIn(sanity.EXCLUSIONS_FEATURE, plan["required_features"])
+
+    def test_sparse_matsuri_picks_require_the_reviewed_fallback_row(self):
+        options = box_options(custom=[matsuri()], itemboxsanity=1, wumpasanity="both")
+        plan = copy.deepcopy(first_world(options, seed=1).ctr_content_plan)
+        row = next(r for r in plan["sanity"]["tracks"] if r["lev_sha256"] == MATSURI)
+        self.assertEqual(row["weapon_crate"], [16])  # Valid in both 15-seat spreads.
+        plan["item_boxes"].pop(crate_exclusions.KEY)
+        plan["required_features"].remove(crate_exclusions.FEATURE)
+        with self.assertRaisesRegex(OptionError, "missing or mismatched reviewed fallback exclusions"):
+            content_plan.validate(plan)
+
+        sanity_only = first_world(dict(options, box_locations=False), seed=1).ctr_content_plan
+        self.assertEqual(sanity_only["sanity"]["exclusion_version"], 2)
+        self.assertNotIn("item_boxes", sanity_only)
+        self.assertTrue(content_plan.validate(sanity_only))
 
     def test_current_sanity_seats_use_package_weapon_count(self):
         inventory = dict(lev_sha256=MATSURI, counts=[26, 3, 0], needs={})
