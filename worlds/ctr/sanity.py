@@ -131,20 +131,14 @@ def eligible(track, family, record, item_boxes, package, capability=None):
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
         if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
-            carried_rows = content_item_boxes.carried_crates(item_boxes, track["id"])
-            carried = {c["ordinal"] for c in carried_rows}
-            package_count = content_item_boxes.crate_count(package)
+            carried = {c["ordinal"] for c in content_item_boxes.carried_crates(item_boxes, track["id"])}
             if version == 1 and record["itemboxsanity"] and carried - excluded:
                 raise OptionError("CTR sanity: fallback exclusions require the updated sanity catalog")
-            if version > 1 and package_count:
-                historical = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], 1)
-                if excluded - historical and carried_rows != crate_exclusions.entries(package):
-                    raise OptionError("CTR sanity: missing or mismatched reviewed fallback exclusions")
             # Version 1 preserves the historical pool. New plans derive
             # physical seats from the exclusions the runtime will load.
             slots = len(content_item_boxes.track_boxes(track, item_boxes, package))
             if slots:
-                raw_count = inv["counts"][0] if version == 1 else package_count
+                raw_count = inv["counts"][0] if version == 1 else content_item_boxes.crate_count(package)
                 seat_excluded = excluded if version == 1 else carried
                 all_crates = [n for n in range(1, raw_count + 1) if n not in seat_excluded]
                 excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))

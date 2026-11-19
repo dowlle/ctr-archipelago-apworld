@@ -2904,7 +2904,8 @@ def validate(plan):
     shortened, cup_names, leg_tracks = None, set(), set()
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
     # Hand-placed spots (A3-14): before any box check is recomputed from them.
-    content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages)
+    content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages,
+                                      require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record))
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue

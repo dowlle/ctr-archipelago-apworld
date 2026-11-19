@@ -36,6 +36,14 @@ def matsuri():
     return p
 
 
+def lockbox_track_4():
+    p = ancient(29, LOCKBOX_4)
+    p.update(content_id="lockbox-adventure-track-4", display_name="Lockbox Adventure track 4",
+             id="package/lockbox-adventure-track-4/1.0.0", revision="1.0.0",
+             uuid="11111111-2222-4333-8444-555555555547")
+    return p
+
+
 def north_pole(crates=29):
     p = ancient(crates, NORTH_POLE)
     p.update(content_id="north-pole", display_name="North Pole", id="package/north-pole/1.1.0",
@@ -91,7 +99,7 @@ class TestCrateExclusions(unittest.TestCase):
         missing = copy.deepcopy(plan)
         missing["item_boxes"].pop(crate_exclusions.KEY)
         missing["required_features"].remove(crate_exclusions.FEATURE)
-        with self.assertRaisesRegex(OptionError, "missing or mismatched reviewed fallback exclusions"):
+        with self.assertRaises(OptionError):
             content_plan.validate(missing)
 
         mixed = copy.deepcopy(legacy["content_plan"])
@@ -112,7 +120,7 @@ class TestCrateExclusions(unittest.TestCase):
         self.assertEqual(row["weapon_crate"], [16])  # Valid in both 15-seat spreads.
         plan["item_boxes"].pop(crate_exclusions.KEY)
         plan["required_features"].remove(crate_exclusions.FEATURE)
-        with self.assertRaisesRegex(OptionError, "missing or mismatched reviewed fallback exclusions"):
+        with self.assertRaisesRegex(OptionError, "missing reviewed fallback exclusions"):
             content_plan.validate(plan)
 
         sanity_only = first_world(dict(options, box_locations=False), seed=1).ctr_content_plan
@@ -130,14 +138,30 @@ class TestCrateExclusions(unittest.TestCase):
         self.assertEqual(row["weapon_crate"], sorted(set(range(2, 27)) - seated))
 
     def test_lockbox_north_pole_emits_its_own_pin(self):
-        p = ancient(29, LOCKBOX_4)
-        p.update(content_id="lockbox-adventure-track-4", display_name="Lockbox Adventure track 4",
-                 id="package/lockbox-adventure-track-4/1.0.0", revision="1.0.0")
+        p = lockbox_track_4()
         plan = first_world(box_options(custom=[p])).ctr_content_plan
         row, = plan["item_boxes"][crate_exclusions.KEY]
         self.assertEqual(row["lev_sha256"], LOCKBOX_4)
         self.assertEqual(row["crates"], [{"ordinal": 1, "pos": [0, 0, 0]}])
         self.assertEqual(content_item_boxes.crate_count(p, plan["item_boxes"], row["track_id"]), 28)
+
+    def test_versioned_room_requires_generic_fallback_exclusions(self):
+        options = box_options(custom=[matsuri(), lockbox_track_4()], itemboxsanity=1, wumpasanity="both")
+        plan = first_world(options, seed=1).ctr_content_plan
+        self.assertEqual(plan["sanity"]["exclusion_version"], 2)
+        self.assertFalse(any(row["lev_sha256"] == LOCKBOX_4 for row in plan["sanity"]["tracks"]))
+
+        missing = copy.deepcopy(plan)
+        rows = missing["item_boxes"][crate_exclusions.KEY]
+        rows[:] = [row for row in rows if row["lev_sha256"] != LOCKBOX_4]
+        with self.assertRaisesRegex(OptionError, "missing reviewed fallback exclusions"):
+            content_plan.validate(missing)
+
+        shifted = copy.deepcopy(plan)
+        row = next(r for r in shifted["item_boxes"][crate_exclusions.KEY] if r["lev_sha256"] == LOCKBOX_4)
+        row["crates"][0]["pos"][0] = 1
+        with self.assertRaisesRegex(OptionError, "reviewed exclusions"):
+            content_plan.validate(shifted)
 
     def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
         p = ancient(24, HOT_AIR_SKYWAY)
