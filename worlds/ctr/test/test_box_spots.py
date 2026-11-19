@@ -86,9 +86,9 @@ class TestConversion(unittest.TestCase):
         self.assertEqual(rows, fixture("box_spots_builtin_rows.json")["rows"])
         self.assertEqual(len(rows), 241)
 
-    def test_shipped_files_are_the_18_retail_tracks_and_the_reviewed_custom_files(self):
+    def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(sorted(box_spots.CUSTOM_FILES), sorted(COMMUNITY))
+        self.assertEqual(set(box_spots.CUSTOM_FILES), set(COMMUNITY) | {"sunset-vista"})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
