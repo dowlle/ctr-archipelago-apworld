@@ -227,6 +227,11 @@ def box_code(track, number):
     return CUSTOM_ITEM_BOX_CLASS.slot_code(track["custom_slot"], number)
 
 
+def carried_crates(record, track_id):
+    return next((row["crates"] for row in (record or {}).get(crate_exclusions.KEY, ())
+                 if row["track_id"] == track_id), ())
+
+
 def crate_count(package, record=None, track_id=None):
     """Eligible crates in this seed; legacy records keep the raw package count.
 
@@ -234,9 +239,7 @@ def crate_count(package, record=None, track_id=None):
     """
     if not package:
         return None
-    excluded = next((row["crates"] for row in (record or {}).get(crate_exclusions.KEY, ())
-                     if row["track_id"] == track_id), ())
-    return crate_exclusions.count(package, excluded)
+    return crate_exclusions.count(package, carried_crates(record, track_id))
 
 
 def seat_indices(crates, slots=SLOTS_PER_TRACK):

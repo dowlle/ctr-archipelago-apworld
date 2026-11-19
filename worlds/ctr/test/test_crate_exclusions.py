@@ -87,6 +87,17 @@ class TestCrateExclusions(unittest.TestCase):
             bad["sanity"]["exclusion_version"] = version
             with self.assertRaises(OptionError):
                 content_plan.validate(bad)
+        missing = copy.deepcopy(plan)
+        missing["item_boxes"].pop(crate_exclusions.KEY)
+        missing["required_features"].remove(crate_exclusions.FEATURE)
+        with self.assertRaisesRegex(OptionError, "ordinal pick mismatch"):
+            content_plan.validate(missing)
+
+        mixed = copy.deepcopy(legacy["content_plan"])
+        mixed["item_boxes"][crate_exclusions.KEY] = plan["item_boxes"][crate_exclusions.KEY]
+        mixed["required_features"] = [f for f in plan["required_features"] if f != sanity.EXCLUSIONS_FEATURE]
+        with self.assertRaisesRegex(OptionError, "fallback exclusions require the updated sanity catalog"):
+            content_plan.validate(mixed)
 
     def test_matsuri_wumpa_only_uses_original_sanity_version(self):
         plan = first_world(box_options(custom=[matsuri()], wumpasanity="both")).ctr_content_plan
