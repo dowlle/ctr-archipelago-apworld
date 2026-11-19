@@ -25,8 +25,8 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "3c55186270a3cb125e03a2d5a91dada4f54248b0"
-REGISTRY_DIGEST = "da77a7d9671febcbbfb55f6432cf59ac3a3233691748539ec9d7ca76c027c9dc"
+REGISTRY_COMMIT = "aa43e00154e99c50d82051b19254b2e900607048"
+REGISTRY_DIGEST = "e81e8730522855d55276586f98c57af4cf9cea00eaac2bfe7469d07b60ee47d2"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")

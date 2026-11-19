@@ -352,8 +352,9 @@ class NamedTrackLocationClass(LocationClass):
         return []
 
     def location_name(self, track_key: str, key: str = "trophy") -> str:
+        canonical = destinations.canonical_track_key(track_key)
         for track in self.tracks:
-            if track.track_key == track_key:
+            if track.track_key == canonical:
                 return location_name(track.ap_name, key)
         raise KeyError(track_key)
 
