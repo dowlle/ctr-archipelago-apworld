@@ -246,6 +246,16 @@ class TestCortexVortexTrack(unittest.TestCase):
             required.remove("custom/cortex-vortex/1.1.2")
         return options
 
+    def test_dropped_title_does_not_take_the_bundled_tracks_override(self):
+        first = copy.deepcopy(UNKNOWN)
+        second = dict(first, display_name="Cortex Vortex")
+        options = cv_options(custom=[first, second])
+        options["content_pool"]["required_entries"] = [content_plan.package_track_id(first), CV]
+        options["content_pool"]["tracks"]["overrides"] = {"Cortex Vortex": ["relic"]}
+        plan = make_world(options, seed=6).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+        self.assertIn("trophy", next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]))
+
     def test_the_bundled_cortex_vortex_replaces_a_downloaded_copy_when_the_option_is_off(self):
         # Ruling of 2026-11-05: "Bundled replaces it". Same pool as in_pool with the copy removed.
         drawn = 0

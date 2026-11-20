@@ -1318,12 +1318,13 @@ def drop_duplicate_tracks(world):
     reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values()) | {"default"}
     literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
     owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}
+    bundled_names = set(track_names(cortex_track(standalone=True), None, literal)) if bundled else set()
     targets = {}
     for index in sorted(dropped):
         package, retained = dropped[index]
         target = package_track_id(retained) if retained else CORTEX_TRACK_ID
         for name in track_names(package, package, literal):
-            if name not in owned:
+            if name not in owned and (target == CORTEX_TRACK_ID or name not in bundled_names):
                 targets.setdefault(name, set()).add(target)
 
     transferred = {name: next(iter(ids)) for name, ids in targets.items() if len(ids) == 1}
@@ -1447,7 +1448,8 @@ def draw_plan(world, key_estimate=True):
         wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
         if wanted is None:
             wanted = next((override for name, override in overrides.items()
-                           if transferred.get(name) == track["id"] and set(override).intersection(supported)),
+                           if name not in known and transferred.get(name) == track["id"]
+                           and set(override).intersection(supported)),
                           selected_modes)
         modes = [m for m in MODES if m in wanted and m in supported]
         if not modes:
