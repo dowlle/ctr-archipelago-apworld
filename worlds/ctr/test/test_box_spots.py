@@ -41,6 +41,8 @@ COMMUNITY = {
 }
 #: Spot numbers per file; every other file holds 1 to 15.
 COMMUNITY_NUMBERS = {"country-speedway": [n for n in range(1, 16) if n != 6]}
+ARABIAN_DAY = "arabian-heights-day"
+ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 
 
 def community_numbers(key):
@@ -88,7 +90,7 @@ class TestConversion(unittest.TestCase):
 
     def test_shipped_files_are_the_18_retail_tracks_and_the_reviewed_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(sorted(box_spots.CUSTOM_FILES), sorted(COMMUNITY))
+        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, ARABIAN_DAY})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -413,6 +415,35 @@ class TestCommunitySpotFiles(unittest.TestCase):
         other_id = next(t["id"] for t in other["tracks"] if t.get("named_block") == 17)
         self.assertIsNone(spot_set(other, other_id))
         self.assertEqual(boxes(other, other_id), [])
+
+    def test_arabian_day_stands_nights_layout_on_its_pinned_crateless_lev(self):
+        package = btp(0)
+        package.update(content_id=ARABIAN_DAY, display_name="Arabian Heights Day",
+                       id=f"package/{ARABIAN_DAY}/1.0.0", revision="1.0.0", evidence=[])
+        package["files"][0]["sha256"] = ARABIAN_DAY_LEV
+        options = box_options(custom=[package], item_box_count=50, progressive_boost="shared_global",
+                              accessibility="full")
+        world = first_world(options)
+        plan = world.ctr_content_plan
+        track_id = f"custom/{ARABIAN_DAY}/1.0.0"
+        own = boxes(plan, track_id)
+        numbers = list(range(1, 28))
+        record = spot_set(plan, track_id)
+        self.assertEqual((record["lev_sha256"], record["pool"], record["picked"]),
+                         (ARABIAN_DAY_LEV, 27, numbers))
+        self.assertEqual([check["location"] for check in own],
+                         [named_tracks.location_code(3, f"item_box_{n}") for n in numbers])
+        self.assertEqual([check["display_name"] for check in own],
+                         [f"Arabian Heights Day: Item Box {n}" for n in numbers])
+        self.assertEqual([check["spot"]["number"] for check in own if check.get("boost") == 2],
+                         list(range(2, 21)))
+        distribute_items_restrictive(world.multiworld)
+        self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
+
+        package["files"][0]["sha256"] = "01" * 32
+        other = first_world(box_options(custom=[package])).ctr_content_plan
+        self.assertIsNone(spot_set(other, track_id))
+        self.assertEqual(boxes(other, track_id), [])
 
     def test_other_revisions_keep_crate_seating(self):
         # The xdelta-import Ancient Lake LEV keeps its reviewed crate exclusion.

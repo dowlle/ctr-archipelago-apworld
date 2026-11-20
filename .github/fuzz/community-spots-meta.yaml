@@ -1,6 +1,6 @@
 # The community box spot files: DK Pass 1.0.0 and Ancient Lake 1.1.0 (A3-45), Country Speedway 1.3.1 and
-# Gossamer's Castle 1.0.0 (A4-62b), exact LEV pins, so every track stands its boxes at the shipped spots.
-# Progressive Boost on, so the boost spots matter. Country Speedway has no weapon crates: its boxes come only from its file.
+# Gossamer's Castle 1.0.0 (A4-62b), and Arabian Heights Day 1.0.0 (A6-16), all with exact LEV pins.
+# Progressive Boost is on. Country Speedway and Arabian Heights Day have no weapon crates.
 Crash Team Racing:
   accessibility: full
   box_locations: true
@@ -54,7 +54,19 @@ Crash Team Racing:
         - {role: lev, sha256: 82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c, bytes: 1414492, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: c515e1d6deccf52fa53ac26e6e9c24b1230baa1682272c0e7d9353ea3957a31a, bytes: 458808, format: ctr-vrm, format_version: 1}
       evidence: []
-  required_entries: [dk-pass, ancient-lake, country-speedway, gossamer-s-castle]
+    - id: package/arabian-heights-day/1.0.0
+      content_id: arabian-heights-day
+      uuid: 11111111-2222-4333-8444-555555555540
+      revision: "1.0.0"
+      display_name: Arabian Heights Day
+      author: Fuzz fixture
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 0, checkpoints: 90, ai_nav: true}
+      files:
+        - {role: lev, sha256: a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900, bytes: 2363952, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 0f8113d3e98d472b938bac0ed8d83327714e5a0260d143c5115c383dc5392366, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [dk-pass, ancient-lake, country-speedway, gossamer-s-castle, arabian-heights-day]
   retail_tracks: [all]
   track_modes: {default: [trophy]}
   crystal_arenas: [Skull Rock, Rampage Ruins, Rocky Road, Nitro Court, Parking Lot, The North Bowl, Lab Basement]

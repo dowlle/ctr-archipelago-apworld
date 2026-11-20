@@ -23,6 +23,7 @@ SUFFIXES = ("Weapon Crate", "Wumpa Crate", "Wumpa Fruit")
 BUDGETS = (80, 16, 32)
 NAMED_BASE = 37200000
 FEATURES = ("itemboxsanity_v1", "wumpasanity_v1")
+EXCLUSIONS_FEATURE = "sanity_exclusions_v2"
 # Retail LevelID order, not the datapackage's BOX_TRACKS order.
 COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 2, 9), (13, 2, 0), (24, 4, 0), (20, 6, 0), (22, 3, 0),
@@ -123,16 +124,24 @@ def eligible(track, family, record, item_boxes, package, capability=None):
     if inv is None:
         return []  # No measured revision, no invented objects.
     out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
-    # Reviewed exclusions are keyed by exact LEV and model family: custom revisions, the retail Roo's
-    # Tubes weapon crate and the Hot Air Skyway Wumpa crate. Fruit has none.
-    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family])
+    # Older rooms selected their picks using the original exclusion catalog.
+    version = record.get("exclusion_version", 1)
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], version)
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
         if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
-            all_crates = [n for n in range(1, inv["counts"][0] + 1) if n not in excluded]
+            carried = {c["ordinal"] for c in content_item_boxes.carried_crates(item_boxes, track["id"])}
+            if version == 1 and record["itemboxsanity"] and carried - excluded:
+                raise OptionError("CTR sanity: fallback exclusions require the updated sanity catalog")
+            # Version 1 preserves the historical pool. New plans derive
+            # physical seats from the exclusions the runtime will load.
             slots = len(content_item_boxes.track_boxes(track, item_boxes, package))
-            excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
+            if slots:
+                raw_count = inv["counts"][0] if version == 1 else content_item_boxes.crate_count(package)
+                seat_excluded = excluded if version == 1 else carried
+                all_crates = [n for n in range(1, raw_count + 1) if n not in seat_excluded]
+                excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
     return [n for n in out if object_needs(inv, KINDS[family], n, record).get("shortcut", 0) <= tier
@@ -158,6 +167,13 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
         record["rules_version"] = version
     else:
         record.pop("rules_version", None)
+    for track in tracks:
+        inv = inventory(track, packages.get(track.get("package_id")), record)
+        if inv and any(c.get("sanity_since", 1) == crate_exclusions.SANITY_VERSION
+                       and c.get("family", KINDS[0]) in enabled
+                       for c in crate_exclusions.EXCLUSIONS.get(inv["lev_sha256"], ())):
+            record["exclusion_version"] = crate_exclusions.SANITY_VERSION
+            break
     record["shortcut_knowledge"] = tier
     seen = set()
     for track in tracks:
@@ -251,8 +267,11 @@ def validate(record, plan):
             raise OptionError("CTR sanity: " + why)
     base = {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}
     context = {"logic_difficulty", "boost_blue_fire"}
-    require(type(record) is dict and set(record) in (base, base | context, base | {"rules_version"},
-                                                   base | context | {"rules_version"}), "record shape")
+    require(type(record) is dict and set(record) - {"exclusion_version", "rules_version"} in (base, base | context),
+            "record shape")
+    if "exclusion_version" in record:
+        require(type(record["exclusion_version"]) is int and record["exclusion_version"] == crate_exclusions.SANITY_VERSION,
+                "exclusion version")
     if "rules_version" in record:
         require(type(record["rules_version"]) is int and record["rules_version"] in (1, 2, 3, 4, 5, 6), "rules version")
     if "logic_difficulty" in record:
