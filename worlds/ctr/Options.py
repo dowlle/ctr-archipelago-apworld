@@ -24,7 +24,8 @@ class OxideGoal(Choice):
     - **any_percent** (default): beat N. Oxide's first race.
     - **101_percent**: beat N. Oxide's Final Challenge.
     - **none**: N. Oxide is optional. Both of his races stay in the seed as
-      checks.
+      checks. With Boss Garages off there are no races to keep, so `none`
+      works as `disabled`.
     - **disabled**: N. Oxide's garage stays closed and both of his races leave
       the seed.
 

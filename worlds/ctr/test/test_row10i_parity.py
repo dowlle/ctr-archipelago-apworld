@@ -12,7 +12,7 @@ from Fill import distribute_items_restrictive
 
 from .test_content_plan import make_world
 from .test_content_plan_row3 import options as shape_options, records
-from .. import content_bosses, content_capability, content_plan, content_race_routes, content_requirements
+from .. import content_bosses, content_capability, content_pickups, content_plan, content_race_routes, content_requirements
 
 TURBO_TRACK = 17
 GEMS = list(range(35010009, 35010014))
@@ -54,6 +54,10 @@ class TestWumpaRoutes(unittest.TestCase):
             elif entry["id"] in encounters and entry["kind"] == "boss_race":
                 want.setdefault(entry["track_id"], []).append(
                     (entry["id"], "boss_race", None, encounters[entry["id"]]["id"]))
+        if content_pickups.final_enabled(plan):
+            # A6-48: no Reach 10 Wumpa for a venue only N. Oxide's races reach.
+            want = {t: r for t, r in want.items()
+                    if any(e not in (content_pickups.FIRST, content_pickups.FINAL) for *_, e in r)}
         self.assertEqual(set(wumpa), set(want))
         for track_id, check in wumpa.items():
             self.assertEqual([(r["entry_id"], r["mode"], r["leg_id"], r["encounter_id"]) for r in check["routes"]],
@@ -66,9 +70,10 @@ class TestWumpaRoutes(unittest.TestCase):
         own = standalone_tracks(plan)
         extra = [check for owner, check in wumpa.items() if owner not in own]
         self.assertTrue(any(r["mode"] == "cup" for c in extra for r in c["routes"]))
-        cortex = wumpa[content_plan.CORTEX_TRACK_ID]
-        self.assertEqual(cortex["location"], 35016121)
-        self.assertEqual([r["mode"] for r in cortex["routes"]], ["boss_race"])
+        # A6-48: Cortex Vortex raced only by the final has no Reach 10 Wumpa
+        # (before, 35016121 with the one boss_race route).
+        self.assertNotIn(content_plan.CORTEX_TRACK_ID, wumpa)
+        self.assertTrue(content_pickups.final_enabled(plan))
         for check in extra:
             track = next(t for t in plan["tracks"] if t["id"] == check["owner"])
             self.assertEqual(check["location"], content_plan.wumpa_location(track))
@@ -103,8 +108,13 @@ class TestWumpaRoutes(unittest.TestCase):
         check["routes"] = [r for r in check["routes"] if r["mode"] != "cup"] or check["routes"][:1]
         with self.assertRaises(Exception):
             content_plan.validate(plan)
+        # A6-48: a Reach 10 Wumpa check the final alone would pay is refused.
         plan = copy.deepcopy(self.plan)
-        plan["checks"] = [c for c in plan["checks"] if c["owner"] != content_plan.CORTEX_TRACK_ID or c["kind"] != "wumpa"]
+        plan["checks"].insert(0, dict(location=35016121, owner=content_plan.CORTEX_TRACK_ID, kind="wumpa",
+                                      display_name="Cortex Vortex: Reach 10 Wumpa",
+                                      routes=[dict(entry_id="entry/boss:4/1", mode="boss_race", leg_id=None,
+                                                   encounter_id=content_pickups.FINAL, own_pad_id="garage:4",
+                                                   award="wumpa")]))
         with self.assertRaises(Exception):
             content_plan.validate(plan)
 

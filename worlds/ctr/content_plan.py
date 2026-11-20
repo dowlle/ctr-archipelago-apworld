@@ -416,7 +416,7 @@ def relic_races(entries):
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
-                      repeatable_pickups=False, tizi_mask=False, tracks=()):
+                      repeatable_pickups=False, tizi_mask=False, tracks=(), final_only_venue=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -468,7 +468,9 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
             + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
-            + ([tizi_madness.FEATURE] if tizi_mask else []))
+            + ([tizi_madness.FEATURE] if tizi_mask else [])
+            # A6-48: a Final Challenge-only venue's checks left out, last.
+            + ([content_pickups.FINAL_FEATURE] if final_only_venue else []))
 
 
 def family_settings(options):
@@ -1668,22 +1670,43 @@ def draw_plan(world, key_estimate=True):
                      + [leg for g in sorted(boss_cups) for leg in boss_cups[g]]
                      + ([boss_final] if boss_record is not None
                         and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED else []))
-    sanity_tracks = ([t for t in chosen if is_track(t) and any(m in t["modes"] for m in ("trophy", "ctr"))]
-                     + [leg for t in chosen if "cup_index" in t for leg in t["legs"]]
-                     + [venue_record(name) for name in pickup_venues])
-    sanity.add_tracks(sanity_record, sanity_tracks, package_by_id, item_boxes, world.multiworld.seed, world.player,
-                      int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)}, capability)
+    pad_sanity_tracks = ([t for t in chosen if is_track(t) and any(m in t["modes"] for m in ("trophy", "ctr"))]
+                         + [leg for t in chosen if "cup_index" in t for leg in t["legs"]])
+    sanity_args = (package_by_id, item_boxes, world.multiworld.seed, world.player,
+                   int(o.shortcut_knowledge.value), {t["id"] for t in chosen if is_track(t)}, capability)
+    count_laps = lambda names: content_laps.count(chosen, is_track, [venue_record(name)["id"] for name in names])
+    count_race_wumpa = lambda names: content_race_routes.count(
+        [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
+        [venue_record(name) for name in names], settings,
+        lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
+        lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
+    # A6-48: a venue whose only allowed route is the Final Challenge gets no
+    # lap, Reach 10 Wumpa or pickup checks (content_pickups.FINAL_FEATURE).
+    # The feature is carried only when it leaves a check or a sanity row out,
+    # so every other room keeps its wire.
+    # Lap venues; the plan's track records still list every venue.
+    lap_venue_names = venue_names
+    final_only_venue = final_lap_left_out = final_wumpa_left_out = False
+    if boss_record is not None and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED:
+        without = lambda names: [n for i, n in enumerate(names) if i != names.index(boss_final)] \
+            if boss_final in names else names
+        rows = lambda names: (None if sanity_record is None else len(sanity.add_tracks_probe(
+            sanity_record, pad_sanity_tracks + [venue_record(n) for n in names], *sanity_args)))
+        final_lap_left_out = bool(laps) and count_laps(venue_names) != count_laps(without(venue_names))
+        final_wumpa_left_out = count_race_wumpa(pickup_venues) != count_race_wumpa(without(pickup_venues))
+        final_only_venue = (final_lap_left_out or final_wumpa_left_out
+                            or rows(pickup_venues) != rows(without(pickup_venues)))
+        if final_only_venue:
+            lap_venue_names, pickup_venues = without(venue_names), without(pickup_venues)
+    sanity_tracks = pad_sanity_tracks + [venue_record(name) for name in pickup_venues]
+    sanity.add_tracks(sanity_record, sanity_tracks, *sanity_args)
     if sanity_record:
         check_count += sum(len(row[kind]) for row in sanity_record["tracks"] for kind in sanity.KINDS)
     if laps:
-        check_count += content_laps.count(chosen, is_track, [venue_record(name)["id"] for name in venue_names])
+        check_count += count_laps(lap_venue_names)
     # Reach 10 Wumpa through cup legs and boss races (row 10i): one per track
     # that only those races reach.
-    check_count += content_race_routes.count(
-        [t for t in chosen if is_track(t)], [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
-        [venue_record(name) for name in pickup_venues], settings,
-        lambda t: fruit_track(t, package_by_id.get(t.get("package_id"))),
-        lambda t: any(m in t["modes"] for m in wumpa_modes(t, package_by_id.get(t.get("package_id")))))
+    check_count += count_race_wumpa(pickup_venues)
     # Rungs of cup leg tracks without a Trophy Race: no pad, or a pad without
     # one (cup_only_podium_rungs, rulings of 2026-11-02).
     cup_only = bool(o.cup_only_podium_rungs.value)
@@ -1752,6 +1775,11 @@ def draw_plan(world, key_estimate=True):
             oxide_track = venue_record(content_bosses.OXIDE_STATION)
             if not any(track["id"] == oxide_track["id"] for track in sanity_tracks):
                 filler_exclusions.discard(LOCATION_BY_CODE[wumpa_location(oxide_track)])
+        # A6-48: the final venue's omitted lap and Reach 10 Wumpa need no filler.
+        if final_lap_left_out:
+            filler_exclusions.discard(LOCATION_BY_CODE[lap_location(venue_record(boss_final))])
+        if final_wumpa_left_out:
+            filler_exclusions.discard(LOCATION_BY_CODE[wumpa_location(venue_record(boss_final))])
 
     def resolve_items(chosen, starts=o.start_inventory_from_pool.value):
         return content_item_pool.resolve(
@@ -1989,6 +2017,8 @@ def draw_plan(world, key_estimate=True):
                                           {t["id"]: room_title(t) for t in plan_tracks}, lap_location))
     checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability, package_by_id))
     checks = content_pickups.omit_unrepeatable(checks)
+    if final_only_venue:
+        checks = content_pickups.omit_final_only(checks, repeatable_pickups)
     # Wumpa Shop slots (job J11), last, each with its drawn price.
     checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
@@ -2073,6 +2103,8 @@ def draw_plan(world, key_estimate=True):
         plan["global_checks"] = global_checks
         if tizi_madness.MaskGates(plan):
             plan["required_features"].append(tizi_madness.FEATURE)
+    if final_only_venue:
+        plan["required_features"].append(content_pickups.FINAL_FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
     if sanity_record:
@@ -2833,6 +2865,9 @@ def validate(plan):
             and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED
             and (sanity_record or settings.get("wumpa") == "per_track")),
             "repeatable pickup feature without Oxide pickup families")
+    require(not content_pickups.final_enabled(plan) or (boss_record is not None
+            and boss_record["oxide_goal"] != content_bosses.GOAL_DISABLED),
+            "final-only venue feature without N. Oxide's races")
     # Row 5: ctr_first, the Wumpa Shop record and the Wumpa goal arm.
     ctr_first = plan.get("adventure_structure") == CTR_FIRST
     require("adventure_structure" not in plan or ctr_first, "adventure_structure must be ctr_first when present")
@@ -2847,7 +2882,8 @@ def validate(plan):
                                                          plan.get("pad_requirements"), fixed, guarded,
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
                                                          repeatable_pickups=content_pickups.enabled(plan),
-                                                         tizi_mask=tizi_mask, tracks=plan["tracks"]),
+                                                         tizi_mask=tizi_mask, tracks=plan["tracks"],
+                                                         final_only_venue=content_pickups.final_enabled(plan)),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -3106,6 +3142,9 @@ def validate(plan):
         expected_checks[check["location"]] = check
     if content_pickups.enabled(plan):
         expected_checks = {c["location"]: c for c in content_pickups.omit_unrepeatable(list(expected_checks.values()))}
+    if content_pickups.final_enabled(plan):
+        expected_checks = {c["location"]: c for c in content_pickups.omit_final_only(list(expected_checks.values()),
+                                                                                     content_pickups.enabled(plan))}
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))
