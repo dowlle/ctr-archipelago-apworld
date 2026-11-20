@@ -215,15 +215,21 @@ class TestCortexVortexTrack(unittest.TestCase):
             saphi["files"], (cortex_vortex.CORTEX_LEV_SHA256, cortex_vortex.CORTEX_VRM_SHA256))]
         return saphi
 
-    def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):
-        # A tester report (alpha2, 2026-11-04): a seed had two Cortex Vortex pads,
-        # the bundled track and a downloaded copy listed in custom_tracks.
-        for required in (True, False):
-            with self.subTest(own_pad=required), self.assertRaises(OptionError) as caught:
-                make_world(cv_options(custom=[self.saphi_cortex_vortex()], required=required), seed=6)
-            message = str(caught.exception)
-            self.assertIn("package/cortex-vortex/1.1.2", message)
-            self.assertIn("one Cortex Vortex", message)
+    def test_bundled_cortex_wins_with_or_without_matching_files(self):
+        for exact in (True, False):
+            with self.subTest(exact=exact):
+                package = self.saphi_cortex_vortex()
+                if not exact:
+                    package["files"][0]["sha256"] = "ab" * 32
+                package["display_name"] = "Downloaded Cortex"
+                options = cv_options(custom=[package], required=False)
+                options["content_pool"]["tracks"]["overrides"] = {"Downloaded Cortex": ["relic"]}
+                world = make_world(options, seed=6)
+                plan = world.ctr_content_plan
+                self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
+                self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+                self.assertNotIn(package["id"], {p["id"] for p in plan["packages"]})
+                self.assertEqual(world.ctr_duplicate_track_count, 1)
 
     def swap_options(self, pinned=False):
         """`cortex_vortex_track: off` and a downloaded copy listed with the other tracks;

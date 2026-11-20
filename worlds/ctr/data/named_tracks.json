@@ -2,8 +2,8 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "aead7be3a7fe9d32ac95253d59afdb47e183486d",
-    "digest": "e81e8730522855d55276586f98c57af4cf9cea00eaac2bfe7469d07b60ee47d2"
+    "commit": "a92f7189fa1705714ff40132d270f5af10f4d483",
+    "digest": "30e3a4be7f69ff9e65448086e3097a24ea898f9cacc2b8778882b2774b353aac"
   },
   "tracks": [
     {
@@ -866,6 +866,7 @@
     "crash-30anniversary-adventure-track-16": "papu-s-sg-temple",
     "crash-30anniversary-adventure-track-19": "drive-thru-danger",
     "crash-30anniversary-adventure-track-2": "cortex-vortex",
+    "crash-30anniversary-adventure-track-26": "coco-park-2025",
     "dracula-s-castle": "draculas-castle",
     "green-hill-raceway-v2-0-slot-25": "green-hill-raceway",
     "lockbox-adventure-track-11": "cortex-vortex",
@@ -885,7 +886,9 @@
     "release-st-patrick-adventure-slot-23": "yoshi-circuit-legacy",
     "release-st-patrick-adventure-slot-31": "hasty-hedges",
     "release-st-patrick-adventure-slot-41": "mario-raceway-n64",
+    "release-st-patrick-adventure-slot-55": "coco-park-2025",
     "release-st-patrick-adventure-slot-9": "toasty-terrace",
+    "release-st-patrick-adventure-track-10": "coco-park-2025",
     "release-st-patrick-adventure-track-15": "green-hill-raceway",
     "release-st-patrick-adventure-track-2": "toasty-terrace",
     "release-st-patrick-adventure-track-4": "yoshi-circuit-legacy",

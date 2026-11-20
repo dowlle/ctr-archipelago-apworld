@@ -299,10 +299,11 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw, where="custom_tracks", *, historical=False):
+def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=None):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks", historical=historical)
+        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks",
+                                         historical=historical, dropped=dropped)
     except custom_packages.PackageError as exc:
         if where == "custom_tracks":
             error(f"{exc}. Use Export YAML in Options > Custom Tracks, or Save YAML for a room "
@@ -1277,6 +1278,64 @@ def move_bundled_cortex_modes(modes, names):
     return moved
 
 
+def drop_duplicate_tracks(world):
+    """Keep the first YAML descriptor per track, with bundled Cortex Vortex taking precedence."""
+    options = world.options
+    raw = list(options.custom_tracks.value)
+    if not raw:
+        return
+    dropped = []
+    packages = resolve_packages(raw, dropped=dropped)
+    bundled = bool(options.cortex_vortex_track.value)
+    if bundled:
+        for index, entry in enumerate(raw):
+            descriptor = custom_packages.yaml_track_entry(entry, "custom_tracks")
+            if destinations.canonical_track_key(descriptor["content_id"]) == CORTEX_TRACK_KEY:
+                dropped.append((index, descriptor, index, None))
+    if not dropped:
+        return
+
+    removed = {index for index, *_ in dropped}
+    survivors = [package for package in packages
+                 if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
+    reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values()) | {"default"}
+    owners = {}
+    for package in survivors:
+        for name in literal_track_names(package, package):
+            owners[name] = package
+    replacements = {}
+    for index, package, retained_index, retained in sorted(dropped, key=lambda row: row[0]):
+        if retained_index in removed:
+            if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY:
+                continue
+            retained = None
+        for name in track_names(package, package, reserved | owners.keys()):
+            if name in reserved or (name in owners and owners[name] is not retained):
+                continue
+            replacements.setdefault(name, retained["content_id"] if retained else destinations.CORTEX_VORTEX)
+
+    modes = dict(options.track_modes.value)
+    for name, target in replacements.items():
+        if name != target and name in modes:
+            modes.setdefault(target, modes.pop(name))
+    options.track_modes.value = modes
+    required = []
+    seen = set()
+    for name in options.required_entries.value:
+        target = replacements.get(name, name)
+        if target == destinations.CORTEX_VORTEX and name in replacements:
+            options.cortex_vortex_track.value = CORTEX_OWN_PAD
+            continue
+        # Retain ordinary duplicate-selector validation. Collapse entries only
+        # where this adjustment merges a removed copy with the retained track.
+        if target not in seen or target not in replacements.values():
+            required.append(target)
+            seen.add(target)
+    options.required_entries.value = required
+    options.custom_tracks.value = [entry for i, entry in enumerate(raw) if i not in removed]
+    world.ctr_duplicate_track_count = len(removed)
+
+
 def swap_in_bundled_cortex(world):
     """Replace an exact copy of the bundled Cortex Vortex files when the option is off.
 
@@ -1349,12 +1408,6 @@ def draw_plan(world, key_estimate=True):
     for package in packages:
         if country_speedway.matches(package) or toasty_terrace.matches(package):
             package["capabilities"]["super_turbo_pads"] = False
-    twin = next((p for p in packages if destinations.canonical_track_key(p["content_id"]) == CORTEX_TRACK_KEY),
-                None) if with_cortex else None
-    if twin is not None:
-        error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
-              "Cortex Vortex that comes with CTR AP. A seed has one Cortex Vortex: remove it from custom_tracks, "
-              "or set cortex_vortex_track to off and the Cortex Vortex that comes with CTR AP replaces it.")
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so

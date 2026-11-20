@@ -198,6 +198,7 @@ class ctrAPWorld(World):
             content_plan.restore(self, passthrough)
         else:
             from . import content_item_boxes, tizi_madness, track_origins
+            content_plan.drop_duplicate_tracks(self)
             content_plan.swap_in_bundled_cortex(self)
             content_item_boxes.settings(self.options)
             # A4-96: Tizi Madness only with hard shortcut knowledge.

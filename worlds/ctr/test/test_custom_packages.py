@@ -100,6 +100,26 @@ class TestAdmission(unittest.TestCase):
         package["files"][0]["sha256"] = entry["doc"]["track"]["lev_sha256"][0]
         self.assertIs(box_spots.file_for(track, package), entry)
 
+    def test_yaml_keeps_first_copy_and_transfers_unshared_selectors(self):
+        first = named_fixture()
+        first.update(content_id="release-st-patrick-adventure-slot-55",
+                     id="package/release-st-patrick-adventure-slot-55/1.1.0",
+                     display_name="Old St. Patrick Title")
+        second = named_fixture()
+        second.update(content_id="coco-park-2025", id="package/coco-park-2025/1.1.0",
+                      display_name="Old Anniversary Title")
+        second["files"][0]["sha256"] = "ab" * 32
+        for chosen, removed in ((first, second), (second, first)):
+            options = options_with([chosen, removed], required=[removed["display_name"]])
+            options["content_pool"]["tracks"]["overrides"] = {removed["display_name"]: ["trophy"]}
+            world = make_world(options, seed=3)
+            plan = world.ctr_content_plan
+            self.assertEqual(plan["packages"], [chosen])
+            track = next(t for t in plan["tracks"] if t.get("package_id") == chosen["id"])
+            self.assertEqual((track["named_block"], track["room_title"], track["modes"]),
+                             (15, "Coco Park 2025", ["trophy"]))
+            self.assertEqual(world.ctr_duplicate_track_count, 1)
+
     def test_literal_selector_keeps_precedence_over_another_tracks_alias(self):
         alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
         other = copy.deepcopy(UNKNOWN)
