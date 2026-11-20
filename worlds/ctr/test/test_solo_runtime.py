@@ -1344,6 +1344,38 @@ class TestCustomTracks(SoloTestCase):
         changed = ctr_solo.apply_tracks(paths, doc, self.assets, [first["id"], "cortex-vortex"], [], page=True)
         self.assertNotIn("required_entries", changed[GAME])
 
+        other = self.install("fixture-other", "2.1", "Second Coco")
+        shared_title = dict(section, custom_tracks=[first, other, second], required_entries=["Second Coco"])
+        self.assertEqual([ctr_solo._start_pick(shared_title, copy) for copy in (first, other)], [1, 2])
+
+    def test_loaded_duplicate_prefers_the_yaml_pins_at_the_same_revision(self):
+        legacy = self.install("release-st-patrick-adventure-slot-55", "2.1", "Legacy Coco")
+        canonical = self.install("coco-park-2025", "2.1", "Canonical Coco")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        listed = [legacy, canonical]
+        rows = ctr_solo.installed_tracks(paths, self.assets, listed)
+        self.assertEqual([row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}],
+                         [legacy["id"]])
+        result = ctr_solo.apply_tracks(paths, {GAME: {"custom_tracks": listed}}, self.assets,
+                                       [legacy["id"]], [], page=True)
+        self.assertEqual(result[GAME]["custom_tracks"][0]["files"], legacy["files"])
+
+    def test_loaded_bundled_on_keeps_the_exact_cortex_copy_for_validation(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from .. import cortex_vortex
+        descriptor = self.install("cortex-vortex", "1.1.6", "Downloaded Cortex")
+        descriptor["files"][0]["sha256"] = cortex_vortex.CORTEX_LEV_SHA256
+        descriptor["files"][1]["sha256"] = cortex_vortex.CORTEX_VRM_SHA256
+        section = dict(custom_tracks=[descriptor], cortex_vortex_track="in_pool",
+                       track_modes={"cortex-vortex": ["trophy"], descriptor["display_name"]: ["bogus"]})
+        with patch.object(ctr_solo, "installed_tracks", return_value=[
+                {"id": descriptor["id"], "content_id": descriptor["content_id"], "descriptor": descriptor}]):
+            result = ctr_solo.apply_tracks(SimpleNamespace(), {GAME: section}, self.assets,
+                                           ["cortex-vortex"], [], page=True)
+        self.assertEqual(result[GAME], section)
+
     def test_corrected_title_keeps_or_removes_yaml_picks(self):
         import yaml
         key = "assembly-lane-n-gage"

@@ -1317,6 +1317,9 @@ def drop_duplicate_tracks(world):
         error("required_entries lists these selectors more than once: " + ", ".join(map(repr, repeated)))
     survivors = [package for package in packages
                  if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
+    from . import tizi_madness
+    if int(options.shortcut_knowledge.value) < tizi_madness.MIN_SHORTCUT_KNOWLEDGE:
+        survivors = [package for package in survivors if not tizi_madness.is_tizi_madness(package)]
     reserved = {RETAIL[level] for level in retail_selection(options)} | {"default"}
     literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
     owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}
@@ -1376,9 +1379,9 @@ def swap_in_bundled_cortex(world):
     reserved.update(name for p in packages if p["id"] not in twins for name in literal_track_names(p, p))
     names = {n for p in copies for n in track_names(p, p, reserved)} - reserved
     swapped_ids = {package_track_id(p) for p in copies}
-    names.update(name for name, target in getattr(world, "ctr_transferred_track_selectors", {}).items()
-                 if target in swapped_ids)
-    kept = [n for n in o.required_entries.value if n not in names]
+    inherited = {name for name, target in getattr(world, "ctr_transferred_track_selectors", {}).items()
+                 if target in swapped_ids}
+    kept = [n for n in o.required_entries.value if n not in names and n not in inherited]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
     o.custom_tracks.value = [raw for raw in o.custom_tracks.value
@@ -1386,6 +1389,7 @@ def swap_in_bundled_cortex(world):
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
     moved_modes = move_bundled_cortex_modes(modes, names)
+    moved_modes = move_bundled_cortex_modes(modes, inherited - names) or moved_modes
     o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins

@@ -1242,14 +1242,23 @@ def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
     return None
 
 
-def installed_tracks(paths: Paths, assets: str) -> list:
+def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
     """Admitted revisions resolved from the shared store or legacy room folders."""
     admit = _world_module("custom_packages").admit
     supported = _world_module("content_plan").supported_modes
     destinations = _world_module("destinations")
     tracks_root = os.path.join(assets, "tracks")
+    preferred = {key: group[0] for key, group in _yaml_track_groups(listed).items()}
+    sources = _descriptor_sources(paths)
+    if preferred:
+        def priority(entry):
+            raw = entry[0]
+            key = _track_key(raw) if isinstance(raw, dict) else None
+            saved = preferred.get(destinations.canonical_track_key(key)) if isinstance(key, str) else None
+            return not (saved and saved.get("revision") == raw.get("revision") and _pins(saved) == _pins(raw))
+        sources.sort(key=priority)
     seen, result = set(), []
-    for raw, source in _descriptor_sources(paths):
+    for raw, source in sources:
         try:
             descriptor = admit(json.loads(json.dumps(raw)))
         except Exception:
@@ -1288,8 +1297,9 @@ def _cortex_installed(assets: str) -> bool:
 def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict:
     """The Custom Tracks page. With a YAML each row starts as that YAML has it
     (`custom_tracks`, `required_entries`, `cortex_vortex_track`)."""
-    tracks = installed_tracks(paths, assets)
     section = _section(read_player_yaml(yaml_path)) if yaml_path else {}
+    listed = _custom_tracks({GAME: section})
+    tracks = installed_tracks(paths, assets, listed)
     rows = [{**{k: v for k, v in t.items() if k != "descriptor"}, "start": _start_pick(section, t["descriptor"])}
             for t in tracks]
     cortex = _cortex_pick(section)
@@ -1302,7 +1312,6 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
         rows = [row for row in rows if row["id"] not in ids]
         cortex = max([cortex] + [row["start"] for row in copies])
         if _cortex_pick(section):
-            listed = _custom_tracks({GAME: section})
             group = _yaml_track_groups(listed).get(CORTEX_ID, ())
             if group and _yaml_group_is_guaranteed(section, group[0], listed, group):
                 cortex = PICK_OWN_PAD
@@ -1374,9 +1383,33 @@ def _pick_names(descriptor: dict, existing: list, reserved=()) -> set:
 
 def _yaml_pick_names(descriptor: dict, listed: list, existing: list) -> set:
     """Resolve a selector against the loaded YAML, where literal names win in list order."""
-    owners = {name: d for d in listed for name in _literal_selectors([d])}
-    return {name for name in _pick_names(descriptor, existing, owners)
-            if name not in owners or owners[name] in existing}
+    groups = _yaml_track_groups(listed)
+    if all(len(group) == 1 for group in groups.values()):
+        owners = {name: d for d in listed for name in _literal_selectors([d])}
+        return {name for name in _pick_names(descriptor, existing, owners)
+                if name not in owners or owners[name] in existing}
+    canonical = _world_module("destinations").canonical_track_key
+    key = _track_key(descriptor)
+    if not isinstance(key, str):
+        return set()
+    key = canonical(key)
+    retained = dict(sorted(((owner, group[0]) for owner, group in groups.items()
+                            if isinstance(group[0].get("display_name"), str)),
+                           key=lambda entry: str(entry[1].get("id", ""))))
+    literal = {name: owner for owner, row in retained.items() for name in _literal_selectors([row])}
+    owners = dict(literal)
+    for owner, row in retained.items():
+        for name in _pick_names(row, [row], literal):
+            owners.setdefault(name, owner)
+    dropped = {}
+    for owner, group in groups.items():
+        copies = [row for row in group[1:] if isinstance(row.get("display_name"), str)]
+        if copies and owner in retained:
+            for name in _pick_names(retained[owner], copies, literal):
+                if name not in owners:
+                    dropped.setdefault(name, set()).add(owner)
+    return {name for name in _pick_names(descriptor, existing, literal)
+            if (owners[name] == key if name in owners else dropped.get(name, {key}) == {key})}
 
 
 def _start_pick(section: dict, descriptor: dict) -> int:
@@ -1409,13 +1442,14 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         return doc
     if set(guaranteed) - set(picked):
         raise SoloError("track", "A guaranteed track must also be picked.")
-    by_id = {t["id"]: t for t in installed_tracks(paths, assets)}
+    listed = _custom_tracks(doc)
+    by_id = {t["id"]: t for t in installed_tracks(paths, assets, listed)}
     packages = [p for p in picked if p != CORTEX_ID]
     missing = [p for p in packages if p not in by_id]
     if missing:
         raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
     canonical_key = _world_module("destinations").canonical_track_key
-    groups = _yaml_track_groups(_custom_tracks(doc))
+    groups = _yaml_track_groups(listed)
     keep_bundled = CORTEX_ID in picked and bool(_cortex_pick(_section(doc)))
     winner_ids = {}
     for track_id in packages:
@@ -1485,7 +1519,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
             group = groups.get(key, ())
             # Keep the loaded copies available for the generator to transfer
             # any unshared selectors. A picker selection uses the first pins.
-            if keep_bundled and key == CORTEX_ID and not bundled_copy(descriptor):
+            if keep_bundled and key == CORTEX_ID:
                 continue
             if key in winner_ids and key != CORTEX_ID:
                 if entry["id"] != winner_ids[key]:
@@ -1494,6 +1528,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
             reserved = _literal_selectors(d for d in (*custom, *picked_descriptors)
                                           if d not in existing and not _same_package(d, descriptor))
             names = _pick_names(descriptor, existing, reserved) - reserved
+            required_names = _yaml_pick_names(descriptor, custom, existing) if existing else names
             if entry["id"] not in picked:
                 custom[:] = [d for d in custom if not _same_package(d, descriptor)]
                 if existing and isinstance(modes, dict):
@@ -1504,7 +1539,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                         for name in mode_names:
                             modes.pop(name, None)
             if existing and entry["id"] not in guaranteed:
-                required[:] = [name for name in required if name not in names]
+                required[:] = [name for name in required if name not in required_names]
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         if not any(_same_package(d, descriptor) for d in custom):

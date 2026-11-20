@@ -348,6 +348,16 @@ class TestCortexVortexTrack(unittest.TestCase):
         content_plan.generate(world)
         self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["relic"])
 
+    def test_with_cortex_off_the_first_exact_copy_keeps_its_mode(self):
+        options = self.swap_options(pinned=True)
+        copies = options["content_pool"]["tracks"]["custom"]
+        copies[-1]["display_name"] = "Downloaded Cortex"
+        copies.append(dict(copies[-1], display_name="Another Cortex"))
+        options["content_pool"]["tracks"]["overrides"] = {
+            "Downloaded Cortex": ["trophy"], "Another Cortex": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["trophy"])
+
     def test_the_swap_is_one_line_of_the_generator_summary(self):
         import logging
         from ..notices import summary_lines
