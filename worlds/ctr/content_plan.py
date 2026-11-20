@@ -1317,7 +1317,7 @@ def drop_duplicate_tracks(world):
         error("required_entries lists these selectors more than once: " + ", ".join(map(repr, repeated)))
     survivors = [package for package in packages
                  if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
-    reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values()) | {"default"}
+    reserved = {RETAIL[level] for level in retail_selection(options)} | {"default"}
     literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
     owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}
     bundled_names = set(track_names(cortex_track(standalone=True), None, literal)) if bundled else set()
@@ -1330,11 +1330,30 @@ def drop_duplicate_tracks(world):
                 targets.setdefault(name, set()).add(target)
 
     transferred = {name: next(iter(ids)) for name, ids in targets.items() if len(ids) == 1}
-    if any(transferred.get(name) == CORTEX_TRACK_ID for name in wanted):
+    arena_pool, arena_count = crystal_settings(options)
+    arena_names = {arena_content.ARENAS[level] for level in arena_pool} if arena_count else set()
+    if any(transferred.get(name) == CORTEX_TRACK_ID and name not in arena_names for name in wanted):
         options.cortex_vortex_track.value = CORTEX_OWN_PAD
     options.custom_tracks.value = [entry for i, entry in enumerate(raw) if i not in dropped]
     world.ctr_transferred_track_selectors = transferred
     world.ctr_duplicate_track_count = len(dropped)
+
+
+def prune_transfers_for_excluded_tracks(world, excluded):
+    """Drop selectors carried to a package an eligibility rule later removes."""
+    transferred = getattr(world, "ctr_transferred_track_selectors", {})
+    if not excluded or not transferred:
+        return
+    excluded_tracks = {"custom/" + package.removeprefix("package/") for package in excluded}
+    names = {name for name, target in transferred.items() if target in excluded_tracks}
+    options = world.options
+    arena_pool, arena_count = crystal_settings(options)
+    arena_names = {arena_content.ARENAS[level] for level in arena_pool} if arena_count else set()
+    options.required_entries.value = [name for name in options.required_entries.value
+                                      if name not in names or name in arena_names]
+    options.track_modes.value = {name: modes for name, modes in options.track_modes.value.items()
+                                 if name not in names}
+    world.ctr_transferred_track_selectors = {name: target for name, target in transferred.items() if name not in names}
 
 
 def swap_in_bundled_cortex(world):
@@ -1440,7 +1459,8 @@ def draw_plan(world, key_estimate=True):
     # A name of the 18 original tracks that this seed leaves out has no effect.
     reserved = set(RETAIL.values()) | {name for track, package, _addressing in pool
                                       for name in literal_track_names(track, package)}
-    known = reserved | {name for track, package, _addressing in pool for name in track_names(track, package, reserved)}
+    live_modes = {name for track, package, _addressing in pool for name in track_names(track, package, reserved)}
+    known = reserved | live_modes
     unknown = sorted(set(overrides) - known - transferred.keys())
     if unknown:
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
@@ -1450,7 +1470,7 @@ def draw_plan(world, key_estimate=True):
         wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
         if wanted is None:
             wanted = next((override for name, override in overrides.items()
-                           if name not in known and transferred.get(name) == track["id"]
+                           if name not in live_modes and transferred.get(name) == track["id"]
                            and set(override).intersection(supported)),
                           selected_modes)
         modes = [m for m in MODES if m in wanted and m in supported]
@@ -1463,6 +1483,8 @@ def draw_plan(world, key_estimate=True):
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
         candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
+    if not arena_count and transferred:
+        arena_candidates = [arena for arena in arena_candidates if arena["display_name"] not in transferred]
     # A track named twice (its title and its key) is one pad, not two (A4-83 review).
     required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id, transferred.items())))
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]

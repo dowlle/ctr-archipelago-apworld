@@ -1324,6 +1324,26 @@ class TestCustomTracks(SoloTestCase):
             result = ctr_solo.apply_tracks(paths, doc, self.assets, ["cortex-vortex"], ["cortex-vortex"], page=True)
         self.assertEqual(result[GAME], {"cortex_vortex_track": "own_pad", "track_modes": {"Cortex Vortex": ["trophy"]}})
 
+    def test_loaded_duplicates_keep_first_pins_and_bundled_cortex(self):
+        first = self.install("release-st-patrick-adventure-slot-55", "2.0", "First Coco")
+        second = self.install("coco-park-2025", "2.1", "Second Coco")
+        cortex = self.install("cortex-vortex", "1.1.6", "Downloaded Cortex")
+        self.assertNotEqual(ctr_solo._pins(first), ctr_solo._pins(second))
+        section = dict(custom_tracks=[first, second, cortex], cortex_vortex_track="in_pool",
+                       required_entries=["Second Coco", "Downloaded Cortex"],
+                       track_modes={"Second Coco": ["trophy"], "Downloaded Cortex": ["relic"]})
+        doc = {GAME: section}
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        self.assertEqual([ctr_solo._start_pick(section, copy) for copy in (first, second, cortex)], [2, 0, 0])
+        result = ctr_solo.apply_tracks(paths, doc, self.assets,
+                                       [first["id"], second["id"], "cortex-vortex", cortex["id"]],
+                                       [second["id"], cortex["id"]], page=True)
+        self.assertEqual(result[GAME], dict(section, cortex_vortex_track="own_pad"))
+        self.assertEqual(ctr_solo._pins(result[GAME]["custom_tracks"][0]), ctr_solo._pins(first))
+        changed = ctr_solo.apply_tracks(paths, doc, self.assets, [first["id"], "cortex-vortex"], [], page=True)
+        self.assertNotIn("required_entries", changed[GAME])
+
     def test_corrected_title_keeps_or_removes_yaml_picks(self):
         import yaml
         key = "assembly-lane-n-gage"

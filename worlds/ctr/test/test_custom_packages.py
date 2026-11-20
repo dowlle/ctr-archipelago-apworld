@@ -150,6 +150,17 @@ class TestAdmission(unittest.TestCase):
         with self.assertRaisesRegex(OptionError, "not a track or arena.*Old Anniversary Title"):
             make_world(options, seed=3)
 
+        options = options_with([first, dict(second, display_name="Crash Cove")], required=["Crash Cove"])
+        options["content_pool"]["tracks"]["retail"] = [level for level, name in content_plan.RETAIL.items()
+                                                       if name != "Crash Cove"]
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertIn("entry/" + content_plan.package_track_id(first), {pad["entry_id"] for pad in plan["pads"]})
+
+        options = options_with([first, dict(second, display_name="Skull Rock")], required=["Skull Rock"])
+        options["content_pool"]["tracks"]["overrides"] = {"Skull Rock": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]), ["relic"])
+
         first["capabilities"]["relic"] = False
         del first["relic_targets"]
         options = options_with([first, second], required=[second["display_name"]])

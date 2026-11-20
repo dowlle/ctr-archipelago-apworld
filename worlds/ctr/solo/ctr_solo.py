@@ -1301,6 +1301,11 @@ def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict
         copies = [row for row in rows if row["id"] in ids]
         rows = [row for row in rows if row["id"] not in ids]
         cortex = max([cortex] + [row["start"] for row in copies])
+        if _cortex_pick(section):
+            listed = _custom_tracks({GAME: section})
+            group = _yaml_track_groups(listed).get(CORTEX_ID, ())
+            if group and _yaml_group_is_guaranteed(section, group[0], listed, group):
+                cortex = PICK_OWN_PAD
         rows.insert(0, {"id": CORTEX_ID, "display_name": "Cortex Vortex", "revision": "", "author": "",
                         "modes": ["trophy", "ctr", "relic"], "race_modes": ["trophy", "ctr", "relic", "time_trial"],
                         "time_trial": True, "seed_usable": True, "source": "built-in", "start": cortex})
@@ -1320,6 +1325,17 @@ def _pins(descriptor: dict) -> list:
 
 def _track_key(descriptor: dict):
     return descriptor.get("track_key", descriptor.get("content_id"))
+
+
+def _yaml_track_groups(listed):
+    """Group YAML entries in their original order, by the generator's track identity."""
+    canonical = _world_module("destinations").canonical_track_key
+    groups = {}
+    for descriptor in listed:
+        key = _track_key(descriptor) if isinstance(descriptor, dict) else None
+        if isinstance(key, str):
+            groups.setdefault(canonical(key), []).append(descriptor)
+    return groups
 
 
 def _same_package(listed, descriptor: dict) -> bool:
@@ -1366,12 +1382,16 @@ def _yaml_pick_names(descriptor: dict, listed: list, existing: list) -> set:
 def _start_pick(section: dict, descriptor: dict) -> int:
     """How a YAML already has a custom track: 0 off, PICK_POOL or PICK_OWN_PAD."""
     listed = _custom_tracks({GAME: section})
-    existing = [d for d in listed if _same_package(d, descriptor)]
-    if not existing:
+    key = _world_module("destinations").canonical_track_key(descriptor["content_id"])
+    group = _yaml_track_groups(listed).get(key, ())
+    if not group or not _same_package(group[0], descriptor) or (key == CORTEX_ID and _cortex_pick(section)):
         return 0
+    return PICK_OWN_PAD if _yaml_group_is_guaranteed(section, descriptor, listed, group) else PICK_POOL
+
+
+def _yaml_group_is_guaranteed(section, descriptor, listed, group):
     required = section.get("required_entries")
-    names = _yaml_pick_names(descriptor, listed, existing)
-    return PICK_OWN_PAD if isinstance(required, list) and names & set(map(str, required)) else PICK_POOL
+    return isinstance(required, list) and bool(_yaml_pick_names(descriptor, listed, group) & set(map(str, required)))
 
 
 def _cortex_pick(section: dict) -> int:
@@ -1394,10 +1414,25 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     missing = [p for p in packages if p not in by_id]
     if missing:
         raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
+    canonical_key = _world_module("destinations").canonical_track_key
+    groups = _yaml_track_groups(_custom_tracks(doc))
+    keep_bundled = CORTEX_ID in picked and bool(_cortex_pick(_section(doc)))
+    winner_ids = {}
+    for track_id in packages:
+        descriptor = by_id[track_id]["descriptor"]
+        key = canonical_key(descriptor["content_id"])
+        group = groups.get(key, ())
+        if len(group) > 1 and _same_package(group[0], descriptor):
+            winner_ids.setdefault(key, track_id)
+    if keep_bundled:
+        winner_ids[CORTEX_ID] = CORTEX_ID
+    replaced = {track_id: winner_ids[key] for track_id in packages
+                if (key := canonical_key(by_id[track_id]["content_id"])) in winner_ids and winner_ids[key] != track_id}
+    packages = [track_id for track_id in packages if track_id not in replaced]
+    guaranteed = list(dict.fromkeys(replaced.get(track_id, track_id) for track_id in guaranteed))
     unusable = next((p for p in packages if not by_id[p]["seed_usable"]), None)
     if unusable:
         raise SoloError("track", f"{by_id[unusable]['display_name']} supports Time Trial only and cannot use an Adventure pad.", track=unusable)
-    canonical_key = _world_module("destinations").canonical_track_key
     keys = [canonical_key(by_id[p]["content_id"]) for p in packages]
     if CORTEX_ID in keys and CORTEX_ID in picked:
         raise SoloError("track", "Pick one Cortex Vortex: the one that comes with CTR AP is already picked.",
@@ -1418,6 +1453,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         custom = []
     if not isinstance(custom, list) or not isinstance(required, list):
         return doc  # the world refuses these with its own message
+    if page and keep_bundled and cortex == PICK_POOL and (group := groups.get(CORTEX_ID)):
+        names = _yaml_pick_names(group[0], custom, group)
+        required[:] = [name for name in required if name not in names]
     # A YAML that already lists a picked track must list exactly the installed
     # one: another version or other file pins is a conflict, refused rather
     # than guessed at (round 2 decision 5). The same package is not added
@@ -1425,10 +1463,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         key = canonical_key(descriptor["content_id"])
-        other = next((d for d in custom if isinstance(d, dict)
-                      and isinstance(_track_key(d), str) and canonical_key(_track_key(d)) == key
-                      and not _same_package(d, descriptor)), None)
-        if other is not None:
+        group = groups.get(key, ())
+        if group and not _same_package(group[0], descriptor):
+            other = group[0]
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
                             f"(version {other.get('revision', '?')}) differently from the installed version "
                             f"{by_id[track_id]['revision']}. Remove it from the YAML or leave the track off.",
@@ -1444,8 +1481,18 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         for entry in by_id.values():
             descriptor = entry["descriptor"]
             existing = [d for d in custom if _same_package(d, descriptor)]
+            key = canonical_key(descriptor["content_id"])
+            group = groups.get(key, ())
+            # Keep the loaded copies available for the generator to transfer
+            # any unshared selectors. A picker selection uses the first pins.
+            if keep_bundled and key == CORTEX_ID and not bundled_copy(descriptor):
+                continue
+            if key in winner_ids and key != CORTEX_ID:
+                if entry["id"] != winner_ids[key]:
+                    continue
+                existing = group
             reserved = _literal_selectors(d for d in (*custom, *picked_descriptors)
-                                          if not _same_package(d, descriptor))
+                                          if d not in existing and not _same_package(d, descriptor))
             names = _pick_names(descriptor, existing, reserved) - reserved
             if entry["id"] not in picked:
                 custom[:] = [d for d in custom if not _same_package(d, descriptor)]
@@ -1467,6 +1514,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
             continue
         descriptor = by_id[track_id]["descriptor"]
         existing = [d for d in custom if _same_package(d, descriptor)]
+        key = canonical_key(descriptor["content_id"])
+        if key in winner_ids:
+            existing = groups[key]
         names = _yaml_pick_names(descriptor, custom, existing)
         if not names.intersection(required):
             # The saved descriptor keeps its exact revision and file pins.
