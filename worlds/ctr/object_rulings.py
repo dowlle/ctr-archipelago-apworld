@@ -31,9 +31,10 @@ RULINGS = _load()
 
 
 def applies_to(package, enabled):
-    if not package:
+    key = (package or {}).get("content_id")
+    if not isinstance(key, str):
         return False
-    key, sha = canonical_track_key(package["content_id"]), lev_pin(package)
+    key, sha = canonical_track_key(key), lev_pin(package)
     return any(content == key and kind in enabled and row["lev_sha256"] == sha
                for (content, kind, _), row in RULINGS.items())
 
@@ -44,9 +45,9 @@ def rank(track, package, kind, ordinal, capability, *, legacy=False):
     Easy/medium require Blue Fire and hard uses the ruled floor. Removal is
     independent of the boost pack; the caller omits rank terms with boost off.
     """
-    if track["origin"] != "custom" or not package:
+    key = (package or {}).get("content_id")
+    if track["origin"] != "custom" or not isinstance(key, str):
         return 0
-    key = package["content_id"]
     row = RULINGS.get((canonical_track_key(key), kind, ordinal))
     if row is None or (row["lev_sha256"] != lev_pin(package) and not (legacy and row["content_id"] == key)):
         return 0
