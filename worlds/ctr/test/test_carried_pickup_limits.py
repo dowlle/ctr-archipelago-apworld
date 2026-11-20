@@ -74,6 +74,15 @@ class TestCarriedPickupLimits(unittest.TestCase):
                        ROYAL["files"][0]["sha256"]),
                       track_rulings.spoiler_sources(plan))
 
+    def test_disabled_pickup_options_still_report_added_ordinals_without_a_wire_marker(self):
+        options = royal_options(item_box_count=0, itemboxsanity=0, wumpasanity="off", progressive_boost="off")
+        _, package = later_revision(options, "ab" * 32)
+        package["capabilities"].update(weapon_crates=29)
+        with self.assertLogs("CTR", "WARNING") as log:
+            plan = make_world(options, seed=3, stop_before="pre_fill").ctr_content_plan
+        self.assertNotIn("track_ruling_sources", plan)
+        self.assertEqual(sum("Weapon Crate 29" in line for line in log.output), 1)
+
     def test_rooms_without_pickup_limits_keep_their_previous_pool(self):
         options = royal_options()
         track_id, package = later_revision(options, "ab" * 32)

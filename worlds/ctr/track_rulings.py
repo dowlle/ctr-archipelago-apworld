@@ -228,8 +228,8 @@ def spoiler_sources(plan):
     return list(plan_sources(plan))
 
 
-def omitted_pickups(plan):
-    """Ranges of added pickup ordinals absent from enabled check families."""
+def omitted_pickups(plan, *, enabled_only=True):
+    """Added ordinals awaiting review, optionally restricted to enabled checks."""
     from . import content_item_boxes, sanity
 
     if not pickup_limits_enabled():
@@ -253,14 +253,12 @@ def omitted_pickups(plan):
         weapon = (content_item_boxes.crate_count(package) or 0) if tid in fallback else 0
         active = (max(weapon, counts[0] if record.get("itemboxsanity") else 0),
                   counts[1] if wumpa & 1 else 0, counts[2] if wumpa & 2 else 0)
+        if not enabled_only:
+            caps = package["capabilities"]
+            active = (caps.get("weapon_crates", 0), caps.get("fruit_crates", 0), caps.get("loose_fruit", 0))
         for name, previous, current in zip(sanity.SUFFIXES, reviewed, active):
             if current > previous:
                 yield package["id"], name, previous + 1, current
-
-
-@validation
-def report_omitted_pickups(plan):
-    return list(omitted_pickups(plan))
 
 
 def valid_sources(plan, packages):

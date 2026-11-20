@@ -1196,6 +1196,8 @@ def generate(world):
     A plan whose start holds no check that can take progression gets its first
     boost as a start (sphere0_guard.start_opener, A4-82), and the whole draw runs
     again from the same random state, as if the YAML had asked for that start."""
+    from .notices import adjusted
+
     state = world.random.getstate()
     plan = _draw_fitting(world)
     opener = sphere0_guard.start_opener(world, plan)
@@ -1205,12 +1207,15 @@ def generate(world):
         starts[opener] = starts.get(opener, 0) + 1
         world.options.start_inventory_from_pool.value = starts
         world.ctr_start_opener = opener
-        from .notices import adjusted
         adjusted(world, "start_opener",
                  f"Starting items: no check open at the start can hold progression, so the slot starts "
                  f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
+    ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
+              for package, kind, first, last in track_rulings.omitted_pickups(plan, enabled_only=False)]
+    if ranges:
+        adjusted(world, "unreviewed_pickups", "Pickups awaiting review and omitted from checks: " + ", ".join(ranges))
     # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
     # draw, and the fallback from the plan's checks. Itemsanity: one weapon
     # type marked early, the legacy draw (item_creation.create_items). Neither
