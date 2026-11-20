@@ -125,6 +125,7 @@ class TestObjectRulings(unittest.TestCase):
     def test_rule_added_to_a_previous_source_does_not_change_saved_rooms(self):
         from .. import track_rulings
 
+        next_version = track_rulings.RULING_VERSION + 1
         exact = options()
         carried = copy.deepcopy(exact)
         package = carried["content_pool"]["tracks"]["custom"][0]
@@ -136,8 +137,8 @@ class TestObjectRulings(unittest.TestCase):
             wire = json.loads(json.dumps(room.fill_slot_data()))
             key = ("tv-world", "wumpa_crate", 3)
             rule = dict(object_rulings.RULINGS[key], hard_rank=0, blue_fire_rank=0)
-            with (mock.patch.dict(object_rulings.RULINGS, {(*key, "1.1.0", PIN, 2): rule}),
-                  mock.patch.object(track_rulings, "RULING_VERSION", 2)):
+            with (mock.patch.dict(object_rulings.RULINGS, {(*key, "1.1.0", PIN, next_version): rule}),
+                  mock.patch.object(track_rulings, "RULING_VERSION", next_version)):
                 restored = make_world({}, passthrough=wire, seed=99, stop_before="pre_fill")
                 self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
                 new_plan = make_world(opts, seed=52, stop_before="pre_fill").ctr_content_plan
@@ -148,6 +149,7 @@ class TestObjectRulings(unittest.TestCase):
     def test_finish_ruling_added_to_a_previous_source_preserves_saved_rooms(self):
         from .. import track_rulings
 
+        next_version = track_rulings.RULING_VERSION + 1
         for revision, pin in (("1.1.0", PIN), ("9.0.0", "ab" * 32)):
             opts = options("hard")
             package = opts["content_pool"]["tracks"]["custom"][0]
@@ -157,8 +159,9 @@ class TestObjectRulings(unittest.TestCase):
             opts["content_pool"]["required_entries"] = [track]
             world = make_world(opts, seed=52, stop_before="pre_fill")
             wire = json.loads(json.dumps(world.fill_slot_data()))
-            with (mock.patch.dict(content_capability.USF_FINISH_RULINGS, {("tv-world", "1.1.0", PIN, 2): 2}),
-                  mock.patch.object(track_rulings, "RULING_VERSION", 2)):
+            new_rule = {("tv-world", "1.1.0", PIN, next_version): 2}
+            with (mock.patch.dict(content_capability.USF_FINISH_RULINGS, new_rule),
+                  mock.patch.object(track_rulings, "RULING_VERSION", next_version)):
                 restored = make_world({}, passthrough=wire, seed=99, stop_before="pre_fill")
                 self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
                 new_plan = make_world(opts, seed=52, stop_before="pre_fill").ctr_content_plan
