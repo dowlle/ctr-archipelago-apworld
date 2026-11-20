@@ -192,6 +192,17 @@ def entry_id(garage, index=0):
     return f"entry/boss:{garage}/{index}"
 
 
+def garages_off_goal_as_disabled(options):
+    """A6-48 (ruling of 2026-11-20: "Treat as disabled when garages off").
+    With `boss_garages` off the garages are empty, so `oxide_goal: none`
+    (optional N. Oxide) has no races to keep and reads as `disabled`. The
+    option value itself changes, before anything reads it, so the seed is the
+    `disabled` seed byte for byte. With garages on, `none` is unchanged. No
+    notice: the result is what the player asked for."""
+    if not options.boss_garages.value and options.oxide_goal.value == GOAL_NONE:
+        options.oxide_goal.value = GOAL_DISABLED
+
+
 def settings(world):
     """The plan's `bosses` record from the boss and goal options, or None with
     `boss_garages` off. Takes no draw. The Final Challenge count is lowered to

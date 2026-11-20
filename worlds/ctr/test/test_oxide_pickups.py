@@ -25,6 +25,11 @@ def options(**extra):
                      item_box_count=0, wumpa_shop_slots=0, podium_rungs=[], accessibility="full"), **extra)
 
 
+#: A6-48 removed Cortex Vortex's final-only checks from these rooms, so the
+#: default pool no longer fits them.
+FEWER_TROPHIES = {"base": {"trophies": 10}}
+
+
 def state_with(world, keys=4, trophies=4, boost=3):
     state = CollectionState(world.multiworld)
     for item in world.multiworld.itempool:
@@ -174,12 +179,13 @@ class TestOxidePickups(unittest.TestCase):
 
     def test_full_accessibility_fill_and_tracker_restore(self):
         for final in ("cortex_vortex", "oxide_station"):
-            world = make_world(options(oxide_final_track=final), seed=5)
+            # A6-48: a final-only venue has no checks, so the pool is smaller.
+            world = make_world(options(oxide_final_track=final, item_pool=FEWER_TROPHIES), seed=5)
             distribute_items_restrictive(world.multiworld)
             state = world.multiworld.get_all_state(False)
             self.assertTrue(all(loc.can_reach(state) for loc in world.multiworld.get_locations(1)))
             wire = world.fill_slot_data()
-            restored = make_world(options(), seed=5, passthrough=wire)
+            restored = make_world(options(item_pool=FEWER_TROPHIES), seed=5, passthrough=wire)
             self.assertEqual(restored.ctr_content_plan, world.ctr_content_plan)
             self.assertEqual({l.address for l in restored.multiworld.get_locations(1)},
                              {l.address for l in world.multiworld.get_locations(1)})
@@ -209,19 +215,28 @@ class TestOxidePickups(unittest.TestCase):
 
     def test_priority_and_exclusions_cannot_restore_an_omitted_location(self):
         world = make_world(options(priority_locations={"Oxide Station: Weapon Crate 1"},
-                                   exclude_locations={"Oxide Station: Wumpa Crate 1"}), seed=3)
+                                   exclude_locations={"Oxide Station: Wumpa Crate 1"}, item_pool=FEWER_TROPHIES), seed=3)
         self.assertFalse(oxide_checks(world.ctr_content_plan))
 
     def test_omitted_reach_ten_wumpa_exclusion_reserves_no_filler(self):
-        opts = options(item_pool={"base": {"trophies": 15}})
-        base = make_world(opts, seed=1).ctr_content_plan
-        excluded = make_world(dict(opts, exclude_locations={"Oxide Station: Reach 10 Wumpa"}), seed=1).ctr_content_plan
+        opts = options(item_pool={"base": {"trophies": 10}})
+        reserves = []
+        resolve = cp.content_item_pool.resolve
+
+        def spy(*args, **kwargs):
+            reserves.append(kwargs.get("filler_reserve", 0))
+            return resolve(*args, **kwargs)
+        with patch.object(cp.content_item_pool, "resolve", spy):
+            base = make_world(opts, seed=1).ctr_content_plan
+            base_reserve = reserves[-1]
+            excluded = make_world(dict(opts, exclude_locations={"Oxide Station: Reach 10 Wumpa"}), seed=1).ctr_content_plan
+        self.assertEqual(reserves[-1], base_reserve)
         self.assertFalse(oxide_checks(base))
         self.assertFalse(oxide_checks(excluded))
         self.assertEqual(base["items"], excluded["items"])
 
     def test_loose_fruit_and_ordinary_boss_routes_are_unchanged(self):
-        world = make_world(options(), seed=3)
+        world = make_world(options(item_pool=FEWER_TROPHIES), seed=3)
         plan = world.ctr_content_plan
         # Oxide Station has no loose fruit. Ordinary garage venues have
         # repeatable routes, including when their track has no standalone pad.
