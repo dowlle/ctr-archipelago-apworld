@@ -12,7 +12,7 @@ FEATURE = "carried_track_rulings_v1"
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
-RULING_VERSION = 2
+RULING_VERSION = 3
 _history = ContextVar("ctr_track_ruling_history", default=None)
 
 

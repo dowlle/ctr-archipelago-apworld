@@ -5,7 +5,7 @@ from unittest.mock import patch
 from Options import OptionError
 
 from .. import content_item_boxes, content_plan, crate_exclusions, notices, track_rulings
-from .test_content_item_boxes import box_options, first_world
+from .test_content_item_boxes import box_options, btp, first_world
 from .test_content_plan import make_world
 from .test_country_speedway import country_options
 from .test_crate_exclusions import lockbox_track_4, matsuri
@@ -26,6 +26,24 @@ def later_revision(options, pin):
     track = f"custom/{key}/9.0.0"
     options["content_pool"]["required_entries"] = [track]
     return track, package
+
+
+def sunset_mixed_options(revision="1.2.0", pin=None):
+    options = royal_options(item_box_count=0, itemboxsanity=0, wumpasanity="off")
+    later_revision(options, "ab" * 32)
+    sunset = btp(25)
+    sunset.update(id=f"package/sunset-vista/{revision}", revision=revision, content_id="sunset-vista",
+                  display_name="Sunset Vista", uuid="11111111-2222-4333-8444-555555555588")
+    old_pin = sunset["files"][0]["sha256"]
+    new_pin = pin or track_rulings.REVIEWS["sunset-vista"][0][0]
+    sunset["files"][0]["sha256"] = new_pin
+    for evidence in sunset.get("evidence", ()):
+        evidence["file_hashes"] = [new_pin if digest == old_pin else digest
+                                   for digest in evidence["file_hashes"]]
+    sunset["capabilities"]["super_turbo_pads"] = True
+    options["content_pool"]["tracks"]["custom"].append(sunset)
+    options["content_pool"]["required_entries"].append(f"custom/sunset-vista/{revision}")
+    return options
 
 
 class TestCarriedPickupLimits(unittest.TestCase):
@@ -93,7 +111,7 @@ class TestCarriedPickupLimits(unittest.TestCase):
             wire = first_world(options, seed=3).fill_slot_data()
             plan = wire["content_plan"]
             source = plan["track_ruling_sources"]
-            self.assertEqual(source["version"], 2)
+            self.assertEqual(source["version"], track_rulings.RULING_VERSION)
             self.assertIs(source["pickup_limits"], True)
             exclusion, = plan["item_boxes"][crate_exclusions.KEY]
             self.assertEqual(exclusion, dict(track_id=tid, lev_sha256="ab" * 32,
@@ -115,7 +133,7 @@ class TestCarriedPickupLimits(unittest.TestCase):
         wire = first_world(options, seed=3).fill_slot_data()
         plan = wire["content_plan"]
         history = plan["track_ruling_sources"]
-        self.assertEqual(history["version"], 2)
+        self.assertEqual(history["version"], track_rulings.RULING_VERSION)
         self.assertNotIn("pickup_limits", history)
         self.assertEqual(plan["sanity"]["exclusion_version"], 2)
         self.assertEqual([r["track_id"] for r in plan["item_boxes"][crate_exclusions.KEY]],
@@ -124,6 +142,20 @@ class TestCarriedPickupLimits(unittest.TestCase):
         disabled = first_world(dict(options, box_locations=False, item_box_count=0, itemboxsanity=0),
                                seed=3).ctr_content_plan
         self.assertNotIn("track_ruling_sources", disabled)
+
+    def test_sunset_vista_finish_ruling_survives_the_shared_history(self):
+        for revision, pin in (("1.2.0", None), ("9.0.0", "cd" * 32)):
+            options = sunset_mixed_options(revision, pin)
+            wire = make_world(options, seed=3, stop_before="pre_fill").fill_slot_data()
+            plan = wire["content_plan"]
+            tid = f"custom/sunset-vista/{revision}"
+            lap = next(c for c in plan["checks"] if c["owner"] == tid and c["kind"] == "lap")
+            self.assertEqual(lap.get("boost", 0), 0)
+            self.assertEqual(plan["track_ruling_sources"]["version"], track_rulings.RULING_VERSION)
+            if pin:
+                self.assertIn((f"package/sunset-vista/{revision}", "finish", "1.2.0",
+                               track_rulings.REVIEWS["sunset-vista"][0][0]), track_rulings.spoiler_sources(plan))
+            self.assertEqual(make_world({}, passthrough=wire, stop_before="pre_fill").fill_slot_data(), wire)
 
     def test_rooms_without_pickup_limits_keep_their_previous_pool(self):
         options = royal_options()
