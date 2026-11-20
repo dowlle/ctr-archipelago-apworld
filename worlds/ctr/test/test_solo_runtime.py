@@ -1356,12 +1356,16 @@ class TestCustomTracks(SoloTestCase):
                             if hashlib.sha256(data).hexdigest() == pin["sha256"])
                 files.append((name, data, pin))
             settings = b'{"laps":3}'
+            patch_source = json.dumps({"schema_version": 1, "provider": "xdelta", "patch_sha256": "a" * 64,
+                                       "bigfile_index": 57, "source_url": "https://example.org/track"}).encode()
             manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"],
                         "version": descriptor["revision"], "title": descriptor["display_name"],
                         "compatibility": {"native_contract": 1, "apworld_contract": 1}, "files": [
                 {"role": pin["role"], "path": "original/" + name, "sha256": pin["sha256"], "bytes": pin["bytes"]}
                 for name, _, pin in files] + [{"role": "race_settings", "path": "metadata/race.json",
-                                                 "sha256": hashlib.sha256(settings).hexdigest(), "bytes": len(settings)}]}
+                                                 "sha256": hashlib.sha256(settings).hexdigest(), "bytes": len(settings)},
+                                                {"role": "presentation", "path": "metadata/xdelta-source.json",
+                                                 "sha256": hashlib.sha256(patch_source).hexdigest(), "bytes": len(patch_source)}]}
             manifest["files"].sort(key=lambda item: (item["role"], item["path"]))
             blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
             folder = os.path.join(store, hashlib.sha256(blob).hexdigest())
@@ -1374,15 +1378,34 @@ class TestCustomTracks(SoloTestCase):
             os.makedirs(os.path.join(folder, "metadata"))
             with open(os.path.join(folder, "metadata", "race.json"), "wb") as handle:
                 handle.write(settings)
+            with open(os.path.join(folder, "metadata", "xdelta-source.json"), "wb") as handle:
+                handle.write(patch_source)
             if descriptor is second:
                 second_settings = os.path.join(folder, "metadata", "race.json")
         shutil.rmtree(os.path.join(self.assets, "tracks", "fixture-loop"))
         self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0", "2.2.0"])
+        events, code = self.call("save-room-yaml", "--assets", self.assets, "--name", "Fixture",
+                                 "--track", first["id"], "--guarantee", first["id"])
+        self.assertEqual(code, 0, events)
+        room_yaml = ctr_solo.read_player_yaml(last(events)["yaml_path"])
+        self.assertEqual(room_yaml["name"], "Fixture")
+        self.assertEqual(room_yaml[GAME]["required_entries"], ["fixture-loop"])
+        entry, = room_yaml[GAME]["custom_tracks"]
+        self.assertEqual((entry["track_key"], entry["revision"]), ("fixture-loop", "2.1.0"))
+        self.assertNotIn("content_id", entry)
+        self.assertEqual(entry["locator"], {"kind": "xdelta", "patch_sha256": "a" * 64,
+                                            "bigfile_index": 57, "source_url": "https://example.org/track"})
         for damaged in (b'{"laps":4}', b'bad'):
             with self.subTest(damaged=damaged):
                 with open(second_settings, "wb") as handle:
                     handle.write(damaged)
                 self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0"])
+
+    def test_room_yaml_refuses_a_track_without_a_public_source(self):
+        track = self.install("private-track", "1.0", "Private Track")
+        events, code = self.call("save-room-yaml", "--assets", self.assets, "--track", track["id"])
+        self.assertEqual(code, 2, events)
+        self.assertIn("Private Track has no known public source", last(events)["message"])
 
     def test_shared_manifest_admission_fixture(self):
         for case, manifest, _, pin in manifest_cases():

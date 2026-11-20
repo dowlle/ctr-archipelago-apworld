@@ -302,10 +302,12 @@ def canonical(value):
 def resolve_packages(raw, where="custom_tracks"):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where)
+        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks")
     except custom_packages.PackageError as exc:
-        error(f"{exc}. Export the package descriptor again from the Custom Content page "
-              "or the AP-Pie track picker; legacy Gem Cup placement descriptors are not this format.")
+        if where == "custom_tracks":
+            error(f"{exc}. Use Export YAML in Options > Custom Tracks, or Save YAML for a room "
+                  "on the Play Solo > Custom Tracks page.")
+        error(f"{exc}.")
 
 
 def pad_registry():
@@ -1160,7 +1162,9 @@ def required_ids(options, candidates, arenas, packages):
         problems = []
         unknown = [name for name in dict.fromkeys(wanted) if name not in names]
         if unknown:
-            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown))
+            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown)
+                            + ". For missing custom track entries, use Save YAML for a room "
+                              "on the Play Solo > Custom Tracks page")
         repeated = [name for name in dict.fromkeys(wanted) if name in names and wanted.count(name) > 1]
         if repeated:
             problems.append("listed more than once: " + ", ".join(repr(name) for name in repeated))
