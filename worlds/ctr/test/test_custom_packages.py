@@ -45,6 +45,16 @@ def options_with(custom, required=None):
 
 
 class TestAdmission(unittest.TestCase):
+    def test_yaml_track_key_alias_preserves_package_wire_shape(self):
+        modern = dict(UNKNOWN, track_key=UNKNOWN["content_id"])
+        del modern["content_id"]
+        self.assertEqual(content_plan.resolve_packages([modern]), [UNKNOWN])
+        self.assertEqual(content_plan.resolve_packages([dict(modern, content_id=UNKNOWN["content_id"])]), [UNKNOWN])
+        with self.assertRaisesRegex(OptionError, "track_key and content_id must match"):
+            content_plan.resolve_packages([dict(modern, content_id="different")])
+        with self.assertRaises(OptionError):
+            content_plan.resolve_packages([modern], "content_plan.packages")
+
     def test_known_profiles_and_unknown_descriptors_admit(self):
         for descriptor in (*content_plan.PACKAGES, UNKNOWN, named_fixture()):
             with self.subTest(descriptor=descriptor["id"]):
