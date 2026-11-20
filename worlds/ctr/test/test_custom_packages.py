@@ -122,12 +122,59 @@ class TestAdmission(unittest.TestCase):
 
         options = options_with([first, second], required=[second["display_name"]])
         options["content_pool"]["tracks"]["overrides"] = {
-            second["display_name"]: ["ctr"],
+            second["display_name"]: ["relic"],
             "coco-park-2025": ["trophy"],
         }
         plan = make_world(options, seed=3).ctr_content_plan
         track = next(t for t in plan["tracks"] if t.get("package_id") == first["id"])
         self.assertEqual(track["modes"], ["trophy"])
+
+        third = copy.deepcopy(UNKNOWN)
+        third["display_name"] = first["content_id"]
+        first["capabilities"]["relic"] = True
+        first["relic_targets"] = UNKNOWN["relic_targets"]
+        options = options_with([first, second, third], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertEqual(content_plan.required_ids(world.options, plan["tracks"], [],
+                                                   {p["id"]: p for p in plan["packages"]},
+                                                   world.ctr_transferred_track_selectors.items()),
+                         [content_plan.package_track_id(first)])
+        modes = {t.get("package_id"): t["modes"] for t in plan["tracks"]}
+        self.assertEqual(modes[first["id"]], ["relic"])
+        self.assertEqual(modes[third["id"]], ["trophy"])
+
+        fourth = dict(third, display_name=second["display_name"])
+        options = options_with([first, second, third, fourth], required=[second["display_name"]])
+        with self.assertRaisesRegex(OptionError, "not a track or arena.*Old Anniversary Title"):
+            make_world(options, seed=3)
+
+        first["capabilities"]["relic"] = False
+        del first["relic_targets"]
+        options = options_with([first, second], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]), ["trophy"])
+
+        options["content_pool"]["tracks"]["overrides"][second["display_name"]] = ["bogus"]
+        with self.assertRaisesRegex(OptionError, "nonempty list of distinct races"):
+            make_world(options, seed=3)
+        options["content_pool"]["tracks"]["overrides"] = {}
+        options["content_pool"]["required_entries"] *= 2
+        with self.assertRaisesRegex(OptionError, "listed more than once|lists these selectors more than once"):
+            make_world(options, seed=3)
+
+    def test_asteroid_legacy_alias_dedup_preserves_the_first_descriptor(self):
+        first = copy.deepcopy(UNKNOWN)
+        key = "release-st-patrick-adventure-track-1"
+        first.update(content_id=key, id=f"package/{key}/2.1")
+        second = copy.deepcopy(first)
+        key = "lego-alien-rally-asteroid"
+        second.update(content_id=key, id=f"package/{key}/2.1")
+        plan = make_world(options_with([first, second]), seed=3).ctr_content_plan
+        self.assertEqual(plan["packages"], [first])
+        self.assertIsNone(destinations.named_track(key))
 
     def test_literal_selector_keeps_precedence_over_another_tracks_alias(self):
         alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"

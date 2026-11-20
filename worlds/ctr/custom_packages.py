@@ -277,8 +277,8 @@ def admit_all(raw, where="tracks.custom", *, yaml_input=False, historical=False,
         key = package["content_id"] if historical else canonical_track_key(package["content_id"])
         earlier = seen.get(("track key", key))
         if dropped is not None and earlier is not None:
-            index, retained = earlier
-            dropped.append((i, package, index, retained))
+            _, retained = earlier
+            dropped[i] = (package, retained)
             continue
         for label, value in (("track key", key), ("package uuid", package["uuid"]),
                              ("LEV and VRM pair", (package["files"][0]["sha256"], package["files"][1]["sha256"]))):

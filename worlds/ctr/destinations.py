@@ -309,7 +309,7 @@ def parse_named_tracks(document: Mapping) -> Tuple[NamedTrack, ...]:
     """
     if not isinstance(document, Mapping) or document.get("format") != NAMED_TRACKS_FORMAT:
         raise ValueError(f"named tracks: format must be {NAMED_TRACKS_FORMAT}")
-    if set(document) - {"format", "registry", "test_data", "tracks", "track_key_aliases"}:
+    if set(document) - {"format", "registry", "test_data", "tracks", "track_key_aliases", "generic_track_keys"}:
         raise ValueError("named tracks: unknown top-level field")
     rows = document.get("tracks")
     if not isinstance(rows, list):
@@ -357,10 +357,18 @@ def parse_track_aliases(document, tracks):
     aliases = document.get("track_key_aliases", {})
     # Cortex Vortex has a registry identity and its own built-in checks.
     keys = {track.track_key for track in tracks} | {"cortex-vortex"}
+    generic = document.get("generic_track_keys", [])
+
+    def is_key(value):
+        return (isinstance(value, str) and 1 <= len(value) <= 64 and not (set(value) - _TRACK_KEY_CHARS)
+                and not value.startswith("-") and not value.endswith("-") and "--" not in value)
+
+    if (not isinstance(generic, list) or any(not is_key(value) or value in keys for value in generic)
+            or len(set(generic)) != len(generic)):
+        raise ValueError("named tracks: invalid generic_track_keys")
+    keys.update(generic)
     if not isinstance(aliases, dict) or any(
-        not isinstance(alias, str) or not 1 <= len(alias) <= 64
-        or set(alias) - _TRACK_KEY_CHARS or alias.startswith("-") or alias.endswith("-")
-        or "--" in alias or alias in keys or not isinstance(target, str) or target not in keys
+        not is_key(alias) or alias in keys or not isinstance(target, str) or target not in keys
         for alias, target in aliases.items()
     ):
         raise ValueError("named tracks: invalid track_key_aliases")

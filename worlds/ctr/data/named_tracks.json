@@ -860,6 +860,9 @@
       ]
     }
   ],
+  "generic_track_keys": [
+    "lego-alien-rally-asteroid"
+  ],
   "track_key_aliases": {
     "boss-race-2": "gossamer-s-castle",
     "crash-30anniversary-adventure-track-12": "cortex-vortex",
@@ -887,7 +890,9 @@
     "release-st-patrick-adventure-slot-31": "hasty-hedges",
     "release-st-patrick-adventure-slot-41": "mario-raceway-n64",
     "release-st-patrick-adventure-slot-55": "coco-park-2025",
+    "release-st-patrick-adventure-slot-7": "lego-alien-rally-asteroid",
     "release-st-patrick-adventure-slot-9": "toasty-terrace",
+    "release-st-patrick-adventure-track-1": "lego-alien-rally-asteroid",
     "release-st-patrick-adventure-track-10": "coco-park-2025",
     "release-st-patrick-adventure-track-15": "green-hill-raceway",
     "release-st-patrick-adventure-track-2": "toasty-terrace",

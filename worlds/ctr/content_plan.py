@@ -1162,7 +1162,11 @@ def track_names(track, package, reserved=()):
     return tuple(dict.fromkeys((*exact, *(name for name in alternate if name not in reserved))))
 
 
-def required_ids(options, candidates, arenas, packages):
+def package_track_id(package):
+    return "custom/" + package["content_id"] + "/" + package["revision"]
+
+
+def required_ids(options, candidates, arenas, packages, transferred=()):
     """The logical ids of `required_entries`, then Cortex Vortex with `own_pad`."""
     names = {}
     for item in candidates + arenas:
@@ -1172,8 +1176,15 @@ def required_ids(options, candidates, arenas, packages):
     for track in candidates:
         for name in track_names(track, packages.get(track.get("package_id")), reserved):
             names.setdefault(name, track["id"])
+    candidate_ids = {track["id"] for track in candidates}
+    bundled_transfers = set()
+    for name, target in transferred:
+        if target in candidate_ids:
+            names.setdefault(name, target)
+            if target == CORTEX_TRACK_ID and names[name] == target:
+                bundled_transfers.add(name)
     wanted = list(options.required_entries.value)
-    if (any(names.get(name) == CORTEX_TRACK_ID for name in wanted)
+    if (any(names.get(name) == CORTEX_TRACK_ID and name not in bundled_transfers for name in wanted)
             or (destinations.CORTEX_VORTEX in wanted and destinations.CORTEX_VORTEX not in names)):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
@@ -1191,7 +1202,7 @@ def required_ids(options, candidates, arenas, packages):
             problems.append(f"{len(wanted)} entries do not fit the {content_cups.PADS} normal pads")
         error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads. "
               + "; ".join(problems) + ".")
-    out = [names[name] for name in wanted]
+    out = [names[name] for name in wanted if name not in bundled_transfers]
     if int(options.cortex_vortex_track.value) == CORTEX_OWN_PAD:
         out.append(CORTEX_TRACK_ID)
     return out
@@ -1284,67 +1295,43 @@ def drop_duplicate_tracks(world):
     raw = list(options.custom_tracks.value)
     if not raw:
         return
-    dropped = []
+    dropped = {}
     packages = resolve_packages(raw, dropped=dropped)
     bundled = bool(options.cortex_vortex_track.value)
     if bundled:
         for index, entry in enumerate(raw):
             descriptor = custom_packages.yaml_track_entry(entry, "custom_tracks")
             if destinations.canonical_track_key(descriptor["content_id"]) == CORTEX_TRACK_KEY:
-                dropped.append((index, descriptor, index, None))
+                dropped[index] = (descriptor, None)
     if not dropped:
         return
 
-    removed = {index for index, *_ in dropped}
+    # Check selectors before transfer, including a malformed override that the
+    # retained track would never use.
+    track_modes(options)
+    wanted = options.required_entries.value
+    if len(wanted) != len(set(wanted)):
+        repeated = [name for name in dict.fromkeys(wanted) if wanted.count(name) > 1]
+        error("required_entries lists these selectors more than once: " + ", ".join(map(repr, repeated)))
     survivors = [package for package in packages
                  if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
     reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values()) | {"default"}
-    owners = {}
-    for package in survivors:
-        for name in literal_track_names(package, package):
-            owners[name] = package
-    literal = reserved | owners.keys()
-    for package in survivors:
+    literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
+    owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}
+    targets = {}
+    for index in sorted(dropped):
+        package, retained = dropped[index]
+        target = package_track_id(retained) if retained else CORTEX_TRACK_ID
         for name in track_names(package, package, literal):
-            owners.setdefault(name, package)
-    replacements = {}
-    for index, package, retained_index, retained in sorted(dropped, key=lambda row: row[0]):
-        if retained_index in removed:
-            if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY:
-                continue
-            retained = None
-        for name in track_names(package, package, literal):
-            if name in reserved or name in owners:
-                continue
-            replacements.setdefault(name, retained["content_id"] if retained else destinations.CORTEX_VORTEX)
+            if name not in owned:
+                targets.setdefault(name, set()).add(target)
 
-    modes = dict(options.track_modes.value)
-    explicit_modes = {owners[name]["content_id"] for name in modes if name in owners}
-    bundled_names = (set(track_names(cortex_track(standalone=True), None, literal)) - owners.keys()
-                     if bundled else set())
-    if bundled_names & modes.keys():
-        explicit_modes.add(destinations.CORTEX_VORTEX)
-    for name, target in replacements.items():
-        if name in modes and name not in bundled_names:
-            override = modes.pop(name)
-            if target not in explicit_modes:
-                modes.setdefault(target, override)
-    options.track_modes.value = modes
-    required = []
-    seen = set()
-    for name in options.required_entries.value:
-        target = replacements.get(name, name)
-        if target == destinations.CORTEX_VORTEX and name in replacements:
-            options.cortex_vortex_track.value = CORTEX_OWN_PAD
-            continue
-        # Retain ordinary duplicate-selector validation. Collapse entries only
-        # where this adjustment merges a removed copy with the retained track.
-        if target not in seen or target not in replacements.values():
-            required.append(target)
-            seen.add(target)
-    options.required_entries.value = required
-    options.custom_tracks.value = [entry for i, entry in enumerate(raw) if i not in removed]
-    world.ctr_duplicate_track_count = len(removed)
+    transferred = {name: next(iter(ids)) for name, ids in targets.items() if len(ids) == 1}
+    if any(transferred.get(name) == CORTEX_TRACK_ID for name in wanted):
+        options.cortex_vortex_track.value = CORTEX_OWN_PAD
+    options.custom_tracks.value = [entry for i, entry in enumerate(raw) if i not in dropped]
+    world.ctr_transferred_track_selectors = transferred
+    world.ctr_duplicate_track_count = len(dropped)
 
 
 def swap_in_bundled_cortex(world):
@@ -1366,6 +1353,9 @@ def swap_in_bundled_cortex(world):
     reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values())
     reserved.update(name for p in packages if p["id"] not in twins for name in literal_track_names(p, p))
     names = {n for p in copies for n in track_names(p, p, reserved)} - reserved
+    swapped_ids = {package_track_id(p) for p in copies}
+    names.update(name for name, target in getattr(world, "ctr_transferred_track_selectors", {}).items()
+                 if target in swapped_ids)
     kept = [n for n in o.required_entries.value if n not in names]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
@@ -1396,6 +1386,7 @@ def draw_plan(world, key_estimate=True):
     o = world.options
     selected_modes, overrides = track_modes(o)
     with_cortex = bool(o.cortex_vortex_track.value)
+    transferred = getattr(world, "ctr_transferred_track_selectors", {})
     cup_spec = content_cups.settings(o)
     arena_pool, arena_count = crystal_settings(o)
     pad_budget.cap_crystals(world, len(arena_pool))
@@ -1438,7 +1429,7 @@ def draw_plan(world, key_estimate=True):
         pool.append((cortex_track(standalone=True), None, {}))
     for slot, package in enumerate(packages, 1):
         block = destinations.named_track(package["content_id"])
-        pool.append((dict(id="custom/" + package["content_id"] + "/" + package["revision"],
+        pool.append((dict(id=package_track_id(package),
                           origin="custom", package_id=package["id"], custom_slot=slot,
                           display_name=package["display_name"], laps=package["laps"]),
                      package, dict(named_block=block.block_index, room_title=block.ap_name) if block else {}))
@@ -1447,13 +1438,18 @@ def draw_plan(world, key_estimate=True):
     reserved = set(RETAIL.values()) | {name for track, package, _addressing in pool
                                       for name in literal_track_names(track, package)}
     known = reserved | {name for track, package, _addressing in pool for name in track_names(track, package, reserved)}
-    unknown = sorted(set(overrides) - known)
+    unknown = sorted(set(overrides) - known - transferred.keys())
     if unknown:
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), selected_modes)
-        modes = [m for m in MODES if m in wanted and m in supported_modes(track["origin"], package)]
+        supported = supported_modes(track["origin"], package)
+        wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
+        if wanted is None:
+            wanted = next((override for name, override in overrides.items()
+                           if transferred.get(name) == track["id"] and set(override).intersection(supported)),
+                          selected_modes)
+        modes = [m for m in MODES if m in wanted and m in supported]
         if not modes:
             if package is not None:
                 error(f"custom track {package['id']} can run none of the races track_modes gives it "
@@ -1464,7 +1460,7 @@ def draw_plan(world, key_estimate=True):
         candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
     # A track named twice (its title and its key) is one pad, not two (A4-83 review).
-    required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id)))
+    required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id, transferred.items())))
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
     # The 27 normal pads are one budget (A4-83): over it, the cup and Crystal
     # Challenge counts are shared out as weights. A seed that fits is untouched.
