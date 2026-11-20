@@ -205,6 +205,19 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
         ids = [row["track_id"] for row in record.get(crate_exclusions.KEY, ())]
         if len(ids) != len(set(ids)):
             error("item_boxes.crate_exclusions names a track more than once.")
+        if require_reviewed_exclusions:
+            # Native compares a version 2 room's carried rows with the reviewed
+            # catalog wherever the pin has a version 2 entry, stamped or not.
+            canonical = lambda crates: json.dumps(crates, sort_keys=True)
+            held = {row["track_id"]: row["crates"] for row in record.get(crate_exclusions.KEY, ())}
+            for row in crate_exclusions.records(tracks, packages, sets):
+                pin = row["lev_sha256"]
+                if not crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1):
+                    continue
+                if row["track_id"] not in held:
+                    error("item_boxes is missing reviewed fallback exclusions.")
+                if canonical(held[row["track_id"]]) != canonical(row["crates"]):
+                    error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
     elif crate_exclusions.KEY in record or require_reviewed_exclusions:
         expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, sets)}
         # A room generated before a later catalog entry carries only the rows
@@ -213,15 +226,15 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
         # Compare complete JSON records, retaining exact token types.
         canonical = lambda row: json.dumps(row, sort_keys=True)
         carried_rows = record.get(crate_exclusions.KEY, ())
-        carried = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
-        if len(set(carried)) != len(carried) or any(
+        carried_ids = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
+        if len(set(carried_ids)) != len(carried_ids) or any(
                 track_id not in expected or canonical(row) != canonical(expected[track_id])
-                for track_id, row in zip(carried, carried_rows)):
+                for track_id, row in zip(carried_ids, carried_rows)):
             error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
         if require_reviewed_exclusions:
             for track_id, row in expected.items():
                 pin = row["lev_sha256"]
-                if (track_id not in carried
+                if (track_id not in carried_ids
                         and crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1)):
                     error("item_boxes is missing reviewed fallback exclusions.")
     if SPOT_KEY not in record:
