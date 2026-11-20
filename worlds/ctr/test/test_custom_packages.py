@@ -120,6 +120,15 @@ class TestAdmission(unittest.TestCase):
                              (15, "Coco Park 2025", ["trophy"]))
             self.assertEqual(world.ctr_duplicate_track_count, 1)
 
+        options = options_with([first, second], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {
+            second["display_name"]: ["ctr"],
+            "coco-park-2025": ["trophy"],
+        }
+        plan = make_world(options, seed=3).ctr_content_plan
+        track = next(t for t in plan["tracks"] if t.get("package_id") == first["id"])
+        self.assertEqual(track["modes"], ["trophy"])
+
     def test_literal_selector_keeps_precedence_over_another_tracks_alias(self):
         alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
         other = copy.deepcopy(UNKNOWN)

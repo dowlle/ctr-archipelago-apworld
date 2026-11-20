@@ -1303,21 +1303,32 @@ def drop_duplicate_tracks(world):
     for package in survivors:
         for name in literal_track_names(package, package):
             owners[name] = package
+    literal = reserved | owners.keys()
+    for package in survivors:
+        for name in track_names(package, package, literal):
+            owners.setdefault(name, package)
     replacements = {}
     for index, package, retained_index, retained in sorted(dropped, key=lambda row: row[0]):
         if retained_index in removed:
             if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY:
                 continue
             retained = None
-        for name in track_names(package, package, reserved | owners.keys()):
-            if name in reserved or (name in owners and owners[name] is not retained):
+        for name in track_names(package, package, literal):
+            if name in reserved or name in owners:
                 continue
             replacements.setdefault(name, retained["content_id"] if retained else destinations.CORTEX_VORTEX)
 
     modes = dict(options.track_modes.value)
+    explicit_modes = {owners[name]["content_id"] for name in modes if name in owners}
+    bundled_names = (set(track_names(cortex_track(standalone=True), None, literal)) - owners.keys()
+                     if bundled else set())
+    if bundled_names & modes.keys():
+        explicit_modes.add(destinations.CORTEX_VORTEX)
     for name, target in replacements.items():
-        if name != target and name in modes:
-            modes.setdefault(target, modes.pop(name))
+        if name in modes and name not in bundled_names:
+            override = modes.pop(name)
+            if target not in explicit_modes:
+                modes.setdefault(target, override)
     options.track_modes.value = modes
     required = []
     seen = set()

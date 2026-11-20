@@ -231,6 +231,10 @@ class TestCortexVortexTrack(unittest.TestCase):
                 self.assertNotIn(package["id"], {p["id"] for p in plan["packages"]})
                 self.assertEqual(world.ctr_duplicate_track_count, 1)
 
+        options["content_pool"]["tracks"]["overrides"]["cortex-vortex"] = ["trophy"]
+        plan = make_world(options, seed=6).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["trophy"])
+
     def swap_options(self, pinned=False):
         """`cortex_vortex_track: off` and a downloaded copy listed with the other tracks;
         `pinned` also puts the copy in `required_entries`."""
