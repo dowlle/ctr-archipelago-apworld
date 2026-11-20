@@ -186,46 +186,81 @@ def check_settings(record, capability=None):
     return record
 
 
-def check_spot_sets(record, tracks, packages, require_reviewed_exclusions=False):
-    """A plan's spot sets: exactly the pad tracks with a spot file of this
-    build, each a valid pick from that file."""
+def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False, require_reviewed_exclusions=False):
+    """Validate saved picks and crate exclusions, or match the source catalog."""
     if not record:
         return
     by_id = {t["id"]: t for t in tracks}
+    sets = spot_sets(record)
     for tid in record.get(country_speedway.BOX_RULES_KEY, ()):
         track = by_id.get(tid)
-        if (not track or track.get("origin") != "custom" or tid in spot_sets(record)
+        if (not track or track.get("origin") != "custom" or tid in sets
                 or not reviewed_pickups(packages.get(track.get("package_id")))):
             error("item_boxes.pickup_rules names an unsupported physical pickup revision.")
-    expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, spot_sets(record))}
+    expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, sets)}
     carried_rows = record.get(crate_exclusions.KEY, ())
-    carried = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
-    if any(tid not in carried and row["crates"][0]["pos"] is None for tid, row in expected.items()):
+    carried_ids = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
+    if any(tid not in carried_ids and row["crates"][0]["pos"] is None for tid, row in expected.items()):
         error("item_boxes.crate_exclusions is missing carried ordinals.")
-    if carried_rows or require_reviewed_exclusions:
+    if carried:
+        for row in carried_rows:
+            track = by_id.get(row["track_id"])
+            package = packages.get((track or {}).get("package_id"))
+            ordinals = [crate["ordinal"] for crate in row["crates"]]
+            if (not package or row["track_id"] in sets or row["lev_sha256"] != box_spots.lev_pin(package)
+                    or ordinals != sorted(set(ordinals))
+                    or ordinals[-1] > package["capabilities"].get("weapon_crates", 0)):
+                error("item_boxes.crate_exclusions disagrees with the room's pinned fallback track.")
+        if len(carried_ids) != len(set(carried_ids)):
+            error("item_boxes.crate_exclusions names a track more than once.")
+        if require_reviewed_exclusions:
+            # Native compares a version 2 room's carried rows with the reviewed
+            # catalog wherever the pin has a version 2 entry, stamped or not.
+            canonical = lambda crates: json.dumps(crates, sort_keys=True)
+            held = {row["track_id"]: row["crates"] for row in carried_rows}
+            for row in expected.values():
+                pin = row["lev_sha256"]
+                if not crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1):
+                    continue
+                if row["track_id"] not in held:
+                    error("item_boxes is missing reviewed fallback exclusions.")
+                if canonical(held[row["track_id"]]) != canonical(row["crates"]):
+                    error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
+    elif carried_rows or require_reviewed_exclusions:
         # A room generated before a later catalog entry carries only the rows
         # of its day: each carried row must equal this build's row for its
         # track, but a track without a carried row keeps its original seating.
         # Compare complete JSON records, retaining exact token types.
         canonical = lambda row: json.dumps(row, sort_keys=True)
-        if len(set(carried)) != len(carried) or any(
+        if len(set(carried_ids)) != len(carried_ids) or any(
                 track_id not in expected or canonical(row) != canonical(expected[track_id])
-                for track_id, row in zip(carried, carried_rows)):
+                for track_id, row in zip(carried_ids, carried_rows)):
             error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
         if require_reviewed_exclusions:
             for track_id, row in expected.items():
                 pin = row["lev_sha256"]
-                if (track_id not in carried
+                if (track_id not in carried_ids
                         and crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1)):
                     error("item_boxes is missing reviewed fallback exclusions.")
     if SPOT_KEY not in record:
         return
-    sets = spot_sets(record)
-    by_id = {t["id"]: t for t in tracks}
     if not set(sets) <= set(by_id):
         error("item_boxes.spot_sets names a track that holds no pad.")
     for track_id, track in by_id.items():
         package = packages.get(track.get("package_id"))
+        if carried:
+            spot_set = sets.get(track_id)
+            if spot_set is None:
+                if track["origin"] == "retail":
+                    error(f"item_boxes.spot_sets is missing retail track {track_id}.")
+                continue
+            picked = spot_set["picked"]
+            if (picked != sorted(set(picked)) or len(picked) != min(spot_set["pool"], record.get("box_count", 15))
+                    or not (track["origin"] == "retail" and "lev_sha256" not in spot_set
+                            or "named_block" in track and package is not None
+                            and spot_set.get("lev_sha256") == box_spots.lev_pin(package))):
+                error(f"item_boxes.spot_sets disagrees with the room's track or pick for {track_id}.")
+            continue
         has_file = box_spots.file_for(track, package) is not None
         # A named custom track whose file shipped after the room was generated
         # keeps its crate seats there: Item Box 1 to 15 are crate seats until
@@ -235,7 +270,8 @@ def check_spot_sets(record, tracks, packages, require_reviewed_exclusions=False)
         if track_id in sets:
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
-                                         {k: v for k, v in sets[track_id].items() if k != "track_id"}, record.get("box_count", 15))
+                                         {k: v for k, v in sets[track_id].items() if k != "track_id"},
+                                         record.get("box_count", 15), compare_digest=not restoring)
             except box_spots.SpotFileError as exc:
                 error(str(exc))
 
@@ -319,9 +355,9 @@ def track_boxes(track, record, package=None):
     """[(number, location code, display suffix)] of a track's box checks."""
     if not record:
         return []
-    found = spot_entry(track, record, package)
-    if found is not None:
-        return [(n, box_code(track, n), f"Item Box {n}") for n in found[0]["picked"]]
+    spot_set = spot_sets(record).get(track["id"])
+    if spot_set is not None:
+        return [(n, box_code(track, n), f"Item Box {n}") for n in spot_set["picked"]]
     if track["origin"] == "retail":
         name = track["display_name"]
         return [(slot, ITEM_BOX_CLASS.slot_code(name, slot), f"Item Box {slot}")

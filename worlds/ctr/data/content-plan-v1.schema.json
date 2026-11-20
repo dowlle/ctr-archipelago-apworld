@@ -4,6 +4,11 @@
     "version": {
       "const": 1
     },
+    "room_compatibility": {
+      "description": "Format 1 restores the room's carried custom identity and box data.",
+      "type": "integer",
+      "const": 1
+    },
     "packages": {
       "type": "array",
       "items": {

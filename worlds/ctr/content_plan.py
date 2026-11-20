@@ -1008,7 +1008,7 @@ def route(entry_id, mode, pad_id, award):
 
 
 def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), package=None, capability=None,
-                 item_boxes=None, relics=None, ctr_first=False):
+                 item_boxes=None, relics=None, ctr_first=False, carried_boxes=None):
     """Every check of a standalone track entry, in its entry's mode order.
 
     Each mode's own checks come first; a Trophy Race adds the seed's podium
@@ -1072,6 +1072,24 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
                 item["boost"] = need
     for slot, code, suffix in content_item_boxes.track_boxes(track, item_boxes, package):
         box = check(code, content_item_boxes.KIND, suffix, [(mode, content_item_boxes.AWARD) for mode in modes])
+        if carried_boxes is not None:
+            saved = carried_boxes.get(code, {})
+            spot = saved.get("spot")
+            expects_spot = track["id"] in content_item_boxes.spot_sets(item_boxes)
+            if expects_spot != (spot is not None) or (spot is not None and spot["number"] != slot):
+                error("box spot number or track disagrees with the room's pick")
+            if spot is not None:
+                box["spot"] = spot
+            if "boost" in saved:
+                if not (capability and capability["boost_mode"] and saved["boost"] <= content_capability.ceiling(capability)):
+                    error("box boost rank exceeds the room's capability")
+                box["boost"] = saved["boost"]
+            if "stats" in saved:
+                if not (capability and capability["stats_mode"]):
+                    error("box stats need the room's Progressive Stats")
+                box["stats"] = True
+            out.append(box)
+            continue
         spot = content_item_boxes.spot_of(track, item_boxes, package, slot)
         if spot is not None:
             box["spot"] = spot
@@ -2118,6 +2136,8 @@ def draw_plan(world, key_estimate=True):
         plan["required_features"].append(content_pickups.FINAL_FEATURE)
     if item_boxes:
         plan["item_boxes"] = item_boxes
+    if plan["packages"] or item_boxes:
+        plan["room_compatibility"] = 1
     if sanity_record:
         plan["sanity"] = sanity_record
     if boss_record is not None:
@@ -2802,7 +2822,7 @@ def goal_envelope(plan):
 
 
 @track_rulings.validation
-def validate(plan):
+def validate(plan, *, restoring=False):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
     from .content_plan_schema import validate_shape
     try:
@@ -2834,6 +2854,7 @@ def validate(plan):
                     and set(code) <= set(track_origins.DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS),
                     "invalid origin letter code")
     checks, requirements = table("checks", "location"), table("requirements")
+    carried_boxes = checks if restoring and "room_compatibility" in plan else None
     # Boss garages (#133 PR 6): encounters exist exactly with the `bosses`
     # record, and every encounter, boss entry, boss requirement and boss check
     # is recomputed from it, the venues its entries name and the ledger.
@@ -2976,12 +2997,26 @@ def validate(plan):
     relic_counts = {}
     # Generic-slot room titles are recomputed from the plan's own tracks; a
     # forged title (a retail or named track's name, or a repeated one) differs.
-    try:
-        expected_titles = generic_room_titles([t for t in plan["tracks"] if t["origin"] == "custom"
-                                               and t["package_id"] in packages
-                                               and type(t["custom_slot"]) is int], packages)
-    except (KeyError, TypeError):
-        expected_titles = {}
+    expected_titles = {} if restoring else generic_room_titles(
+        [t for t in plan["tracks"] if t["origin"] == "custom" and t["package_id"] in packages], packages)
+    reserved_titles = {name.casefold() for name in (*RETAIL.values(), destinations.CORTEX_VORTEX)}
+    custom_titles = set()
+
+    def check_custom_identity(track, package, slot):
+        title = room_title(track)
+        block = destinations.named_track(package["content_id"])
+        if "named_block" in track:
+            require(block is not None and track["named_block"] == block.block_index and
+                    track.get("room_title") == block.ap_name, "named block does not match this build's registry")
+        else:
+            require(is_sanitized(title), "room title is not sanitized")
+            if not restoring:
+                require(block is None, "a track with a named block must use it")
+                require(title == expected_titles.get(slot), "room title is not the seed's clash-suffixed title for this track")
+        folded = title.casefold()
+        require(folded not in reserved_titles and folded not in custom_titles,
+                "duplicate or reserved room title")
+        custom_titles.add(folded)
     arena_ids=set()
     # Cups (#133 PR 5): sweeps exist for every cup or none; leg laps share one
     # switch; leg tracks need no standalone entry. The Gem Cups come first.
@@ -2991,7 +3026,8 @@ def validate(plan):
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
     # Hand-placed spots (A3-14): before any box check is recomputed from them.
     content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages,
-                                      require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record))
+                                       restoring=restoring, carried=carried_boxes is not None,
+                                       require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record))
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue
@@ -3057,15 +3093,7 @@ def validate(plan):
             slots.add(slot)
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
-            block = destinations.named_track(package["content_id"])
-            if "named_block" in track:
-                require(block is not None and track["named_block"] == block.block_index and
-                        track.get("room_title") == block.ap_name, "named block does not match this build's registry")
-            else:
-                require(block is None, "a track with a named block must use it")
-                require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
-                require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
-                        "room title is not the seed's clash-suffixed title for this track")
+            check_custom_identity(track, package, slot)
         require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")))),
                 "a track mode its capabilities do not allow")
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
@@ -3079,7 +3107,7 @@ def validate(plan):
             relic_counts[tier] = relic_counts.get(tier, 0) + 1
         for check in track_checks(track, entry["id"], pad_id, entry["modes"], settings, locations,
                                   packages.get(track.get("package_id")), capability, item_boxes, relics,
-                                  ctr_first=first is not None):
+                                  ctr_first=first is not None, carried_boxes=carried_boxes):
             require(check["location"] not in expected_checks, "duplicate check identity")
             expected_checks[check["location"]] = check
     # A track raced only in cups is checked like a standalone one (#133 PR 5).
@@ -3105,15 +3133,7 @@ def validate(plan):
             slots.add(slot)
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
-            block = destinations.named_track(package["content_id"])
-            if "named_block" in track:
-                require(block is not None and track["named_block"] == block.block_index and
-                        track.get("room_title") == block.ap_name, "named block does not match this build's registry")
-            else:
-                require(block is None, "a track with a named block must use it")
-                require(is_sanitized(track.get("room_title", track["display_name"])), "room title is not sanitized")
-                require(track.get("room_title", track["display_name"]) == expected_titles.get(slot),
-                        "room title is not the seed's clash-suffixed title for this track")
+            check_custom_identity(track, package, slot)
         used_tracks.add(track_id)
     for check in content_cups.leg_victories(tracks, plan["entries"], plan["pads"],
                                             {t["id"]: room_title(t) for t in plan["tracks"]}):
@@ -3313,8 +3333,23 @@ def _tracker_arrays(value, depth=0, budget=None):
 
 
 def restore(world, slot_data):
+    try:
+        _restore(world, slot_data)
+    except OptionError as exc:
+        options = slot_data.get("ctr_options")
+        source = options.get("world_version") if isinstance(options, dict) else None
+        source = source[:48] if isinstance(source, str) and source.isprintable() else "unknown"
+        plan = slot_data.get("content_plan")
+        room_format = plan.get("room_compatibility") if isinstance(plan, dict) else None
+        stamp = f"room format {room_format}" if type(room_format) is int and 0 <= room_format <= 999 else "room format unknown"
+        reason = str(exc).removeprefix("CTR content plan: ")
+        error(f"generated with {source} ({stamp}), this build is "
+              f"{world.world_version.as_simple_string()} (room format 1). {reason}")
+
+
+def _restore(world, slot_data):
     plan = _tracker_arrays(slot_data["content_plan"])
-    validate(plan)
+    validate(plan, restoring=True)
     co = slot_data.get("ctr_options", {})
     if (type(slot_data.get("schema_version")) is not int or slot_data["schema_version"] != SCHEMA or
             type(co.get("schema_version")) is not int or co["schema_version"] != SCHEMA or co.get("content_plan") is not True):

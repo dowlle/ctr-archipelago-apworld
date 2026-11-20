@@ -163,6 +163,40 @@ class TestCrateExclusions(unittest.TestCase):
         with self.assertRaisesRegex(OptionError, "reviewed exclusions"):
             content_plan.validate(shifted)
 
+    def test_tracker_restore_of_a_stamped_room_keeps_the_versioned_exclusion_check(self):
+        # Native checks a version 2 room's fallback exclusions against its
+        # reviewed catalog, also for a stamped room.
+        with patch.dict(box_spots.CUSTOM_FILES, {}, clear=True):
+            options = box_options(custom=[matsuri(), lockbox_track_4()], itemboxsanity=1, wumpasanity="both")
+            wire = first_world(options, seed=1).fill_slot_data()
+            self.assertEqual(wire["content_plan"]["room_compatibility"], 1)
+            self.assertEqual(make_world({}, passthrough=copy.deepcopy(wire)).fill_slot_data(), wire)
+
+            def lockbox_row(room):
+                return next(r for r in room["content_plan"]["item_boxes"][crate_exclusions.KEY]
+                            if r["lev_sha256"] == LOCKBOX_4)
+
+            shifted = copy.deepcopy(wire)
+            lockbox_row(shifted)["crates"][0]["pos"][0] = 1
+            with self.assertRaisesRegex(OptionError, "reviewed exclusions"):
+                make_world({}, passthrough=shifted)
+            missing = copy.deepcopy(wire)
+            rows = missing["content_plan"]["item_boxes"][crate_exclusions.KEY]
+            rows[:] = [r for r in rows if r["lev_sha256"] != LOCKBOX_4]
+            with self.assertRaisesRegex(OptionError, "missing reviewed fallback exclusions"):
+                make_world({}, passthrough=missing)
+
+    def test_regular_validation_still_compares_the_spot_file_digest_with_exclusions_carried(self):
+        with patch.dict(box_spots.CUSTOM_FILES, {}, clear=True):
+            options = box_options(custom=[matsuri(), lockbox_track_4()], itemboxsanity=1, wumpasanity="both")
+            plan = first_world(options, seed=1).ctr_content_plan
+            self.assertTrue(plan["item_boxes"][crate_exclusions.KEY] and plan["item_boxes"]["spot_sets"])
+            content_plan.validate(plan)
+            bad = copy.deepcopy(plan)
+            bad["item_boxes"]["spot_sets"][0]["file_sha256"] = "0" * 64
+            with self.assertRaises(OptionError):
+                content_plan.validate(bad)
+
     def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
         p = ancient(24, HOT_AIR_SKYWAY)
         p.update(content_id="hot-air-skyway", display_name="Hot Air Skyway",
@@ -195,6 +229,16 @@ class TestCrateExclusions(unittest.TestCase):
             bad["item_boxes"][crate_exclusions.KEY][0]["crates"][0][field] = value
             with self.assertRaises(OptionError):
                 content_plan.validate(bad)
+
+    def test_restore_keeps_carried_exclusions_after_review_changes(self):
+        wire = first_world(box_options(custom=[north_pole(3)])).fill_slot_data()
+        with patch.dict(crate_exclusions.EXCLUSIONS, {}, clear=True):
+            restored = make_world({}, passthrough=wire)
+        self.assertEqual(restored.fill_slot_data(), wire)
+        row, = wire["content_plan"]["item_boxes"][crate_exclusions.KEY]
+        row["crates"][0]["ordinal"] = 4
+        with self.assertRaisesRegex(OptionError, "pinned fallback track"):
+            make_world({}, passthrough=wire)
 
     def test_north_pole_box_terms_unchanged(self):
         p = north_pole()
