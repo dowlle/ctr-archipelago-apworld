@@ -23,13 +23,15 @@ SUFFIXES = ("Weapon Crate", "Wumpa Crate", "Wumpa Fruit")
 BUDGETS = (80, 16, 32)
 NAMED_BASE = 37200000
 FEATURES = ("itemboxsanity_v1", "wumpasanity_v1")
+EXCLUSIONS_FEATURE = "sanity_exclusions_v2"
 # Retail LevelID order, not the datapackage's BOX_TRACKS order.
 COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 2, 9), (13, 2, 0), (24, 4, 0), (20, 6, 0), (22, 3, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
-REVIEWED_PICKUP_PINS = CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS
+PICKUP_RULING_COUNTS = json.loads(pkgutil.get_data(__package__, "data/pickup_ruling_counts.json"))
+REVIEWED_PICKUP_PINS = CATALOG.keys() | PICKUP_RULING_COUNTS.keys()
 CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
 
 
@@ -62,6 +64,14 @@ class SanityLocations(LocationClass):
 
 
 SANITY_CLASS = SanityLocations()
+
+
+def reviewed_counts(package):
+    """Physical ordinal bounds of the inherited pickup source for this room."""
+    if not track_rulings.pickup_limits_enabled() or not track_rulings.inherits(package):
+        return None
+    source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
+    return CATALOG[source]["counts"] if source in CATALOG else PICKUP_RULING_COUNTS.get(source)
 
 
 def settings(options):
@@ -126,17 +136,32 @@ def eligible(track, family, record, item_boxes, package, capability=None):
     inv = inventory(track, package, record)
     if inv is None:
         return []  # No measured revision, no invented objects.
-    out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
-    # Exclusions are independent of seating and grouped by model family.
-    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family],
+    reviewed = reviewed_counts(package)
+    count = min(inv["counts"][family], BUDGETS[family])
+    if reviewed is not None:
+        count = min(count, reviewed[family])
+    out = list(range(1, count + 1))
+    # Older rooms selected their picks using the original exclusion catalog.
+    version = record.get("exclusion_version", 1)
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], version,
                                          package if track["origin"] == "custom" else None)
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
         if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
-            all_crates = [n for n in range(1, inv["counts"][0] + 1) if n not in excluded]
+            carried = {c["ordinal"] for c in content_item_boxes.carried_crates(item_boxes, track["id"])}
+            if version == 1 and record["itemboxsanity"] and carried - excluded:
+                raise OptionError("CTR sanity: fallback exclusions require the updated sanity catalog")
+            # Version 1 preserves the historical pool. New plans derive
+            # physical seats from the exclusions the runtime will load.
             slots = len(content_item_boxes.track_boxes(track, item_boxes, package))
-            excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
+            if slots:
+                limit = content_item_boxes.seat_limit(package)
+                legacy = version == 1 and limit == content_item_boxes.crate_count(package)
+                raw_count = inv["counts"][0] if legacy else limit
+                seat_excluded = excluded if legacy else carried
+                all_crates = [n for n in range(1, raw_count + 1) if n not in seat_excluded]
+                excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
     return [n for n in out if object_needs(inv, KINDS[family], n, record).get("shortcut", 0) <= tier
@@ -162,6 +187,15 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
         record["rules_version"] = version
     else:
         record.pop("rules_version", None)
+    for track in tracks:
+        inv = inventory(track, packages.get(track.get("package_id")), record)
+        source = track_rulings.source(packages.get(track.get("package_id")), crate_exclusions.EXCLUSIONS)
+        if inv and any(c.get("sanity_since", 1) == crate_exclusions.SANITY_VERSION
+                       and c.get("family", KINDS[0]) in enabled
+                       for c in crate_exclusions.EXCLUSIONS.get(source if track["origin"] == "custom"
+                                                                else inv["lev_sha256"], ())):
+            record["exclusion_version"] = crate_exclusions.SANITY_VERSION
+            break
     record["shortcut_knowledge"] = tier
     seen = set()
     for track in tracks:
@@ -257,8 +291,11 @@ def validate(record, plan):
             raise OptionError("CTR sanity: " + why)
     base = {"itemboxsanity", "wumpasanity", "shortcut_knowledge", "tracks"}
     context = {"logic_difficulty", "boost_blue_fire"}
-    require(type(record) is dict and set(record) in (base, base | context, base | {"rules_version"},
-                                                   base | context | {"rules_version"}), "record shape")
+    require(type(record) is dict and set(record) - {"exclusion_version", "rules_version"} in (base, base | context),
+            "record shape")
+    if "exclusion_version" in record:
+        require(type(record["exclusion_version"]) is int and record["exclusion_version"] == crate_exclusions.SANITY_VERSION,
+                "exclusion version")
     if "rules_version" in record:
         require(type(record["rules_version"]) is int and record["rules_version"] in (1, 2, 3, 4, 5, 6), "rules version")
     if "logic_difficulty" in record:

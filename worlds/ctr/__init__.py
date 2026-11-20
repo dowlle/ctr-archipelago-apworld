@@ -198,12 +198,19 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
-            from . import content_item_boxes, tizi_madness, track_origins
+            from . import content_item_boxes, tizi_madness, track_origins, track_rulings
+            from .notices import adjusted
             content_item_boxes.settings(self.options)
             # A4-96: Tizi Madness only with hard shortcut knowledge.
             tizi_madness.leave_out_below_hard(self)
             content_plan.generate(self)
             track_origins.prune_unused_option_names(self)
+            omitted = track_rulings.report_omitted_pickups(self.ctr_content_plan)
+            if omitted:
+                ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
+                          for package, kind, first, last in omitted]
+                adjusted(self, "unreviewed_pickups", "Pickups awaiting review and omitted from checks: "
+                         + ", ".join(ranges))
         from .notices import emit_summary
         emit_summary(self)
 

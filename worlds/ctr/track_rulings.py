@@ -38,7 +38,7 @@ def _recorded(plan):
     """Read the optional room record. Shape and references are validated separately."""
     record = plan.get("track_ruling_sources") if enabled(plan) else None
     if not isinstance(record, dict) or not isinstance(record.get("packages"), list):
-        return 0, {}
+        return 0, {}, False
     history = {}
     for row in record["packages"]:
         if (isinstance(row, dict) and isinstance(row.get("package_id"), str)
@@ -46,7 +46,7 @@ def _recorded(plan):
             history[row["package_id"]] = tuple(
                 (r["revision"], r["lev_sha256"]) for r in row["reviews"]
                 if isinstance(r, dict) and {"revision", "lev_sha256"} <= r.keys())
-    return record.get("version", 0), history
+    return record.get("version", 0), history, record.get("pickup_limits") is True
 
 
 generation = _scoped(lambda world: True)
@@ -112,6 +112,11 @@ def scoped_version():
     if history is True:
         return RULING_VERSION
     return history[0] if history else 0
+
+
+def pickup_limits_enabled():
+    history = _history.get()
+    return history is True or bool(history and history[2])
 
 
 def scope_keys(row):
@@ -206,17 +211,56 @@ def plan_sources(plan):
 
 def wire_sources(plan):
     """Save the ordered review identities that produced this room's logic."""
-    if not (RULING_VERSION > 1 and plan["packages"]) and not any(plan_sources(plan)):
+    limited = any(omitted_pickups(plan))
+    if not limited and not (RULING_VERSION > 1 and plan["packages"]) and not any(plan_sources(plan)):
         return None
-    return {"version": RULING_VERSION, "packages": [
+    record = {"version": RULING_VERSION, "packages": [
         {"package_id": package["id"], "reviews": [
             {"revision": rev, "lev_sha256": pin} for rev, pin in _reviews(package)]}
         for package in plan["packages"]]}
+    if limited:
+        record["pickup_limits"] = True
+    return record
 
 
 @validation
 def spoiler_sources(plan):
     return list(plan_sources(plan))
+
+
+def omitted_pickups(plan):
+    """Ranges of added pickup ordinals absent from enabled check families."""
+    from . import content_item_boxes, sanity
+
+    if not pickup_limits_enabled():
+        return
+    packages = {pkg["id"]: pkg for pkg in plan["packages"]}
+    record = plan.get("sanity", {})
+    counts_by_track = {row["track_id"]: row["counts"] for row in record.get("tracks", ())}
+    boxes = plan.get("item_boxes", {})
+    entries = {pad["entry_id"] for pad in plan["pads"]}
+    spots = content_item_boxes.spot_sets(boxes)
+    fallback = {e["track_id"] for e in plan["entries"] if boxes and e["kind"] == "track"
+                and e["id"] in entries and e["track_id"] not in spots}
+    for track in plan["tracks"]:
+        package = packages.get(track.get("package_id"))
+        reviewed = sanity.reviewed_counts(package)
+        if reviewed is None:
+            continue
+        tid = track["id"]
+        counts = counts_by_track.get(tid, (0, 0, 0))
+        wumpa = record.get("wumpasanity", 0)
+        weapon = (content_item_boxes.crate_count(package) or 0) if tid in fallback else 0
+        active = (max(weapon, counts[0] if record.get("itemboxsanity") else 0),
+                  counts[1] if wumpa & 1 else 0, counts[2] if wumpa & 2 else 0)
+        for name, previous, current in zip(sanity.SUFFIXES, reviewed, active):
+            if current > previous:
+                yield package["id"], name, previous + 1, current
+
+
+@validation
+def report_omitted_pickups(plan):
+    return list(omitted_pickups(plan))
 
 
 def valid_sources(plan, packages):
@@ -227,6 +271,8 @@ def valid_sources(plan, packages):
     if not record:
         return True
     if not 1 <= record["version"] <= RULING_VERSION:
+        return False
+    if "pickup_limits" in record and (record["pickup_limits"] is not True or not any(omitted_pickups(plan))):
         return False
     records = record["packages"]
     ids = [row["package_id"] for row in records]

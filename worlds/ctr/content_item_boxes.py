@@ -186,7 +186,7 @@ def check_settings(record, capability=None):
     return record
 
 
-def check_spot_sets(record, tracks, packages):
+def check_spot_sets(record, tracks, packages, require_reviewed_exclusions=False):
     """A plan's spot sets: exactly the pad tracks with a spot file of this
     build, each a valid pick from that file."""
     if not record:
@@ -198,22 +198,26 @@ def check_spot_sets(record, tracks, packages):
                 or not reviewed_pickups(packages.get(track.get("package_id")))):
             error("item_boxes.pickup_rules names an unsupported physical pickup revision.")
     expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, spot_sets(record))}
-    excluded = record.get(crate_exclusions.KEY, ())
-    missing = {tid for tid, row in expected.items() if row["crates"][0]["pos"] is None}
-    missing.difference_update(row.get("track_id") for row in excluded if isinstance(row, dict))
-    if missing:
+    carried_rows = record.get(crate_exclusions.KEY, ())
+    carried = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
+    if any(tid not in carried and row["crates"][0]["pos"] is None for tid, row in expected.items()):
         error("item_boxes.crate_exclusions is missing carried ordinals.")
-    if excluded:
+    if carried_rows or require_reviewed_exclusions:
         # A room generated before a later catalog entry carries only the rows
         # of its day: each carried row must equal this build's row for its
         # track, but a track without a carried row keeps its original seating.
         # Compare complete JSON records, retaining exact token types.
         canonical = lambda row: json.dumps(row, sort_keys=True)
-        carried = [row.get("track_id") if isinstance(row, dict) else None for row in excluded]
         if len(set(carried)) != len(carried) or any(
                 track_id not in expected or canonical(row) != canonical(expected[track_id])
-                for track_id, row in zip(carried, excluded)):
+                for track_id, row in zip(carried, carried_rows)):
             error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
+        if require_reviewed_exclusions:
+            for track_id, row in expected.items():
+                pin = row["lev_sha256"]
+                if (track_id not in carried
+                        and crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1)):
+                    error("item_boxes is missing reviewed fallback exclusions.")
     if SPOT_KEY not in record:
         return
     sets = spot_sets(record)
@@ -264,6 +268,11 @@ def box_code(track, number):
     return CUSTOM_ITEM_BOX_CLASS.slot_code(track["custom_slot"], number)
 
 
+def carried_crates(record, track_id):
+    return next((row["crates"] for row in (record or {}).get(crate_exclusions.KEY, ())
+                 if row["track_id"] == track_id), ())
+
+
 def crate_count(package, record=None, track_id=None):
     """Eligible crates in this seed; legacy records keep the raw package count.
 
@@ -271,9 +280,15 @@ def crate_count(package, record=None, track_id=None):
     """
     if not package:
         return None
-    excluded = next((row["crates"] for row in (record or {}).get(crate_exclusions.KEY, ())
-                     if row["track_id"] == track_id), ())
-    return crate_exclusions.count(package, excluded)
+    return crate_exclusions.count(package, carried_crates(record, track_id))
+
+
+def seat_limit(package):
+    from .sanity import reviewed_counts
+
+    raw = crate_count(package)
+    reviewed = reviewed_counts(package)
+    return min(raw, reviewed[0]) if raw is not None and reviewed is not None else raw
 
 
 def seat_indices(crates, slots=SLOTS_PER_TRACK):
@@ -288,11 +303,8 @@ def seat_indices(crates, slots=SLOTS_PER_TRACK):
 
 def physical_seat(track, record, package, number):
     """One-based native weapon ordinal after this room's exclusions and spread."""
-    excluded = next((row["crates"] for row in record.get(crate_exclusions.KEY, ())
-                     if row["track_id"] == track["id"]), ())
-    omitted = {row["ordinal"] for row in excluded}
-    raw = package["capabilities"]["weapon_crates"]
-    crates = [n for n in range(1, raw + 1) if n not in omitted]
+    omitted = {row["ordinal"] for row in carried_crates(record, track["id"])}
+    crates = [n for n in range(1, seat_limit(package) + 1) if n not in omitted]
     seats = seat_indices(len(crates), min(record.get("box_count", 15), 15))
     return crates[seats[number - 1]]
 
@@ -315,9 +327,10 @@ def track_boxes(track, record, package=None):
         return [(slot, ITEM_BOX_CLASS.slot_code(name, slot), f"Item Box {slot}")
                 for slot in retail_slots(name, record["shortcut_knowledge"])]
     if track["origin"] == "custom":
-        crates = crate_count(package, record, track["id"])
-        if not crates:
+        limit = seat_limit(package)
+        if not limit:
             return []
+        crates = limit - sum(row["ordinal"] <= limit for row in carried_crates(record, track["id"]))
         return [(slot, box_code(track, slot), f"Item Box {slot}")
                 for slot in range(1, len(seat_indices(crates, min(record.get("box_count", 15), 15))) + 1)]
     return []

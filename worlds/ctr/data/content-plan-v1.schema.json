@@ -72,6 +72,7 @@
       "required": ["version", "packages"],
       "properties": {
         "version": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "pickup_limits": {"const": true},
         "packages": {
           "type": "array", "minItems": 1, "maxItems": 132,
           "items": {
@@ -137,10 +138,10 @@
           "box_spots_v1",
           "box_count_v1",
           "itemboxsanity_v1",
-          "wumpasanity_v1"
+          "wumpasanity_v1",
+          "sanity_exclusions_v2"
         ]
       },
-      "maxItems": 39,
       "minItems": 1,
       "uniqueItems": true
     },
@@ -168,6 +169,7 @@
         "rules_version": {"type": "integer", "enum": [1, 2, 3, 4, 5, 6]},
         "itemboxsanity": {"type": "integer", "minimum": 0, "maximum": 50},
         "wumpasanity": {"type": "integer", "minimum": 0, "maximum": 3},
+        "exclusion_version": {"const": 2},
         "logic_difficulty": {"type": "integer", "minimum": 0, "maximum": 2},
         "boost_blue_fire": {"type": "boolean"},
         "shortcut_knowledge": {"type": "integer", "minimum": 0, "maximum": 2},
