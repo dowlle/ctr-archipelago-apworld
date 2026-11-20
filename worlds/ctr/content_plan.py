@@ -1140,25 +1140,34 @@ def retail_selection(options):
     return sorted(i for i, name in RETAIL.items() if "all" in chosen or name in chosen)
 
 
-def track_names(track, package):
-    """The title and equivalent keys a YAML may use to select this track."""
+def literal_track_names(track, package):
+    """The selectors supported before alternate registry keys were accepted."""
     title = track["display_name"]
+    return tuple(dict.fromkeys((title, package["content_id"]))) if package else (title,)
+
+
+def track_names(track, package, reserved=()):
+    """The track's literal selectors, then aliases unclaimed by another literal selector."""
+    exact = literal_track_names(track, package)
     if package:
-        names = (title, *destinations.equivalent_track_keys(package["content_id"]))
+        alternate = destinations.equivalent_track_keys(package["content_id"])
         if cortex_vortex.bundled_copy(package):
-            names += (destinations.CORTEX_VORTEX,)
-        return tuple(dict.fromkeys(names))
-    if track.get("id") == CORTEX_TRACK_ID:
-        return (title, *destinations.equivalent_track_keys(CORTEX_TRACK_KEY))
-    return (title,)
+            alternate += (destinations.CORTEX_VORTEX,)
+    else:
+        alternate = destinations.equivalent_track_keys(CORTEX_TRACK_KEY) if track.get("id") == CORTEX_TRACK_ID else ()
+    return tuple(dict.fromkeys((*exact, *(name for name in alternate if name not in reserved))))
 
 
 def required_ids(options, candidates, arenas, packages):
     """The logical ids of `required_entries`, then Cortex Vortex with `own_pad`."""
     names = {}
     for item in candidates + arenas:
-        for name in track_names(item, packages.get(item.get("package_id"))):
+        for name in literal_track_names(item, packages.get(item.get("package_id"))):
             names[name] = item["id"]
+    reserved = set(names)
+    for track in candidates:
+        for name in track_names(track, packages.get(track.get("package_id")), reserved):
+            names.setdefault(name, track["id"])
     wanted = list(options.required_entries.value)
     if (any(names.get(name) == CORTEX_TRACK_ID for name in wanted)
             or (destinations.CORTEX_VORTEX in wanted and destinations.CORTEX_VORTEX not in names)):
@@ -1279,7 +1288,8 @@ def swap_in_bundled_cortex(world):
     if not copies:
         return
     twins = [p["id"] for p in copies]
-    names = {n for p in copies for n in track_names(p, p)}
+    reserved = {name for p in packages if p["id"] not in twins for name in literal_track_names(p, p)}
+    names = {n for p in copies for n in track_names(p, p, reserved)}
     kept = [n for n in o.required_entries.value if n not in names]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
@@ -1364,13 +1374,15 @@ def draw_plan(world, key_estimate=True):
                      package, dict(named_block=block.block_index, room_title=block.ap_name) if block else {}))
     package_by_id = {p["id"]: p for p in packages}
     # A name of the 18 original tracks that this seed leaves out has no effect.
-    known = set(RETAIL.values()) | {name for track, package, _addressing in pool for name in track_names(track, package)}
+    reserved = set(RETAIL.values()) | {name for track, package, _addressing in pool
+                                      for name in literal_track_names(track, package)}
+    known = reserved | {name for track, package, _addressing in pool for name in track_names(track, package, reserved)}
     unknown = sorted(set(overrides) - known)
     if unknown:
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        wanted = next((overrides[name] for name in track_names(track, package) if name in overrides), selected_modes)
+        wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), selected_modes)
         modes = [m for m in MODES if m in wanted and m in supported_modes(track["origin"], package)]
         if not modes:
             if package is not None:

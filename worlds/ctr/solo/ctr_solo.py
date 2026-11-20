@@ -1330,20 +1330,25 @@ def _same_package(listed, descriptor: dict) -> bool:
     return same_key and _pins(listed) == _pins(descriptor)
 
 
-def _pick_names(descriptor: dict, existing: list) -> set:
+def _literal_selectors(descriptors) -> set:
+    return {name for d in descriptors if isinstance(d, dict)
+            for name in (d.get("content_id"), d.get("display_name")) if isinstance(name, str)}
+
+
+def _pick_names(descriptor: dict, existing: list, reserved=()) -> set:
     """All selectors for this installed package, including its title in the loaded YAML."""
-    names = set(_world_module("content_plan").track_names(descriptor, descriptor))
-    names.update(d["display_name"] for d in existing if isinstance(d.get("display_name"), str))
-    return names
+    return set(_world_module("content_plan").track_names(descriptor, descriptor, reserved)) | _literal_selectors(existing)
 
 
 def _start_pick(section: dict, descriptor: dict) -> int:
     """How a YAML already has a custom track: 0 off, PICK_POOL or PICK_OWN_PAD."""
-    existing = [d for d in _custom_tracks({GAME: section}) if _same_package(d, descriptor)]
+    listed = _custom_tracks({GAME: section})
+    existing = [d for d in listed if _same_package(d, descriptor)]
     if not existing:
         return 0
     required = section.get("required_entries")
-    names = _pick_names(descriptor, existing)
+    reserved = _literal_selectors(d for d in listed if d not in existing)
+    names = _pick_names(descriptor, existing, reserved)
     return PICK_OWN_PAD if isinstance(required, list) and names & set(map(str, required)) else PICK_POOL
 
 
@@ -1408,18 +1413,23 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                             track=track_id)
     if page:  # a row the page showed leaves the YAML as the player set it
         bundled_copy = _world_module("cortex_vortex").bundled_copy
+        plan = _world_module("content_plan")
         modes = section.get("track_modes")
+        picked_descriptors = [by_id[track_id]["descriptor"] for track_id in packages]
         for entry in by_id.values():
             descriptor = entry["descriptor"]
             existing = [d for d in custom if _same_package(d, descriptor)]
-            names = _pick_names(descriptor, existing)
+            reserved = _literal_selectors(d for d in (*custom, *picked_descriptors)
+                                          if not _same_package(d, descriptor))
+            names = _pick_names(descriptor, existing, reserved) - reserved
             if entry["id"] not in picked:
                 custom[:] = [d for d in custom if not _same_package(d, descriptor)]
                 if existing and isinstance(modes, dict):
+                    mode_names = names - set(plan.RETAIL.values())
                     if cortex and bundled_copy(descriptor):
-                        _world_module("content_plan").move_bundled_cortex_modes(modes, names)
+                        plan.move_bundled_cortex_modes(modes, mode_names)
                     else:
-                        for name in names:
+                        for name in mode_names:
                             modes.pop(name, None)
             if existing and entry["id"] not in guaranteed:
                 required[:] = [name for name in required if name not in names]

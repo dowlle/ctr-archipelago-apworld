@@ -100,6 +100,23 @@ class TestAdmission(unittest.TestCase):
         package["files"][0]["sha256"] = entry["doc"]["track"]["lev_sha256"][0]
         self.assertIs(box_spots.file_for(track, package), entry)
 
+    def test_literal_selector_keeps_precedence_over_another_tracks_alias(self):
+        alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
+        other = copy.deepcopy(UNKNOWN)
+        other["display_name"] = alias
+        canonical = named_fixture()
+        canonical.update(content_id=key, id=f"package/{key}/{canonical['revision']}",
+                         display_name="Assembly Lane N-Gage")
+        options = options_with([other, canonical], required=[alias])
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["relic"]}
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertEqual(content_plan.required_ids(world.options, plan["tracks"], [],
+                                                   {p["id"]: p for p in plan["packages"]}), ["custom/fixture-loop/2.1"])
+        modes = {track.get("package_id"): track["modes"] for track in plan["tracks"]}
+        self.assertEqual(modes[other["id"]], ["relic"])
+        self.assertEqual(modes[canonical["id"]], ["trophy"])
+
     def test_older_rooms_keep_two_raw_keys_that_now_share_an_identity(self):
         first, second = copy.deepcopy(UNKNOWN), copy.deepcopy(UNKNOWN)
         first.update(content_id="crash-30anniversary-adventure-track-2",

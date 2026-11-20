@@ -1356,6 +1356,14 @@ class TestCustomTracks(SoloTestCase):
         with open(room, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), saved)
 
+    def test_removing_a_custom_copy_preserves_a_retail_title_mode_override(self):
+        descriptor = self.install("crash-cove-custom", "1.0", "Crash Cove")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [descriptor], "track_modes": {"Crash Cove": ["trophy"]}}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)
+        self.assertEqual(result[GAME], {"track_modes": {"Crash Cove": ["trophy"]}})
+
     def test_historical_key_reads_the_canonical_original_folder(self):
         alias = "n-gage-assembly-lane"
         descriptor = self.install(alias, "1.0", "Assembly Lane N-Gage")
