@@ -297,6 +297,8 @@ class TestRanks(unittest.TestCase):
             ("lights-out", "1.0.0"): ("5ebdb9f235ba0c07ba5c72b715c949afdd6062fcf3208f45a1c13936ffb529c6", 1),
             ("neon-paradise", "1.0.0"): ("665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0", 0),
             ("neon-paradise", "1.1.0"): ("639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", 0),
+            # Project ruling of 2026-11-20 07:55 CET (A6-33d2): in-game pass.
+            ("sunset-vista", "1.2.0"): ("97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5", 0),
         }
         table = content_capability.USF_FINISH_RULINGS
         self.assertEqual({k: v for k, v in table.items() if k[1] is not None},
