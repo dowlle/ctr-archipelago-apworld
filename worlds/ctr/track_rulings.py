@@ -12,7 +12,7 @@ FEATURE = "carried_track_rulings_v1"
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
-RULING_VERSION = 1
+RULING_VERSION = 2
 _history = ContextVar("ctr_track_ruling_history", default=None)
 
 
@@ -155,7 +155,7 @@ def carried_sources(package):
     if current in reviews:
         return {}
     families = {
-        "ordinary pickups": sanity.CATALOG.keys() | content_item_boxes.PICKUP_RULE_PINS,
+        "ordinary pickups": sanity.REVIEWED_PICKUP_PINS,
         "AP box pickup ranks": content_item_boxes.PICKUP_RULE_PINS,
         "crate exclusions": crate_exclusions.EXCLUSIONS,
         "finish": content_capability.CARRY_FREE_FINISH_PINS | {royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256},
@@ -212,7 +212,7 @@ def plan_sources(plan):
 def wire_sources(plan):
     """Save the ordered review identities that produced this room's logic."""
     limited = any(omitted_pickups(plan))
-    if not limited and not (RULING_VERSION > 1 and plan["packages"]) and not any(plan_sources(plan)):
+    if not limited and not any(plan_sources(plan)) and not requires_pinned_lookup(plan):
         return None
     record = {"version": RULING_VERSION, "packages": [
         {"package_id": package["id"], "reviews": [
@@ -221,6 +221,26 @@ def wire_sources(plan):
     if limited:
         record["pickup_limits"] = True
     return record
+
+
+def requires_pinned_lookup(plan):
+    """An exact lookup can differ even when no inherited family supplies a row."""
+    from . import content_capability, object_rulings
+
+    contents = {package["content_id"] for package in plan["packages"]}
+    if not contents:
+        return False
+    for rulings, base_size in ((content_capability.USF_FINISH_RULINGS, 3),
+                              (content_capability.LETTER_BOOST_RULINGS, 2),
+                              (object_rulings.RULINGS, 3)):
+        if any(len(key) > base_size and key[0] in contents and key[-1] <= scoped_version() for key in rulings):
+            return True
+    pins_by_key = {key: {row[0] for row in rows} for key, rows in REVIEWS.items()}
+    for package in plan["packages"]:
+        pin = lev_pin(package)
+        if inherits(package) and any(key != package["content_id"] and pin in pins for key, pins in pins_by_key.items()):
+            return True
+    return False
 
 
 @validation

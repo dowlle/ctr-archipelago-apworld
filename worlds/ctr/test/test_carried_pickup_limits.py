@@ -4,9 +4,11 @@ from unittest.mock import patch
 
 from Options import OptionError
 
-from .. import content_item_boxes, content_plan, notices, track_rulings
+from .. import content_item_boxes, content_plan, crate_exclusions, notices, track_rulings
+from .test_content_item_boxes import box_options, first_world
 from .test_content_plan import make_world
 from .test_country_speedway import country_options
+from .test_crate_exclusions import lockbox_track_4, matsuri
 from .test_green_hill_raceway import PACKAGE as GREEN_HILL, green_options
 from .test_royal_raceway import PACKAGE as ROYAL, royal_options
 from .test_toasty_terrace import toasty_options
@@ -82,6 +84,43 @@ class TestCarriedPickupLimits(unittest.TestCase):
             plan = make_world(options, seed=3, stop_before="pre_fill").ctr_content_plan
         self.assertNotIn("track_ruling_sources", plan)
         self.assertEqual(sum("Weapon Crate 29" in line for line in log.output), 1)
+
+    def test_a6_15_exclusions_and_counts_carry_to_new_revisions(self):
+        for fixture, reviewed in ((matsuri, 27), (lockbox_track_4, 29)):
+            options = box_options(custom=[fixture()], itemboxsanity=50, wumpasanity="both", item_box_count=5)
+            tid, package = later_revision(options, "ab" * 32)
+            package["capabilities"].update(weapon_crates=reviewed + 1, fruit_crates=3, loose_fruit=0)
+            wire = first_world(options, seed=3).fill_slot_data()
+            plan = wire["content_plan"]
+            source = plan["track_ruling_sources"]
+            self.assertEqual(source["version"], 2)
+            self.assertIs(source["pickup_limits"], True)
+            exclusion, = plan["item_boxes"][crate_exclusions.KEY]
+            self.assertEqual(exclusion, dict(track_id=tid, lev_sha256="ab" * 32,
+                                             crates=[dict(ordinal=1, pos=None)]))
+            rows = [r for r in plan["sanity"]["tracks"] if r["track_id"] == tid]
+            if fixture is matsuri:
+                row, = rows
+                self.assertNotIn(1, row["weapon_crate"])
+                self.assertNotIn(reviewed + 1, row["weapon_crate"])
+            else:
+                self.assertFalse(rows)
+            self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
+
+    def test_foreign_pin_does_not_demand_its_exact_exclusion_in_a_version_two_room(self):
+        nina = lockbox_track_4()
+        nina.update(id="package/nina-s-nightmare/9.0.0", revision="9.0.0", content_id="nina-s-nightmare",
+                    display_name="Nina's Nightmare")
+        options = box_options(custom=[nina, matsuri()], itemboxsanity=50, progressive_boost="off")
+        wire = first_world(options, seed=3).fill_slot_data()
+        plan = wire["content_plan"]
+        history = plan["track_ruling_sources"]
+        self.assertEqual(history["version"], 2)
+        self.assertNotIn("pickup_limits", history)
+        self.assertEqual(plan["sanity"]["exclusion_version"], 2)
+        self.assertEqual([r["track_id"] for r in plan["item_boxes"][crate_exclusions.KEY]],
+                         ["custom/matsuri/1.0.0"])
+        self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
 
     def test_rooms_without_pickup_limits_keep_their_previous_pool(self):
         options = royal_options()
