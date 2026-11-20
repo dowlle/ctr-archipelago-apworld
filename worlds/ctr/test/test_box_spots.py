@@ -95,6 +95,23 @@ class TestConversion(unittest.TestCase):
             self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
 
+    def test_sunset_vista_file_is_the_approved_no_boost_file(self):
+        """The in-game review of 2026-11-20: all 24 spots stay where they
+        are, need no boost, and a lap finishes without boost (finish rank 0)."""
+        from .. import content_capability
+        doc = box_spots.CUSTOM_FILES["sunset-vista"]["doc"]
+        lev = doc["track"]["lev_sha256"][0]
+        self.assertEqual([s["number"] for s in doc["spots"]], list(range(1, 25)))
+        for spot in doc["spots"]:
+            self.assertEqual(spot["needs"], "none", spot["number"])
+            self.assertIn("2026-11-20", spot["source"])
+            self.assertEqual(box_spots.needs_rank(spot), 0)
+        package = dict(content_id="sunset-vista", revision="1.2.0", capabilities={},
+                       files=[dict(role="lev", sha256=lev)])
+        self.assertEqual(content_capability.ruled_finish(package), 0)
+        self.assertIsNone(content_capability.ruled_finish(dict(package, revision="1.1.0",
+                                                               files=[dict(role="lev", sha256="01" * 32)])))
+
     def test_number_lock(self):
         """Append only: a locked number stays a spot or is retired, never both,
         and every spot number is locked."""
