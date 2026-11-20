@@ -250,7 +250,19 @@ def admit(descriptor, where="package"):
     return out
 
 
-def admit_all(raw, where="tracks.custom", *, historical=False):
+def yaml_track_entry(descriptor, where):
+    """Translate the player YAML field to the existing package wire field."""
+    if not isinstance(descriptor, dict) or "track_key" not in descriptor:
+        return descriptor
+    descriptor = dict(descriptor)
+    key = descriptor.pop("track_key")
+    if "content_id" in descriptor and descriptor["content_id"] != key:
+        _fail(where, "track_key and content_id must match when both are given")
+    descriptor["content_id"] = key
+    return descriptor
+
+
+def admit_all(raw, where="tracks.custom", *, yaml_input=False, historical=False):
     """Admit a whole descriptor list, sorted by package id; refuse duplicates."""
     from .destinations import canonical_track_key
 
@@ -258,7 +270,10 @@ def admit_all(raw, where="tracks.custom", *, historical=False):
         _fail(where, f"must be a list of at most {MAX_PACKAGES} complete package descriptors")
     result, seen = [], {}
     for i, descriptor in enumerate(raw):
-        package = admit(descriptor, f"{where}[{i}]")
+        at = f"{where}[{i}]"
+        if yaml_input:
+            descriptor = yaml_track_entry(descriptor, at)
+        package = admit(descriptor, at)
         key = package["content_id"]
         for label, value in (("track key", key if historical else canonical_track_key(key)), ("package uuid", package["uuid"]),
                              ("LEV and VRM pair", (package["files"][0]["sha256"], package["files"][1]["sha256"]))):

@@ -1318,21 +1318,25 @@ def _pins(descriptor: dict) -> list:
                   key=lambda pin: str(pin[0])) if isinstance(files, list) else []
 
 
+def _track_key(descriptor: dict):
+    return descriptor.get("track_key", descriptor.get("content_id"))
+
+
 def _same_package(listed, descriptor: dict) -> bool:
     """Match a YAML entry to this installed revision of the track by exact file pins."""
     if not isinstance(listed, dict):
         return False
+    key = _track_key(listed)
     same_key = (listed.get("id") == descriptor["id"]
                 or (listed.get("revision") == descriptor["revision"]
-                    and isinstance(listed.get("content_id"), str)
-                    and listed["content_id"] in
-                    _world_module("destinations").equivalent_track_keys(descriptor["content_id"])))
+                    and isinstance(key, str)
+                    and key in _world_module("destinations").equivalent_track_keys(descriptor["content_id"])))
     return same_key and _pins(listed) == _pins(descriptor)
 
 
 def _literal_selectors(descriptors) -> set:
     return {name for d in descriptors if isinstance(d, dict)
-            for name in (d.get("content_id"), d.get("display_name")) if isinstance(name, str)}
+            for name in (_track_key(d), d.get("display_name")) if isinstance(name, str)}
 
 
 def _pick_names(descriptor: dict, existing: list, reserved=()) -> set:
@@ -1343,9 +1347,11 @@ def _pick_names(descriptor: dict, existing: list, reserved=()) -> set:
     plan = _world_module("content_plan")
     for listed in existing:
         current = dict(descriptor)
-        for field in ("content_id", "display_name"):
-            if isinstance(listed.get(field), str):
-                current[field] = listed[field]
+        key, title = _track_key(listed), listed.get("display_name")
+        if isinstance(key, str):
+            current["content_id"] = key
+        if isinstance(title, str):
+            current["display_name"] = title
         names.update(plan.track_names(current, current, reserved))
     return names
 
@@ -1419,8 +1425,8 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         key = canonical_key(descriptor["content_id"])
-        other = next((d for d in custom if isinstance(d, dict) and isinstance(d.get("content_id"), str)
-                      and canonical_key(d["content_id"]) == key
+        other = next((d for d in custom if isinstance(d, dict)
+                      and isinstance(_track_key(d), str) and canonical_key(_track_key(d)) == key
                       and not _same_package(d, descriptor)), None)
         if other is not None:
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
@@ -1465,7 +1471,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         if not names.intersection(required):
             # The saved descriptor keeps its exact revision and file pins.
             # Prefer a selector it actually owns in the assembled YAML.
-            key = existing[0].get("content_id", descriptor["content_id"])
+            key = _track_key(existing[0])
             if not names:
                 raise SoloError("track", f"{descriptor['display_name']} needs a distinct name or key for its guaranteed pad.",
                                 track=track_id)
@@ -1479,6 +1485,55 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     else:
         section.pop("required_entries", None)
     return doc
+
+
+def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: list[str], name: str) -> dict:
+    """Write a player YAML with the current track choices and room defaults."""
+    if not picked:
+        raise SoloError("track", "Pick at least one custom track first.")
+    doc = apply_tracks(paths, {"name": name or "Player", "game": GAME, GAME: {}},
+                       assets, picked, guaranteed)
+    section = doc[GAME]
+    known_packages = _world_module("content_plan").PACKAGES
+    tracks_root = os.path.join(assets, "tracks")
+    for entry in section.get("custom_tracks", []):
+        folder = _shared_package_folder(tracks_root, entry)
+        manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, folder) if folder else None
+        files = manifest.get("files", []) if isinstance(manifest, dict) else []
+        public = any(_same_package(entry, package) for package in known_packages)
+        for file in files:
+            if file["role"] != "presentation":
+                continue
+            source = _small_json(os.path.join(folder, file["path"]), 4096, folder)
+            if not isinstance(source, dict) or source.get("schema_version") != 1:
+                continue
+            provider = source.get("provider")
+            if file["path"] == "metadata/saphi-source.json" and provider == "projectsaphi":
+                ids = [source.get(key) for key in ("track_id", "lev_media_id", "vrm_media_id")]
+                public |= source.get("version") == entry["revision"] and all(type(i) is int and i > 0 for i in ids)
+            elif file["path"] == "metadata/seed-source.json" and provider == "ctr-seed":
+                track_id = source.get("saphi_track_id")
+                public |= type(track_id) is int and 0 < track_id <= 100000000
+            elif file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
+                locator = dict(kind="xdelta", patch_sha256=source.get("patch_sha256"),
+                               bigfile_index=source.get("bigfile_index"), source_url=source.get("source_url"))
+                try:
+                    _world_module("custom_packages").admit(dict(entry, locator=locator))
+                except ValueError:
+                    continue
+                entry["locator"] = locator
+                public = True
+        if not public:
+            raise SoloError("track", f"{entry['display_name']} has no known public source.")
+        entry["track_key"] = entry.pop("content_id")
+    fd, path = tempfile.mkstemp(prefix="room-tracks-", suffix=".yaml", dir=paths.yamls)
+    os.close(fd)
+    try:
+        dump_yaml(doc, path)
+    except Exception:
+        os.unlink(path)
+        raise
+    return {"yaml_path": path}
 
 
 # ---------------------------------------------------------------------------
@@ -1903,6 +1958,11 @@ def build_parser() -> argparse.ArgumentParser:
     cmd = sub.add_parser("tracks")
     cmd.add_argument("--assets", default=None, help="the client's assets folder (default <client>/assets)")
     cmd.add_argument("--yaml", default=None, help="start each track as this YAML has it")
+    cmd = sub.add_parser("save-room-yaml")
+    cmd.add_argument("--assets", default=None)
+    cmd.add_argument("--name", default=None)
+    cmd.add_argument("--track", action="append", default=[])
+    cmd.add_argument("--guarantee", action="append", default=[])
     cmd = sub.add_parser("describe")
     cmd.add_argument("--yaml", default=None, help="report the overlay options' values in this YAML")
     for name in ("validate", "generate"):
@@ -1971,6 +2031,8 @@ def main(argv: list[str] | None = None, *, allow_test_ports: bool = False) -> in
             emit("result", **describe(paths, args.yaml))
         elif args.command == "tracks":
             emit("result", **list_tracks(paths, assets, args.yaml))
+        elif args.command == "save-room-yaml":
+            emit("result", **save_room_yaml(paths, assets, args.track, args.guarantee, args.name))
         elif args.command == "validate":
             emit("result", **validate(paths, args.yaml, args.name, args.set, args.stamp_requires, tracks))
         elif args.command == "generate":

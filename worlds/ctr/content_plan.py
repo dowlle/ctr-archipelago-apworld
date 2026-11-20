@@ -302,10 +302,12 @@ def canonical(value):
 def resolve_packages(raw, where="custom_tracks", *, historical=False):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where, historical=historical)
+        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks", historical=historical)
     except custom_packages.PackageError as exc:
-        error(f"{exc}. Export the package descriptor again from the Custom Content page "
-              "or the AP-Pie track picker; legacy Gem Cup placement descriptors are not this format.")
+        if where == "custom_tracks":
+            error(f"{exc}. Use Export YAML in Options > Custom Tracks, or Save YAML for a room "
+                  "on the Play Solo > Custom Tracks page.")
+        error(f"{exc}.")
 
 
 def pad_registry():
@@ -457,6 +459,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_bosses.CHAOS_FEATURE] if bosses is not None and bosses.get("final_chaos") else [])
             + ([sanity.FEATURES[0]] if sanity_record and sanity_record["itemboxsanity"] else [])
             + ([sanity.FEATURES[1]] if sanity_record and sanity_record["wumpasanity"] else [])
+            + ([sanity.EXCLUSIONS_FEATURE] if sanity_record and "exclusion_version" in sanity_record else [])
             + ([content_wumpa.SHOP_FEATURE] if shop else [])
             + ([content_wumpa.LOGIC_FEATURE] if shop and "logic_scale" in shop else [])
             + ([content_wumpa.GOAL_FEATURE] if wumpa_goal else [])
@@ -1177,7 +1180,9 @@ def required_ids(options, candidates, arenas, packages):
         problems = []
         unknown = [name for name in dict.fromkeys(wanted) if name not in names]
         if unknown:
-            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown))
+            problems.append("not a track or arena this seed can use: " + ", ".join(repr(name) for name in unknown)
+                            + ". For missing custom track entries, use Save YAML for a room "
+                              "on the Play Solo > Custom Tracks page")
         repeated = [name for name in dict.fromkeys(wanted) if name in names and wanted.count(name) > 1]
         if repeated:
             problems.append("listed more than once: " + ", ".join(repr(name) for name in repeated))
@@ -1295,7 +1300,7 @@ def swap_in_bundled_cortex(world):
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
     o.custom_tracks.value = [raw for raw in o.custom_tracks.value
-                             if custom_packages.admit(raw, "custom_tracks")["id"] not in twins]
+                             if custom_packages.yaml_track_entry(raw, "custom_tracks")["id"] not in twins]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
     moved_modes = move_bundled_cortex_modes(modes, names)
@@ -2959,7 +2964,8 @@ def validate(plan):
     shortened, cup_names, leg_tracks = None, set(), set()
     standalone_ids = {e["track_id"] for e in entries.values() if e["kind"] == "track"}
     # Hand-placed spots (A3-14): before any box check is recomputed from them.
-    content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages)
+    content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages,
+                                      require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record))
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue
