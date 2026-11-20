@@ -198,7 +198,8 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
-            from . import content_item_boxes, tizi_madness, track_origins
+            from . import content_bosses, content_item_boxes, tizi_madness, track_origins
+            content_bosses.garages_off_goal_as_disabled(self.options)
             content_item_boxes.settings(self.options)
             # A4-96: Tizi Madness only with hard shortcut knowledge.
             tizi_madness.leave_out_below_hard(self)

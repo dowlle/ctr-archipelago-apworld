@@ -5,6 +5,7 @@ DATAPACKAGE STABILITY: retail uses the approved sparse 35026/35029 blocks;
 named tracks get a separate 128-code block at 37200000 + 128 * block_index.
 All names register unconditionally. Append only, never rename or reorder.
 """
+import copy
 import hashlib
 import json
 import pkgutil
@@ -148,6 +149,14 @@ def eligible(track, family, record, item_boxes, package, capability=None):
             and object_rulings.rank(track, package, KINDS[family], n, record if "logic_difficulty" in record else capability) is not None]
 
 
+def add_tracks_probe(record, tracks, *args):
+    """The rows `add_tracks` would give `record` for `tracks`, leaving `record`
+    untouched (A6-48 compares two venue lists before choosing one)."""
+    probe = copy.deepcopy(record)
+    add_tracks(probe, tracks, *args)
+    return probe["tracks"]
+
+
 def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standalone=(), capability=None):
     if record is None:
         return
@@ -289,7 +298,9 @@ def validate(record, plan):
     by_id = {t["id"]: t for t in plan["tracks"]}
     uses = routes(plan["tracks"], plan["entries"], plan["pads"], plan["encounters"])
     expected = {t["id"] for t in plan["tracks"]
-                if any(content_pickups.repeatable(r) or not content_pickups.enabled(plan) for r in uses[t["id"]])
+                if any((content_pickups.repeatable(r) or not content_pickups.enabled(plan))
+                       and not (content_pickups.final_enabled(plan) and r["encounter_id"] == content_pickups.FINAL)
+                       for r in uses[t["id"]])
                 and inventory(t, packages.get(t.get("package_id")), record) is not None}
     require(type(record["tracks"]) is list and len(record["tracks"]) == len(expected), "track count")
     seen = set()

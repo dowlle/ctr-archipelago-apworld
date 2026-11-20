@@ -8,7 +8,7 @@ from NetUtils import convert_to_base_types
 from Options import OptionError
 
 from .test_content_plan import make_world, profile_options
-from .. import content_laps, content_plan
+from .. import content_laps, content_pickups, content_plan
 from ..lap_checks import LAP_CORTEX_VORTEX_CODE
 from ..progressive_capability import boost_item_name
 
@@ -141,18 +141,24 @@ class TestBossRaces(unittest.TestCase):
         self.assertEqual(len(plan["encounters"]), 6)
         for enc in plan["encounters"]:
             track = entries[enc["entry_id"]]["track_id"]
+            if track not in laps:
+                # A6-48: a venue only the Final Challenge races has no lap check.
+                self.assertEqual(enc["id"], content_pickups.FINAL)
+                self.assertTrue(content_pickups.final_enabled(plan))
+                continue
             routes = [r for r in laps[track]["routes"] if r["encounter_id"] == enc["id"]]
             self.assertEqual(len(routes), 1)
             self.assertEqual((routes[0]["mode"], routes[0]["own_pad_id"], routes[0]["award"], routes[0]["leg_id"]),
                              ("boss_race", enc["pad_id"], "lap", None))
         self.assertTrue(content_plan.validate(plan))
 
-    def test_a_venue_raced_nowhere_else_has_its_check(self):
+    def test_a_venue_raced_only_by_the_final_has_no_check(self):
+        # A6-48 (ruling of 2026-11-20): before, Cortex Vortex raced only by the
+        # final had LAP_CORTEX_VORTEX_CODE with the one Final Challenge route.
         world = make_world(self.options())
-        laps = self.laps(world)
-        cortex = laps[content_plan.CORTEX_TRACK_ID]
-        self.assertEqual(cortex["location"], LAP_CORTEX_VORTEX_CODE)
-        self.assertEqual([r["encounter_id"] for r in cortex["routes"]], ["encounter/garage:4/1"])
+        self.assertNotIn(content_plan.CORTEX_TRACK_ID, self.laps(world))
+        self.assertTrue(content_pickups.final_enabled(world.ctr_content_plan))
+        self.assertNotIn(LAP_CORTEX_VORTEX_CODE, {c["location"] for c in world.ctr_content_plan["checks"]})
 
     def test_boss_cup_legs_are_routes(self):
         options = self.options()
@@ -173,10 +179,13 @@ class TestBossRaces(unittest.TestCase):
         self.assertTrue(content_plan.validate(plan))
 
     def test_a_boss_route_needs_the_encounter_and_no_win(self):
-        options = self.options(warppad_unlock_requirements="vanilla")
-        world = make_world(options)
-        cortex = self.laps(world)[content_plan.CORTEX_TRACK_ID]
-        lap = world.multiworld.get_location(content_plan.LOCATION_BY_CODE[cortex["location"]], 1)
+        # Oxide Station raced only by N. Oxide's two races: its lap routes are
+        # both encounters (A6-48 keeps it for the First Challenge route).
+        from .test_final_only_venue import options
+        world = make_world(options(oxide_final_track="oxide_station", warppad_unlock_requirements="vanilla"), seed=3)
+        oxide = self.laps(world)["retail:13"]
+        self.assertEqual({r["encounter_id"] for r in oxide["routes"]}, {content_pickups.FIRST, content_pickups.FINAL})
+        lap = world.multiworld.get_location(content_plan.LOCATION_BY_CODE[oxide["location"]], 1)
         self.assertFalse(lap.can_reach(CollectionState(world.multiworld)))
         self.assertTrue(lap.can_reach(world.multiworld.get_all_state(False)))
 
@@ -188,8 +197,8 @@ class TestBossRaces(unittest.TestCase):
                 ("pad", lambda r: r.__setitem__("own_pad_id", "garage:0"))]:
             forged = copy.deepcopy(plan)
             check = next(c for c in forged["checks"] if c["kind"] == content_laps.KIND
-                         and c["owner"] == content_plan.CORTEX_TRACK_ID)
-            change(check["routes"][0])
+                         and any(r["encounter_id"] == content_pickups.FIRST for r in c["routes"]))
+            change(next(r for r in check["routes"] if r["encounter_id"] == content_pickups.FIRST))
             with self.subTest(name), self.assertRaises(OptionError):
                 content_plan.validate(forged)
 
