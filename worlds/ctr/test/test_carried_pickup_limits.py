@@ -121,6 +121,9 @@ class TestCarriedPickupLimits(unittest.TestCase):
         self.assertEqual([r["track_id"] for r in plan["item_boxes"][crate_exclusions.KEY]],
                          ["custom/matsuri/1.0.0"])
         self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
+        disabled = first_world(dict(options, box_locations=False, item_box_count=0, itemboxsanity=0),
+                               seed=3).ctr_content_plan
+        self.assertNotIn("track_ruling_sources", disabled)
 
     def test_rooms_without_pickup_limits_keep_their_previous_pool(self):
         options = royal_options()

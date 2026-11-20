@@ -227,6 +227,8 @@ def requires_pinned_lookup(plan):
     """An exact lookup can differ even when no inherited family supplies a row."""
     from . import content_capability, object_rulings
 
+    if not (plan.get("item_boxes") or plan.get("sanity") or plan.get("capability", {}).get("boost_mode")):
+        return False
     contents = {package["content_id"] for package in plan["packages"]}
     if not contents:
         return False
