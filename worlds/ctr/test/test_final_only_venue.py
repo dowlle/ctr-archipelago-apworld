@@ -11,6 +11,7 @@ import copy
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from BaseClasses import ItemClassification
 from Fill import distribute_items_restrictive
@@ -146,11 +147,24 @@ class TestFinalOnlyVenue(unittest.TestCase):
 
     def test_excluded_omitted_checks_reserve_no_filler(self):
         opts = options(item_pool={"base": {"trophies": 15}})
-        base = make_world(opts, seed=1).ctr_content_plan
-        excluded = make_world(dict(opts, exclude_locations={"Cortex Vortex: Reach 10 Wumpa",
-                                                            "Cortex Vortex: Complete One Lap"}), seed=1).ctr_content_plan
+        reserves = []
+        resolve = cp.content_item_pool.resolve
+
+        def spy(*args, **kwargs):
+            reserves.append(kwargs.get("filler_reserve", 0))
+            return resolve(*args, **kwargs)
+        with patch.object(cp.content_item_pool, "resolve", spy):
+            base = make_world(opts, seed=1).ctr_content_plan
+            base_reserve, reserves[:] = reserves[-1], []
+            excluded = make_world(dict(opts, exclude_locations={"Cortex Vortex: Reach 10 Wumpa",
+                                                                "Cortex Vortex: Complete One Lap"}), seed=1).ctr_content_plan
         self.assertFalse(owned(excluded, VORTEX))
+        self.assertEqual(reserves[-1], base_reserve)
         self.assertEqual(base["items"], excluded["items"])
+        # Control: an excluded check that stays reserves one filler slot.
+        with patch.object(cp.content_item_pool, "resolve", spy):
+            make_world(dict(opts, exclude_locations={"Oxide Station: Complete One Lap"}), seed=1)
+        self.assertEqual(reserves[-1], base_reserve + 1)
 
     def test_full_accessibility_fill_and_tracker_restore(self):
         for final in ("cortex_vortex", "vortex_chaos", "oxide_station"):
@@ -176,6 +190,20 @@ class TestFinalOnlyVenue(unittest.TestCase):
         plan["required_features"].remove(pickups.FINAL_FEATURE)
         with self.assertRaises(OptionError):
             cp.validate(plan)
+
+    def test_first_challenge_counts_for_pickups_without_the_repeatable_marker(self):
+        # Review round 1: without repeatable_pickups_v1 the First Challenge is
+        # a pickup route, so removing only that marker must not validate.
+        world = make_world(options(itemboxsanity=0, wumpasanity="off", item_pool=pool(),
+                                   oxide_final_challenge_relic_count=0), seed=3)
+        plan = copy.deepcopy(world.ctr_content_plan)
+        self.assertTrue(pickups.enabled(plan) and pickups.final_enabled(plan))
+        plan["required_features"].remove(pickups.FEATURE)
+        with self.assertRaises(OptionError):
+            cp.validate(plan)
+        first_only = dict(kind="wumpa", owner=OXIDE, routes=[dict(encounter_id=pickups.FIRST)])
+        self.assertFalse(pickups.final_only(first_only, False))
+        self.assertTrue(pickups.final_only(first_only, True))
 
     def test_pre_feature_room_keeps_its_final_only_checks(self):
         # Generated on main before A6-48 with options(), seed 3: Cortex Vortex

@@ -188,6 +188,19 @@ class TestBossRaces(unittest.TestCase):
         lap = world.multiworld.get_location(content_plan.LOCATION_BY_CODE[oxide["location"]], 1)
         self.assertFalse(lap.can_reach(CollectionState(world.multiworld)))
         self.assertTrue(lap.can_reach(world.multiworld.get_all_state(False)))
+        # A garage venue raced nowhere else: its one route is the encounter,
+        # open at the garage's four Trophies, with no win needed.
+        plan = world.ctr_content_plan
+        entries = {e["id"]: e for e in plan["entries"]}
+        enc = next(e for e in plan["encounters"] if e["id"] == "encounter/garage:0/0")
+        venue = self.laps(world)[entries[enc["entry_id"]]["track_id"]]
+        self.assertEqual([r["encounter_id"] for r in venue["routes"]], [enc["id"]])
+        lap = world.multiworld.get_location(content_plan.LOCATION_BY_CODE[venue["location"]], 1)
+        state = CollectionState(world.multiworld)
+        self.assertFalse(lap.can_reach(state))
+        for _ in range(4):
+            state.collect(world.create_item("Trophy"), True)
+        self.assertTrue(lap.can_reach(state))  # four Trophies, no events swept: no win
 
     def test_forged_boss_routes_are_refused(self):
         plan = make_world(self.options()).ctr_content_plan

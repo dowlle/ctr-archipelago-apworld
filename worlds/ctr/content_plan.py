@@ -2018,7 +2018,7 @@ def draw_plan(world, key_estimate=True):
     checks.extend(sanity.checks(sanity_record, plan_tracks, entries + boss_entries, pads, encounters, capability, package_by_id))
     checks = content_pickups.omit_unrepeatable(checks)
     if final_only_venue:
-        checks = content_pickups.omit_final_only(checks)
+        checks = content_pickups.omit_final_only(checks, repeatable_pickups)
     # Wumpa Shop slots (job J11), last, each with its drawn price.
     checks.extend(content_wumpa.checks(shop, content_wumpa.draw_prices(world, shop) if shop else {}))
     for boss in range(5):
@@ -3143,7 +3143,8 @@ def validate(plan):
     if content_pickups.enabled(plan):
         expected_checks = {c["location"]: c for c in content_pickups.omit_unrepeatable(list(expected_checks.values()))}
     if content_pickups.final_enabled(plan):
-        expected_checks = {c["location"]: c for c in content_pickups.omit_final_only(list(expected_checks.values()))}
+        expected_checks = {c["location"]: c for c in content_pickups.omit_final_only(list(expected_checks.values()),
+                                                                                     content_pickups.enabled(plan))}
     require(used_tracks == set(tracks) and used_packages == set(packages), "unused track/package")
     if settings.get("wumpa") == "global":
         wumpa = global_wumpa_check(global_wumpa_routes(plan["tracks"], plan["entries"], plan["pads"], packages))

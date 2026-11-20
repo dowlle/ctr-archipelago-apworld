@@ -220,8 +220,17 @@ class TestOxidePickups(unittest.TestCase):
 
     def test_omitted_reach_ten_wumpa_exclusion_reserves_no_filler(self):
         opts = options(item_pool={"base": {"trophies": 10}})
-        base = make_world(opts, seed=1).ctr_content_plan
-        excluded = make_world(dict(opts, exclude_locations={"Oxide Station: Reach 10 Wumpa"}), seed=1).ctr_content_plan
+        reserves = []
+        resolve = cp.content_item_pool.resolve
+
+        def spy(*args, **kwargs):
+            reserves.append(kwargs.get("filler_reserve", 0))
+            return resolve(*args, **kwargs)
+        with patch.object(cp.content_item_pool, "resolve", spy):
+            base = make_world(opts, seed=1).ctr_content_plan
+            base_reserve = reserves[-1]
+            excluded = make_world(dict(opts, exclude_locations={"Oxide Station: Reach 10 Wumpa"}), seed=1).ctr_content_plan
+        self.assertEqual(reserves[-1], base_reserve)
         self.assertFalse(oxide_checks(base))
         self.assertFalse(oxide_checks(excluded))
         self.assertEqual(base["items"], excluded["items"])

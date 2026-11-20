@@ -44,14 +44,15 @@ def omit_unrepeatable(checks):
             or logic_routes(c, True)]
 
 
-def final_only(check):
+def final_only(check, repeatable_pickups):
     """Is `check` a venue check that only the Final Challenge reaches (A6-48)?
-    A pickup's First Challenge route does not count (A6-16c); a lap's does."""
+    In a `repeatable_pickups_v1` plan a pickup's First Challenge route does not
+    count (A6-16c); a lap's First Challenge route always does."""
     if check["owner"] == "global" or check["kind"] not in KINDS + (LAP_KIND,):
         return False
-    skip = (FINAL,) if check["kind"] == LAP_KIND else (FIRST, FINAL)
+    skip = (FIRST, FINAL) if repeatable_pickups and check["kind"] != LAP_KIND else (FINAL,)
     return bool(check["routes"]) and all(r["encounter_id"] in skip for r in check["routes"])
 
 
-def omit_final_only(checks):
-    return [c for c in checks if not final_only(c)]
+def omit_final_only(checks, repeatable_pickups):
+    return [c for c in checks if not final_only(c, repeatable_pickups)]
