@@ -1364,6 +1364,32 @@ class TestCustomTracks(SoloTestCase):
         result = ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)
         self.assertEqual(result[GAME], {"track_modes": {"Crash Cove": ["trophy"]}})
 
+    def test_guarantee_keeps_the_yaml_alias_when_the_installed_key_is_another_title(self):
+        key, alias = "assembly-lane-n-gage", "n-gage-assembly-lane"
+        active = self.install(key, "2.1", "Assembly Lane N-Gage")
+        saved = dict(active, id=f"package/{alias}/2.1", content_id=alias)
+        other = self.install("fixture-conflict", "2.1", key)
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [saved, other]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [active["id"], other["id"]], [active["id"]],
+                                       page=True)[GAME]
+        self.assertEqual(result["custom_tracks"], [saved, other])
+        self.assertEqual(result["required_entries"], [alias])
+        self.assertEqual(ctr_solo._start_pick(result, active), 2)
+        self.assertEqual(ctr_solo._start_pick(result, other), 1)
+
+    def test_removing_custom_titles_preserves_default_and_bundled_modes(self):
+        named_default = self.install("fixture-default", "2.1", "default")
+        named_cortex = self.install("fixture-title", "2.1", "Cortex Vortex")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        modes = {"default": ["trophy"], "Cortex Vortex": ["relic"]}
+        doc = {GAME: {"custom_tracks": [named_default, named_cortex], "cortex_vortex_track": "in_pool",
+                      "track_modes": modes}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, ["cortex-vortex"], [], page=True)[GAME]
+        self.assertEqual(result, {"cortex_vortex_track": "in_pool", "track_modes": modes})
+
     def test_historical_key_reads_the_canonical_original_folder(self):
         alias = "n-gage-assembly-lane"
         descriptor = self.install(alias, "1.0", "Assembly Lane N-Gage")

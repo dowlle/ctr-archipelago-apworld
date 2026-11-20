@@ -272,6 +272,26 @@ class TestCortexVortexTrack(unittest.TestCase):
         self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
         self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["trophy"])
 
+    def test_swapping_an_exact_copy_preserves_other_tracks_literal_selectors(self):
+        from .test_custom_packages import UNKNOWN
+
+        options = self.swap_options()
+        packages = options["content_pool"]["tracks"]["custom"]
+        alias = "lockbox-adventure-track-11"
+        packages[-1].update(content_id=alias, id=f"package/{alias}/{packages[-1]['revision']}",
+                            display_name="Crash Cove")
+        other = dict(UNKNOWN, id="package/fixture-other/2.1", content_id="fixture-other",
+                     uuid="1f0e0d0c-0b0a-4908-8706-050403020100", display_name=alias,
+                     files=[dict(pin, sha256=digest * 32) for pin, digest in zip(UNKNOWN["files"], ("e5", "f6"))])
+        packages.append(other)
+        options["content_pool"]["required_entries"].append(alias)
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["trophy"], "retail:3": ["trophy"]}
+        world = make_world(options, seed=3)
+        self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_IN_POOL)
+        self.assertIn(alias, world.options.required_entries.value)
+        self.assertEqual(world.options.track_modes.value[alias], ["trophy"])
+        self.assertEqual(track_of(world.ctr_content_plan, "retail:3")["modes"], ["trophy"])
+
     def test_identified_copy_with_different_pins_keeps_its_own_files(self):
         options = self.swap_options(pinned=True)
         package = options["content_pool"]["tracks"]["custom"][-1]

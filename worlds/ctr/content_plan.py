@@ -1265,7 +1265,7 @@ def _draw_fitting(world):
 def move_bundled_cortex_modes(modes, names):
     """Carry a copy's mode override to the bundled row; an explicit bundled override wins."""
     moved = False
-    for name in sorted(set(names) - {destinations.CORTEX_VORTEX}):
+    for name in sorted(set(names) - {"default", destinations.CORTEX_VORTEX}):
         if name in modes:
             moved = moved or destinations.CORTEX_VORTEX not in modes
             modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
@@ -1288,8 +1288,9 @@ def swap_in_bundled_cortex(world):
     if not copies:
         return
     twins = [p["id"] for p in copies]
-    reserved = {name for p in packages if p["id"] not in twins for name in literal_track_names(p, p)}
-    names = {n for p in copies for n in track_names(p, p, reserved)}
+    reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values())
+    reserved.update(name for p in packages if p["id"] not in twins for name in literal_track_names(p, p))
+    names = {n for p in copies for n in track_names(p, p, reserved)} - reserved
     kept = [n for n in o.required_entries.value if n not in names]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept

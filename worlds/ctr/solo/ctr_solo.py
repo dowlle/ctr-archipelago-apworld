@@ -1337,7 +1337,24 @@ def _literal_selectors(descriptors) -> set:
 
 def _pick_names(descriptor: dict, existing: list, reserved=()) -> set:
     """All selectors for this installed package, including its title in the loaded YAML."""
-    return set(_world_module("content_plan").track_names(descriptor, descriptor, reserved)) | _literal_selectors(existing)
+    if not existing:
+        existing = [descriptor]
+    names = set()
+    plan = _world_module("content_plan")
+    for listed in existing:
+        current = dict(descriptor)
+        for field in ("content_id", "display_name"):
+            if isinstance(listed.get(field), str):
+                current[field] = listed[field]
+        names.update(plan.track_names(current, current, reserved))
+    return names
+
+
+def _yaml_pick_names(descriptor: dict, listed: list, existing: list) -> set:
+    """Resolve a selector against the loaded YAML, where literal names win in list order."""
+    owners = {name: d for d in listed for name in _literal_selectors([d])}
+    return {name for name in _pick_names(descriptor, existing, owners)
+            if name not in owners or owners[name] in existing}
 
 
 def _start_pick(section: dict, descriptor: dict) -> int:
@@ -1347,8 +1364,7 @@ def _start_pick(section: dict, descriptor: dict) -> int:
     if not existing:
         return 0
     required = section.get("required_entries")
-    reserved = _literal_selectors(d for d in listed if d not in existing)
-    names = _pick_names(descriptor, existing, reserved)
+    names = _yaml_pick_names(descriptor, listed, existing)
     return PICK_OWN_PAD if isinstance(required, list) and names & set(map(str, required)) else PICK_POOL
 
 
@@ -1414,6 +1430,9 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     if page:  # a row the page showed leaves the YAML as the player set it
         bundled_copy = _world_module("cortex_vortex").bundled_copy
         plan = _world_module("content_plan")
+        reserved_modes = {"default", *plan.RETAIL.values()}
+        if cortex:
+            reserved_modes.add(plan.destinations.CORTEX_VORTEX)
         modes = section.get("track_modes")
         picked_descriptors = [by_id[track_id]["descriptor"] for track_id in packages]
         for entry in by_id.values():
@@ -1425,7 +1444,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
             if entry["id"] not in picked:
                 custom[:] = [d for d in custom if not _same_package(d, descriptor)]
                 if existing and isinstance(modes, dict):
-                    mode_names = names - set(plan.RETAIL.values())
+                    mode_names = names - reserved_modes
                     if cortex and bundled_copy(descriptor):
                         plan.move_bundled_cortex_modes(modes, mode_names)
                     else:
@@ -1440,9 +1459,17 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     for track_id in guaranteed:
         if track_id == CORTEX_ID:
             continue
-        if _start_pick({"custom_tracks": custom, "required_entries": required},
-                       by_id[track_id]["descriptor"]) != PICK_OWN_PAD:
-            required.append(by_id[track_id]["content_id"])
+        descriptor = by_id[track_id]["descriptor"]
+        existing = [d for d in custom if _same_package(d, descriptor)]
+        names = _yaml_pick_names(descriptor, custom, existing)
+        if not names.intersection(required):
+            # The saved descriptor keeps its exact revision and file pins.
+            # Prefer a selector it actually owns in the assembled YAML.
+            key = existing[0].get("content_id", descriptor["content_id"])
+            if not names:
+                raise SoloError("track", f"{descriptor['display_name']} needs a distinct name or key for its guaranteed pad.",
+                                track=track_id)
+            required.append(key if key in names else min(names))
     if custom:
         section["custom_tracks"] = custom
     else:
