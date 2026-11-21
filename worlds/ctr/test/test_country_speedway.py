@@ -23,6 +23,35 @@ def country_options(**extra):
 
 
 class TestCountrySpeedway(unittest.TestCase):
+    def test_reused_older_lev_uses_the_latest_pickup_rules_and_current_counts(self):
+        from .. import track_rulings
+        old_pin = next(pin for pin, revision in track_rulings.REVIEWS["country-speedway"] if revision == "1.2.1")
+        options = country_options(item_box_count=0)
+        package = options["content_pool"]["tracks"]["custom"][0]
+        package.update(id="package/country-speedway/9.0.0", revision="9.0.0")
+        package["files"][0]["sha256"] = old_pin
+        options["content_pool"]["required_entries"] = ["custom/country-speedway/9.0.0"]
+        plan = make_world(options, seed=3, stop_before="pre_fill").ctr_content_plan
+        row = next(r for r in plan["sanity"]["tracks"] if r["track_id"] == "custom/country-speedway/9.0.0")
+        self.assertEqual(row["counts"], [25, 5, 0])
+        self.assertEqual((len(row["weapon_crate"]), len(row["wumpa_crate"])), (25, 5))
+        self.assertEqual(plan["sanity"]["rules_version"], 3)
+
+    def test_a_new_revision_keeps_the_finish_ruling_and_its_own_pad_measurement(self):
+        for pin in ("ab" * 32, country.LEV_SHA256):
+            options = country_options(logic_difficulty="hard")
+            package = options["content_pool"]["tracks"]["custom"][0]
+            package.update(id="package/country-speedway/9.0.0", revision="9.0.0")
+            package["files"][0]["sha256"] = pin
+            package["capabilities"]["super_turbo_pads"] = True
+            track = "custom/country-speedway/9.0.0"
+            options["content_pool"]["required_entries"] = [track]
+            world = make_world(options, seed=3, stop_before="pre_fill")
+            plan = world.ctr_content_plan
+            self.assertTrue(plan["packages"][0]["capabilities"]["super_turbo_pads"])
+            trophy = next(c for c in plan["checks"] if c["kind"] == "trophy" and c["owner"] == track)
+            self.assertEqual(trophy.get("boost", 0), 0)
+
     def test_country_version_is_separate_from_older_corrections(self):
         for version in (1, 2):
             w = make_world(country_options(), seed=3, stop_before="pre_fill")

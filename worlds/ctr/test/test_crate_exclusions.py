@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from Options import OptionError
-from .. import crate_exclusions, content_item_boxes, content_plan, box_spots, sanity
+from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, sanity, track_rulings
 from .test_content_item_boxes import btp, box_options, first_world, boxes
 from .test_content_plan import make_world
 
@@ -199,6 +199,8 @@ class TestCrateExclusions(unittest.TestCase):
 
     def test_wumpa_entry_never_reaches_weapon_crate_seating_or_the_wire(self):
         p = ancient(24, HOT_AIR_SKYWAY)
+        p.update(content_id="hot-air-skyway", display_name="Hot Air Skyway",
+                 id="package/hot-air-skyway/1.1.0")
         self.assertEqual(crate_exclusions.entries(p), [])
         self.assertEqual(content_item_boxes.crate_count(p), 24)
         plan = first_world(box_options(custom=[p])).ctr_content_plan
@@ -292,7 +294,8 @@ class TestCrateExclusions(unittest.TestCase):
 
     def test_exact_revision_counts_and_generation(self):
         for digest in (*ANCIENT_LAKE, NORTH_POLE):  # custom revisions; the retail Roo's Tubes and Skyway pins are sanity only
-            p = ancient(digest=digest)
+            package = north_pole if digest == NORTH_POLE else lambda count: ancient(count, digest)
+            p = package(17)
             self.assertEqual(content_item_boxes.crate_count(p), 17)
             world = first_world(box_options(custom=[p]))
             plan = world.ctr_content_plan
@@ -304,14 +307,14 @@ class TestCrateExclusions(unittest.TestCase):
             self.assertEqual(len(boxes(plan, row["track_id"])), 15)
             self.assertTrue(content_plan.validate(plan))
             # The count crosses the 15-seat ceiling only with a smaller fixture.
-            small = first_world(box_options(custom=[ancient(3, digest)]))
+            small = first_world(box_options(custom=[package(3)]))
             track_id = small.ctr_content_plan["item_boxes"][crate_exclusions.KEY][0]["track_id"]
             self.assertEqual(len(boxes(small.ctr_content_plan, track_id)), 2)
 
     def test_tracker_restores_legacy_and_current_seating(self):
         for digest in (*ANCIENT_LAKE, NORTH_POLE):
             for count in (3, 17):
-                p = ancient(count, digest)
+                p = north_pole(count) if digest == NORTH_POLE else ancient(count, digest)
                 # Generate the historical wire with no catalog, rather than
                 # merely stripping the field from a seed with fewer checks.
                 with patch.dict(crate_exclusions.EXCLUSIONS, {}, clear=True):
@@ -329,13 +332,28 @@ class TestCrateExclusions(unittest.TestCase):
                 self.assertEqual(json.loads(json.dumps(current_restored.fill_slot_data())), current_wire)
                 self.assertEqual(len(boxes(current_restored.ctr_content_plan, track_id)), min(count - 1, 15))
 
-    def test_unknown_revision_and_north_pole_are_unchanged(self):
+    def test_unknown_revision_uses_ordinals_from_the_reviewed_revision(self):
         for digest in ("01" * 32, "17eafea488" + "0" * 54):
             p = ancient(3, digest)
             self.assertEqual(content_item_boxes.crate_count(p), 3)
-            plan = first_world(box_options(custom=[p])).ctr_content_plan
-            self.assertNotIn(crate_exclusions.KEY, plan["item_boxes"])
-            self.assertNotIn(crate_exclusions.FEATURE, plan["required_features"])
+            world = first_world(box_options(custom=[p]))
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+            plan = wire["content_plan"]
+            self.assertIn(track_rulings.FEATURE, plan["required_features"])
+            row, = plan["item_boxes"][crate_exclusions.KEY]
+            self.assertEqual(row["lev_sha256"], digest)
+            self.assertEqual(row["crates"], [{"ordinal": 1, "pos": None}])
+            self.assertEqual(len(boxes(plan, row["track_id"])), 2)
+            next_version = track_rulings.RULING_VERSION + 1
+            for reviews in (track_rulings.REVIEWS["ancient-lake"],
+                            [[digest, p["revision"], next_version], *track_rulings.REVIEWS["ancient-lake"]]):
+                with (patch.dict(track_rulings.REVIEWS, {"ancient-lake": reviews}),
+                      patch.object(track_rulings, "RULING_VERSION", next_version)):
+                    restored = make_world({}, seed=999, passthrough=wire)
+                    self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+            plan["required_features"].remove(track_rulings.FEATURE)
+            with self.assertRaises(OptionError):
+                content_plan.validate(plan)
 
     def test_forged_list_refused(self):
         plan = first_world(box_options(custom=[ancient()])).ctr_content_plan

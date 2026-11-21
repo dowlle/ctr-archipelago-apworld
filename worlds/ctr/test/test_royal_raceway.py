@@ -146,14 +146,15 @@ class TestRoyalRaceway(unittest.TestCase):
         old = copy.deepcopy(PACKAGE)
         self.assertEqual(boxes.box_terms(track, 1, p["capability"], old, dict(shortcut_knowledge=1))[0], 2)
 
-    def test_unrecognised_revision_keeps_generic_terms(self):
+    def test_unrecognised_revision_inherits_pickup_and_finish_rules(self):
         options = royal_options()
         pkg = options["content_pool"]["tracks"]["custom"][0]
         pkg["files"][0]["sha256"] = "ab" * 32
         p = make_world(options, seed=3, stop_before="pre_fill").ctr_content_plan
-        self.assertLess(p["sanity"].get("rules_version", 0), 5)
-        self.assertNotIn("pickup_rules", p.get("item_boxes", {}))
-        self.assertTrue(all(c.get("boost", 0) == 2 for c in own(p, (*sanity.KINDS, "box"))))
+        self.assertEqual(p["sanity"]["rules_version"], 5)
+        self.assertIn(TRACK, p["item_boxes"]["pickup_rules"])
+        self.assertEqual(p["capability"]["finish_floors"], [TRACK])
+        self.assertTrue(all(c.get("boost", 0) == 0 for c in own(p, (*sanity.KINDS, "box"))))
 
     def test_independent_pad_and_racer_gates(self):
         for seed in range(12):

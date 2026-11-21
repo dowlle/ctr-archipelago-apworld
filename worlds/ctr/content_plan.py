@@ -40,7 +40,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               tizi_madness, turbo_grant, pad_budget, track_origins)
+               tizi_madness, turbo_grant, pad_budget, track_origins, track_rulings)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -417,7 +417,8 @@ def relic_races(entries):
 def required_features(requirements, entries=(), checks=(), settings=None, packs=None, racers=None, capability=None,
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
-                      repeatable_pickups=False, tizi_mask=False, tracks=(), final_only_venue=False):
+                      repeatable_pickups=False, tizi_mask=False, tracks=(), final_only_venue=False,
+                      carried_rulings=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -470,8 +471,9 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
             + ([tizi_madness.FEATURE] if tizi_mask else [])
-            # A6-48: a Final Challenge-only venue's checks left out, last.
-            + ([content_pickups.FINAL_FEATURE] if final_only_venue else []))
+            # A6-48: a Final Challenge-only venue's checks left out.
+            + ([content_pickups.FINAL_FEATURE] if final_only_venue else [])
+            + ([track_rulings.FEATURE] if carried_rulings else []))
 
 
 def family_settings(options):
@@ -1236,6 +1238,7 @@ def required_ids(options, candidates, arenas, packages, transferred=()):
 OPENING_REDRAWS = 64
 
 
+@track_rulings.generation
 def generate(world):
     """Draw the plan. One whose opening does not fit draws again, as the layout is
     what decides it (content_opening), and the best draw stands: no seed is refused
@@ -1244,6 +1247,8 @@ def generate(world):
     A plan whose start holds no check that can take progression gets its first
     boost as a start (sphere0_guard.start_opener, A4-82), and the whole draw runs
     again from the same random state, as if the YAML had asked for that start."""
+    from .notices import adjusted
+
     state = world.random.getstate()
     plan = _draw_fitting(world)
     opener = sphere0_guard.start_opener(world, plan)
@@ -1253,12 +1258,15 @@ def generate(world):
         starts[opener] = starts.get(opener, 0) + 1
         world.options.start_inventory_from_pool.value = starts
         world.ctr_start_opener = opener
-        from .notices import adjusted
         adjusted(world, "start_opener",
                  f"Starting items: no check open at the start can hold progression, so the slot starts "
                  f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
+    ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
+              for package, kind, first, last in track_rulings.omitted_pickups(plan, enabled_only=False)]
+    if ranges:
+        adjusted(world, "unreviewed_pickups", "Pickups awaiting review and omitted from checks: " + ", ".join(ranges))
     # Hit Character (#133 PR 4d): the encounter block's roster seed, its only
     # draw, and the fallback from the plan's checks. Itemsanity: one weapon
     # type marked early, the legacy draw (item_creation.create_items). Neither
@@ -1422,6 +1430,7 @@ def swap_in_bundled_cortex(world):
              + (f" {' and '.join(carried)} carried over.".replace(" its ", " Its ", 1) if carried else ""))
 
 
+@track_rulings.generation
 def draw_plan(world, key_estimate=True):
     """One draw of the plan. `key_estimate` lets the first Key's estimate pick the
     layout. It knows no boss rank and no Relic Race first, so a redraw goes without
@@ -1452,7 +1461,9 @@ def draw_plan(world, key_estimate=True):
     # rooms keep their descriptor, including the historical missing-field floor.
     from . import country_speedway, toasty_terrace
     for package in packages:
-        if country_speedway.matches(package) or toasty_terrace.matches(package):
+        if package["revision"] == "1.3.0" and (
+                (package["content_id"] == "country-speedway" and country_speedway.matches(package))
+                or (package["content_id"] == "toasty-terrace" and toasty_terrace.matches(package))):
             package["capabilities"]["super_turbo_pads"] = False
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
@@ -2248,6 +2259,10 @@ def draw_plan(world, key_estimate=True):
         plan["bosses"] = boss_record
     if shop:
         plan["wumpa_shop"] = shop
+    sources = track_rulings.wire_sources(plan)
+    if sources:
+        plan["track_ruling_sources"] = sources
+        plan["required_features"].append(track_rulings.FEATURE)
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -2474,6 +2489,7 @@ def predicate(world, node):
     return predicate_term(world, node).compile()
 
 
+@track_rulings.regions
 def create_regions(world):
     mw, player, plan = world.multiworld, world.player, world.ctr_content_plan
     menu = Region("Menu", player, mw)
@@ -2925,6 +2941,7 @@ def goal_envelope(plan):
                 goal_bosses=record["bosses_required"] if record else 0, goal_gems=gem["count"] if gem else 0)
 
 
+@track_rulings.validation
 def validate(plan, *, restoring=False):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
     from .content_plan_schema import validate_shape
@@ -2943,6 +2960,7 @@ def validate(plan, *, restoring=False):
         return result
 
     packages = table("packages")
+    require(track_rulings.valid_sources(plan, packages), "invalid carried ruling sources")
     # The wire is canonical: an admitted copy of each record must equal it.
     require(resolve_packages(plan["packages"], "content_plan.packages", historical=True) ==
             sorted(plan["packages"], key=lambda p: p["id"])
@@ -2988,15 +3006,19 @@ def validate(plan, *, restoring=False):
     packs = check_pack_settings(plan["item_packs"]) if "item_packs" in plan else {}
     racers = check_racer_settings(plan["racers"]) if "racers" in plan else None
     capability = content_capability.check_settings(plan["capability"]) if "capability" in plan else {}
-    if content_capability.FLOORS_KEY in capability:
+    carried_rulings = track_rulings.enabled(plan)
+    require(not carried_rulings or track_rulings.scoped_version() > 1 or track_rulings.pickup_limits_enabled()
+            or any(track_rulings.plan_sources(plan)),
+            "carried rulings without an applicable track")
+    if content_capability.FLOORS_KEY in capability or (carried_rulings and capability.get("boost_mode")):
         reviewed = content_capability.finish_floor_tracks(
             [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
-        require(capability[content_capability.FLOORS_KEY] == reviewed,
+        require(capability.get(content_capability.FLOORS_KEY, []) == reviewed,
                 "capability.finish_floors does not name exactly the reviewed tracks")
-    if content_capability.FREE_KEY in capability:
+    if content_capability.FREE_KEY in capability or (carried_rulings and capability.get("boost_mode")):
         reviewed = content_capability.finish_free_tracks(
             [(t, next((p for p in plan["packages"] if p["id"] == t.get("package_id")), None)) for t in plan["tracks"]])
-        require(capability[content_capability.FREE_KEY] == reviewed,
+        require(capability.get(content_capability.FREE_KEY, []) == reviewed,
                 "capability.finish_free does not name exactly the reviewed tracks")
     global_checks = content_global_checks.check_settings(plan["global_checks"]) if "global_checks" in plan else {}
     item_boxes = (content_item_boxes.check_settings(plan["item_boxes"], capability)
@@ -3025,7 +3047,8 @@ def validate(plan, *, restoring=False):
                                                          ctr_first, shop, wumpa_arm is not None, "pad_client" in plan, sanity_record,
                                                          repeatable_pickups=content_pickups.enabled(plan),
                                                          tizi_mask=tizi_mask, tracks=plan["tracks"],
-                                                         final_only_venue=content_pickups.final_enabled(plan)),
+                                                         final_only_venue=content_pickups.final_enabled(plan),
+                                                         carried_rulings=carried_rulings),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -3280,7 +3303,8 @@ def validate(plan, *, restoring=False):
             if content_race_routes.cup_only_on(plan["checks"]) else None):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
-    for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters, capability, packages):
+    for check in sanity.checks(sanity_record, plan["tracks"], plan["entries"], plan["pads"], boss_encounters,
+                               capability, packages, legacy_rulings=True):
         require(check["location"] not in expected_checks, "duplicate sanity identity")
         expected_checks[check["location"]] = check
     if content_pickups.enabled(plan):

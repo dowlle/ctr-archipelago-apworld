@@ -69,6 +69,23 @@ env:
   TRACKER_SHA256: 'ce5674e899d0303f156d43f2c8ebe026498031bf7cd3382524c1d02ee359d463'
 
 jobs:
+  carried-track-rulings:
+    name: report carried custom-track rulings
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: dowlle/ctr-track-registry
+          ref: main
+          path: track-registry
+          persist-credentials: false
+      - name: List current revisions using reviewed rulings from an earlier revision
+        run: |
+          set -o pipefail
+          python3 worlds/ctr/tools/report_carried_track_rulings.py track-registry/registry.json | tee -a "$GITHUB_STEP_SUMMARY"
+
   classify:
     name: classify CTR fuzz tier
     if: github.event_name != 'schedule'
@@ -311,7 +328,7 @@ jobs:
             extra_args+=(-m ci_meta.yaml)
           fi
           case "$CHECK_META" in
-            country-speedway|toasty-terrace|royal-raceway|green-hill)
+            country-speedway|toasty-terrace|royal-raceway|green-hill|carried-track-rulings)
               cp "../world-src/.github/fuzz/${CHECK_META}-meta.yaml" ci_meta.yaml
               extra_args+=(-m ci_meta.yaml)
               ;;

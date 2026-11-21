@@ -59,7 +59,7 @@ from types import SimpleNamespace
 
 from Options import OptionError
 
-from . import capability_contract, progressive_capability
+from . import capability_contract, country_speedway, progressive_capability, toasty_terrace, track_rulings
 from .usf_finish import (CTR_CHALLENGE_BOOST_COUNT, FIRST_BOOST_COUNT, USF_BOOST_COUNT,
                          relic_perfect_boost_min, relic_tier_boost_min)
 
@@ -81,9 +81,10 @@ def _load_rulings():
     per-package rulings on the custom track finish rank (ruling 2026-10-18:
     "they require USF UNLESS I say otherwise"; per-revision rows and the
     first-boost rank since A2-22). A row without revision is keyed
-    (content id, None, None) and covers every revision. Project-owned data,
-    never a descriptor field; every entry cites its ruling. A package no row
-    matches keeps the measured default (`super_turbo_pads`)."""
+    (content id, None, None) and covers every revision. New rows include the
+    catalog version as a fourth key. Project-owned data, never a descriptor
+    field; every entry cites its ruling. A package no row matches keeps the
+    measured default (`super_turbo_pads`)."""
     raw = json.loads(pkgutil.get_data(__package__, "data/usf_finish_rulings.json"))
     if raw.get("version") != 2:
         raise ValueError("usf_finish_rulings.json: version must be 2")
@@ -92,6 +93,12 @@ def _load_rulings():
         scoped = "revision" in row or "lev_sha256" in row
         keys = {"content_id", "finish_rank", "ruling"} | ({"revision", "lev_sha256"} if scoped else set())
         key = (row.get("content_id"), row.get("revision"), row.get("lev_sha256"))
+        if "since" in row:
+            scope, fields = track_rulings.scope_keys(row)
+            if not scope:
+                raise ValueError("usf_finish_rulings.json: a catalog version needs a revision and LEV sha256")
+            keys |= fields
+            key = (*key, row["since"])
         if (set(row) != keys or type(row["finish_rank"]) is not int
                 or row["finish_rank"] not in (0, FIRST_BOOST_COUNT, USF_BOOST_COUNT)
                 or type(row["content_id"]) is not str or not row["content_id"]
@@ -108,8 +115,13 @@ def _load_rulings():
 
 
 #: the project's per-package rulings: {(content id, revision, LEV sha256):
-#: finish rank}, revision and LEV sha256 None on a row for every revision.
+#: finish rank}, with an optional catalog version. Revision and LEV sha256
+#: are None on a baseline row that applies to every revision.
 USF_FINISH_RULINGS = _load_rulings()
+
+# These exact revisions normalize a measured descriptor field at generation.
+# A revised package keeps its own measurement and inherits the finish logic.
+CARRY_FREE_FINISH_PINS = {country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256}
 
 
 def _load_letter_rulings():
@@ -119,11 +131,12 @@ def _load_letter_rulings():
         raise ValueError("letter_boost_rulings.json: version must be 1")
     out = {}
     for row in raw["rulings"]:
-        key = (row.get("content_id"), row.get("letter"))
-        if (set(row) != {"content_id", "letter", "rank", "ruling"}
+        scope, scope_fields = track_rulings.scope_keys(row)
+        key = (row.get("content_id"), row.get("letter"), *scope)
+        if (set(row) != {"content_id", "letter", "rank", "ruling"} | scope_fields
                 or type(key[0]) is not str or not key[0]
                 or key[1] not in ("letter_c", "letter_t", "letter_r")
-                or type(row.get("rank")) is not int or row["rank"] not in (1, 2)
+                or type(row.get("rank")) is not int or row["rank"] not in ((0, 1, 2) if scope else (1, 2))
                 or type(row.get("ruling")) is not str or "2026-" not in row["ruling"]
                 or key in out):
             raise ValueError("letter_boost_rulings.json: expected a unique content id and AP letter, "
@@ -138,19 +151,30 @@ LETTER_BOOST_RULINGS = _load_letter_rulings()
 def letter_boost(track, award, package=None):
     """Letter floor, independent of the finish rank and logic difficulty."""
     if track["origin"] == "custom":
-        return LETTER_BOOST_RULINGS.get(((package or {}).get("content_id"), award), 0)
+        return track_rulings.ruled_value(package, LETTER_BOOST_RULINGS, award) or 0
     return LETTER_BOOST.get((_name(track), award), 0)
 
 
 def ruled_finish(package):
-    """The ruled finish rank of a custom package, or None when no row matches.
-    A row for the package's exact revision and LEV pin wins over a row for
-    every revision of its content id."""
+    """Resolve the exact finish rank, inherited rank or unscoped default."""
     content = package.get("content_id")
-    lev = next((pin.get("sha256") for pin in package.get("files", ()) if isinstance(pin, dict)
-                and pin.get("role") == "lev"), None)
-    exact = USF_FINISH_RULINGS.get((content, package.get("revision"), lev)) if lev else None
-    return exact if exact is not None else USF_FINISH_RULINGS.get((content, None, None))
+    rows = finish_ruling_rows(content)
+    scoped = rows.get(track_rulings.scoped_source(package, rows),
+                      USF_FINISH_RULINGS.get((content, None, None)))
+    if scoped is not None:
+        return scoped
+    source = track_rulings.source(package, CARRY_FREE_FINISH_PINS)
+    if source in CARRY_FREE_FINISH_PINS and track_rulings.inherits(package):
+        return 0
+    return None
+
+
+def finish_ruling_rows(content):
+    """Finish ranks available in the room's catalog version, by revision and LEV."""
+    version = track_rulings.scoped_version()
+    applicable = [(row, rank) for row, rank in USF_FINISH_RULINGS.items()
+                  if row[0] == content and row[2] and (len(row) == 3 or row[3] <= version)]
+    return {row[1:3]: rank for row, rank in sorted(applicable, key=lambda entry: entry[0][3:])}
 
 
 def error(message):
@@ -233,7 +257,8 @@ FLOORS_KEY = "finish_floors"
 def finish_floor_tracks(pairs):
     """Sorted ids of the (track, package) pairs a reviewed finish floor covers."""
     from . import royal_raceway
-    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and royal_raceway.matches(package)})
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom"
+                   and track_rulings.source(package, (royal_raceway.LEV_SHA256,)) == royal_raceway.LEV_SHA256})
 
 
 #: Optional `capability` member (Green Hill Raceway 2.0.0): ids of exact reviewed
@@ -245,7 +270,8 @@ FREE_KEY = "finish_free"
 def finish_free_tracks(pairs):
     """Sorted ids of the (track, package) pairs a reviewed free finish covers."""
     from . import green_hill_raceway
-    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom" and green_hill_raceway.matches(package)})
+    return sorted({t["id"] for t, package in pairs if t["origin"] == "custom"
+                   and track_rulings.source(package, (green_hill_raceway.LEV_SHA256,)) == green_hill_raceway.LEV_SHA256})
 
 
 def has_free_finish(track, record):

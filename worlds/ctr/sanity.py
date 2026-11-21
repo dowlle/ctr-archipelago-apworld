@@ -15,7 +15,7 @@ from Options import OptionError
 
 from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
-               royal_raceway, toasty_terrace)
+               royal_raceway, toasty_terrace, track_rulings)
 from .item_boxes import BOX_TRACKS
 from .cortex_vortex import CORTEX_LEV_SHA256
 from .location_class import LocationClass
@@ -32,6 +32,8 @@ COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
+PICKUP_RULING_COUNTS = json.loads(pkgutil.get_data(__package__, "data/pickup_ruling_counts.json"))
+REVIEWED_PICKUP_PINS = CATALOG.keys() | PICKUP_RULING_COUNTS.keys()
 
 
 def code(track, family, number):
@@ -65,6 +67,14 @@ class SanityLocations(LocationClass):
 SANITY_CLASS = SanityLocations()
 
 
+def reviewed_counts(package):
+    """Physical ordinal bounds of the inherited pickup source for this room."""
+    if not track_rulings.pickup_limits_enabled() or not track_rulings.inherits(package):
+        return None
+    source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
+    return CATALOG[source]["counts"] if source in CATALOG else PICKUP_RULING_COUNTS.get(source)
+
+
 def settings(options):
     count, wumpa = int(options.itemboxsanity.value), int(options.wumpasanity.value)
     return dict(itemboxsanity=count, wumpasanity=wumpa, tracks=[], rules_version=4,
@@ -81,27 +91,30 @@ def inventory(track, package=None, record=None):
         return CATALOG.get(key)
     if "named_block" in track:
         pin = box_spots.lev_pin(package)
-        if pin in CATALOG:
+        source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
+        if not track_rulings.inherits(package) and pin in CATALOG:
             return CATALOG[pin]
         caps = (package or {}).get("capabilities", {})
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
-            if royal_raceway.matches(package):
+            if source in CATALOG:
+                return dict(lev_sha256=pin, counts=counts, needs=CATALOG[source]["needs"])
+            if source == royal_raceway.LEV_SHA256:
                 # Crates are Boost 0 from the Royal rules version; loose fruit, if any, keeps the generic term.
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: ({str(n): dict(since=royal_raceway.RULES_VERSION) for n in range(1, count + 1)}
                                           if kind in ("weapon_crate", "wumpa_crate")
                                           else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
                                    for kind, count, budget in zip(KINDS, counts, BUDGETS)})
-            if green_hill_raceway.matches(package):
+            if source == green_hill_raceway.LEV_SHA256:
                 # Crates are Boost 0 from the Green Hill rules version; loose fruit, if any, keeps the generic term.
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: ({str(n): dict(since=green_hill_raceway.RULES_VERSION) for n in range(1, count + 1)}
                                           if kind in ("weapon_crate", "wumpa_crate")
                                           else {str(n): dict(needs="usf", reviewed=False) for n in range(1, min(count, budget) + 1)})
                                    for kind, count, budget in zip(KINDS, counts, BUDGETS)})
-            if country_speedway.matches(package) or toasty_terrace.matches(package):
-                since = toasty_terrace.RULES_VERSION if toasty_terrace.matches(package) else 3
+            if source in (country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256):
+                since = toasty_terrace.RULES_VERSION if source == toasty_terrace.LEV_SHA256 else 3
                 return dict(lev_sha256=pin, counts=counts,
                             needs={kind: {str(n): dict(since=since) for n in range(1, count + 1)}
                                    for kind, count in zip(KINDS, counts)})
@@ -124,10 +137,15 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
     inv = inventory(track, package, record)
     if inv is None:
         return []  # No measured revision, no invented objects.
-    out = list(range(1, min(inv["counts"][family], BUDGETS[family]) + 1))
+    reviewed = reviewed_counts(package)
+    count = min(inv["counts"][family], BUDGETS[family])
+    if reviewed is not None:
+        count = min(count, reviewed[family])
+    out = list(range(1, count + 1))
     # Older rooms selected their picks using the original exclusion catalog.
     version = record.get("exclusion_version", 1)
-    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], version)
+    excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], version,
+                                         package if track["origin"] == "custom" else None)
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
@@ -139,8 +157,10 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
             # physical seats from the exclusions the runtime will load.
             slots = len(content_item_boxes.track_boxes(track, item_boxes, package))
             if slots:
-                raw_count = inv["counts"][0] if version == 1 else content_item_boxes.crate_count(package)
-                seat_excluded = excluded if version == 1 else carried
+                limit = content_item_boxes.seat_limit(package)
+                legacy = version == 1 and limit == content_item_boxes.crate_count(package)
+                raw_count = inv["counts"][0] if legacy else limit
+                seat_excluded = excluded if legacy else carried
                 all_crates = [n for n in range(1, raw_count + 1) if n not in seat_excluded]
                 excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
@@ -179,9 +199,11 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
         record.pop("rules_version", None)
     for track in tracks:
         inv = inventory(track, packages.get(track.get("package_id")), record)
+        source = track_rulings.source(packages.get(track.get("package_id")), crate_exclusions.EXCLUSIONS)
         if inv and any(c.get("sanity_since", 1) == crate_exclusions.SANITY_VERSION
                        and c.get("family", KINDS[0]) in enabled
-                       for c in crate_exclusions.EXCLUSIONS.get(inv["lev_sha256"], ())):
+                       for c in crate_exclusions.EXCLUSIONS.get(source if track["origin"] == "custom"
+                                                                else inv["lev_sha256"], ())):
             record["exclusion_version"] = crate_exclusions.SANITY_VERSION
             break
     record["shortcut_knowledge"] = tier
@@ -220,7 +242,7 @@ def routes(tracks, entries, pads, encounters):
     return out
 
 
-def checks(record, tracks, entries, pads, encounters, capability, packages=None):
+def checks(record, tracks, entries, pads, encounters, capability, packages=None, *, legacy_rulings=False):
     if record is None:
         return []
     by_id = {t["id"]: t for t in tracks}
@@ -228,31 +250,31 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
     out = []
     for row in record["tracks"]:
         t = by_id[row["track_id"]]
+        package = (packages or {}).get(t.get("package_id"))
+        source = track_rulings.source(package, REVIEWED_PICKUP_PINS) if package else row["lev_sha256"]
+        need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(source)
+        inherited = track_rulings.inherits(package)
         for f, kind in enumerate(KINDS):
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                need = inventory(t, record=record) if t["origin"] != "custom" else CATALOG.get(row["lev_sha256"])
-                if need is None:
-                    need = dict(needs={kind: {str(n): dict(needs="usf") for n in row[kind]} for kind in KINDS})
-                fields = object_needs(need or {}, kind, n, record)
-                if row["lev_sha256"] == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
+                fields = (dict(needs="usf") if need is None or (inherited and n > need["counts"][f])
+                          else object_needs(need, kind, n, record))
+                if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
-                if row["lev_sha256"] == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
+                if source == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
                     fields = dict(needs="none")
-                if (row["lev_sha256"] == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (source == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= royal_raceway.RULES_VERSION):
                     fields = dict(needs="none")
-                if (row["lev_sha256"] == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (source == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= green_hill_raceway.RULES_VERSION):
                     fields = dict(needs="none")
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
-                # Older rooms persisted these settings when they applied a ruling
-                # by raw key. Preserve those rooms even when their LEV differs.
                 saved_ruling = "logic_difficulty" in record
-                rank = object_rulings.rank(t, (packages or {}).get(t.get("package_id")), kind, n,
-                                           record if saved_ruling else capability, legacy=saved_ruling)
+                rank = object_rulings.rank(t, package, kind, n, record if saved_ruling else capability,
+                                           legacy=legacy_rulings and saved_ruling)
                 if rank and (capability or {}).get("boost_mode"):
                     c["boost"] = max(c.get("boost", 0), rank)
                 if capability and capability.get("stats_mode") and fields.get("shortcut") == 2:

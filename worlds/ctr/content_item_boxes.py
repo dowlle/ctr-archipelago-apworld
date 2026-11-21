@@ -62,7 +62,7 @@ import json
 
 from Options import OptionError
 
-from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace
+from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace, track_rulings
 from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
@@ -97,10 +97,14 @@ def settings(options):
     return record
 
 
+PICKUP_RULE_PINS = {country_speedway.LEV_SHA256, toasty_terrace.LEV_SHA256,
+                    royal_raceway.LEV_SHA256, green_hill_raceway.LEV_SHA256}
+
+
 def reviewed_pickups(package):
-    """Exact LEVs with reviewed physical pickup ranks (the `pickup_rules` marker)."""
-    return (country_speedway.matches(package) or toasty_terrace.matches(package)
-            or royal_raceway.matches(package) or green_hill_raceway.matches(package))
+    """LEV that supplies the physical pickup rank, if one has a ruling."""
+    pin = track_rulings.source(package, PICKUP_RULE_PINS)
+    return pin if pin in PICKUP_RULE_PINS else None
 
 
 def add_spot_sets(record, tracks, package_by_id, seed, player):
@@ -193,8 +197,13 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
         if (not track or track.get("origin") != "custom" or tid in sets
                 or not reviewed_pickups(packages.get(track.get("package_id")))):
             error("item_boxes.pickup_rules names an unsupported physical pickup revision.")
+    expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, sets)}
+    carried_rows = record.get(crate_exclusions.KEY, ())
+    carried_ids = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
+    if any(tid not in carried_ids and row["crates"][0]["pos"] is None for tid, row in expected.items()):
+        error("item_boxes.crate_exclusions is missing carried ordinals.")
     if carried:
-        for row in record.get(crate_exclusions.KEY, ()):
+        for row in carried_rows:
             track = by_id.get(row["track_id"])
             package = packages.get((track or {}).get("package_id"))
             ordinals = [crate["ordinal"] for crate in row["crates"]]
@@ -202,15 +211,14 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                     or ordinals != sorted(set(ordinals))
                     or ordinals[-1] > package["capabilities"].get("weapon_crates", 0)):
                 error("item_boxes.crate_exclusions disagrees with the room's pinned fallback track.")
-        ids = [row["track_id"] for row in record.get(crate_exclusions.KEY, ())]
-        if len(ids) != len(set(ids)):
+        if len(carried_ids) != len(set(carried_ids)):
             error("item_boxes.crate_exclusions names a track more than once.")
         if require_reviewed_exclusions:
             # Native compares a version 2 room's carried rows with the reviewed
             # catalog wherever the pin has a version 2 entry, stamped or not.
             canonical = lambda crates: json.dumps(crates, sort_keys=True)
-            held = {row["track_id"]: row["crates"] for row in record.get(crate_exclusions.KEY, ())}
-            for row in crate_exclusions.records(tracks, packages, sets):
+            held = {row["track_id"]: row["crates"] for row in carried_rows}
+            for row in expected.values():
                 pin = row["lev_sha256"]
                 if not crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1):
                     continue
@@ -218,15 +226,12 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                     error("item_boxes is missing reviewed fallback exclusions.")
                 if canonical(held[row["track_id"]]) != canonical(row["crates"]):
                     error("item_boxes.crate_exclusions disagrees with this build's reviewed exclusions.")
-    elif crate_exclusions.KEY in record or require_reviewed_exclusions:
-        expected = {row["track_id"]: row for row in crate_exclusions.records(tracks, packages, sets)}
+    elif carried_rows or require_reviewed_exclusions:
         # A room generated before a later catalog entry carries only the rows
         # of its day: each carried row must equal this build's row for its
         # track, but a track without a carried row keeps its original seating.
         # Compare complete JSON records, retaining exact token types.
         canonical = lambda row: json.dumps(row, sort_keys=True)
-        carried_rows = record.get(crate_exclusions.KEY, ())
-        carried_ids = [row.get("track_id") if isinstance(row, dict) else None for row in carried_rows]
         if len(set(carried_ids)) != len(carried_ids) or any(
                 track_id not in expected or canonical(row) != canonical(expected[track_id])
                 for track_id, row in zip(carried_ids, carried_rows)):
@@ -314,6 +319,14 @@ def crate_count(package, record=None, track_id=None):
     return crate_exclusions.count(package, carried_crates(record, track_id))
 
 
+def seat_limit(package):
+    from .sanity import reviewed_counts
+
+    raw = crate_count(package)
+    reviewed = reviewed_counts(package)
+    return min(raw, reviewed[0]) if raw is not None and reviewed is not None else raw
+
+
 def seat_indices(crates, slots=SLOTS_PER_TRACK):
     """Which weapon crates, by their order in the LEV instance table, take the
     Item Box seats: min(crates, slots) of them, spread over the whole table
@@ -326,11 +339,8 @@ def seat_indices(crates, slots=SLOTS_PER_TRACK):
 
 def physical_seat(track, record, package, number):
     """One-based native weapon ordinal after this room's exclusions and spread."""
-    excluded = next((row["crates"] for row in record.get(crate_exclusions.KEY, ())
-                     if row["track_id"] == track["id"]), ())
-    omitted = {row["ordinal"] for row in excluded}
-    raw = package["capabilities"]["weapon_crates"]
-    crates = [n for n in range(1, raw + 1) if n not in omitted]
+    omitted = {row["ordinal"] for row in carried_crates(record, track["id"])}
+    crates = [n for n in range(1, seat_limit(package) + 1) if n not in omitted]
     seats = seat_indices(len(crates), min(record.get("box_count", 15), 15))
     return crates[seats[number - 1]]
 
@@ -353,9 +363,10 @@ def track_boxes(track, record, package=None):
         return [(slot, ITEM_BOX_CLASS.slot_code(name, slot), f"Item Box {slot}")
                 for slot in retail_slots(name, record["shortcut_knowledge"])]
     if track["origin"] == "custom":
-        crates = crate_count(package, record, track["id"])
-        if not crates:
+        limit = seat_limit(package)
+        if not limit:
             return []
+        crates = limit - sum(row["ordinal"] <= limit for row in carried_crates(record, track["id"]))
         return [(slot, box_code(track, slot), f"Item Box {slot}")
                 for slot in range(1, len(seat_indices(crates, min(record.get("box_count", 15), 15))) + 1)]
     return []
@@ -377,11 +388,11 @@ def box_terms(track, slot, capability, package=None, record=None):
     if track["origin"] == "retail":
         boost_min, needs_stats = BOX_RULES.get((track["display_name"], slot), (0, False))
         return (boost_min if boost_on else 0), bool(needs_stats and stats_on)
-    if (track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ())
-            and (toasty_terrace.matches(package) or royal_raceway.matches(package)
-                 or green_hill_raceway.matches(package))):
-        return 0, False
-    if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()) and country_speedway.matches(package):
-        rank = country_speedway.rank("weapon_crate", physical_seat(track, record, package, slot))
-        return (rank if boost_on else 0), False
+    if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()):
+        pin = reviewed_pickups(package)
+        if pin == country_speedway.LEV_SHA256:
+            rank = country_speedway.rank("weapon_crate", physical_seat(track, record, package, slot))
+            return (rank if boost_on else 0), False
+        if pin:
+            return 0, False
     return (finish_boost(track, capability, package) if boost_on else 0), False
