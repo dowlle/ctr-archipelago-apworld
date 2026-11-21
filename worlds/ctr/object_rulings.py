@@ -37,16 +37,16 @@ def _selection(package, kind, ordinal, *, legacy=False):
     raw = package["content_id"]
     road = canonical_track_key(raw)
     version = track_rulings.scoped_version()
-    pinned, scoped = {}, {}
+    pinned, scoped_keys = {}, []
     # Prefer a historical key's own row when both keys name this exact source.
     for content in dict.fromkeys((road, raw)):
         key = (content, kind, ordinal)
         row = RULINGS.get(key)
         if row is not None:
             pinned[row["lev_sha256"]] = row
-        versions = sorted(row_key for row_key in RULINGS if row_key[:-3] == key and row_key[-1] <= version)
-        for row_key in versions:
-            scoped[row_key[-3:-1]] = RULINGS[row_key]
+        scoped_keys.extend(row_key for row_key in RULINGS if row_key[:-3] == key and row_key[-1] <= version)
+    # The latest applicable version wins. The raw key breaks ties.
+    scoped = {key[-3:-1]: RULINGS[key] for key in sorted(scoped_keys, key=lambda key: (key[-1], key[0] == raw))}
     current = track_rulings.revision_ref(package)
     source = current if current in scoped else track_rulings.scoped_source(package, scoped, pins=pinned)
     row = scoped.get(source) or pinned.get(source[1])
