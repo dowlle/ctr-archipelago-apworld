@@ -112,7 +112,7 @@ CORTEX_TRACK_ID = "cortex_vortex"
 CORTEX_PACKAGE_ID = "bundled/cortex-vortex"
 #: The track key of Cortex Vortex. A downloaded Cortex Vortex package (the Saphi
 #: release) carries it too: it is the same track, so a seed takes one or the other.
-CORTEX_TRACK_KEY = "cortex-vortex"
+CORTEX_TRACK_KEY = cortex_vortex.CORTEX_TRACK_KEY
 CORTEX_LAPS = 3
 #: Standalone Cortex Vortex races are two laps (ruling of 2026-11-09, A4-13):
 #: the pad's Trophy Race, CTR Challenge and Relic Race, with the client's
@@ -299,10 +299,11 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw, where="custom_tracks"):
+def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=None):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks")
+        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks",
+                                         historical=historical, dropped=dropped)
     except custom_packages.PackageError as exc:
         if where == "custom_tracks":
             error(f"{exc}. Use Export YAML in Options > Custom Tracks, or Save YAML for a room "
@@ -1163,19 +1164,48 @@ def retail_selection(options):
     return sorted(i for i, name in RETAIL.items() if "all" in chosen or name in chosen)
 
 
-def track_names(track, package):
-    """The names a YAML may call a track by: its title, and a custom track's key."""
-    return {track["display_name"]} | ({package["content_id"]} if package else set())
+def literal_track_names(track, package):
+    """The selectors supported before alternate registry keys were accepted."""
+    title = track["display_name"]
+    return tuple(dict.fromkeys((title, package["content_id"]))) if package else (title,)
 
 
-def required_ids(options, candidates, arenas, packages):
+def track_names(track, package, reserved=()):
+    """The track's literal selectors, then aliases unclaimed by another literal selector."""
+    exact = literal_track_names(track, package)
+    if package:
+        alternate = destinations.equivalent_track_keys(package["content_id"])
+        if cortex_vortex.bundled_copy(package):
+            alternate += (destinations.CORTEX_VORTEX,)
+    else:
+        alternate = destinations.equivalent_track_keys(CORTEX_TRACK_KEY) if track.get("id") == CORTEX_TRACK_ID else ()
+    return tuple(dict.fromkeys((*exact, *(name for name in alternate if name not in reserved))))
+
+
+def package_track_id(package):
+    return "custom/" + package["content_id"] + "/" + package["revision"]
+
+
+def required_ids(options, candidates, arenas, packages, transferred=()):
     """The logical ids of `required_entries`, then Cortex Vortex with `own_pad`."""
     names = {}
     for item in candidates + arenas:
-        for name in track_names(item, packages.get(item.get("package_id"))):
+        for name in literal_track_names(item, packages.get(item.get("package_id"))):
             names[name] = item["id"]
+    reserved = set(names)
+    for track in candidates:
+        for name in track_names(track, packages.get(track.get("package_id")), reserved):
+            names.setdefault(name, track["id"])
+    candidate_ids = {track["id"] for track in candidates}
+    bundled_transfers = set()
+    for name, target in transferred:
+        if target in candidate_ids:
+            names.setdefault(name, target)
+            if target == CORTEX_TRACK_ID and names[name] == target:
+                bundled_transfers.add(name)
     wanted = list(options.required_entries.value)
-    if destinations.CORTEX_VORTEX in wanted:
+    if (any(names.get(name) == CORTEX_TRACK_ID and name not in bundled_transfers for name in wanted)
+            or (destinations.CORTEX_VORTEX in wanted and destinations.CORTEX_VORTEX not in names)):
         error("required_entries does not take Cortex Vortex. Use cortex_vortex_track: own_pad.")
     if (any(name not in names for name in wanted) or len(set(wanted)) != len(wanted)
             or len(wanted) > content_cups.PADS):
@@ -1192,7 +1222,7 @@ def required_ids(options, candidates, arenas, packages):
             problems.append(f"{len(wanted)} entries do not fit the {content_cups.PADS} normal pads")
         error("required_entries must be distinct tracks and arenas this seed can use, fitting the 27 normal pads. "
               + "; ".join(problems) + ".")
-    out = [names[name] for name in wanted]
+    out = [names[name] for name in wanted if name not in bundled_transfers]
     if int(options.cortex_vortex_track.value) == CORTEX_OWN_PAD:
         out.append(CORTEX_TRACK_ID)
     return out
@@ -1269,37 +1299,115 @@ def _draw_fitting(world):
     return plan
 
 
+def move_bundled_cortex_modes(modes, names):
+    """Carry a copy's mode override to the bundled row; an explicit bundled override wins."""
+    moved = False
+    for name in sorted(set(names) - {"default", destinations.CORTEX_VORTEX}):
+        if name in modes:
+            moved = moved or destinations.CORTEX_VORTEX not in modes
+            modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+    return moved
+
+
+def drop_duplicate_tracks(world):
+    """Keep the first YAML descriptor per track, with bundled Cortex Vortex taking precedence."""
+    options = world.options
+    raw = list(options.custom_tracks.value)
+    if not raw:
+        return
+    dropped = {}
+    packages = resolve_packages(raw, dropped=dropped)
+    bundled = bool(options.cortex_vortex_track.value)
+    if bundled:
+        for index, entry in enumerate(raw):
+            descriptor = custom_packages.yaml_track_entry(entry, "custom_tracks")
+            if destinations.canonical_track_key(descriptor["content_id"]) == CORTEX_TRACK_KEY:
+                dropped[index] = (descriptor, None)
+    if not dropped:
+        return
+
+    # Check selectors before transfer, including a malformed override that the
+    # retained track would never use.
+    track_modes(options)
+    wanted = options.required_entries.value
+    if len(wanted) != len(set(wanted)):
+        repeated = [name for name in dict.fromkeys(wanted) if wanted.count(name) > 1]
+        error("required_entries lists these selectors more than once: " + ", ".join(map(repr, repeated)))
+    survivors = [package for package in packages
+                 if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
+    from . import tizi_madness
+    if int(options.shortcut_knowledge.value) < tizi_madness.MIN_SHORTCUT_KNOWLEDGE:
+        survivors = [package for package in survivors if not tizi_madness.is_tizi_madness(package)]
+    reserved = {RETAIL[level] for level in retail_selection(options)} | {"default"}
+    literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
+    owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}
+    bundled_names = set(track_names(cortex_track(standalone=True), None, literal)) if bundled else set()
+    targets = {}
+    for index in sorted(dropped):
+        package, retained = dropped[index]
+        target = package_track_id(retained) if retained else CORTEX_TRACK_ID
+        for name in track_names(package, package, literal):
+            if name not in owned and (target == CORTEX_TRACK_ID or name not in bundled_names):
+                targets.setdefault(name, set()).add(target)
+
+    transferred = {name: next(iter(ids)) for name, ids in targets.items() if len(ids) == 1}
+    arena_pool, arena_count = crystal_settings(options)
+    arena_names = {arena_content.ARENAS[level] for level in arena_pool} if arena_count else set()
+    if any(transferred.get(name) == CORTEX_TRACK_ID and name not in arena_names for name in wanted):
+        options.cortex_vortex_track.value = CORTEX_OWN_PAD
+    options.custom_tracks.value = [entry for i, entry in enumerate(raw) if i not in dropped]
+    world.ctr_transferred_track_selectors = transferred
+    world.ctr_duplicate_track_count = len(dropped)
+
+
+def prune_transfers_for_excluded_tracks(world, excluded):
+    """Drop selectors carried to a package an eligibility rule later removes."""
+    transferred = getattr(world, "ctr_transferred_track_selectors", {})
+    if not excluded or not transferred:
+        return
+    excluded_tracks = {"custom/" + package.removeprefix("package/") for package in excluded}
+    names = {name for name, target in transferred.items() if target in excluded_tracks}
+    options = world.options
+    arena_pool, arena_count = crystal_settings(options)
+    arena_names = {arena_content.ARENAS[level] for level in arena_pool} if arena_count else set()
+    options.required_entries.value = [name for name in options.required_entries.value
+                                      if name not in names or name in arena_names]
+    options.track_modes.value = {name: modes for name, modes in options.track_modes.value.items()
+                                 if name not in names}
+    world.ctr_transferred_track_selectors = {name: target for name, target in transferred.items() if name not in names}
+
+
 def swap_in_bundled_cortex(world):
-    """`cortex_vortex_track: off` with a downloaded Cortex Vortex in `custom_tracks`
-    (maintainer ruling of 2026-11-05: "Bundled replaces it"). The downloaded copy leaves
-    the list and the seed behaves as `in_pool`: the bundled Cortex Vortex is a drawn
-    candidate exactly where the copy was, so the player keeps the track they asked
-    for and every player races the same certified bytes and boxes. `in_pool` and not
+    """Replace an exact copy of the bundled Cortex Vortex files when the option is off.
+
+    Other copies can share the registry key and still carry different pickups or files.
+    The seed with an exact duplicate behaves as `in_pool`. `in_pool` and not
     `own_pad`, because a listed custom track is never promised a pad either. A copy that
     `required_entries` names keeps that promise: the swap is `own_pad` and the entry leaves the list.
-    Runs before the plan is drawn or restored, so both see the same options."""
+    Runs before a new plan is drawn."""
     o = world.options
     if o.cortex_vortex_track.value:
         return
     packages = resolve_packages(list(o.custom_tracks.value))
-    copies = [p for p in packages if p["content_id"] == CORTEX_TRACK_KEY]
+    copies = [p for p in packages if cortex_vortex.bundled_copy(p)]
     if not copies:
         return
     twins = [p["id"] for p in copies]
-    names = {n for p in copies for n in (p["display_name"], p["content_id"])}
-    kept = [n for n in o.required_entries.value if n not in names]
+    reserved = set(RETAIL.values()) | set(arena_content.ARENAS.values())
+    reserved.update(name for p in packages if p["id"] not in twins for name in literal_track_names(p, p))
+    names = {n for p in copies for n in track_names(p, p, reserved)} - reserved
+    swapped_ids = {package_track_id(p) for p in copies}
+    inherited = {name for name, target in getattr(world, "ctr_transferred_track_selectors", {}).items()
+                 if target in swapped_ids}
+    kept = [n for n in o.required_entries.value if n not in names and n not in inherited]
     pinned = len(kept) != len(o.required_entries.value)
     o.required_entries.value = kept
     o.custom_tracks.value = [raw for raw in o.custom_tracks.value
-                             if custom_packages.admit(raw, "custom_tracks")["content_id"] != CORTEX_TRACK_KEY]
+                             if custom_packages.yaml_track_entry(raw, "custom_tracks")["id"] not in twins]
     # A track_modes override that names the copy carries over to the bundled track.
     modes = dict(o.track_modes.value)
-    moved_modes = False
-    for name in sorted(names - {destinations.CORTEX_VORTEX}):
-        if name in modes:
-            # An entry already under the bundled track's own name wins; the copy's is dropped.
-            moved_modes = moved_modes or destinations.CORTEX_VORTEX not in modes
-            modes.setdefault(destinations.CORTEX_VORTEX, modes.pop(name))
+    moved_modes = move_bundled_cortex_modes(modes, names)
+    moved_modes = move_bundled_cortex_modes(modes, inherited - names) or moved_modes
     o.track_modes.value = modes
     o.cortex_vortex_track.value = CORTEX_OWN_PAD if pinned else CORTEX_IN_POOL
     world.ctr_cortex_swap = twins
@@ -1322,6 +1430,7 @@ def draw_plan(world, key_estimate=True):
     o = world.options
     selected_modes, overrides = track_modes(o)
     with_cortex = bool(o.cortex_vortex_track.value)
+    transferred = getattr(world, "ctr_transferred_track_selectors", {})
     cup_spec = content_cups.settings(o)
     arena_pool, arena_count = crystal_settings(o)
     pad_budget.cap_crystals(world, len(arena_pool))
@@ -1345,11 +1454,6 @@ def draw_plan(world, key_estimate=True):
     for package in packages:
         if country_speedway.matches(package) or toasty_terrace.matches(package):
             package["capabilities"]["super_turbo_pads"] = False
-    twin = next((p for p in packages if p["content_id"] == CORTEX_TRACK_KEY), None) if with_cortex else None
-    if twin is not None:
-        error(f"custom_tracks lists Cortex Vortex ({twin['id']}), and cortex_vortex_track already adds the "
-              "Cortex Vortex that comes with CTR AP. A seed has one Cortex Vortex: remove it from custom_tracks, "
-              "or set cortex_vortex_track to off and the Cortex Vortex that comes with CTR AP replaces it.")
     # Field mapping (ruling of 2026-10-13): the named-block identity is the registry
     # `track_key`. The package descriptor carries it in its existing wire field
     # `content_id` (same string, e.g. "baby-t-park"); the wire name is kept so
@@ -1369,20 +1473,29 @@ def draw_plan(world, key_estimate=True):
         pool.append((cortex_track(standalone=True), None, {}))
     for slot, package in enumerate(packages, 1):
         block = destinations.named_track(package["content_id"])
-        pool.append((dict(id="custom/" + package["content_id"] + "/" + package["revision"],
+        pool.append((dict(id=package_track_id(package),
                           origin="custom", package_id=package["id"], custom_slot=slot,
                           display_name=package["display_name"], laps=package["laps"]),
                      package, dict(named_block=block.block_index, room_title=block.ap_name) if block else {}))
     package_by_id = {p["id"]: p for p in packages}
     # A name of the 18 original tracks that this seed leaves out has no effect.
-    known = set(RETAIL.values()) | {name for track, package, _addressing in pool for name in track_names(track, package)}
-    unknown = sorted(set(overrides) - known)
+    reserved = set(RETAIL.values()) | {name for track, package, _addressing in pool
+                                      for name in literal_track_names(track, package)}
+    live_modes = {name for track, package, _addressing in pool for name in track_names(track, package, reserved)}
+    known = reserved | live_modes
+    unknown = sorted(set(overrides) - known - transferred.keys())
     if unknown:
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        wanted = next((overrides[name] for name in track_names(track, package) if name in overrides), selected_modes)
-        modes = [m for m in MODES if m in wanted and m in supported_modes(track["origin"], package)]
+        supported = supported_modes(track["origin"], package)
+        wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
+        if wanted is None:
+            wanted = next((override for name, override in overrides.items()
+                           if name not in live_modes and transferred.get(name) == track["id"]
+                           and set(override).intersection(supported)),
+                          selected_modes)
+        modes = [m for m in MODES if m in wanted and m in supported]
         if not modes:
             if package is not None:
                 error(f"custom track {package['id']} can run none of the races track_modes gives it "
@@ -1392,8 +1505,10 @@ def draw_plan(world, key_estimate=True):
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
         candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
+    if not arena_count and transferred:
+        arena_candidates = [arena for arena in arena_candidates if arena["display_name"] not in transferred]
     # A track named twice (its title and its key) is one pad, not two (A4-83 review).
-    required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id)))
+    required = list(dict.fromkeys(required_ids(o, candidates, arena_candidates, package_by_id, transferred.items())))
     chosen_arenas=[a for a in arena_candidates if a['id'] in required]
     # The 27 normal pads are one budget (A4-83): over it, the cup and Crystal
     # Challenge counts are shared out as weights. A seed that fits is untouched.
@@ -2306,15 +2421,20 @@ def global_wumpa_routes(tracks, entries, pads, packages):
     return out
 
 
-def generic_room_titles(tracks, packages):
+def generic_room_titles(tracks, packages, *, carried_aliases=False):
     """{custom_slot: room title} for the generic-slot (B+) tracks among `tracks`.
 
     Only the seed's own tracks take part, in slot order, so a title clashes
     only with names in the same room: retail stems, every named block and an
     earlier generic track (custom_track_titles.seed_titles). A track with no
     usable title keeps its generic name."""
-    rows = [(t["custom_slot"], packages[t["package_id"]]) for t in tracks
-            if destinations.named_track(packages[t["package_id"]]["content_id"]) is None]
+    rows = []
+    for track in tracks:
+        package = packages[track["package_id"]]
+        key = package["content_id"]
+        if destinations.named_track(key) is None or (
+                carried_aliases and "named_block" not in track and key in destinations.TRACK_KEY_ALIASES):
+            rows.append((track["custom_slot"], package))
     titles = seed_titles([(slot, p["display_name"], p["author"], p["content_id"]) for slot, p in rows])
     return {slot: titles.get(slot, f"Custom Track {slot}") for slot, _ in rows}
 
@@ -2824,7 +2944,8 @@ def validate(plan, *, restoring=False):
 
     packages = table("packages")
     # The wire is canonical: an admitted copy of each record must equal it.
-    require(resolve_packages(plan["packages"], "content_plan.packages") == sorted(plan["packages"], key=lambda p: p["id"])
+    require(resolve_packages(plan["packages"], "content_plan.packages", historical=True) ==
+            sorted(plan["packages"], key=lambda p: p["id"])
             and [p["id"] for p in plan["packages"]] == sorted(packages),
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
@@ -2975,7 +3096,8 @@ def validate(plan, *, restoring=False):
     # Generic-slot room titles are recomputed from the plan's own tracks; a
     # forged title (a retail or named track's name, or a repeated one) differs.
     expected_titles = {} if restoring else generic_room_titles(
-        [t for t in plan["tracks"] if t["origin"] == "custom" and t["package_id"] in packages], packages)
+        [t for t in plan["tracks"] if t["origin"] == "custom" and t["package_id"] in packages], packages,
+        carried_aliases=True)
     reserved_titles = {name.casefold() for name in (*RETAIL.values(), destinations.CORTEX_VORTEX)}
     custom_titles = set()
 
@@ -2988,7 +3110,8 @@ def validate(plan, *, restoring=False):
         else:
             require(is_sanitized(title), "room title is not sanitized")
             if not restoring:
-                require(block is None, "a track with a named block must use it")
+                require(block is None or package["content_id"] in destinations.TRACK_KEY_ALIASES,
+                        "a track with a named block must use it")
                 require(title == expected_titles.get(slot), "room title is not the seed's clash-suffixed title for this track")
         folded = title.casefold()
         require(folded not in reserved_titles and folded not in custom_titles,

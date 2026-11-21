@@ -1275,9 +1275,7 @@ class TestCustomTracks(SoloTestCase):
             self.assertEqual(code, 0, events)
             self.assertEqual(self.room_section(events)["cortex_vortex_track"], want)
 
-    def test_a_downloaded_cortex_vortex_is_the_same_row_as_the_bundled_one(self):
-        # A tester report (alpha2, 2026-11-04): Play Solo offered the bundled Cortex
-        # Vortex and a downloaded copy as two rows, and the seed got both.
+    def test_cortex_vortex_with_other_pins_stays_selectable(self):
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
@@ -1285,24 +1283,192 @@ class TestCustomTracks(SoloTestCase):
         for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
             with open(os.path.join(folder, name), "wb") as handle:
                 handle.write(b"x")
-        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", loop["id"]])
+        self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", saphi["id"], loop["id"]])
         source = write_yaml(self.work, "both.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
             custom_tracks=[saphi, loop], required_entries=["cortex-vortex"])}))
         events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
         self.assertEqual(code, 0, events)
-        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]}, {"cortex-vortex": 2, loop["id"]: 1})
+        self.assertEqual({t["id"]: t["start"] for t in last(events)["tracks"]},
+                         {"cortex-vortex": 0, saphi["id"]: 2, loop["id"]: 1})
         events, code = self.call("generate", "--yaml", source, "--assets", self.assets, "--seed", "3",
-                                 "--tracks-page", "--track", "cortex-vortex", "--guarantee", "cortex-vortex",
+                                 "--tracks-page", "--track", saphi["id"], "--guarantee", saphi["id"],
                                  "--track", loop["id"])
         self.assertEqual(code, 0, events)
         section = self.room_section(events)
-        self.assertEqual(section["custom_tracks"], [loop])
-        self.assertNotIn("required_entries", section)
-        self.assertEqual(section["cortex_vortex_track"], "own_pad")
+        self.assertEqual(section["custom_tracks"], [saphi, loop])
+        self.assertEqual(section["required_entries"], ["cortex-vortex"])
+        self.assertEqual(section.get("cortex_vortex_track", "off"), "off")
         events, code = self.call("validate", "--yaml", self.preset("standard.yaml"), "--assets", self.assets,
                                  "--track", "cortex-vortex", "--track", saphi["id"])
         self.assertNotEqual(code, 0, events)
         self.assertEqual((last(events)["kind"], last(events)["track"]), ("track", saphi["id"]))
+
+    def test_exact_cortex_vortex_duplicate_has_one_row(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from .. import cortex_vortex
+
+        alias = "lockbox-adventure-track-11"
+        descriptor = self.install(alias, "1.0", "Lockbox Adventure track 11")
+        descriptor["files"][0]["sha256"] = cortex_vortex.CORTEX_LEV_SHA256
+        descriptor["files"][1]["sha256"] = cortex_vortex.CORTEX_VRM_SHA256
+        doc = {GAME: dict(custom_tracks=[descriptor], required_entries=["cortex-vortex"],
+                          track_modes={alias: ["trophy"]})}
+        paths = SimpleNamespace(tracks=self.work)
+        with patch.object(ctr_solo, "installed_tracks", return_value=[
+                {"id": descriptor["id"], "descriptor": descriptor}]), \
+                patch.object(ctr_solo, "_cortex_installed", return_value=True), \
+                patch.object(ctr_solo, "read_player_yaml", return_value=doc):
+            rows = ctr_solo.list_tracks(paths, self.assets, "fixture.yaml")["tracks"]
+            self.assertEqual([(row["id"], row["start"]) for row in rows], [("cortex-vortex", 2)])
+            result = ctr_solo.apply_tracks(paths, doc, self.assets, ["cortex-vortex"], ["cortex-vortex"], page=True)
+        self.assertEqual(result[GAME], {"cortex_vortex_track": "own_pad", "track_modes": {"Cortex Vortex": ["trophy"]}})
+
+    def test_loaded_duplicates_keep_first_pins_and_bundled_cortex(self):
+        first = self.install("release-st-patrick-adventure-slot-55", "2.0", "First Coco")
+        second = self.install("coco-park-2025", "2.1", "Second Coco")
+        cortex = self.install("cortex-vortex", "1.1.6", "Downloaded Cortex")
+        self.assertNotEqual(ctr_solo._pins(first), ctr_solo._pins(second))
+        section = dict(custom_tracks=[first, second, cortex], cortex_vortex_track="in_pool",
+                       required_entries=["Second Coco", "Downloaded Cortex"],
+                       track_modes={"Second Coco": ["trophy"], "Downloaded Cortex": ["relic"]})
+        doc = {GAME: section}
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        self.assertEqual([ctr_solo._start_pick(section, copy) for copy in (first, second, cortex)], [2, 0, 0])
+        result = ctr_solo.apply_tracks(paths, doc, self.assets,
+                                       [first["id"], second["id"], "cortex-vortex", cortex["id"]],
+                                       [second["id"], cortex["id"]], page=True)
+        self.assertEqual(result[GAME], dict(section, cortex_vortex_track="own_pad"))
+        self.assertEqual(ctr_solo._pins(result[GAME]["custom_tracks"][0]), ctr_solo._pins(first))
+        changed = ctr_solo.apply_tracks(paths, doc, self.assets, [first["id"], "cortex-vortex"], [], page=True)
+        self.assertNotIn("required_entries", changed[GAME])
+
+        other = self.install("fixture-other", "2.1", "Second Coco")
+        shared_title = dict(section, custom_tracks=[first, other, second], required_entries=["Second Coco"])
+        self.assertEqual([ctr_solo._start_pick(shared_title, copy) for copy in (first, other)], [1, 2])
+
+    def test_loaded_duplicate_prefers_the_yaml_pins_at_the_same_revision(self):
+        legacy = self.install("release-st-patrick-adventure-slot-55", "2.1", "Legacy Coco")
+        canonical = self.install("coco-park-2025", "2.1", "Canonical Coco")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        listed = [legacy, canonical]
+        rows = ctr_solo.installed_tracks(paths, self.assets, listed)
+        self.assertEqual([row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}],
+                         [legacy["id"]])
+        result = ctr_solo.apply_tracks(paths, {GAME: {"custom_tracks": listed}}, self.assets,
+                                       [legacy["id"]], [], page=True)
+        self.assertEqual(result[GAME]["custom_tracks"][0]["files"], legacy["files"])
+
+    def test_loaded_bundled_on_keeps_the_exact_cortex_copy_for_validation(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from .. import cortex_vortex
+        descriptor = self.install("cortex-vortex", "1.1.6", "Downloaded Cortex")
+        descriptor["files"][0]["sha256"] = cortex_vortex.CORTEX_LEV_SHA256
+        descriptor["files"][1]["sha256"] = cortex_vortex.CORTEX_VRM_SHA256
+        section = dict(custom_tracks=[descriptor], cortex_vortex_track="in_pool",
+                       track_modes={"cortex-vortex": ["trophy"], descriptor["display_name"]: ["bogus"]})
+        with patch.object(ctr_solo, "installed_tracks", return_value=[
+                {"id": descriptor["id"], "content_id": descriptor["content_id"], "descriptor": descriptor}]):
+            result = ctr_solo.apply_tracks(SimpleNamespace(), {GAME: section}, self.assets,
+                                           ["cortex-vortex"], [], page=True)
+        self.assertEqual(result[GAME], section)
+
+    def test_corrected_title_keeps_or_removes_yaml_picks(self):
+        import yaml
+        key = "assembly-lane-n-gage"
+        descriptor = self.install(key, "1.0", "Assembly Lane N-Gage")
+        old_title = "N-Gage Assembly Lane"
+        yaml_entry = dict(descriptor, display_name=old_title)
+        source = write_yaml(self.work, "renamed.yaml", yaml.safe_dump({"name": "Solo", "game": GAME, GAME: dict(
+            custom_tracks=[yaml_entry], required_entries=[old_title], track_modes={old_title: ["trophy"]})}))
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        rows = ctr_solo.list_tracks(paths, self.assets, source)["tracks"]
+        self.assertEqual([(row["id"], row["start"]) for row in rows], [(descriptor["id"], 2)])
+        doc = ctr_solo.read_player_yaml(source)
+        self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [descriptor["id"]], [descriptor["id"]],
+                                              page=True)[GAME], doc[GAME])
+        self.assertEqual(ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)[GAME], {"track_modes": {}})
+        broken = {"id": "package/other/1.0", "files": [{"role": None}, {"role": "lev"}]}
+        self.assertFalse(ctr_solo._same_package(broken, descriptor))
+
+    def test_historical_room_copy_does_not_replace_active_alias_row(self):
+        current = self.install("assembly-lane-n-gage", "2.1", "Assembly Lane N-Gage")
+        old = self.install("n-gage-assembly-lane", "2.1", "Old title", write_descriptor=False)
+        rooms = os.path.join(self.solo, "rooms", "old-room")
+        os.makedirs(rooms)
+        room = os.path.join(rooms, "room.json")
+        saved = json.dumps({"custom_tracks": [old]})
+        with open(room, "w", encoding="utf-8") as handle:
+            handle.write(saved)
+        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
+        with open(room, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), saved)
+
+    def test_removing_a_custom_copy_preserves_a_retail_title_mode_override(self):
+        descriptor = self.install("crash-cove-custom", "1.0", "Crash Cove")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [descriptor], "track_modes": {"Crash Cove": ["trophy"]}}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [], [], page=True)
+        self.assertEqual(result[GAME], {"track_modes": {"Crash Cove": ["trophy"]}})
+
+    def test_guarantee_keeps_the_yaml_alias_when_the_installed_key_is_another_title(self):
+        key, alias = "assembly-lane-n-gage", "n-gage-assembly-lane"
+        active = self.install(key, "2.1", "Assembly Lane N-Gage")
+        saved = dict(active, id=f"package/{alias}/2.1", content_id=alias)
+        other = self.install("fixture-conflict", "2.1", key)
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [saved, other]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [active["id"], other["id"]], [active["id"]],
+                                       page=True)[GAME]
+        self.assertEqual(result["custom_tracks"], [saved, other])
+        self.assertEqual(result["required_entries"], [alias])
+        self.assertEqual(ctr_solo._start_pick(result, active), 2)
+        self.assertEqual(ctr_solo._start_pick(result, other), 1)
+
+    def test_removing_custom_titles_preserves_default_and_bundled_modes(self):
+        named_default = self.install("fixture-default", "2.1", "default")
+        named_cortex = self.install("fixture-title", "2.1", "Cortex Vortex")
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        modes = {"default": ["trophy"], "Cortex Vortex": ["relic"]}
+        doc = {GAME: {"custom_tracks": [named_default, named_cortex], "cortex_vortex_track": "in_pool",
+                      "track_modes": modes}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, ["cortex-vortex"], [], page=True)[GAME]
+        self.assertEqual(result, {"cortex_vortex_track": "in_pool", "track_modes": modes})
+
+    def test_exported_track_key_matches_installed_alias_and_keeps_its_guarantee(self):
+        key, alias = "assembly-lane-n-gage", "n-gage-assembly-lane"
+        active = self.install(key, "2.1", "Assembly Lane N-Gage")
+        saved = dict(active, id=f"package/{alias}/2.1", track_key=alias, display_name="Old title")
+        del saved["content_id"]
+        other = self.install("fixture-conflict", "2.1", key)
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        section = {"custom_tracks": [saved, other], "required_entries": [alias]}
+        self.assertEqual(ctr_solo._start_pick(section, active), 2)
+        self.assertEqual(ctr_solo._start_pick(section, other), 1)
+        doc = {GAME: dict(section, required_entries=[])}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [active["id"], other["id"]], [active["id"]],
+                                       page=True)[GAME]
+        self.assertEqual(result, section)
+
+    def test_historical_key_reads_the_canonical_original_folder(self):
+        alias = "n-gage-assembly-lane"
+        descriptor = self.install(alias, "1.0", "Assembly Lane N-Gage")
+        root = os.path.join(self.assets, "tracks")
+        os.rename(os.path.join(root, alias), os.path.join(root, "assembly-lane-n-gage"))
+        self.assertIn(descriptor["id"], [track["id"] for track in self.tracks()])
+        original = os.path.join(root, alias, "original")
+        os.makedirs(original)
+        os.rename(os.path.join(root, "assembly-lane-n-gage", "original", "b-1.0.vrm"),
+                  os.path.join(original, "b-1.0.vrm"))
+        self.assertNotIn(descriptor["id"], [track["id"] for track in self.tracks()])
 
     def test_the_page_replaces_the_yaml_picks(self):
         import yaml

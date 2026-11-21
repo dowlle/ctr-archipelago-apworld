@@ -98,6 +98,27 @@ class TestObjectRulings(unittest.TestCase):
             with mock.patch.dict(object_rulings.RULINGS, {}, clear=True):
                 self.assertEqual(make_world(opts, seed=52).fill_slot_data(), baseline)
 
+    def test_new_ruling_uses_exact_lev_and_older_room_restores(self):
+        opts = options()
+        package = opts["content_pool"]["tracks"]["custom"][0]
+        package["files"][0]["sha256"] = "ab" * 32
+        # Give the changed revision measured counts without giving it the ruling.
+        with mock.patch.dict(sanity.CATALOG, {"ab" * 32: dict(sanity.CATALOG[PIN], lev_sha256="ab" * 32)}):
+            current = make_world(opts, seed=52, stop_before="pre_fill").ctr_content_plan
+            row = next(r for r in current["sanity"]["tracks"] if r["track_id"] == TV)
+            self.assertEqual(row["wumpa_crate"], list(range(1, 10)))
+            self.assertNotIn("logic_difficulty", current["sanity"])
+            rank = object_rulings.rank
+            with mock.patch.object(object_rulings, "applies_to",
+                                   side_effect=lambda p, kinds: p["content_id"] == "tv-world" and "wumpa_crate" in kinds), \
+                 mock.patch.object(object_rulings, "rank",
+                                   side_effect=lambda *args, **kwargs: rank(*args, legacy=True)):
+                old = make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data()
+            old_row = next(r for r in old["content_plan"]["sanity"]["tracks"] if r["track_id"] == TV)
+            self.assertEqual(old_row["wumpa_crate"], [1, 2, 7, 8, 9])
+            restored = make_world({}, passthrough=old, stop_before="pre_fill")
+            self.assertEqual(restored.fill_slot_data(), old)
+
     def test_loader_refuses_invalid_rows(self):
         good = next(iter(object_rulings.RULINGS.values()))
         self.assertEqual(len(object_rulings.RULINGS), 4)

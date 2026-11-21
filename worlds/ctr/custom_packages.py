@@ -262,8 +262,10 @@ def yaml_track_entry(descriptor, where):
     return descriptor
 
 
-def admit_all(raw, where="tracks.custom", *, yaml_input=False):
-    """Admit a whole descriptor list, sorted by package id; refuse duplicates."""
+def admit_all(raw, where="tracks.custom", *, yaml_input=False, historical=False, dropped=None):
+    """Admit descriptors in package-id order. A new YAML may keep its first copy of a track."""
+    from .destinations import canonical_track_key
+
     if type(raw) is not list or len(raw) > MAX_PACKAGES:
         _fail(where, f"must be a list of at most {MAX_PACKAGES} complete package descriptors")
     result, seen = [], {}
@@ -272,12 +274,18 @@ def admit_all(raw, where="tracks.custom", *, yaml_input=False):
         if yaml_input:
             descriptor = yaml_track_entry(descriptor, at)
         package = admit(descriptor, at)
-        for label, value in (("track key", package["content_id"]), ("package uuid", package["uuid"]),
+        key = package["content_id"] if historical else canonical_track_key(package["content_id"])
+        earlier = seen.get(("track key", key))
+        if dropped is not None and earlier is not None:
+            _, retained = earlier
+            dropped[i] = (package, retained)
+            continue
+        for label, value in (("track key", key), ("package uuid", package["uuid"]),
                              ("LEV and VRM pair", (package["files"][0]["sha256"], package["files"][1]["sha256"]))):
             if (label, value) in seen:
-                _fail(f"{where}[{i}]", f"repeats the {label} of {where}[{seen[label, value]}]; "
+                _fail(f"{where}[{i}]", f"repeats the {label} of {where}[{seen[label, value][0]}]; "
                       "list each track once, with one revision")
-            seen[label, value] = i
+            seen[label, value] = (i, package)
         result.append(package)
     return sorted(result, key=lambda p: p["id"])
 

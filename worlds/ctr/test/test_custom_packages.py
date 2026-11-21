@@ -7,10 +7,11 @@ applies the same rules (native tools/test-content-plan-parity.py).
 import copy
 import json
 import unittest
+from unittest.mock import patch
 
 from Options import OptionError
 
-from .. import content_plan, custom_packages, named_tracks
+from .. import box_spots, content_plan, custom_packages, destinations, named_tracks
 from .test_content_plan import make_world, profile_options
 
 #: Test data only: a track key with no named block, so it takes path B+.
@@ -45,6 +46,189 @@ def options_with(custom, required=None):
 
 
 class TestAdmission(unittest.TestCase):
+    def test_alias_for_a_builtin_has_identity_without_a_custom_block(self):
+        key = "lockbox-adventure-track-11"
+        self.assertEqual(destinations.canonical_track_key(key), "cortex-vortex")
+        self.assertIsNone(destinations.named_track(key))
+
+    def test_historical_key_uses_the_canonical_block_for_new_rooms(self):
+        alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
+        descriptor = copy.deepcopy(UNKNOWN)
+        descriptor.update(content_id=alias, id=f"package/{alias}/{descriptor['revision']}",
+                          display_name="N-Gage Assembly Lane")
+        options = options_with([descriptor])
+        block = destinations.named_track(key)
+        self.assertIs(destinations.named_track(alias), block)
+        world = make_world(options, seed=3)
+        track = next(t for t in world.ctr_content_plan["tracks"] if t.get("package_id") == descriptor["id"])
+        self.assertEqual((track["named_block"], track["room_title"]), (block.block_index, block.ap_name))
+        self.assertEqual(world.ctr_content_plan["packages"][0]["content_id"], alias)
+        tracker = make_world(options, passthrough=world.fill_slot_data())
+        tracker.generate_basic()
+        address = named_tracks.location_code(block.block_index, "trophy")
+        self.assertEqual(tracker.location_id_to_name[address], block.ap_name + ": Trophy Race")
+
+        options["content_pool"]["required_entries"] = [key]
+        options["content_pool"]["tracks"]["overrides"] = {key: ["trophy"]}
+        alias_world = make_world(options, seed=3)
+        alias_track = next(t for t in alias_world.ctr_content_plan["tracks"] if t.get("package_id") == descriptor["id"])
+        self.assertEqual(alias_track["modes"], ["trophy"])
+        options = options_with([descriptor])
+
+        with patch.dict(destinations.TRACK_KEY_ALIASES, {}, clear=True):
+            old_world = make_world(options, seed=3)
+            wire = old_world.fill_slot_data()
+            track = next(t for t in wire["content_plan"]["tracks"] if t.get("package_id") == descriptor["id"])
+            self.assertNotIn("named_block", track)
+            saved = next(c for c in wire["content_plan"]["checks"] if c["owner"] == track["id"])
+        restored = make_world(options, passthrough=wire)
+        restored.generate_basic()
+        self.assertEqual(restored.location_id_to_name[saved["location"]], saved["display_name"])
+
+        canonical = copy.deepcopy(descriptor)
+        canonical.update(content_id=key, id=f"package/{key}/{canonical['revision']}")
+        with self.assertRaisesRegex(custom_packages.PackageError, "repeats the track key"):
+            custom_packages.admit_all([descriptor, canonical])
+
+    def test_alias_does_not_grant_box_spots_without_the_lev_pin(self):
+        key = "gossamer-s-castle"
+        track = {"origin": "custom", "named_block": destinations.named_track(key).block_index}
+        package = copy.deepcopy(UNKNOWN)
+        package["content_id"] = "boss-race-2"
+        self.assertIsNone(box_spots.file_for(track, package))
+        entry = box_spots.CUSTOM_FILES[key]
+        package["files"][0]["sha256"] = entry["doc"]["track"]["lev_sha256"][0]
+        self.assertIs(box_spots.file_for(track, package), entry)
+
+    def test_yaml_keeps_first_copy_and_transfers_unshared_selectors(self):
+        first = named_fixture()
+        first.update(content_id="release-st-patrick-adventure-slot-55",
+                     id="package/release-st-patrick-adventure-slot-55/1.1.0",
+                     display_name="Old St. Patrick Title")
+        second = named_fixture()
+        second.update(content_id="coco-park-2025", id="package/coco-park-2025/1.1.0",
+                      display_name="Old Anniversary Title")
+        second["files"][0]["sha256"] = "ab" * 32
+        for chosen, removed in ((first, second), (second, first)):
+            options = options_with([chosen, removed], required=[removed["display_name"]])
+            options["content_pool"]["tracks"]["overrides"] = {removed["display_name"]: ["trophy"]}
+            world = make_world(options, seed=3)
+            plan = world.ctr_content_plan
+            self.assertEqual(plan["packages"], [chosen])
+            track = next(t for t in plan["tracks"] if t.get("package_id") == chosen["id"])
+            self.assertEqual((track["named_block"], track["room_title"], track["modes"]),
+                             (15, "Coco Park 2025", ["trophy"]))
+            self.assertEqual(world.ctr_duplicate_track_count, 1)
+
+        options = options_with([first, second], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {
+            second["display_name"]: ["relic"],
+            "coco-park-2025": ["trophy"],
+        }
+        plan = make_world(options, seed=3).ctr_content_plan
+        track = next(t for t in plan["tracks"] if t.get("package_id") == first["id"])
+        self.assertEqual(track["modes"], ["trophy"])
+
+        third = copy.deepcopy(UNKNOWN)
+        third["display_name"] = first["content_id"]
+        first["capabilities"]["relic"] = True
+        first["relic_targets"] = UNKNOWN["relic_targets"]
+        options = options_with([first, second, third], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertEqual(content_plan.required_ids(world.options, plan["tracks"], [],
+                                                   {p["id"]: p for p in plan["packages"]},
+                                                   world.ctr_transferred_track_selectors.items()),
+                         [content_plan.package_track_id(first)])
+        modes = {t.get("package_id"): t["modes"] for t in plan["tracks"]}
+        self.assertEqual(modes[first["id"]], ["relic"])
+        self.assertEqual(modes[third["id"]], ["trophy"])
+
+        fourth = dict(third, display_name=second["display_name"])
+        options = options_with([first, second, third, fourth], required=[second["display_name"]])
+        with self.assertRaisesRegex(OptionError, "not a track or arena.*Old Anniversary Title"):
+            make_world(options, seed=3)
+
+        options = options_with([first, dict(second, display_name="Crash Cove")], required=["Crash Cove"])
+        options["content_pool"]["tracks"]["retail"] = [level for level, name in content_plan.RETAIL.items()
+                                                       if name != "Crash Cove"]
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertIn("entry/" + content_plan.package_track_id(first), {pad["entry_id"] for pad in plan["pads"]})
+
+        options = options_with([first, dict(second, display_name="Skull Rock")], required=["Skull Rock"])
+        options["content_pool"]["tracks"]["overrides"] = {"Skull Rock": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]), ["relic"])
+
+        from .test_tizi_madness import tizi_descriptor
+        excluded = tizi_descriptor(display_name=second["display_name"])
+        options = options_with([first, excluded, second], required=[second["display_name"]])
+        options["shortcut_knowledge"] = "medium"
+        options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertIn("entry/" + content_plan.package_track_id(first), {pad["entry_id"] for pad in plan["pads"]})
+        self.assertEqual(next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]), ["relic"])
+
+        first["capabilities"]["relic"] = False
+        del first["relic_targets"]
+        options = options_with([first, second], required=[second["display_name"]])
+        options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]), ["trophy"])
+
+        options["content_pool"]["tracks"]["overrides"][second["display_name"]] = ["bogus"]
+        with self.assertRaisesRegex(OptionError, "nonempty list of distinct races"):
+            make_world(options, seed=3)
+        options["content_pool"]["tracks"]["overrides"] = {}
+        options["content_pool"]["required_entries"] *= 2
+        with self.assertRaisesRegex(OptionError, "listed more than once|lists these selectors more than once"):
+            make_world(options, seed=3)
+
+    def test_asteroid_legacy_alias_dedup_preserves_the_first_descriptor(self):
+        first = copy.deepcopy(UNKNOWN)
+        key = "release-st-patrick-adventure-track-1"
+        first.update(content_id=key, id=f"package/{key}/2.1")
+        second = copy.deepcopy(first)
+        key = "lego-alien-rally-asteroid"
+        second.update(content_id=key, id=f"package/{key}/2.1")
+        plan = make_world(options_with([first, second]), seed=3).ctr_content_plan
+        self.assertEqual(plan["packages"], [first])
+        self.assertIsNone(destinations.named_track(key))
+
+    def test_literal_selector_keeps_precedence_over_another_tracks_alias(self):
+        alias, key = "n-gage-assembly-lane", "assembly-lane-n-gage"
+        other = copy.deepcopy(UNKNOWN)
+        other["display_name"] = alias
+        canonical = named_fixture()
+        canonical.update(content_id=key, id=f"package/{key}/{canonical['revision']}",
+                         display_name="Assembly Lane N-Gage")
+        options = options_with([other, canonical], required=[alias])
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["relic"]}
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertEqual(content_plan.required_ids(world.options, plan["tracks"], [],
+                                                   {p["id"]: p for p in plan["packages"]}), ["custom/fixture-loop/2.1"])
+        modes = {track.get("package_id"): track["modes"] for track in plan["tracks"]}
+        self.assertEqual(modes[other["id"]], ["relic"])
+        self.assertEqual(modes[canonical["id"]], ["trophy"])
+
+    def test_older_rooms_keep_two_raw_keys_that_now_share_an_identity(self):
+        first, second = copy.deepcopy(UNKNOWN), copy.deepcopy(UNKNOWN)
+        first.update(content_id="crash-30anniversary-adventure-track-2",
+                     id="package/crash-30anniversary-adventure-track-2/2.1", display_name="Archived One")
+        second.update(content_id="crash-30anniversary-adventure-track-12",
+                      id="package/crash-30anniversary-adventure-track-12/2.1", display_name="Archived Two",
+                      uuid="1f0e0d0c-0b0a-4908-8706-050403020100")
+        second["files"][0]["sha256"] = "f2" * 32
+        options = options_with([first, second])
+        with patch.dict(destinations.TRACK_KEY_ALIASES, {}, clear=True):
+            old = make_world(options, seed=3).fill_slot_data()
+        restored = make_world(options, passthrough=old)
+        self.assertEqual(restored.ctr_content_plan["packages"], old["content_plan"]["packages"])
+        with self.assertRaisesRegex(custom_packages.PackageError, "repeats the track key"):
+            custom_packages.admit_all([first, second])
+
     def test_yaml_track_key_alias_preserves_package_wire_shape(self):
         modern = dict(UNKNOWN, track_key=UNKNOWN["content_id"])
         del modern["content_id"]

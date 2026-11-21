@@ -309,7 +309,7 @@ def parse_named_tracks(document: Mapping) -> Tuple[NamedTrack, ...]:
     """
     if not isinstance(document, Mapping) or document.get("format") != NAMED_TRACKS_FORMAT:
         raise ValueError(f"named tracks: format must be {NAMED_TRACKS_FORMAT}")
-    if set(document) - {"format", "registry", "test_data", "tracks"}:
+    if set(document) - {"format", "registry", "test_data", "tracks", "track_key_aliases", "generic_track_keys"}:
         raise ValueError("named tracks: unknown top-level field")
     rows = document.get("tracks")
     if not isinstance(rows, list):
@@ -353,19 +353,53 @@ def parse_named_tracks(document: Mapping) -> Tuple[NamedTrack, ...]:
     return tuple(sorted(out, key=lambda t: t.block_index))
 
 
+def parse_track_aliases(document, tracks):
+    aliases = document.get("track_key_aliases", {})
+    # Cortex Vortex has a registry identity and its own built-in checks.
+    keys = {track.track_key for track in tracks} | {"cortex-vortex"}
+    generic = document.get("generic_track_keys", [])
+
+    def is_key(value):
+        return (isinstance(value, str) and 1 <= len(value) <= 64 and not (set(value) - _TRACK_KEY_CHARS)
+                and not value.startswith("-") and not value.endswith("-") and "--" not in value)
+
+    if (not isinstance(generic, list) or any(not is_key(value) or value in keys for value in generic)
+            or len(set(generic)) != len(generic)):
+        raise ValueError("named tracks: invalid generic_track_keys")
+    keys.update(generic)
+    if not isinstance(aliases, dict) or any(
+        not is_key(alias) or alias in keys or not isinstance(target, str) or target not in keys
+        for alias, target in aliases.items()
+    ):
+        raise ValueError("named tracks: invalid track_key_aliases")
+    return aliases
+
+
 def load_named_tracks() -> Tuple[NamedTrack, ...]:
-    return parse_named_tracks(json.loads(
-        pkgutil.get_data(__package__, NAMED_TRACKS_FILE).decode("utf-8")))
+    return parse_named_tracks(_NAMED_DOCUMENT)
 
 
 #: The named tracks this build registers, in block order.
+_NAMED_DOCUMENT = json.loads(pkgutil.get_data(__package__, NAMED_TRACKS_FILE).decode("utf-8"))
 NAMED_TRACKS: Tuple[NamedTrack, ...] = load_named_tracks()
 NAMED_BY_KEY: Dict[str, NamedTrack] = {t.track_key: t for t in NAMED_TRACKS}
+TRACK_KEY_ALIASES = parse_track_aliases(_NAMED_DOCUMENT, NAMED_TRACKS)
+
+
+def canonical_track_key(track_key: str) -> str:
+    return TRACK_KEY_ALIASES.get(track_key, track_key)
+
+
+def equivalent_track_keys(track_key: str) -> Tuple[str, ...]:
+    """The supplied key first, followed by the canonical key and its other aliases."""
+    canonical = canonical_track_key(track_key)
+    return tuple(dict.fromkeys((track_key, canonical, *(alias for alias, target in TRACK_KEY_ALIASES.items()
+                                                       if target == canonical))))
 
 
 def named_track(track_key: str) -> Optional[NamedTrack]:
     """The named block row for `track_key`, or None (the generic fallback)."""
-    return NAMED_BY_KEY.get(track_key)
+    return NAMED_BY_KEY.get(canonical_track_key(track_key))
 
 
 def cup_destination(region: str) -> Tuple[str, int]:

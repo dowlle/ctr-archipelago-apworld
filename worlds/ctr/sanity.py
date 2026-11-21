@@ -17,6 +17,7 @@ from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
                royal_raceway, toasty_terrace)
 from .item_boxes import BOX_TRACKS
+from .cortex_vortex import CORTEX_LEV_SHA256
 from .location_class import LocationClass
 
 KINDS = ("weapon_crate", "wumpa_crate", "wumpa_fruit")
@@ -31,7 +32,6 @@ COUNTS = ((16, 2, 16), (16, 2, 0), (16, 2, 14), (18, 3, 0), (12, 11, 0),
           (16, 10, 0), (17, 4, 0), (24, 12, 0), (19, 13, 0), (16, 3, 10),
           (24, 4, 0), (16, 3, 6), (16, 3, 9))
 CATALOG = json.loads(pkgutil.get_data(__package__, "data/sanity_needs.json"))
-CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
 
 
 def code(track, family, number):
@@ -120,7 +120,7 @@ def object_needs(inv, kind, ordinal, record):
     return fields if fields.get("since", 0) <= record.get("rules_version", 0) else {}
 
 
-def eligible(track, family, record, item_boxes, package, capability=None):
+def eligible(track, family, record, item_boxes, package, capability=None, *, legacy_rulings=False):
     inv = inventory(track, package, record)
     if inv is None:
         return []  # No measured revision, no invented objects.
@@ -145,8 +145,9 @@ def eligible(track, family, record, item_boxes, package, capability=None):
                 excluded.update(all_crates[i] for i in content_item_boxes.seat_indices(len(all_crates), slots))
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
+    ruling_settings = record if "logic_difficulty" in record else capability
     return [n for n in out if object_needs(inv, KINDS[family], n, record).get("shortcut", 0) <= tier
-            and object_rulings.rank(track, package, KINDS[family], n, record if "logic_difficulty" in record else capability) is not None]
+            and object_rulings.rank(track, package, KINDS[family], n, ruling_settings, legacy=legacy_rulings) is not None]
 
 
 def add_tracks_probe(record, tracks, *args):
@@ -162,10 +163,10 @@ def add_tracks(record, tracks, packages, item_boxes, seed, player, tier, standal
         return
     # Carry selection settings only for a raced, enabled family with a project
     # ruling. Unrelated tracks and disabled Wumpasanity preserve their wire.
-    contents = {packages.get(t.get("package_id"), {}).get("content_id") for t in tracks if t["origin"] == "custom"}
     enabled = {kind for kind, on in zip(KINDS, (record["itemboxsanity"], record["wumpasanity"] & 1,
                                                record["wumpasanity"] & 2)) if on}
-    ruled = any(content in contents and kind in enabled for content, kind, ordinal in object_rulings.RULINGS)
+    ruled = any(object_rulings.applies_to(packages.get(t.get("package_id")), enabled)
+                for t in tracks if t["origin"] == "custom")
     if not ruled:
         record.pop("logic_difficulty", None)
         record.pop("boost_blue_fire", None)
@@ -247,8 +248,11 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None)
                     fields = dict(needs="none")
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
+                # Older rooms persisted these settings when they applied a ruling
+                # by raw key. Preserve those rooms even when their LEV differs.
+                saved_ruling = "logic_difficulty" in record
                 rank = object_rulings.rank(t, (packages or {}).get(t.get("package_id")), kind, n,
-                                           record if "logic_difficulty" in record else capability)
+                                           record if saved_ruling else capability, legacy=saved_ruling)
                 if rank and (capability or {}).get("boost_mode"):
                     c["boost"] = max(c.get("boost", 0), rank)
                 if capability and capability.get("stats_mode") and fields.get("shortcut") == 2:
@@ -316,7 +320,8 @@ def validate(record, plan):
             numbers = row[kind]
             standalone = any(e["kind"] == "track" and e.get("track_id") == tid and e["id"] in
                              {p["entry_id"] for p in plan["pads"]} for e in plan["entries"])
-            pool = eligible(t, f, record, plan.get("item_boxes") if standalone else None, package, plan.get("capability"))
+            pool = eligible(t, f, record, plan.get("item_boxes") if standalone else None, package,
+                            plan.get("capability"), legacy_rulings="logic_difficulty" in record)
             require(type(numbers) is list and all(type(n) is int for n in numbers) and numbers == sorted(set(numbers)), "ordinal shape")
             count = min(len(pool), record["itemboxsanity"]) if f == 0 else len(pool) if record["wumpasanity"] & f else 0
             require(len(numbers) == count and set(numbers) <= set(pool), "ordinal pick mismatch")

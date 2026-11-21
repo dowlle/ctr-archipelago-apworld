@@ -125,6 +125,18 @@ class TestHardOnly(unittest.TestCase):
                 self.assertFalse({"Tizi Madness", "cocoteamracing-track-3"} & set(world.options.required_entries.value))
                 self.assertNotIn(name, world.options.track_modes.value)
 
+    def test_transferred_names_go_with_an_excluded_tizi_package(self):
+        first = tizi_descriptor()
+        other_copy = dict(first, display_name="Old Tizi title")
+        base = copy.deepcopy(content_plan.PACKAGES[1])
+        options = options_with([first, other_copy, base], required=["Old Tizi title"])
+        options["shortcut_knowledge"] = "medium"
+        options["content_pool"]["tracks"]["overrides"] = {"Old Tizi title": ["trophy"]}
+        world = make_world(options)
+        self.assertFalse(plan_has(world.ctr_content_plan, first))
+        self.assertNotIn("Old Tizi title", world.options.required_entries.value)
+        self.assertNotIn("Old Tizi title", world.options.track_modes.value)
+
     def test_a_shared_title_keeps_the_other_tracks_options(self):
         # An impostor titled "Tizi Madness" stays in an easy seed, and so does
         # a track_modes entry by that title, which may mean it.
