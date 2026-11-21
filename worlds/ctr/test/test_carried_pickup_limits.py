@@ -117,12 +117,11 @@ class TestCarriedPickupLimits(unittest.TestCase):
             self.assertEqual(exclusion, dict(track_id=tid, lev_sha256="ab" * 32,
                                              crates=[dict(ordinal=1, pos=None)]))
             rows = [r for r in plan["sanity"]["tracks"] if r["track_id"] == tid]
-            if fixture is matsuri:
-                row, = rows
-                self.assertNotIn(1, row["weapon_crate"])
-                self.assertNotIn(reviewed + 1, row["weapon_crate"])
-            else:
-                self.assertFalse(rows)
+            # Main now names the Lockbox alias as North Pole, giving it a
+            # sanity block while its reviewed pickup bounds stay package-specific.
+            row, = rows
+            self.assertNotIn(1, row["weapon_crate"])
+            self.assertNotIn(reviewed + 1, row["weapon_crate"])
             self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
 
     def test_foreign_pin_does_not_demand_its_exact_exclusion_in_a_version_two_room(self):

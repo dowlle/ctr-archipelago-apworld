@@ -32,6 +32,16 @@ from . import destinations
 from .location_class import LocationClass
 
 CORTEX_VORTEX = destinations.CORTEX_VORTEX
+CORTEX_TRACK_KEY = "cortex-vortex"
+CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
+CORTEX_VRM_SHA256 = "4131444b9d1d53971befcfd11349efceaf887c20b795c8890fdcb2c36bdff07d"
+
+
+def bundled_copy(package):
+    """True for a registered Cortex Vortex key with the exact bundled pair."""
+    return (destinations.canonical_track_key(package["content_id"]) == CORTEX_TRACK_KEY
+            and package["files"][0]["sha256"] == CORTEX_LEV_SHA256
+            and package["files"][1]["sha256"] == CORTEX_VRM_SHA256)
 
 
 #: Virtual destination ID, outside {0..27, 100..104}.

@@ -211,18 +211,29 @@ class TestCortexVortexTrack(unittest.TestCase):
         saphi = copy.deepcopy(UNKNOWN)
         saphi.update(id="package/cortex-vortex/1.1.2", content_id="cortex-vortex", revision="1.1.2",
                      uuid="f1a619f0-9176-5e75-ad96-00db77d8cf2b", display_name="Cortex Vortex", author="Lockheart")
-        saphi["files"] = [dict(f, sha256=h * 32) for f, h in zip(saphi["files"], ("aa", "bb"))]
+        saphi["files"] = [dict(f, sha256=h) for f, h in zip(
+            saphi["files"], (cortex_vortex.CORTEX_LEV_SHA256, cortex_vortex.CORTEX_VRM_SHA256))]
         return saphi
 
-    def test_a_downloaded_cortex_vortex_with_the_bundled_one_is_refused(self):
-        # A tester report (alpha2, 2026-11-04): a seed had two Cortex Vortex pads,
-        # the bundled track and a downloaded copy listed in custom_tracks.
-        for required in (True, False):
-            with self.subTest(own_pad=required), self.assertRaises(OptionError) as caught:
-                make_world(cv_options(custom=[self.saphi_cortex_vortex()], required=required), seed=6)
-            message = str(caught.exception)
-            self.assertIn("package/cortex-vortex/1.1.2", message)
-            self.assertIn("one Cortex Vortex", message)
+    def test_bundled_cortex_wins_with_or_without_matching_files(self):
+        for exact in (True, False):
+            with self.subTest(exact=exact):
+                package = self.saphi_cortex_vortex()
+                if not exact:
+                    package["files"][0]["sha256"] = "ab" * 32
+                package["display_name"] = "Downloaded Cortex"
+                options = cv_options(custom=[package], required=False)
+                options["content_pool"]["tracks"]["overrides"] = {"Downloaded Cortex": ["relic"]}
+                world = make_world(options, seed=6)
+                plan = world.ctr_content_plan
+                self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
+                self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+                self.assertNotIn(package["id"], {p["id"] for p in plan["packages"]})
+                self.assertEqual(world.ctr_duplicate_track_count, 1)
+
+        options["content_pool"]["tracks"]["overrides"]["cortex-vortex"] = ["trophy"]
+        plan = make_world(options, seed=6).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["trophy"])
 
     def swap_options(self, pinned=False):
         """`cortex_vortex_track: off` and a downloaded copy listed with the other tracks;
@@ -234,6 +245,16 @@ class TestCortexVortexTrack(unittest.TestCase):
         if not pinned:
             required.remove("custom/cortex-vortex/1.1.2")
         return options
+
+    def test_dropped_title_does_not_take_the_bundled_tracks_override(self):
+        first = copy.deepcopy(UNKNOWN)
+        second = dict(first, display_name="Cortex Vortex")
+        options = cv_options(custom=[first, second])
+        options["content_pool"]["required_entries"] = [content_plan.package_track_id(first), CV]
+        options["content_pool"]["tracks"]["overrides"] = {"Cortex Vortex": ["relic"]}
+        plan = make_world(options, seed=6).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["relic"])
+        self.assertIn("trophy", next(t["modes"] for t in plan["tracks"] if t.get("package_id") == first["id"]))
 
     def test_the_bundled_cortex_vortex_replaces_a_downloaded_copy_when_the_option_is_off(self):
         # Ruling of 2026-11-05: "Bundled replaces it". Same pool as in_pool with the copy removed.
@@ -260,6 +281,48 @@ class TestCortexVortexTrack(unittest.TestCase):
             self.assertIn(CV, {t["id"] for t in world.ctr_content_plan["tracks"]})
             self.assertEqual(world.ctr_cortex_swap_mode, "own_pad")
 
+    def test_a_canonical_selector_swaps_an_exact_copy_stored_under_an_alias(self):
+        options = self.swap_options()
+        package = options["content_pool"]["tracks"]["custom"][-1]
+        alias = "lockbox-adventure-track-11"
+        package.update(content_id=alias, id=f"package/{alias}/{package['revision']}")
+        options["content_pool"]["required_entries"].append("cortex-vortex")
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["trophy"]}
+        world = make_world(options, seed=3)
+        self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_OWN_PAD)
+        self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["trophy"])
+
+    def test_swapping_an_exact_copy_preserves_other_tracks_literal_selectors(self):
+        from .test_custom_packages import UNKNOWN
+
+        options = self.swap_options()
+        packages = options["content_pool"]["tracks"]["custom"]
+        alias = "lockbox-adventure-track-11"
+        packages[-1].update(content_id=alias, id=f"package/{alias}/{packages[-1]['revision']}",
+                            display_name="Crash Cove")
+        other = dict(UNKNOWN, id="package/fixture-other/2.1", content_id="fixture-other",
+                     uuid="1f0e0d0c-0b0a-4908-8706-050403020100", display_name=alias,
+                     files=[dict(pin, sha256=digest * 32) for pin, digest in zip(UNKNOWN["files"], ("e5", "f6"))])
+        packages.append(other)
+        options["content_pool"]["required_entries"].append(alias)
+        options["content_pool"]["tracks"]["overrides"] = {alias: ["trophy"], "retail:3": ["trophy"]}
+        world = make_world(options, seed=3)
+        self.assertEqual(world.options.cortex_vortex_track.value, content_plan.CORTEX_IN_POOL)
+        self.assertIn(alias, world.options.required_entries.value)
+        self.assertEqual(world.options.track_modes.value[alias], ["trophy"])
+        self.assertEqual(track_of(world.ctr_content_plan, "retail:3")["modes"], ["trophy"])
+
+    def test_identified_copy_with_different_pins_keeps_its_own_files(self):
+        options = self.swap_options(pinned=True)
+        package = options["content_pool"]["tracks"]["custom"][-1]
+        package["files"][0]["sha256"] = "cd" * 32
+        package["capabilities"].update(weapon_crates=0, fruit_crates=0, wumpa=False)
+        world = make_world(options, seed=3)
+        plan = world.ctr_content_plan
+        self.assertNotIn(CV, {track["id"] for track in plan["tracks"]})
+        self.assertIn(package, plan["packages"])
+        self.assertEqual(world.options.cortex_vortex_track.value, 0)
+
     def test_the_swap_matches_in_pool_without_the_copy(self):
         swapped = make_world(self.swap_options(), seed=4).ctr_content_plan
         options = self.swap_options()
@@ -284,6 +347,16 @@ class TestCortexVortexTrack(unittest.TestCase):
         self.assertNotIn("Cortex Vortex Remix", world.options.track_modes.value)
         content_plan.generate(world)
         self.assertEqual(track_of(world.ctr_content_plan, CV)["modes"], ["relic"])
+
+    def test_with_cortex_off_the_first_exact_copy_keeps_its_mode(self):
+        options = self.swap_options(pinned=True)
+        copies = options["content_pool"]["tracks"]["custom"]
+        copies[-1]["display_name"] = "Downloaded Cortex"
+        copies.append(dict(copies[-1], display_name="Another Cortex"))
+        options["content_pool"]["tracks"]["overrides"] = {
+            "Downloaded Cortex": ["trophy"], "Another Cortex": ["relic"]}
+        plan = make_world(options, seed=3).ctr_content_plan
+        self.assertEqual(track_of(plan, CV)["modes"], ["trophy"])
 
     def test_the_swap_is_one_line_of_the_generator_summary(self):
         import logging

@@ -71,6 +71,9 @@ def emit_summary(world) -> bool:
     lines = summary_lines(world)
     if not lines:
         return False
+    dropped = getattr(world, "ctr_duplicate_track_count", 0)
+    if dropped:
+        lines[-1] += f" Duplicate custom track entries dropped: {dropped}."
     state["emitted"] = True
     logger.warning("CTR (%s): the generator adjusted these settings for this slot:\n%s",
                    slot_label(world), "\n".join("  - " + line for line in lines))

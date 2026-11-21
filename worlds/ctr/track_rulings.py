@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from functools import wraps
 
 from .box_spots import lev_pin
+from .destinations import canonical_track_key
 
 FEATURE = "carried_track_rulings_v1"
 # Rows are [LEV SHA-256, revision, first catalog version], latest reviewed first.
@@ -12,7 +13,13 @@ FEATURE = "carried_track_rulings_v1"
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
-RULING_VERSION = 3
+RULING_VERSION = 4
+# The two exact patch copies can arrive under the shared registry key.
+# Keep their pickup measurements independent of the downloadable release.
+COCO_PATCH_PINS = {
+    "af764b90d10fa952aac4502c89c5f0466dd4afdbaee7c3a65279624dfeb18aa2",  # St. Patrick 55
+    "65ab90d0024aae57ac09f23932f7bf46e5b6b4640a4fb5d16a214a36063a15a8",  # 30th Anniversary 169
+}
 _history = ContextVar("ctr_track_ruling_history", default=None)
 
 
@@ -57,7 +64,10 @@ regions = _scoped(lambda world: _recorded(world.ctr_content_plan))
 def reviewed(package, version=None):
     """Ordered project review identities for a track key."""
     version = RULING_VERSION if version is None else version
-    return tuple((row[1], row[0]) for row in REVIEWS.get((package or {}).get("content_id"), ())
+    key = (package or {}).get("content_id")
+    if version >= 4 and key == "coco-park-2025" and lev_pin(package) in COCO_PATCH_PINS:
+        return ()
+    return tuple((row[1], row[0]) for row in REVIEWS.get(key, ())
                  if (row[2] if len(row) > 2 else 1) <= version)
 
 
@@ -87,13 +97,13 @@ def source(package, pins):
     return next((old for _, old in reviews if old in pins), None)
 
 
-def scoped_source(package, refs):
+def scoped_source(package, refs, *, pins=()):
     """Resolve a revision-and-LEV pair for scoped ranks."""
     current = revision_ref(package)
     reviews = _reviews(package)
     if not reviews or current in reviews or (_history.get() is True and current in refs):
         return current
-    return next((ref for ref in reviews if ref in refs), (None, None))
+    return next((ref for ref in reviews if ref in refs or ref[1] in pins), (None, None))
 
 
 def scope(row):
@@ -171,15 +181,16 @@ def carried_sources(package):
     if finish_source in finish_refs and finish_source != current:
         result["finish"] = finish_source
     latest = reviews[0]
-    for family, rulings, key_size in (("letters", content_capability.LETTER_BOOST_RULINGS, 2),
-                                      ("objects", sanity.object_rulings.RULINGS, 3)):
-        keys = [row for row in rulings if row[0] == content]
-        refs = {row[-3:-1] for row in keys if len(row) > key_size and row[-1] <= scoped_version()}
-        selected = scoped_source(package, refs)
-        if selected in refs and selected != current:
-            result[family] = selected
-        elif any(len(row) == key_size for row in keys):
-            result[family] = latest
+    keys = [row for row in content_capability.LETTER_BOOST_RULINGS if row[0] == content]
+    refs = {row[-3:-1] for row in keys if len(row) > 2 and row[-1] <= scoped_version()}
+    selected = scoped_source(package, refs)
+    if selected in refs and selected != current:
+        result["letters"] = selected
+    elif any(len(row) == 2 for row in keys):
+        result["letters"] = latest
+    object_source = sanity.object_rulings.carried_source(package)
+    if object_source is not None:
+        result["objects"] = object_source
     if "finish" not in result and (content, None, None) in content_capability.USF_FINISH_RULINGS:
         result["finish"] = latest
     return result
@@ -232,10 +243,11 @@ def requires_pinned_lookup(plan):
     contents = {package["content_id"] for package in plan["packages"]}
     if not contents:
         return False
-    for rulings, base_size in ((content_capability.USF_FINISH_RULINGS, 3),
-                              (content_capability.LETTER_BOOST_RULINGS, 2),
-                              (object_rulings.RULINGS, 3)):
-        if any(len(key) > base_size and key[0] in contents and key[-1] <= scoped_version() for key in rulings):
+    roads = contents | {canonical_track_key(key) for key in contents}
+    for keys, rulings, base_size in ((contents, content_capability.USF_FINISH_RULINGS, 3),
+                                    (contents, content_capability.LETTER_BOOST_RULINGS, 2),
+                                    (roads, object_rulings.RULINGS, 3)):
+        if any(len(key) > base_size and key[0] in keys and key[-1] <= scoped_version() for key in rulings):
             return True
     pins_by_key = {key: {row[0] for row in rows} for key, rows in REVIEWS.items()}
     for package in plan["packages"]:

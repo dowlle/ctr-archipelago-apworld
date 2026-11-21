@@ -90,6 +90,9 @@ def leave_out_below_hard(world):
         except custom_packages.PackageError:
             continue
         names.discard(other["display_name"])
+    # A selector the duplicate pass assigned is handled against its surviving
+    # package ID after this filter.
+    names.difference_update(getattr(world, "ctr_transferred_track_selectors", ()))
     o.custom_tracks.value = kept
     o.required_entries.value = [n for n in o.required_entries.value if n not in names]
     o.track_modes.value = {k: v for k, v in o.track_modes.value.items() if k not in names}
