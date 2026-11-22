@@ -15,7 +15,7 @@ from worlds.AutoWorld import data_package_checksum
 from .custom_track_presentation import item_aliases, location_aliases
 
 
-def _relabel(canonical, owners, changed, player_name, kind="location"):
+def _relabel(canonical, owners, changed, player_name, kind, reserved_names):
     """{code: label} with conflicting per-player labels combined and every
     label unique, so the reverse name->ID map stays bijective."""
     labels = dict(canonical)
@@ -32,10 +32,10 @@ def _relabel(canonical, owners, changed, player_name, kind="location"):
     # A title can equal another title or even a registered retail name. Keep
     # the reverse name->ID map bijective, including deliberately crafted text.
     counts = Counter(labels.values())
-    reserved = set(labels.values()) | set(canonical.values())
+    reserved = set(labels.values()) | reserved_names
     for code in sorted(changed):
         label = labels[code]
-        if counts[label] > 1:
+        if counts[label] > 1 or (label != canonical[code] and label in reserved_names):
             candidate = f"{label} [{kind} {code}]"
             while candidate in reserved:
                 candidate += "*"
@@ -97,22 +97,26 @@ def embed_track_names(multiworld, multidata, game: str) -> None:
         return
 
     result = deepcopy(package)
-    if changed:
-        labels = _relabel(canonical, owners, changed, multiworld.player_name)
-        result["location_name_to_id"] = dict(sorted((name, code) for code, name in labels.items()))
-        renames = {canonical[code]: labels[code] for code in changed}
-        result["location_name_groups"] = {
+    # Old canonical labels must remain available as hint groups after relabeling.
+    reserved_names = set(canonical.values()) | set(canonical_items.values())
+    reserved_names.update(package.get("location_name_groups", {}))
+    reserved_names.update(package.get("item_name_groups", {}))
+    for kind, original, entries, renamed_codes in (
+        ("location", canonical, owners, changed),
+        ("item", canonical_items, item_owners, changed_items),
+    ):
+        if not renamed_codes:
+            continue
+        labels = _relabel(original, entries, renamed_codes, multiworld.player_name, kind, reserved_names)
+        result[f"{kind}_name_to_id"] = dict(sorted((name, code) for code, name in labels.items()))
+        renames = {original[code]: labels[code] for code in renamed_codes}
+        groups_key = f"{kind}_name_groups"
+        groups = {
             group: sorted(renames.get(name, name) for name in names)
-            for group, names in sorted(result.get("location_name_groups", {}).items())
+            for group, names in result.get(groups_key, {}).items()
         }
-    if changed_items:
-        labels = _relabel(canonical_items, item_owners, changed_items, multiworld.player_name, "item")
-        result["item_name_to_id"] = dict(sorted((name, code) for code, name in labels.items()))
-        renames = {canonical_items[code]: labels[code] for code in changed_items}
-        result["item_name_groups"] = {
-            group: sorted(renames.get(name, name) for name in names)
-            for group, names in sorted(result.get("item_name_groups", {}).items())
-        }
+        groups.update((old, [new]) for old, new in renames.items() if old != new)
+        result[groups_key] = dict(sorted(groups.items()))
     result.pop("checksum", None)
     result = dict(sorted(result.items()))
     result["checksum"] = data_package_checksum(result)
