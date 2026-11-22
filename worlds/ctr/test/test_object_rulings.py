@@ -165,6 +165,42 @@ class TestObjectRulings(unittest.TestCase):
                 self.assertEqual(track_rulings.generation(lambda _: object_rulings.carried_source(package))(None),
                                  ("1.0.0", pin) if raw == st_patrick else None)
 
+    def test_coco_patch_copies_keep_their_own_pickup_limits(self):
+        # The two patch copies share the reviewed release's registry key. From
+        # catalog version 4 they stay isolated: no carried rulings, and their
+        # pickup limits are their own measured counts, not the release's 0/0/0.
+        key = "coco-park-2025"
+        release = ("1.0.0", "ad527ad87af70b4a98e6de5624db8a16ac297b3723701b91b45a0b2987348234")
+        patches = {
+            "af764b90d10fa952aac4502c89c5f0466dd4afdbaee7c3a65279624dfeb18aa2": (0, 0, 0),
+            "65ab90d0024aae57ac09f23932f7bf46e5b6b4640a4fb5d16a214a36063a15a8": (12, 2, 0),
+        }
+
+        def package(revision, pin, counts):
+            return dict(id=f"package/{key}/{revision}", content_id=key, revision=revision,
+                        files=[dict(role="lev", sha256=pin)],
+                        capabilities=dict(zip(("weapon_crates", "fruit_crates", "loose_fruit"), counts)))
+
+        exact = package("1.0.0", release[1], (0, 0, 0))
+        for version in (1, 2, 3, 4):
+            self.assertEqual(track_rulings.reviewed(exact, version), (release,))
+        self.assertEqual(track_rulings.reviewed(exact), (release,))
+        self.assertFalse(track_rulings.generation(lambda _: track_rulings.inherits(exact))(None))
+        for pin, counts in patches.items():
+            with self.subTest(pin=pin):
+                patch_copy = package("2.0.0", pin, counts)
+                self.assertEqual(track_rulings.reviewed(patch_copy), ())
+                self.assertEqual(track_rulings.reviewed(patch_copy, 4), ())
+                # Catalog versions 1 to 3 still map the copies to the release.
+                for version in (1, 2, 3):
+                    self.assertEqual(track_rulings.reviewed(patch_copy, version), (release,))
+                def probe(_):
+                    return (track_rulings.inherits(patch_copy),
+                            track_rulings.carried_sources(patch_copy),
+                            track_rulings.source(patch_copy, sanity.REVIEWED_PICKUP_PINS),
+                            sanity.reviewed_counts(patch_copy))
+                self.assertEqual(track_rulings.generation(probe)(None), (False, {}, pin, None))
+
     def test_rule_added_to_a_previous_source_does_not_change_saved_rooms(self):
         from .. import track_rulings
 
