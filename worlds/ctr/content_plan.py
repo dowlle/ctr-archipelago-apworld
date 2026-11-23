@@ -1343,9 +1343,8 @@ def drop_duplicate_tracks(world):
         error("required_entries lists these selectors more than once: " + ", ".join(map(repr, repeated)))
     survivors = [package for package in packages
                  if not bundled or destinations.canonical_track_key(package["content_id"]) != CORTEX_TRACK_KEY]
-    from . import tizi_madness
-    if int(options.shortcut_knowledge.value) < tizi_madness.MIN_SHORTCUT_KNOWLEDGE:
-        survivors = [package for package in survivors if not tizi_madness.is_tizi_madness(package)]
+    shortcut_knowledge = int(options.shortcut_knowledge.value)
+    survivors = [package for package in survivors if not tizi_madness.is_seed_excluded(package, shortcut_knowledge)]
     reserved = {RETAIL[level] for level in retail_selection(options)} | {"default"}
     literal = reserved | {name for package in survivors for name in literal_track_names(package, package)}
     owned = reserved | {name for package in survivors for name in track_names(package, package, literal)}

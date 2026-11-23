@@ -202,8 +202,7 @@ class ctrAPWorld(World):
             content_plan.drop_duplicate_tracks(self)
             content_plan.swap_in_bundled_cortex(self)
             content_item_boxes.settings(self.options)
-            # A4-96: Tizi Madness only with hard shortcut knowledge.
-            content_plan.prune_transfers_for_excluded_tracks(self, tizi_madness.leave_out_below_hard(self))
+            content_plan.prune_transfers_for_excluded_tracks(self, tizi_madness.exclude_from_seed(self))
             content_plan.generate(self)
             track_origins.prune_unused_option_names(self)
         from .notices import emit_summary

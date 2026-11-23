@@ -77,21 +77,15 @@ class TestCortexSwap(unittest.TestCase):
 
 
 class TestTiziLeaveOut(unittest.TestCase):
-    def test_track_key_form_is_left_out_below_hard_like_content_id(self):
+    def test_track_key_form_is_left_out_at_every_level_like_content_id(self):
         legacy = tizi_descriptor()
-        for sk in ("easy", "medium"):
+        for sk in SK:
             with self.subTest(shortcut_knowledge=sk):
                 old = self.modern_world(legacy, sk, legacy_form=True)
                 new = self.modern_world(legacy, sk)
                 self.assertEqual(old.ctr_tizi_madness_left_out, [legacy["id"]])
                 self.assertEqual(new.ctr_tizi_madness_left_out, old.ctr_tizi_madness_left_out)
                 self.assertEqual(new.ctr_content_plan, old.ctr_content_plan)
-
-    def test_track_key_form_stays_at_hard(self):
-        legacy = tizi_descriptor()
-        old, new = self.modern_world(legacy, "hard", legacy_form=True), self.modern_world(legacy, "hard")
-        self.assertFalse(hasattr(new, "ctr_tizi_madness_left_out"))
-        self.assertEqual(new.ctr_content_plan, old.ctr_content_plan)
 
     @staticmethod
     def modern_world(descriptor, sk, legacy_form=False):
