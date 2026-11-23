@@ -328,7 +328,7 @@ jobs:
             extra_args+=(-m ci_meta.yaml)
           fi
           case "$CHECK_META" in
-            country-speedway|toasty-terrace|royal-raceway|green-hill|carried-track-rulings)
+            country-speedway|toasty-terrace|toasty-terrace-merged|royal-raceway|green-hill|carried-track-rulings)
               cp "../world-src/.github/fuzz/${CHECK_META}-meta.yaml" ci_meta.yaml
               extra_args+=(-m ci_meta.yaml)
               ;;
