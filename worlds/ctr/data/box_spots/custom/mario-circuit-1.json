@@ -1,0 +1,103 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "mario-circuit-1",
+  "name": "Mario Circuit 1",
+  "lev_sha256": [
+   "a9c8989b857d547eec29b0728899c8f34a878401c2c6dfb2a4b49b9301ab4e83"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -1214,
+    368,
+    -4897
+   ],
+   "rot_y": 368,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -1058,
+    323,
+    -4655
+   ],
+   "rot_y": 368,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -902,
+    281,
+    -4413
+   ],
+   "rot_y": 368,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -746,
+    239,
+    -4171
+   ],
+   "rot_y": 368,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    7614,
+    29,
+    -4169
+   ],
+   "rot_y": -1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    7355,
+    23,
+    -4294
+   ],
+   "rot_y": -1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    7095,
+    18,
+    -4418
+   ],
+   "rot_y": -1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    6836,
+    12,
+    -4543
+   ],
+   "rot_y": -1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV fb7119f0), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

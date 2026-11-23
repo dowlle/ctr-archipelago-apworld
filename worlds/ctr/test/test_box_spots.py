@@ -41,6 +41,8 @@ COMMUNITY = {
 }
 #: Spot numbers per file; every other file holds 1 to 15.
 COMMUNITY_NUMBERS = {"country-speedway": [n for n in range(1, 16) if n != 6]}
+#: Copied from donor builds (BX3, 2026-11-23), pending the picture review.
+BX3_COPIES = ['acid-lake', 'arctic-alleyway', 'assembly-lane-n-gage', 'big-forest', 'chasqui-rally', 'crystal-caves', 'dark-ruins', 'deep-sea-driving-n-gage', 'diwali', 'diwali-no-usf', 'draculas-castle', 'dreamy-heights', 'mario-circuit-1', 'neon-paradise', 'neonstadion', 'out-of-time-n-gage', 'sid-house', 'skater-s-retreat', 'the-dairy-track', 'tomb-temple', 'tribal-trials']
 ARABIAN_DAY = "arabian-heights-day"
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 
@@ -90,7 +92,7 @@ class TestConversion(unittest.TestCase):
 
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, ARABIAN_DAY, "sunset-vista"})
+        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, ARABIAN_DAY, "sunset-vista", *BX3_COPIES})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])

@@ -20,11 +20,32 @@
     "TURBO_TRACK"
   ],
   "custom": [
+    "acid-lake",
     "ancient-lake",
     "arabian-heights-day",
+    "arctic-alleyway",
+    "assembly-lane-n-gage",
+    "big-forest",
+    "chasqui-rally",
     "country-speedway",
+    "crystal-caves",
+    "dark-ruins",
+    "deep-sea-driving-n-gage",
+    "diwali",
+    "diwali-no-usf",
     "dk-pass",
+    "draculas-castle",
+    "dreamy-heights",
     "gossamer-s-castle",
-    "sunset-vista"
+    "mario-circuit-1",
+    "neon-paradise",
+    "neonstadion",
+    "out-of-time-n-gage",
+    "sid-house",
+    "skater-s-retreat",
+    "sunset-vista",
+    "the-dairy-track",
+    "tomb-temple",
+    "tribal-trials"
   ]
 }

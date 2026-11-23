@@ -1,0 +1,187 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "out-of-time-n-gage",
+  "name": "Out Of Time N-Gage",
+  "lev_sha256": [
+   "29a8b5b2b72b7dc83662834d2129272f6036fc06fb5fa1c71d547e791eb70ce8"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    9896,
+    -298,
+    12805
+   ],
+   "rot_y": -7,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)"
+  },
+  {
+   "number": 2,
+   "pos": [
+    9762,
+    -273,
+    13061
+   ],
+   "rot_y": -7,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)"
+  },
+  {
+   "number": 3,
+   "pos": [
+    9609,
+    -245,
+    13317
+   ],
+   "rot_y": -7,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)"
+  },
+  {
+   "number": 4,
+   "pos": [
+    9439,
+    -221,
+    13534
+   ],
+   "rot_y": -7,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)"
+  },
+  {
+   "number": 5,
+   "pos": [
+    22648,
+    217,
+    -1943
+   ],
+   "rot_y": 1203,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    22402,
+    182,
+    -1879
+   ],
+   "rot_y": 1203,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    22156,
+    147,
+    -1815
+   ],
+   "rot_y": 1203,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    21910,
+    126,
+    -1751
+   ],
+   "rot_y": 1203,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    10326,
+    -220,
+    -6743
+   ],
+   "rot_y": -1924,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    10375,
+    -243,
+    -6492
+   ],
+   "rot_y": -1924,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    10425,
+    -259,
+    -6242
+   ],
+   "rot_y": -1924,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    10474,
+    -274,
+    -5991
+   ],
+   "rot_y": -1924,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 13,
+   "pos": [
+    4663,
+    -25,
+    -384
+   ],
+   "rot_y": 2040,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 14,
+   "pos": [
+    4660,
+    -25,
+    -128
+   ],
+   "rot_y": 2040,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 15,
+   "pos": [
+    4656,
+    -25,
+    128
+   ],
+   "rot_y": 2040,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 16,
+   "pos": [
+    4653,
+    -25,
+    384
+   ],
+   "rot_y": 2040,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 135 (donor LEV 275de216), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

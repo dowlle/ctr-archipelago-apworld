@@ -1,0 +1,147 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "the-dairy-track",
+  "name": "The Dairy Track",
+  "lev_sha256": [
+   "ffdd944c6fc721d59aefdf23c2f90a9f7e4bf341bf952b501286b1354718fc50"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    9588,
+    33,
+    -14848
+   ],
+   "rot_y": -1890,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    15418,
+    79,
+    6363
+   ],
+   "rot_y": -27,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    15406,
+    78,
+    6650
+   ],
+   "rot_y": -27,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    15394,
+    78,
+    6938
+   ],
+   "rot_y": -27,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    15382,
+    78,
+    7226
+   ],
+   "rot_y": -27,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    11184,
+    16,
+    -6735
+   ],
+   "rot_y": 815,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    11458,
+    16,
+    -6644
+   ],
+   "rot_y": 815,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    11731,
+    16,
+    -6553
+   ],
+   "rot_y": 815,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    12004,
+    16,
+    -6462
+   ],
+   "rot_y": 815,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    9520,
+    14,
+    -15128
+   ],
+   "rot_y": -1893,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    9452,
+    0,
+    -15408
+   ],
+   "rot_y": -1892,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    9384,
+    0,
+    -15688
+   ],
+   "rot_y": -1892,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV a4cfe29c), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

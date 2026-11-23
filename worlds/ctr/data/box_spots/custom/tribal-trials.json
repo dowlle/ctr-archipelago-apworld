@@ -1,0 +1,115 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "tribal-trials",
+  "name": "Tribal Trials",
+  "lev_sha256": [
+   "a7b4aef448047524863c032d8121f65f74012f741d64a6ad80f2b07456fcbfcd",
+   "e2cc24322951d621c33ce00c976f5da22e6da0f143d5fd0b4ca0f560c130efb9"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    10980,
+    230,
+    -1372
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -4020,
+    -524,
+    2181
+   ],
+   "rot_y": 683,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -4269,
+    -524,
+    2037
+   ],
+   "rot_y": 683,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -4519,
+    -524,
+    1893
+   ],
+   "rot_y": 683,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    -4768,
+    -524,
+    1749
+   ],
+   "rot_y": 683,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    3028,
+    -832,
+    -6295
+   ],
+   "rot_y": -519,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    3228,
+    -791,
+    -6500
+   ],
+   "rot_y": -519,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    3428,
+    -755,
+    -6704
+   ],
+   "rot_y": -519,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    3628,
+    -724,
+    -6909
+   ],
+   "rot_y": -519,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 169 (donor LEV 662cbdd2), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

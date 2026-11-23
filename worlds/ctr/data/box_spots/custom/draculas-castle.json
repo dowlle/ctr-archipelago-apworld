@@ -1,0 +1,132 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "draculas-castle",
+  "name": "Draculas Castle",
+  "lev_sha256": [
+   "8c343aa6723ee2dec99d54f815e77e9e20798f657d6f4464f312529ffe4698f4"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -5515,
+    3224,
+    -20763
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -5515,
+    3224,
+    -20475
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -5515,
+    3224,
+    -20187
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -5515,
+    3224,
+    -19899
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)"
+  },
+  {
+   "number": 5,
+   "pos": [
+    -1675,
+    3224,
+    -13755
+   ],
+   "rot_y": 2048,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    -1675,
+    3224,
+    -14043
+   ],
+   "rot_y": 2048,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    -1675,
+    3224,
+    -14331
+   ],
+   "rot_y": 2048,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    -1675,
+    3224,
+    -14619
+   ],
+   "rot_y": 2048,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    4606,
+    4058,
+    -6189
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    4583,
+    4058,
+    -6592
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    4585,
+    4058,
+    -7016
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 72bf846c), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

@@ -1,0 +1,191 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "arctic-alleyway",
+  "name": "Arctic Alleyway",
+  "lev_sha256": [
+   "a31f66f5ac7d0fcf1a99cfa4af0d956e655f51a3fbc27b3511e24e23f139dda9"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    3238,
+    -74,
+    -382
+   ],
+   "rot_y": 2041,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    4434,
+    -74,
+    -4572
+   ],
+   "rot_y": -69,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    4461,
+    -74,
+    -4827
+   ],
+   "rot_y": -69,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    4489,
+    -74,
+    -5081
+   ],
+   "rot_y": -69,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    4516,
+    -74,
+    -5336
+   ],
+   "rot_y": -69,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    11689,
+    1507,
+    -14493
+   ],
+   "rot_y": -149,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    11747,
+    1510,
+    -14742
+   ],
+   "rot_y": -149,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    11805,
+    1514,
+    -14992
+   ],
+   "rot_y": -149,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    11863,
+    1517,
+    -15241
+   ],
+   "rot_y": -149,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    10528,
+    3739,
+    -177
+   ],
+   "rot_y": -1467,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    10727,
+    3740,
+    -16
+   ],
+   "rot_y": -1467,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    10927,
+    3740,
+    146
+   ],
+   "rot_y": -1467,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 13,
+   "pos": [
+    11126,
+    3741,
+    307
+   ],
+   "rot_y": -1467,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 14,
+   "pos": [
+    3235,
+    -74,
+    -126
+   ],
+   "rot_y": 2041,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 15,
+   "pos": [
+    3233,
+    -74,
+    130
+   ],
+   "rot_y": 2041,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 16,
+   "pos": [
+    3230,
+    -74,
+    386
+   ],
+   "rot_y": 2041,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 41 (donor LEV 407aac46), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}
