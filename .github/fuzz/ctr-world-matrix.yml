@@ -180,6 +180,7 @@
 # Reviewed track revisions with ordinary pickups, AP boxes and Boost varied.
 - {check_name: country-speedway,              check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'country-speedway'}
 - {check_name: toasty-terrace,                 check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'toasty-terrace'}
+- {check_name: toasty-terrace-merged,          check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'toasty-terrace-merged'}
 - {check_name: royal-raceway,                  check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'royal-raceway'}
 - {check_name: green-hill,                     check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'green-hill'}
 - {check_name: carried-track-rulings,          check_runs: 500, check_hook: 'hooks.ctr_ut_hook:Hook', check_mode: fuzz, check_tracker: 'yes', check_meta: 'carried-track-rulings'}
