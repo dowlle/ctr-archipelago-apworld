@@ -1,0 +1,140 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "deep-sea-driving-n-gage",
+  "name": "Deep Sea Driving N-Gage",
+  "lev_sha256": [
+   "42da6f96c336d9e41507c21d7c14a5f8f788f894ddee800622badd5304a763c1",
+   "21987d52a922a8ae6493eb926e79f3fa55e035b03cf3273db55e150fadc711f7"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -2315,
+    -59,
+    -17154
+   ],
+   "rot_y": 97,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -2351,
+    -95,
+    -17407
+   ],
+   "rot_y": 97,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -2387,
+    -90,
+    -17661
+   ],
+   "rot_y": 97,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -2423,
+    -55,
+    -17914
+   ],
+   "rot_y": 97,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 5,
+   "pos": [
+    19627,
+    74,
+    -23288
+   ],
+   "rot_y": -6,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 6,
+   "pos": [
+    19627,
+    73,
+    -23544
+   ],
+   "rot_y": -6,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 7,
+   "pos": [
+    19627,
+    81,
+    -23800
+   ],
+   "rot_y": -6,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 8,
+   "pos": [
+    19627,
+    104,
+    -24056
+   ],
+   "rot_y": -6,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)"
+  },
+  {
+   "number": 9,
+   "pos": [
+    5764,
+    403,
+    -204
+   ],
+   "rot_y": 1766,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    5673,
+    334,
+    30
+   ],
+   "rot_y": 1766,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    5581,
+    287,
+    264
+   ],
+   "rot_y": 1766,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    5490,
+    270,
+    498
+   ],
+   "rot_y": 1766,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta slot 47 (donor LEV 9a94ba59), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

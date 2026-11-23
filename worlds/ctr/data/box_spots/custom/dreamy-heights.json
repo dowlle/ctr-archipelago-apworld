@@ -1,0 +1,193 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "dreamy-heights",
+  "name": "Dreamy Heights",
+  "lev_sha256": [
+   "78d166b92bf813737842c0080880338c4bcdf812a7002f1ba587da262331c6c7",
+   "0a5e65b10ec24e32b57d3f40a8271051c7e77c0a28b1829eef7d53b402a9d408",
+   "9f85b2d5dbc2fe543ce024751fc6e08f77d7ba649f8ddfec936f016804a9bbf3"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -5814,
+    -610,
+    4862
+   ],
+   "rot_y": -1905,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -5731,
+    -584,
+    5235
+   ],
+   "rot_y": -1905,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -5647,
+    -551,
+    5609
+   ],
+   "rot_y": -1905,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -5564,
+    -511,
+    5982
+   ],
+   "rot_y": -1905,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    -12593,
+    694,
+    1317
+   ],
+   "rot_y": -1124,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    -12214,
+    665,
+    1380
+   ],
+   "rot_y": -1124,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    -11836,
+    644,
+    1444
+   ],
+   "rot_y": -1124,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    -11457,
+    607,
+    1507
+   ],
+   "rot_y": -1124,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    -12097,
+    836,
+    -7019
+   ],
+   "rot_y": 510,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    -12367,
+    826,
+    -7292
+   ],
+   "rot_y": 510,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    -12637,
+    825,
+    -7564
+   ],
+   "rot_y": 510,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    -12907,
+    833,
+    -7837
+   ],
+   "rot_y": 510,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 13,
+   "pos": [
+    1794,
+    -497,
+    -4699
+   ],
+   "rot_y": -461,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 14,
+   "pos": [
+    2043,
+    -495,
+    -4991
+   ],
+   "rot_y": -461,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 15,
+   "pos": [
+    2293,
+    -485,
+    -5283
+   ],
+   "rot_y": -461,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 16,
+   "pos": [
+    2542,
+    -465,
+    -5575
+   ],
+   "rot_y": -461,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 47 (donor LEV ec006933), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}

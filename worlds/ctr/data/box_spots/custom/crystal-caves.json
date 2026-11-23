@@ -1,0 +1,135 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "crystal-caves",
+  "name": "Crystal Caves",
+  "lev_sha256": [
+   "eddcd303e316e8eb41f885e8ec959a2c2d3db06e21727dfc50c61ab8a8048139"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -4286,
+    216,
+    -2740
+   ],
+   "rot_y": 1265,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -4522,
+    205,
+    -2645
+   ],
+   "rot_y": 1265,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -4758,
+    205,
+    -2551
+   ],
+   "rot_y": 1265,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -4994,
+    219,
+    -2456
+   ],
+   "rot_y": 1265,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 5,
+   "pos": [
+    103,
+    -376,
+    -12938
+   ],
+   "rot_y": -160,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 6,
+   "pos": [
+    164,
+    -309,
+    -13175
+   ],
+   "rot_y": -160,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 7,
+   "pos": [
+    226,
+    -212,
+    -13413
+   ],
+   "rot_y": -160,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 8,
+   "pos": [
+    287,
+    -88,
+    -13650
+   ],
+   "rot_y": -160,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 9,
+   "pos": [
+    5695,
+    -200,
+    -3348
+   ],
+   "rot_y": 1798,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 10,
+   "pos": [
+    5600,
+    -207,
+    -3111
+   ],
+   "rot_y": 1798,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 11,
+   "pos": [
+    5504,
+    -209,
+    -2873
+   ],
+   "rot_y": 1798,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  },
+  {
+   "number": 12,
+   "pos": [
+    5408,
+    -207,
+    -2626
+   ],
+   "rot_y": 1798,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 79 (donor LEV 0c74562b), pending review (2026-11-23)"
+  }
+ ],
+ "retired": []
+}

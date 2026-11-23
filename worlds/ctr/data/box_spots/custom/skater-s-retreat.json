@@ -1,0 +1,181 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "skater-s-retreat",
+  "name": "Skater's Retreat",
+  "lev_sha256": [
+   "80325e45c0fbc8203c99f82709a919d68e417dacbdb8134298ccd10bfeee8130",
+   "a728c5b1846323d544e5b973a00931d2cceb1f0a67cba5ee5752befcd4aaa4a9"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    8573,
+    340,
+    9117
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    8573,
+    340,
+    8797
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    8573,
+    340,
+    8477
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    8573,
+    340,
+    8157
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    7084,
+    172,
+    3776
+   ],
+   "rot_y": 1027,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    6764,
+    172,
+    3776
+   ],
+   "rot_y": 1027,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    6444,
+    172,
+    3776
+   ],
+   "rot_y": 1027,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    6124,
+    172,
+    3776
+   ],
+   "rot_y": 1027,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    1646,
+    310,
+    -1167
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 10,
+   "pos": [
+    495,
+    236,
+    -4044
+   ],
+   "rot_y": 0,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 11,
+   "pos": [
+    -2488,
+    340,
+    5305
+   ],
+   "rot_y": 512,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 12,
+   "pos": [
+    -2815,
+    340,
+    4973
+   ],
+   "rot_y": 512,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 13,
+   "pos": [
+    -3358,
+    698,
+    7488
+   ],
+   "rot_y": 512,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 14,
+   "pos": [
+    -3778,
+    698,
+    7874
+   ],
+   "rot_y": 512,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 15,
+   "pos": [
+    -4158,
+    698,
+    8231
+   ],
+   "rot_y": 512,
+   "source": "BX3 copy from Lockbox_Adventure.xdelta, slot 71 (donor LEV 563a3aa7), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}
