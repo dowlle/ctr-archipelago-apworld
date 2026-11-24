@@ -6,17 +6,19 @@ per seat on its own weapon crates (min(weapon_crates, 15)); generic slots use
 their reserved box codes. Cortex Vortex has none. The paired native parser
 reads the same records (native tools/test-content-plan-parity.py).
 """
+import contextlib
 import copy
 import json
 import unittest
+from unittest import mock
 
 from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from .. import content_item_boxes, content_plan, custom_packages, named_tracks
+from .. import box_spots, content_item_boxes, content_plan, custom_packages, named_tracks
 from ..custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
-from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS
+from ..item_boxes import BOX_RULES, ITEM_BOX_CLASS, SLOTS_PER_TRACK
 from ..Locations import CTR_LOCATION_IDS
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN, named_fixture
@@ -56,6 +58,24 @@ def box_options(custom=None, tier="medium", **extra):
     options.update(box_locations=True, shortcut_knowledge=tier, character_unlocks=False)
     options.update(extra)
     return options
+
+
+@contextlib.contextmanager
+def builtin_only():
+    """The 18 retail files as they shipped before A7-1: built-in spots only."""
+    r = {lid: dict(e, doc=dict(e["doc"], spots=[s for s in e["doc"]["spots"] if s.get("source") == "builtin"]))
+         for lid, e in box_spots.RETAIL_FILES.items()}
+    with mock.patch.dict(box_spots.RETAIL_FILES, r):
+        yield
+
+
+class BuiltinOnly(unittest.TestCase):
+    """Retail tests of the built-in seating: the retail files hold only their
+    built-in spots (15 or fewer per track, so every box is used and no random
+    pick is drawn), as before A7-1 added the 2026-11-24 spots."""
+
+    def setUp(self):
+        self.enterContext(builtin_only())
 
 
 def first_world(options, seed=0):
@@ -99,7 +119,7 @@ class TestOffKeepsTheWire(unittest.TestCase):
         self.assertNotIn("color_boxes_by_item", wire["ctr_options"])
 
 
-class TestRetailBoxes(unittest.TestCase):
+class TestRetailBoxes(BuiltinOnly):
     def test_every_tier_matches_the_frozen_seating(self):
         for tier, value in TIERS.items():
             world = make_world(box_options(tier=tier), seed=2)
@@ -134,7 +154,8 @@ class TestRetailBoxes(unittest.TestCase):
             seen += 1
             self.assertEqual(check.get("boost", 0), boost, check["display_name"])
             self.assertEqual(check.get("stats", False), stats, check["display_name"])
-        self.assertEqual(seen, len(BOX_RULES))
+        # Every built-in rule shows; the A7-1 Papu spot past 15 is not in these files.
+        self.assertEqual(seen, len([key for key in BOX_RULES if key[1] <= SLOTS_PER_TRACK]))
         self.assertTrue(by_name["Oxide Station: Item Box 6"]["stats"])
         self.assertNotIn("boost", by_name["Oxide Station: Item Box 6"])
 
@@ -144,7 +165,7 @@ class TestRetailBoxes(unittest.TestCase):
         plan = make_world(box_options(tier="hard", progressive_stats="shared_global"), seed=1).ctr_content_plan
         self.assertFalse([c for c in boxes(plan) if "boost" in c])
         self.assertEqual({c["display_name"] for c in boxes(plan) if c.get("stats")},
-                         {f"{t}: Item Box {s}" for (t, s), (_b, st) in BOX_RULES.items() if st})
+                         {f"{t}: Item Box {s}" for (t, s), (_b, st) in BOX_RULES.items() if st and s <= SLOTS_PER_TRACK})
 
 
 class TestCustomBoxes(unittest.TestCase):
@@ -224,7 +245,7 @@ class TestCustomBoxes(unittest.TestCase):
         self.assertEqual(custom_packages.admit(btp(65536))["capabilities"]["weapon_crates"], 65536)
 
 
-class TestLogic(unittest.TestCase):
+class TestLogic(BuiltinOnly):
     def test_boost_and_stat_terms_gate_the_box(self):
         world = make_world(box_options(tier="hard", progressive_boost="shared_global",
                                        progressive_stats="shared_global"), seed=1)

@@ -22,7 +22,7 @@ from Options import OptionError
 
 from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
 from ..Locations import CTR_LOCATION_IDS
-from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, first_world, refused
+from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN
 
@@ -68,15 +68,6 @@ def spot_files(retail=(), custom=()):
     r = {e["doc"]["track"]["level_id"]: e for e in (entry(f"box_spots/retail/{n}.json") for n in retail)}
     c = {e["doc"]["track"]["track_key"]: e for e in (entry(f"box_spots/custom/{n}.json") for n in custom)}
     with mock.patch.dict(box_spots.RETAIL_FILES, r), mock.patch.dict(box_spots.CUSTOM_FILES, c):
-        yield
-
-
-@contextlib.contextmanager
-def builtin_only():
-    """The 18 retail files as they shipped before A7-1: built-in spots only."""
-    r = {lid: dict(e, doc=dict(e["doc"], spots=[s for s in e["doc"]["spots"] if s.get("source") == "builtin"]))
-         for lid, e in box_spots.RETAIL_FILES.items()}
-    with mock.patch.dict(box_spots.RETAIL_FILES, r):
         yield
 
 
@@ -577,3 +568,16 @@ class TestDowlleRetailSpots(unittest.TestCase):
                 state.sweep_for_advancements()
                 self.assertTrue(world.multiworld.can_beat_game(state))
                 self.assertTrue(all(loc.can_reach(state) for loc in world.multiworld.get_locations()))
+
+    def test_picked_boxes_carry_their_rules(self):
+        options = box_options(custom=[], tier="hard", progressive_boost="shared_global",
+                              progressive_stats="shared_global", item_box_count=50)
+        for seed in (1, 2):
+            plan = first_world(options, seed=seed).ctr_content_plan
+            retail = [c for c in boxes(plan) if c["owner"].startswith("retail:")]
+            self.assertEqual(len(retail), 639)
+            for check in retail:
+                track, _, slot = check["display_name"].rpartition(": Item Box ")
+                boost, stats = item_boxes.BOX_RULES.get((track, int(slot)), (0, False))
+                self.assertEqual(check.get("boost", 0), boost, check["display_name"])
+                self.assertEqual(check.get("stats", False), stats, check["display_name"])
