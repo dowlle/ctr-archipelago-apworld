@@ -42,7 +42,9 @@ def allowed_looks(world) -> List[str]:
     passthrough = getattr(getattr(world, "multiworld", None), "re_gen_passthrough", {}).get(
         getattr(world, "game", ""))
     if passthrough:
-        names = passthrough.get("ctr_options", {}).get(WIRE_KEY, [])
+        names = (passthrough.get("ctr_options") or {}).get(WIRE_KEY) or []
+        if not isinstance(names, list):
+            names = []
         if hasattr(world.options, "character_looks"):
             world.options.character_looks.value = {n for n in names if n in LOOKS}
     option = getattr(world.options, "character_looks", None)

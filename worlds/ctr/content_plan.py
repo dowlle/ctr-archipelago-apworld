@@ -3580,6 +3580,9 @@ def _restore(world, slot_data):
         getattr(world.options, key).value = int(co.get(key, False))
     world.options.trap_display.value = co.get("trap_display", 0)
     world._ctr_trap_display_salt = co.get("trap_display_salt")
+    # Character looks (JL2): the envelope's list, absent meaning none.
+    from . import character_looks
+    character_looks.allowed_looks(world)
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
     # room's encounter block verbatim (no redraw), its fallback checked against
     # the plan's unlock wins.

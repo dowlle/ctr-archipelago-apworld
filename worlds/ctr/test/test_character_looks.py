@@ -130,3 +130,52 @@ class TestTrackerAndContentPlan(unittest.TestCase):
                                  json.dumps(empty.fill_slot_data(), sort_keys=True))
                 self.assertEqual([i.name for i in base.multiworld.itempool],
                                  [i.name for i in empty.multiworld.itempool])
+
+
+class TestRollsKeepTheirAlphabet(unittest.TestCase):
+    """With no looks enabled, random name rolls and group draws roll the same
+    names as before the look items existed (Codex review round 1)."""
+
+    def test_legacy_view_leaves_looks_out_of_rolls_and_shared_groups(self):
+        from .. import ctrAPWorld
+        from ..track_origins import legacy_option_world
+        view = legacy_option_world(ctrAPWorld)
+        self.assertNotIn("Joe Mama", view.item_names)
+        self.assertNotIn("Joe Mama", view.item_name_groups["Filler"])
+        self.assertNotIn("Joe Mama", view.item_name_groups["Everything"])
+        self.assertEqual(set(view.item_name_groups["Character Looks"]), {"Joe Mama"})
+        self.assertIn("Joe Mama", ctrAPWorld.item_name_groups["Filler"])
+
+    def test_filler_group_plando_rolls_as_before(self):
+        from BaseClasses import PlandoOptions
+        from Options import PlandoItem
+        from .. import ctrAPWorld
+        types = ctrAPWorld.options_dataclass.type_hints
+        for seed in range(40):
+            state = random.getstate()
+            try:
+                random.seed(seed)
+                plando = types["plando_items"]([PlandoItem({"Filler": 1}, ["Crash Cove: Trophy Race"])])
+                plando.verify(ctrAPWorld, "ContentPlan", PlandoOptions.items)
+                self.assertNotIn("Joe Mama", plando.value[0].items)
+            finally:
+                random.setstate(state)
+
+    def test_explicit_look_names_still_verify(self):
+        from BaseClasses import PlandoOptions
+        from Options import PlandoItem
+        from .. import ctrAPWorld
+        types = ctrAPWorld.options_dataclass.type_hints
+        plando = types["plando_items"]([PlandoItem({"Joe Mama": 1}, ["Crash Cove: Trophy Race"])])
+        plando.verify(ctrAPWorld, "ContentPlan", PlandoOptions.items)
+        hints = types["start_hints"](["Joe Mama"])
+        hints.verify(ctrAPWorld, "ContentPlan", PlandoOptions.none)
+
+    def test_malformed_wire_restores_to_none(self):
+        for value in (None, "Joe Mama", 3, ["Joe Biden"]):
+            with self.subTest(value=value):
+                world = SimpleNamespace(game="Crash Team Racing",
+                                        options=SimpleNamespace(character_looks=SimpleNamespace(value={"Joe Mama"})),
+                                        multiworld=SimpleNamespace(re_gen_passthrough={
+                                            "Crash Team Racing": {"ctr_options": {"character_looks": value}}}))
+                self.assertEqual(character_looks.allowed_looks(world), [])

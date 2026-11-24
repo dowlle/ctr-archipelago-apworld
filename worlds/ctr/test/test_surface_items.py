@@ -138,9 +138,7 @@ class TestOriginLetterGroups(unittest.TestCase):
             hints = types["start_hints"].from_text("random-low")
             hints.verify(ctrAPWorld, "ContentPlan", PlandoOptions.none)
             self.assertEqual(len(hints.value), 23)
-            # The roll draws from every item name, so a new item (Joe Mama,
-            # JL2) moves it; the K/N exclusion below is what this pins.
-            self.assertIn("Letter C (Custom Track 23)", hints.value)
+            self.assertIn("Letter C (Custom Track 5)", hints.value)
             self.assertTrue(all(not name.startswith(("Letter K (", "Letter N (")) for name in hints.value))
         finally:
             random.setstate(state)

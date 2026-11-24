@@ -54,11 +54,18 @@ def legacy_option_world(world):
     """The old alphabet of registered names for options rolled before the plan."""
     from .item_groups import letter_item_names
 
-    item_ids = {name: code for name, code in world.item_name_to_id.items() if not _origin_item(code)}
+    from .character_looks import GROUP as LOOK_GROUP, LOOKS
+
+    # Character looks (JL2) are left out the same way: a random name roll or a
+    # group draw (Filler, Everything) keeps the alphabet it had before them.
+    # The Character Looks group itself stays for YAMLs that name it.
+    item_ids = {name: code for name, code in world.item_name_to_id.items()
+                if not _origin_item(code) and name not in LOOKS}
     item_names = frozenset(item_ids)
     locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
     named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
-    item_groups = dict(world.item_name_groups)
+    item_groups = {group: (members if group == LOOK_GROUP else frozenset(members) - set(LOOKS))
+                   for group, members in world.item_name_groups.items()}
     item_groups["Everything"] = item_names
     item_groups["CTR Letters"] = frozenset(letter_item_names(named_items))
     return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
