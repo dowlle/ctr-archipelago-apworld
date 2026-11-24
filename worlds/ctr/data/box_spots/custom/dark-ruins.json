@@ -1,0 +1,137 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "dark-ruins",
+  "name": "Dark Ruins",
+  "lev_sha256": [
+   "8728705c81dacb2ace83a7ecc54e38ffdedde8696932656d37b9533b8ba7530b",
+   "429abe639478a96635fd61c1d14303276203bfdc05e277b5273d8c69000a04c9",
+   "ced2df2e83aef4759e0bb132fbd36f44c51d818b623d7950faec2407b8229589"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    3549,
+    393,
+    12830
+   ],
+   "rot_y": 956,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 2,
+   "pos": [
+    5938,
+    -557,
+    3412
+   ],
+   "rot_y": 105,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 3,
+   "pos": [
+    5893,
+    -520,
+    3162
+   ],
+   "rot_y": 105,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 4,
+   "pos": [
+    5847,
+    -484,
+    2912
+   ],
+   "rot_y": 105,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 5,
+   "pos": [
+    5802,
+    -452,
+    2662
+   ],
+   "rot_y": 105,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 6,
+   "pos": [
+    -6908,
+    1656,
+    6876
+   ],
+   "rot_y": 1089,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 7,
+   "pos": [
+    -7145,
+    1749,
+    6887
+   ],
+   "rot_y": 1089,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 8,
+   "pos": [
+    -7383,
+    1842,
+    6897
+   ],
+   "rot_y": 1089,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 9,
+   "pos": [
+    -7620,
+    1938,
+    6908
+   ],
+   "rot_y": 1089,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 10,
+   "pos": [
+    3294,
+    389,
+    12803
+   ],
+   "rot_y": 956,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 11,
+   "pos": [
+    3040,
+    385,
+    12777
+   ],
+   "rot_y": 956,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 12,
+   "pos": [
+    2785,
+    380,
+    12750
+   ],
+   "rot_y": 956,
+   "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  }
+ ],
+ "retired": []
+}

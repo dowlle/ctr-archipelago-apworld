@@ -1,0 +1,105 @@
+{
+ "format": "ctr-ap-box-spots",
+ "version": 1,
+ "track": {
+  "kind": "custom",
+  "track_key": "chasqui-rally",
+  "name": "Chasqui Rally",
+  "lev_sha256": [
+   "cbb60edfa5910d4414020e2399fe64ea0a912b253b050fcee01600ed40bc748f",
+   "421c54ae016fce4592804f122ee8d9ac35318ec98f04bec7377e3f4b39d97cc2",
+   "9201064be9731919a0b86590af2801f902c0c8704520521900e84faf17ecc06d"
+  ]
+ },
+ "spots": [
+  {
+   "number": 1,
+   "pos": [
+    -4403,
+    -15,
+    16274
+   ],
+   "rot_y": 289,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 2,
+   "pos": [
+    -4284,
+    -57,
+    16536
+   ],
+   "rot_y": 280,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 3,
+   "pos": [
+    -4164,
+    -74,
+    16798
+   ],
+   "rot_y": 279,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 4,
+   "pos": [
+    -4045,
+    -75,
+    17060
+   ],
+   "rot_y": 279,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 5,
+   "pos": [
+    3710,
+    -73,
+    1487
+   ],
+   "rot_y": 1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 6,
+   "pos": [
+    3969,
+    -73,
+    1362
+   ],
+   "rot_y": 1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 7,
+   "pos": [
+    4229,
+    -72,
+    1238
+   ],
+   "rot_y": 1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  },
+  {
+   "number": 8,
+   "pos": [
+    4488,
+    -70,
+    1113
+   ],
+   "rot_y": 1316,
+   "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
+   "needs": "none"
+  }
+ ],
+ "retired": []
+}
