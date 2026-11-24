@@ -40,7 +40,9 @@
     {"number": 40, "pos": [8061, 99, 2166], "rot_y": 1514, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
     {"number": 41, "pos": [10647, 114, 669], "rot_y": 1454, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
     {"number": 42, "pos": [11846, 114, -3352], "rot_y": 2231, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
-    {"number": 43, "pos": [3966, 689, -5555], "rot_y": 3088, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"}
+    {"number": 43, "pos": [3966, 689, -5555], "rot_y": 3088, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 44, "pos": [-5829, 575, 2218], "rot_y": 1910, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1b: dowlle ruled his placements boost 0 (2026-11-24 13:53 CET); ground map doubt: ground map: behind link L1 (only entry)"},
+    {"number": 45, "pos": [-6795, 575, 7361], "rot_y": 2416, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1b: dowlle ruled his placements boost 0 (2026-11-24 13:53 CET); ground map doubt: ground map: behind link L1 (only entry)"}
   ],
   "retired": []
 }

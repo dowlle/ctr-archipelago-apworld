@@ -44,7 +44,7 @@ COMMUNITY_NUMBERS = {"country-speedway": [n for n in range(1, 16) if n != 6]}
 ARABIAN_DAY = "arabian-heights-day"
 #: A7-1: the source of dowlle's retail spots and how many ship per LevelID.
 DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
-DOWLLE_2026_11_24_COUNTS = {0: 14, 1: 35, 2: 33, 3: 28, 4: 22, 5: 24, 6: 18, 7: 20, 8: 0, 9: 6, 10: 9, 11: 13, 12: 17, 13: 27, 14: 27, 15: 35, 16: 35, 17: 35}
+DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 
 
@@ -105,10 +105,11 @@ class TestConversion(unittest.TestCase):
             self.assertEqual(e["doc"]["retired"], [], e["path"])
 
     def test_dowlle_retail_spots_of_2026_11_24(self):
-        """A7-1: dowlle's Box Author Mode spots on the retail tracks. Only spots the
-        ground map puts on start ground ship (needs none), numbered from 16 in
-        the placement order after the built-ins, plus Papu's Pyramid box 50 (BX5
-        candidate C) with built-in spot 10's rule. Held spots have no number."""
+        """A7-1: dowlle's Box Author Mode spots on the retail tracks, numbered from
+        16 after the built-ins. dowlle ruled his placements boost 0 (A7-1b), so
+        they ship with needs none, except Papu's Pyramid box 50 (BX5 candidate
+        C) with built-in spot 10's rule. Spots flagged on 2026-11-08, airborne
+        spots and spots without ground under them stay held, without a number."""
         for lid, e in box_spots.RETAIL_FILES.items():
             new = [s for s in e["doc"]["spots"] if s.get("source") != "builtin"]
             self.assertEqual(len(new), DOWLLE_2026_11_24_COUNTS[lid], e["path"])
@@ -121,7 +122,7 @@ class TestConversion(unittest.TestCase):
                 else:
                     self.assertEqual(spot["needs"], "none", (e["path"], spot["number"]))
                     self.assertNotIn("shortcut", spot)
-        self.assertEqual(sum(DOWLLE_2026_11_24_COUNTS.values()), 398)
+        self.assertEqual(sum(DOWLLE_2026_11_24_COUNTS.values()), 546)
 
     def test_sunset_vista_file_is_the_approved_no_boost_file(self):
         """The in-game review of 2026-11-20: all 24 spots stay where they
@@ -575,7 +576,7 @@ class TestDowlleRetailSpots(unittest.TestCase):
         for seed in (1, 2):
             plan = first_world(options, seed=seed).ctr_content_plan
             retail = [c for c in boxes(plan) if c["owner"].startswith("retail:")]
-            self.assertEqual(len(retail), 639)
+            self.assertEqual(len(retail), 787)
             for check in retail:
                 track, _, slot = check["display_name"].rpartition(": Item Box ")
                 boost, stats = item_boxes.BOX_RULES.get((track, int(slot)), (0, False))
