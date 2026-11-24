@@ -25,7 +25,7 @@ warp_pad_rules racer_locked_pads shuffle_keys shuffle_gems
 podium_rungs cup_only_podium_rungs relic_perfect_checks lettersanity letters_per_track track_origin_letters cup_sweep_checks
 lap_completion_checks box_locations item_box_count itemboxsanity wumpasanity itemsanity
 crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_logic_scale wumpa_shop_progression wumpa_shop_hints
-item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up
+item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up character_looks
 progressive_starting_wumpa turbo_grant tizi_helper trap_display
 starting_character character_unlocks remove_playable_oxide starting_stat_class penta_stats editable_stats
 progressive_stats
@@ -60,7 +60,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2), 100)
+        self.assertEqual(len(SECTION_2), 101)  # + character_looks (JL2)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))
