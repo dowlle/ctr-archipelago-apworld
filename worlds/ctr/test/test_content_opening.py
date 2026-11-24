@@ -314,7 +314,8 @@ class TestCostedFixedKeyCapacity(unittest.TestCase):
     # The A4-71 author preference changes no cup of this seed (it has no custom tracks).
     # Whole-family hub bands give letters seed 169 enough paid slack (12).
     # Seed 170 still advertises 43 checks while paid support leaves only six.
-    cases = (("letters", 170, 43), ("racers", 83, 58))
+    # A7-1: the 2026-11-24 retail box spots let racers seed 83 open 68 (from 58).
+    cases = (("letters", 170, 43), ("racers", 83, 68))
 
     def options(self, name):
         path = Path(__file__).parent / "fixtures" / f"row13_fixed_key_{name}.yaml"
