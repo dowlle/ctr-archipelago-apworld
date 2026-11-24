@@ -1,0 +1,18 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "bowser-castle-1", "name": "Bowser Castle 1", "lev_sha256": ["0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9"]},
+  "spots": [
+    {"number": 1, "pos": [5620, 216, 413], "rot_y": 1810, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 2, "pos": [3193, 124, -8915], "rot_y": 2944, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 3, "pos": [-122, 744, -9480], "rot_y": 2911, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 4, "pos": [-3921, 801, -9236], "rot_y": 3104, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 5, "pos": [-3180, 997, -5663], "rot_y": 951, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24"},
+    {"number": 6, "pos": [-1004, 1134, -5761], "rot_y": 1076, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24"},
+    {"number": 7, "pos": [-1892, -133, -2282], "rot_y": 2950, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L5 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"},
+    {"number": 8, "pos": [-5346, -133, -2469], "rot_y": 3055, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 9, "pos": [-4670, -133, 285], "rot_y": 1050, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 10, "pos": [-1857, -134, -367], "rot_y": 1159, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"}
+  ],
+  "retired": []
+}

@@ -99,6 +99,330 @@
    "rot_y": 1316,
    "source": "BX3 copy from LRG2Pancho build (donor LEV 9bba2b38), pending review (2026-11-23)",
    "needs": "none"
+  },
+  {
+   "number": 9,
+   "pos": [
+    -3803,
+    -49,
+    -303
+   ],
+   "rot_y": 3029,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 10,
+   "pos": [
+    809,
+    31,
+    -1376
+   ],
+   "rot_y": 2076,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 11,
+   "pos": [
+    1025,
+    141,
+    -2401
+   ],
+   "rot_y": 1018,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 12,
+   "pos": [
+    2972,
+    -66,
+    2478
+   ],
+   "rot_y": 3427,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 13,
+   "pos": [
+    2746,
+    -48,
+    7490
+   ],
+   "rot_y": 326,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 14,
+   "pos": [
+    4530,
+    272,
+    9835
+   ],
+   "rot_y": 38,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 15,
+   "pos": [
+    1134,
+    252,
+    10343
+   ],
+   "rot_y": 2836,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 16,
+   "pos": [
+    -2802,
+    42,
+    11103
+   ],
+   "rot_y": 3944,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 17,
+   "pos": [
+    -2980,
+    365,
+    14156
+   ],
+   "rot_y": 36,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 18,
+   "pos": [
+    -5285,
+    -39,
+    17858
+   ],
+   "rot_y": 2607,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 19,
+   "pos": [
+    -8350,
+    96,
+    14945
+   ],
+   "rot_y": 1060,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 20,
+   "pos": [
+    -6217,
+    -154,
+    4488
+   ],
+   "rot_y": 1650,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 21,
+   "pos": [
+    -5144,
+    218,
+    2713
+   ],
+   "rot_y": 1904,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 22,
+   "pos": [
+    -7784,
+    -68,
+    393
+   ],
+   "rot_y": 1467,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 23,
+   "pos": [
+    -7114,
+    -37,
+    -559
+   ],
+   "rot_y": 1679,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 24,
+   "pos": [
+    -3906,
+    180,
+    0
+   ],
+   "rot_y": 1209,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 25,
+   "pos": [
+    1456,
+    204,
+    -1063
+   ],
+   "rot_y": 1650,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 26,
+   "pos": [
+    2818,
+    494,
+    -1359
+   ],
+   "rot_y": 587,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 27,
+   "pos": [
+    1206,
+    -24,
+    3434
+   ],
+   "rot_y": 3955,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 28,
+   "pos": [
+    220,
+    -8,
+    3110
+   ],
+   "rot_y": 2588,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 29,
+   "pos": [
+    -670,
+    562,
+    10089
+   ],
+   "rot_y": 3114,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 30,
+   "pos": [
+    -2266,
+    551,
+    14577
+   ],
+   "rot_y": 169,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 31,
+   "pos": [
+    -6200,
+    -16,
+    15272
+   ],
+   "rot_y": 2196,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 32,
+   "pos": [
+    -7445,
+    372,
+    10825
+   ],
+   "rot_y": 1949,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 33,
+   "pos": [
+    -4908,
+    -257,
+    4163
+   ],
+   "rot_y": 1807,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 34,
+   "pos": [
+    -7940,
+    -74,
+    1899
+   ],
+   "rot_y": 2238,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
+  },
+  {
+   "number": 35,
+   "pos": [
+    -4760,
+    -74,
+    360
+   ],
+   "rot_y": 1064,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: on start ground"
   }
  ],
  "retired": []

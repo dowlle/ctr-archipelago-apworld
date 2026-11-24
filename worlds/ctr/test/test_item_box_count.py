@@ -12,7 +12,7 @@ from unittest import mock
 from Options import OptionError
 from .. import box_spots, content_plan
 from ..Options import ItemBoxCount
-from .test_content_item_boxes import box_options, boxes, first_world, btp
+from .test_content_item_boxes import before_cp1, box_options, boxes, first_world, btp
 from .test_content_plan import make_world
 
 
@@ -25,7 +25,7 @@ def fifty_spots(custom=False):
     entry["sha256"] = hashlib.sha256(json.dumps(entry["doc"]).encode()).hexdigest()
     named = copy.deepcopy(entry)
     named["doc"]["track"] = dict(track_key="baby-t-park", lev_sha256=[box_spots.lev_pin(btp())])
-    with mock.patch.dict(box_spots.RETAIL_FILES, {3: entry}), mock.patch.dict(
+    with before_cp1(), mock.patch.dict(box_spots.RETAIL_FILES, {3: entry}), mock.patch.dict(
             box_spots.CUSTOM_FILES, {"baby-t-park": named} if custom else {}):
         yield
 

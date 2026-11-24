@@ -17,7 +17,26 @@
     {"number": 12, "pos": [-533, 340, -15209], "rot_y": 2865, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #231"},
     {"number": 13, "pos": [-3589, -287, -666], "rot_y": 2446, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #231"},
     {"number": 14, "pos": [665, -311, 4102], "rot_y": 628, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #231"},
-    {"number": 15, "pos": [4418, -310, 2164], "rot_y": 91, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #231"}
+    {"number": 15, "pos": [4418, -310, 2164], "rot_y": 91, "needs": "none", "source": "community", "credit": "Discord community", "review": "apworld PR #231"},
+    {"number": 16, "pos": [3378, -264, -4353], "rot_y": 1952, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 17, "pos": [3696, -46, -8506], "rot_y": 2018, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 18, "pos": [2491, 285, -14689], "rot_y": 2627, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 19, "pos": [701, 325, -14766], "rot_y": 3350, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 20, "pos": [-2681, -120, -10923], "rot_y": 3847, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 21, "pos": [-2561, -250, -8757], "rot_y": 398, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 22, "pos": [-1412, -265, -5338], "rot_y": 3897, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 23, "pos": [-2696, -270, -888], "rot_y": 3818, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 24, "pos": [-2077, -264, 1613], "rot_y": 429, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 25, "pos": [2002, -264, 3243], "rot_y": 1496, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 26, "pos": [3514, -265, -1018], "rot_y": 1959, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 27, "pos": [2991, -75, -10366], "rot_y": 2064, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 28, "pos": [1949, 29, -12316], "rot_y": 2761, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 29, "pos": [-1239, -263, -7709], "rot_y": 604, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 30, "pos": [-166, -264, -6226], "rot_y": 277, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 31, "pos": [-425, -264, -4118], "rot_y": 3709, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 32, "pos": [-1919, -265, 2620], "rot_y": 558, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 33, "pos": [1024, -290, 2412], "rot_y": 1244, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 34, "pos": [2732, -266, 610], "rot_y": 1811, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"}
   ],
   "retired": []
 }

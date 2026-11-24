@@ -131,6 +131,187 @@
    ],
    "rot_y": 956,
    "source": "BX3 copy from Crash-30Anniversary_Adventure.xdelta, slot 119 (donor LEV db0a1f20), pending review (2026-11-23)"
+  },
+  {
+   "number": 13,
+   "pos": [
+    2732,
+    -183,
+    5786
+   ],
+   "rot_y": 3588,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 14,
+   "pos": [
+    1843,
+    -86,
+    8184
+   ],
+   "rot_y": 28,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 15,
+   "pos": [
+    2827,
+    214,
+    10853
+   ],
+   "rot_y": -150,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 16,
+   "pos": [
+    -511,
+    376,
+    12347
+   ],
+   "rot_y": 2123,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 17,
+   "pos": [
+    -522,
+    685,
+    9106
+   ],
+   "rot_y": 2036,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2, L3 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 18,
+   "pos": [
+    -1635,
+    456,
+    6183
+   ],
+   "rot_y": 2750,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2, L3, L4 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 19,
+   "pos": [
+    -2759,
+    460,
+    4682
+   ],
+   "rot_y": 2087,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2, L3, L4 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 20,
+   "pos": [
+    -6564,
+    1427,
+    4901
+   ],
+   "rot_y": 3410,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 21,
+   "pos": [
+    -4583,
+    1910,
+    6129
+   ],
+   "rot_y": 1862,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 22,
+   "pos": [
+    -1798,
+    489,
+    182
+   ],
+   "rot_y": 1158,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 23,
+   "pos": [
+    2940,
+    -116,
+    -416
+   ],
+   "rot_y": 3953,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 24,
+   "pos": [
+    2853,
+    -224,
+    445
+   ],
+   "rot_y": 4021,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 25,
+   "pos": [
+    6819,
+    432,
+    840
+   ],
+   "rot_y": 404,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 26,
+   "pos": [
+    4636,
+    -579,
+    3284
+   ],
+   "rot_y": 2913,
+   "needs": "none",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24"
+  },
+  {
+   "number": 27,
+   "pos": [
+    990,
+    475,
+    13572
+   ],
+   "rot_y": 2705,
+   "needs": "boost",
+   "source": "dowlle, Box Author Mode, 2026-11-24",
+   "review": "CP1 ground map: behind link L1, L2 (least demanding chain)",
+   "note": "dowlle's stream call at 1:15 (\"that might need boost, I'm not sure\"): the last spot placed before the call at 1:15:03, behind jump links L1, L2"
   }
  ],
  "retired": []

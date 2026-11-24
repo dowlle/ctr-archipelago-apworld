@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "garden-speedway", "name": "Garden Speedway", "lev_sha256": ["a04e15057ee83c80d98f0e88eb513eb51286e123b11e82155203b7ef9a43b23e"]},
+  "spots": [
+    {"number": 1, "pos": [3715, 646, -375], "rot_y": 1052, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 2, "pos": [5967, 42, 43], "rot_y": 505, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 3, "pos": [8807, -347, -2831], "rot_y": 2120, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 4, "pos": [6574, -375, -5064], "rot_y": 3030, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 5, "pos": [4137, 417, -5373], "rot_y": 3183, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 6, "pos": [494, 70, -5752], "rot_y": 2532, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 7, "pos": [-3817, 964, -5462], "rot_y": 3528, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 8, "pos": [-8497, 1185, -3331], "rot_y": 3948, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 9, "pos": [-7246, 1320, 669], "rot_y": 670, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 10, "pos": [-1783, 86, -409], "rot_y": 1259, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 11, "pos": [9060, -113, -338], "rot_y": 1634, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 12, "pos": [503, 64, -4922], "rot_y": 2788, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 13, "pos": [-3208, 844, -6360], "rot_y": 3114, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 14, "pos": [-5991, 1141, -5056], "rot_y": 3410, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"},
+    {"number": 15, "pos": [-5016, 916, 1224], "rot_y": 1175, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground"}
+  ],
+  "retired": []
+}
