@@ -64,13 +64,48 @@ class TestCortexVortexMerged(unittest.TestCase):
                 self.assertTrue(content_plan.validate(older["content_plan"]))
                 tracker = make_world({}, passthrough=older, stop_before="pre_fill")
                 self.assertEqual(older["content_plan"], tracker.ctr_content_plan)
-            # Same checks, same terms: only the pin differs.
-            self.assertEqual(plan["checks"], older["content_plan"]["checks"])
+            # Same checks, same terms: recomputed from the older row's catalog entry.
+            p = older["content_plan"]
+            recomputed = sanity.checks(p["sanity"], p["tracks"], p["entries"], p["pads"], p["encounters"],
+                                       p.get("capability"), {pkg["id"]: pkg for pkg in p["packages"]})
+            self.assertEqual(recomputed, [c for c in plan["checks"] if c["kind"] in sanity.KINDS])
+            self.assertTrue(any(c["owner"] == "cortex_vortex" for c in recomputed))
             for digest in (SAPHI_1_1_2_LEV, cortex_vortex.CORTEX_RELIC_LEV_SHA256, "0" * 64):
                 bad = copy.deepcopy(plan)
                 cortex_row(bad)["lev_sha256"] = digest
                 with self.subTest(mode=mode, digest=digest[:8]), self.assertRaises(OptionError):
                     content_plan.validate(bad)
+
+
+class TestBundledCopy(unittest.TestCase):
+    def package(self, relic=None):
+        pin = lambda role, sha: {"role": role, "sha256": sha}
+        p = {"content_id": "cortex-vortex", "files": [pin("lev", cortex_vortex.CORTEX_LEV_SHA256),
+                                                     pin("vrm", cortex_vortex.CORTEX_VRM_SHA256)]}
+        if relic:
+            p["relic_files"] = [pin("lev", relic[0]), pin("vrm", relic[1])]
+        return p
+
+    def test_relic_pair_decides(self):
+        self.assertTrue(cortex_vortex.bundled_copy(self.package()))
+        self.assertTrue(cortex_vortex.bundled_copy(self.package(
+            (cortex_vortex.CORTEX_RELIC_LEV_SHA256, cortex_vortex.CORTEX_RELIC_VRM_SHA256))))
+        self.assertFalse(cortex_vortex.bundled_copy(self.package(("1" * 64, "2" * 64))))
+
+
+class TestSoloSeesBothPairs(unittest.TestCase):
+    def test_both_pairs_needed(self):
+        import os, tempfile
+        from ..solo import ctr_solo
+        with tempfile.TemporaryDirectory() as assets:
+            folder = os.path.join(assets, "tracks", "cortex-vortex")
+            os.makedirs(folder)
+            for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm", "CVortex Arcade All.sca"):
+                open(os.path.join(folder, name), "wb").close()
+            self.assertFalse(ctr_solo._cortex_installed(assets))
+            for name in ("CVortex Relic.lev", "CVortex Relic.vrm"):
+                open(os.path.join(folder, name), "wb").close()
+            self.assertTrue(ctr_solo._cortex_installed(assets))
 
 
 if __name__ == "__main__":

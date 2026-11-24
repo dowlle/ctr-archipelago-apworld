@@ -51,10 +51,15 @@ CORTEX_SANITY_PINS = (CORTEX_LEV_SHA256, CORTEX_LEGACY_LEV_SHA256)
 
 
 def bundled_copy(package):
-    """True for a registered Cortex Vortex key with the exact bundled pair."""
+    """True for a registered Cortex Vortex key with the exact bundled main pair
+    and, when it carries `relic_files`, the exact bundled relic pair. A copy
+    with another relic pair keeps its own Relic Race files and targets."""
+    relic = package.get("relic_files")
     return (destinations.canonical_track_key(package["content_id"]) == CORTEX_TRACK_KEY
             and package["files"][0]["sha256"] == CORTEX_LEV_SHA256
-            and package["files"][1]["sha256"] == CORTEX_VRM_SHA256)
+            and package["files"][1]["sha256"] == CORTEX_VRM_SHA256
+            and (not relic or (relic[0]["sha256"] == CORTEX_RELIC_LEV_SHA256
+                               and relic[1]["sha256"] == CORTEX_RELIC_VRM_SHA256)))
 
 
 #: Virtual destination ID, outside {0..27, 100..104}.

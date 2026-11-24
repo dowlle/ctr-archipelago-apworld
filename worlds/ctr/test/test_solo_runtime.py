@@ -1278,7 +1278,7 @@ class TestCustomTracks(SoloTestCase):
         folder = os.path.join(self.assets, "tracks", "cortex-vortex")
         os.makedirs(folder)
         self.assertNotIn("cortex-vortex", [t["id"] for t in self.tracks()])
-        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm", "CVortex Relic.lev", "CVortex Relic.vrm"):
             with open(os.path.join(folder, name), "wb") as handle:
                 handle.write(b"x")
         row = self.tracks()[0]
@@ -1295,7 +1295,7 @@ class TestCustomTracks(SoloTestCase):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         saphi = self.install("cortex-vortex", "1.1.6", "Cortex Vortex")
         folder = os.path.join(self.assets, "tracks", "cortex-vortex")
-        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm"):
+        for name in ("CVortex Arcade All.lev", "CVortex Arcade All.vrm", "CVortex Relic.lev", "CVortex Relic.vrm"):
             with open(os.path.join(folder, name), "wb") as handle:
                 handle.write(b"x")
         self.assertEqual([t["id"] for t in self.tracks()], ["cortex-vortex", saphi["id"], loop["id"]])
