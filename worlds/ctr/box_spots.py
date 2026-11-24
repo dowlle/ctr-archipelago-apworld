@@ -10,7 +10,10 @@ apworld are ever read: there is no player-side override (ruled 2026-11-06).
     converted one to one: spot n is the level's n-th row of native
     ap_placements_data.h, its logic fields come from the tables that used to be
     literals in item_boxes.py (test/fixtures/retail_box_tables.json keeps those
-    literals, and the conversion test rebuilds them from the files).
+    literals, and the conversion test rebuilds them from the files). dowlle's
+    Box Author Mode spots of 2026-11-24 (A7-1) follow from number 16: only
+    those the ground map puts on start ground (needs none), plus Papu's
+    Pyramid box 50 with spot 10's rule; held spots are not in the files.
   * Custom: data/box_spots/custom/<track_key>.json, only for a track with a
     named block (ruled 2026-11-06: a generic `Custom Track N` keeps crate
     seating), pinned to the LEV digests it was measured on. A file whose pins

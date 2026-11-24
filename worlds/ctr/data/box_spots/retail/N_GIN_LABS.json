@@ -17,7 +17,20 @@
     {"number": 12, "pos": [17776, 458, 6829], "rot_y": 4025, "needs": "none", "source": "builtin"},
     {"number": 13, "pos": [12854, 420, 19694], "rot_y": 2945, "needs": "none", "source": "builtin"},
     {"number": 14, "pos": [-2682, -768, 19444], "rot_y": 1537, "needs": "usf", "source": "builtin"},
-    {"number": 15, "pos": [2363, -768, 20378], "rot_y": 3397, "needs": "usf", "source": "builtin"}
+    {"number": 15, "pos": [2363, -768, 20378], "rot_y": 3397, "needs": "usf", "source": "builtin"},
+    {"number": 16, "pos": [16034, 1, 4516], "rot_y": 962, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 17, "pos": [17495, 1, 3593], "rot_y": 174, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 18, "pos": [12652, -768, 15930], "rot_y": 2035, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 19, "pos": [13262, -768, 13058], "rot_y": 1788, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 20, "pos": [12085, -768, 12618], "rot_y": 3964, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 21, "pos": [13714, -768, 8645], "rot_y": 1956, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 22, "pos": [11907, -768, 9198], "rot_y": 3276, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 23, "pos": [9030, -768, 10466], "rot_y": 3988, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 24, "pos": [8612, -768, 10584], "rot_y": 3098, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 25, "pos": [7885, -768, 10635], "rot_y": 2487, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 26, "pos": [8498, -384, 6402], "rot_y": 2005, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 27, "pos": [7856, 1, 3257], "rot_y": 3875, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 28, "pos": [10513, -768, 9594], "rot_y": 951, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"}
   ],
   "retired": []
 }

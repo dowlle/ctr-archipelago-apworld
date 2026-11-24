@@ -16,7 +16,16 @@
     {"number": 11, "pos": [-2753, 3387, -3], "rot_y": 1073, "needs": "usf", "source": "builtin"},
     {"number": 12, "pos": [4321, 1, -393], "rot_y": 795, "needs": "none", "no_gate": true, "source": "builtin"},
     {"number": 13, "pos": [4524, 1, 399], "rot_y": 2646, "needs": "none", "no_gate": true, "source": "builtin"},
-    {"number": 14, "pos": [-1390, 1, 5469], "rot_y": 3023, "needs": "none", "source": "builtin"}
+    {"number": 14, "pos": [-1390, 1, 5469], "rot_y": 3023, "needs": "none", "source": "builtin"},
+    {"number": 16, "pos": [5995, 1, 6799], "rot_y": 581, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 17, "pos": [5642, 1, 2725], "rot_y": 2060, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 18, "pos": [6080, 1, -660], "rot_y": 1953, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 19, "pos": [179, 1, 635], "rot_y": 3649, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 20, "pos": [191, 1, -586], "rot_y": 2059, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 21, "pos": [-172, 1, 6752], "rot_y": 3725, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 22, "pos": [-226, 1, 11366], "rot_y": 3106, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 23, "pos": [2328, 1, -93], "rot_y": 1087, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"},
+    {"number": 24, "pos": [5216, 1, 4340], "rot_y": 3951, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "A7-1 ground map: on start ground"}
   ],
   "retired": []
 }
