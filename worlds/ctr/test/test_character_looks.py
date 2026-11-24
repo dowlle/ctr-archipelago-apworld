@@ -213,3 +213,26 @@ class TestRound2(unittest.TestCase):
                 restore_legacy_link_pools(mw, ctrAPWorld)
                 self.assertEqual("Joe Mama" in group["item_pool"], expected)
                 self.assertIn("Wumpa Fruit", group["item_pool"])
+
+    def test_expanded_link_pool_keeps_enabled_looks(self):
+        """The framework has expanded the group already and the slot's link
+        option holds the legacy names (round 3 repro)."""
+        from .. import ctrAPWorld
+        from ..track_origins import legacy_option_world, restore_legacy_link_pools
+        legacy_filler = sorted(legacy_option_world(ctrAPWorld).item_name_groups["Filler"])
+
+        def slot(looks):
+            links = SimpleNamespace(value=[{"name": "Shared", "item_pool": legacy_filler}], legacy_value=[])
+            return SimpleNamespace(game=ctrAPWorld.game, ctr_content_plan={"required_features": []},
+                                   multiworld=SimpleNamespace(re_gen_passthrough={}),
+                                   options=SimpleNamespace(item_links=links,
+                                                           character_looks=SimpleNamespace(value=set(looks))))
+
+        for looks, expected in ((["Joe Mama"], True), ([], False)):
+            with self.subTest(looks=looks):
+                group = {"game": ctrAPWorld.game, "players": {1, 2}, "name": "Shared",
+                         "item_pool": set(legacy_filler) | {"Joe Mama"}, "local_items": set(),
+                         "non_local_items": set()}
+                mw = SimpleNamespace(groups={3: group}, worlds={1: slot(looks), 2: slot(looks)})
+                restore_legacy_link_pools(mw, ctrAPWorld)
+                self.assertEqual("Joe Mama" in group["item_pool"], expected)

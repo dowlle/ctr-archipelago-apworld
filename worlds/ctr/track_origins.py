@@ -119,13 +119,15 @@ def restore_legacy_link_pools(multiworld, world_type):
             shared &= set(link["item_pool"])
             excluded |= set(link.get("exclude", ()))
         groups = legacy_option_world(world_type).item_name_groups
-        pool = set()
-        for name in shared:
-            pool |= groups.get(name, {name})
-        # Character looks (JL2): the legacy groups leave them out, so a group
-        # link (Filler, Everything) adds the looks a member slot allows.
+        # Character looks (JL2): looks the framework already put in this
+        # link's pool stay when a member slot allows them (review round 3).
         from .character_looks import LOOKS, allowed_looks
         enabled = {look for w in worlds for look in allowed_looks(w)}
+        pool = set(group["item_pool"]) & set(LOOKS) & enabled
+        for name in shared:
+            pool |= groups.get(name, {name})
+        # The legacy groups leave looks out, so a group name (Filler,
+        # Everything) adds the looks a member slot allows.
         for name in shared:
             pool |= set(world_type.item_name_groups.get(name, ())) & set(LOOKS) & enabled
         for name in excluded:
