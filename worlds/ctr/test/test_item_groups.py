@@ -78,7 +78,9 @@ EXPECTED_GROUPS = {
     "Stats": set(STAT_ITEMS),
     "CTR Letters": set(),  # membership: test_ctr_letters_is_every_letter_item
     "Filler": {"Wumpa Fruit", "Small Wumpa Bundle", "Big Wumpa Bundle",
-               "Reserve Top-Up"},
+               "Reserve Top-Up", "Joe Mama"},
+    # Character looks (JL2): one filler item per look.
+    "Character Looks": {"Joe Mama"},
     "Ignore Ground Types": {"Ignore Grass", "Ignore Dirt", "Ignore Snow",
                             "Ignore Water", "Ignore Ice", "Ignore Sand"},
     **{f"{racer} Stats": {f"{chain} ({racer})" for chain in CHAINS}

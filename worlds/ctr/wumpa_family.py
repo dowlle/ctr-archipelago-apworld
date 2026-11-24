@@ -113,12 +113,18 @@ def filler_weights(world) -> Dict[str, int]:
     bundles-off seed byte-identical to a pre-activation seed, the same
     generation-neutrality property `trap_fill_percentage = 0` has.
     """
+    from . import character_looks
     top_up = reserve_top_up_enabled(world)
-    if not world.options.wumpa_bundles.value and not top_up:
+    looks = character_looks.allowed_looks(world)
+    if not world.options.wumpa_bundles.value and not top_up and not looks:
         return {"Wumpa Fruit": 1}
     weights = dict(FILLER_WEIGHTS) if world.options.wumpa_bundles.value else {"Wumpa Fruit": 6}
     if top_up:
         weights["Reserve Top-Up"] = 1
+    # Character looks (JL2): each allowed look at weight 1, after the existing
+    # names so a seed without looks draws exactly as before.
+    for look in looks:
+        weights[look] = character_looks.WEIGHT
     return weights
 
 

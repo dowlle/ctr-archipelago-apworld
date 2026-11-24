@@ -298,6 +298,7 @@ class TestMintedItems(unittest.TestCase):
             ("Limp Mode", 35010212, "trap"),
             ("Stuck Steering", 35010213, "trap"),
             ("Wumpa Leak", 35010214, "trap"),
+            ("Joe Mama", 35010215, "filler"),
         ])
         for row in ITEM_DATA:
             self.assertEqual(I[row["name"]], row["code"])
