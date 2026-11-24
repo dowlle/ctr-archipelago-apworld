@@ -10,12 +10,10 @@ a Mask; "everywhere" the track is raced.
 
 What this module owns, on the apworld side:
 
-1. Generation (`leave_out_below_hard`). With `shortcut_knowledge` easy or
-   medium the track never enters the seed: its descriptor leaves
-   `custom_tracks` before the plan is drawn, so it is no pad, cup leg, boss
-   venue or any other use, the same way a box above the chosen shortcut level
-   is left out rather than put out of logic. A `required_entries` or
-   `track_modes` name for it goes with it. With `hard` nothing changes.
+1. Generation (`exclude_from_seed`). The track is left out at every shortcut
+   knowledge level because parts of it can't be reached (A6-82, 2026-11-23).
+   Its descriptor leaves `custom_tracks` before the plan is drawn, along
+   with any `required_entries` or `track_modes` selectors for it.
 2. Logic (`MaskGates`). With Itemsanity on, every check raced on the track
    also needs the `Mask` weapon item: the region of its track pad or boss
    race, and every cup route from its first Tizi Madness leg on, plus the
@@ -46,6 +44,10 @@ PATCH_SHA256 = "17e43e108b7f732cb8302636f6984a3b0df59df6af517fffab0e860d00209b54
 BIGFILE_INDEX = 47
 #: The Itemsanity weapon item the logic asks for.
 MASK_ITEM = "Mask"
+# A6-82 (2026-11-23): hold Tizi Madness out of every seed until the closed
+# road and unreachable placements are fixed. Turning this off restores A4-96.
+EXCLUDE_FROM_ALL_SEEDS = True
+SEED_EXCLUSION_NOTICE = "Tizi Madness is left out of seeds for now because parts of the track can't be reached."
 #: `shortcut_knowledge` from which the track may appear (item_boxes.SK_HARD).
 MIN_SHORTCUT_KNOWLEDGE = 2
 
@@ -60,14 +62,19 @@ def is_tizi_madness(package):
     return pins.get("lev") == LEV_SHA256 and pins.get("vrm") == VRM_SHA256
 
 
-def leave_out_below_hard(world):
-    """Rule 1. Drop Tizi Madness from `custom_tracks` below hard shortcut
-    knowledge, with the names other options give it. A descriptor that does
-    not pass admission is kept as it is, so the normal admission error names
-    it. Returns the ids left out (empty when nothing changed)."""
+def is_seed_excluded(package, shortcut_knowledge=None):
+    """Whether the package is excluded, with no shortcut level on the Solo picker."""
+    below_hard = shortcut_knowledge is not None and shortcut_knowledge < MIN_SHORTCUT_KNOWLEDGE
+    return (EXCLUDE_FROM_ALL_SEEDS or below_hard) and is_tizi_madness(package)
+
+
+def exclude_from_seed(world):
+    """Drop Tizi Madness from `custom_tracks` and return the excluded IDs.
+
+    Preserve malformed descriptors so the normal admission error names them.
+    """
     o = world.options
-    if int(o.shortcut_knowledge.value) >= MIN_SHORTCUT_KNOWLEDGE:
-        return []
+    shortcut_knowledge = int(o.shortcut_knowledge.value)
     kept, dropped, names = [], [], set()
     for raw in o.custom_tracks.value:
         try:
@@ -75,7 +82,7 @@ def leave_out_below_hard(world):
         except custom_packages.PackageError:
             kept.append(raw)
             continue
-        if is_tizi_madness(package):
+        if is_seed_excluded(package, shortcut_knowledge):
             dropped.append(package["id"])
             names.update((package["display_name"], package["content_id"],
                           f"custom/{package['content_id']}/{package['revision']}"))
@@ -97,7 +104,9 @@ def leave_out_below_hard(world):
     o.required_entries.value = [n for n in o.required_entries.value if n not in names]
     o.track_modes.value = {k: v for k, v in o.track_modes.value.items() if k not in names}
     world.ctr_tizi_madness_left_out = dropped
-    notices.note_ignored(world, "Tizi Madness in custom_tracks (it needs shortcut_knowledge hard)")
+    notice = (SEED_EXCLUSION_NOTICE if EXCLUDE_FROM_ALL_SEEDS else
+              "Tizi Madness is left out of this seed because it needs shortcut_knowledge hard.")
+    notices.adjusted(world, "tizi_madness", notice)
     return dropped
 
 

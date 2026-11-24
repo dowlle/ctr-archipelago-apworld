@@ -1,4 +1,4 @@
-"""Tizi Madness: hard shortcut knowledge only, and the Mask with Itemsanity (A4-96).
+"""Tizi Madness seed exclusion (A6-82) and retained Mask rules (A4-96).
 
 Ruling of 2026-11-14, 23:03 to 23:06 CET (tizi_madness.py). The track is
 Coco Team Racing track 3 as the client imports it; it is recognised by its LEV
@@ -7,6 +7,7 @@ and VRM pins, never by its title.
 import copy
 import json
 import unittest
+from unittest.mock import patch
 
 from BaseClasses import CollectionState
 
@@ -90,7 +91,7 @@ class TestIdentity(unittest.TestCase):
                          "74c00036dd24a34134c76236ae89dba1f3caa4b67bb30ca5717988b8987bf6ce")
 
 
-class TestHardOnly(unittest.TestCase):
+class TestSeedExclusion(unittest.TestCase):
     def test_easy_and_medium_leave_the_track_out(self):
         for sk in ("easy", "medium"):
             for descriptor in (tizi_descriptor(), renamed_copy()):
@@ -102,10 +103,16 @@ class TestHardOnly(unittest.TestCase):
                     self.assertEqual(world.ctr_tizi_madness_left_out, [descriptor["id"]])
                     self.assertEqual(world.options.required_entries.value, [])
 
-    def test_hard_keeps_it(self):
-        world = world_with(tizi_descriptor(), "hard")
-        self.assertTrue(plan_has(world.ctr_content_plan, tizi_descriptor()))
-        self.assertFalse(hasattr(world, "ctr_tizi_madness_left_out"))
+    def test_hard_also_leaves_the_track_out(self):
+        for descriptor in (tizi_descriptor(), renamed_copy()):
+            with self.subTest(title=descriptor["display_name"]), self.assertLogs("CTR", level="INFO") as logs:
+                world = world_with(descriptor, "hard", itemsanity=True)
+                self.assertFalse(plan_has(world.ctr_content_plan, descriptor))
+                self.assertNotIn(tizi_madness.LEV_SHA256, json.dumps(world.ctr_content_plan))
+                self.assertEqual(world.ctr_tizi_madness_left_out, [descriptor["id"]])
+                self.assertEqual(world.options.required_entries.value, [])
+            self.assertIn("Tizi Madness is left out of seeds for now because parts of the track can't be reached",
+                          "\n".join(logs.output))
 
     def test_an_impostor_title_stays_in_easy(self):
         world = world_with(impostor(), "easy")
@@ -197,6 +204,7 @@ def names_in(term):
     return out
 
 
+@patch.object(tizi_madness, "EXCLUDE_FROM_ALL_SEEDS", False)
 class TestMaskLogic(unittest.TestCase):
     def tizi_pad(self, world):
         plan = world.ctr_content_plan
@@ -271,6 +279,7 @@ def route_needs(gates, check, route):
     return gates.region(route["entry_id"]) or gates.route(route)
 
 
+@patch.object(tizi_madness, "EXCLUDE_FROM_ALL_SEEDS", False)
 class TestEveryCheck(unittest.TestCase):
     """Every check of a plan with Tizi Madness on a pad, in cups and as a boss
     venue: a check whose every route races Tizi Madness waits for the Mask,
@@ -338,6 +347,7 @@ class TestEveryCheck(unittest.TestCase):
         self.assertGreaterEqual(seen, {"boss", "cup-free", "cup-gated", "hit-in-boss-cup"})
 
 
+@patch.object(tizi_madness, "EXCLUDE_FROM_ALL_SEEDS", False)
 class TestHitInBossCupStart(unittest.TestCase):
     def test_a_boss_cup_that_starts_on_tizi_madness_hides_its_boss_without_the_mask(self):
         # Review round 2: Hit Character's boss path read only the region.
@@ -367,6 +377,7 @@ class TestHitInBossCupStart(unittest.TestCase):
         self.fail("no seed drew a boss cup that starts on Tizi Madness")
 
 
+@patch.object(tizi_madness, "EXCLUDE_FROM_ALL_SEEDS", False)
 class TestOpeningEstimate(unittest.TestCase):
     def test_the_estimate_keeps_a_tizi_madness_pad_closed_without_the_mask(self):
         # Review round 2: the opening estimate (content_opening.PlanReach) saw
@@ -381,6 +392,7 @@ class TestOpeningEstimate(unittest.TestCase):
         self.assertFalse(reach._pad_open(pad, everything))
 
 
+@patch.object(tizi_madness, "EXCLUDE_FROM_ALL_SEEDS", False)
 class TestOpeningEstimateCups(unittest.TestCase):
     def test_the_estimate_matches_the_rules_on_cup_routes(self):
         # Review round 3: PlanReach counted cup checks past the Tizi Madness leg

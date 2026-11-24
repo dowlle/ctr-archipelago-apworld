@@ -1060,6 +1060,21 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(code, 0, events)
         return last(events)["tracks"]
 
+    def test_tizi_madness_is_unavailable_for_new_seeds(self):
+        from unittest.mock import patch
+        from .. import tizi_madness
+
+        renamed = self.install("training", "1.0", "Shortcut Practice")
+        namesake = self.install("namesake", "1.0", "Tizi Madness")
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        with patch.multiple(tizi_madness, LEV_SHA256=renamed["files"][0]["sha256"],
+                            VRM_SHA256=renamed["files"][1]["sha256"]):
+            self.assertEqual([row["id"] for row in ctr_solo.list_tracks(paths, self.assets)["tracks"]],
+                             [namesake["id"]])
+            with self.assertRaisesRegex(ctr_solo.SoloError, "no longer available for seeds"):
+                ctr_solo.save_room_yaml(paths, self.assets, [renamed["id"]], [], "AppieCTR")
+        self.assertTrue(os.path.isfile(os.path.join(self.descriptors, "training__1.0.json")))
+
     def test_lists_only_tracks_whose_files_are_installed(self):
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
         self.install("fixture-hill", "1.0", "Fixture Hill")

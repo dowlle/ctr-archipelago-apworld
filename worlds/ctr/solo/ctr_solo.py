@@ -1247,6 +1247,7 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
     admit = _world_module("custom_packages").admit
     supported = _world_module("content_plan").supported_modes
     destinations = _world_module("destinations")
+    tizi_madness = _world_module("tizi_madness")
     tracks_root = os.path.join(assets, "tracks")
     preferred = {key: group[0] for key, group in _yaml_track_groups(listed).items()}
     sources = _descriptor_sources(paths)
@@ -1262,6 +1263,8 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
         try:
             descriptor = admit(json.loads(json.dumps(raw)))
         except Exception:
+            continue
+        if tizi_madness.is_seed_excluded(descriptor):
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
         identity = (destinations.canonical_track_key(key), revision)
@@ -1447,7 +1450,7 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     packages = [p for p in picked if p != CORTEX_ID]
     missing = [p for p in packages if p not in by_id]
     if missing:
-        raise SoloError("track", f"This track is no longer installed: {missing[0]}", track=missing[0])
+        raise SoloError("track", f"This track is no longer available for seeds: {missing[0]}", track=missing[0])
     canonical_key = _world_module("destinations").canonical_track_key
     groups = _yaml_track_groups(listed)
     keep_bundled = CORTEX_ID in picked and bool(_cortex_pick(_section(doc)))

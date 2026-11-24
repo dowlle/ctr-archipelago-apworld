@@ -164,7 +164,7 @@ class TestAdmission(unittest.TestCase):
         from .test_tizi_madness import tizi_descriptor
         excluded = tizi_descriptor(display_name=second["display_name"])
         options = options_with([first, excluded, second], required=[second["display_name"]])
-        options["shortcut_knowledge"] = "medium"
+        options["shortcut_knowledge"] = "hard"
         options["content_pool"]["tracks"]["overrides"] = {second["display_name"]: ["relic"]}
         plan = make_world(options, seed=3).ctr_content_plan
         self.assertIn("entry/" + content_plan.package_track_id(first), {pad["entry_id"] for pad in plan["pads"]})
