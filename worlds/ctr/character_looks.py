@@ -43,8 +43,11 @@ def allowed_looks(world) -> List[str]:
         getattr(world, "game", ""))
     if passthrough:
         names = (passthrough.get("ctr_options") or {}).get(WIRE_KEY) or []
-        if not isinstance(names, list):
+        # A saved room turns slot-data lists into tuples; anything else, or a
+        # non-string entry, restores to no looks.
+        if not isinstance(names, (list, tuple)):
             names = []
+        names = [n for n in names if isinstance(n, str)]
         if hasattr(world.options, "character_looks"):
             world.options.character_looks.value = {n for n in names if n in LOOKS}
     option = getattr(world.options, "character_looks", None)

@@ -179,3 +179,37 @@ class TestRollsKeepTheirAlphabet(unittest.TestCase):
                                         multiworld=SimpleNamespace(re_gen_passthrough={
                                             "Crash Team Racing": {"ctr_options": {"character_looks": value}}}))
                 self.assertEqual(character_looks.allowed_looks(world), [])
+
+
+class TestRound2(unittest.TestCase):
+    """Codex review round 2: saved rooms hold tuples, and group links keep
+    the looks their slots allow."""
+
+    def test_saved_room_tuple_restores(self):
+        for value, expected in ((("Joe Mama",), ["Joe Mama"]), ([{}], []), (("Joe Mama", 3), ["Joe Mama"])):
+            with self.subTest(value=value):
+                world = SimpleNamespace(game="Crash Team Racing",
+                                        options=SimpleNamespace(character_looks=SimpleNamespace(value=set())),
+                                        multiworld=SimpleNamespace(re_gen_passthrough={
+                                            "Crash Team Racing": {"ctr_options": {"character_looks": value}}}))
+                self.assertEqual(character_looks.allowed_looks(world), expected)
+
+    def test_filler_link_shares_enabled_looks(self):
+        from .. import ctrAPWorld
+        from ..track_origins import restore_legacy_link_pools
+
+        def slot(looks):
+            links = SimpleNamespace(value=[{"name": "Shared", "item_pool": ["Filler"]}], legacy_value=[])
+            return SimpleNamespace(game=ctrAPWorld.game, ctr_content_plan={"required_features": []},
+                                   multiworld=SimpleNamespace(re_gen_passthrough={}),
+                                   options=SimpleNamespace(item_links=links,
+                                                           character_looks=SimpleNamespace(value=set(looks))))
+
+        for looks, expected in ((["Joe Mama"], True), ([], False)):
+            with self.subTest(looks=looks):
+                group = {"game": ctrAPWorld.game, "players": {1, 2}, "name": "Shared",
+                         "item_pool": set(), "local_items": set(), "non_local_items": set()}
+                mw = SimpleNamespace(groups={3: group}, worlds={1: slot(looks), 2: slot([])})
+                restore_legacy_link_pools(mw, ctrAPWorld)
+                self.assertEqual("Joe Mama" in group["item_pool"], expected)
+                self.assertIn("Wumpa Fruit", group["item_pool"])
