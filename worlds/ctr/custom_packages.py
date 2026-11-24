@@ -41,7 +41,22 @@ Descriptor (YAML `custom_tracks[]`, wire `content_plan.packages[]`):
     files         exactly the LEV pin then the VRM pin: role, lowercase sha256,
                   bytes (LEV at most 16 MiB, VRM at most 4 MiB), format
                   ctr-lev / ctr-vrm, format_version 1
-    evidence      0 to 16 informational rows; every hash must be one of the pins
+    relic_files   optional (merged mode builds): a second LEV then VRM pin pair,
+                  same shape and limits as files, for a track whose Saphi
+                  builds split the modes (crates and Arcade in one build, the
+                  Relic Race lap graph in a sibling build). Native serves it
+                  only for a Relic Race; every other mode, every capability
+                  but relic and time_trial, and all identity (id, content_id,
+                  revision, uuid, names, spots, rulings) stay on files.
+                  Refused when equal to the files pair, when capabilities.relic
+                  is false, or without relic_targets; relic_targets must be the
+                  relic build's times. A relic pair may not repeat in another
+                  package or equal another package's files pair
+    relic_revision optional, only with relic_files: the relic build's version
+                  string, same rules as revision; it may equal revision.
+                  Informational, never part of an id
+    evidence      0 to 16 informational rows; every hash must be one of the
+                  pins of either pair
     locator       optional; where an imported track comes from, so the client
                   can name the patch to import ([[xdelta track importer
                   design]]): kind "xdelta", patch_sha256 (64 lowercase hex),
@@ -80,7 +95,7 @@ WEAPON_CRATES_MAX = 65536
 RELIC_TIERS = ("sapphire", "gold", "platinum")
 REQUIRED = ("id", "content_id", "uuid", "revision", "display_name", "author", "laps",
             "capabilities", "files", "evidence")
-OPTIONAL = ("relic_targets", "locator")
+OPTIONAL = ("relic_targets", "locator", "relic_files", "relic_revision")
 LOCATOR_REQUIRED = ("kind", "patch_sha256", "bigfile_index")
 LOCATOR_OPTIONAL = ("patch_name", "source_url")
 BIGFILE_INDEX_MAX = 4095
@@ -158,6 +173,26 @@ def _label(value, where):
     return value
 
 
+def _pin_pair(files, where, what):
+    """Check one LEV-then-VRM pin pair and return its canonical copy."""
+    if type(files) is not list or len(files) != 2:
+        _fail(where, f"must list exactly two files, {what}")
+    pins = []
+    for i, ((role, fmt, limit), pin) in enumerate(zip(FILES, files)):
+        at = f"{where}[{i}]"
+        _closed(pin, ("role", "sha256", "bytes", "format", "format_version"), (), at)
+        if pin["role"] != role:
+            _fail(at + ".role", f"must be {role!r} (the LEV comes first, then the VRM)")
+        _string(pin["sha256"], HEX64, 64, at + ".sha256", "64 lowercase hexadecimal characters")
+        _integer(pin["bytes"], 1, limit, at + ".bytes")
+        if pin["format"] != fmt:
+            _fail(at + ".format", f"must be {fmt!r}")
+        if type(pin["format_version"]) is not int or pin["format_version"] != 1:
+            _fail(at + ".format_version", "must be 1")
+        pins.append(dict(role=role, sha256=pin["sha256"], bytes=pin["bytes"], format=fmt, format_version=1))
+    return pins
+
+
 def admit(descriptor, where="package"):
     """Return a canonical copy of one complete descriptor, or raise PackageError."""
     _closed(descriptor, REQUIRED, OPTIONAL, where)
@@ -211,27 +246,25 @@ def admit(descriptor, where="package"):
         if "source_url" in loc:
             located["source_url"] = _string(loc["source_url"], SOURCE_URL, 128, at + ".source_url", "an https:// link")
         out["locator"] = located
-    files = d["files"]
-    if type(files) is not list or len(files) != 2:
-        _fail(where + ".files", "must list exactly two files, the LEV then the VRM")
-    pins = []
-    for i, ((role, fmt, limit), pin) in enumerate(zip(FILES, files)):
-        at = f"{where}.files[{i}]"
-        _closed(pin, ("role", "sha256", "bytes", "format", "format_version"), (), at)
-        if pin["role"] != role:
-            _fail(at + ".role", f"must be {role!r} (the LEV comes first, then the VRM)")
-        _string(pin["sha256"], HEX64, 64, at + ".sha256", "64 lowercase hexadecimal characters")
-        _integer(pin["bytes"], 1, limit, at + ".bytes")
-        if pin["format"] != fmt:
-            _fail(at + ".format", f"must be {fmt!r}")
-        if type(pin["format_version"]) is not int or pin["format_version"] != 1:
-            _fail(at + ".format_version", "must be 1")
-        pins.append(dict(role=role, sha256=pin["sha256"], bytes=pin["bytes"], format=fmt, format_version=1))
+    pins = _pin_pair(d["files"], where + ".files", "the LEV then the VRM")
     out["files"] = pins
+    hashes = {p["sha256"] for p in pins}
+    if "relic_files" in d:
+        if not caps["relic"]:
+            _fail(where + ".relic_files", "requires capabilities.relic to be true")
+        relic_pins = _pin_pair(d["relic_files"], where + ".relic_files", "the relic build's LEV then VRM")
+        if [p["sha256"] for p in relic_pins] == [p["sha256"] for p in pins]:
+            _fail(where + ".relic_files", "must differ from files (it is the same LEV and VRM pair)")
+        out["relic_files"] = relic_pins
+        hashes |= {p["sha256"] for p in relic_pins}
+        if "relic_revision" in d:
+            out["relic_revision"] = _string(d["relic_revision"], REVISION, 64, where + ".relic_revision",
+                                            "quote versions such as \"1.0\"")
+    elif "relic_revision" in d:
+        _fail(where + ".relic_revision", "is only allowed together with relic_files")
     evidence = d["evidence"]
     if type(evidence) is not list or len(evidence) > MAX_EVIDENCE:
         _fail(where + ".evidence", f"must be a list of at most {MAX_EVIDENCE} rows")
-    hashes = {p["sha256"] for p in pins}
     rows = []
     for i, row in enumerate(evidence):
         at = f"{where}.evidence[{i}]"
@@ -280,8 +313,10 @@ def admit_all(raw, where="tracks.custom", *, yaml_input=False, historical=False,
             _, retained = earlier
             dropped[i] = (package, retained)
             continue
-        for label, value in (("track key", key), ("package uuid", package["uuid"]),
-                             ("LEV and VRM pair", (package["files"][0]["sha256"], package["files"][1]["sha256"]))):
+        pairs = [("LEV and VRM pair", tuple(p["sha256"] for p in package["files"]))]
+        if "relic_files" in package:
+            pairs.append(("LEV and VRM pair", tuple(p["sha256"] for p in package["relic_files"])))
+        for label, value in (("track key", key), ("package uuid", package["uuid"]), *pairs):
             if (label, value) in seen:
                 _fail(f"{where}[{i}]", f"repeats the {label} of {where}[{seen[label, value][0]}]; "
                       "list each track once, with one revision")
