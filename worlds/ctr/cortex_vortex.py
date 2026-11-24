@@ -33,8 +33,21 @@ from .location_class import LocationClass
 
 CORTEX_VORTEX = destinations.CORTEX_VORTEX
 CORTEX_TRACK_KEY = "cortex-vortex"
-CORTEX_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
-CORTEX_VRM_SHA256 = "4131444b9d1d53971befcfd11349efceaf887c20b795c8890fdcb2c36bdff07d"
+#: The bundled Cortex Vortex is a merged mode build (CV1, 2026-11-24), like a
+#: package with `relic_files`: Saphi 1.1.5 is the main pair (crates, CTR
+#: letters, Arcade grid) and Saphi 1.1.6 the relic pair (the 100 time crates),
+#: served by native only in a Relic Race. Native pins the same four digests
+#: (include/platform/native_cortex_asset_pins.h).
+CORTEX_LEV_SHA256 = "cabeba054ad1416a67ab2af2dcaad46e8ded71213319035750377b244fd9aa1a"
+CORTEX_VRM_SHA256 = "a81cb4aa483d884b4d6b616bb12e0e8778439c1f4075d79b3807682a19dbe914"
+CORTEX_RELIC_LEV_SHA256 = "08afeda329194b737014f29324d0930bafbd0b940d02e72b29b37b0e9cded911"
+CORTEX_RELIC_VRM_SHA256 = "9e15a816e547b8a3b3d913a1767d58b1866e9b9d643f11cd3411381da6255500"
+#: The all-in-one build bundled before CV1 (the A6-15b crate rulings were
+#: made on it). Its weapon and Wumpa crates are 1.1.5's, at the same places in
+#: the same instance order, so the rulings carry by position unchanged. Rooms
+#: whose sanity rows name it keep restoring and admitting.
+CORTEX_LEGACY_LEV_SHA256 = "4e3a2daf56c67be3ac645d3bb5375e516c828a0bca24c35ac69b3366c466fe13"
+CORTEX_SANITY_PINS = (CORTEX_LEV_SHA256, CORTEX_LEGACY_LEV_SHA256)
 
 
 def bundled_copy(package):

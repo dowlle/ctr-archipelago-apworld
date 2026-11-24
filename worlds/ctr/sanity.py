@@ -17,7 +17,7 @@ from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
                royal_raceway, toasty_terrace, track_rulings)
 from .item_boxes import BOX_TRACKS
-from .cortex_vortex import CORTEX_LEV_SHA256
+from .cortex_vortex import CORTEX_LEV_SHA256, CORTEX_LEGACY_LEV_SHA256
 from .location_class import LocationClass
 
 KINDS = ("weapon_crate", "wumpa_crate", "wumpa_fruit")
@@ -87,8 +87,14 @@ def inventory(track, package=None, record=None):
         return CATALOG.get("retail:" + str(track["retail_id"]))
     if track["origin"] == "cortex_vortex":
         # Unversioned persisted rooms retain their historical asset identity.
-        key = CORTEX_LEV_SHA256 if record is None or record.get("rules_version", 0) >= 2 else "cortex_vortex"
-        return CATALOG.get(key)
+        if record is not None and record.get("rules_version", 0) < 2:
+            return CATALOG.get("cortex_vortex")
+        # A room from before CV1 named the all-in-one bundled build. Its crates
+        # are the 1.1.5 crates at the same places and in the same order, so its
+        # own catalog row (the same needs) keeps it restoring and admitting.
+        persisted = next((row.get("lev_sha256") for row in (record or {}).get("tracks", ())
+                          if type(row) is dict and row.get("track_id") == track.get("id")), None)
+        return CATALOG.get(CORTEX_LEGACY_LEV_SHA256 if persisted == CORTEX_LEGACY_LEV_SHA256 else CORTEX_LEV_SHA256)
     if "named_block" in track:
         pin = box_spots.lev_pin(package)
         source = track_rulings.source(package, REVIEWED_PICKUP_PINS)
