@@ -9,6 +9,7 @@ import pytest
 from Options import OptionError
 
 from .. import box_spots
+from .test_content_item_boxes import builtin_only
 from .test_content_plan import make_world
 
 
@@ -21,13 +22,22 @@ def test_restore_after_promotion_and_spot_file_changes():
     plan = wire["content_plan"]
     assert plan["room_compatibility"] == 1
     # A text-only edit changes the file digest, while the old room still
-    # has the same spot numbers, coordinates and effective logic.
-    retail_files = {key: dict(entry, sha256="0" * 64) for key, entry in box_spots.RETAIL_FILES.items()}
+    # has the same spot numbers, coordinates and effective logic. The room
+    # was generated on the built-in spot files.
+    legacy = copy.deepcopy(wire)
+    del legacy["content_plan"]["room_compatibility"]
+    with builtin_only():
+        retail_files = {key: dict(entry, sha256="0" * 64) for key, entry in box_spots.RETAIL_FILES.items()}
     with patch.object(box_spots, "RETAIL_FILES", retail_files):
         assert make_world({}, passthrough=wire).fill_slot_data() == wire
-        legacy = copy.deepcopy(wire)
-        del legacy["content_plan"]["room_compatibility"]
         assert make_world({}, passthrough=legacy).fill_slot_data() == legacy
+
+    # A7-1 added spots to the shipped retail files, so the pick pool changed:
+    # format 1 carries its picks and still restores; a room from before
+    # format 1 cannot prove its picks against the new files and is refused.
+    assert make_world({}, passthrough=wire).fill_slot_data() == wire
+    with pytest.raises(OptionError, match=r"generated with .*this build is .*not a valid pick"):
+        make_world({}, passthrough=legacy)
 
     # Format 1 also contains enough to restore when a spot file is removed.
     with patch.object(box_spots, "RETAIL_FILES", {}):

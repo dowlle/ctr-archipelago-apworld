@@ -22,7 +22,7 @@ from Options import OptionError
 
 from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
 from ..Locations import CTR_LOCATION_IDS
-from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, first_world, refused
+from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN
 
@@ -42,6 +42,9 @@ COMMUNITY = {
 #: Spot numbers per file; every other file holds 1 to 15.
 COMMUNITY_NUMBERS = {"country-speedway": [n for n in range(1, 16) if n != 6]}
 ARABIAN_DAY = "arabian-heights-day"
+#: A7-1: the source of dowlle's retail spots and how many ship per LevelID.
+DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
+DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 
 
@@ -76,8 +79,14 @@ class TestConversion(unittest.TestCase):
     def test_files_rebuild_the_frozen_tables(self):
         frozen = fixture("retail_box_tables.json")
         self.assertEqual(item_boxes.PLACED_COUNTS, frozen["placed_counts"])
-        self.assertEqual(item_boxes.SK_REQUIRED_TIER, {(t, n): v for t, n, v in frozen["sk_required_tier"]})
-        self.assertEqual(item_boxes.BOX_RULES, {(t, n): (b, s) for t, n, b, s in frozen["box_rules"]})
+        # A7-1 adds one ruled spot past the built-ins: Papu's Pyramid box 50
+        # (BX5 candidate C), with built-in spot 10's rule (boost, hard tier).
+        papu = ("Papu's Pyramid", next(s["number"] for s in box_spots.RETAIL_FILES[5]["doc"]["spots"]
+                                       if s["pos"] == [102, 663, -4736]))
+        self.assertEqual(item_boxes.SK_REQUIRED_TIER,
+                         {(t, n): v for t, n, v in frozen["sk_required_tier"]} | {papu: 2})
+        self.assertEqual(item_boxes.BOX_RULES,
+                         {(t, n): (b, s) for t, n, b, s in frozen["box_rules"]} | {papu: (1, True)})
         self.assertEqual(item_boxes.EXPLICIT_NO_GATE, frozenset((t, n) for t, n in frozen["explicit_no_gate"]))
         self.assertEqual(list(item_boxes.TIGER_TEMPLE_DOOR_BOXES), [tuple(k) for k in frozen["tiger_temple_door"]])
 
@@ -92,8 +101,28 @@ class TestConversion(unittest.TestCase):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
         self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, ARABIAN_DAY, "sunset-vista"})
         for e in box_spots.RETAIL_FILES.values():
-            self.assertTrue(all(s.get("source") == "builtin" for s in e["doc"]["spots"]), e["path"])
+            self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
+
+    def test_dowlle_retail_spots_of_2026_11_24(self):
+        """A7-1: dowlle's Box Author Mode spots on the retail tracks, numbered from
+        16 after the built-ins. dowlle ruled his placements boost 0 (A7-1b), so
+        they ship with needs none, except Papu's Pyramid box 50 (BX5 candidate
+        C) with built-in spot 10's rule. Spots flagged on 2026-11-08, airborne
+        spots and spots without ground under them stay held, without a number."""
+        for lid, e in box_spots.RETAIL_FILES.items():
+            new = [s for s in e["doc"]["spots"] if s.get("source") != "builtin"]
+            self.assertEqual(len(new), DOWLLE_2026_11_24_COUNTS[lid], e["path"])
+            self.assertEqual([s["number"] for s in new], list(range(16, 16 + len(new))), e["path"])
+            for spot in new:
+                self.assertEqual(spot["source"], DOWLLE_2026_11_24)
+                if lid == 5 and spot["pos"] == [102, 663, -4736]:
+                    self.assertEqual((spot["rot_y"], spot["needs"], spot["shortcut"]), (2488, "boost", "hard"))
+                    self.assertEqual(box_spots.RETAIL_RULES[("Papu's Pyramid", spot["number"])], (1, True))
+                else:
+                    self.assertEqual(spot["needs"], "none", (e["path"], spot["number"]))
+                    self.assertNotIn("shortcut", spot)
+        self.assertEqual(sum(DOWLLE_2026_11_24_COUNTS.values()), 546)
 
     def test_sunset_vista_file_is_the_approved_no_boost_file(self):
         """The in-game review of 2026-11-20: all 24 spots stay where they
@@ -208,6 +237,10 @@ class TestPick(unittest.TestCase):
 
 class TestRetailSeeds(unittest.TestCase):
     def test_every_retail_track_uses_its_built_in_spots(self):
+        with builtin_only():
+            self._every_retail_track_uses_its_built_in_spots()
+
+    def _every_retail_track_uses_its_built_in_spots(self):
         for tier, value in (("easy", 0), ("medium", 1), ("hard", 2)):
             world = make_world(box_options(tier=tier), seed=2)
             plan = world.ctr_content_plan
@@ -235,7 +268,7 @@ class TestRetailSeeds(unittest.TestCase):
         for legacy in (False, True):
             patch = (mock.patch.object(content_item_boxes, "add_spot_sets", lambda record, *a: record)
                      if legacy else contextlib.nullcontext())
-            with patch:
+            with patch, builtin_only():
                 world = first_world(options, seed=11)
                 distribute_items_restrictive(world.multiworld)
             placements.append(sorted((loc.name, loc.item.name) for loc in world.multiworld.get_locations()
@@ -246,7 +279,8 @@ class TestRetailSeeds(unittest.TestCase):
 
     def test_a_record_without_spot_sets_still_validates(self):
         """An alpha2-era plan (no spot sets, no spot fields) is still read."""
-        plan = copy.deepcopy(make_world(box_options(tier="hard"), seed=2).ctr_content_plan)
+        with builtin_only():
+            plan = copy.deepcopy(make_world(box_options(tier="hard"), seed=2).ctr_content_plan)
         plan["item_boxes"].pop("spot_sets")
         plan["required_features"].remove(box_spots.FEATURE)
         for check in plan["checks"]:
@@ -503,3 +537,48 @@ class TestCommunitySpotFiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDowlleRetailSpots(unittest.TestCase):
+    """A7-1: seeds on the shipped retail files with dowlle's 2026-11-24 spots."""
+
+    def test_filled_seeds_reach_every_location_at_counts_15_and_50(self):
+        for count, seed, extra in ((15, 0, {}), (50, 1, {}), (50, 4, dict(progressive_boost="per_character"))):
+            with self.subTest(count=count, seed=seed):
+                seen = set()
+                world = first_world(box_options(custom=[], tier="hard", item_box_count=count, **extra), seed=seed)
+                plan = world.ctr_content_plan
+                for record in plan["item_boxes"]["spot_sets"]:
+                    if not record["track_id"].startswith("retail:"):
+                        continue
+                    entry = box_spots.RETAIL_FILES[int(record["track_id"].split(":")[1])]
+                    pool = len(box_spots.eligible(entry, 2))
+                    self.assertEqual(record["pool"], pool, record["track_id"])
+                    self.assertEqual(len(record["picked"]), min(count, pool), record["track_id"])
+                    spots = box_spots.spots_by_number(entry)
+                    checks = boxes(plan, record["track_id"])
+                    self.assertEqual([c["spot"]["number"] for c in checks], record["picked"])
+                    for check in checks:
+                        row = spots[check["spot"]["number"]]
+                        self.assertEqual((check["spot"]["pos"], check["spot"]["rot_y"]), (row["pos"], row["rot_y"]))
+                    seen.update(n for n in record["picked"] if n >= 16)
+                self.assertTrue(seen, "no 2026-11-24 spot was picked")
+                self.assertFalse(refused(plan))
+                distribute_items_restrictive(world.multiworld)
+                state = CollectionState(world.multiworld)
+                state.sweep_for_advancements()
+                self.assertTrue(world.multiworld.can_beat_game(state))
+                self.assertTrue(all(loc.can_reach(state) for loc in world.multiworld.get_locations()))
+
+    def test_picked_boxes_carry_their_rules(self):
+        options = box_options(custom=[], tier="hard", progressive_boost="shared_global",
+                              progressive_stats="shared_global", item_box_count=50)
+        for seed in (1, 2):
+            plan = first_world(options, seed=seed).ctr_content_plan
+            retail = [c for c in boxes(plan) if c["owner"].startswith("retail:")]
+            self.assertEqual(len(retail), 787)
+            for check in retail:
+                track, _, slot = check["display_name"].rpartition(": Item Box ")
+                boost, stats = item_boxes.BOX_RULES.get((track, int(slot)), (0, False))
+                self.assertEqual(check.get("boost", 0), boost, check["display_name"])
+                self.assertEqual(check.get("stats", False), stats, check["display_name"])

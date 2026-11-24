@@ -515,12 +515,19 @@ class TestNetCapacityAcrossLocationAndItemFamilies(unittest.TestCase):
         self.assertEqual(pool - base_pool, 22)
 
     def test_boxes_add_locations_only(self):
+        # The legacy class counts built-in boxes only, so the exact count is
+        # compared on the built-in spot files; the shipped files (more than 15
+        # spots on most retail tracks since A7-1) must balance the same way.
+        from .test_content_item_boxes import builtin_only
         base_pool, base_unfilled = _pool_supply(_build(1))
         pool, unfilled = _pool_supply(_build(1, box_locations=True))
         self.assertEqual(pool - base_pool, unfilled - base_unfilled)
-        self.assertEqual(unfilled - base_unfilled,
-                         len(ITEM_BOX_CLASS.created_locations(
-                             _build(1, box_locations=True).worlds[1].options)))
+        with builtin_only():
+            pool, unfilled = _pool_supply(_build(1, box_locations=True))
+            self.assertEqual(pool - base_pool, unfilled - base_unfilled)
+            self.assertEqual(unfilled - base_unfilled,
+                             len(ITEM_BOX_CLASS.created_locations(
+                                 _build(1, box_locations=True).worlds[1].options)))
 
     def test_lettersanity_and_relic_perfect_are_inert_this_branch(self):
         """Both classes are registered but create no locations yet (#148,

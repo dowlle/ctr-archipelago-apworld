@@ -16,7 +16,8 @@ from ..item_boxes import (BOX_RULES, BOX_TRACKS, EXPLICIT_NO_GATE,
                           ITEM_BOX_CLASS, ITEM_BOX_CODE_BASE, PLACED_COUNTS,
                           SK_HARD, SK_MEDIUM, SK_REQUIRED_TIER, SLOTS_PER_TRACK,
                           TIGER_TEMPLE_DOOR_OPENERS, TRACK_LEVEL_IDS)
-from .. import progressive_capability
+from .. import box_spots, progressive_capability
+from .test_content_item_boxes import BuiltinOnly
 from ..progressive_capability import STAT_CHAINS
 from . import CTRTestBase
 
@@ -32,6 +33,13 @@ def _grant(state, player, *items):
         state.add_item(item, player, 1)
 
 
+#: A7-1: Papu's Pyramid box 50 of the 2026-11-24 placements (BX5 candidate C).
+PAPU_50 = ("Papu's Pyramid", next(s["number"] for s in box_spots.RETAIL_FILES[5]["doc"]["spots"]
+                                  if s["pos"] == [102, 663, -4736]))
+#: The rules of the built-in spots alone.
+BUILTIN_RULES = {k: v for k, v in BOX_RULES.items() if k[1] <= PLACED_COUNTS[k[0]]}
+
+
 class TestSeatingTables(unittest.TestCase):
     """The static tables against their derived invariants."""
 
@@ -44,12 +52,16 @@ class TestSeatingTables(unittest.TestCase):
     def test_rule_census(self):
         """Spec 2 census plus the three ruled Hot Air Skyway defaults and the
         live-session Tiny Arena 1 fix: 40 gated slots, 8 explicit no-gate, 193
-        plain free-reach."""
-        self.assertEqual(len(BOX_RULES), 40)
-        boost1 = [k for k, (b, s) in BOX_RULES.items() if b == 1 and not s]
-        boost2 = [k for k, (b, s) in BOX_RULES.items() if b == 2 and not s]
-        stats = [k for k, (b, s) in BOX_RULES.items() if s]
-        sk_only = [k for k, (b, s) in BOX_RULES.items() if b == 0 and not s]
+        plain free-reach. Past the built-ins only Papu's Pyramid box 50 (A7-1,
+        BX5 candidate C) carries a rule, built-in spot 10's."""
+        self.assertEqual(set(BOX_RULES) - set(BUILTIN_RULES), {PAPU_50})
+        self.assertEqual(BOX_RULES[PAPU_50], BOX_RULES[("Papu's Pyramid", 10)])
+        rules = BUILTIN_RULES
+        self.assertEqual(len(rules), 40)
+        boost1 = [k for k, (b, s) in rules.items() if b == 1 and not s]
+        boost2 = [k for k, (b, s) in rules.items() if b == 2 and not s]
+        stats = [k for k, (b, s) in rules.items() if s]
+        sk_only = [k for k, (b, s) in rules.items() if b == 0 and not s]
         # 6 pure + 4 with a medium SK term + Tiny Arena 1 (ruled 2026-08-12).
         self.assertEqual(len(boost1), 11)
         self.assertIn(("Tiny Arena", 1), boost1)
@@ -60,19 +72,22 @@ class TestSeatingTables(unittest.TestCase):
                          [("Coco Park", 7), ("Dragon Mines", 2),
                           ("Tiger Temple", 5)])
         self.assertEqual(len(EXPLICIT_NO_GATE), 8)
-        self.assertFalse(set(EXPLICIT_NO_GATE) & set(BOX_RULES))
+        self.assertFalse(set(EXPLICIT_NO_GATE) & set(rules))
         # Every gated/no-gate slot must actually be a placed slot.
-        for track, slot in list(BOX_RULES) + list(EXPLICIT_NO_GATE):
+        for track, slot in list(rules) + list(EXPLICIT_NO_GATE):
             self.assertLessEqual(slot, PLACED_COUNTS[track])
 
     def test_sk_removal_sets(self):
-        self.assertEqual(len(SK_REQUIRED_TIER), 12)
-        hard = {k for k, tier in SK_REQUIRED_TIER.items() if tier == SK_HARD}
+        self.assertEqual(SK_REQUIRED_TIER[PAPU_50], SK_HARD)
+        tiers = {k: v for k, v in SK_REQUIRED_TIER.items() if k != PAPU_50}
+        rules = BUILTIN_RULES
+        self.assertEqual(len(tiers), 12)
+        hard = {k for k, tier in tiers.items() if tier == SK_HARD}
         self.assertEqual(hard, {("Papu's Pyramid", 7), ("Papu's Pyramid", 10),
                                 ("Polar Pass", 9), ("Hot Air Skyway", 8),
                                 ("Oxide Station", 6)})
         # The hard-tier slots are exactly the stats-reading slots.
-        self.assertEqual(hard, {k for k, (b, s) in BOX_RULES.items() if s})
+        self.assertEqual(hard, {k for k, (b, s) in rules.items() if s})
 
     def test_slot_codes_follow_the_frozen_block(self):
         self.assertEqual(ITEM_BOX_CLASS.slot_code(BOX_TRACKS[0], 1),
@@ -111,7 +126,7 @@ class TestSeatingPerTier(unittest.TestCase):
         self.assertNotIn("Dragon Mines: Item Box 14", created)
 
 
-class TestBoxAccessRules(unittest.TestCase):
+class TestBoxAccessRules(BuiltinOnly):
     PLAYER = 1
 
     def _rule(self, track, slot, **options):
