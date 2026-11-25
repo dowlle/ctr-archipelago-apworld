@@ -20,7 +20,7 @@ from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
+from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks, track_rulings
 from ..Locations import CTR_LOCATION_IDS
 from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
@@ -487,7 +487,7 @@ class TestCommunitySpotFiles(unittest.TestCase):
         self.assertEqual([check["display_name"] for check in own],
                          [f"Arabian Heights Day: Item Box {n}" for n in numbers])
         self.assertEqual([check["spot"]["number"] for check in own if check.get("boost") == 2],
-                         list(range(2, 21)))
+                         [])
         distribute_items_restrictive(world.multiworld)
         self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
 
@@ -495,6 +495,45 @@ class TestCommunitySpotFiles(unittest.TestCase):
         other = first_world(box_options(custom=[package])).ctr_content_plan
         self.assertIsNone(spot_set(other, track_id))
         self.assertEqual(boxes(other, track_id), [])
+
+    def test_arabian_boost_ruling_preserves_saved_rooms_and_unmatched_night_boxes(self):
+        day, night = btp(0), btp(27)
+        for package, key, title, revision, pin in (
+                (day, ARABIAN_DAY, "Arabian Heights Day", "1.0.0", ARABIAN_DAY_LEV),
+                (night, "arabian-heights-night", "Arabian Heights Night", "1.1.0",
+                 "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c")):
+            package.update(content_id=key, display_name=title, id=f"package/{key}/{revision}",
+                           revision=revision, evidence=[])
+            package["files"][0]["sha256"] = pin
+            package["capabilities"]["super_turbo_pads"] = True
+        for package in (day, night):
+            tid = package["id"].replace("package/", "custom/")
+            options = box_options(custom=[package], item_box_count=50, progressive_boost="shared_global",
+                                  logic_difficulty="hard", lap_completion_checks=True,
+                                  podium_placement_checks=True)
+            with mock.patch.object(track_rulings, "RULING_VERSION", 4):
+                saved = first_world(options).fill_slot_data()
+            current = first_world(options).fill_slot_data()
+            plan = current["content_plan"]
+            self.assertEqual(plan["track_ruling_sources"]["version"], 5)
+            self.assertEqual(make_world({}, passthrough=saved).fill_slot_data(), saved)
+            self.assertEqual(make_world({}, passthrough=current).fill_slot_data(), current)
+            for kind in ("trophy", "lap", "podium", "box"):
+                checks = [c for c in plan["checks"] if c["owner"] == tid and c["kind"] == kind]
+                self.assertTrue(checks, kind)
+                self.assertTrue(all(c.get("boost", 0) == 0 for c in checks), checks)
+            self.assertTrue(any(c.get("boost") == 2 for c in boxes(saved["content_plan"], tid)))
+            self.assertEqual([c["location"] for c in boxes(plan, tid)],
+                             [c["location"] for c in boxes(saved["content_plan"], tid)])
+
+        # A different LEV can inherit the lap ruling, but its crate seats
+        # have no coordinate match and keep the previous USF term.
+        night["files"][0]["sha256"] = "12" * 32
+        p = first_world(box_options(custom=[night], item_box_count=5, progressive_boost="shared_global",
+                                    logic_difficulty="hard", lap_completion_checks=True)).ctr_content_plan
+        tid = "custom/arabian-heights-night/1.1.0"
+        self.assertEqual([c.get("boost") for c in boxes(p, tid)], [2] * 5)
+        self.assertTrue(any(c["owner"] == tid and c["kind"] == "lap" and "boost" not in c for c in p["checks"]))
 
     def test_other_revisions_keep_crate_seating(self):
         # The xdelta-import Ancient Lake LEV keeps its reviewed crate exclusion.
