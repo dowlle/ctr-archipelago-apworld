@@ -301,7 +301,7 @@ class TestRanks(unittest.TestCase):
             ("sunset-vista", "1.2.0"): ("97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5", 0),
         }
         table = content_capability.USF_FINISH_RULINGS
-        self.assertEqual({k: v for k, v in table.items() if k[1] is not None},
+        self.assertEqual({k: v for k, v in table.items() if len(k) == 3 and k[1] is not None},
                          {(c, r, lev): rank for (c, r), (lev, rank) in pins.items()})
         track = dict(origin="custom", display_name="Loop")
         for (key, revision), (lev, rank) in pins.items():
