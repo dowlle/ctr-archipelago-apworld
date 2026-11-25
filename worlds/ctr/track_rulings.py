@@ -13,7 +13,7 @@ FEATURE = "carried_track_rulings_v1"
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
-RULING_VERSION = 4
+RULING_VERSION = 6
 # The two exact patch copies can arrive under the shared registry key.
 # Keep their pickup measurements independent of the downloadable release.
 COCO_PATCH_PINS = {
@@ -193,6 +193,8 @@ def carried_sources(package):
         result["objects"] = object_source
     if "finish" not in result and (content, None, None) in content_capability.USF_FINISH_RULINGS:
         result["finish"] = latest
+    if content_capability.exact_versioned_finish(package) is not None:
+        result.pop("finish", None)
     return result
 
 
