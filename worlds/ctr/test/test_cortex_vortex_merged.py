@@ -96,7 +96,7 @@ class TestBundledCopy(unittest.TestCase):
 class TestSoloSeesBothPairs(unittest.TestCase):
     def test_both_pairs_needed(self):
         import os, tempfile
-        from ..solo import ctr_solo
+        from ..tools.solo import ctr_solo
         with tempfile.TemporaryDirectory() as assets:
             folder = os.path.join(assets, "tracks", "cortex-vortex")
             os.makedirs(folder)
