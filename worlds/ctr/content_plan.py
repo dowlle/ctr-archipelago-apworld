@@ -40,7 +40,7 @@ from .custom_track_titles import is_sanitized, seed_titles
 from .custom_packages import BABY_T_PARK_PROFILES
 from . import (content_pickups, sanity, arena_content, logic_terms, content_bosses, content_capability, content_cups, content_fixed, content_global_checks,
                content_item_boxes, content_laps, content_race_routes, content_requirements, content_wumpa, custom_packages, spoiler_items, tizi_helper,
-               tizi_madness, turbo_grant, pad_budget, track_origins, track_rulings)
+               tizi_madness, turbo_grant, pad_budget, track_fill, track_origins, track_rulings)
 from .Locations import CTR_LOCATION_IDS
 from .destinations import HUB_STATIC
 
@@ -302,8 +302,20 @@ def canonical(value):
 def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=None):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
-        return custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks",
-                                         historical=historical, dropped=dropped)
+        packages = custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks",
+                                             historical=historical, dropped=dropped)
+        if where == "custom_tracks" and not historical and track_fill.enabled():
+            for package in packages:
+                caps = package["capabilities"]
+                if not caps["time_trial"] or caps["relic"]:
+                    continue
+                key = destinations.canonical_track_key(package["content_id"])
+                fill = track_fill.bundled(key, package["files"][0]["sha256"])
+                if fill:
+                    caps["relic"] = True
+                    package["relic_targets"] = {tier: fill["relic_targets"][tier] for tier in track_fill.TIERS}
+                    package["fill"] = fill
+        return packages
     except custom_packages.PackageError as exc:
         if where == "custom_tracks":
             error(f"{exc}. Use Export YAML in Options > Custom Tracks, or Save YAML for a room "
@@ -418,7 +430,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
                       global_checks=None, item_boxes=None, bosses=None, rows=(), pad_requirements=None, fixed=None,
                       guarded=None, ctr_first=False, shop=None, wumpa_goal=False, pad_client=False, sanity_record=None,
                       repeatable_pickups=False, tizi_mask=False, tracks=(), final_only_venue=False,
-                      carried_rulings=False):
+                      carried_rulings=False, filled_tracks=False):
     # Cups (#133 PR 5a) declare their feature after Item Box Locations, boss
     # garages (#133 PR 6) next, the row 2 plan content, row 3's pad requirements
     # and row 4's fixed items. Row 5's features close the list in a fixed order,
@@ -473,7 +485,8 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([tizi_madness.FEATURE] if tizi_mask else [])
             # A6-48: a Final Challenge-only venue's checks left out.
             + ([content_pickups.FINAL_FEATURE] if final_only_venue else [])
-            + ([track_rulings.FEATURE] if carried_rulings else []))
+            + ([track_rulings.FEATURE] if carried_rulings else [])
+            + ([track_fill.FEATURE] if filled_tracks else []))
 
 
 def family_settings(options):
@@ -1263,6 +1276,9 @@ def generate(world):
                  f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
+    filled = [package["display_name"] for package in plan["packages"] if "fill" in package]
+    if filled:
+        adjusted(world, "track_fill", "Track fill enables Relic Race on " + ", ".join(filled) + ".")
     ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
               for package, kind, first, last in track_rulings.omitted_pickups(plan, enabled_only=False)]
     if ranges:
@@ -2262,6 +2278,8 @@ def draw_plan(world, key_estimate=True):
     if sources:
         plan["track_ruling_sources"] = sources
         plan["required_features"].append(track_rulings.FEATURE)
+    if any("fill" in package for package in plan["packages"]):
+        plan["required_features"].append(track_fill.FEATURE)
     world.ctr_racer_locks, world.ctr_racer_lock_counts = {}, {"requested": 0, "eligible": 0}
     if racers:
         # Racer locks (#133 PR 4b) go on pads that do not open at the start,
@@ -2899,6 +2917,7 @@ def add_racer_unlock_placement_rules(world):
 def wire(world):
     o = world.options
     plan=world.ctr_content_plan
+    schema = track_fill.SCHEMA if track_fill.FEATURE in plan["required_features"] else SCHEMA
     extra=({'include_battle_arenas':True,
             'include_arcade_arenas':any(e['kind']=='crystal' and e['arena_id'] in arena_content.ARCADE for e in plan['entries']),
             'crystalsanity':any(c['kind']=='crystal_pickup' for c in plan['checks'])}
@@ -2914,8 +2933,8 @@ def wire(world):
     relic_option = ({"relic_progression": relic_progression}
                     if plan.get("pad_requirements", {}).get("mode") == "vanilla"
                     and not all(relic_progression.values()) else {})
-    return dict(schema_version=SCHEMA, content_plan=copy.deepcopy(world.ctr_content_plan),
-                ctr_options=dict(schema_version=SCHEMA, world_version=world.world_version.as_simple_string(), content_plan=True,
+    return dict(schema_version=schema, content_plan=copy.deepcopy(world.ctr_content_plan),
+                ctr_options=dict(schema_version=schema, world_version=world.world_version.as_simple_string(), content_plan=True,
                                  goal=-1, **goal_envelope(plan),
                                  starting_character=characters.ROSTER_CHARACTER_ID[world.ctr_starting_character],
                                  # True exactly when the plan has its `racers` record (#133 PR 4b).
@@ -3047,7 +3066,8 @@ def validate(plan, *, restoring=False):
                                                          repeatable_pickups=content_pickups.enabled(plan),
                                                          tizi_mask=tizi_mask, tracks=plan["tracks"],
                                                          final_only_venue=content_pickups.final_enabled(plan),
-                                                         carried_rulings=carried_rulings),
+                                                         carried_rulings=carried_rulings,
+                                                         filled_tracks=any("fill" in p for p in packages.values())),
             'required features do not match the selected content/checks')
     crystalsanity=any(c['kind']=='crystal_pickup' for c in plan['checks'])
     expected_pads = {f"pad:{physical}": (f"hub:{hub}", f"keys:{keys}" if keys else "free")
@@ -3474,8 +3494,9 @@ def _restore(world, slot_data):
     plan = _tracker_arrays(slot_data["content_plan"])
     validate(plan, restoring=True)
     co = slot_data.get("ctr_options", {})
-    if (type(slot_data.get("schema_version")) is not int or slot_data["schema_version"] != SCHEMA or
-            type(co.get("schema_version")) is not int or co["schema_version"] != SCHEMA or co.get("content_plan") is not True):
+    schema = track_fill.SCHEMA if track_fill.FEATURE in plan["required_features"] else SCHEMA
+    if (type(slot_data.get("schema_version")) is not int or slot_data["schema_version"] != schema or
+            type(co.get("schema_version")) is not int or co["schema_version"] != schema or co.get("content_plan") is not True):
         error("content-plan envelope is missing or inconsistent")
     has_crystals=any(e['kind']=='crystal' for e in plan['entries'])
     for key,want in dict(include_battle_arenas=has_crystals,

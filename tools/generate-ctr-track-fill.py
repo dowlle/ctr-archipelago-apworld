@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Generate slice-1 fill files from registry, OV1 inventory and local LEVs.
+
+The geometry tools directory supplies BX1's analyze.py and its dependencies.
+The local LEV index and capability sheet are inputs and are never packaged.
+Run with --check to re-derive and compare the complete output directory.
+"""
+
+import argparse
+import csv
+import hashlib
+import importlib.util
+import json
+import math
+import sys
+from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+TIME_COLUMN = "Relic times (sapphire / gold / platinum)"
+TYPES = ("time1", "time2", "time3")
+
+
+def read_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_fill_module():
+    spec = importlib.util.spec_from_file_location("track_fill", ROOT / "worlds/ctr/track_fill.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def target_times(row):
+    text = row.get(TIME_COLUMN, "")
+    if not text:
+        return None
+    source = "saphi" if text.endswith(" (Saphi)") else "author"
+    values = []
+    for clock in text.removesuffix(" (Saphi)").split(" / "):
+        minutes, colon, seconds = clock.partition(":")
+        try:
+            time = Decimal(minutes) * 60 + Decimal(seconds) if colon else Decimal(minutes)
+        except ArithmeticError:
+            return None
+        values.append(round(time * 960))
+    if len(values) != 3 or not values[0] > values[1] > values[2] > 0:
+        return None
+    return dict(zip(("sapphire", "gold", "platinum"), values), source=source)
+
+
+def pins(registry):
+    for track in registry["tracks"]:
+        for revision in track["revisions"]:
+            lev = revision.get("files", {}).get("lev", {}).get("sha256")
+            if lev:
+                yield track["track_key"], revision["revision"], lev
+
+
+def generate(args, fill_module, analyze, np):
+    inventory = {row["sha"]: row for row in read_json(args.inventory)}
+    paths = read_json(args.lev_paths)
+    with args.pack_rows.open(encoding="utf-8", newline="") as source:
+        rows = {row["LEV sha256"]: row for row in csv.DictReader(source)}
+    rows.update({row["LEV sha256"]: row for row in read_json(args.sheet_rows)})
+    registry_pins = sorted(set(pins(read_json(args.registry))))
+
+    @lru_cache(maxsize=16)
+    def geometry(sha):
+        path = Path(paths[sha])
+        if hashlib.sha256(path.read_bytes()).hexdigest() != sha:
+            raise ValueError(f"LEV hash mismatch for {sha}")
+        return analyze.geometry(path)
+
+    @lru_cache(maxsize=16)
+    def collision(sha):
+        path = Path(paths[sha])
+        _, vertices, quads, _ = analyze.mesh_data(path)
+        vertices = vertices[quads[np.all(quads < len(vertices), axis=1)]].astype(np.int32)
+        keys = [quad.tobytes() for quad in vertices]
+        return vertices, keys, analyze.ground(path)
+
+    def neighbourhood(sha, pos):
+        vertices, keys, ground = collision(sha)
+        dx = vertices[:, :, 0] - pos[0]
+        dz = vertices[:, :, 2] - pos[2]
+        distance2 = dx.astype(np.int64)**2 + dz.astype(np.int64)**2
+        nearby = np.flatnonzero(np.any(distance2 <= 512**2, axis=1))
+        distance = analyze.measure(pos, *ground)["distance"]
+        return {keys[i] for i in nearby}, distance
+
+    def safe_position(donor, target, pos):
+        nearby, height = neighbourhood(donor, pos)
+        target_nearby, target_height = neighbourhood(target, pos)
+        return bool(nearby and nearby == target_nearby and math.isfinite(height)
+                    and abs(target_height - height) <= 20)
+
+    def donor_info(target, one):
+        source = geometry(one)
+        target_geo = geometry(target)
+        if source["road_sha"] and source["road_sha"] == target_geo["road_sha"]:
+            kind, overlap = "identical", 1.0
+        else:
+            comparison = analyze.compare(source, target_geo)
+            if not comparison or comparison["road"] < 0.95:
+                return None
+            kind, overlap = "similar>=0.95", comparison["road"]
+        return dict(lev_sha256=one, road_sha256=source["road_sha"], kind=kind, overlap=round(overlap * 100000))
+
+    def matched_donors(target, candidates):
+        matches = [match for one in candidates if (match := donor_info(target, one))]
+        return sorted(matches, key=lambda row: (row["kind"], -row["overlap"], row["lev_sha256"]))
+
+    def published_targets(target, candidates):
+        local = target_times(rows.get(target, {}))
+        if local:
+            return local, None
+        with_targets = [one for one in candidates if target_times(rows.get(one, {}))]
+        for match in matched_donors(target, with_targets):
+            source = match["lev_sha256"]
+            return target_times(rows[source]), match
+        return None, None
+
+    output, report = {}, []
+    for key, revision, target in registry_pins:
+        record = inventory.get(target)
+        if not record or not record["ok"] or not record["tt"] or record["time"]:
+            continue
+        siblings = [one for one, version in inventory.items() if one != target and version["ok"]
+                    and (version["key"] == record["key"] or version["road_sha"] == record["road_sha"])]
+        candidates = [one for one in siblings if inventory[one]["time"]]
+        if not candidates:
+            continue
+        entry = dict(track=key, revision=revision, lev_sha256=target)
+        report.append(entry)
+        targets, times_donor = published_targets(target, siblings)
+        donors = matched_donors(target, candidates)
+        for donor in donors:
+            sha = donor["lev_sha256"]
+            points = geometry(sha)["points"]
+            crates = [dict(pos=list(pos), type=kind)
+                      for kind, family in enumerate(TYPES, 1) for pos in points[family]]
+            if len(crates) != inventory[sha]["time"]:
+                raise ValueError(f"native and geometry time crate counts differ for {sha}")
+            passed = sum(safe_position(sha, target, crate["pos"]) for crate in crates)
+            entry.update(kept=passed, total=len(crates), donor=sha, overlap=donor["overlap"])
+            if passed != len(crates):
+                continue
+            if not targets:
+                entry["status"] = "no verified relic targets"
+                break
+            provenance = [donor]
+            if times_donor and times_donor["lev_sha256"] != sha:
+                provenance.append(times_donor)
+            families = dict(fill_module.EMPTY_FAMILIES, grid=None, time_crates=crates)
+            payload = dict(schema=1, lev_sha256=target, generator=dict(name="ctr-track-fill", version=1),
+                           donors=provenance, families=families,
+                           counts={name: len(value or ()) for name, value in families.items()},
+                           relic_targets=targets)
+            payload["fill_sha256"] = fill_module.payload_sha256(payload)
+            fill_module.validate(payload, target)
+            path = Path(key) / (target[:16] + ".json")
+            if path in output and output[path]["lev_sha256"] != target:
+                raise ValueError(f"ambiguous LEV prefix in {path}")
+            output[path] = payload
+            entry.update(status="generated", targets=targets)
+            break
+        else:
+            entry["status"] = "incomplete crate set" if donors else "no same-road crate donor"
+    return output, report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for argument in ("geometry-tools", "inventory", "lev-paths", "sheet-rows", "pack-rows", "registry", "output"):
+        parser.add_argument("--" + argument, type=Path, required=True)
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    sys.path.insert(0, str(args.geometry_tools.resolve()))
+    import analyze
+    import numpy
+
+    output, report = generate(args, load_fill_module(), analyze, numpy)
+    if args.report:
+        args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if args.check:
+        existing = {p.relative_to(args.output): read_json(p) for p in args.output.glob("*/*.json")}
+        if existing != output:
+            parser.exit(1, "track fill files differ from regenerated data\n")
+    else:
+        for path, fill in output.items():
+            path = args.output / path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(fill, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    print(f"{len(output)} fill files, {len({path.parent for path in output})} tracks")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,121 @@
+"""Validation and canonical hashing for experimental track fill files."""
+
+import hashlib
+import json
+import os
+import pkgutil
+import re
+
+
+FEATURE = "track_fill_v1"
+SWITCH = "CTR_TRACK_FILL"
+SCHEMA = 19
+TIERS = ("sapphire", "gold", "platinum")
+MAX_TICKS = 960 * 60 * 60
+MAX_CRATES = 256
+FAMILIES = ("time_crates", "letters", "fruit_crates", "loose_fruit", "weapon_crates", "grid")
+EMPTY_FAMILIES = {"letters": {}, "fruit_crates": [], "loose_fruit": [], "weapon_crates": []}
+HEX_SHA = re.compile(r"[0-9a-f]{64}")
+TRACK_KEY = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def enabled():
+    return os.environ.get(SWITCH) == "1"
+
+
+def canonical_bytes(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+
+
+def payload_sha256(fill):
+    payload = {key: value for key, value in fill.items() if key != "fill_sha256"}
+    return hashlib.sha256(canonical_bytes(payload)).hexdigest()
+
+
+def _fields(value, keys):
+    return type(value) is dict and value.keys() == set(keys)
+
+
+def _int(value, low, high):
+    return type(value) is int and low <= value <= high
+
+
+def _sha(value):
+    return type(value) is str and HEX_SHA.fullmatch(value) is not None
+
+
+def _position(value):
+    return type(value) is list and len(value) == 3 and all(_int(axis, -32768, 32767) for axis in value)
+
+
+def validate(fill, lev_sha):
+    """Validate the frozen slice-1 record against the package LEV pin."""
+    if not _fields(fill, (
+            "schema", "lev_sha256", "generator", "donors", "families",
+            "counts", "relic_targets", "fill_sha256")):
+        raise ValueError("fill has unsupported or incomplete record fields")
+    if not _int(fill["schema"], 1, 1):
+        raise ValueError("unsupported track fill schema")
+    if not _sha(lev_sha) or fill["lev_sha256"] != lev_sha:
+        raise ValueError("track fill LEV hash differs from the package pin")
+    generator = fill["generator"]
+    if (not _fields(generator, ("name", "version")) or generator["name"] != "ctr-track-fill"
+            or not _int(generator["version"], 1, 1)):
+        raise ValueError("unsupported track fill generator")
+    donors = fill["donors"]
+    if type(donors) is not list or not 1 <= len(donors) <= 2:
+        raise ValueError("track fill requires one or two donors")
+    seen = {lev_sha}
+    for donor in donors:
+        if (not _fields(donor, ("lev_sha256", "road_sha256", "kind", "overlap"))
+                or not _sha(donor["lev_sha256"]) or donor["lev_sha256"] in seen
+                or not _sha(donor["road_sha256"])):
+            raise ValueError("invalid track fill donor identity")
+        seen.add(donor["lev_sha256"])
+        overlap = donor["overlap"]
+        # Overlap is in hundred-thousandths to keep the wire integer-only.
+        if (not _int(overlap, 95000, 100000)
+                or donor["kind"] not in ("identical", "similar>=0.95")
+                or (donor["kind"] == "identical" and overlap != 100000)):
+            raise ValueError("track fill requires a same-road donor")
+    families = fill["families"]
+    if not _fields(families, FAMILIES) or any(families[key] != empty for key, empty in EMPTY_FAMILIES.items()):
+        raise ValueError("unsupported track fill families")
+    crates = families["time_crates"]
+    if type(crates) is not list or not 1 <= len(crates) <= MAX_CRATES:
+        raise ValueError("invalid time crate set size")
+    for crate in crates:
+        if (not _fields(crate, ("pos", "type")) or not _position(crate["pos"])
+                or not _int(crate["type"], 1, 3)):
+            raise ValueError("invalid track fill time crate")
+    grid = families["grid"]
+    if grid is not None and (
+            type(grid) is not list or len(grid) != 8 or any(
+                not _fields(spawn, ("pos", "rot_y")) or not _position(spawn["pos"])
+                or not _int(spawn["rot_y"], -32768, 32767) for spawn in grid)):
+        raise ValueError("invalid track fill starting grid")
+    counts = fill["counts"]
+    if (not _fields(counts, FAMILIES) or any(
+            not _int(counts[name], len(families[name] or ()), len(families[name] or ()))
+            for name in FAMILIES)):
+        raise ValueError("track fill counts differ from its families")
+    targets = fill["relic_targets"]
+    if not _fields(targets, (*TIERS, "source")) or targets["source"] not in ("saphi", "author"):
+        raise ValueError("track fill requires relic targets from Saphi or the author")
+    if (any(not _int(targets[tier], 1, MAX_TICKS) for tier in TIERS)
+            or not targets["sapphire"] > targets["gold"] > targets["platinum"]):
+        raise ValueError("track fill relic targets must descend from sapphire to platinum")
+    if not _sha(fill["fill_sha256"]) or fill["fill_sha256"] != payload_sha256(fill):
+        raise ValueError("track fill SHA-256 mismatch")
+    return fill
+
+
+def bundled(key, lev_sha):
+    """Read just the apworld entry for this track and exact LEV, if any."""
+    if not TRACK_KEY.fullmatch(key) or not _sha(lev_sha):
+        raise ValueError("invalid bundled track fill identity")
+    try:
+        data = pkgutil.get_data(__package__, f"data/track_fill/{key}/{lev_sha[:16]}.json")
+    except FileNotFoundError:
+        return None
+    return validate(json.loads(data), lev_sha) if data is not None else None

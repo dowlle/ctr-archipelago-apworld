@@ -193,9 +193,9 @@ def _pin_pair(files, where, what):
     return pins
 
 
-def admit(descriptor, where="package"):
+def admit(descriptor, where="package", *, frozen_fill=False):
     """Return a canonical copy of one complete descriptor, or raise PackageError."""
-    _closed(descriptor, REQUIRED, OPTIONAL, where)
+    _closed(descriptor, REQUIRED, OPTIONAL + (("fill",) if frozen_fill else ()), where)
     d = descriptor
     key = _string(d["content_id"], TRACK_KEY, 64, where + ".content_id",
                   "lowercase letters and digits in hyphen-separated groups, such as baby-t-park")
@@ -262,6 +262,18 @@ def admit(descriptor, where="package"):
                                             "quote versions such as \"1.0\"")
     elif "relic_revision" in d:
         _fail(where + ".relic_revision", "is only allowed together with relic_files")
+    if "fill" in d:
+        from . import track_fill
+
+        if not caps["relic"] or not caps["time_trial"] or "relic_files" in d:
+            _fail(where + ".fill", "requires Relic Race on the main LEV and VRM pair")
+        try:
+            fill = track_fill.validate(d["fill"], pins[0]["sha256"])
+        except ValueError as exc:
+            _fail(where + ".fill", str(exc))
+        if any(out["relic_targets"][tier] != fill["relic_targets"][tier] for tier in RELIC_TIERS):
+            _fail(where + ".fill", "relic targets disagree with the package")
+        out["fill"] = fill
     evidence = d["evidence"]
     if type(evidence) is not list or len(evidence) > MAX_EVIDENCE:
         _fail(where + ".evidence", f"must be a list of at most {MAX_EVIDENCE} rows")
@@ -306,7 +318,7 @@ def admit_all(raw, where="tracks.custom", *, yaml_input=False, historical=False,
         at = f"{where}[{i}]"
         if yaml_input:
             descriptor = yaml_track_entry(descriptor, at)
-        package = admit(descriptor, at)
+        package = admit(descriptor, at, frozen_fill=historical and not yaml_input)
         key = package["content_id"] if historical else canonical_track_key(package["content_id"])
         earlier = seen.get(("track key", key))
         if dropped is not None and earlier is not None:
