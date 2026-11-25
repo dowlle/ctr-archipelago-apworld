@@ -1288,13 +1288,18 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
     return result
 
 
+#: The bundled Cortex Vortex files: the main pair and the relic pair (CV1).
+CORTEX_FILES = ("cvortex arcade all.lev", "cvortex arcade all.vrm", "cvortex relic.lev", "cvortex relic.vrm")
+
+
 def _cortex_installed(assets: str) -> bool:
-    """The client's Cortex Vortex pair: a LEV and a VRM in assets/tracks/cortex-vortex."""
+    """The client's Cortex Vortex: both bundled pairs in assets/tracks/cortex-vortex.
+    An older client folder with only the all-in-one pair is not offered."""
     try:
-        names = [name.lower() for name in os.listdir(os.path.join(assets, "tracks", CORTEX_FOLDER))]
+        names = {name.lower() for name in os.listdir(os.path.join(assets, "tracks", CORTEX_FOLDER))}
     except OSError:
         return False
-    return all(any(name.endswith(suffix) for name in names) for suffix in TRACK_FILE_SUFFIX.values())
+    return all(name in names for name in CORTEX_FILES)
 
 
 def list_tracks(paths: Paths, assets: str, yaml_path: str | None = None) -> dict:
