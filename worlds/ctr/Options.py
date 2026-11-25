@@ -586,17 +586,9 @@ class ReserveTopUp(DefaultOnToggle):
 
 
 class CharacterLooks(OptionSet):
-    """Character looks to add to the filler items that are not traps. Empty by
-    default.
-
-    Each look is a filler item that changes how a racer looks. "Joe Mama" makes
-    Komodo Joe look like Komodo Moe (model by Lockheart). Each allowed look is
-    drawn at weight 1, beside Wumpa Fruit at 6, and can arrive more than once.
-    The newest look you receive is worn from the next load; the Joe Look row in
-    the in-game options switches between the looks you have and the original.
-    Looks only change the model, never stats or logic."""
+    """Parked until the client supports player-supplied character models."""
     display_name = "Character Looks"
-    valid_keys = ["Joe Mama"]
+    visibility = Visibility.none
     default = frozenset()
 
 
@@ -1948,7 +1940,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
                LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
-    "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp, CharacterLooks,
+    "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper,
                         TrapDisplay],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,

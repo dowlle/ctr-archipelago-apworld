@@ -50,7 +50,7 @@
     "death_link": "Solo has no other players, so DeathLink is forced off (ruling 2026-11-02).",
     "death_link_send": "DeathLink is forced off in solo.",
     "deathlink_amnesty": "DeathLink is forced off in solo.",
-    "retail_tracks": "A set of tracks. The Custom Tracks page and a YAML cover track choice.", "character_looks": "A list of look items, empty by default. Only a YAML sets it.",
+    "retail_tracks": "A set of tracks. The Custom Tracks page and a YAML cover track choice.",
     "track_modes": "A dictionary of per-track modes. Set it in a YAML.",
     "track_origin_letters": "Uses the default for installed custom tracks. Set it in a YAML.",
     "custom_tracks": "A list. The Custom Tracks page owns it.",
