@@ -2,25 +2,19 @@
 
 import hashlib
 import json
-import os
 import pkgutil
 import re
 
 
 FEATURE = "track_fill_v1"
-SWITCH = "CTR_TRACK_FILL"
 SCHEMA = 19
 TIERS = ("sapphire", "gold", "platinum")
 MAX_TICKS = 960 * 60 * 60
-MAX_CRATES = 256
+MAX_CRATES = 127  # The retail perfect bonus reads the driver's count as signed.
 FAMILIES = ("time_crates", "letters", "fruit_crates", "loose_fruit", "weapon_crates", "grid")
 EMPTY_FAMILIES = {"letters": {}, "fruit_crates": [], "loose_fruit": [], "weapon_crates": []}
 HEX_SHA = re.compile(r"[0-9a-f]{64}")
 TRACK_KEY = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-
-
-def enabled():
-    return os.environ.get(SWITCH) == "1"
 
 
 def canonical_bytes(value):

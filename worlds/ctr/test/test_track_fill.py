@@ -2,7 +2,6 @@
 
 import copy
 import json
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,20 +34,18 @@ def test_bundled_fills_match_pins_and_hashes():
 
 
 def test_fill_room_is_frozen_and_schema_bump_is_conditional():
-    with patch.dict(os.environ, {track_fill.SWITCH: "1"}):
-        wire = make_world(fill_options()).fill_slot_data()
+    wire = make_world(dict(fill_options(), track_fill=True)).fill_slot_data()
     assert wire["schema_version"] == wire["ctr_options"]["schema_version"] == 19
     package, = wire["content_plan"]["packages"]
     assert package["capabilities"]["relic"]
     assert wire["content_plan"]["required_features"][-1] == track_fill.FEATURE
     assert len(package["fill"]["families"]["time_crates"]) == 66
-    with patch.dict(os.environ, {track_fill.SWITCH: "0"}):
-        ordinary = make_world(fill_options()).fill_slot_data()
-        assert ordinary["schema_version"] == ordinary["ctr_options"]["schema_version"] == 18
-        assert "fill" not in ordinary["content_plan"]["packages"][0]
-        assert track_fill.FEATURE not in ordinary["content_plan"]["required_features"]
-        with patch.object(track_fill, "bundled", side_effect=AssertionError("room must use its frozen fill")):
-            restored = make_world(fill_options(), passthrough=wire)
+    ordinary = make_world(fill_options()).fill_slot_data()
+    assert ordinary["schema_version"] == ordinary["ctr_options"]["schema_version"] == 18
+    assert "fill" not in ordinary["content_plan"]["packages"][0]
+    assert track_fill.FEATURE not in ordinary["content_plan"]["required_features"]
+    with patch.object(track_fill, "bundled", side_effect=AssertionError("room must use its frozen fill")):
+        restored = make_world(fill_options(), passthrough=wire)
     assert restored.ctr_content_plan["packages"][0] == package
 
     for change in ("count", "pin", "digest", "feature"):

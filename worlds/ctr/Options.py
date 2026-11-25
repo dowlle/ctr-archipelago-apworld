@@ -1537,6 +1537,13 @@ def _normalized_track_entry(entry):
         return entry
 
 
+class TrackFill(Toggle):
+    """Experimental. Give eligible custom track revisions a Relic Race using
+    same-road time crate placements and verified targets. Off by default. A
+    room that uses a fill requires a client launched with CTR_TRACK_FILL=1."""
+    display_name = "Track Fill"
+
+
 class CortexVortexTrack(Choice):
     """Choose whether Cortex Vortex can appear as a track. It has a Trophy Race,
     CTR Challenge and Relic Race, no item boxes, and you need Ultimate Sacred
@@ -1819,6 +1826,7 @@ class ctrAPOptions(PerGameCommonOptions):
     retail_tracks: RetailTracks
     track_modes: TrackModes
     custom_tracks: CustomTracks
+    track_fill: TrackFill
     cortex_vortex_track: CortexVortexTrack
     required_entries: RequiredEntries
     # content: cups and arenas
@@ -1934,7 +1942,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     # it, how it opens, what pays out, then items, racers, boost and cosmetics.
     # Every option must appear in exactly one group. Anything left out lands in
     # an unlabelled bucket at the bottom of the web page.
-    "Tracks": [RetailTracks, TrackModes, CustomTracks, CortexVortexTrack, RequiredEntries],
+    "Tracks": [RetailTracks, TrackModes, CustomTracks, TrackFill, CortexVortexTrack, RequiredEntries],
     "Cups and Arenas": [CupCount, CupTracks, CupCustomLegs, OneLapCups, CrystalChallengeCount, CrystalArenas],
     "Bosses": [BossGarages, BossCups, GarageRequirementLevel, BossTrackShuffle, BossTrackPool, BossOpponentShuffle,
                BossCharacterPool, BossTrackAssignment, BossKitShuffle, BossAttackAssignment, BossAttackIntensity,

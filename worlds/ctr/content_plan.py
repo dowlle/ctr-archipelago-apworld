@@ -299,12 +299,12 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=None):
+def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=None, use_fill=False):
     """Admit any complete descriptor (#133 PR 2); bytes are checked by native."""
     try:
         packages = custom_packages.admit_all(raw, where, yaml_input=where == "custom_tracks",
                                              historical=historical, dropped=dropped)
-        if where == "custom_tracks" and not historical and track_fill.enabled():
+        if where == "custom_tracks" and not historical and use_fill:
             for package in packages:
                 caps = package["capabilities"]
                 if not caps["time_trial"] or caps["relic"]:
@@ -1471,7 +1471,7 @@ def draw_plan(world, key_estimate=True):
     # the character options. They take no draw.
     forced_options.raise_if_starting_as_removed_oxide(world)
     forced_options.warn_racer_locked_pads_boolean_normalized(world)
-    packages = resolve_packages(list(o.custom_tracks.value))
+    packages = resolve_packages(list(o.custom_tracks.value), use_fill=bool(o.track_fill.value))
     # New rooms carry measured turbo metadata for this exact LEV. Persisted
     # rooms keep their descriptor, including the historical missing-field floor.
     from . import country_speedway, toasty_terrace

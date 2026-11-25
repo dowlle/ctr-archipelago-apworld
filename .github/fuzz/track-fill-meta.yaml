@@ -1,0 +1,19 @@
+Crash Team Racing:
+  accessibility: full
+  track_fill: true
+  custom_tracks:
+    - id: package/acid-lake/1.0.0
+      content_id: acid-lake
+      uuid: 2fcc047d-6aa9-5b88-9e3c-e6228d5b401c
+      revision: "1.0.0"
+      display_name: Acid Lake
+      author: Lolothesamurai
+      laps: 3
+      capabilities: {time_trial: true, arcade: false, relic: false, ctr_tokens: false, wumpa: false, weapon_crates: 0}
+      files:
+        - {role: lev, sha256: e2a9e1daaf89ebd499d657462d19ae9c0be488f18c04d1e391d4abb6e5e791a6, bytes: 810876, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 0d75e1e0da02092c09728b3c38aef8eff0d5170fb626b7db48fa7a885a9429af, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [acid-lake]
+  track_modes: {default: [trophy, ctr, relic], acid-lake: [relic]}
+  retail_tracks: [all]
