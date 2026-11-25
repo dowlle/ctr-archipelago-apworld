@@ -52,8 +52,8 @@ def _sha256(value):
     return isinstance(value, str) and _HEX64.fullmatch(value) is not None
 
 
-def _check_file_shape(doc, path):
-    """Shape and values of one spot file; returns it. Raises SpotFileError."""
+def check_draft_file(doc, path="<file>"):
+    """Check a proposal's geometry and fields before its source is reviewed."""
     if not isinstance(doc, dict) or set(doc) != {"format", "version", "track", "spots", "retired"}:
         _fail(path, "must hold exactly format, version, track, spots and retired")
     if doc["format"] != FORMAT or doc["version"] != VERSION:
@@ -139,7 +139,7 @@ def _check_source(spot, track_id, pins, source_records, path):
 
 def check_file(doc, source_records, path="<file>"):
     """Validate a catalog file against its reviewed sources before generation."""
-    _check_file_shape(doc, path)
+    check_draft_file(doc, path)
     track = doc["track"]
     track_id = (f"retail:{track['level_id']}" if track["kind"] == "retail"
                 else f"custom:{track['track_key']}")

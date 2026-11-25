@@ -87,7 +87,7 @@ def fixture(path):
 
 def entry(path):
     raw = pkgutil.get_data(box_spots.__package__, FIXTURES + path)
-    return dict(doc=box_spot_catalog._check_file_shape(json.loads(raw.decode("utf-8")), path), path=path,
+    return dict(doc=box_spot_catalog.check_draft_file(json.loads(raw.decode("utf-8")), path), path=path,
                 sha256=hashlib.sha256(raw).hexdigest())
 
 
@@ -209,10 +209,10 @@ class TestFileChecks(unittest.TestCase):
         doc = copy.deepcopy(self.BASE)
         change(doc)
         with self.assertRaises(box_spots.SpotFileError):
-            box_spot_catalog._check_file_shape(doc, "<test>")
+            box_spot_catalog.check_draft_file(doc)
 
     def test_good_file(self):
-        self.assertEqual(box_spot_catalog._check_file_shape(copy.deepcopy(self.BASE), "<test>")["version"], 1)
+        self.assertEqual(box_spot_catalog.check_draft_file(copy.deepcopy(self.BASE))["version"], 1)
 
     def test_bad_files(self):
         spot = lambda d: d["spots"][0]
