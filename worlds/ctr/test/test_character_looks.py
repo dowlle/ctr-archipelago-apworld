@@ -134,7 +134,7 @@ class TestTrackerAndContentPlan(unittest.TestCase):
 
 class TestRollsKeepTheirAlphabet(unittest.TestCase):
     """With no looks enabled, random name rolls and group draws roll the same
-    names as before the look items existed (Codex review round 1)."""
+    names as before the look items existed."""
 
     def test_legacy_view_leaves_looks_out_of_rolls_and_shared_groups(self):
         from .. import ctrAPWorld
@@ -181,8 +181,8 @@ class TestRollsKeepTheirAlphabet(unittest.TestCase):
                 self.assertEqual(character_looks.allowed_looks(world), [])
 
 
-class TestRound2(unittest.TestCase):
-    """Codex review round 2: saved rooms hold tuples, and group links keep
+class TestSavedRoomsAndLinks(unittest.TestCase):
+    """Saved rooms hold tuples, and group links keep
     the looks their slots allow."""
 
     def test_saved_room_tuple_restores(self):

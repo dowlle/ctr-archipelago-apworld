@@ -120,7 +120,7 @@ def restore_legacy_link_pools(multiworld, world_type):
             excluded |= set(link.get("exclude", ()))
         groups = legacy_option_world(world_type).item_name_groups
         # Character looks (JL2): looks the framework already put in this
-        # link's pool stay when a member slot allows them (review round 3).
+        # link's pool stay when a member slot allows them.
         from .character_looks import LOOKS, allowed_looks
         enabled = {look for w in worlds for look in allowed_looks(w)}
         pool = set(group["item_pool"]) & set(LOOKS) & enabled
