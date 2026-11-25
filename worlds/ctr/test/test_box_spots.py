@@ -20,9 +20,9 @@ from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from .. import box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
+from .. import box_spot_catalog, box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks
 from ..Locations import CTR_LOCATION_IDS
-from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, builtin_only, first_world, refused
+from .test_content_item_boxes import BTP_ID, LOOP_ID, before_cp1, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN
 
@@ -47,6 +47,35 @@ DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 
+#: CP1: dowlle's Box Author Mode spots on named custom tracks (2026-11-24).
+#: track key -> (named block, LEV pin, first new number, spots shipped, numbers
+#: that need boost from his stream calls). Numbers follow the track's existing
+#: spots (main or the BX3 copies) in placement order; airborne spots, spots
+#: without ground and spots past number 50 are held, without a number.
+DOWLLE_CUSTOM = {
+    "ancient-lake": (1, "21e1ffe395f1d5d0a2c4538050d18912577a4dd783026fa9caea8b09ad8d3aee", 16, 19, []),
+    "arctic-alleyway": (6, "a31f66f5ac7d0fcf1a99cfa4af0d956e655f51a3fbc27b3511e24e23f139dda9", 17, 34, [36]),
+    "baby-t-park": (8, "be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8", 1, 29, []),
+    "big-forest": (9, "9553863255f8b9a72cf2b8fbe0e3f1f3195e0e502c604ccf0c3f06ff0c3ea535", 13, 38, [50]),
+    "bowser-castle-1": (10, "0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9", 1, 10, []),
+    "chasqui-rally": (12, "9201064be9731919a0b86590af2801f902c0c8704520521900e84faf17ecc06d", 9, 27, []),
+    "choco-island-2": (13, "4d5a7397feaa242083a59279c28d8e96118ec7074de5f03eeab329207c4472d4", 1, 18, []),
+    "coco-park-2025": (15, "bbebd28a0c61723b632a1535d26a5f90d061f6c918403a851680f64e487f9a1c", 1, 43, [10, 11, 12, 13, 14, 15, 16, 17]),
+    "country-speedway": (17, "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996", 16, 35, []),
+    "crystal-caves": (18, "eddcd303e316e8eb41f885e8ec959a2c2d3db06e21727dfc50c61ab8a8048139", 13, 24, []),
+    "dark-ruins": (21, "ced2df2e83aef4759e0bb132fbd36f44c51d818b623d7950faec2407b8229589", 13, 15, [27]),
+    "diwali": (23, "5d4c5da687c67af1d7baa42f1246b4c4d43e708667f2c5921ce4ec0ebcd5f305", 13, 15, []),
+    "draculas-castle": (26, "8c343aa6723ee2dec99d54f815e77e9e20798f657d6f4464f312529ffe4698f4", 12, 39, []),
+    "dreamy-heights": (27, "9f85b2d5dbc2fe543ce024751fc6e08f77d7ba649f8ddfec936f016804a9bbf3", 17, 33, []),
+    "garden-speedway": (32, "a04e15057ee83c80d98f0e88eb513eb51286e123b11e82155203b7ef9a43b23e", 1, 15, []),
+    "gossamer-s-castle": (89, "82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c", 16, 23, []),
+    "green-hill-raceway": (35, "50250966e9b31d13b140aaafa9433ffce19269898a0850edd0a1e8cf1207c760", 1, 27, []),
+    "haven-stadium": (38, "37f2daddfe7fd988b091b914536737f77a3ac07384e120a25b7e3d69386e3188", 1, 21, []),
+    "inferno-island": (41, "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32", 1, 25, [20, 21, 22]),
+    "neon-paradise": (51, "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", 19, 20, []),
+    "neonstadion": (52, "8c1fde3e60405eb8737e75aa4cfe5cb205cd9d21961eccf4c5d7827ecf484880", 17, 24, []),
+}
+
 
 def community_numbers(key):
     return COMMUNITY_NUMBERS.get(key, list(range(1, 16)))
@@ -58,7 +87,7 @@ def fixture(path):
 
 def entry(path):
     raw = pkgutil.get_data(box_spots.__package__, FIXTURES + path)
-    return dict(doc=box_spots.check_file(json.loads(raw.decode("utf-8")), path), path=path,
+    return dict(doc=box_spot_catalog._check_file_shape(json.loads(raw.decode("utf-8")), path), path=path,
                 sha256=hashlib.sha256(raw).hexdigest())
 
 
@@ -99,7 +128,7 @@ class TestConversion(unittest.TestCase):
 
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, ARABIAN_DAY, "sunset-vista"})
+        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, *DOWLLE_CUSTOM, ARABIAN_DAY, "sunset-vista"})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -180,10 +209,10 @@ class TestFileChecks(unittest.TestCase):
         doc = copy.deepcopy(self.BASE)
         change(doc)
         with self.assertRaises(box_spots.SpotFileError):
-            box_spots.check_file(doc)
+            box_spot_catalog._check_file_shape(doc, "<test>")
 
     def test_good_file(self):
-        self.assertIs(box_spots.check_file(copy.deepcopy(self.BASE))["version"], 1)
+        self.assertEqual(box_spot_catalog._check_file_shape(copy.deepcopy(self.BASE), "<test>")["version"], 1)
 
     def test_bad_files(self):
         spot = lambda d: d["spots"][0]
@@ -214,6 +243,70 @@ class TestFileChecks(unittest.TestCase):
 
     def test_absent_needs_means_usf(self):
         self.assertEqual(box_spots.needs_rank({"number": 1, "pos": [0, 0, 0], "rot_y": 0}), 2)
+
+
+class TestSourceChecks(unittest.TestCase):
+    def test_catalog_has_all_reviewed_ap_source_kinds(self):
+        docs = [e["doc"] for e in (*box_spots.RETAIL_FILES.values(), *box_spots.CUSTOM_FILES.values())]
+        sources = set()
+        for doc in docs:
+            box_spots.check_file(doc)
+            for spot in doc["spots"]:
+                if spot["source_family"] == "ap_box":
+                    sources.add(box_spots.SOURCE_RECORDS[spot["provenance"][0]]["kind"])
+        self.assertEqual(sources, box_spot_catalog.AP_SOURCE_KINDS)
+
+    def test_refuses_non_ap_and_unknown_families(self):
+        doc = box_spots.RETAIL_FILES[4]["doc"]
+        for family in ("weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter", "other"):
+            with self.subTest(family=family), self.assertRaises(box_spots.SpotFileError):
+                box_spots.check_file(dict(doc, spots=[dict(doc["spots"][0], source_family=family)]))
+
+    def test_refuses_missing_or_mismatched_source(self):
+        doc = box_spots.RETAIL_FILES[4]["doc"]
+        original = doc["spots"][0]
+        for field in ("source_family", "provenance"):
+            spot = dict(original)
+            del spot[field]
+            with self.subTest(field=field), self.assertRaises(box_spots.SpotFileError):
+                box_spots.check_file(dict(doc, spots=[spot]))
+        for changes in ({"pos": [0, 0, 0]}, {"number": 50}, {"rot_y": original["rot_y"] + 1},
+                        {"provenance": ["invented-source", 1]}):
+            with self.subTest(changes=changes), self.assertRaises(box_spots.SpotFileError):
+                box_spots.check_file(dict(doc, spots=[dict(original, **changes)]))
+
+    def test_published_day_rows_are_the_only_donor_exception(self):
+        doc = box_spots.CUSTOM_FILES[ARABIAN_DAY]["doc"]
+        self.assertEqual([s["number"] for s in doc["spots"]], list(range(1, 28)))
+        self.assertEqual({s["source_family"] for s in doc["spots"]}, {"weapon_crate"})
+        box_spots.check_file(doc)
+        with self.assertRaisesRegex(box_spots.SpotFileError, "LEV donor models"):
+            box_spots.check_file(dict(doc, spots=[dict(doc["spots"][0], source_family="ap_box")]))
+
+    def test_bx3_model_8_refused_even_if_labelled_ap(self):
+        doc = box_spots.CUSTOM_FILES["chasqui-rally"]["doc"]
+        # BX3 Chasqui row 1, from the LRG2Pancho model-8 extract.
+        spot = dict(number=1, pos=[-4403, -15, 16274], rot_y=289, provenance=["bx3", 1])
+        source = dict(kind="lev_model_extract", track="custom:chasqui-rally",
+                      pins=doc["track"]["lev_sha256"], rows={1: [spot["number"], *spot["pos"], spot["rot_y"]]},
+                      model_id=8, donor_lev_sha256="9bba2b38" + "0" * 56)
+        for family in ("ap_box", "weapon_crate"):
+            with self.subTest(family=family), self.assertRaisesRegex(box_spots.SpotFileError, "LEV donor models"):
+                box_spot_catalog.check_file(dict(doc, spots=[dict(spot, source_family=family)]), {"bx3": source})
+
+    def test_cp1_pins_cannot_be_broadened_by_a_spot_file(self):
+        for key in ("chasqui-rally", "dark-ruins", "dreamy-heights", "neon-paradise"):
+            doc = box_spots.CUSTOM_FILES[key]["doc"]
+            pin = DOWLLE_CUSTOM[key][1]
+            self.assertEqual(doc["track"]["lev_sha256"], [pin])
+            track = dict(doc["track"], lev_sha256=[pin, "01" * 32])
+            with self.subTest(track=key), self.assertRaisesRegex(box_spots.SpotFileError, "LEV pins"):
+                box_spots.check_file(dict(doc, track=track))
+            package = dowlle_package(key)
+            named = dict(origin="custom", named_block=DOWLLE_CUSTOM[key][0])
+            self.assertIsNotNone(box_spots.file_for(named, package))
+            package["files"][0]["sha256"] = "01" * 32
+            self.assertIsNone(box_spots.file_for(named, package))
 
 
 class TestPick(unittest.TestCase):
@@ -416,7 +509,10 @@ def community_package(key, crates=17, digest=None):
 
 
 class TestCommunitySpotFiles(unittest.TestCase):
-    """The first reviewed community files: DK Pass and Ancient Lake (A3-45)."""
+    """The original community submissions, isolated from later additions."""
+
+    def setUp(self):
+        self.enterContext(before_cp1())
 
     def test_files_are_reviewed_named_track_files(self):
         for key, (block, pin, needs) in COMMUNITY.items():
@@ -582,3 +678,78 @@ class TestDowlleRetailSpots(unittest.TestCase):
                 boost, stats = item_boxes.BOX_RULES.get((track, int(slot)), (0, False))
                 self.assertEqual(check.get("boost", 0), boost, check["display_name"])
                 self.assertEqual(check.get("stats", False), stats, check["display_name"])
+
+
+def dowlle_package(key):
+    """A catalogue package of a CP1 track on the LEV its spots were placed on."""
+    block, pin = DOWLLE_CUSTOM[key][:2]
+    if key == "baby-t-park":
+        return btp()
+    package = btp()
+    old = package["files"][0]["sha256"]
+    package.update(content_id=key, display_name=box_spots.CUSTOM_FILES[key]["doc"]["track"]["name"],
+                   id=f"package/{key}/1.0.0", revision="1.0.0", uuid=f"11111111-2222-4333-8444-{block:012d}")
+    package["files"][0]["sha256"] = pin
+    for evidence in package.get("evidence", []):
+        evidence["file_hashes"] = [pin if h == old else h for h in evidence["file_hashes"]]
+    return package
+
+
+class TestDowlleCustomSpots(unittest.TestCase):
+    """CP1: dowlle's 2026-11-24 placements on 21 named custom tracks. He ruled
+    his placements boost 0 (2026-11-24); the spots his stream calls named need
+    boost. Every spot is pinned to the LEV it was placed on."""
+
+    def test_files_hold_the_spots_in_placement_order(self):
+        total = 0
+        for key, (block, pin, first, count, boost) in DOWLLE_CUSTOM.items():
+            doc = box_spots.CUSTOM_FILES[key]["doc"]
+            self.assertEqual(destinations.named_track(key).block_index, block, key)
+            self.assertEqual(doc["track"]["lev_sha256"], [pin], key)
+            new = [s for s in doc["spots"] if s.get("source") == DOWLLE_2026_11_24]
+            self.assertEqual([s["number"] for s in new], list(range(first, first + count)), key)
+            self.assertEqual(max(s["number"] for s in doc["spots"]), first + count - 1, key)
+            self.assertLessEqual(first + count - 1, box_spots.MAX_NUMBER, key)
+            older = [s for s in doc["spots"] if s.get("source") != DOWLLE_2026_11_24]
+            self.assertTrue(all(s["number"] < first for s in older), key)
+            for spot in new:
+                self.assertEqual(spot["needs"], "boost" if spot["number"] in boost else "none", (key, spot["number"]))
+                self.assertNotIn("shortcut", spot)
+                self.assertTrue(spot["review"].startswith("CP1 ground map: "), (key, spot["number"]))
+                self.assertEqual("note" in spot, spot["number"] in boost, (key, spot["number"]))
+                if spot["number"] in boost:
+                    self.assertTrue(spot["note"].startswith("dowlle's stream call at "), (key, spot["number"]))
+            total += count
+        self.assertEqual(total, 534)
+        self.assertEqual(sum(len(v[4]) for v in DOWLLE_CUSTOM.values()), 14)
+
+    def test_seeds_stand_the_boxes_and_stay_completable(self):
+        """Every CP1 track in a filled seed at Item Box Count 15 and 50: the
+        picked spots are the file's, boost spots carry boost, and every
+        location is reachable."""
+        keys = sorted(DOWLLE_CUSTOM)
+        groups = [keys[i::3] for i in range(3)]
+        for count in (15, 50):
+            for group in groups:
+                with self.subTest(count=count, group=group):
+                    options = box_options(custom=[dowlle_package(k) for k in group], tier="hard",
+                                          item_box_count=count, progressive_boost="shared_global",
+                                          accessibility="full")
+                    world = first_world(options, seed=count)
+                    plan = world.ctr_content_plan
+                    self.assertFalse(refused(plan))
+                    for key in group:
+                        block, pin, first, n, boost = DOWLLE_CUSTOM[key]
+                        track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == block)
+                        record = spot_set(plan, track_id)
+                        self.assertEqual(record["lev_sha256"], pin)
+                        pool = len(box_spots.CUSTOM_FILES[key]["doc"]["spots"])
+                        self.assertEqual((record["pool"], len(record["picked"])), (pool, min(count, pool)))
+                        spots = box_spots.spots_by_number(box_spots.CUSTOM_FILES[key])
+                        for check in boxes(plan, track_id):
+                            m = check["spot"]["number"]
+                            self.assertEqual(check["spot"], box_spots.wire_spot(spots[m]))
+                            self.assertEqual(check["location"], named_tracks.location_code(block, f"item_box_{m}"))
+                            self.assertEqual(check.get("boost", 0), box_spots.needs_rank(spots[m]))
+                    distribute_items_restrictive(world.multiworld)
+                    self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))

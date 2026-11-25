@@ -97,6 +97,9 @@ class TestCountrySpeedway(unittest.TestCase):
 
     def test_authored_131_spots_keep_their_own_ranks(self):
         from .test_box_spots import community_package
+        from .test_content_item_boxes import before_cp1
+        # The 14 community spots of 1.3.1, as before CP1 appended dowlle's spots.
+        self.enterContext(before_cp1())
         package = community_package("country-speedway", crates=25)
         track = dict(id="country131", origin="custom", package_id=package["id"], named_block=17,
                      display_name="Country Speedway", custom_slot=1)

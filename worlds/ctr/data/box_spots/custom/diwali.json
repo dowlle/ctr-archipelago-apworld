@@ -1,0 +1,23 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "diwali", "name": "Diwali", "lev_sha256": ["5d4c5da687c67af1d7baa42f1246b4c4d43e708667f2c5921ce4ec0ebcd5f305"]},
+  "spots": [
+    {"number": 13, "pos": [-10311, -324, 6659], "rot_y": 2026, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 628]},
+    {"number": 14, "pos": [-16601, -504, 7804], "rot_y": 3088, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 629]},
+    {"number": 15, "pos": [-16627, -327, 5821], "rot_y": 416, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 630]},
+    {"number": 16, "pos": [-13251, 573, 581], "rot_y": 2426, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 631]},
+    {"number": 17, "pos": [-12369, 644, -835], "rot_y": 1657, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 632]},
+    {"number": 18, "pos": [2813, 88, -4590], "rot_y": 767, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 633]},
+    {"number": 19, "pos": [2924, 118, -4135], "rot_y": 73, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 634]},
+    {"number": 20, "pos": [2538, 143, -3570], "rot_y": 3608, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 635]},
+    {"number": 21, "pos": [829, -5, -2426], "rot_y": 48, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 636]},
+    {"number": 22, "pos": [1099, -267, 1904], "rot_y": 4079, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: no reachable link found; shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-diwali", 637]},
+    {"number": 23, "pos": [-1676, -861, 12830], "rot_y": 3146, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L5, L10 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-diwali", 638]},
+    {"number": 24, "pos": [-8264, -698, 11886], "rot_y": 3037, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 639]},
+    {"number": 25, "pos": [-11078, -532, 10346], "rot_y": 2742, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 640]},
+    {"number": 26, "pos": [-12509, -505, 7935], "rot_y": 2172, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 641]},
+    {"number": 27, "pos": [-10381, 428, 1576], "rot_y": 1893, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-diwali", 642]}
+  ],
+  "retired": []
+}

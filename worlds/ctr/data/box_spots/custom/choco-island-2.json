@@ -1,0 +1,26 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "choco-island-2", "name": "Choco Island 2", "lev_sha256": ["4d5a7397feaa242083a59279c28d8e96118ec7074de5f03eeab329207c4472d4"]},
+  "spots": [
+    {"number": 1, "pos": [1702, 122, 332], "rot_y": 891, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 594]},
+    {"number": 2, "pos": [4782, 572, -299], "rot_y": 1007, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L3 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 595]},
+    {"number": 3, "pos": [7423, 527, 209], "rot_y": 932, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L9 (only entry); shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 596]},
+    {"number": 4, "pos": [12507, 956, 1237], "rot_y": 652, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 597]},
+    {"number": 5, "pos": [13148, 1022, 5677], "rot_y": 3903, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 598]},
+    {"number": 6, "pos": [11636, 922, 9897], "rot_y": 3937, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 599]},
+    {"number": 7, "pos": [11550, 929, 12103], "rot_y": 126, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 600]},
+    {"number": 8, "pos": [9241, 1220, 16909], "rot_y": 2864, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 601]},
+    {"number": 9, "pos": [6370, 1439, 15914], "rot_y": 2823, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 602]},
+    {"number": 10, "pos": [4087, 1282, 14045], "rot_y": 2967, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 603]},
+    {"number": 11, "pos": [-1354, -269, 14572], "rot_y": 2905, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 604]},
+    {"number": 12, "pos": [-3526, -231, 12874], "rot_y": 2501, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 605]},
+    {"number": 13, "pos": [-4811, 105, 10098], "rot_y": 1685, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 606]},
+    {"number": 14, "pos": [-5054, -976, 3813], "rot_y": 2169, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 607]},
+    {"number": 15, "pos": [-2441, -195, 67], "rot_y": 980, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 608]},
+    {"number": 16, "pos": [3172, 239, 1092], "rot_y": 326, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 609]},
+    {"number": 17, "pos": [7587, 583, 2429], "rot_y": 1347, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 610]},
+    {"number": 18, "pos": [11693, 944, 14456], "rot_y": 36, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-choco-island-2", 611]}
+  ],
+  "retired": []
+}

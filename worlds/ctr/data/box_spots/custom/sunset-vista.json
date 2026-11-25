@@ -1,279 +1,32 @@
 {
   "format": "ctr-ap-box-spots",
   "version": 1,
-  "track": {
-    "kind": "custom",
-    "track_key": "sunset-vista",
-    "name": "Sunset Vista",
-    "lev_sha256": [
-      "97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5"
-    ]
-  },
+  "track": {"kind": "custom", "track_key": "sunset-vista", "name": "Sunset Vista", "lev_sha256": ["97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5"]},
   "spots": [
-    {
-      "number": 1,
-      "pos": [
-        -2034,
-        -1112,
-        2660
-      ],
-      "rot_y": 157,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 2,
-      "pos": [
-        2916,
-        -87,
-        -57
-      ],
-      "rot_y": 3006,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 3,
-      "pos": [
-        -434,
-        941,
-        47
-      ],
-      "rot_y": 3037,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 4,
-      "pos": [
-        -5127,
-        1968,
-        2253
-      ],
-      "rot_y": 1354,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 5,
-      "pos": [
-        -3019,
-        1943,
-        -3570
-      ],
-      "rot_y": 2739,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 6,
-      "pos": [
-        -4356,
-        2241,
-        -3328
-      ],
-      "rot_y": 3100,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 7,
-      "pos": [
-        -7393,
-        2583,
-        -1199
-      ],
-      "rot_y": 1058,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 8,
-      "pos": [
-        3988,
-        2791,
-        -80
-      ],
-      "rot_y": 568,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 9,
-      "pos": [
-        6437,
-        2795,
-        5381
-      ],
-      "rot_y": 3968,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 10,
-      "pos": [
-        2207,
-        2656,
-        6869
-      ],
-      "rot_y": 3060,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 11,
-      "pos": [
-        -5273,
-        2654,
-        10330
-      ],
-      "rot_y": 213,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 12,
-      "pos": [
-        -673,
-        1056,
-        6229
-      ],
-      "rot_y": 2094,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 13,
-      "pos": [
-        -1313,
-        1056,
-        6015
-      ],
-      "rot_y": 2094,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 14,
-      "pos": [
-        1582,
-        -1824,
-        12313
-      ],
-      "rot_y": 2,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 15,
-      "pos": [
-        6053,
-        -2144,
-        13275
-      ],
-      "rot_y": 2164,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 16,
-      "pos": [
-        4123,
-        -1833,
-        7315
-      ],
-      "rot_y": 2281,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 17,
-      "pos": [
-        -1257,
-        -1744,
-        4688
-      ],
-      "rot_y": 2907,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 18,
-      "pos": [
-        -6863,
-        -1673,
-        -1653
-      ],
-      "rot_y": 2023,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 19,
-      "pos": [
-        -1608,
-        -1752,
-        -5397
-      ],
-      "rot_y": 996,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 20,
-      "pos": [
-        1660,
-        -2348,
-        -5557
-      ],
-      "rot_y": 1080,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 21,
-      "pos": [
-        8653,
-        -2348,
-        -12117
-      ],
-      "rot_y": 2096,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 22,
-      "pos": [
-        4264,
-        -2037,
-        -15147
-      ],
-      "rot_y": 2999,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 23,
-      "pos": [
-        -1606,
-        -1112,
-        -9983
-      ],
-      "rot_y": 4088,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    },
-    {
-      "number": 24,
-      "pos": [
-        -2564,
-        -1112,
-        -9343
-      ],
-      "rot_y": 4088,
-      "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20",
-      "needs": "none"
-    }
+    {"number": 1, "pos": [-2034, -1112, 2660], "rot_y": 157, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 1]},
+    {"number": 2, "pos": [2916, -87, -57], "rot_y": 3006, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 2]},
+    {"number": 3, "pos": [-434, 941, 47], "rot_y": 3037, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 3]},
+    {"number": 4, "pos": [-5127, 1968, 2253], "rot_y": 1354, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 4]},
+    {"number": 5, "pos": [-3019, 1943, -3570], "rot_y": 2739, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 5]},
+    {"number": 6, "pos": [-4356, 2241, -3328], "rot_y": 3100, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 6]},
+    {"number": 7, "pos": [-7393, 2583, -1199], "rot_y": 1058, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 7]},
+    {"number": 8, "pos": [3988, 2791, -80], "rot_y": 568, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 8]},
+    {"number": 9, "pos": [6437, 2795, 5381], "rot_y": 3968, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 9]},
+    {"number": 10, "pos": [2207, 2656, 6869], "rot_y": 3060, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 10]},
+    {"number": 11, "pos": [-5273, 2654, 10330], "rot_y": 213, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 11]},
+    {"number": 12, "pos": [-673, 1056, 6229], "rot_y": 2094, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 12]},
+    {"number": 13, "pos": [-1313, 1056, 6015], "rot_y": 2094, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 13]},
+    {"number": 14, "pos": [1582, -1824, 12313], "rot_y": 2, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 14]},
+    {"number": 15, "pos": [6053, -2144, 13275], "rot_y": 2164, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 15]},
+    {"number": 16, "pos": [4123, -1833, 7315], "rot_y": 2281, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 16]},
+    {"number": 17, "pos": [-1257, -1744, 4688], "rot_y": 2907, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 17]},
+    {"number": 18, "pos": [-6863, -1673, -1653], "rot_y": 2023, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 18]},
+    {"number": 19, "pos": [-1608, -1752, -5397], "rot_y": 996, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 19]},
+    {"number": 20, "pos": [1660, -2348, -5557], "rot_y": 1080, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 20]},
+    {"number": 21, "pos": [8653, -2348, -12117], "rot_y": 2096, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 21]},
+    {"number": 22, "pos": [4264, -2037, -15147], "rot_y": 2999, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 22]},
+    {"number": 23, "pos": [-1606, -1112, -9983], "rot_y": 4088, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 23]},
+    {"number": 24, "pos": [-2564, -1112, -9343], "rot_y": 4088, "source": "In-game review of Sunset Vista 1.2.0 on the Steam Deck, 2026-11-20", "needs": "none", "source_family": "ap_box", "provenance": ["a6-33-sunset-vista", 24]}
   ],
   "retired": []
 }

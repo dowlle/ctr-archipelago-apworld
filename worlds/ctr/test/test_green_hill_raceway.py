@@ -43,6 +43,14 @@ def own(p, kinds=None):
 
 
 class TestGreenHillRaceway(unittest.TestCase):
+    """The driven crate rows of 2.0.0 (crate seating). CP1 gave this LEV a
+    spot file, which replaces crate seating for boxes; these tests keep the
+    files as before CP1 so the crate-row ruling stays covered."""
+
+    def setUp(self):
+        from .test_content_item_boxes import before_cp1
+        self.enterContext(before_cp1())
+
     def test_all_ordinals_reachable_at_ranks_zero_one_two(self):
         for count in (0, 1, 5, 15, 50):
             for mode in ("shared_global", "per_character"):
