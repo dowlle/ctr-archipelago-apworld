@@ -1,7 +1,7 @@
 {
   "game": "Crash Team Racing",
   "world_version": "0.3.0",
-  "checksum": "66622669d78a2f3ca2147d14036de6d78214ff58",
+  "checksum": "87b2eacd7c41f83e9e6acd58922ef37058d7dacf",
   "item_name_to_id": {
     "AP Box Colours": 35010205,
     "Always Jumping": 35010208,
@@ -38,6 +38,7 @@
     "Invincibility Mask": 35010118,
     "Invisibility": 35010119,
     "Item Reroll": 35010108,
+    "Joe Mama": 35010215,
     "Key": 35010014,
     "Komodo Joe": 35010131,
     "Letter C (Acid Lake)": 35100000,
@@ -25534,6 +25535,9 @@
       "Red CTR Token",
       "Yellow CTR Token"
     ],
+    "Character Looks": [
+      "Joe Mama"
+    ],
     "Characters": [
       "Coco Bandicoot",
       "Crash Bandicoot",
@@ -25603,6 +25607,7 @@
       "Invincibility Mask",
       "Invisibility",
       "Item Reroll",
+      "Joe Mama",
       "Key",
       "Komodo Joe",
       "Letter C (Acid Lake)",
@@ -26622,6 +26627,7 @@
     ],
     "Filler": [
       "Big Wumpa Bundle",
+      "Joe Mama",
       "Reserve Top-Up",
       "Small Wumpa Bundle",
       "Wumpa Fruit"

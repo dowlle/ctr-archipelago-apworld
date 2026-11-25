@@ -54,11 +54,18 @@ def legacy_option_world(world):
     """The old alphabet of registered names for options rolled before the plan."""
     from .item_groups import letter_item_names
 
-    item_ids = {name: code for name, code in world.item_name_to_id.items() if not _origin_item(code)}
+    from .character_looks import GROUP as LOOK_GROUP, LOOKS
+
+    # Character looks (JL2) are left out the same way: a random name roll or a
+    # group draw (Filler, Everything) keeps the alphabet it had before them.
+    # The Character Looks group itself stays for YAMLs that name it.
+    item_ids = {name: code for name, code in world.item_name_to_id.items()
+                if not _origin_item(code) and name not in LOOKS}
     item_names = frozenset(item_ids)
     locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
     named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
-    item_groups = dict(world.item_name_groups)
+    item_groups = {group: (members if group == LOOK_GROUP else frozenset(members) - set(LOOKS))
+                   for group, members in world.item_name_groups.items()}
     item_groups["Everything"] = item_names
     item_groups["CTR Letters"] = frozenset(letter_item_names(named_items))
     return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
@@ -112,11 +119,20 @@ def restore_legacy_link_pools(multiworld, world_type):
             shared &= set(link["item_pool"])
             excluded |= set(link.get("exclude", ()))
         groups = legacy_option_world(world_type).item_name_groups
-        pool = set()
+        # Character looks (JL2): looks the framework already put in this
+        # link's pool stay when a member slot allows them.
+        from .character_looks import LOOKS, allowed_looks
+        enabled = {look for w in worlds for look in allowed_looks(w)}
+        pool = set(group["item_pool"]) & set(LOOKS) & enabled
         for name in shared:
             pool |= groups.get(name, {name})
+        # The legacy groups leave looks out, so a group name (Filler,
+        # Everything) adds the looks a member slot allows.
+        for name in shared:
+            pool |= set(world_type.item_name_groups.get(name, ())) & set(LOOKS) & enabled
         for name in excluded:
             pool -= groups.get(name, {name})
+            pool -= set(world_type.item_name_groups.get(name, ())) & set(LOOKS)
         group["item_pool"] = pool
         group["local_items"] &= pool
         group["non_local_items"] &= pool

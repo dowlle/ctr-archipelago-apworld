@@ -98,6 +98,7 @@ Crash Team Racing:
   hit_character: true
   trap_fill_percentage: 20
   reserve_top_up: true
+  character_looks: [Joe Mama]
   spoiler_items: true
   turbo_grant: true
   tizi_helper: true
