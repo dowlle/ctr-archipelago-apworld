@@ -13,7 +13,9 @@ FEATURE = "carried_track_rulings_v1"
 REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.json"))
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
-RULING_VERSION = 6
+BASE_RULING_VERSION = 4
+DECK_FINISH_VERSION = 6
+RULING_VERSION = DECK_FINISH_VERSION
 # The two exact patch copies can arrive under the shared registry key.
 # Keep their pickup measurements independent of the downloadable release.
 COCO_PATCH_PINS = {
@@ -227,7 +229,7 @@ def wire_sources(plan):
     limited = any(omitted_pickups(plan))
     if not limited and not any(plan_sources(plan)) and not requires_pinned_lookup(plan):
         return None
-    record = {"version": RULING_VERSION, "packages": [
+    record = {"version": room_version(plan), "packages": [
         {"package_id": package["id"], "reviews": [
             {"revision": rev, "lev_sha256": pin} for rev, pin in _reviews(package)]}
         for package in plan["packages"]]}
@@ -236,19 +238,34 @@ def wire_sources(plan):
     return record
 
 
+def room_version(plan):
+    """Use a new finish catalog only when the room has the corresponding Boost rules."""
+    from . import content_capability
+
+    if RULING_VERSION != DECK_FINISH_VERSION:
+        return RULING_VERSION
+    if not plan.get("capability", {}).get("boost_mode"):
+        return BASE_RULING_VERSION
+    contents = {package["content_id"] for package in plan["packages"]}
+    return max((row[-1] for row in content_capability.USF_FINISH_RULINGS
+                if len(row) == 4 and row[0] in contents), default=BASE_RULING_VERSION)
+
+
 def requires_pinned_lookup(plan):
     """An exact lookup can differ even when no inherited family supplies a row."""
     from . import content_capability, object_rulings
 
-    if not (plan.get("item_boxes") or plan.get("sanity") or plan.get("capability", {}).get("boost_mode")):
+    boost = plan.get("capability", {}).get("boost_mode")
+    if not (plan.get("item_boxes") or plan.get("sanity") or boost):
         return False
     contents = {package["content_id"] for package in plan["packages"]}
     if not contents:
         return False
     roads = contents | {canonical_track_key(key) for key in contents}
-    for keys, rulings, base_size in ((contents, content_capability.USF_FINISH_RULINGS, 3),
-                                    (contents, content_capability.LETTER_BOOST_RULINGS, 2),
-                                    (roads, object_rulings.RULINGS, 3)):
+    families = [(contents, content_capability.LETTER_BOOST_RULINGS, 2), (roads, object_rulings.RULINGS, 3)]
+    if boost:
+        families.append((contents, content_capability.USF_FINISH_RULINGS, 3))
+    for keys, rulings, base_size in families:
         if any(len(key) > base_size and key[0] in keys and key[-1] <= scoped_version() for key in rulings):
             return True
     pins_by_key = {key: {row[0] for row in rows} for key, rows in REVIEWS.items()}
