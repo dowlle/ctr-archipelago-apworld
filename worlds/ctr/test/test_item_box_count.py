@@ -68,7 +68,7 @@ class TestItemBoxCount(unittest.TestCase):
             self.assertEqual(section, original)
 
     def test_solo_previews_legacy_without_rewriting_unrelated_edits(self):
-        from ..solo import ctr_solo
+        from ..tools.solo import ctr_solo
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "old.yaml"
             path.write_text("name: Player\ngame: Crash Team Racing\nCrash Team Racing:\n  box_locations: false\n")

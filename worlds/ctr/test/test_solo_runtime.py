@@ -1,4 +1,4 @@
-"""Solo runtime wrapper (#89): worlds/ctr/solo/ctr_solo.py.
+"""Solo runtime wrapper (#89): worlds/ctr/tools/solo/ctr_solo.py.
 
 Builds a client-shaped folder the way the release does (trimmed core from this
 checkout, packed ctr.apworld, the solo files) and runs the wrapper as a child
@@ -21,7 +21,7 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORLD = os.path.dirname(HERE)
-SOLO = os.path.join(WORLD, "solo")
+SOLO = os.path.join(WORLD, "tools", "solo")
 REPO = os.path.dirname(os.path.dirname(WORLD))
 GAME = "Crash Team Racing"
 

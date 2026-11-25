@@ -11,7 +11,7 @@ import yaml
 
 from ..Options import ctrAPOptions
 
-PRESETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "solo", "presets")
+PRESETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "solo", "presets")
 GAME = "Crash Team Racing"
 
 
