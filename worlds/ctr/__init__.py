@@ -14,6 +14,7 @@ from .itemsanity import ITEM_NAMES
 from .custom_lettersanity import CUSTOM_LETTER_ITEM_DATA
 from .cortex_vortex import LETTER_ITEM_DATA as CORTEX_VORTEX_LETTER_ITEM_DATA
 from .minted_items_030 import ITEM_DATA as MINTED_030_ITEM_DATA, MINTED_TRAP_ITEM_NAMES
+from .character_looks import LOOKS as CHARACTER_LOOKS
 from .named_tracks import (NAMED_TRACKS, NAMED_TRACK_ITEM_DATA,
                            validate_tracks as _validate_named_tracks)
 from .Options import ctrAPOptions, create_option_groups
@@ -159,6 +160,8 @@ class ctrAPWorld(World):
         # group is part of the checksummed datapackage.
         "Traps": set(ALL_TRAP_ITEM_NAMES) | set(MINTED_TRAP_ITEM_NAMES),
         "Itemsanity Weapons": set(ITEM_NAMES),
+        # Character looks (JL2): one filler item per look.
+        "Character Looks": set(CHARACTER_LOOKS),
     }
     # Issue #536: Characters, Stats (+ one per racer), CTR Letters, Filler,
     # Ignore Ground Types. Built from the registries; see item_groups.py.

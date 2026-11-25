@@ -11,6 +11,10 @@
   * The alpha3 data package (ruled 2026-11-06): `Always Jumping`,
     `No Drifting`, `Rival Surge`, `Mud Season`, `Limp Mode`, `Stuck Steering`
     and `Wumpa Leak`, traps at 35010208..35010214, native AP_TrapEffect 22..28.
+  * `Joe Mama` (character looks, JL2, ruled 2026-11-23 22:45 CET), filler:
+    Komodo Joe wears Lockheart's Komodo Moe model. Repeatable; the newest
+    look received becomes the chosen one. Pooled only when `character_looks`
+    lists it (character_looks.py).
 
 The ids continue the positional item index after the Cortex Vortex letters
 (35010200..35010202). Like those letters they live outside data/items.json,
@@ -46,6 +50,8 @@ MINTED_ITEMS_030: Tuple[Tuple[str, int, ItemClassification], ...] = (
     ("Limp Mode", 35010212, ItemClassification.trap),
     ("Stuck Steering", 35010213, ItemClassification.trap),
     ("Wumpa Leak", 35010214, ItemClassification.trap),
+    # Character looks (JL2): one filler item per look.
+    ("Joe Mama", 35010215, ItemClassification.filler),
 )
 #: Stable `trap_weights` keys the trap feature PRs will register.
 MINTED_TRAP_KEYS = {"Clocked Out": "clocked_out", "Reverse Camera": "reverse_camera",

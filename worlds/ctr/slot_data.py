@@ -8,7 +8,7 @@ logic. One generator row 12 deleted the original generator's blocks.
 import logging
 from typing import Dict
 
-from . import wumpa_family
+from . import character_looks, wumpa_family
 
 
 #: The global slot_data schema this apworld emits. Schema 18 is the only one
@@ -43,5 +43,7 @@ def fill_slot_data(world) -> Dict[str, object]:
     wire = content_plan.wire(world)
     wire["ctr_options"]["reserve_top_up"] = wumpa_family.reserve_top_up_enabled(world)
     wire["ctr_options"]["spoiler_items"] = bool(world.options.spoiler_items.value)
+    # Character looks (JL2): present only when the YAML allows a look.
+    wire["ctr_options"].update(character_looks.envelope(world))
     wire.update(win_logic_block(world))
     return wire

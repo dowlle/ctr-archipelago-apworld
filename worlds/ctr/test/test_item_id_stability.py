@@ -98,6 +98,8 @@ class TestItemIdStability(unittest.TestCase):
                        "Rival Surge": 35010210, "Mud Season": 35010211,
                        "Limp Mode": 35010212, "Stuck Steering": 35010213,
                        "Wumpa Leak": 35010214})
+        # The first character look (JL2, 2026-11-24).
+        minted.update({"Joe Mama": 35010215})
         named_doc = json.loads(pkgutil.get_data(
             "worlds.ctr", "data/named_tracks.json").decode("utf-8"))
         named = {f"Letter {letter} ({row['ap_name']})": 35100000 + 5 * row["block_index"] + li

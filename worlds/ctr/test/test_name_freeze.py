@@ -160,7 +160,8 @@ class TestNameFreezeCensus(unittest.TestCase):
         # + the alpha3 data package (2026-11-06): seven traps.
         # + the fourth step (A4-62b, 2026-11-11): 3 letters of block 89.
         # + two origin letter families for all 87 named blocks (A6-18).
-        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7 + 3 + 87 * 2)
+        # + the first character look, Joe Mama (JL2, 2026-11-24).
+        self.assertEqual(len(world_type.item_name_to_id), 599 + 5 + 246 + 12 + 7 + 3 + 87 * 2 + 1)
         # 574 through the trap rework, plus the 19 names the approved
         # 2026-08-29 Wumpa unfreeze appended, plus 32 frozen generic custom
         # race slots with one Trophy and five podium identities apiece.
