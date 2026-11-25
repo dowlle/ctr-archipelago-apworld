@@ -205,6 +205,10 @@ jobs:
           echo "$out"
           echo "sha256=$(echo "$out" | cut -f2)" >> "$GITHUB_OUTPUT"
           unzip -l ctr.apworld | tail -1
+      - name: Check the packed world excludes Solo sources
+        env:
+          CTR_PACKED_APWORLD: ctr.apworld
+        run: python3 -m unittest discover -s worlds/ctr/test -p test_package_environment.py
       - uses: actions/upload-artifact@v4
         with:
           name: ctr.apworld

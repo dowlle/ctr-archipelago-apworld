@@ -48,7 +48,8 @@ VERSION_FILES = {
     "worlds/ctr/archipelago.json",
     "worlds/ctr/datapackage_manifest.json",
 }
-SAFE_PREFIXES = ("worlds/ctr/solo/", "worlds/ctr/docs/", "worlds/ctr/test/")
+# Keep the old Solo prefix for the previous path of a rename.
+SAFE_PREFIXES = ("worlds/ctr/tools/solo/", "worlds/ctr/solo/", "worlds/ctr/docs/", "worlds/ctr/test/")
 
 
 def is_safe(path: str) -> bool:

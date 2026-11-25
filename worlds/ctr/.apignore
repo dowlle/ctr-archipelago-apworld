@@ -1,2 +1,3 @@
 # Development-only tests and fixtures are not part of the runtime APWorld.
 test/
+/tools/solo/

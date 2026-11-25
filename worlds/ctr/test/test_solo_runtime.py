@@ -1,4 +1,4 @@
-"""Solo runtime wrapper (#89): worlds/ctr/solo/ctr_solo.py.
+"""Solo runtime wrapper (#89): worlds/ctr/tools/solo/ctr_solo.py.
 
 Builds a client-shaped folder the way the release does (trimmed core from this
 checkout, packed ctr.apworld, the solo files) and runs the wrapper as a child
@@ -21,7 +21,8 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORLD = os.path.dirname(HERE)
-SOLO = os.path.join(WORLD, "solo")
+SOLO = os.path.join(WORLD, "tools", "solo")
+PRESETS = os.path.join(WORLD, "solo", "presets")
 REPO = os.path.dirname(os.path.dirname(WORLD))
 GAME = "Crash Team Racing"
 
@@ -69,7 +70,7 @@ def build_client() -> str:
     with open(os.path.join(runtime, "test_entry.py"), "w", encoding="utf-8") as handle:
         handle.write("import os, sys\nsys.path.insert(0, os.path.dirname(__file__))\n"
                      "import ctr_solo\nsys.exit(ctr_solo.main(allow_test_ports=True))\n")
-    shutil.copytree(os.path.join(SOLO, "presets"), os.path.join(runtime, "presets"))
+    shutil.copytree(PRESETS, os.path.join(runtime, "presets"))
     subprocess.run([sys.executable, os.path.join(WORLD, "tools", "build_apworld.py"),
                     os.path.join(client, "ctr.apworld")], check=True, stdout=subprocess.DEVNULL)
     _CLIENT = client
@@ -969,7 +970,7 @@ game: {GAME}
 
 class TestPresets(SoloTestCase):
     def test_every_preset_generates(self):
-        with open(os.path.join(SOLO, "presets", "presets.json"), encoding="utf-8") as handle:
+        with open(os.path.join(PRESETS, "presets.json"), encoding="utf-8") as handle:
             presets = json.load(handle)["presets"]
         for preset in presets:
             with self.subTest(preset=preset["id"]):

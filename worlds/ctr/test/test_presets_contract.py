@@ -1,6 +1,6 @@
-"""The three presets are one shared set (2026-10-28 ruling): Play Solo reads them
-from the packed apworld, and AP-Pie's YAML Builder reads the same files from the
-release apworld of the version it builds for. This locks the contract AP-Pie
+"""The three presets are one shared set (2026-10-28 ruling). The client release
+build takes them from its paired checkout and AP-Pie's YAML Builder reads the
+same files from the matching packed apworld. This locks the contract AP-Pie
 relies on: the index file, the three names, one game block per YAML, and only
 real option names in it. Whether each preset generates is test_solo_runtime."""
 import json

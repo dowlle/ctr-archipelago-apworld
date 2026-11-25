@@ -21,7 +21,8 @@ MAIN = "refs/heads/main"
 class ClassifyTests(unittest.TestCase):
     def test_safe_changes_skip_fuzz_only_on_pr(self):
         paths = [
-            "worlds/ctr/solo/app.py",
+            "worlds/ctr/tools/solo/ctr_solo.py",
+            "worlds/ctr/solo/ctr_solo.py",
             "worlds/ctr/docs/guide.txt",
             "worlds/ctr/test/test_seed.py",
             "README.md",
