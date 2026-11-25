@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Pack worlds/ctr into ctr.apworld the way a release does: members rooted at
-ctr/, no tests, bytecode or tooling (including the Play Solo release sources).
-Prints the output path and
-its sha256. Used by CI; a release still follows RELEASING.md."""
+ctr/, no tests, bytecode or tools. The shared YAML presets remain packaged
+for AP-Pie's Builder. Prints the output path and SHA-256. Used by CI; a release
+still follows RELEASING.md."""
 import hashlib, os, sys, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
