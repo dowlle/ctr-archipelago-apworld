@@ -185,17 +185,21 @@ def main():
     import numpy
 
     output, report = generate(args, load_fill_module(), analyze, numpy)
+    catalogue = {}
+    for path, fill in sorted(output.items()):
+        catalogue.setdefault(path.parent.name, []).append(fill["lev_sha256"])
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.check:
         existing = {p.relative_to(args.output): read_json(p) for p in args.output.glob("*/*.json")}
-        if existing != output:
+        if existing != output or read_json(args.output / "index.json") != catalogue:
             parser.exit(1, "track fill files differ from regenerated data\n")
     else:
         for path, fill in output.items():
             path = args.output / path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(fill, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        (args.output / "index.json").write_text(json.dumps(catalogue, indent=2) + "\n", encoding="utf-8")
     print(f"{len(output)} fill files, {len({path.parent for path in output})} tracks")
 
 

@@ -31,6 +31,8 @@ def test_bundled_fills_match_pins_and_hashes():
         fill = json.loads(path.read_text())
         assert path.stem == fill["lev_sha256"][:16]
         assert track_fill.bundled(path.parent.name, fill["lev_sha256"]) == fill
+    with patch.object(track_fill.pkgutil, "get_data", side_effect=OSError("missing zip entry")):
+        assert track_fill.bundled("ancient-lake", "a" * 64) is None
 
 
 def test_fill_room_is_frozen_and_schema_bump_is_conditional():

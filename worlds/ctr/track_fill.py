@@ -4,6 +4,7 @@ import hashlib
 import json
 import pkgutil
 import re
+from functools import lru_cache
 
 
 FEATURE = "track_fill_v1"
@@ -104,12 +105,18 @@ def validate(fill, lev_sha):
     return fill
 
 
+@lru_cache(maxsize=1)
+def _catalogue():
+    # ZIP loaders raise OSError for missing entries. Check the generated
+    # catalogue before asking the resource loader for an optional fill.
+    return json.loads(pkgutil.get_data(__package__, "data/track_fill/index.json"))
+
+
 def bundled(key, lev_sha):
     """Read just the apworld entry for this track and exact LEV, if any."""
     if not TRACK_KEY.fullmatch(key) or not _sha(lev_sha):
         raise ValueError("invalid bundled track fill identity")
-    try:
-        data = pkgutil.get_data(__package__, f"data/track_fill/{key}/{lev_sha[:16]}.json")
-    except FileNotFoundError:
+    if lev_sha not in _catalogue().get(key, ()):
         return None
-    return validate(json.loads(data), lev_sha) if data is not None else None
+    data = pkgutil.get_data(__package__, f"data/track_fill/{key}/{lev_sha[:16]}.json")
+    return validate(json.loads(data), lev_sha)
