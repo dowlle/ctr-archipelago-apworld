@@ -25,6 +25,7 @@ from ..Locations import CTR_LOCATION_IDS
 from .test_content_item_boxes import BTP_ID, LOOP_ID, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
 from .test_custom_packages import UNKNOWN
+from .test_green_hill_raceway import state_at
 
 FIXTURES = "test/fixtures/"
 CRASH_COVE = 3
@@ -513,15 +514,20 @@ class TestCommunitySpotFiles(unittest.TestCase):
                                   podium_placement_checks=True)
             with mock.patch.object(track_rulings, "RULING_VERSION", 4):
                 saved = first_world(options).fill_slot_data()
-            current = first_world(options).fill_slot_data()
+            world = first_world(options)
+            current = world.fill_slot_data()
             plan = current["content_plan"]
             self.assertEqual(plan["track_ruling_sources"]["version"], 5)
-            self.assertEqual(make_world({}, passthrough=saved).fill_slot_data(), saved)
+            old_world = make_world({}, passthrough=saved)
+            self.assertEqual(old_world.fill_slot_data(), saved)
             self.assertEqual(make_world({}, passthrough=current).fill_slot_data(), current)
-            for kind in ("trophy", "lap", "podium", "box"):
+            for kind in ("trophy", "podium", "box"):
                 checks = [c for c in plan["checks"] if c["owner"] == tid and c["kind"] == kind]
                 self.assertTrue(checks, kind)
                 self.assertTrue(all(c.get("boost", 0) == 0 for c in checks), checks)
+            lap = f"{package['display_name']}: Complete One Lap"
+            self.assertFalse(old_world.multiworld.get_location(lap, 1).can_reach(state_at(old_world, 0)))
+            self.assertTrue(world.multiworld.get_location(lap, 1).can_reach(state_at(world, 0)))
             self.assertTrue(any(c.get("boost") == 2 for c in boxes(saved["content_plan"], tid)))
             self.assertEqual([c["location"] for c in boxes(plan, tid)],
                              [c["location"] for c in boxes(saved["content_plan"], tid)])
@@ -529,11 +535,12 @@ class TestCommunitySpotFiles(unittest.TestCase):
         # A different LEV can inherit the lap ruling, but its crate seats
         # have no coordinate match and keep the previous USF term.
         night["files"][0]["sha256"] = "12" * 32
-        p = first_world(box_options(custom=[night], item_box_count=5, progressive_boost="shared_global",
-                                    logic_difficulty="hard", lap_completion_checks=True)).ctr_content_plan
+        world = first_world(box_options(custom=[night], item_box_count=5, progressive_boost="shared_global",
+                                        logic_difficulty="hard", lap_completion_checks=True))
         tid = "custom/arabian-heights-night/1.1.0"
-        self.assertEqual([c.get("boost") for c in boxes(p, tid)], [2] * 5)
-        self.assertTrue(any(c["owner"] == tid and c["kind"] == "lap" and "boost" not in c for c in p["checks"]))
+        self.assertEqual([c.get("boost") for c in boxes(world.ctr_content_plan, tid)], [2] * 5)
+        lap = world.multiworld.get_location("Arabian Heights Night: Complete One Lap", 1)
+        self.assertTrue(lap.can_reach(state_at(world, 0)))
 
     def test_other_revisions_keep_crate_seating(self):
         # The xdelta-import Ancient Lake LEV keeps its reviewed crate exclusion.
