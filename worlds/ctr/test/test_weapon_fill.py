@@ -269,3 +269,130 @@ def test_families_are_chosen_on_their_own():
     track_fill.validate(weapons_only, acid, 3)
     assert track_fill.select_families(fill, time=True, weapons=True) is fill
     assert track_fill.select_families(fill, time=False, weapons=False) is None
+
+
+# ── WF1b: filled crates are item sources (dowlle, 2026-11-26 10:48 CET) ───
+# "Yes, they need to count for the logic for both": Itemsanity and Hit
+# Character route from a filled track, with the crate's boost rank. A crate
+# an AP box takes over is no item source in that room.
+
+from .. import content_global_checks
+
+
+def day_only(**extra):
+    options = day_options(track_fill=True, itemsanity=True, hit_character=True, accessibility="full", **extra)
+    options["content_pool"]["tracks"]["retail"] = []
+    options["item_pool"]["base"].update(trophies=0, tokens=dict.fromkeys(("red", "green", "blue", "yellow", "purple"), 0),
+                                        relics=dict.fromkeys(("sapphire", "gold", "platinum"), 0))
+    return options
+
+
+def global_routes(plan, kind):
+    return [c for c in plan["checks"] if c["kind"] == kind]
+
+
+@pytest.mark.parametrize("count", [15, 50, 0])
+def test_day_only_pool_with_itemsanity_generates(count):
+    # Count 0: no AP box seats, Weapon Crate checks give the start its room.
+    extra = dict(item_box_count=count) if count else dict(box_locations=False, itemboxsanity=50)
+    world, plan = plan_of(day_only(**extra))
+    package, = plan["packages"]
+    track, = plan["tracks"]
+    free = content_item_boxes.free_fill_ranks(track, plan.get("item_boxes"), package)
+    # The cap of 15 keeps at least 12 of Day's 27 crates free.
+    assert len(free) == (27 if count == 0 else 12)
+    for kind in ("itemsanity", "hit"):
+        checks = global_routes(plan, kind)
+        assert checks and all(r["entry_id"] == "entry/" + TRACK for c in checks for r in c["routes"])
+    # Seated crates are no item source: the free crates' ranks are the
+    # unseated rows of the fill, and the route takes the lowest.
+    if count:
+        picked = set(content_item_boxes.spot_sets(plan["item_boxes"])[TRACK]["picked"])
+        rows = track_fill.package_weapons(package)
+        assert free == [rows[n - 1]["rank"] for n in range(1, 28) if n not in picked]
+    assert content_global_checks.crate_rank(track, {package["id"]: package}, plan.get("item_boxes")) == min(free)
+    content_plan.validate(json.loads(json.dumps(plan)))
+    distribute_items_restrictive(world.multiworld)
+    assert world.multiworld.fulfills_accessibility(CollectionState(world.multiworld))
+
+
+def test_switch_off_day_only_pool_with_itemsanity_still_refuses():
+    options = day_only()
+    options["track_fill"] = False
+    with pytest.raises(OptionError, match="itemsanity needs at least one Trophy Race"):
+        make_world(options, seed=0)
+
+
+def test_fully_seated_fallback_track_is_no_route_until_a_crate_is_free():
+    """Tribal Trials 1.0.0 seats a fallback box on each of its 9 filled
+    crates at Item Box Count 15, so it holds no item source; at count 5 four
+    crates stay free and it routes both families."""
+    package = crateless_package("tribal-trials", TRIBAL_LEV, "Tribal Trials")
+    base = dict(custom=[package], track_fill=True, itemsanity=True, hit_character=True,
+                progressive_boost="shared_global")
+    _, plan = plan_of(box_options(**base))
+    track = next(t for t in plan["tracks"] if t.get("package_id") == plan["packages"][0]["id"])
+    for kind in ("itemsanity", "hit"):
+        assert not [r for c in global_routes(plan, kind) for r in c["routes"] if r["entry_id"] == "entry/" + track["id"]]
+    _, plan = plan_of(box_options(item_box_count=5, **base))
+    frozen, = plan["packages"]
+    free = content_item_boxes.free_fill_ranks(track, plan["item_boxes"], frozen)
+    seats = {content_item_boxes.physical_seat(track, plan["item_boxes"], frozen, n) for n in range(1, 6)}
+    assert len(free) == 4 and len(seats) == 5
+    for kind in ("itemsanity", "hit"):
+        assert [r for c in global_routes(plan, kind) for r in c["routes"] if r["entry_id"] == "entry/" + track["id"]]
+    content_plan.validate(json.loads(json.dumps(plan)))
+
+
+def test_crate_rank_is_the_lowest_free_rank_and_needs_the_boost_chain():
+    package = dict(id="p", capabilities=dict(weapon_crates=0),
+                   fill=dict(families=dict(weapon_crates=[dict(pos=[0, 0, 0], rot=[0, 0, 0], rank=2),
+                                                         dict(pos=[9, 0, 0], rot=[0, 0, 0], rank=1)])))
+    track = dict(id="t", origin="custom", package_id="p")
+    assert content_global_checks.crate_rank(track, {"p": package}) == 1
+    assert content_global_checks.crate_rank(dict(track, origin="retail"), {"p": package}) == 0
+    # No fill: a crateless package stays no route, as before WF1b.
+    assert content_global_checks.crate_rank(track, {"p": dict(package, fill=None)}) is None
+    assert content_global_checks.crate_rank(track, {"p": dict(package, capabilities=dict(weapon_crates=4))}) == 0
+    entries = [dict(id="e", kind="track", track_id="t")]
+    plan = dict(capability=dict(boost_mode=1), entries=entries, tracks=[track], packages=[package],
+                pads=[dict(id="pad:1", entry_id="e")])
+    route = dict(entry_id="e", mode="trophy", leg_id=None, own_pad_id="pad:1")
+    assert content_global_checks.route_crate_ranks(plan, [route]) == [1]
+    assert content_global_checks.route_crate_ranks(dict(plan, capability={}), [route]) == [0]
+
+
+def test_itemsanity_on_a_usf_only_free_set_needs_usf():
+    """With every free crate at rank 2, a filled track's Itemsanity route
+    needs Progressive Boost 2 for the pad's racer, on top of the weapon."""
+    world, plan = plan_of(day_only(box_locations=False, itemboxsanity=50))
+    package, = plan["packages"]
+    for crate in package["fill"]["families"]["weapon_crates"]:
+        assert crate["rank"] in (0, 2)
+    # Day has Boost 0 crates, so its routes need no boost.
+    assert content_global_checks.crate_rank(plan["tracks"][0], {package["id"]: package}) == 0
+    usf = copy.deepcopy(package)
+    for crate in usf["fill"]["families"]["weapon_crates"]:
+        crate["rank"] = 2
+    assert content_global_checks.crate_rank(plan["tracks"][0], {package["id"]: usf}) == 2
+
+
+def test_missing_fruit_counts_still_give_weapon_crate_checks():
+    """The client's YAML export states weapon_crates but not fruit_crates or
+    loose_fruit; a filled track still gets its Weapon Crate checks."""
+    package = crateless_package("tribal-trials", TRIBAL_LEV, "Tribal Trials")
+    for key in ("fruit_crates", "loose_fruit"):
+        package["capabilities"].pop(key)
+    world, plan = plan_of(box_options(custom=[package], track_fill=True, itemboxsanity=50, item_box_count=5,
+                                      progressive_boost="shared_global", accessibility="full"))
+    frozen, = plan["packages"]
+    track = next(t for t in plan["tracks"] if t.get("package_id") == frozen["id"])
+    row = sanity_row_of(plan, track["id"])
+    assert row["counts"] == [9, 0, 0] and len(row["weapon_crate"]) == 4
+    content_plan.validate(json.loads(json.dumps(plan)))
+    distribute_items_restrictive(world.multiworld)
+    assert world.multiworld.fulfills_accessibility(CollectionState(world.multiworld))
+    # Without the fill the same descriptor has no sanity inventory.
+    _, plan = plan_of(box_options(custom=[package], itemboxsanity=50, item_box_count=5,
+                                  progressive_boost="shared_global"))
+    assert not [r for r in (plan.get("sanity") or {}).get("tracks", ()) if r["track_id"] == track["id"]]

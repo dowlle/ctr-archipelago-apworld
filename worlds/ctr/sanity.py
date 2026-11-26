@@ -132,6 +132,12 @@ def _measured_inventory(track, package=None, record=None):
         if not track_rulings.inherits(package) and pin in CATALOG:
             return CATALOG[pin]
         caps = (package or {}).get("capabilities", {})
+        if caps.get("weapon_crates") == 0 and track_fill.package_weapons(package):
+            # WF1b: a LEV measured without weapon crates whose frozen fill adds
+            # them has Weapon Crate checks even when the descriptor leaves its
+            # fruit counts out (the client's YAML export does). An unstated
+            # fruit family counts as none: fewer checks, never a wrong one.
+            caps = dict(caps, fruit_crates=caps.get("fruit_crates", 0), loose_fruit=caps.get("loose_fruit", 0))
         if all(k in caps for k in ("weapon_crates", "fruit_crates", "loose_fruit")):
             counts = [caps[k] for k in ("weapon_crates", "fruit_crates", "loose_fruit")]
             if source in CATALOG:

@@ -1895,7 +1895,8 @@ def draw_plan(world, key_estimate=True):
     global_checks = content_global_checks.settings(o)
     check_count += content_global_checks.check_count(global_checks, [t for t in chosen if "cup_index" not in t],
                                                      package_by_id,
-                                                     [leg for t in chosen if "cup_index" in t for leg in t["legs"]])
+                                                     [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
+                                                     item_boxes)
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -2177,7 +2178,8 @@ def draw_plan(world, key_estimate=True):
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
             content_requirements.MODES[unlock_mode], package_by_id, bool(world.options.one_lap_cups.value))
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
-    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
+    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits,
+                                               item_boxes))
     checks.extend(boss_checks)
     # Cup leg and boss race routes of the per-track checks (row 10i).
     checks.extend(content_race_routes.extend(
@@ -3375,7 +3377,7 @@ def _validate(plan, *, restoring=False):
     # Itemsanity and Hit Character (#133 PR 4d), recomputed from the layout.
     boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=boss_encounters))
     for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"], packages,
-                                              boss_hits):
+                                              boss_hits, item_boxes):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
     # Wumpa Shop slots (job J11): the last 5 x N checks, in hub and slot

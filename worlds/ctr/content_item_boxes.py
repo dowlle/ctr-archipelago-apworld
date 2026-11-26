@@ -196,6 +196,27 @@ def seated_crates(track, record, package):
     return track_fill.seated_ordinals(package, [by_number[n] for n in found["picked"] if n in by_number], lev)
 
 
+def free_fill_ranks(track, record, package):
+    """The ranks of the filled weapon crates (WF1) no AP box takes over in this
+    room, in fill order (WF1b, dowlle 2026-11-26: a seated crate is no item
+    source). [] for a track that is not filled. `record` is the room's
+    item_boxes record when the track has box checks, else None (no seats).
+    Hand-placed spots seat the crates at their exact place and angle; a track
+    without a spot file seats its fallback boxes as native does (fill order,
+    spread, at most 15)."""
+    weapons = track_fill.package_weapons(package) if track.get("origin") == "custom" else []
+    if not weapons or ((package or {}).get("capabilities") or {}).get("weapon_crates") != 0:
+        return []
+    seated = set()
+    if record:
+        if track["id"] in spot_sets(record):
+            seated = set(seated_crates(track, record, package))
+        else:
+            slots = len(track_boxes(track, record, package))
+            seated = {physical_seat(track, record, package, n) for n in range(1, slots + 1)}
+    return [crate["rank"] for number, crate in enumerate(weapons, 1) if number not in seated]
+
+
 def add_spot_sets(record, tracks, package_by_id, seed, player):
     """Put `spot_sets` into a record from settings(): the pick of every track
     in `tracks` that has a spot file. Draws nothing from the world's random
