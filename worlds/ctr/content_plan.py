@@ -310,7 +310,7 @@ def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=No
                 if not caps["time_trial"] or caps["relic"]:
                     continue
                 key = destinations.canonical_track_key(package["content_id"])
-                fill = track_fill.bundled(key, package["files"][0]["sha256"])
+                fill = track_fill.bundled(key, package["files"][0]["sha256"], package["laps"])
                 if fill:
                     caps["relic"] = True
                     package["relic_targets"] = {tier: fill["relic_targets"][tier] for tier in track_fill.TIERS}
@@ -2232,6 +2232,13 @@ def draw_plan(world, key_estimate=True):
         error("Gem goal exceeds the selected distinct base Gem colours.")
     requirements += boss_requirements
     entries += boss_entries
+    if o.track_fill.value:
+        relic_tracks = {entry["track_id"] for entry in entries
+                        if entry["kind"] == "track" and "relic" in entry["modes"]}
+        for package in packages:
+            if "fill" in package and package_track_id(package) not in relic_tracks:
+                del package["fill"], package["relic_targets"]
+                package["capabilities"]["relic"] = False
     pad_record = dict(mode=content_requirements.MODES[unlock_mode])
     plan = dict(version=1, packages=[p for p in packages if any(t.get("package_id") == p["id"] for t in plan_tracks)],
                 tracks=plan_tracks, entries=entries, pads=pads, encounters=encounters, requirements=requirements,

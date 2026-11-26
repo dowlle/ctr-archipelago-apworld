@@ -6,11 +6,18 @@ import sys
 import yaml
 
 from worlds.AutoWorld import AutoWorldRegister
+from worlds.ctr import track_fill
 
 
 game = "Crash Team Racing"
 path = Path(sys.argv[1])
 overrides = yaml.safe_load(path.read_text(encoding="utf-8"))[game]
+descriptor, = overrides["custom_tracks"]
+lev_sha = next(file["sha256"] for file in descriptor["files"] if file["role"] == "lev")
+fill = track_fill.bundled(descriptor["content_id"], lev_sha, descriptor["laps"])
+if not fill or fill["counts"]["time_crates"] != 29:
+    raise SystemExit("The packed Acid Lake fixture must carry all 29 time crates.")
+
 options = AutoWorldRegister.world_types[game].options_dataclass.type_hints
 defaults = {}
 for name, option in options.items():

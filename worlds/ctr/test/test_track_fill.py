@@ -15,7 +15,7 @@ from .test_custom_packages import named_fixture, options_with
 
 def fill_options():
     descriptor = named_fixture()
-    descriptor.update(id="package/tv-world/1.0.0", revision="1.0.0")
+    descriptor.update(id="package/tv-world/1.0.0", revision="1.0.0", laps=3)
     path = Path(__file__).resolve().parents[1] / "data/track_fill/tv-world/e55a14baab68d763.json"
     descriptor["files"][0]["sha256"] = json.loads(path.read_text())["lev_sha256"]
     options = options_with([descriptor])
@@ -26,13 +26,40 @@ def fill_options():
 def test_bundled_fills_match_pins_and_hashes():
     root = Path(__file__).resolve().parents[1] / "data/track_fill"
     files = sorted(root.glob("*/*.json"))
+    index = json.loads((root / "index.json").read_text())
     assert files
     for path in files:
         fill = json.loads(path.read_text())
         assert path.stem == fill["lev_sha256"][:16]
-        assert track_fill.bundled(path.parent.name, fill["lev_sha256"]) == fill
+        key, sha = path.parent.name, fill["lev_sha256"]
+        assert track_fill.bundled(key, sha, index[key][sha]["laps"]) == fill
     with patch.object(track_fill.pkgutil, "get_data", side_effect=OSError("missing zip entry")):
-        assert track_fill.bundled("ancient-lake", "a" * 64) is None
+        assert track_fill.bundled("ancient-lake", "a" * 64, 3) is None
+
+
+def test_acid_lake_requires_verified_laps_and_catalogue_digest():
+    key = "acid-lake"
+    sha = "e2a9e1daaf89ebd499d657462d19ae9c0be488f18c04d1e391d4abb6e5e791a6"
+    fill = track_fill.bundled(key, sha, 3)
+    assert fill["counts"]["time_crates"] == 29
+    assert track_fill.bundled(key, sha, 7) is None
+    fill["families"]["time_crates"].pop()
+    fill["counts"]["time_crates"] -= 1
+    fill["fill_sha256"] = track_fill.payload_sha256(fill)
+    with patch.object(track_fill.pkgutil, "get_data", return_value=track_fill.canonical_bytes(fill)):
+        with pytest.raises(ValueError, match="generated catalogue pin"):
+            track_fill.bundled(key, sha, 3)
+
+
+@pytest.mark.parametrize("modes,laps", [(["trophy"], 3), (["trophy", "relic"], 7)])
+def test_unused_fill_preserves_schema_18_slot_data(modes, laps):
+    options = fill_options()
+    options["content_pool"]["tracks"]["modes"] = modes
+    options["content_pool"]["tracks"]["custom"][0]["laps"] = laps
+    ordinary = make_world(options).fill_slot_data()
+    opted_in = make_world(dict(options, track_fill=True)).fill_slot_data()
+    assert opted_in == ordinary
+    assert opted_in["schema_version"] == 18
 
 
 def test_fill_room_is_frozen_and_schema_bump_is_conditional():

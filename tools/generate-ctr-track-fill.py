@@ -78,9 +78,13 @@ def generate(args, fill_module, analyze, np):
     @lru_cache(maxsize=16)
     def collision(sha):
         path = Path(paths[sha])
-        _, vertices, quads, _ = analyze.mesh_data(path)
-        vertices = vertices[quads[np.all(quads < len(vertices), axis=1)]].astype(np.int32)
-        keys = [quad.tobytes() for quad in vertices]
+        _, vertices, quads, flags = analyze.mesh_data(path)
+        valid = np.all(quads < len(vertices), axis=1)
+        vertices = vertices[quads[valid]].astype(np.int32)
+        # Reflect split, gravity, collision response, trigger, kill plane,
+        # door, ground and collision surface flags from namespace_Level.h.
+        collision_flags = flags[valid] & 0x3657
+        keys = [(quad.tobytes(), int(flag)) for quad, flag in zip(vertices, collision_flags)]
         return vertices, keys, analyze.ground(path)
 
     def neighbourhood(sha, pos):
@@ -114,11 +118,18 @@ def generate(args, fill_module, analyze, np):
         matches = [match for one in candidates if (match := donor_info(target, one))]
         return sorted(matches, key=lambda row: (row["kind"], -row["overlap"], row["lev_sha256"]))
 
-    def published_targets(target, candidates):
+    def laps_for(sha):
+        value = str(rows.get(sha, {}).get("Laps", ""))
+        return int(value) if value.isdecimal() else None
+
+    def published_targets(target, candidates, laps):
+        with_targets = [one for one in candidates if laps_for(one) == laps
+                        and target_times(rows[one])]
         local = target_times(rows.get(target, {}))
         if local:
-            return local, None
-        with_targets = [one for one in candidates if target_times(rows.get(one, {}))]
+            same_times = [one for one in with_targets if inventory[one]["time"] and target_times(rows[one]) == local]
+            matches = matched_donors(target, same_times)
+            return local, matches[0] if matches else None
         for match in matched_donors(target, with_targets):
             source = match["lev_sha256"]
             return target_times(rows[source]), match
@@ -134,10 +145,13 @@ def generate(args, fill_module, analyze, np):
         candidates = [one for one in siblings if inventory[one]["time"]]
         if not candidates:
             continue
-        entry = dict(track=key, revision=revision, lev_sha256=target)
+        laps = laps_for(target)
+        entry = dict(track=key, revision=revision, lev_sha256=target, laps=laps)
         report.append(entry)
-        targets, times_donor = published_targets(target, siblings)
+        targets, times_donor = published_targets(target, siblings, laps) if laps else (None, None)
         donors = matched_donors(target, candidates)
+        if times_donor:
+            donors.sort(key=lambda row: (row["kind"], -row["overlap"], row["lev_sha256"] != times_donor["lev_sha256"]))
         for donor in donors:
             sha = donor["lev_sha256"]
             points = geometry(sha)["points"]
@@ -166,7 +180,9 @@ def generate(args, fill_module, analyze, np):
             if path in output and output[path]["lev_sha256"] != target:
                 raise ValueError(f"ambiguous LEV prefix in {path}")
             output[path] = payload
-            entry.update(status="generated", targets=targets)
+            timing_sha = times_donor["lev_sha256"] if times_donor else target
+            entry.update(status="generated", targets=targets, targets_lev_sha256=timing_sha,
+                         targets_revision=inventory[timing_sha]["version"])
             break
         else:
             entry["status"] = "incomplete crate set" if donors else "no same-road crate donor"
@@ -186,8 +202,10 @@ def main():
 
     output, report = generate(args, load_fill_module(), analyze, numpy)
     catalogue = {}
+    laps = {entry["lev_sha256"]: entry["laps"] for entry in report if entry["status"] == "generated"}
     for path, fill in sorted(output.items()):
-        catalogue.setdefault(path.parent.name, []).append(fill["lev_sha256"])
+        pin = fill["lev_sha256"]
+        catalogue.setdefault(path.parent.name, {})[pin] = {"laps": laps[pin], "fill_sha256": fill["fill_sha256"]}
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.check:

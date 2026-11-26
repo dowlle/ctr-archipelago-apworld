@@ -112,11 +112,15 @@ def _catalogue():
     return json.loads(pkgutil.get_data(__package__, "data/track_fill/index.json"))
 
 
-def bundled(key, lev_sha):
-    """Read just the apworld entry for this track and exact LEV, if any."""
+def bundled(key, lev_sha, laps):
+    """Read the apworld entry for the exact LEV and verified lap count."""
     if not TRACK_KEY.fullmatch(key) or not _sha(lev_sha):
         raise ValueError("invalid bundled track fill identity")
-    if lev_sha not in _catalogue().get(key, ()):
+    pin = _catalogue().get(key, {}).get(lev_sha)
+    if not pin or laps != pin["laps"]:
         return None
     data = pkgutil.get_data(__package__, f"data/track_fill/{key}/{lev_sha[:16]}.json")
-    return validate(json.loads(data), lev_sha)
+    fill = validate(json.loads(data), lev_sha)
+    if fill["fill_sha256"] != pin["fill_sha256"]:
+        raise ValueError("bundled track fill differs from its generated catalogue pin")
+    return fill
