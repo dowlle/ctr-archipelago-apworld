@@ -255,3 +255,17 @@ def test_catalog_correction_and_tampered_seats_on_restore():
     box["spot"]["pos"][0] += 7
     with pytest.raises(OptionError):
         make_world(day_options(), seed=999, passthrough=forged)
+
+
+def test_families_are_chosen_on_their_own():
+    acid = "e2a9e1daaf89ebd499d657462d19ae9c0be488f18c04d1e391d4abb6e5e791a6"
+    fill = track_fill.bundled("acid-lake", acid, 3)
+    assert len(fill["families"]["time_crates"]) == 29 and len(fill["families"]["weapon_crates"]) == 12
+    time_only = track_fill.select_families(fill, time=True, weapons=False)
+    assert time_only["families"]["weapon_crates"] == [] and len(time_only["families"]["time_crates"]) == 29
+    assert track_fill.validate(time_only, acid, 3) is time_only
+    weapons_only = track_fill.select_families(fill, time=False, weapons=True)
+    assert weapons_only["relic_targets"] is None and len(weapons_only["families"]["weapon_crates"]) == 12
+    track_fill.validate(weapons_only, acid, 3)
+    assert track_fill.select_families(fill, time=True, weapons=True) is fill
+    assert track_fill.select_families(fill, time=False, weapons=False) is None

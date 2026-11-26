@@ -1,5 +1,6 @@
 """Validation and canonical hashing for experimental track fill files."""
 
+import copy
 import hashlib
 import json
 import pkgutil
@@ -149,6 +150,26 @@ def seated_ordinals(package, spots, lev_count=0):
     where = {(tuple(s["pos"]), s["rot_y"]) for s in spots}
     return [lev_count + i for i, crate in enumerate(package_weapons(package), 1)
             if (tuple(crate["pos"]), crate["rot"][1]) in where]
+
+
+def select_families(fill, *, time, weapons):
+    """The fill with only the families a package may use, re-hashed; None when
+    none is left. Unchanged when both families are allowed or absent."""
+    keep_time = bool(time and time_crates(fill))
+    keep_weapons = bool(weapons and weapon_crates(fill))
+    if not keep_time and not keep_weapons:
+        return None
+    if keep_time == bool(time_crates(fill)) and keep_weapons == bool(weapon_crates(fill)):
+        return fill
+    out = copy.deepcopy(fill)
+    if not keep_time:
+        out["families"]["time_crates"] = []
+        out["relic_targets"] = None
+    if not keep_weapons:
+        out["families"]["weapon_crates"] = []
+    out["counts"] = {name: len(value or ()) for name, value in out["families"].items()}
+    out["fill_sha256"] = payload_sha256(out)
+    return out
 
 
 @lru_cache(maxsize=1)

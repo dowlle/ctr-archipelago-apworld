@@ -127,8 +127,8 @@ def spot_cap(track, package, record):
     spots are fallback seats on filled weapon crates. A saved room decides by
     its own frozen spots, never by today's catalog."""
     count = (record or {}).get("box_count", 15)
-    if track.get("id") in FROZEN_SPOTS:
-        spots = FROZEN_SPOTS[track["id"]]
+    if track.get("id") in _frozen():
+        spots = _frozen()[track["id"]]
         seats = track_fill.seated_ordinals(package, spots)
         return min(count, box_spots.PICK) if spots and len(seats) == len(spots) else count
     return min(count, box_spots.PICK) if weapon_seat_file(track, package) else count
@@ -138,7 +138,7 @@ def check_fill_seats(track, package, record):
     """A saved pick on filled crates follows the rules native enforces: one box
     per filled crate at its own angle, and either every box is a seat (at most
     15) or none is."""
-    spots = FROZEN_SPOTS.get(track["id"])
+    spots = _frozen().get(track["id"])
     weapons = track_fill.package_weapons(package)
     if not spots or not weapons:
         return
@@ -156,9 +156,16 @@ def check_fill_seats(track, package, record):
         error(f"item_boxes.spot_sets mixes fallback seats and spots on {track['id']}.")
 
 
+import contextvars
+
 #: Box spots a frozen room carries, {track id: [spot]}, set while a saved
-#: plan is validated so its seats come from its own checks (WF1).
-FROZEN_SPOTS = {}
+#: plan is validated so its seats come from its own checks (WF1). A context
+#: variable, so concurrent validations never read each other's spots.
+FROZEN = contextvars.ContextVar("ctr_frozen_box_spots", default={})
+
+
+def _frozen():
+    return FROZEN.get()
 
 
 def frozen_spots(plan):
@@ -167,8 +174,9 @@ def frozen_spots(plan):
     checks = plan.get("checks") if isinstance(plan, dict) else None
     for check in checks if isinstance(checks, (list, tuple)) else ():
         spot = check.get("spot") if isinstance(check, dict) and check.get("kind") == KIND else None
-        if isinstance(spot, dict) and isinstance(spot.get("pos"), (list, tuple)) and "rot_y" in spot:
-            out.setdefault(check.get("owner"), []).append(spot)
+        owner = check.get("owner") if isinstance(check, dict) else None
+        if isinstance(owner, str) and isinstance(spot, dict) and isinstance(spot.get("pos"), (list, tuple)) and "rot_y" in spot:
+            out.setdefault(owner, []).append(spot)
     return out
 
 
@@ -179,8 +187,8 @@ def seated_crates(track, record, package):
     if found is None or not track_fill.package_weapons(package):
         return []
     lev = (package.get("capabilities") or {}).get("weapon_crates", 0)
-    if track["id"] in FROZEN_SPOTS:
-        return track_fill.seated_ordinals(package, FROZEN_SPOTS[track["id"]], lev)
+    if track["id"] in _frozen():
+        return track_fill.seated_ordinals(package, _frozen()[track["id"]], lev)
     entry = box_spots.file_for(track, package)
     if entry is None:
         return []

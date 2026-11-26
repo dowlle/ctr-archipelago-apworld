@@ -313,11 +313,14 @@ def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=No
                 fill = track_fill.bundled(key, package["files"][0]["sha256"], package["laps"])
                 if not fill:
                     continue
-                # Every family a fill carries must be absent on the measured
-                # LEV; a copy never stands beside the track's own objects.
-                if track_fill.time_crates(fill) and (not caps["time_trial"] or caps["relic"]):
-                    continue
-                if track_fill.weapon_crates(fill) and caps.get("weapon_crates") != 0:
+                # Every family the room uses must be absent on the measured
+                # LEV; a copy never stands beside the track's own objects. Each
+                # family is chosen on its own, so a descriptor without a
+                # measured weapon count still keeps its time crates.
+                fill = track_fill.select_families(
+                    fill, time=caps["time_trial"] and not caps["relic"],
+                    weapons=caps.get("weapon_crates") == 0)
+                if not fill:
                     continue
                 if track_fill.time_crates(fill):
                     caps["relic"] = True
@@ -2985,11 +2988,11 @@ def goal_envelope(plan):
 def validate(plan, *, restoring=False):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
     # WF1: seats on filled crates follow the plan's own frozen box spots.
-    content_item_boxes.FROZEN_SPOTS = content_item_boxes.frozen_spots(plan) if isinstance(plan, dict) else {}
+    token = content_item_boxes.FROZEN.set(content_item_boxes.frozen_spots(plan))
     try:
         return _validate(plan, restoring=restoring)
     finally:
-        content_item_boxes.FROZEN_SPOTS = {}
+        content_item_boxes.FROZEN.reset(token)
 
 
 def _validate(plan, *, restoring=False):
