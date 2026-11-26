@@ -1,7 +1,8 @@
 # Keep unrelated options at their packed defaults. Seeds still vary the
 # layout and mode order while always using a filled Relic Race, and always
 # race Arabian Heights Day's 27 filled weapon crates (WF1) at varied Item Box
-# and Itemboxsanity counts.
+# and Itemboxsanity counts. WF1b: Itemsanity and Hit Character route through
+# the filled crates no AP box takes over, so both vary too.
 Crash Team Racing:
   accessibility: full
   track_fill: true
@@ -9,6 +10,8 @@ Crash Team Racing:
   relic_perfect_checks: true
   item_box_count: {0: 1, 15: 2, 50: 1}
   itemboxsanity: {0: 1, 20: 1, 50: 1}
+  itemsanity: {false: 1, true: 1}
+  hit_character: {false: 1, true: 1}
   custom_tracks:
     - id: package/acid-lake/1.0.0
       content_id: acid-lake
