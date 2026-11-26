@@ -1,9 +1,10 @@
 """Validate the AP spot catalog at pack time and when the world imports it.
 
-Each source record identifies reviewed evidence and its SHA-256. The rows are
-normalized as [source ordinal, Item Box number, x, y, z, yaw]. A spot references
-one row by [source record, ordinal]. Source records must be reviewed against
-their evidence when added; a spot's description and family claim are not proof.
+The approved evidence snapshot records each source kind, track identity, LEV
+pins, original evidence SHA-256, and rows normalized as
+[source ordinal, Item Box number, x, y, z, yaw]. Each spot references one row
+by [source record, ordinal]. The snapshot must be checked against its original
+sources before approving a new digest in this module.
 """
 import hashlib
 import json
@@ -26,6 +27,9 @@ _HEX64 = re.compile(r"[0-9a-f]{64}")
 
 INDEX_PATH = "data/box_spots/index.json"
 PROVENANCE_PATH = "data/box_spots/provenance.json"
+# Digest of the reviewed, canonical JSON evidence. Keep this approval separate
+# from the catalog data so editing a source record cannot approve its own kind.
+REVIEWED_PROVENANCE_SHA256 = "173aab3bf16ba7b3786079a871ffeb218dee4edbf5f068bdb52a37834230cd55"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
@@ -152,6 +156,9 @@ def load_sources(read):
     records = json.loads(read(PROVENANCE_PATH).decode("utf-8"))
     if not isinstance(records, dict):
         _fail(PROVENANCE_PATH, "expected an object keyed by source record ID")
+    evidence = json.dumps(records, sort_keys=True, separators=(",", ":")).encode()
+    if hashlib.sha256(evidence).hexdigest() != REVIEWED_PROVENANCE_SHA256:
+        _fail(PROVENANCE_PATH, "source evidence does not match the reviewed SHA-256")
     for source_id, source in records.items():
         if not isinstance(source, dict):
             _fail(PROVENANCE_PATH, f"{source_id}: expected a source record object")
@@ -186,7 +193,8 @@ def load_index(read):
     return json.loads(read(INDEX_PATH).decode("utf-8"))
 
 
-def load_catalog(read, source_records, *, paths=None):
+def load_catalog(read, *, paths=None):
+    source_records = load_sources(read)
     index = load_index(read)
     if (not isinstance(index, dict) or set(index) != {"retail", "custom"}
             or any(not isinstance(names, list)
@@ -209,4 +217,4 @@ def load_catalog(read, source_records, *, paths=None):
             if doc["track"][key] in out:
                 _fail(path, "a second file for the same track")
             out[doc["track"][key]] = dict(doc=doc, path=path, sha256=hashlib.sha256(raw).hexdigest())
-    return retail, custom
+    return retail, custom, source_records

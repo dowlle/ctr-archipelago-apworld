@@ -363,8 +363,8 @@ def main():
     paths = [*sources, args.output, args.report]
     if len({p.resolve() for p in paths}) != len(paths):
         parser.error("use separate paths for the inputs, spot output and report")
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from worlds.ctr.box_spot_catalog import check_draft_file
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "worlds" / "ctr"))
+    from box_spot_catalog import check_draft_file
 
     sys.path.insert(0, str(args.levtool_root))
     from levtool.format import LevFile

@@ -64,15 +64,12 @@ def load_index():
     return box_spot_catalog.load_index(_read)
 
 
-SOURCE_RECORDS = box_spot_catalog.load_sources(_read)
-
-
 def check_file(doc, path="<file>"):
     return box_spot_catalog.check_file(doc, SOURCE_RECORDS, path)
 
 
 #: {LevelID: {doc, path, sha256}} and {track_key: {...}}, read once at import.
-RETAIL_FILES, CUSTOM_FILES = box_spot_catalog.load_catalog(_read, SOURCE_RECORDS)
+RETAIL_FILES, CUSTOM_FILES, SOURCE_RECORDS = box_spot_catalog.load_catalog(_read)
 
 
 def needs_rank(spot):

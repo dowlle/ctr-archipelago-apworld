@@ -289,10 +289,33 @@ class TestSourceChecks(unittest.TestCase):
         spot = dict(number=1, pos=[-4403, -15, 16274], rot_y=289, provenance=["bx3", 1])
         source = dict(kind="lev_model_extract", track="custom:chasqui-rally",
                       pins=doc["track"]["lev_sha256"], rows={1: [spot["number"], *spot["pos"], spot["rot_y"]]},
-                      model_id=8, donor_lev_sha256="9bba2b38" + "0" * 56)
+                      model_id=8, donor_lev_sha256="9bba2b381dc77f8dbe208ef140446c77f4119b3f9b713916c0e11f5b7ade3d8a")
         for family in ("ap_box", "weapon_crate"):
             with self.subTest(family=family), self.assertRaisesRegex(box_spots.SpotFileError, "LEV donor models"):
                 box_spot_catalog.check_file(dict(doc, spots=[dict(spot, source_family=family)]), {"bx3": source})
+
+    def test_full_catalog_refuses_a_relabelled_bx3_source_record(self):
+        entry = box_spots.CUSTOM_FILES["chasqui-rally"]
+        doc = copy.deepcopy(entry["doc"])
+        copied = dict(number=1, pos=[-4403, -15, 16274], rot_y=289, source_family="ap_box",
+                      provenance=["bx3", 1])
+        doc["spots"].insert(0, copied)
+        records = json.loads(pkgutil.get_data(box_spots.__package__, box_spot_catalog.PROVENANCE_PATH))
+        for kind in ("box_author_export", "reviewed_ap_proposal"):
+            records["bx3"] = dict(
+                kind=kind, track="custom:chasqui-rally", pins=doc["track"]["lev_sha256"],
+                record="Claimed AP submission", sha256="9bba2b381dc77f8dbe208ef140446c77f4119b3f9b713916c0e11f5b7ade3d8a",
+                rows=[[1, 1, -4403, -15, 16274, 289]],
+            )
+            changed = {box_spot_catalog.PROVENANCE_PATH: records, entry["path"]: doc}
+
+            def read(path):
+                if path in changed:
+                    return json.dumps(changed[path]).encode()
+                return pkgutil.get_data(box_spots.__package__, path)
+
+            with self.subTest(kind=kind), self.assertRaisesRegex(box_spots.SpotFileError, "reviewed SHA-256"):
+                box_spot_catalog.load_catalog(read)
 
     def test_cp1_pins_cannot_be_broadened_by_a_spot_file(self):
         for key in ("chasqui-rally", "dark-ruins", "dreamy-heights", "neon-paradise"):
