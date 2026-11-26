@@ -1,7 +1,7 @@
-"""The three presets are one shared set (2026-10-28 ruling). The client release
+"""The four presets are one shared set (2026-10-28 ruling). The client release
 build takes them from its paired checkout and AP-Pie's YAML Builder reads the
 same files from the matching packed apworld. This locks the contract AP-Pie
-relies on: the index file, the three names, one game block per YAML, and only
+relies on: the index file, the four names, one game block per YAML, and only
 real option names in it. Whether each preset generates is test_solo_runtime."""
 import json
 import os
@@ -20,11 +20,12 @@ class PresetsContractTest(unittest.TestCase):
         with open(os.path.join(PRESETS, "presets.json"), encoding="utf-8") as handle:
             return json.load(handle)
 
-    def test_index_lists_the_three_presets_in_order(self):
+    def test_index_lists_the_four_presets_in_order(self):
         index = self.index()
         self.assertEqual(index["schema"], 1)
         self.assertEqual([(p["id"], p["label"]) for p in index["presets"]],
-                         [("quick", "Quick"), ("standard", "Standard"), ("full_adventure", "Full Adventure")])
+                         [("quick", "Quick"), ("standard", "Standard"), ("full_adventure", "Full Adventure"),
+                          ("trophy_hunt", "Trophy Hunt")])
         for preset in index["presets"]:
             self.assertEqual(sorted(preset), ["file", "id", "label", "summary"])
             self.assertTrue(preset["summary"])
@@ -46,7 +47,8 @@ class PresetsContractTest(unittest.TestCase):
         # Swapping two files in the index would pass every other check.
         self.assertEqual({p["id"]: p["file"] for p in self.index()["presets"]},
                          {"quick": "quick.yaml", "standard": "standard.yaml",
-                          "full_adventure": "full_adventure.yaml"})
+                          "full_adventure": "full_adventure.yaml",
+                          "trophy_hunt": "trophy_hunt.yaml"})
 
     def test_every_file_in_the_folder_is_indexed(self):
         listed = {p["file"] for p in self.index()["presets"]} | {"presets.json"}

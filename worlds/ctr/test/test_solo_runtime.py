@@ -216,7 +216,7 @@ class TestDescribe(SoloTestCase):
         self.assertGreaterEqual(len(overlay_names), 12)
         for rule in overlay["rules"]:
             self.assertIn(rule["option"], names)
-        self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure"])
+        self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure", "trophy_hunt"])
         # Solo forces DeathLink off (SOLO_FORCED), so the options screen has no
         # DeathLink row (ruling of 2026-11-02).
         self.assertNotIn("death_link", overlay_names)
@@ -737,6 +737,12 @@ class TestRelicCounts(SoloTestCase):
             self.assertEqual(values["item_pool"], RELIC_DEFAULTS, name)
             with open(self.preset(name), encoding="utf-8") as handle:
                 self.assertNotIn("item_pool", handle.read(), "presets keep their values (A4-24 review is open)")
+
+    def test_trophy_hunt_shows_its_own_relic_counts(self):
+        """Trophy Hunt asks for 18 Platinum Relics on top of the default pool, so
+        its screen starts there, not at the release defaults."""
+        values = self.describe("--yaml", self.preset("trophy_hunt.yaml"))["values"]
+        self.assertEqual(values["item_pool"], {"sapphire": 18, "gold": 18, "platinum": 18})
 
     def test_an_imported_yaml_starts_at_its_own_base_relics(self):
         path = write_yaml(self.work, "pool.yaml", f"""name: Pool
@@ -1664,7 +1670,7 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(sorted(t["source"] for t in self.tracks()), ["room", "room"])
 
     def test_every_start_takes_one_and_two_tracks_and_a_guaranteed_pad(self):
-        """Probe matrix of round 2 decision 5: the three presets and two
+        """Probe matrix of round 2 decision 5: the four presets and two
         imported YAMLs (with and without their own content), seeds 1 and 2."""
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
@@ -1673,7 +1679,7 @@ class TestCustomTracks(SoloTestCase):
             {"name": "Imported", "game": GAME, GAME: dict(oxide_goal="any_percent", death_link="off",
                                                           itemsanity=True, accessibility="full")}))
         planned = self.yaml_with_content("planned.yaml")
-        starts = [self.preset(n) for n in ("quick.yaml", "standard.yaml", "full_adventure.yaml")] + [plain, planned]
+        starts = [self.preset(n) for n in ("quick.yaml", "standard.yaml", "full_adventure.yaml", "trophy_hunt.yaml")] + [plain, planned]
         picks = (([loop], []), ([loop], [loop]), ([loop, hill], [hill]), ([loop, hill], [loop, hill]))
         for source in starts:
             for picked, guaranteed in picks:

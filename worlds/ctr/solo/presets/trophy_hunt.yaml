@@ -1,0 +1,162 @@
+# Trophy Hunt: a trophy-gated run with a hard-logic start, chaotic bosses and
+# checks nearly everywhere. Beat N. Oxide for the 101% goal. It carries no
+# custom tracks: add them through the Play Solo options if you want them.
+name: Player
+game: Crash Team Racing
+Crash Team Racing:
+  accessibility: full
+  death_link: "off"
+  cortex_vortex_track: in_pool
+  crystal_challenge_count: 7
+  boss_cups: 4
+  garage_requirement_level: chaotic
+  boss_track_shuffle: true
+  boss_opponent_shuffle: true
+  boss_track_assignment: independent_track
+  boss_kit_shuffle: true
+  boss_attack_intensity: mayhem
+  boss_weapon_pool:
+  - bomb
+  - clock
+  - warp_orb
+  - missile
+  - tnt
+  - turbo
+  - shield
+  - potion
+  - mask
+  oxide_attack_profile: all_compatible
+  oxide_weapon_pool:
+  - bomb
+  - clock
+  - warp_orb
+  - missile
+  - tnt
+  - turbo
+  - shield
+  - potion
+  - mask
+  purple_cup_boss_gauntlet: true
+  oxide_goal: 101_percent
+  bosses_required_goal: 4
+  gems_required_goal: 5
+  goal_wumpa: 1500
+  oxide_final_challenge_unlock: total_relics
+  oxide_final_challenge_relic_count: random-high
+  oxide_final_track: vortex_chaos
+  adventure_structure: trophy_ctr_combined
+  requirement_weights:
+    Blue CTR Token: 4
+    Blue Gem: 4
+    Gold Relic: 4
+    Green CTR Token: 4
+    Green Gem: 4
+    Key: 4
+    Platinum Relic: 4
+    Purple CTR Token: 4
+    Purple Gem: 4
+    Red CTR Token: 4
+    Red Gem: 4
+    Sapphire Relic: 4
+    Trophy: 4
+    Yellow CTR Token: 4
+    Yellow Gem: 4
+  warp_pad_rules:
+    Red Cup:
+      item: Trophy
+      count: 90
+    Yellow Cup:
+      item: Trophy
+      count: 90
+    Blue Cup:
+      item: Trophy
+      count: 90
+    Purple Cup:
+      item: Trophy
+      count: 90
+    Green Cup:
+      item: Trophy
+      count: 90
+  racer_locked_pads:
+    random: 50
+    random-low: 50
+    random-high: 50
+  podium_rungs:
+  - held_1st
+  - held_3rd
+  - finish_any
+  - finish_on_podium
+  - held_5th
+  relic_perfect_checks: true
+  lettersanity: locations_and_items
+  cup_sweep_checks: true
+  lap_completion_checks: true
+  item_box_count: 10
+  itemboxsanity: 20
+  wumpasanity:
+    crates: 50
+    fruit: 50
+    both: 50
+  itemsanity: true
+  crystalsanity: true
+  wumpa_check: per_track
+  hit_character: true
+  wumpa_shop_slots:
+    '20': 50
+    random-high: 50
+  wumpa_shop_prices:
+    '200': 50
+    random-range-75-200: 50
+  shop_hints_progression_only: true
+  item_pool:
+    base:
+      trophies: 100
+      relics:
+        sapphire: 18
+        gold: 18
+        platinum: 18
+  trap_fill_percentage: 5
+  trap_weights:
+    always_jumping: 3
+    boost_blocker: 3
+    clocked_out: 3
+    demo_camera: 3
+    empty_crates: 3
+    first_person: 3
+    flatten: 3
+    forced_boost: 0
+    forced_use: 0
+    forced_usf: 0
+    icy_road: 0
+    item_reroll: 0
+    limp_mode: 3
+    low_gravity: 3
+    mirror_mode: 3
+    mud_season: 3
+    nitro: 3
+    no_drifting: 3
+    red_potion: 3
+    reverse_camera: 3
+    reverse_steering: 3
+    rival_surge: 3
+    stuck_steering: 3
+    upside_down: 3
+    warpball_ambush: 3
+    weakened_kart: 3
+    wireframe: 3
+    wumpa_leak: 3
+    wumpa_wipeout: 3
+  progressive_starting_wumpa: 10
+  turbo_grant: true
+  tizi_helper: true
+  trap_display: as_progression
+  starting_character: random_any
+  editable_stats: per_character
+  progressive_stats: per_character
+  progressive_boost: per_character
+  progressive_boost_blue_fire: true
+  logic_difficulty: hard
+  shortcut_knowledge: hard
+  deathlink_amnesty: 3
+  spoiler_items: true
+  pad_approach_hints: true

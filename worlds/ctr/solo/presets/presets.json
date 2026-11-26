@@ -3,6 +3,7 @@
   "presets": [
     {"id": "quick", "file": "quick.yaml", "label": "Quick", "summary": "Short goal, few locks"},
     {"id": "standard", "file": "standard.yaml", "label": "Standard", "summary": "The release defaults"},
-    {"id": "full_adventure", "file": "full_adventure.yaml", "label": "Full Adventure", "summary": "Everything on, every location reachable"}
+    {"id": "full_adventure", "file": "full_adventure.yaml", "label": "Full Adventure", "summary": "Everything on, every location reachable"},
+    {"id": "trophy_hunt", "file": "trophy_hunt.yaml", "label": "Trophy Hunt", "summary": "Trophy-gated 101% run, chaotic bosses, many checks"}
   ]
 }
