@@ -1,6 +1,10 @@
+# Keep unrelated options at their packed defaults. Seeds still vary the
+# layout and mode order while always using a filled Relic Race.
 Crash Team Racing:
   accessibility: full
   track_fill: true
+  race_mode_order: {fixed: 1, per_pad: 1}
+  relic_perfect_checks: true
   custom_tracks:
     - id: package/acid-lake/1.0.0
       content_id: acid-lake
