@@ -53,6 +53,7 @@
     "retail_tracks": "A set of tracks. The Custom Tracks page and a YAML cover track choice.",
     "track_modes": "A dictionary of per-track modes. Set it in a YAML.",
     "track_origin_letters": "Uses the default for installed custom tracks. Set it in a YAML.",
+    "placed_track_letters": "Defaults off in Play Solo. To test registered adventure-pack placements, set it in a YAML.",
     "custom_tracks": "A list. The Custom Tracks page owns it.",
     "required_entries": "A list. The Custom Tracks page owns it.",
     "cortex_vortex_track": "The Custom Tracks page owns it.",
