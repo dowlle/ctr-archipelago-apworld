@@ -49,6 +49,10 @@ DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 TOASTY = "toasty-terrace"
+RECOVERED_CUSTOM = {
+    "acropolis": (91, "20785164f1123ab6ed8b3f5026aaeed781496aabfee4fc5f662847f49cd54a74", 50, {22, 23}),
+    "nina-s-nightmare": (90, "7fc42abb12130c546a7b500815a3d3a372c4178f4f063b56460730443f4ea0a0", 29, {6, 10, 25}),
+}
 
 #: CP1: dowlle's Box Author Mode spots on named custom tracks (2026-11-24).
 #: track key -> (named block, LEV pin, first new number, spots shipped, numbers
@@ -131,10 +135,25 @@ class TestConversion(unittest.TestCase):
 
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, *DOWLLE_CUSTOM, ARABIAN_DAY, "sunset-vista", TOASTY})
+        self.assertEqual(set(box_spots.CUSTOM_FILES),
+                         {*COMMUNITY, *DOWLLE_CUSTOM, *RECOVERED_CUSTOM, ARABIAN_DAY, "sunset-vista", TOASTY})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
+
+    def test_recovered_custom_spots_keep_source_order_and_exact_race_pin(self):
+        for key, (block, lev, last, held) in RECOVERED_CUSTOM.items():
+            with self.subTest(key=key):
+                doc = box_spots.CUSTOM_FILES[key]["doc"]
+                self.assertEqual(doc["track"]["lev_sha256"], [lev])
+                self.assertEqual([s["number"] for s in doc["spots"]],
+                                 [n for n in range(1, last + 1) if n not in held])
+                for spot in doc["spots"]:
+                    n = spot["number"]
+                    self.assertEqual(spot["source_family"], "ap_box")
+                    self.assertEqual(spot["provenance"][0], f"cp1-{key}")
+                    self.assertEqual(CTR_LOCATION_IDS[f'{doc["track"]["name"]}: Item Box {n}'],
+                                     35200000 + 200 * block + 19 + n)
 
     def test_dowlle_retail_spots_of_2026_11_24(self):
         """A7-1: dowlle's Box Author Mode spots on the retail tracks, numbered from
@@ -774,6 +793,85 @@ def dowlle_package(key):
     for evidence in package.get("evidence", []):
         evidence["file_hashes"] = [pin if h == old else h for h in evidence["file_hashes"]]
     return package
+
+
+def recovered_packages():
+    """The two reviewed main race pairs, including their weapon crate counts."""
+    acropolis = ("acropolis", "1.0.0", "72b34baf-fb6b-500f-95b5-3cf59dd4c508", "Lolothesamurai",
+                 16, 3, 176, False, 1054740, "02be4386105c01abecec5b3470718fcb6b1e0924b11a2e63e8797376a9a1d8db")
+    nina = ("nina-s-nightmare", "1.0.3", "2a22c2c3-118e-5635-8012-4d508cf7bc20", "Lockheart",
+            20, 4, 156, True, 1574284, "b5a9905448bbd18cb26609c778f93f6cc8d9dad155a955d143b091db0a80e784")
+    for key, revision, uuid, author, crates, fruit, checkpoints, tokens, lev_size, vrm in (acropolis, nina):
+        yield dict(
+            id=f"package/{key}/{revision}", content_id=key, revision=revision, uuid=uuid,
+            display_name=box_spots.CUSTOM_FILES[key]["doc"]["track"]["name"], author=author, laps=3,
+            capabilities=dict(time_trial=True, arcade=True, relic=False, ctr_tokens=tokens, wumpa=True,
+                              super_turbo_pads=True, weapon_crates=crates, fruit_crates=fruit, loose_fruit=0,
+                              checkpoints=checkpoints, ai_nav=True),
+            files=[dict(role="lev", sha256=RECOVERED_CUSTOM[key][1], bytes=lev_size,
+                        format="ctr-lev", format_version=1),
+                   dict(role="vrm", sha256=vrm, bytes=458808, format="ctr-vrm", format_version=1)],
+            evidence=[],
+        )
+
+
+class TestRecoveredCustomRooms(unittest.TestCase):
+    def test_filled_rooms_use_the_recovered_spots(self):
+        for count in (0, 15, 50):
+            with self.subTest(count=count):
+                options = box_options(custom=list(recovered_packages()), progressive_boost="shared_global",
+                                      accessibility="full")
+                if count != 15:
+                    options["item_box_count"] = count
+                world = first_world(options, seed=261143)
+                plan = world.ctr_content_plan
+                self.assertFalse(refused(plan))
+                for key, (block, lev, last, held) in RECOVERED_CUSTOM.items():
+                    track_id = next(t["id"] for t in plan["tracks"] if t.get("named_block") == block)
+                    pickups = boxes(plan, track_id)
+                    self.assertEqual(len(pickups), min(count, last - len(held)))
+                    if count == 0:
+                        self.assertNotIn("item_boxes", plan)
+                        continue
+                    record = spot_set(plan, track_id)
+                    self.assertEqual(record["lev_sha256"], lev)
+                    self.assertEqual(record["pool"], last - len(held))
+                    spots = box_spots.spots_by_number(box_spots.CUSTOM_FILES[key])
+                    self.assertEqual([c["spot"]["number"] for c in pickups], record["picked"])
+                    self.assertTrue(set(record["picked"]).isdisjoint(held))
+                    for check in pickups:
+                        number = check["spot"]["number"]
+                        self.assertEqual(check["spot"], box_spots.wire_spot(spots[number]))
+                        self.assertEqual(check["location"], named_tracks.location_code(block, f"item_box_{number}"))
+                        self.assertEqual(check.get("boost", 0), 0)
+                distribute_items_restrictive(world.multiworld)
+                self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
+
+    def test_mismatched_primary_lev_keeps_crate_seats(self):
+        packages = list(recovered_packages())
+        for package in packages:
+            package["files"][0]["sha256"] = hashlib.sha256(package["id"].encode()).hexdigest()
+        plan = first_world(box_options(custom=packages, item_box_count=15)).ctr_content_plan
+        self.assert_crate_seating(plan, packages)
+
+    def test_rooms_from_before_the_recovery_keep_crate_seats(self):
+        packages = list(recovered_packages())
+        previous_catalog = {key: entry for key, entry in box_spots.CUSTOM_FILES.items()
+                            if key not in RECOVERED_CUSTOM}
+        with mock.patch.dict(box_spots.CUSTOM_FILES, previous_catalog, clear=True):
+            world = first_world(box_options(custom=packages, item_box_count=15))
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+        self.assert_crate_seating(wire["content_plan"], packages)
+        restored = make_world({}, seed=999, passthrough=wire)
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+
+    def assert_crate_seating(self, plan, packages):
+        for package in packages:
+            track_id = package["id"].replace("package/", "custom/", 1)
+            self.assertIsNone(spot_set(plan, track_id))
+            pickups = boxes(plan, track_id)
+            self.assertEqual(len(pickups), 15)
+            self.assertTrue(all("spot" not in check for check in pickups))
 
 
 class TestDowlleCustomSpots(unittest.TestCase):
