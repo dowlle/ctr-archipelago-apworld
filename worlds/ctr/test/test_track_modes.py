@@ -80,6 +80,34 @@ class TestModesByCapability(unittest.TestCase):
                                  "custom/fixture-loop/2.1": ["trophy", "relic"],
                                  "custom/relic-loop/1": ["relic"]})
 
+    def test_placed_letters_require_opt_in_and_both_file_pins(self):
+        package = copy.deepcopy(UNKNOWN)
+        package.update(id="package/assembly-lane-n-gage/2.1",
+                       content_id="assembly-lane-n-gage", display_name="Assembly Lane N-Gage",
+                       evidence=[])
+        package["capabilities"].update(relic=False, ctr_tokens=False)
+        package.pop("relic_targets")
+        package["files"][0]["sha256"] = "b646db4e5564827ca228f08c3f9159593790203ab57b5bf8244bcc909353edae"
+        package["files"][1]["sha256"] = "2620d0f6b92d23497962ac1dcfa0dd6f283d44057a67918f72aa85db943aa723"
+        options = mode_options(custom=[package])
+        options.update(lettersanity="locations_and_items", letters_per_track=3)
+        for placed, origin, matches in [(False, True, True), (True, True, True),
+                                        (True, False, True), (True, True, False)]:
+            with self.subTest(placed=placed, origin=origin, matches=matches):
+                package["files"][1]["sha256"] = (
+                    "2620d0f6b92d23497962ac1dcfa0dd6f283d44057a67918f72aa85db943aa723"
+                    if matches else "00" * 32)
+                world = make_world(dict(options, placed_track_letters=placed, track_origin_letters=origin))
+                plan = world.ctr_content_plan
+                track = next(t for t in plan["tracks"] if t["origin"] == "custom")
+                active = placed and matches
+                self.assertEqual(track["modes"], ["trophy", "ctr"] if active else ["trophy"])
+                self.assertEqual("placed_track_letters_v1" in plan["required_features"], active)
+                self.assertEqual(track.get("letters"), "CNK" if active and origin else None)
+                self.assertTrue(content_plan.validate(plan))
+                wire = world.fill_slot_data()
+                self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
+
     def test_relic_needs_a_lap_graph(self):
         d = relic_only()
         d["capabilities"]["time_trial"] = False

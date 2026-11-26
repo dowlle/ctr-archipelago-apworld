@@ -137,6 +137,7 @@
           "pad_client_v1",
           "lap_checks_v1",
           "origin_letters_v1",
+          "placed_track_letters_v1",
           "repeatable_pickups_v1",
           "tizi_mask_v1",
           "final_only_venue_v1",
@@ -702,6 +703,9 @@
               "minLength": 3,
               "maxLength": 3,
               "pattern": "^[A-Z0-9]{3}$"
+            },
+            "placed_letters": {
+              "const": true
             },
             "room_title": {
               "type": "string",

@@ -207,6 +207,16 @@
       "review": "verified"
     },
     "assembly-lane-n-gage": {
+      "letter_placements": {
+        "b646db4e5564827ca228f08c3f9159593790203ab57b5bf8244bcc909353edae": {
+          "vrm_sha256": "2620d0f6b92d23497962ac1dcfa0dd6f283d44057a67918f72aa85db943aa723",
+          "slots": [
+            {"x": 11171, "y": -62, "z": -1236, "yaw": 3656},
+            {"x": 2377, "y": 89, "z": -2830, "yaw": 1003},
+            {"x": 7169, "y": -62, "z": -21034, "yaw": 3061}
+          ]
+        }
+      },
       "evidence": [
         {
           "note": "Course title: Assembly Lane N-Gage.",
@@ -449,6 +459,16 @@
       "review": "verified"
     },
     "jungle-boogie-n-gage": {
+      "letter_placements": {
+        "ac968f6ce814ecbe67a7efd6e926f4fa7c59803c56e8f05a194156962ec0f906": {
+          "vrm_sha256": "73095c1261541884f9046104134c5c0ff2d95b917cfd847cad2cef687b138e0f",
+          "slots": [
+            {"x": 9281, "y": -2431, "z": 4419, "yaw": 2183},
+            {"x": -16460, "y": 1085, "z": -1853, "yaw": 3852},
+            {"x": -2805, "y": 50, "z": -1256, "yaw": 2677}
+          ]
+        }
+      },
       "evidence": [
         {
           "note": "Course title: Jungle Boogie N-Gage.",
@@ -532,6 +552,16 @@
       "review": "verified"
     },
     "out-of-time-n-gage": {
+      "letter_placements": {
+        "275de2169ef44626e5f9160c4fbdccf7bedacec85ad98bf40d7dbb4120a0d981": {
+          "vrm_sha256": "3ba0c84b27ab5fcc0a395456561b7df900f7981652c51e7259cb1ba47a3c7b8e",
+          "slots": [
+            {"x": 8636, "y": -4, "z": -5669, "yaw": 3507},
+            {"x": 9828, "y": -336, "z": 10906, "yaw": 3725},
+            {"x": 2892, "y": 549, "z": -3008, "yaw": 0}
+          ]
+        }
+      },
       "evidence": [
         {
           "note": "Course title: Out Of Time N-Gage.",

@@ -11,22 +11,37 @@ from worlds.AutoWorld import data_package_checksum
 from . import destinations, named_tracks
 
 FEATURE = "origin_letters_v1"
+PLACEMENT_FEATURE = "placed_track_letters_v1"
 DEFAULT = "CTR"
 
 # Pinned together with named_tracks.json by tools/build_named_tracks.py.
 _CATALOGUE = json.loads(pkgutil.get_data(__package__, "data/origins.json"))
 
 
-def letters_for_package(package):
-    """Stage 1 requires models in the exact LEV the seed pins."""
+def _origin(package):
     row = _CATALOGUE["tracks"].get(destinations.canonical_track_key(package["content_id"]))
     if not row or row["review"] != "verified" or row["relation"] not in ("port", "remake"):
-        return DEFAULT
+        return {}, DEFAULT
     game = _CATALOGUE["games"][row["origin_game"]]
     code = game["code"]
+    if not game["racing_game"] or not set(code) <= set(DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS):
+        return {}, DEFAULT
+    return row, code
+
+
+def has_letter_placements(package):
+    if not package or not package["capabilities"]["arcade"]:
+        return False
+    row, code = _origin(package)
+    files = {record["role"]: record["sha256"] for record in package["files"]}
+    placement = row.get("letter_placements", {}).get(files["lev"])
+    return code == "CNK" and placement is not None and placement["vrm_sha256"] == files["vrm"]
+
+
+def letters_for_package(package, placed=False):
+    row, code = _origin(package)
     lev = package["files"][0]["sha256"]
-    if (game["racing_game"] and row.get("own_letter_models", {}).get(lev) == code
-            and set(code) <= set(DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS)):
+    if placed or row.get("own_letter_models", {}).get(lev) == code:
         return code
     return DEFAULT
 

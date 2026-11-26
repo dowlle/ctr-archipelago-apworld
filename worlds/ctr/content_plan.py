@@ -469,6 +469,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             # Lap completion, origin letters, then the versioned optional pickup semantics.
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
             + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else [])
+            + ([track_origins.PLACEMENT_FEATURE] if any("placed_letters" in t for t in tracks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
             + ([tizi_madness.FEATURE] if tizi_mask else [])
             # A6-48: a Final Challenge-only venue's checks left out.
@@ -824,7 +825,7 @@ def draw_racer_locks(world, plan, racers):
         by_id[pad_id]["racer_lock"] = characters.ROSTER_CHARACTER_ID[name]
 
 
-def supported_modes(origin, package=None):
+def supported_modes(origin, package=None, placed_letters=False):
     """Modes a track can run, in MODES order (#133 PR 3).
 
     Retail tracks and Cortex Vortex run all three (Cortex Vortex's bundled
@@ -842,7 +843,7 @@ def supported_modes(origin, package=None):
     out = []
     if caps["arcade"]:
         out.append("trophy")
-        if caps["ctr_tokens"]:
+        if caps["ctr_tokens"] or placed_letters:
             out.append("ctr")
     if caps["relic"] and caps["time_trial"]:
         out.append("relic")
@@ -1498,7 +1499,8 @@ def draw_plan(world, key_estimate=True):
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        supported = supported_modes(track["origin"], package)
+        placed = o.placed_track_letters.value and "named_block" in addressing and track_origins.has_letter_placements(package)
+        supported = supported_modes(track["origin"], package, placed)
         wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
         if wanted is None:
             wanted = next((override for name, override in overrides.items()
@@ -1513,7 +1515,10 @@ def draw_plan(world, key_estimate=True):
                       "relic and time_trial. Remove it from custom_tracks or give it a race it supports.")
             continue
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
-        candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
+        candidate = dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing)
+        if placed and "ctr" in modes:
+            candidate["placed_letters"] = True
+        candidates.append(candidate)
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
     if not arena_count and transferred:
         arena_candidates = [arena for arena in arena_candidates if arena["display_name"] not in transferred]
@@ -1708,7 +1713,8 @@ def draw_plan(world, key_estimate=True):
     if o.track_origin_letters.value:
         for track in chosen:
             if "named_block" in track and "ctr" in track["modes"]:
-                code = track_origins.letters_for_package(package_by_id[track["package_id"]])
+                code = track_origins.letters_for_package(package_by_id[track["package_id"]],
+                                                        placed=track.get("placed_letters", False))
                 if code != track_origins.DEFAULT:
                     track["letters"] = code
     letters = {}
@@ -2967,6 +2973,12 @@ def validate(plan, *, restoring=False):
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
     for track in tracks.values():
+        if "placed_letters" in track:
+            require(track["placed_letters"] is True and track.get("origin") == "custom"
+                    and "named_block" in track and "ctr" in track.get("modes", ())
+                    and track.get("letters", "CTR") in ("CNK", "CTR")
+                    and track_origins.has_letter_placements(packages.get(track.get("package_id"))),
+                    "invalid placed letter revision")
         if "letters" in track:
             code = track["letters"]
             require(track.get("origin") == "custom" and "named_block" in track and "ctr" in track.get("modes", ())
@@ -3216,7 +3228,8 @@ def validate(plan, *, restoring=False):
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
             check_custom_identity(track, package, slot)
-        require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")))),
+        require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")),
+                                                         track.get("placed_letters", False))),
                 "a track mode its capabilities do not allow")
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
         locations, _items = plan_letters(plan, track, settings)
