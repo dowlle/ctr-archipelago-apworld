@@ -139,7 +139,7 @@ class TestModesByCapability(unittest.TestCase):
                     track = next(t for t in plan["tracks"] if t["origin"] == "custom")
                     self.assertTrue(track["placed_letters"])
                     self.assertEqual(track.get("letters"), "CNK" if origin else None)
-                    checks = {c["location"] for c in plan["checks"] if c.get("track_id") == track["id"]}
+                    checks = {c["location"] for c in plan["checks"] if c["owner"] == track["id"]}
                     self.assertTrue({base + offset for offset in (9, *slots)} <= checks)
 
     def test_relic_needs_a_lap_graph(self):
