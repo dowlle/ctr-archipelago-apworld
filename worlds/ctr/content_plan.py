@@ -1515,10 +1515,7 @@ def draw_plan(world, key_estimate=True):
                       "relic and time_trial. Remove it from custom_tracks or give it a race it supports.")
             continue
         # Field order as the Trophy-only profile wrote it, so its wire is unchanged.
-        candidate = dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing)
-        if placed and "ctr" in modes:
-            candidate["placed_letters"] = True
-        candidates.append(candidate)
+        candidates.append(dict(track, modes=modes, capabilities=list(modes), field_size=8, **addressing))
     arena_candidates=[dict(id=f'arena:{lid}', arena_id=lid, display_name=arena_content.ARENAS[lid]) for lid in arena_pool]
     if not arena_count and transferred:
         arena_candidates = [arena for arena in arena_candidates if arena["display_name"] not in transferred]
@@ -1710,11 +1707,14 @@ def draw_plan(world, key_estimate=True):
     # Per-track check families (#133 PR 3b). Lettersanity modes 1 and 2 draw
     # letters_per_track letters per CTR Challenge here, before the ledger is
     # sized, in pad order; nothing is drawn when Lettersanity is off.
-    if o.track_origin_letters.value:
-        for track in chosen:
-            if "named_block" in track and "ctr" in track["modes"]:
-                code = track_origins.letters_for_package(package_by_id[track["package_id"]],
-                                                        placed=track.get("placed_letters", False))
+    for track in chosen:
+        if "named_block" in track and "ctr" in track["modes"]:
+            package = package_by_id[track["package_id"]]
+            placed = o.placed_track_letters.value and track_origins.has_letter_placements(package)
+            if placed:
+                track["placed_letters"] = True
+            if o.track_origin_letters.value:
+                code = track_origins.letters_for_package(package, placed=placed)
                 if code != track_origins.DEFAULT:
                     track["letters"] = code
     letters = {}
@@ -2976,7 +2976,7 @@ def validate(plan, *, restoring=False):
         if "placed_letters" in track:
             require(track["placed_letters"] is True and track.get("origin") == "custom"
                     and "named_block" in track and "ctr" in track.get("modes", ())
-                    and track.get("letters", "CTR") in ("CNK", "CTR")
+                    and track.get("letters", "CNK") == "CNK"
                     and track_origins.has_letter_placements(packages.get(track.get("package_id"))),
                     "invalid placed letter revision")
         if "letters" in track:

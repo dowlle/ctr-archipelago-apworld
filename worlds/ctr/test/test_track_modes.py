@@ -107,6 +107,11 @@ class TestModesByCapability(unittest.TestCase):
                 self.assertTrue(content_plan.validate(plan))
                 wire = world.fill_slot_data()
                 self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
+                if active and not origin:
+                    forged = copy.deepcopy(plan)
+                    next(t for t in forged["tracks"] if t.get("placed_letters"))["letters"] = "CTR"
+                    with self.assertRaisesRegex(OptionError, "invalid placed letter revision"):
+                        content_plan.validate(forged)
 
     def test_relic_needs_a_lap_graph(self):
         d = relic_only()
