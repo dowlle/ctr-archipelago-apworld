@@ -30,7 +30,7 @@ PROVENANCE_PATH = "data/box_spots/provenance.json"
 SEAT_SPOTS_PATH = "data/box_spots/seat-spots-v2.json"
 # Digest of the reviewed, canonical JSON evidence. Keep this approval separate
 # from the catalog data so editing a source record cannot approve its own kind.
-REVIEWED_PROVENANCE_SHA256 = "799d39885ff24f93b188ce70ae9e7c34f18bcc48d0a4265c3da785cc2fae74ad"
+REVIEWED_PROVENANCE_SHA256 = "acb9954a89ed7b2fb61075a180257253e4cfb0859306e9ce05efb4f06ad45d28"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
