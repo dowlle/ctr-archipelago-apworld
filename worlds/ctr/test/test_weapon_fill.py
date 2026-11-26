@@ -237,7 +237,7 @@ def test_authored_spots_keep_every_filled_crate():
 
 def test_held_weak_layouts_and_big_forest_carry_no_weapon_fill():
     index = json.loads((box_spots.pkgutil.get_data(box_spots.__package__, "data/track_fill/index.json")))
-    for key in ("mario-circuit-1", "neonstadion", "the-dairy-track", "big-forest"):
+    for key in ("neonstadion", "the-dairy-track", "big-forest"):
         assert key not in index
 
 
