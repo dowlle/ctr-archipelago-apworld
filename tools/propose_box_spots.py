@@ -363,8 +363,8 @@ def main():
     paths = [*sources, args.output, args.report]
     if len({p.resolve() for p in paths}) != len(paths):
         parser.error("use separate paths for the inputs, spot output and report")
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from worlds.ctr.box_spots import check_file
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "worlds" / "ctr"))
+    from box_spot_catalog import check_draft_file
 
     sys.path.insert(0, str(args.levtool_root))
     from levtool.format import LevFile
@@ -376,9 +376,9 @@ def main():
             raise ValueError(f"LEV parser rejected geometry: {lev.errors[0]}")
         track = dict(kind="custom", track_key=args.track_key, name=args.name,
                      lev_sha256=[hashlib.sha256(raw).hexdigest()])
-        existing = check_file(json.loads(args.existing.read_text()), args.existing) if args.existing else None
+        existing = check_draft_file(json.loads(args.existing.read_text()), args.existing) if args.existing else None
         doc, report = propose(lev, track, args.max_spots, existing)
-        check_file(doc, args.output)
+        check_draft_file(doc, args.output)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
     args.output.write_text(json.dumps(doc, indent=2) + "\n")

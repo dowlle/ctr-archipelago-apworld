@@ -42,135 +42,34 @@ seeded from the multiworld seed, the player, "box_spots" and the track id; the
 world's random stream is never touched.
 """
 import hashlib
-import json
 import pkgutil
 import random
-import re
 
-from . import destinations
+from . import box_spot_catalog, destinations
+from .box_spot_catalog import DEFAULT_NEEDS, MAX_NUMBER, NEEDS, SHORTCUT, SpotFileError, _fail
 
-FORMAT = "ctr-ap-box-spots"
-VERSION = 1
 FEATURE = "box_spots_v1"
-#: Spot numbers per track (the alpha3 data package, ruled 2026-11-06).
-MAX_NUMBER = 50
 #: Boxes a track carries in one seed at most.
 PICK = 15
-#: The `needs` field as a Progressive Boost rank (USF is the second upgrade).
-NEEDS = {"none": 0, "boost": 1, "usf": 2}
-DEFAULT_NEEDS = "usf"
-#: The `shortcut` field as the Shortcut Knowledge tier that creates the spot.
-SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
-DOORS = ("tiger_temple",)
-SPOT_FIELDS = {"number", "pos", "rot_y", "needs", "shortcut", "door", "no_gate", "source", "credit", "review",
-               "note"}
-TEXT_FIELDS = ("source", "credit", "review", "note")
-_HEX64 = re.compile(r"[0-9a-f]{64}")
-
-INDEX_PATH = "data/box_spots/index.json"
-
-
-class SpotFileError(ValueError):
-    pass
-
-
-def _fail(path, message):
-    raise SpotFileError(f"CTR box spot file {path}: {message}")
-
-
-def _int16(value):
-    return type(value) is int and -32768 <= value <= 32767
-
-
-def check_file(doc, path="<file>"):
-    """Shape and values of one spot file; returns it. Raises SpotFileError."""
-    if not isinstance(doc, dict) or set(doc) != {"format", "version", "track", "spots", "retired"}:
-        _fail(path, "must hold exactly format, version, track, spots and retired")
-    if doc["format"] != FORMAT or doc["version"] != VERSION:
-        _fail(path, f"format must be {FORMAT} version {VERSION}")
-    track = doc["track"]
-    if not isinstance(track, dict) or track.get("kind") not in ("retail", "custom"):
-        _fail(path, "track.kind must be retail or custom")
-    if track["kind"] == "retail":
-        if set(track) != {"kind", "level_id", "name"} or type(track["level_id"]) is not int:
-            _fail(path, "a retail track names exactly kind, level_id and name")
-    else:
-        if set(track) != {"kind", "track_key", "name", "lev_sha256"}:
-            _fail(path, "a custom track names exactly kind, track_key, name and lev_sha256")
-        pins = track["lev_sha256"]
-        if not isinstance(pins, list) or not pins or any(not isinstance(p, str) or not _HEX64.fullmatch(p)
-                                                         for p in pins):
-            _fail(path, "lev_sha256 must be a nonempty list of lowercase SHA-256 digests")
-    retired = doc["retired"]
-    if not isinstance(retired, list) or any(type(n) is not int or not 1 <= n <= MAX_NUMBER for n in retired) \
-            or len(set(retired)) != len(retired):
-        _fail(path, f"retired must be distinct numbers 1 to {MAX_NUMBER}")
-    spots = doc["spots"]
-    if not isinstance(spots, list):
-        _fail(path, "spots must be a list")
-    seen = set()
-    for spot in spots:
-        if not isinstance(spot, dict) or not {"number", "pos", "rot_y"} <= set(spot) or set(spot) - SPOT_FIELDS:
-            _fail(path, "a spot holds number, pos and rot_y, and only known fields")
-        n = spot["number"]
-        if type(n) is not int or not 1 <= n <= MAX_NUMBER or n in seen:
-            _fail(path, f"spot numbers must be distinct, 1 to {MAX_NUMBER}")
-        if n in retired:
-            _fail(path, f"spot {n} is retired")
-        seen.add(n)
-        pos = spot["pos"]
-        if not isinstance(pos, list) or len(pos) != 3 or not all(_int16(v) for v in pos):
-            _fail(path, f"spot {n}: pos must be three signed 16-bit LEV units")
-        # An engine angle, 0x1000 a full turn; kept as authored (the built-in
-        # rows hold values outside 0 to 4095), so only the LEV width is checked.
-        if not _int16(spot["rot_y"]):
-            _fail(path, f"spot {n}: rot_y must be a signed 16-bit engine angle")
-        if spot.get("needs", DEFAULT_NEEDS) not in NEEDS:
-            _fail(path, f"spot {n}: needs must be none, boost or usf")
-        if spot.get("shortcut", "none") not in SHORTCUT:
-            _fail(path, f"spot {n}: shortcut must be none, medium or hard")
-        if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):
-            _fail(path, f"spot {n}: door is only tiger_temple, on retail Tiger Temple")
-        if "no_gate" in spot and (spot["no_gate"] is not True or spot.get("needs") != "none"):
-            _fail(path, f"spot {n}: no_gate is true only, on a spot that needs none")
-        if any(not isinstance(spot.get(k, ""), str) for k in TEXT_FIELDS):
-            _fail(path, f"spot {n}: source, credit, review and note are text")
-    return doc
 
 
 def _read(path):
     raw = pkgutil.get_data(__package__, path)
     if raw is None:
-        _fail(path, "is missing from this apworld")
+        raise SpotFileError(f"CTR box spot file {path}: is missing from this apworld")
     return raw
 
 
 def load_index():
-    return json.loads(_read(INDEX_PATH).decode("utf-8"))
+    return box_spot_catalog.load_index(_read)
 
 
-def _load_all():
-    index = load_index()
-    if set(index) != {"retail", "custom"}:
-        raise SpotFileError(f"CTR box spot index {INDEX_PATH} must list retail and custom")
-    retail, custom = {}, {}
-    for kind, out, key in (("retail", retail, "level_id"), ("custom", custom, "track_key")):
-        for name in index[kind]:
-            path = f"data/box_spots/{kind}/{name}.json"
-            raw = _read(path)
-            doc = check_file(json.loads(raw.decode("utf-8")), path)
-            if doc["track"]["kind"] != kind:
-                _fail(path, f"sits under {kind} but describes a {doc['track']['kind']} track")
-            if kind == "custom" and doc["track"]["track_key"] != name:
-                _fail(path, "file name and track_key differ")
-            if doc["track"][key] in out:
-                _fail(path, "a second file for the same track")
-            out[doc["track"][key]] = dict(doc=doc, path=path, sha256=hashlib.sha256(raw).hexdigest())
-    return retail, custom
+def check_file(doc, path="<file>"):
+    return box_spot_catalog.check_file(doc, SOURCE_RECORDS, path)
 
 
 #: {LevelID: {doc, path, sha256}} and {track_key: {...}}, read once at import.
-RETAIL_FILES, CUSTOM_FILES = _load_all()
+RETAIL_FILES, CUSTOM_FILES, SOURCE_RECORDS = box_spot_catalog.load_catalog(_read)
 
 
 def needs_rank(spot):
