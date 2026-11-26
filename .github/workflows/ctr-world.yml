@@ -338,6 +338,7 @@ jobs:
               ;;
             track-fill)
               cp ../world-src/.github/fuzz/track-fill-meta.yaml ci_meta.yaml
+              cp ../world-src/.github/fuzz/ctr_track_fill_hook.py hooks/ctr_track_fill_hook.py
               PYTHONPATH=. uv run python ../world-src/.github/fuzz/track-fill-defaults.py ci_meta.yaml
               extra_args+=(-m ci_meta.yaml)
               ;;

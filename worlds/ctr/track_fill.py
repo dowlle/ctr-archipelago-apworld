@@ -43,8 +43,8 @@ def _position(value):
     return type(value) is list and len(value) == 3 and all(_int(axis, -32768, 32767) for axis in value)
 
 
-def validate(fill, lev_sha):
-    """Validate the frozen slice-1 record against the package LEV pin."""
+def validate(fill, lev_sha, laps):
+    """Validate the frozen record against the package LEV and lap count."""
     if not _fields(fill, (
             "schema", "lev_sha256", "generator", "donors", "families",
             "counts", "relic_targets", "fill_sha256")):
@@ -95,8 +95,10 @@ def validate(fill, lev_sha):
             for name in FAMILIES)):
         raise ValueError("track fill counts differ from its families")
     targets = fill["relic_targets"]
-    if not _fields(targets, (*TIERS, "source")) or targets["source"] not in ("saphi", "author"):
+    if not _fields(targets, (*TIERS, "source", "laps")) or targets["source"] not in ("saphi", "author"):
         raise ValueError("track fill requires relic targets from Saphi or the author")
+    if not _int(targets["laps"], 1, 7) or targets["laps"] != laps:
+        raise ValueError("track fill relic target laps differ from the package")
     if (any(not _int(targets[tier], 1, MAX_TICKS) for tier in TIERS)
             or not targets["sapphire"] > targets["gold"] > targets["platinum"]):
         raise ValueError("track fill relic targets must descend from sapphire to platinum")
@@ -120,7 +122,7 @@ def bundled(key, lev_sha, laps):
     if not pin or laps != pin["laps"]:
         return None
     data = pkgutil.get_data(__package__, f"data/track_fill/{key}/{lev_sha[:16]}.json")
-    fill = validate(json.loads(data), lev_sha)
+    fill = validate(json.loads(data), lev_sha, laps)
     if fill["fill_sha256"] != pin["fill_sha256"]:
         raise ValueError("bundled track fill differs from its generated catalogue pin")
     return fill

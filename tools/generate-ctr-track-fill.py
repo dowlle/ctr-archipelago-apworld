@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import struct
 import sys
 from decimal import Decimal
 from functools import lru_cache
@@ -78,13 +79,22 @@ def generate(args, fill_module, analyze, np):
     @lru_cache(maxsize=16)
     def collision(sha):
         path = Path(paths[sha])
-        _, vertices, quads, flags = analyze.mesh_data(path)
+        data, vertices, quads, flags = analyze.mesh_data(path)
         valid = np.all(quads < len(vertices), axis=1)
         vertices = vertices[quads[valid]].astype(np.int32)
         # Reflect split, gravity, collision response, trigger, kill plane,
         # door, ground and collision surface flags from namespace_Level.h.
         collision_flags = flags[valid] & 0x3657
-        keys = [(quad.tobytes(), int(flag)) for quad, flag in zip(vertices, collision_flags)]
+        keys = []
+        if len(quads):
+            mesh, = struct.unpack_from("<I", data, analyze.LEVEL_FIELDS["mesh_offset"])
+            quad_offset, = struct.unpack_from("<I", data, mesh + 12)
+            order = np.ndarray((len(quads),), dtype="<u4", buffer=data, offset=quad_offset + 0x14,
+                               strides=(analyze.QUADBLOCK_SIZE,))
+            # The high bit of draw_order_low controls back-face collision.
+            double_sided = order[valid] & 0x80000000
+            keys = [(quad.tobytes(), int(flag), bool(two_sided))
+                    for quad, flag, two_sided in zip(vertices, collision_flags, double_sided)]
         return vertices, keys, analyze.ground(path)
 
     def neighbourhood(sha, pos):
@@ -173,9 +183,9 @@ def generate(args, fill_module, analyze, np):
             payload = dict(schema=1, lev_sha256=target, generator=dict(name="ctr-track-fill", version=1),
                            donors=provenance, families=families,
                            counts={name: len(value or ()) for name, value in families.items()},
-                           relic_targets=targets)
+                           relic_targets=dict(targets, laps=laps))
             payload["fill_sha256"] = fill_module.payload_sha256(payload)
-            fill_module.validate(payload, target)
+            fill_module.validate(payload, target, laps)
             path = Path(key) / (target[:16] + ".json")
             if path in output and output[path]["lev_sha256"] != target:
                 raise ValueError(f"ambiguous LEV prefix in {path}")

@@ -77,6 +77,14 @@ def test_fill_room_is_frozen_and_schema_bump_is_conditional():
         restored = make_world(fill_options(), passthrough=wire)
     assert restored.ctr_content_plan["packages"][0] == package
 
+    changed = copy.deepcopy(wire)
+    changed_plan = changed["content_plan"]
+    changed_plan["packages"][0]["laps"] = 7
+    track, = (track for track in changed_plan["tracks"] if track.get("package_id") == package["id"])
+    track["laps"] = 7
+    with pytest.raises(OptionError, match="relic target laps differ"):
+        make_world(fill_options(), passthrough=changed)
+
     for change in ("count", "pin", "digest", "feature"):
         plan = copy.deepcopy(wire["content_plan"])
         fill = plan["packages"][0]["fill"]

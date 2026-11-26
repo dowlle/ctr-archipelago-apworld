@@ -14,7 +14,7 @@
 - {check_name: check-lambda-capture,        check_runs: 500,  check_hook: 'hooks.detect_rule_variable_capture_issues:Hook',            check_mode: fuzz, check_meta: 'random'}
 - {check_name: check-static-output,         check_runs: 500,  check_hook: 'hooks.detect_output_placement_changes:Hook',                check_mode: fuzz, check_meta: 'random'}
 - {check_name: check-indirect-conditions,   check_runs: 500,  check_hook: 'hooks.indirect_conditions:Hook',                            check_mode: fuzz, check_meta: 'random'}
-- {check_name: track-fill,                  check_runs: 500,  check_hook: 'hooks.determinism:Hook',                                    check_mode: fuzz, check_meta: 'track-fill'}
+- {check_name: track-fill,                  check_runs: 500,  check_hook: 'hooks.ctr_track_fill_hook:Hook',                              check_mode: fuzz, check_meta: 'track-fill'}
 # check-ut compares Universal Tracker's logic with the server's own
 # logic, so it needs the tracker world installed and its own hook. It
 # also forces accessibility: full, because a tracker divergence shows

@@ -268,7 +268,7 @@ def admit(descriptor, where="package", *, frozen_fill=False):
         if not caps["relic"] or not caps["time_trial"] or "relic_files" in d:
             _fail(where + ".fill", "requires Relic Race on the main LEV and VRM pair")
         try:
-            fill = track_fill.validate(d["fill"], pins[0]["sha256"])
+            fill = track_fill.validate(d["fill"], pins[0]["sha256"], laps)
         except ValueError as exc:
             _fail(where + ".fill", str(exc))
         if any(out["relic_targets"][tier] != fill["relic_targets"][tier] for tier in RELIC_TIERS):
