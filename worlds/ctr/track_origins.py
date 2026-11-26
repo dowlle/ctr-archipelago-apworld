@@ -65,24 +65,41 @@ class _OptionWorld(NamedTuple):
 
 
 @cache
-def legacy_option_world(world):
+def legacy_option_world(world, *, for_random=False):
     """The old alphabet of registered names for options rolled before the plan."""
     from .item_groups import letter_item_names
 
     from .character_looks import GROUP as LOOK_GROUP, LOOKS
+    from .sanity import NAMED_BASE as NAMED_SANITY_BASE
 
     # Character looks (JL2) are left out the same way: a random name roll or a
     # group draw (Filler, Everything) keeps the alphabet it had before them.
     # The Character Looks group itself stays for YAMLs that name it.
+    # HS3 named blocks start at 90. Keep early random rolls on the prior
+    # registry so appending the two blocks does not disturb existing seeds.
+    first_hs3_block = 90
+    named_min = named_tracks.NAMED_ITEM_BASE + first_hs3_block * named_tracks.ITEM_BUDGET
+    named_max = named_tracks.NAMED_ITEM_RANGE[1]
+    new_named_items = {name for name, code in world.item_name_to_id.items()
+                       if for_random and named_min <= code <= named_max}
     item_ids = {name: code for name, code in world.item_name_to_id.items()
-                if not _origin_item(code) and name not in LOOKS}
+                if not _origin_item(code) and name not in LOOKS and name not in new_named_items}
     item_names = frozenset(item_ids)
-    locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
-    named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
+    def random_location_name(code):
+        block = named_tracks.block_of_location(code)
+        sanity_offset = code - NAMED_SANITY_BASE
+        new_sanity = first_hs3_block * 128 <= sanity_offset < named_tracks.NAMED_TRACK_LIMIT * 128
+        return (block is None or block[0] < first_hs3_block) and not new_sanity
+
+    locations = frozenset(name for name, code in world.location_name_to_id.items()
+                          if not is_origin_location(code) and (not for_random or random_location_name(code)))
+    named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if row["name"] in item_names]
     item_groups = {group: (members if group == LOOK_GROUP else frozenset(members) - set(LOOKS))
                    for group, members in world.item_name_groups.items()}
     item_groups["Everything"] = item_names
     item_groups["CTR Letters"] = frozenset(letter_item_names(named_items))
+    if new_named_items:
+        item_groups = {group: members - new_named_items for group, members in item_groups.items()}
     return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
 
 

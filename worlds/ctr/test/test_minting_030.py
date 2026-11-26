@@ -279,8 +279,9 @@ class TestFourthPassGossamersCastle(unittest.TestCase):
         self.assertEqual(row.block_index, 17)
         self.assertIn("9cf03bb8d60c7c675c25bbbc97e269e5cadccb91ab40bfce7072ed7558a045b6", row.revisions)
 
-    def test_block_90_and_up_are_not_minted(self):
-        self.assertNotIn(90, {r.block_index for r in nt.NAMED_TRACKS})
+    def test_sunday_registry_blocks_follow_the_previous_catalogue(self):
+        tail = {r.track_key: r.block_index for r in nt.NAMED_TRACKS if r.block_index >= 90}
+        self.assertEqual(tail, {"nina-s-nightmare": 90, "acropolis": 91})
 
 
 class TestMintedItems(unittest.TestCase):

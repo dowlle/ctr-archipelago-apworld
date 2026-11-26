@@ -10,7 +10,7 @@ class _StableRandomNames:
     def verify(self, world, player_name, plando_options):
         if self.random_str and not self.value:
             from .track_origins import legacy_option_world
-            world = legacy_option_world(world)
+            world = legacy_option_world(world, for_random=True)
         super().verify(world, player_name, plando_options)
 
 
@@ -46,7 +46,7 @@ class CTRPlandoItems(PlandoItems):
 
         # Group draws are rolled before tracks are picked. Explicit item
         # names can still address any registered origin letter.
-        super().verify(legacy_option_world(world) if self.value else world, player_name, plando_options)
+        super().verify(legacy_option_world(world, for_random=True) if self.value else world, player_name, plando_options)
 
 
 class CTRItemLinks(ItemLinks):
