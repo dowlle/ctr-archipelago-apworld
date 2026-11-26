@@ -473,3 +473,22 @@ def test_boss_routes_take_their_venues_rank():
     routes = [dict(entry_id="boss", mode="boss_race", leg_id=None), dict(entry_id="cup", mode="boss_cup", leg_id=None),
               dict(entry_id="retail-boss", mode="boss_race", leg_id=None)]
     assert content_global_checks.route_crate_ranks(plan, routes) == [2, 2, 0]
+
+
+def test_boss_races_ignore_pad_seats_and_boss_cups_keep_them():
+    """A boss race on a custom garage venue stands no AP box, so its pad's
+    seats do not narrow the free crates; a boss cup leg may stand them."""
+    from unittest import mock
+    package = dict(id="p", capabilities=dict(weapon_crates=0),
+                   fill=dict(families=dict(weapon_crates=[dict(pos=[0, 0, 0], rot=[0, 0, 0], rank=0),
+                                                         dict(pos=[9, 0, 0], rot=[0, 0, 0], rank=2)])))
+    tracks = [dict(id="t", origin="custom", package_id="p")]
+    entries = [dict(id="e", kind="track", track_id="t"), dict(id="boss", kind="boss_race", track_id="t"),
+               dict(id="cup", kind="boss_cup", legs=[dict(id="leg:0", track_id="t")])]
+    plan = dict(capability=dict(boost_mode=1), entries=entries, tracks=tracks, packages=[package],
+                pads=[dict(id="pad:1", entry_id="e")], checks=[], item_boxes=dict(box_count=15))
+    seated = lambda track, record, pkg: [2] if record else [0, 2]  # the pad seats the rank-0 crate
+    with mock.patch.object(content_item_boxes, "free_fill_ranks", seated):
+        routes = [dict(entry_id="boss", mode="boss_race", leg_id=None), dict(entry_id="cup", mode="boss_cup", leg_id=None),
+                  dict(entry_id="e", mode="trophy", leg_id=None)]
+        assert content_global_checks.route_crate_ranks(plan, routes) == [0, 2, 2]

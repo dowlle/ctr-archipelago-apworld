@@ -335,7 +335,11 @@ def route_crate_ranks(plan, routes):
         from .content_item_boxes import FROZEN, frozen_spots
         token = FROZEN.set(frozen_spots(plan))
         try:
-            rank = crate_rank(tracks[track_id], packages, plan.get("item_boxes"), track_id in standalone)
+            # A boss race on a custom garage venue stands no AP box (native
+            # ap_boxes.c), so every filled crate is free there; a boss cup's
+            # leg may stand its pad's boxes and keeps the seats.
+            seated = track_id in standalone and route["mode"] != content_bosses.MODE
+            rank = crate_rank(tracks[track_id], packages, plan.get("item_boxes"), seated)
         finally:
             FROZEN.reset(token)
         out.append(rank or 0)
