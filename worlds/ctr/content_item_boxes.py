@@ -73,6 +73,17 @@ KEYS = ("shortcut_knowledge",)
 SPOT_KEY = "spot_sets"
 KIND = "box"
 AWARD = "box"
+ARABIAN_DAY = "arabian-heights-day"
+ARABIAN_NIGHT = "arabian-heights-night"
+ARABIAN_DAY_BOX_REVISION = (
+    "1.0.0", "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900")
+ARABIAN_NIGHT_BOX_REVISION = (
+    "1.1.0", "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c")
+# Day's pinned spots are a coordinate-for-coordinate copy of Night's weapon
+# crate ordinals. Each of these seven rows had a pickup in the Boost 0 drive.
+ARABIAN_DAY_ROWS = ((1, 25, 26, 27), (2, 3, 4, 5), (6, 7, 8), (9, 10, 11, 12),
+                    (13, 14, 15, 16), (17, 18, 19, 20), (21, 22, 23, 24))
+ARABIAN_REVIEWED_BOXES = frozenset(n for row in ARABIAN_DAY_ROWS for n in row)
 
 
 def error(message):
@@ -383,7 +394,13 @@ def box_terms(track, slot, capability, package=None, record=None):
     found = spot_entry(track, record, package)
     if found is not None:
         spot = box_spots.spots_by_number(found[1])[slot]
-        return ((box_spots.needs_rank(spot) if boost_on else 0),
+        rank = box_spots.needs_rank(spot) if boost_on else 0
+        if (rank and track_rulings.scoped_version() >= track_rulings.ARABIAN_BOOST_VERSION
+                and found[1]["doc"]["track"].get("track_key") == ARABIAN_DAY
+                and track_rulings.revision_ref(package) == ARABIAN_DAY_BOX_REVISION
+                and slot in ARABIAN_REVIEWED_BOXES):
+            rank = 0
+        return (rank,
                 bool(stats_on and box_spots.tier(spot) == box_spots.SHORTCUT["hard"]))
     if track["origin"] == "retail":
         boost_min, needs_stats = BOX_RULES.get((track["display_name"], slot), (0, False))
@@ -395,4 +412,16 @@ def box_terms(track, slot, capability, package=None, record=None):
             return (rank if boost_on else 0), False
         if pin:
             return 0, False
+    if boost_on and package and track_rulings.scoped_version() >= track_rulings.ARABIAN_BOOST_VERSION:
+        key = package["content_id"]
+        if key == ARABIAN_NIGHT:
+            # AP box numbers are spread seats, not the LEV's crate ordinals.
+            if (track_rulings.revision_ref(package) == ARABIAN_NIGHT_BOX_REVISION
+                    and physical_seat(track, record, package, slot) in ARABIAN_REVIEWED_BOXES):
+                return 0, False
+            return 2, False
+        if key == ARABIAN_DAY:
+            # Unmatched crate seats keep the measured default even when this
+            # package inherits the reviewed finish rule.
+            return (2 if package["capabilities"].get("super_turbo_pads", True) else 0), False
     return (finish_boost(track, capability, package) if boost_on else 0), False

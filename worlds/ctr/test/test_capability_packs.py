@@ -301,8 +301,14 @@ class TestRanks(unittest.TestCase):
             ("sunset-vista", "1.2.0"): ("97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5", 0),
         }
         table = content_capability.USF_FINISH_RULINGS
-        self.assertEqual({k: v for k, v in table.items() if k[1] is not None},
+        self.assertEqual({k: v for k, v in table.items() if len(k) == 3 and k[1] is not None},
                          {(c, r, lev): rank for (c, r), (lev, rank) in pins.items()})
+        self.assertEqual({k[:3]: rank for k, rank in table.items() if len(k) == 4 and k[3] == 5}, {
+            ("arabian-heights-day", "1.0.0",
+             "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"): 0,
+            ("arabian-heights-night", "1.1.0",
+             "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c"): 0,
+        })
         track = dict(origin="custom", display_name="Loop")
         for (key, revision), (lev, rank) in pins.items():
             def package(pin, rev=revision, pads=True):
