@@ -396,3 +396,28 @@ def test_missing_fruit_counts_still_give_weapon_crate_checks():
     _, plan = plan_of(box_options(custom=[package], itemboxsanity=50, item_box_count=5,
                                   progressive_boost="shared_global"))
     assert not [r for r in (plan.get("sanity") or {}).get("tracks", ()) if r["track_id"] == track["id"]]
+
+
+DARK_RUINS_LEV = "8728705c81dacb2ace83a7ecc54e38ffdedde8696932656d37b9533b8ba7530b"
+
+
+def test_usf_only_free_crates_put_usf_on_the_route():
+    """Dark Ruins 1.0.1's 12 filled crates all need USF (rank 2). At Item Box
+    Count 5 seven stay free, so Itemsanity on that track needs the weapon and
+    Progressive Boost 2; the plan routes from it and validates."""
+    package = crateless_package("dark-ruins", DARK_RUINS_LEV, "Dark Ruins")
+    package["laps"] = 3
+    options = box_options(custom=[package], track_fill=True, itemsanity=True, hit_character=True,
+                          item_box_count=5, progressive_boost="shared_global", accessibility="full")
+    world, plan = plan_of(options)
+    frozen, = plan["packages"]
+    track = next(t for t in plan["tracks"] if t.get("package_id") == frozen["id"])
+    assert content_item_boxes.free_fill_ranks(track, plan["item_boxes"], frozen) == [2] * 7
+    assert content_global_checks.crate_rank(track, {frozen["id"]: frozen}, plan["item_boxes"]) == 2
+    use = next(c for c in plan["checks"] if c["kind"] == "itemsanity")
+    mine = [r for r in use["routes"] if r["entry_id"] == "entry/" + track["id"]]
+    assert mine
+    assert content_global_checks.route_crate_ranks(plan, mine) == [2] * len(mine)
+    content_plan.validate(json.loads(json.dumps(plan)))
+    distribute_items_restrictive(world.multiworld)
+    assert world.multiworld.fulfills_accessibility(CollectionState(world.multiworld))
