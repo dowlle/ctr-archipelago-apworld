@@ -249,9 +249,11 @@ def generate(args, fill_module, analyze, np):
             entry["status"] = "no verified lap count"
             continue
         ruled = spec["fit"] == "ruled"
-        if ruled:
-            entry["ruling"] = spec["ruling"]
-        info = donor_info(target, donor, ruled=ruled)
+        ruling = spec.get("ruling")
+        explicit_ruling = ruled and isinstance(ruling, str) and bool(ruling.strip())
+        if explicit_ruling:
+            entry["ruling"] = ruling
+        info = donor_info(target, donor, ruled=explicit_ruling)
         if inventory[target]["weapon"] or weapon_crates(target):
             entry["status"] = "target already has weapon crates"
             continue
