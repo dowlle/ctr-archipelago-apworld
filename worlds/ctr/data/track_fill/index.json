@@ -2,7 +2,7 @@
   "acid-lake": {
     "e2a9e1daaf89ebd499d657462d19ae9c0be488f18c04d1e391d4abb6e5e791a6": {
       "laps": 3,
-      "fill_sha256": "c95b54564a9b75fc52afb53a7ba153cdce2489190b88334a1ba4960fb1b635c5"
+      "fill_sha256": "4699eaea7dd12ae7e98b2fccd3adeeaaa3095d24f7bf3830dc8c6e20cbc736cb"
     }
   },
   "ancient-lake": {
@@ -19,20 +19,42 @@
       "fill_sha256": "8dd3f4347a5f44c33ac954ff5e905792ef7d5a45e730dd6241d307398d82220d"
     }
   },
+  "arabian-heights-day": {
+    "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900": {
+      "laps": 3,
+      "fill_sha256": "f850b8e47a625f0903f37ec32a387bbe03cbe069657dd446628ccb2ab26d3fcc"
+    }
+  },
   "arabian-heights-night": {
     "3994b126b595ca961302a9811be450c8d3a8fe5ea5f9d04d308d11913553cd49": {
       "laps": 3,
       "fill_sha256": "32e129a7585bfd650f642d188f722f2c84f3c37432793a2a36fbd7006fc88e3f"
     }
   },
+  "arctic-alleyway": {
+    "a31f66f5ac7d0fcf1a99cfa4af0d956e655f51a3fbc27b3511e24e23f139dda9": {
+      "laps": 3,
+      "fill_sha256": "f3bd1e1bb83db97615503fb3a9880c9d5b67e3aa7aaaae82ac294ceef0e181da"
+    }
+  },
+  "assembly-lane-n-gage": {
+    "4d82f9383ae28b7460581b24302f981e1e125f0109b0cd6804b6f497d61c262b": {
+      "laps": 3,
+      "fill_sha256": "ca81e6b8ab969d3694a7935bac909d2eaacc2611b7297cc67e32e6b6bf60cae1"
+    }
+  },
   "chasqui-rally": {
     "421c54ae016fce4592804f122ee8d9ac35318ec98f04bec7377e3f4b39d97cc2": {
       "laps": 3,
-      "fill_sha256": "b7effe7e138bf1166e57763794c16e51e67ca673f1625a827a0784460bbdf098"
+      "fill_sha256": "3151385a1e31a37e8d2778ae55b14e6cea155855584786bc81bef9442d69c085"
+    },
+    "9201064be9731919a0b86590af2801f902c0c8704520521900e84faf17ecc06d": {
+      "laps": 3,
+      "fill_sha256": "e292ca37cb1ee412c5ce6247b26b53bec4a853d39b74a3c506c2123e96f6e64b"
     },
     "cbb60edfa5910d4414020e2399fe64ea0a912b253b050fcee01600ed40bc748f": {
       "laps": 3,
-      "fill_sha256": "ac4153b077b94710f02ab8cb5d6df0c9dde401dd1c8e264a6c272f1b06d90873"
+      "fill_sha256": "9675fc05ade55f859512dd8f8e29bb2e83521682798f184ed6894b48e55f5ecc"
     }
   },
   "coco-park-2025": {
@@ -51,16 +73,82 @@
       "fill_sha256": "0b2e86d4e6d90a1829c89bcd24244c6db9e349aebc65bf1de495706151aab465"
     }
   },
+  "crystal-caves": {
+    "eddcd303e316e8eb41f885e8ec959a2c2d3db06e21727dfc50c61ab8a8048139": {
+      "laps": 3,
+      "fill_sha256": "7d657fa92c8a8734eb53701c3cae4d7f918dd207078b5b90b7acbd4ba1998c71"
+    }
+  },
+  "dark-ruins": {
+    "429abe639478a96635fd61c1d14303276203bfdc05e277b5273d8c69000a04c9": {
+      "laps": 3,
+      "fill_sha256": "f955e4d391d4478a4142a93236ef504ad0b9a55e611d5ef37a58c44d7ad720cf"
+    },
+    "8728705c81dacb2ace83a7ecc54e38ffdedde8696932656d37b9533b8ba7530b": {
+      "laps": 3,
+      "fill_sha256": "a2e96bbe1f5e59a42a6eb421a17fd01613f4e245ea47621fa49cd480a7e52878"
+    },
+    "ced2df2e83aef4759e0bb132fbd36f44c51d818b623d7950faec2407b8229589": {
+      "laps": 3,
+      "fill_sha256": "fc3e9c229b675d017defb08c9bb9e1cd17d6703f5df44e673a38428fa26f528f"
+    }
+  },
+  "deep-sea-driving-n-gage": {
+    "21987d52a922a8ae6493eb926e79f3fa55e035b03cf3273db55e150fadc711f7": {
+      "laps": 3,
+      "fill_sha256": "68bb0e558e5c60778b3c1f884a5358c0ba602d54f3fdc2092eeb3eee6b5955f9"
+    },
+    "42da6f96c336d9e41507c21d7c14a5f8f788f894ddee800622badd5304a763c1": {
+      "laps": 3,
+      "fill_sha256": "174fc298aeaf48639b27ff3ee61ee144c063e45e88a9d2ab1a1b214271bb6623"
+    }
+  },
   "diwali": {
     "5d4c5da687c67af1d7baa42f1246b4c4d43e708667f2c5921ce4ec0ebcd5f305": {
       "laps": 3,
-      "fill_sha256": "f6237518d0f3144cb82a202f6a47475c67882563efa0b30e69052897c63d10b6"
+      "fill_sha256": "be090d4675ed61119b209ca9934128c2ef2cc16c7cfe3dc3cd79d80e3fdd3302"
     }
   },
   "diwali-no-usf": {
     "ac5067b48cc8474fe48921ab631ea07cd7444c8a4ccb5f8fd1d9ac9bb143a05a": {
       "laps": 3,
-      "fill_sha256": "e7007a1311c36668b7054c0a9b40015a2f6d0841de9f9d20a63d628e0d7289d9"
+      "fill_sha256": "8a9dfd4e3cedbe4ae878de02352a75da1d43b7ca3291311482d99f59ae1ccad6"
+    }
+  },
+  "draculas-castle": {
+    "8c343aa6723ee2dec99d54f815e77e9e20798f657d6f4464f312529ffe4698f4": {
+      "laps": 3,
+      "fill_sha256": "adb8af50e5409cf552c30d08229083fd8ec2f8851e66a01f9130ebe280706d1e"
+    }
+  },
+  "dreamy-heights": {
+    "0a5e65b10ec24e32b57d3f40a8271051c7e77c0a28b1829eef7d53b402a9d408": {
+      "laps": 3,
+      "fill_sha256": "cc9a8fef81e35f71c11a51117d231ec37ac741979fc05043e743cef8677bc6b4"
+    },
+    "78d166b92bf813737842c0080880338c4bcdf812a7002f1ba587da262331c6c7": {
+      "laps": 3,
+      "fill_sha256": "7a715b1146982faec6665d1f5d2b3e9786bacc1866cfe36044883b691606ecec"
+    },
+    "9f85b2d5dbc2fe543ce024751fc6e08f77d7ba649f8ddfec936f016804a9bbf3": {
+      "laps": 3,
+      "fill_sha256": "d14e66e9261b8a1d473cb7d498e295395ef93d5aab539df3a08864eac6b046d2"
+    }
+  },
+  "neon-paradise": {
+    "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d": {
+      "laps": 3,
+      "fill_sha256": "be3fdf8fcb7ae566568784aa01206467d199e081521e6f8e1ea5b2f4cf1dfd65"
+    },
+    "665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0": {
+      "laps": 3,
+      "fill_sha256": "be4a0d227041e53e09d0e74d28f17569255c13395bfcbfda41eb1d2fca14769a"
+    }
+  },
+  "out-of-time-n-gage": {
+    "29a8b5b2b72b7dc83662834d2129272f6036fc06fb5fa1c71d547e791eb70ce8": {
+      "laps": 3,
+      "fill_sha256": "c8b4a3267df7241a053e433432ff29ea885762ef4844f5ce5eee6a626edf9509"
     }
   },
   "pepsi-city": {
@@ -78,15 +166,25 @@
   "sid-house": {
     "279ea3365efd2bac1cc5d9e4d5ebb6c153a4614f7f3376a5e9c2185136a0747f": {
       "laps": 3,
-      "fill_sha256": "78b0018ad25028cbc57f5e32759c59d96ae758719de24c3586608bba19e8b4f4"
+      "fill_sha256": "6a5087587a7c60d78556ce57f5a6e31244e5e9e23dff3201dfc49d7b0c8162ca"
     },
     "b33df114772ccbc19fa2bae99d7cbf86d6fb015092b5a43a60944ea927876cd7": {
       "laps": 3,
-      "fill_sha256": "7295c1ec9e2221e498c902140a4efe01037458f5d4e49a038e9f2c3ffe2df805"
+      "fill_sha256": "0baf1e50be11bdf447d91c8e37583710781261f44b0e6c22dddc706af1fee815"
     },
     "e0c9c346c5b5f3ba7d09ece54c2abd20759a596b292185724a2e7281e6f6eb34": {
       "laps": 3,
-      "fill_sha256": "0d717a18b6df61457e4270f3852d84f1f4134326ec52b6fbf71c56d855540064"
+      "fill_sha256": "798d08d3ee6bad6508da52564bdc9314e321f4a8606a69cc0e46acff65e3a26f"
+    }
+  },
+  "skater-s-retreat": {
+    "80325e45c0fbc8203c99f82709a919d68e417dacbdb8134298ccd10bfeee8130": {
+      "laps": 3,
+      "fill_sha256": "78b06990245da1ef4dbe751d9691b061f2c09aace56967e8420df91fb60e3d06"
+    },
+    "a728c5b1846323d544e5b973a00931d2cceb1f0a67cba5ee5752befcd4aaa4a9": {
+      "laps": 3,
+      "fill_sha256": "0a6c3b2f7a5f7b1cae3f4e05c4c7b7435a85aab5f9bf78bd7973d4cfa3799ac5"
     }
   },
   "snowy-valley": {
@@ -106,9 +204,23 @@
     }
   },
   "tomb-temple": {
+    "1b9fff6acf833fbfb11c4137aad4ac687d35b314a8e03f368e53fb42f8985999": {
+      "laps": 3,
+      "fill_sha256": "3207b4a082029e3b0bf4996254c53dcb5dcceea0301a6bc11043779b72c94d5e"
+    },
     "9a9073fe9d2dd0bbf3222dc1b4d8be8ccf6811890e0919ca05fbc181f7adf082": {
       "laps": 3,
-      "fill_sha256": "aaa3f1dff03af73621a725b05a5b7758bf76369201788271afc2f160cd56d62c"
+      "fill_sha256": "118c5e8d98a8efea6e709b065f4712a3711dc082d788a99fb14cf9e5a4a41240"
+    }
+  },
+  "tribal-trials": {
+    "a7b4aef448047524863c032d8121f65f74012f741d64a6ad80f2b07456fcbfcd": {
+      "laps": 3,
+      "fill_sha256": "3cb73640cc7c5552b7f8a26d39a07daabdada8c8221dbc16c7df2348f2deeec4"
+    },
+    "e2cc24322951d621c33ce00c976f5da22e6da0f143d5fd0b4ca0f560c130efb9": {
+      "laps": 3,
+      "fill_sha256": "da5a5e27b13025d34088490cf868d53a3ef5d464558408f2c8b90d29e9684400"
     }
   },
   "tv-world": {

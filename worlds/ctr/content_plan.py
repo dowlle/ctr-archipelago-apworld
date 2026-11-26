@@ -307,14 +307,22 @@ def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=No
         if where == "custom_tracks" and not historical and use_fill:
             for package in packages:
                 caps = package["capabilities"]
-                if not caps["time_trial"] or caps["relic"]:
+                if "relic_files" in package:
                     continue
                 key = destinations.canonical_track_key(package["content_id"])
                 fill = track_fill.bundled(key, package["files"][0]["sha256"], package["laps"])
-                if fill:
+                if not fill:
+                    continue
+                # Every family a fill carries must be absent on the measured
+                # LEV; a copy never stands beside the track's own objects.
+                if track_fill.time_crates(fill) and (not caps["time_trial"] or caps["relic"]):
+                    continue
+                if track_fill.weapon_crates(fill) and caps.get("weapon_crates") != 0:
+                    continue
+                if track_fill.time_crates(fill):
                     caps["relic"] = True
                     package["relic_targets"] = {tier: fill["relic_targets"][tier] for tier in track_fill.TIERS}
-                    package["fill"] = fill
+                package["fill"] = fill
         return packages
     except custom_packages.PackageError as exc:
         if where == "custom_tracks":
@@ -1276,9 +1284,13 @@ def generate(world):
                  f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
-    filled = [package["display_name"] for package in plan["packages"] if "fill" in package]
-    if filled:
-        adjusted(world, "track_fill", "Track fill enables Relic Race on " + ", ".join(filled) + ".")
+    filled = [package["display_name"] for package in plan["packages"]
+              if track_fill.time_crates(package.get("fill"))]
+    armed = [package["display_name"] for package in plan["packages"] if track_fill.package_weapons(package)]
+    if filled or armed:
+        adjusted(world, "track_fill", " ".join(
+            (["Track fill enables Relic Race on " + ", ".join(filled) + "."] if filled else [])
+            + (["Track fill adds weapon crates on " + ", ".join(armed) + "."] if armed else [])))
     ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
               for package, kind, first, last in track_rulings.omitted_pickups(plan, enabled_only=False)]
     if ranges:
@@ -2236,7 +2248,10 @@ def draw_plan(world, key_estimate=True):
         relic_tracks = {entry["track_id"] for entry in entries
                         if entry["kind"] == "track" and "relic" in entry["modes"]}
         for package in packages:
-            if "fill" in package and package_track_id(package) not in relic_tracks:
+            # A time crate fill alone matters only to a scheduled Relic Race.
+            # Weapon crates are raced in every other mode, so they stay.
+            if ("fill" in package and package_track_id(package) not in relic_tracks
+                    and not track_fill.package_weapons(package)):
                 del package["fill"], package["relic_targets"]
                 package["capabilities"]["relic"] = False
     pad_record = dict(mode=content_requirements.MODES[unlock_mode])

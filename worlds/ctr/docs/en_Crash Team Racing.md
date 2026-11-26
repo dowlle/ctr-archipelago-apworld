@@ -224,7 +224,7 @@ random_without_4_keys refuses a rule of 4 Keys.
 
 ### Custom Tracks
 
-`track_fill: true` enables experimental Relic Races on eligible pinned custom track builds.
+`track_fill: true` enables experimental Relic Races on eligible pinned custom track builds, and real weapon crates on pinned builds that lack them (Arabian Heights Day takes Arabian Heights Night's 27).
 The room includes the time crates and targets and requires a client launched with `CTR_TRACK_FILL=1`.
 The default is off.
 

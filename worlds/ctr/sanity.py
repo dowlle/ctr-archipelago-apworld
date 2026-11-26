@@ -15,7 +15,7 @@ from Options import OptionError
 
 from . import (box_spots, content_item_boxes, content_pickups, country_speedway,
                crate_exclusions, destinations, green_hill_raceway, object_rulings,
-               royal_raceway, toasty_terrace, track_rulings)
+               royal_raceway, toasty_terrace, track_fill, track_rulings)
 from .item_boxes import BOX_TRACKS
 from .cortex_vortex import CORTEX_LEV_SHA256, CORTEX_LEGACY_LEV_SHA256
 from .location_class import LocationClass
@@ -83,6 +83,37 @@ def settings(options):
 
 
 def inventory(track, package=None, record=None):
+    inv = _measured_inventory(track, package, record)
+    weapons = track_fill.package_weapons(package) if track["origin"] == "custom" else []
+    if inv is None or not weapons:
+        return inv
+    # WF1: filled weapon crates follow the LEV's own as ordinals count + 1 on,
+    # each with the rank its fill row carries (OV1 rule 5).
+    lev = inv["counts"][0]
+    needs = copy.deepcopy(inv.get("needs", {}))
+    needs.setdefault(KINDS[0], {}).update(
+        {str(lev + i): dict(needs=track_fill.RANK_NAMES[crate["rank"]]) for i, crate in enumerate(weapons, 1)})
+    return dict(inv, counts=[lev + len(weapons)] + list(inv["counts"][1:]), needs=needs)
+
+
+def fill_count(track, package, family):
+    """Filled weapon crates of a LEV measured without its own (WF1), else 0."""
+    caps = (package or {}).get("capabilities") or {}
+    if family or track["origin"] != "custom" or caps.get("weapon_crates") != 0:
+        return 0
+    return len(track_fill.package_weapons(package))
+
+
+def fill_needs(track, package, family, number):
+    """The fill row's `needs` for a filled weapon crate ordinal, else None."""
+    weapons = track_fill.package_weapons(package) if track["origin"] == "custom" else []
+    lev = ((package or {}).get("capabilities") or {}).get("weapon_crates", 0)
+    if family or not weapons or not lev < number <= lev + len(weapons):
+        return None
+    return dict(needs=track_fill.RANK_NAMES[weapons[number - lev - 1]["rank"]])
+
+
+def _measured_inventory(track, package=None, record=None):
     if track["origin"] == "retail":
         return CATALOG.get("retail:" + str(track["retail_id"]))
     if track["origin"] == "cortex_vortex":
@@ -145,7 +176,8 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
         return []  # No measured revision, no invented objects.
     reviewed = reviewed_counts(package)
     count = min(inv["counts"][family], BUDGETS[family])
-    if reviewed is not None:
+    filled = fill_count(track, package, family)
+    if reviewed is not None and not filled:
         count = min(count, reviewed[family])
     out = list(range(1, count + 1))
     # Older rooms selected their picks using the original exclusion catalog.
@@ -155,7 +187,10 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
-        if track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
+        if track["origin"] == "custom" and item_boxes and track["id"] in content_item_boxes.spot_sets(item_boxes):
+            # WF1: an AP box standing on a filled weapon crate hides it.
+            excluded.update(content_item_boxes.seated_crates(track, item_boxes, package))
+        elif track["origin"] == "custom" and item_boxes and track["id"] not in content_item_boxes.spot_sets(item_boxes):
             carried = {c["ordinal"] for c in content_item_boxes.carried_crates(item_boxes, track["id"])}
             if version == 1 and record["itemboxsanity"] and carried - excluded:
                 raise OptionError("CTR sanity: fallback exclusions require the updated sanity catalog")
@@ -172,8 +207,12 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
     out = [n for n in out if n not in excluded]
     tier = record["shortcut_knowledge"]
     ruling_settings = record if "logic_difficulty" in record else capability
+    # A filled crate takes its rank from its fill row only: an inherited
+    # ruling names the LEV's own objects by ordinal (WF1).
     return [n for n in out if object_needs(inv, KINDS[family], n, record).get("shortcut", 0) <= tier
-            and object_rulings.rank(track, package, KINDS[family], n, ruling_settings, legacy=legacy_rulings) is not None]
+            and (fill_needs(track, package, family, n) is not None
+                 or object_rulings.rank(track, package, KINDS[family], n, ruling_settings,
+                                        legacy=legacy_rulings) is not None)]
 
 
 def add_tracks_probe(record, tracks, *args):
@@ -264,8 +303,9 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None,
             for n in row[kind]:
                 c = dict(location=code(t, f, n), owner=t["id"], kind=kind,
                          display_name=f"{t.get('room_title', t['display_name'])}: {SUFFIXES[f]} {n}", routes=uses[t["id"]])
-                fields = (dict(needs="usf") if need is None or (inherited and n > need["counts"][f])
-                          else object_needs(need, kind, n, record))
+                fields = (fill_needs(t, package, f, n)
+                          or (dict(needs="usf") if need is None or (inherited and n > need["counts"][f])
+                              else object_needs(need, kind, n, record)))
                 if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
                 if source == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
@@ -279,8 +319,8 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None,
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":
                     c["boost"] = 2 if fields.get("needs") == "usf" else 1
                 saved_ruling = "logic_difficulty" in record
-                rank = object_rulings.rank(t, package, kind, n, record if saved_ruling else capability,
-                                           legacy=legacy_rulings and saved_ruling)
+                rank = 0 if fill_needs(t, package, f, n) else object_rulings.rank(
+                    t, package, kind, n, record if saved_ruling else capability, legacy=legacy_rulings and saved_ruling)
                 if rank and (capability or {}).get("boost_mode"):
                     c["boost"] = max(c.get("boost", 0), rank)
                 if capability and capability.get("stats_mode") and fields.get("shortcut") == 2:

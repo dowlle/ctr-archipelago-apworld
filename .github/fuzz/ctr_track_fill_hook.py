@@ -1,4 +1,4 @@
-"""Check the packed Acid Lake room emitted by each determinism fuzz case."""
+"""Check the packed Acid Lake and Arabian Heights Day room of each determinism fuzz case."""
 
 from pathlib import Path
 from zipfile import ZipFile
@@ -40,6 +40,18 @@ class Hook(DeterminismHook):
             if (not bundled or frozen["counts"]["time_crates"] != 29
                     or track_fill.canonical_bytes(frozen) != track_fill.canonical_bytes(bundled)):
                 raise ValueError("The generated room must freeze all 29 pinned Acid Lake crates and targets.")
+            day, = (p for p in plan["packages"] if p["content_id"] == "arabian-heights-day")
+            weapons = track_fill.package_weapons(day)
+            if (len(weapons) != 27 or day["capabilities"]["weapon_crates"] != 0
+                    or track_fill.canonical_bytes(day["fill"]) != track_fill.canonical_bytes(
+                        track_fill.bundled("arabian-heights-day", day["files"][0]["sha256"], day["laps"]))):
+                raise ValueError("The generated room must freeze Arabian Heights Day's 27 pinned weapon crates.")
+            track = next(t["id"] for t in plan["tracks"] if t.get("package_id") == day["id"])
+            spots = next((s for s in (plan.get("item_boxes") or {}).get("spot_sets", ()) if s["track_id"] == track), None)
+            picked = set(spots["picked"]) if spots else set()
+            row = next((r for r in (plan.get("sanity") or {}).get("tracks", ()) if r["track_id"] == track), None)
+            if len(picked) > 15 or (row and (row["counts"][0] != 27 or picked & set(row["weapon_crate"]))):
+                raise ValueError("Day seats at most 15 boxes and no seated crate is a sanity check.")
         except Exception as exc:
             self.fill_error = exc
 
