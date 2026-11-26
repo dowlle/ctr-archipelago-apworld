@@ -89,12 +89,19 @@ def generate(args, fill_module, analyze, np):
         if len(quads):
             mesh, = struct.unpack_from("<I", data, analyze.LEVEL_FIELDS["mesh_offset"])
             quad_offset, = struct.unpack_from("<I", data, mesh + 12)
-            order = np.ndarray((len(quads),), dtype="<u4", buffer=data, offset=quad_offset + 0x14,
-                               strides=(analyze.QUADBLOCK_SIZE,))
-            # The high bit of draw_order_low controls back-face collision.
-            double_sided = order[valid] & 0x80000000
-            keys = [(quad.tobytes(), int(flag), bool(two_sided))
-                    for quad, flag, two_sided in zip(vertices, collision_flags, double_sided)]
+            # QuadBlock layout in namespace_Level.h. Draw-order bit 31
+            # controls back-face collision; the other draw bits are visual.
+            collision_fields = np.dtype({
+                "names": ("draw_order_low", "bounds", "terrain", "normal_y", "normal_shift", "normal_dividends"),
+                "formats": ("<u4", "V12", "u1", "i1", "i1", "V20"),
+                "offsets": (0x14, 0x2C, 0x38, 0x3B, 0x3F, 0x48),
+                "itemsize": analyze.QUADBLOCK_SIZE,
+            })
+            physics = np.frombuffer(data, dtype=collision_fields, count=len(quads), offset=quad_offset)[valid]
+            keys = [(quad.tobytes(), int(flag), bool(fields["draw_order_low"] & 0x80000000),
+                     bytes(fields["bounds"]), int(fields["terrain"]), int(fields["normal_y"]),
+                     int(fields["normal_shift"]), bytes(fields["normal_dividends"]))
+                    for quad, flag, fields in zip(vertices, collision_flags, physics)]
         return vertices, keys, analyze.ground(path)
 
     def neighbourhood(sha, pos):
