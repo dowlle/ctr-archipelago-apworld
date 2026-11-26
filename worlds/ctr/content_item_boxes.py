@@ -120,16 +120,18 @@ def reviewed_pickups(package):
     return pin if pin in PICKUP_RULE_PINS else None
 
 
-def add_spot_sets(record, tracks, package_by_id, seed, player):
+def add_spot_sets(record, tracks, package_by_id, seed, player, blue_fire=False):
     """Put `spot_sets` into a record from settings(): the pick of every track
     in `tracks` that has a spot file. Draws nothing from the world's random
-    stream (box_spots.pick)."""
+    stream (box_spots.pick). `blue_fire` is the capability record's
+    boost_blue_fire: only then do blue_fire spots join a pool."""
     if not record:
         return record
     sets = []
     for track in tracks:
         found = box_spots.spot_set(track, package_by_id.get(track.get("package_id")),
-                                   record["shortcut_knowledge"], seed, player, record.get("box_count", 15))
+                                   record["shortcut_knowledge"], seed, player, record.get("box_count", 15),
+                                   blue_fire)
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
@@ -240,7 +242,8 @@ def check_settings(record, capability=None):
     return record
 
 
-def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False, require_reviewed_exclusions=False):
+def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False, require_reviewed_exclusions=False,
+                    blue_fire=False):
     """Validate saved picks and crate exclusions, or match the source catalog."""
     if not record:
         return
@@ -329,7 +332,8 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
                                          {k: v for k, v in sets[track_id].items() if k != "track_id"},
-                                         record.get("box_count", 15), compare_digest=not restoring)
+                                         record.get("box_count", 15), compare_digest=not restoring,
+                                         blue_fire=blue_fire)
             except box_spots.SpotFileError as exc:
                 error(str(exc))
 

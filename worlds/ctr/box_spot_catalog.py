@@ -14,8 +14,10 @@ FORMAT = "ctr-ap-box-spots"
 VERSION = 1
 #: Spot numbers per track (the alpha3 data package, ruled 2026-11-06).
 MAX_NUMBER = 50
-#: The `needs` field as a Progressive Boost rank (USF is the second upgrade).
-NEEDS = {"none": 0, "boost": 1, "usf": 2}
+#: The `needs` field as a Progressive Boost rank (USF is the second upgrade,
+#: Blue Fire the optional third). A blue_fire spot exists in a seed only with
+#: Progressive Boost and Blue Fire on (box_spots.eligible).
+NEEDS = {"none": 0, "boost": 1, "usf": 2, "blue_fire": 3}
 DEFAULT_NEEDS = "usf"
 #: The `shortcut` field as the Shortcut Knowledge tier that creates the spot.
 SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
@@ -30,7 +32,7 @@ PROVENANCE_PATH = "data/box_spots/provenance.json"
 SEAT_SPOTS_PATH = "data/box_spots/seat-spots-v2.json"
 # Digest of the reviewed, canonical JSON evidence. Keep this approval separate
 # from the catalog data so editing a source record cannot approve its own kind.
-REVIEWED_PROVENANCE_SHA256 = "acb9954a89ed7b2fb61075a180257253e4cfb0859306e9ce05efb4f06ad45d28"
+REVIEWED_PROVENANCE_SHA256 = "edbd8a6eb6f2d0de42ebbf3332aa3e5d7b7e1bdf20e660c2122cdf59564002dc"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
@@ -100,7 +102,11 @@ def check_draft_file(doc, path="<file>"):
         if not _int16(spot["rot_y"]):
             _fail(path, f"spot {n}: rot_y must be a signed 16-bit engine angle")
         if spot.get("needs", DEFAULT_NEEDS) not in NEEDS:
-            _fail(path, f"spot {n}: needs must be none, boost or usf")
+            _fail(path, f"spot {n}: needs must be none, boost, usf or blue_fire")
+        if spot.get("needs") == "blue_fire" and track["kind"] != "custom":
+            # The retail fallback tables (box_spots._retail_tables) have no
+            # Blue Fire filter, so rank 3 stays on custom files.
+            _fail(path, f"spot {n}: needs blue_fire is only for custom tracks")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):
