@@ -124,9 +124,36 @@ def weapon_seat_file(track, package):
 
 def spot_cap(track, package, record):
     """How many spots a track picks: the Item Box Count, or at most 15 when the
-    spots are fallback seats on filled weapon crates."""
+    spots are fallback seats on filled weapon crates. A saved room decides by
+    its own frozen spots, never by today's catalog."""
     count = (record or {}).get("box_count", 15)
+    if track.get("id") in FROZEN_SPOTS:
+        spots = FROZEN_SPOTS[track["id"]]
+        seats = track_fill.seated_ordinals(package, spots)
+        return min(count, box_spots.PICK) if spots and len(seats) == len(spots) else count
     return min(count, box_spots.PICK) if weapon_seat_file(track, package) else count
+
+
+def check_fill_seats(track, package, record):
+    """A saved pick on filled crates follows the rules native enforces: one box
+    per filled crate at its own angle, and either every box is a seat (at most
+    15) or none is."""
+    spots = FROZEN_SPOTS.get(track["id"])
+    weapons = track_fill.package_weapons(package)
+    if not spots or not weapons:
+        return
+    by_pos = {}
+    for i, crate in enumerate(weapons):
+        by_pos[tuple(crate["pos"])] = (i, crate["rot"][1])
+    claimed = []
+    for spot in spots:
+        found = by_pos.get(tuple(spot["pos"]))
+        if found is not None:
+            if found[1] != spot["rot_y"] or found[0] in claimed:
+                error(f"item_boxes.spot_sets puts two boxes or a turned box on one filled crate of {track['id']}.")
+            claimed.append(found[0])
+    if claimed and (len(claimed) != len(spots) or len(spots) > box_spots.PICK):
+        error(f"item_boxes.spot_sets mixes fallback seats and spots on {track['id']}.")
 
 
 #: Box spots a frozen room carries, {track id: [spot]}, set while a saved
@@ -137,9 +164,11 @@ FROZEN_SPOTS = {}
 def frozen_spots(plan):
     """{track id: [spot]} of a plan's box checks that carry a spot."""
     out = {}
-    for check in plan.get("checks", ()):
-        if check.get("kind") == KIND and "spot" in check:
-            out.setdefault(check.get("owner"), []).append(check["spot"])
+    checks = plan.get("checks") if isinstance(plan, dict) else None
+    for check in checks if isinstance(checks, (list, tuple)) else ():
+        spot = check.get("spot") if isinstance(check, dict) and check.get("kind") == KIND else None
+        if isinstance(spot, dict) and isinstance(spot.get("pos"), (list, tuple)) and "rot_y" in spot:
+            out.setdefault(check.get("owner"), []).append(spot)
     return out
 
 
@@ -308,11 +337,8 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                     error(f"item_boxes.spot_sets is missing retail track {track_id}.")
                 continue
             picked = spot_set["picked"]
-            # A saved fill room may have capped its fallback seats at 15.
-            counts = {min(spot_set["pool"], spot_cap(track, package, record))}
-            if track_fill.package_weapons(package):
-                counts.add(min(spot_set["pool"], record.get("box_count", 15), box_spots.PICK))
-            if (picked != sorted(set(picked)) or len(picked) not in counts
+            check_fill_seats(track, package, record)
+            if (picked != sorted(set(picked)) or len(picked) != min(spot_set["pool"], spot_cap(track, package, record))
                     or not (track["origin"] == "retail" and "lev_sha256" not in spot_set
                             or "named_block" in track and package is not None
                             and spot_set.get("lev_sha256") == box_spots.lev_pin(package))):
@@ -325,6 +351,7 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
         if has_file != (track_id in sets) and not (has_file and track.get("origin") == "custom"):
             error(f"item_boxes.spot_sets disagrees with this build's box spot files for {track_id}.")
         if track_id in sets:
+            check_fill_seats(track, package, record)
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
                                          {k: v for k, v in sets[track_id].items() if k != "track_id"},

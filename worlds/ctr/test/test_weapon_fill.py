@@ -237,3 +237,21 @@ def test_donor_ruling_may_carry_any_rank():
     fill["families"]["weapon_crates"][1].update(rank=0, rank_source="donor_ruling")
     fill["fill_sha256"] = track_fill.payload_sha256(fill)
     track_fill.validate(fill, DAY_LEV, 3)
+
+
+def test_catalog_correction_and_tampered_seats_on_restore():
+    from unittest.mock import patch
+    wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
+                                            seed=11).fill_slot_data()))
+    # A later correction of one Day spot leaves the saved room restorable.
+    corrected = copy.deepcopy(box_spots.CUSTOM_FILES[DAY])
+    corrected["doc"]["spots"][1]["pos"] = [0, 0, 0]
+    with patch.dict(box_spots.CUSTOM_FILES, {DAY: corrected}):
+        restored = make_world(day_options(), seed=999, passthrough=wire)
+    assert json.loads(json.dumps(restored.fill_slot_data())) == wire
+    # A saved seat moved off its crate mixes seats and spots: refused.
+    forged = copy.deepcopy(wire)
+    box = next(c for c in forged["content_plan"]["checks"] if c.get("kind") == "box" and c["owner"] == TRACK)
+    box["spot"]["pos"][0] += 7
+    with pytest.raises(OptionError):
+        make_world(day_options(), seed=999, passthrough=forged)
