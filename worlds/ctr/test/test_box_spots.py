@@ -49,8 +49,8 @@ DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 RECOVERED_CUSTOM = {
-    "acropolis": (91, "20785164f1123ab6ed8b3f5026aaeed781496aabfee4fc5f662847f49cd54a74", 50, 22),
-    "nina-s-nightmare": (90, "7fc42abb12130c546a7b500815a3d3a372c4178f4f063b56460730443f4ea0a0", 29, 10),
+    "acropolis": (91, "20785164f1123ab6ed8b3f5026aaeed781496aabfee4fc5f662847f49cd54a74", 50, {22, 23}),
+    "nina-s-nightmare": (90, "7fc42abb12130c546a7b500815a3d3a372c4178f4f063b56460730443f4ea0a0", 29, {6, 10, 25}),
 }
 
 #: CP1: dowlle's Box Author Mode spots on named custom tracks (2026-11-24).
@@ -146,7 +146,7 @@ class TestConversion(unittest.TestCase):
                 doc = box_spots.CUSTOM_FILES[key]["doc"]
                 self.assertEqual(doc["track"]["lev_sha256"], [lev])
                 self.assertEqual([s["number"] for s in doc["spots"]],
-                                 [n for n in range(1, last + 1) if n != held])
+                                 [n for n in range(1, last + 1) if n not in held])
                 for spot in doc["spots"]:
                     n = spot["number"]
                     self.assertEqual(spot["source_family"], "ap_box")
