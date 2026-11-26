@@ -22,8 +22,9 @@ term, because it crosses the line.
     (ruling 2026-10-17). the project's per-package rulings in
     `data/usf_finish_rulings.json` (2026-10-18) decide first, by content id
     and, for a row scoped to one revision (A2-22), revision and LEV pin:
-    Arabian Heights Night and Cortex Vortex need USF; TV World, North Pole and
-    Baby T Park take the generic terms only. A ruling may also set the first
+    Cortex Vortex needs USF; the reviewed Arabian Heights Day and Night
+    revisions, TV World, North Pole and Baby T Park take the generic terms
+    only. A ruling may also set the first
     boost (rank 1). A custom package that is not ruled and does not state
     `super_turbo_pads` is treated as having one, the safe direction;
   * Trophy Race: F, and on easy and medium the first rank on every

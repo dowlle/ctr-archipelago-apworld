@@ -3,6 +3,8 @@
   "version": 2,
   "rulings": [
     {"content_id": "arabian-heights-night", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: needs USF to finish"},
+    {"content_id": "arabian-heights-day", "revision": "1.0.0", "lev_sha256": "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900", "finish_rank": 0, "since": 5, "ruling": "Project ruling 2026-11-25 23:25 CET: Appie completed a lap at Boost 0 and ruled the track finishable at that rank"},
+    {"content_id": "arabian-heights-night", "revision": "1.1.0", "lev_sha256": "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c", "finish_rank": 0, "since": 5, "ruling": "Project ruling 2026-11-25 23:25 CET: Appie ruled that Night drives the same as Day and takes its Boost 0 lap and finish rule"},
     {"content_id": "baby-t-park", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
     {"content_id": "cortex-vortex", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: Cortex Vortex (bundled) needs USF to finish"},
     {"content_id": "north-pole", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},

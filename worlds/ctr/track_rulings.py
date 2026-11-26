@@ -14,6 +14,7 @@ REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.
 # Future scoped additions bump this on both sides and cite it as their "since".
 # Version 0 is the original markerless lookup, before versioned ruling rows.
 BASE_RULING_VERSION = 4
+ARABIAN_BOOST_VERSION = 5
 DECK_FINISH_VERSION = 6
 RULING_VERSION = DECK_FINISH_VERSION
 # The two exact patch copies can arrive under the shared registry key.
