@@ -55,7 +55,7 @@ def test_day_fill_is_nights_layout_with_the_published_spot_ranks():
     assert len(weapons) == 27 == fill["counts"]["weapon_crates"]
     for number, (spot, crate) in enumerate(zip(spots, weapons), 1):
         assert spot["number"] == number and spot["provenance"] == ["a6-16-night-weapon-crates", number]
-        assert (crate["pos"], crate["rot_y"]) == (spot["pos"], spot["rot_y"])
+        assert (crate["pos"], crate["rot"][1]) == (spot["pos"], spot["rot_y"])
         assert track_fill.RANK_NAMES[crate["rank"]] == spot.get("needs", "usf")
     # The fill holds no time crates, so Day gains no Relic Race.
     assert track_fill.bundled(DAY, DAY_LEV, 5) is None
@@ -70,7 +70,7 @@ def test_weapon_rows_are_closed(change):
     elif change == "duplicate":
         weapons[1]["pos"] = list(weapons[0]["pos"])
     elif change == "rank_source":
-        weapons[0]["rank_source"] = "default_usf"
+        weapons[0]["rank_source"] = "default_usf"  # spot 1 is start ground, rank 0
     else:
         weapons[0]["model"] = 8
     fill["fill_sha256"] = track_fill.payload_sha256(fill)
@@ -183,6 +183,10 @@ def test_fallback_track_seats_at_most_15_boxes_on_filled_crates():
     assert len(own) == 9 and all("spot" not in c for c in own)
     seats = {content_item_boxes.physical_seat(track, plan["item_boxes"], frozen, n) for n in range(1, 10)}
     assert seats == set(range(1, 10))
+    # Each fallback box needs at least its seated crate's frozen rank.
+    for check, n in zip(own, range(1, 10)):
+        rank = weapons[content_item_boxes.physical_seat(track, plan["item_boxes"], frozen, n) - 1]["rank"]
+        assert check.get("boost", 0) >= rank
     # All nine crates are seated, so sanity counts them and picks none.
     row = sanity_row_of(plan, track["id"])
     assert row["counts"][0] == 9 and row["weapon_crate"] == []
@@ -215,3 +219,21 @@ def test_held_weak_layouts_and_big_forest_carry_no_weapon_fill():
 
 def sanity_row_of(plan, track_id):
     return next(row for row in plan["sanity"]["tracks"] if row["track_id"] == track_id)
+
+
+def test_restore_uses_the_rooms_own_spots_not_the_catalog():
+    """A fill room keeps its seats when Day's spot file later changes."""
+    from unittest.mock import patch
+    wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
+                                            seed=11).fill_slot_data()))
+    with patch.dict(box_spots.CUSTOM_FILES, {}, clear=False):
+        box_spots.CUSTOM_FILES.pop(DAY, None)
+        restored = make_world(day_options(), seed=999, passthrough=wire)
+    assert json.loads(json.dumps(restored.fill_slot_data())) == wire
+
+
+def test_donor_ruling_may_carry_any_rank():
+    fill = copy.deepcopy(track_fill.bundled(DAY, DAY_LEV, 3))
+    fill["families"]["weapon_crates"][1].update(rank=0, rank_source="donor_ruling")
+    fill["fill_sha256"] = track_fill.payload_sha256(fill)
+    track_fill.validate(fill, DAY_LEV, 3)

@@ -184,6 +184,9 @@ def eligible(track, family, record, item_boxes, package, capability=None, *, leg
     version = record.get("exclusion_version", 1)
     excluded = crate_exclusions.ordinals(inv["lev_sha256"], KINDS[family], version,
                                          package if track["origin"] == "custom" else None)
+    if filled:
+        # Inherited exclusions name the LEV's own crates, never filled ones.
+        excluded = {n for n in excluded if n <= inv["counts"][family] - filled}
     if family == 0:
         # Seat the AP boxes first, only on a standalone fallback pad. Authored
         # spot tracks hide no weapon crates. Match the runtime's eligible spread.
@@ -306,14 +309,18 @@ def checks(record, tracks, entries, pads, encounters, capability, packages=None,
                 fields = (fill_needs(t, package, f, n)
                           or (dict(needs="usf") if need is None or (inherited and n > need["counts"][f])
                               else object_needs(need, kind, n, record)))
-                if source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
+                filled_crate = fill_needs(t, package, f, n) is not None
+                if filled_crate:
+                    pass  # WF1: the fill row's rank; LEV rulings below name other objects.
+                elif source == country_speedway.LEV_SHA256 and record.get("rules_version", 0) >= 3:
                     fields = dict(needs="usf" if country_speedway.rank(kind, n) else "none")
-                if source == toasty_terrace.LEV_SHA256 and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION:
+                if (not filled_crate and source == toasty_terrace.LEV_SHA256
+                        and record.get("rules_version", 0) >= toasty_terrace.RULES_VERSION):
                     fields = dict(needs="none")
-                if (source == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (not filled_crate and source == royal_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= royal_raceway.RULES_VERSION):
                     fields = dict(needs="none")
-                if (source == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
+                if (not filled_crate and source == green_hill_raceway.LEV_SHA256 and kind in ("weapon_crate", "wumpa_crate")
                         and record.get("rules_version", 0) >= green_hill_raceway.RULES_VERSION):
                     fields = dict(needs="none")
                 if capability and capability.get("boost_mode") and fields.get("needs", "none") != "none":

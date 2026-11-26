@@ -89,10 +89,10 @@ def validate(fill, lev_sha, laps):
         raise ValueError("invalid time crate set size")
     seen_positions = set()
     for crate in weapons:
-        if (not _fields(crate, ("pos", "rot_y", "rank", "rank_source")) or not _position(crate["pos"])
-                or not _int(crate["rot_y"], -32768, 32767) or not _int(crate["rank"], 0, 2)
+        if (not _fields(crate, ("pos", "rot", "rank", "rank_source")) or not _position(crate["pos"])
+                or not _position(crate["rot"]) or not _int(crate["rank"], 0, 2)
                 or crate["rank_source"] not in RANK_SOURCES
-                or (crate["rank_source"] == "start_ground") != (crate["rank"] == 0)
+                or crate["rank_source"] == "start_ground" and crate["rank"] != 0
                 or crate["rank_source"] == "default_usf" and crate["rank"] != 2
                 or tuple(crate["pos"]) in seen_positions):
             raise ValueError("invalid track fill weapon crate")
@@ -148,7 +148,7 @@ def seated_ordinals(package, spots, lev_count=0):
     the position and angle of a standing spot (native ap_boxes.c does the same)."""
     where = {(tuple(s["pos"]), s["rot_y"]) for s in spots}
     return [lev_count + i for i, crate in enumerate(package_weapons(package), 1)
-            if (tuple(crate["pos"]), crate["rot_y"]) in where]
+            if (tuple(crate["pos"]), crate["rot"][1]) in where]
 
 
 @lru_cache(maxsize=1)

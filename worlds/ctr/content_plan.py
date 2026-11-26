@@ -2984,6 +2984,16 @@ def goal_envelope(plan):
 @track_rulings.validation
 def validate(plan, *, restoring=False):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
+    # WF1: seats on filled crates follow the plan's own frozen box spots.
+    content_item_boxes.FROZEN_SPOTS = content_item_boxes.frozen_spots(plan) if isinstance(plan, dict) else {}
+    try:
+        return _validate(plan, restoring=restoring)
+    finally:
+        content_item_boxes.FROZEN_SPOTS = {}
+
+
+def _validate(plan, *, restoring=False):
+    """validate() without the frozen spot context."""
     from .content_plan_schema import validate_shape
     try:
         validate_shape(plan)

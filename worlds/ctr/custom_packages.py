@@ -276,7 +276,7 @@ def admit(descriptor, where="package", *, frozen_fill=False):
                 _fail(where + ".fill", "relic targets disagree with the package")
         # WF1: weapon crates fill only a LEV measured without any. The
         # package keeps the measured count; the fill adds its own ordinals.
-        if track_fill.weapon_crates(fill) and caps.get("weapon_crates") != 0:
+        if track_fill.weapon_crates(fill) and (caps.get("weapon_crates") != 0 or "relic_files" in d):
             _fail(where + ".fill", "weapon crates fill only a LEV measured without weapon crates")
         out["fill"] = fill
     evidence = d["evidence"]

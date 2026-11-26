@@ -8,8 +8,8 @@ Run with --check to re-derive and compare the complete output directory.
 WF1 weapon crates: --weapon-targets names each target LEV, its donor, the
 package lap count (or null for the capability sheet's), the fit rule and the
 rank of every donor crate, and optionally donor ordinals to exclude. The donor's
-weapon crates (model 8, instance-table order, signed yaw) are copied at their
-exact position and angle. The target must hold no weapon crate. The fit is
+weapon crates (model 8, instance-table order, full rotation) are copied at
+their exact position and rotation. The target must hold no weapon crate. The fit is
 OV1's 512-unit neighbourhood rule ("strict"), keeping the crates that pass, or
 "ruled" where dowlle placed a whole layout: every crate must then stand on
 ground at the donor's height, and the report lists the strict rule's misses. A weapon family
@@ -174,7 +174,7 @@ def generate(args, fill_module, analyze, np):
             model = word(at + 0x10)
             if model and struct.unpack_from("<h", data, model + 16)[0] == 8:
                 crates.append((list(struct.unpack_from("<3h", data, at + 0x30)),
-                               struct.unpack_from("<3h", data, at + 0x36)[1]))
+                               list(struct.unpack_from("<3h", data, at + 0x36))))
         return crates
 
     output, report = {}, []
@@ -255,8 +255,8 @@ def generate(args, fill_module, analyze, np):
         if spec["fit"] == "ruled" and not all(passed):
             entry["status"] = "ruled layout no longer fits"
             continue
-        weapons = [dict(pos=pos, rot_y=rot_y, rank=rank["rank"], rank_source=rank["rank_source"])
-                   for (pos, rot_y), rank, ok in zip(crates, spec["ranks"], passed) if ok]
+        weapons = [dict(pos=pos, rot=rot, rank=rank["rank"], rank_source=rank["rank_source"])
+                   for (pos, rot), rank, ok in zip(crates, spec["ranks"], passed) if ok]
         if not weapons:
             entry["status"] = "no crate passes the fit"
             continue
