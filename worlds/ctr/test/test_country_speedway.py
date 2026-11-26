@@ -110,7 +110,7 @@ class TestCountrySpeedway(unittest.TestCase):
         self.assertEqual(len(checks), 14)
         for n, _, _ in checks:
             self.assertEqual(boxes.box_terms(track, n, dict(boost_mode=1), package, record)[0],
-                             int(n in (2, 3, 4, 11, 14)))
+                             int(n in (3, 4, 14)))
 
     def test_route_and_locked_racer_are_independent(self):
         for seed in range(12):

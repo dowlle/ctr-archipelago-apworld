@@ -15,7 +15,8 @@ REVIEWS = json.loads(pkgutil.get_data(__package__, "data/track_ruling_revisions.
 # Version 0 is the original markerless lookup, before versioned ruling rows.
 BASE_RULING_VERSION = 4
 ARABIAN_BOOST_VERSION = 5
-RULING_VERSION = ARABIAN_BOOST_VERSION
+DECK_FINISH_VERSION = 6
+RULING_VERSION = DECK_FINISH_VERSION
 # The two exact patch copies can arrive under the shared registry key.
 # Keep their pickup measurements independent of the downloadable release.
 COCO_PATCH_PINS = {
@@ -195,6 +196,8 @@ def carried_sources(package):
         result["objects"] = object_source
     if "finish" not in result and (content, None, None) in content_capability.USF_FINISH_RULINGS:
         result["finish"] = latest
+    if content_capability.exact_versioned_finish(package) is not None:
+        result.pop("finish", None)
     return result
 
 
@@ -237,17 +240,16 @@ def wire_sources(plan):
 
 
 def room_version(plan):
-    """Catalog v5 adds only Boost terms for the Arabian Heights packages."""
+    """Use a new finish catalog only when the room has the corresponding Boost rules."""
     from . import content_capability
 
-    if RULING_VERSION != ARABIAN_BOOST_VERSION:
+    if RULING_VERSION != DECK_FINISH_VERSION:
         return RULING_VERSION
-    if plan.get("capability", {}).get("boost_mode"):
-        contents = {package["content_id"] for package in plan["packages"]}
-        if any(len(key) == 4 and key[-1] == ARABIAN_BOOST_VERSION and key[0] in contents
-               for key in content_capability.USF_FINISH_RULINGS):
-            return ARABIAN_BOOST_VERSION
-    return BASE_RULING_VERSION
+    if not plan.get("capability", {}).get("boost_mode"):
+        return BASE_RULING_VERSION
+    contents = {package["content_id"] for package in plan["packages"]}
+    return max((row[-1] for row in content_capability.USF_FINISH_RULINGS
+                if len(row) == 4 and row[0] in contents), default=BASE_RULING_VERSION)
 
 
 def requires_pinned_lookup(plan):

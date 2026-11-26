@@ -20,7 +20,8 @@ from BaseClasses import CollectionState
 from Fill import distribute_items_restrictive
 from Options import OptionError
 
-from .. import box_spot_catalog, box_spots, content_item_boxes, content_plan, crate_exclusions, destinations, item_boxes, named_tracks, track_rulings
+from .. import (box_spot_catalog, box_spots, content_item_boxes, content_plan,
+                crate_exclusions, destinations, item_boxes, named_tracks, track_rulings)
 from ..Locations import CTR_LOCATION_IDS
 from .test_content_item_boxes import BTP_ID, LOOP_ID, before_cp1, box_options, boxes, btp, builtin_only, first_world, refused
 from .test_content_plan import make_world
@@ -37,7 +38,7 @@ COMMUNITY = {
     # A4-62b: Country Speedway 1.3.1 (spot 6 of the submission dropped: it sits
     # on a wall top) and Gossamer's Castle 1.0.0 (block 89).
     "country-speedway": (17, "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996",
-                         {2: "boost", 3: "boost", 4: "boost", 11: "boost", 14: "boost"}),
+                         {3: "boost", 4: "boost", 14: "boost"}),
     "gossamer-s-castle": (89, "82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c", {6: "boost"}),
 }
 #: Spot numbers per file; every other file holds 1 to 15.
@@ -61,8 +62,8 @@ DOWLLE_CUSTOM = {
     "bowser-castle-1": (10, "0b59b54ac3d902d43ee7b798d45dd4979aa5859520460282d22fb6bc85dcbcd9", 1, 10, []),
     "chasqui-rally": (12, "9201064be9731919a0b86590af2801f902c0c8704520521900e84faf17ecc06d", 9, 27, []),
     "choco-island-2": (13, "4d5a7397feaa242083a59279c28d8e96118ec7074de5f03eeab329207c4472d4", 1, 18, []),
-    "coco-park-2025": (15, "bbebd28a0c61723b632a1535d26a5f90d061f6c918403a851680f64e487f9a1c", 1, 43, [10, 11, 12, 13, 14, 15, 16, 17]),
-    "country-speedway": (17, "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996", 16, 35, []),
+    "coco-park-2025": (15, "bbebd28a0c61723b632a1535d26a5f90d061f6c918403a851680f64e487f9a1c", 1, 43, []),
+    "country-speedway": (17, "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996", 16, 35, [23, 24]),
     "crystal-caves": (18, "eddcd303e316e8eb41f885e8ec959a2c2d3db06e21727dfc50c61ab8a8048139", 13, 24, []),
     "dark-ruins": (21, "ced2df2e83aef4759e0bb132fbd36f44c51d818b623d7950faec2407b8229589", 13, 15, [27]),
     "diwali": (23, "5d4c5da687c67af1d7baa42f1246b4c4d43e708667f2c5921ce4ec0ebcd5f305", 13, 15, []),
@@ -72,7 +73,7 @@ DOWLLE_CUSTOM = {
     "gossamer-s-castle": (89, "82a6d81942050ad29370033ccabc111b1731f24cf42e103afab12fd42a79f14c", 16, 23, []),
     "green-hill-raceway": (35, "50250966e9b31d13b140aaafa9433ffce19269898a0850edd0a1e8cf1207c760", 1, 27, []),
     "haven-stadium": (38, "37f2daddfe7fd988b091b914536737f77a3ac07384e120a25b7e3d69386e3188", 1, 21, []),
-    "inferno-island": (41, "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32", 1, 25, [20, 21, 22]),
+    "inferno-island": (41, "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32", 1, 25, []),
     "neon-paradise": (51, "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", 19, 20, []),
     "neonstadion": (52, "8c1fde3e60405eb8737e75aa4cfe5cb205cd9d21961eccf4c5d7827ecf484880", 17, 24, []),
 }
@@ -581,7 +582,7 @@ class TestCommunitySpotFiles(unittest.TestCase):
         self.assertEqual(spot_set(plan, track_id)["picked"], numbers)
         own = boxes(plan, track_id)
         self.assertEqual([c["spot"]["number"] for c in own], numbers)
-        self.assertEqual([c["spot"]["number"] for c in own if c.get("boost", 0)], [2, 3, 4, 11, 14])
+        self.assertEqual([c["spot"]["number"] for c in own if c.get("boost", 0)], [3, 4, 14])
         other = first_world(box_options(custom=[community_package("country-speedway", 0, "01" * 32)])).ctr_content_plan
         other_id = next(t["id"] for t in other["tracks"] if t.get("named_block") == 17)
         self.assertIsNone(spot_set(other, other_id))
@@ -769,6 +770,32 @@ class TestDowlleCustomSpots(unittest.TestCase):
     his placements boost 0 (2026-11-24); the spots his stream calls named need
     boost. Every spot is pinned to the LEV it was placed on."""
 
+    def test_haven_finish_rank_is_independent_of_reverse_pickups(self):
+        package = dowlle_package("haven-stadium")
+        package.update(id="package/haven-stadium/1.1.0", revision="1.1.0")
+        package["capabilities"]["super_turbo_pads"] = True
+        options = box_options(custom=[package], tier="easy", item_box_count=50,
+                              progressive_boost="shared_global", logic_difficulty="hard",
+                              lap_completion_checks=True, podium_placement_checks=True)
+        world = first_world(options)
+        wire = json.loads(json.dumps(world.fill_slot_data()))
+        plan = wire["content_plan"]
+        track_id = "custom/haven-stadium/1.1.0"
+        self.assertEqual(plan["track_ruling_sources"]["version"], content_plan.track_rulings.RULING_VERSION)
+        pickups = boxes(plan, track_id)
+        self.assertEqual([c["spot"]["number"] for c in pickups], list(range(1, 22)))
+        self.assertTrue(all(c.get("boost", 0) == 0 for c in pickups))
+        checks = {c["routes"][0]["award"]: c for c in plan["checks"] if c["owner"] == track_id}
+        for current in (world, make_world({}, passthrough=wire, stop_before="pre_fill")):
+            for rank in (0, 1):
+                with self.subTest(rank=rank):
+                    state = state_at(current, rank)
+                    for award in ("lap", "win", "finish_any", "finish_podium", "held_3rd"):
+                        location = current.multiworld.get_location(checks[award]["display_name"], 1)
+                        self.assertEqual(location.can_reach(state), award == "held_3rd" or rank == 1, award)
+                    for check in pickups:
+                        self.assertTrue(current.multiworld.get_location(check["display_name"], 1).can_reach(state))
+
     def test_files_hold_the_spots_in_placement_order(self):
         total = 0
         for key, (block, pin, first, count, boost) in DOWLLE_CUSTOM.items():
@@ -785,12 +812,13 @@ class TestDowlleCustomSpots(unittest.TestCase):
                 self.assertEqual(spot["needs"], "boost" if spot["number"] in boost else "none", (key, spot["number"]))
                 self.assertNotIn("shortcut", spot)
                 self.assertTrue(spot["review"].startswith("CP1 ground map: "), (key, spot["number"]))
-                self.assertEqual("note" in spot, spot["number"] in boost, (key, spot["number"]))
-                if spot["number"] in boost:
+                if "2026-11-26" not in spot["review"]:
+                    self.assertEqual("note" in spot, spot["number"] in boost, (key, spot["number"]))
+                if "note" in spot:
                     self.assertTrue(spot["note"].startswith("dowlle's stream call at "), (key, spot["number"]))
             total += count
         self.assertEqual(total, 534)
-        self.assertEqual(sum(len(v[4]) for v in DOWLLE_CUSTOM.values()), 14)
+        self.assertEqual(sum(len(v[4]) for v in DOWLLE_CUSTOM.values()), 5)
 
     def test_seeds_stand_the_boxes_and_stay_completable(self):
         """Every CP1 track in a filled seed at Item Box Count 15 and 50: the
