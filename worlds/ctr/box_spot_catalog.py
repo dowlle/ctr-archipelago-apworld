@@ -103,6 +103,10 @@ def check_draft_file(doc, path="<file>"):
             _fail(path, f"spot {n}: rot_y must be a signed 16-bit engine angle")
         if spot.get("needs", DEFAULT_NEEDS) not in NEEDS:
             _fail(path, f"spot {n}: needs must be none, boost, usf or blue_fire")
+        if spot.get("needs") == "blue_fire" and track["kind"] != "custom":
+            # The retail fallback tables (box_spots._retail_tables) have no
+            # Blue Fire filter, so rank 3 stays on custom files.
+            _fail(path, f"spot {n}: needs blue_fire is only for custom tracks")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):

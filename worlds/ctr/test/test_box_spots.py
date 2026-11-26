@@ -900,7 +900,8 @@ class TestToastyDeckSpots(unittest.TestCase):
 
     def test_boost_rule_spots_exist_only_with_blue_fire(self):
         from .test_toasty_terrace import TRACK
-        cases = (("off", False), ("shared_global", False), ("shared_global", True), ("per_character", True))
+        cases = (("off", False), ("off", True), ("shared_global", False), ("shared_global", True),
+                 ("per_character", True))
         for mode, blue in cases:
             with self.subTest(mode=mode, blue_fire=blue):
                 world = make_world(self.options(item_box_count=50, progressive_boost=mode,
@@ -910,7 +911,9 @@ class TestToastyDeckSpots(unittest.TestCase):
                 self.assertTrue(content_plan.validate(plan))
                 record = spot_set(plan, TRACK)
                 self.assertEqual(record["lev_sha256"], TOASTY_130_LEV)
-                expected = TOASTY_NUMBERS if blue else [n for n in TOASTY_NUMBERS if n not in TOASTY_BLUE_FIRE]
+                # Blue Fire does nothing without Progressive Boost (capability record).
+                expected = (TOASTY_NUMBERS if blue and mode != "off"
+                            else [n for n in TOASTY_NUMBERS if n not in TOASTY_BLUE_FIRE])
                 self.assertEqual((record["pool"], record["picked"]), (len(expected), expected))
                 checks = boxes(plan, TRACK)
                 self.assertEqual([c["spot"]["number"] for c in checks], expected)
@@ -930,7 +933,18 @@ class TestToastyDeckSpots(unittest.TestCase):
         self.assertTrue(all(c.get("boost", 0) == 0 for c in boxes(plan, TRACK)))
 
     def test_full_fill_and_boost_3_gate(self):
-        world = make_world(self.options(item_box_count=50, progressive_boost="shared_global",
+        for mode in ("shared_global", "per_character"):
+            with self.subTest(mode=mode):
+                self._fill_and_gate(mode)
+
+    def test_blue_fire_is_refused_on_a_retail_file(self):
+        doc = copy.deepcopy(box_spots.RETAIL_FILES[0]["doc"])
+        doc["spots"][0]["needs"] = "blue_fire"
+        with self.assertRaises(box_spots.SpotFileError):
+            box_spot_catalog.check_draft_file(doc)
+
+    def _fill_and_gate(self, mode):
+        world = make_world(self.options(item_box_count=50, progressive_boost=mode,
                                         progressive_boost_blue_fire=True, accessibility="full"), seed=5)
         distribute_items_restrictive(world.multiworld)
         self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
