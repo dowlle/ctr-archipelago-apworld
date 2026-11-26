@@ -29,7 +29,7 @@ INDEX_PATH = "data/box_spots/index.json"
 PROVENANCE_PATH = "data/box_spots/provenance.json"
 # Digest of the reviewed, canonical JSON evidence. Keep this approval separate
 # from the catalog data so editing a source record cannot approve its own kind.
-REVIEWED_PROVENANCE_SHA256 = "173aab3bf16ba7b3786079a871ffeb218dee4edbf5f068bdb52a37834230cd55"
+REVIEWED_PROVENANCE_SHA256 = "60825d88a3a9952dea5b9139341667689baaff52ee477db0f6d55a0cf057e07c"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
