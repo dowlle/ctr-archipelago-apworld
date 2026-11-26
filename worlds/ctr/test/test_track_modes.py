@@ -80,6 +80,68 @@ class TestModesByCapability(unittest.TestCase):
                                  "custom/fixture-loop/2.1": ["trophy", "relic"],
                                  "custom/relic-loop/1": ["relic"]})
 
+    def test_placed_letters_require_opt_in_and_both_file_pins(self):
+        package = copy.deepcopy(UNKNOWN)
+        package.update(id="package/assembly-lane-n-gage/2.1",
+                       content_id="assembly-lane-n-gage", display_name="Assembly Lane N-Gage",
+                       evidence=[])
+        package["capabilities"].update(relic=False, ctr_tokens=False)
+        package.pop("relic_targets")
+        package["files"][0]["sha256"] = "b646db4e5564827ca228f08c3f9159593790203ab57b5bf8244bcc909353edae"
+        package["files"][1]["sha256"] = "2620d0f6b92d23497962ac1dcfa0dd6f283d44057a67918f72aa85db943aa723"
+        options = mode_options(custom=[package])
+        options.update(lettersanity="locations_and_items", letters_per_track=3)
+        for placed, origin, matches in [(False, True, True), (True, True, True),
+                                        (True, False, True), (True, True, False)]:
+            with self.subTest(placed=placed, origin=origin, matches=matches):
+                package["files"][1]["sha256"] = (
+                    "2620d0f6b92d23497962ac1dcfa0dd6f283d44057a67918f72aa85db943aa723"
+                    if matches else "00" * 32)
+                world = make_world(dict(options, placed_track_letters=placed, track_origin_letters=origin))
+                plan = world.ctr_content_plan
+                track = next(t for t in plan["tracks"] if t["origin"] == "custom")
+                active = placed and matches
+                self.assertEqual(track["modes"], ["trophy", "ctr"] if active else ["trophy"])
+                self.assertEqual("placed_track_letters_v1" in plan["required_features"], active)
+                self.assertEqual(track.get("letters"), "CNK" if active and origin else None)
+                self.assertTrue(content_plan.validate(plan))
+                wire = world.fill_slot_data()
+                self.assertEqual(make_world({}, passthrough=wire).fill_slot_data(), wire)
+                if active and not origin:
+                    forged = copy.deepcopy(plan)
+                    next(t for t in forged["tracks"] if t.get("placed_letters"))["letters"] = "CTR"
+                    with self.assertRaisesRegex(OptionError, "invalid placed letter revision"):
+                        content_plan.validate(forged)
+
+    def test_remaining_ngage_challenges_keep_named_checks(self):
+        revisions = (
+            ("android-alley-n-gage", "Android Alley N-Gage",
+             "a06bbb0a6c171b702166271b1024830b7a12b3c1faf43477b1e28f218585665a",
+             "f13d8a876620f92bc69407f5de3d4b89eee93f9cbda0abc862529608f353c042", 35200400),
+            ("deep-sea-driving-n-gage", "Deep Sea Driving N-Gage",
+             "9a94ba597c53d5ca62f9d16a3622f713b1455ab48e9b93a7e22d5dc0b043fed8",
+             "285e03d7b414b98b73711bb08a8e96d1f6a1f1bbbb3e95a418a92c3aee8f88c8", 35204400),
+        )
+        for key, title, lev, vrm, base in revisions:
+            package = copy.deepcopy(UNKNOWN)
+            package.update(id=f"package/{key}/1.0.0", content_id=key, revision="1.0.0",
+                           display_name=title, evidence=[])
+            package["capabilities"].update(relic=False, ctr_tokens=False)
+            package.pop("relic_targets")
+            package["files"][0]["sha256"] = lev
+            package["files"][1]["sha256"] = vrm
+            options = mode_options(custom=[package])
+            for origin, slots in [(True, (11, 154, 151)), (False, (11, 12, 13))]:
+                with self.subTest(track=key, origin=origin):
+                    plan = make_world(dict(options, placed_track_letters=True, track_origin_letters=origin,
+                                           lettersanity="locations_and_items",
+                                           letters_per_track=3)).ctr_content_plan
+                    track = next(t for t in plan["tracks"] if t["origin"] == "custom")
+                    self.assertTrue(track["placed_letters"])
+                    self.assertEqual(track.get("letters"), "CNK" if origin else None)
+                    checks = {c["location"] for c in plan["checks"] if c["owner"] == track["id"]}
+                    self.assertTrue({base + offset for offset in (9, *slots)} <= checks)
+
     def test_relic_needs_a_lap_graph(self):
         d = relic_only()
         d["capabilities"]["time_trial"] = False

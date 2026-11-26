@@ -528,9 +528,16 @@ class RelicPerfectChecks(Toggle):
 
 
 class TrackOriginLetters(DefaultOnToggle):
-    """Use the origin game's letters on verified custom tracks that ship those models."""
+    """Use the origin game's letters on verified custom tracks with matching
+    models or supported letter placements."""
     display_name = "Track Origin Letters"
     # The emitted track code is already shown in the content-plan spoiler.
+    visibility = Visibility.all & ~Visibility.spoiler
+
+
+class PlacedTrackLetters(Toggle):
+    """Enable CTR Challenges using client-placed letters on supported custom track revisions."""
+    display_name = "Placed Track Letters"
     visibility = Visibility.all & ~Visibility.spoiler
 
 
@@ -1863,6 +1870,7 @@ class ctrAPOptions(PerGameCommonOptions):
     relic_perfect_checks: RelicPerfectChecks
     lettersanity: Lettersanity
     track_origin_letters: TrackOriginLetters
+    placed_track_letters: PlacedTrackLetters
     letters_per_track: LettersPerTrack
     cup_sweep_checks: CupSweepChecks
     lap_completion_checks: LapCompletionChecks
@@ -1936,7 +1944,7 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, LettersPerTrack, CupSweepChecks,
+    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, PlacedTrackLetters, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],

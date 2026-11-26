@@ -2,11 +2,14 @@
   "format": 1,
   "registry": {
     "repository": "https://github.com/dowlle/ctr-track-registry",
-    "commit": "a92f7189fa1705714ff40132d270f5af10f4d483",
-    "digest": "30e3a4be7f69ff9e65448086e3097a24ea898f9cacc2b8778882b2774b353aac"
+    "commit": "af651e617b53e76d72c777bb14132dc5bbc4fd39",
+    "digest": "afa520c9795d8ab694ddbf4952a94ad9702098f11d34e8ac0ff2be2193dca27c"
   },
   "credits": {
     "acid-lake": [
+      "Lolothesamurai"
+    ],
+    "acropolis": [
       "Lolothesamurai"
     ],
     "ancient-lake": [
@@ -167,6 +170,9 @@
     ],
     "neonstadion": [
       "Lolothesamurai"
+    ],
+    "nina-s-nightmare": [
+      "Lockheart"
     ],
     "north-pole": [
       "Lockheart"
