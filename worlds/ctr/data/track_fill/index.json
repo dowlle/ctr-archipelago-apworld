@@ -135,6 +135,12 @@
       "fill_sha256": "945fe3e87808942e93005e00e167e0073b706cb117ebb4626e919dd50655c033"
     }
   },
+  "mario-circuit-1": {
+    "a9c8989b857d547eec29b0728899c8f34a878401c2c6dfb2a4b49b9301ab4e83": {
+      "laps": 3,
+      "fill_sha256": "f468c245be9be11be0fb773653e84305af951bc194deda347090c85ae689ef9a"
+    }
+  },
   "neon-paradise": {
     "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d": {
       "laps": 3,
@@ -180,11 +186,11 @@
   "skater-s-retreat": {
     "80325e45c0fbc8203c99f82709a919d68e417dacbdb8134298ccd10bfeee8130": {
       "laps": 3,
-      "fill_sha256": "bc7d2a7f24d5adc4fb9a83f702c18e0897e31025ddcd71ca999cdc6d5681c12f"
+      "fill_sha256": "cb6677022d2744618cc9e7a74191c1c69b6e64796476516bcb7a9a34a46e3d6a"
     },
     "a728c5b1846323d544e5b973a00931d2cceb1f0a67cba5ee5752befcd4aaa4a9": {
       "laps": 3,
-      "fill_sha256": "677f05cbb64f19d292a2813a273c66428182053516afb14f3f714c1065802b53"
+      "fill_sha256": "210a88091390bf922dd2d869632a82aa80d6e15c5917b951fb57d72b939a6b48"
     }
   },
   "snowy-valley": {

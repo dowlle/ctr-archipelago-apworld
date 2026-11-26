@@ -68,6 +68,7 @@ def validate(fill, lev_sha, laps):
     if type(donors) is not list or not 1 <= len(donors) <= 2:
         raise ValueError("track fill requires one or two donors")
     seen = {lev_sha}
+    has_ruled_donor = False
     for donor in donors:
         if (not _fields(donor, ("lev_sha256", "road_sha256", "kind", "overlap"))
                 or not _sha(donor["lev_sha256"]) or donor["lev_sha256"] in seen
@@ -75,11 +76,13 @@ def validate(fill, lev_sha, laps):
             raise ValueError("invalid track fill donor identity")
         seen.add(donor["lev_sha256"])
         overlap = donor["overlap"]
+        kind = donor["kind"]
         # Overlap is in hundred-thousandths to keep the wire integer-only.
-        if (not _int(overlap, 95000, 100000)
-                or donor["kind"] not in ("identical", "similar>=0.95")
-                or (donor["kind"] == "identical" and overlap != 100000)):
-            raise ValueError("track fill requires a same-road donor")
+        if kind == "ruled" and _int(overlap, 1, 94999):
+            has_ruled_donor = True
+        elif not ((kind == "identical" and _int(overlap, 100000, 100000))
+                  or (kind == "similar>=0.95" and _int(overlap, 95000, 100000))):
+            raise ValueError("invalid track fill donor kind or overlap")
     families = fill["families"]
     if not _fields(families, FAMILIES) or any(families[key] != empty for key, empty in EMPTY_FAMILIES.items()):
         raise ValueError("unsupported track fill families")
@@ -88,6 +91,8 @@ def validate(fill, lev_sha, laps):
     if (type(crates) is not list or len(crates) > MAX_CRATES or type(weapons) is not list
             or len(weapons) > MAX_WEAPON_CRATES or not crates and not weapons):
         raise ValueError("invalid time crate set size")
+    if has_ruled_donor and (len(donors) != 1 or crates or families["grid"] is not None):
+        raise ValueError("a ruled weak donor requires a weapon-only fill")
     seen_positions = set()
     for crate in weapons:
         if (not _fields(crate, ("pos", "rot", "rank", "rank_source")) or not _position(crate["pos"])

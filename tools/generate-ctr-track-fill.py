@@ -11,8 +11,9 @@ rank of every donor crate, and optionally donor ordinals to exclude. The donor's
 weapon crates (model 8, instance-table order, full rotation) are copied at
 their exact position and rotation. The target must hold no weapon crate. The fit is
 OV1's 512-unit neighbourhood rule ("strict"), keeping the crates that pass, or
-"ruled" where dowlle placed a whole layout: every crate must then stand on
-ground at the donor's height, and the report lists the strict rule's misses. A weapon family
+"ruled" for an explicitly approved layout: a weaker donor may be used for
+weapon crates, but every kept crate must still have ground at the donor's
+height. The report lists the strict rule's misses. A weapon family
 joins any time crate family of the same LEV in one file.
 """
 
@@ -131,16 +132,27 @@ def generate(args, fill_module, analyze, np):
         # each crate must still be there at the same height.
         return grounded if ruled else bool(nearby and nearby == target_nearby and grounded)
 
-    def donor_info(target, one):
+    def supported_position(target, pos):
+        ground = analyze.measure(pos, *collision(target)[2])
+        # Crate origins are quantized to integer LEV coordinates.
+        return ground["horizontal"] <= 1 and -1 <= ground["dy"] <= 384
+
+    def donor_info(target, one, *, ruled=False):
         source = geometry(one)
         target_geo = geometry(target)
         if source["road_sha"] and source["road_sha"] == target_geo["road_sha"]:
             kind, overlap = "identical", 1.0
         else:
             comparison = analyze.compare(source, target_geo)
-            if not comparison or comparison["road"] < 0.95:
+            if not comparison:
                 return None
-            kind, overlap = "similar>=0.95", comparison["road"]
+            overlap = comparison["road"]
+            if overlap >= 0.95:
+                kind = "similar>=0.95"
+            elif ruled and overlap > 0:
+                kind = "ruled"
+            else:
+                return None
         return dict(lev_sha256=one, road_sha256=source["road_sha"], kind=kind, overlap=round(overlap * 100000))
 
     def matched_donors(target, candidates):
@@ -236,7 +248,10 @@ def generate(args, fill_module, analyze, np):
         if not laps:
             entry["status"] = "no verified lap count"
             continue
-        info = donor_info(target, donor)
+        ruled = spec["fit"] == "ruled"
+        if ruled:
+            entry["ruling"] = spec["ruling"]
+        info = donor_info(target, donor, ruled=ruled)
         if inventory[target]["weapon"] or weapon_crates(target):
             entry["status"] = "target already has weapon crates"
             continue
@@ -246,13 +261,18 @@ def generate(args, fill_module, analyze, np):
             continue
         # Donor ordinals an earlier review dropped from this layout stay out.
         excluded = set(spec.get("exclude", ()))
-        passed = [n not in excluded and safe_position(donor, target, pos, spec["fit"] == "ruled")
+        weak = info["kind"] == "ruled"
+        if weak and not any(track == key and sha == target for track, _, sha in registry_pins):
+            entry["status"] = "weak donor target is not pinned to this track"
+            continue
+        passed = [n not in excluded and safe_position(donor, target, pos, ruled)
+                  and (not weak or supported_position(target, pos))
                   for n, (pos, _) in enumerate(crates, 1)]
         strict = [safe_position(donor, target, pos) for pos, _ in crates]
         entry.update(kept=sum(passed), total=len(crates), overlap=info["overlap"],
                      dropped=[n for n, ok in enumerate(passed, 1) if not ok],
                      strict_fit_failed=[n for n, ok in enumerate(strict, 1) if not ok])
-        if spec["fit"] == "ruled" and not all(passed):
+        if ruled and not weak and not all(passed):
             entry["status"] = "ruled layout no longer fits"
             continue
         weapons = [dict(pos=pos, rot=rot, rank=rank["rank"], rank_source=rank["rank_source"])

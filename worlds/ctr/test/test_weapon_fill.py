@@ -61,6 +61,30 @@ def test_day_fill_is_nights_layout_with_the_published_spot_ranks():
     assert track_fill.bundled(DAY, DAY_LEV, 5) is None
 
 
+def test_mario_accepts_a_ruled_weak_donor_for_weapon_crates_only():
+    pin = "a9c8989b857d547eec29b0728899c8f34a878401c2c6dfb2a4b49b9301ab4e83"
+    fill = track_fill.bundled("mario-circuit-1", pin, 3)
+    donor, = fill["donors"]
+    assert donor["lev_sha256"] == "fb7119f056178beff7b48ca13c63a5893b0146ef527973f71b5fc57b3cf80766"
+    assert (donor["kind"], donor["overlap"]) == ("ruled", 90907)
+    assert len(fill["families"]["weapon_crates"]) == 8
+    assert track_fill.bundled("mario-circuit-1", "f" * 64, 3) is None
+
+    changed = copy.deepcopy(fill)
+    changed["donors"][0]["kind"] = "similar>=0.95"
+    changed["fill_sha256"] = track_fill.payload_sha256(changed)
+    with pytest.raises(ValueError, match="donor kind or overlap"):
+        track_fill.validate(changed, pin, 3)
+
+    changed = copy.deepcopy(fill)
+    changed["families"]["time_crates"] = [{"pos": [0, 0, 0], "type": 1}]
+    changed["counts"]["time_crates"] = 1
+    changed["relic_targets"] = dict(sapphire=3, gold=2, platinum=1, source="saphi", laps=3)
+    changed["fill_sha256"] = track_fill.payload_sha256(changed)
+    with pytest.raises(ValueError, match="weapon-only"):
+        track_fill.validate(changed, pin, 3)
+
+
 @pytest.mark.parametrize("change", ["time_targets", "duplicate", "rank_source", "family"])
 def test_weapon_rows_are_closed(change):
     fill = copy.deepcopy(track_fill.bundled(DAY, DAY_LEV, 3))
