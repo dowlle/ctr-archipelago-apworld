@@ -25,8 +25,8 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "d9e05b2f1adc8eaccc2b96d628b300cfae5d09db"
-REGISTRY_DIGEST = "d73e4c55e6977b2fcfd2dba63e1167e719ab4943902556bfedf360dd2f1d00ae"
+REGISTRY_COMMIT = "af651e617b53e76d72c777bb14132dc5bbc4fd39"
+REGISTRY_DIGEST = "afa520c9795d8ab694ddbf4952a94ad9702098f11d34e8ac0ff2be2193dca27c"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")
@@ -209,12 +209,12 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(doc["registry"], {"repository": "https://github.com/dowlle/ctr-track-registry",
                                            "commit": REGISTRY_COMMIT, "digest": REGISTRY_DIGEST})
         blocks = [row["block_index"] for row in doc["tracks"]]
-        self.assertEqual(blocks, sorted(set(range(90)) - {14, 16, 68}))
+        self.assertEqual(blocks, sorted(set(range(92)) - {14, 16, 68}))
         keys = {row["track_key"] for row in doc["tracks"]}
         # 14 and 68 are `reserved` (hubs, no race mode confirmed); 16 is
         # `builtin` (the hard-coded Cortex Vortex block).
         self.assertFalse(keys & {"christmas-hub", "st-patricks-day-hub-world", "cortex-vortex"})
-        self.assertEqual(len(nt.NAMED_TRACKS), 87)
+        self.assertEqual(len(nt.NAMED_TRACKS), 89)
 
     def test_offset_layout_of_the_0_3_0_step(self):
         self.assertEqual(L["Baby T Park: Cup Leg Victory"], nt.location_code(8, "cup_leg_victory"))

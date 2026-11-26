@@ -181,6 +181,16 @@
       "review": "verified"
     },
     "android-alley-n-gage": {
+      "letter_placements": {
+        "a06bbb0a6c171b702166271b1024830b7a12b3c1faf43477b1e28f218585665a": {
+          "vrm_sha256": "f13d8a876620f92bc69407f5de3d4b89eee93f9cbda0abc862529608f353c042",
+          "slots": [
+            {"x": 1899, "y": 366, "z": 14310, "yaw": 2375},
+            {"x": 9027, "y": 335, "z": 22310, "yaw": 1024},
+            {"x": -5464, "y": 195, "z": 14482, "yaw": 2167}
+          ]
+        }
+      },
       "evidence": [
         {
           "note": "Anfrost identifies the N-Gage version of Android Alley as the source.",
@@ -309,6 +319,16 @@
       "review": "verified"
     },
     "deep-sea-driving-n-gage": {
+      "letter_placements": {
+        "9a94ba597c53d5ca62f9d16a3622f713b1455ab48e9b93a7e22d5dc0b043fed8": {
+          "vrm_sha256": "285e03d7b414b98b73711bb08a8e96d1f6a1f1bbbb3e95a418a92c3aee8f88c8",
+          "slots": [
+            {"x": 13746, "y": 324, "z": 1451, "yaw": 3875},
+            {"x": 11124, "y": 1344, "z": -17730, "yaw": 3461},
+            {"x": 474, "y": 245, "z": -11779, "yaw": 2318}
+          ]
+        }
+      },
       "evidence": [
         {
           "note": "Course title: Deep Sea Driving N-Gage.",

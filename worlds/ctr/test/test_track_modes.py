@@ -113,6 +113,35 @@ class TestModesByCapability(unittest.TestCase):
                     with self.assertRaisesRegex(OptionError, "invalid placed letter revision"):
                         content_plan.validate(forged)
 
+    def test_remaining_ngage_challenges_keep_named_checks(self):
+        revisions = (
+            ("android-alley-n-gage", "Android Alley N-Gage",
+             "a06bbb0a6c171b702166271b1024830b7a12b3c1faf43477b1e28f218585665a",
+             "f13d8a876620f92bc69407f5de3d4b89eee93f9cbda0abc862529608f353c042", 35200400),
+            ("deep-sea-driving-n-gage", "Deep Sea Driving N-Gage",
+             "9a94ba597c53d5ca62f9d16a3622f713b1455ab48e9b93a7e22d5dc0b043fed8",
+             "285e03d7b414b98b73711bb08a8e96d1f6a1f1bbbb3e95a418a92c3aee8f88c8", 35204400),
+        )
+        for key, title, lev, vrm, base in revisions:
+            package = copy.deepcopy(UNKNOWN)
+            package.update(id=f"package/{key}/1.0.0", content_id=key, revision="1.0.0",
+                           display_name=title, evidence=[])
+            package["capabilities"].update(relic=False, ctr_tokens=False)
+            package.pop("relic_targets")
+            package["files"][0]["sha256"] = lev
+            package["files"][1]["sha256"] = vrm
+            options = mode_options(custom=[package])
+            for origin, slots in [(True, (11, 154, 151)), (False, (11, 12, 13))]:
+                with self.subTest(track=key, origin=origin):
+                    plan = make_world(dict(options, placed_track_letters=True, track_origin_letters=origin,
+                                           lettersanity="locations_and_items",
+                                           letters_per_track=3)).ctr_content_plan
+                    track = next(t for t in plan["tracks"] if t["origin"] == "custom")
+                    self.assertTrue(track["placed_letters"])
+                    self.assertEqual(track.get("letters"), "CNK" if origin else None)
+                    checks = {c["location"] for c in plan["checks"] if c.get("track_id") == track["id"]}
+                    self.assertTrue({base + offset for offset in (9, *slots)} <= checks)
+
     def test_relic_needs_a_lap_graph(self):
         d = relic_only()
         d["capabilities"]["time_trial"] = False
