@@ -1,0 +1,32 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "neonstadion", "name": "Neonstadion", "lev_sha256": ["8c1fde3e60405eb8737e75aa4cfe5cb205cd9d21961eccf4c5d7827ecf484880"]},
+  "spots": [
+    {"number": 17, "pos": [4154, 28, 676], "rot_y": 797, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 997]},
+    {"number": 18, "pos": [6050, 32, 4017], "rot_y": 86, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 998]},
+    {"number": 19, "pos": [4190, 19, 6507], "rot_y": 3138, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 999]},
+    {"number": 20, "pos": [-829, -48, 5677], "rot_y": 2784, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1000]},
+    {"number": 21, "pos": [-2798, 828, 2644], "rot_y": 2131, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1001]},
+    {"number": 22, "pos": [-2576, 1136, 4], "rot_y": 2049, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1002]},
+    {"number": 23, "pos": [-852, -80, -4470], "rot_y": 1093, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1003]},
+    {"number": 24, "pos": [3468, -12, -2659], "rot_y": 517, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1004]},
+    {"number": 25, "pos": [7300, 664, -2678], "rot_y": 1319, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1005]},
+    {"number": 26, "pos": [6939, -94, -8306], "rot_y": 2594, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1006]},
+    {"number": 27, "pos": [1068, 248, -9851], "rot_y": 3873, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1007]},
+    {"number": 28, "pos": [-3475, 48, -8217], "rot_y": 2578, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1008]},
+    {"number": 29, "pos": [-5202, -47, -9624], "rot_y": 2686, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1009]},
+    {"number": 30, "pos": [-7650, -4, -10286], "rot_y": 3097, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1010]},
+    {"number": 31, "pos": [-7965, -1101, -3132], "rot_y": 822, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1011]},
+    {"number": 32, "pos": [-5271, -1188, 34], "rot_y": 4107, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1012]},
+    {"number": 33, "pos": [-6755, -870, 6275], "rot_y": 3513, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1013]},
+    {"number": 34, "pos": [-12360, -363, 4217], "rot_y": 270, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1014]},
+    {"number": 35, "pos": [-14239, -472, 7025], "rot_y": 2929, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1015]},
+    {"number": 36, "pos": [-17981, 187, 2414], "rot_y": 1938, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1016]},
+    {"number": 37, "pos": [-16271, 712, -2403], "rot_y": 1394, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1017]},
+    {"number": 38, "pos": [-11477, 963, -2418], "rot_y": 544, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1018]},
+    {"number": 39, "pos": [-7466, 1, 692], "rot_y": 1075, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1019]},
+    {"number": 40, "pos": [-2430, -354, 0], "rot_y": 1052, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-neonstadion", 1020]}
+  ],
+  "retired": []
+}
