@@ -70,7 +70,7 @@ class TestOptionSet(unittest.TestCase):
         self.assertEqual(len(grouped), len(set(grouped)))
         hints = ctrAPOptions.type_hints
         self.assertEqual({cls for name, cls in hints.items() if name in SECTION_2} -
-                         {hints["start_inventory_from_pool"], hints["box_locations"]},
+                         {hints["start_inventory_from_pool"], hints["box_locations"], hints["character_looks"]},
                          set(grouped))
 
     def test_defaults_are_the_plan_table(self):

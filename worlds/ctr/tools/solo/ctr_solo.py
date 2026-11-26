@@ -499,7 +499,8 @@ def overlay_values(yaml_path: str | None, overlay: dict) -> dict:
 def describe(paths: Paths, yaml_path: str | None = None) -> dict:
     cls = world_class()
     options = [describe_option(name, option)
-               for name, option in cls.options_dataclass.type_hints.items()]
+               for name, option in cls.options_dataclass.type_hints.items()
+               if name != "character_looks"]
     overlay = load_overlay(paths)
     doc = read_player_yaml(yaml_path) if yaml_path else {}
     from worlds.ctr.legacy_yaml import migrate_box_count

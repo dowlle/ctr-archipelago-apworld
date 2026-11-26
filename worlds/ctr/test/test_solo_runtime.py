@@ -208,7 +208,8 @@ class TestDescribe(SoloTestCase):
         result = last(events)
         self.assertEqual(result["event"], "result")
         names = [o["name"] for o in result["options"]]
-        self.assertEqual(set(names), set(ctrAPOptions.type_hints))
+        self.assertNotIn("character_looks", names)
+        self.assertEqual(set(names), set(ctrAPOptions.type_hints) - {"character_looks"})
         overlay = result["overlay"]
         overlay_names = [n for g in overlay["groups"] for n in g["options"]]
         self.assertFalse(set(overlay_names) - set(names), "overlay names an option the world does not have")
@@ -224,7 +225,8 @@ class TestDescribe(SoloTestCase):
 
     def test_every_world_option_is_on_the_screen_or_left_out_with_a_reason(self):
         """Alpha2: Play Solo offers every option that can be a row. A new world
-        option must be placed in a group or named in left_out with its reason."""
+        option in the Solo schema must be placed in a group or named in
+        left_out with its reason."""
         from worlds.ctr.Options import ctrAPOptions
         events, code = self.call("describe")
         self.assertEqual(code, 0, events)
@@ -234,7 +236,8 @@ class TestDescribe(SoloTestCase):
         left_out = overlay["left_out"]
         self.assertEqual(len(shown), len(set(shown)), "an option sits in two groups")
         self.assertFalse(set(shown) & set(left_out), "an option is both shown and left out")
-        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints),
+        self.assertNotIn("character_looks", set(shown) | set(left_out))
+        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints) - {"character_looks"},
                          "place every new option in a group or give it a left_out reason")
         for name, reason in left_out.items():
             self.assertTrue(reason.strip(), name)

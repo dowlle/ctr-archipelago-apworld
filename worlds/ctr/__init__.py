@@ -200,7 +200,8 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
-            from . import content_bosses, content_item_boxes, tizi_madness, track_origins
+            from . import character_looks, content_bosses, content_item_boxes, tizi_madness, track_origins
+            character_looks.park(self)
             content_bosses.garages_off_goal_as_disabled(self.options)
             content_plan.drop_duplicate_tracks(self)
             content_plan.swap_in_bundled_cortex(self)
