@@ -7,6 +7,7 @@ registry snapshot as --registry and supplemental mode descriptors as
 --descriptor when a package uses a separate LEV for its Relic Race.
 """
 import argparse
+from collections import defaultdict
 import hashlib
 import itertools
 import json
@@ -36,25 +37,25 @@ def lev_pin(files):
 
 def audit(registry, descriptors, lev_index):
     from levtool.format import LevFile
-    from worlds.ctr import box_spots, content_item_boxes, crate_exclusions, destinations
+    from worlds.ctr import box_spots, content_item_boxes, crate_exclusions, destinations, track_rulings
 
-    entries = {}
+    entries = defaultdict(set)
     for track in registry["tracks"]:
         for revision in track["revisions"]:
             pin = lev_pin(revision.get("files", {}))
-            modes = {REGISTRY_MODES[m]: pin for m in revision["modes"] if m in REGISTRY_MODES}
+            modes = {(REGISTRY_MODES[m], pin) for m in revision["modes"] if m in REGISTRY_MODES}
             if modes and pin:
-                entries[track["track_key"], revision["revision"], pin] = modes
+                entries[track["track_key"], revision["revision"], pin].update(modes)
     for desc in descriptors:
         pin = lev_pin(desc["files"])
         enabled = desc["capabilities"]
-        modes = entries.setdefault((desc["content_id"], desc["revision"], pin), {})
+        modes = entries[desc["content_id"], desc["revision"], pin]
         if enabled.get("arcade"):
-            modes["trophy"] = pin
+            modes.add(("trophy", pin))
         if enabled.get("ctr_tokens"):
-            modes["ctr"] = pin
+            modes.add(("ctr", pin))
         if enabled.get("relic"):
-            modes["relic"] = lev_pin(desc.get("relic_files", [])) or pin
+            modes.add(("relic", lev_pin(desc.get("relic_files", [])) or pin))
 
     def instances(pin):
         path = Path(lev_index[pin])
@@ -63,27 +64,33 @@ def audit(registry, descriptors, lev_index):
             raise ValueError(f"LEV hash mismatch for {pin}")
         return LevFile.from_path(path).instances
 
+    @track_rulings.generation
+    def fallback_seats(package, crates):
+        limit = content_item_boxes.seat_limit(package)
+        omitted = {row["ordinal"] for row in crate_exclusions.entries(package)}
+        return [(ordinal, index, obj) for ordinal, (index, obj) in enumerate(crates, 1)
+                if ordinal <= limit and ordinal not in omitted]
+
     hits, missing, covered = set(), [], []
     for (key, revision, pin), modes in sorted(entries.items()):
         if not modes:
             continue
-        absent = {main for main in {pin, *modes.values()} if main not in lev_index}
+        absent = {digest for digest in {pin, *(p for _, p in modes)} if digest not in lev_index}
         if absent:
-            missing.append((key, revision, sorted(absent)))
+            missing.append((key, revision, pin, sorted(absent, key=str)))
+        if pin in absent:
             continue
         main = instances(pin)
         crates = [(i, o) for i, o in enumerate(main) if o.model_id == 8]
-        omitted = crate_exclusions.ordinals(pin)
-        limit = content_item_boxes.seat_limit(dict(content_id=key, revision=revision,
-            capabilities={"weapon_crates": len(crates)}, files=[dict(role="lev", sha256=pin)]))
-        seats = [(ord_, index, obj) for ord_, (index, obj) in enumerate(crates, 1)
-                 if ord_ <= limit and ord_ not in omitted]
         authored = box_spots.CUSTOM_FILES.get(destinations.canonical_track_key(key))
         if authored and pin in authored["doc"]["track"]["lev_sha256"]:
             layouts = [[(s["number"], s["pos"], None) for s in authored["doc"]["spots"]]]
         else:
             replacements = box_spots.SEAT_SPOTS.get(pin, {})
             layouts = []
+            package = dict(content_id=key, revision=revision, capabilities={"weapon_crates": len(crates)},
+                           files=[dict(role="lev", sha256=pin)])
+            seats = fallback_seats(package, crates)
             for count in range(1, 1 + min(len(seats), 15)):
                 layout = []
                 for number, s in enumerate(content_item_boxes.seat_indices(len(seats), count), 1):
@@ -92,10 +99,12 @@ def audit(registry, descriptors, lev_index):
                     layout.append((number, replacement["pos"], None) if replacement
                                   else (number, obj.position, index))
                 layouts.append(layout)
-        for mode, mode_pin in sorted(modes.items()):
+        for mode, mode_pin in sorted(modes, key=str):
+            if mode_pin in absent:
+                continue
             table = main if mode_pin == pin else instances(mode_pin)
             objects = [(i, obj) for i, obj in enumerate(table) if obj.model_id in MODELS[mode]]
-            covered.append((key, revision, mode))
+            covered.append((key, revision, mode, pin, mode_pin))
             for boxes in layouts:
                 for number, pos, seat in boxes:
                     for i, obj in objects:
@@ -104,11 +113,11 @@ def audit(registry, descriptors, lev_index):
                         distance = math.dist(pos, obj.position)
                         if distance <= OVERLAP:
                             hits.add((key, revision, pin, mode, number, tuple(pos), i,
-                                      obj.model_id, tuple(obj.position), round(distance, 1)))
+                                      obj.model_id, tuple(obj.position), round(distance, 1), mode_pin))
                 for (a, pos, _), (b, other, _) in itertools.combinations(boxes, 2):
                     distance = math.dist(pos, other)
                     if distance <= OVERLAP:
-                        hits.add((key, revision, pin, mode, a, tuple(pos), b, "AP", tuple(other), round(distance, 1)))
+                        hits.add((key, revision, pin, mode, a, tuple(pos), b, "AP", tuple(other), round(distance, 1), mode_pin))
     return dict(covered=covered, missing=missing, hits=sorted(hits, key=str))
 
 
