@@ -421,3 +421,55 @@ def test_usf_only_free_crates_put_usf_on_the_route():
     content_plan.validate(json.loads(json.dumps(plan)))
     distribute_items_restrictive(world.multiworld)
     assert world.multiworld.fulfills_accessibility(CollectionState(world.multiworld))
+
+
+def test_installed_rules_need_the_free_crates_rank():
+    """Day-only seed 254 seats all eight Boost 0 crates, so its 12 free
+    filled crates all need USF (rank 2): Itemsanity: Bomb and every
+    ordinary Hit check open with the Bomb and two Progressive Boosts, not
+    with one, and never without the Bomb."""
+    world = make_world(day_only(), seed=254)
+    plan = world.ctr_content_plan
+    package, = plan["packages"]
+    track, = plan["tracks"]
+    assert set(content_item_boxes.free_fill_ranks(track, plan["item_boxes"], package)) == {2}
+    from .. import progressive_capability
+    mw, player = world.multiworld, world.player
+    boost = progressive_capability.boost_item_name()
+    bomb = mw.get_location("Itemsanity: Bomb", player)
+    hit = next(mw.get_location(c["display_name"], player) for c in plan["checks"]
+               if c["kind"] == "hit" and all(r["mode"] not in ("boss_race", "boss_cup") for r in c["routes"]))
+    pool = [item for item in mw.itempool if item.player == player]
+    progression = [item for item in pool if item.advancement and item.name not in (boost, "Bomb")]
+    # The boosts stand pre-placed on box locations in this room.
+    boosts = [loc.item for loc in mw.get_locations(player) if loc.item is not None and loc.item.name == boost]
+    assert len(boosts) >= 2
+
+    boosts_held = boosts
+
+    def state_with(count, weapon=True):
+        state = CollectionState(mw)
+        for item in progression + boosts_held[:count]:
+            state.collect(item, True)
+        if weapon:
+            state.collect(next(i for i in pool if i.name == "Bomb"), True)
+        state.sweep_for_advancements(locations=[loc for loc in mw.get_locations(player) if loc.address is None])
+        return state
+
+    assert not bomb.can_reach(state_with(1))
+    assert bomb.can_reach(state_with(2))
+    assert not bomb.can_reach(state_with(2, weapon=False))
+    assert not hit.can_reach(state_with(1)) and hit.can_reach(state_with(2))
+
+
+def test_boss_routes_take_their_venues_rank():
+    package = dict(id="p", capabilities=dict(weapon_crates=0),
+                   fill=dict(families=dict(weapon_crates=[dict(pos=[0, 0, 0], rot=[0, 0, 0], rank=2)])))
+    tracks = [dict(id="t", origin="custom", package_id="p"), dict(id="r", origin="retail")]
+    entries = [dict(id="boss", kind="boss_race", track_id="t"),
+               dict(id="cup", kind="boss_cup", legs=[dict(id="leg:0", track_id="t"), dict(id="leg:1", track_id="r")]),
+               dict(id="retail-boss", kind="boss_race", track_id="r")]
+    plan = dict(capability=dict(boost_mode=1), entries=entries, tracks=tracks, packages=[package], pads=[], checks=[])
+    routes = [dict(entry_id="boss", mode="boss_race", leg_id=None), dict(entry_id="cup", mode="boss_cup", leg_id=None),
+              dict(entry_id="retail-boss", mode="boss_race", leg_id=None)]
+    assert content_global_checks.route_crate_ranks(plan, routes) == [2, 2, 0]

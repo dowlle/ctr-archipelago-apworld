@@ -323,12 +323,21 @@ def route_crate_ranks(plan, routes):
         entry = entries.get(route["entry_id"], {})
         if route["mode"] == content_cups.MODE:
             track_id = next(leg["track_id"] for leg in entry["legs"] if leg["id"] == route["leg_id"])
-        elif entry.get("kind") == "track":
-            track_id = entry["track_id"]
+        elif route["mode"] in content_bosses.MODES and entry.get("legs"):
+            track_id = entry["legs"][0]["track_id"]  # a boss cup: the boss can be hit in its first leg
         else:
-            out.append(0)  # a boss race route: hitting the boss needs no crate
+            track_id = entry.get("track_id")  # a race, or a boss race on its venue
+        if track_id not in tracks:
+            out.append(0)
             continue
-        rank = crate_rank(tracks[track_id], packages, plan.get("item_boxes"), track_id in standalone)
+        # A saved room seats its crates by its own frozen spots, never by
+        # today's catalog (content_item_boxes.FROZEN).
+        from .content_item_boxes import FROZEN, frozen_spots
+        token = FROZEN.set(frozen_spots(plan))
+        try:
+            rank = crate_rank(tracks[track_id], packages, plan.get("item_boxes"), track_id in standalone)
+        finally:
+            FROZEN.reset(token)
         out.append(rank or 0)
     return out
 
@@ -420,9 +429,12 @@ def install(world, check, location, route_tests):
     # encounter's region (garage gate and the race's own requirement); the win
     # check's boost rank is not needed to hit the racer (Rulebook: the player
     # does not need to beat the boss first).
-    boss = tuple(entry for entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
     crate_by_route = dict(zip((id(route) for _entry, _test, route in route_tests),
                               route_crate_ranks(plan, [route for _entry, _test, route in route_tests])))
+    boss = tuple(entry for entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
+    # WF1b: hitting the boss needs a weapon rolled on its venue's filled crates.
+    boss_need = {entry: crate_by_route[id(route)] for entry, _test, route in route_tests
+                 if route["mode"] in content_bosses.MODES}
     for (entry, test, route), (_entry, stage, _route) in zip(route_tests, route_terms):
         if route["mode"] in content_bosses.MODES:
             continue
@@ -476,6 +488,9 @@ def install(world, check, location, route_tests):
             return False
         if boss and any(state.can_reach(region, "Region", player)
                         and (region not in masked or state.has(tizi_madness.MASK_ITEM, player))
+                        and (not boss_need[region]
+                             or progressive_capability.gate_satisfied(world, state, player,
+                                                                      boost_min=boss_need[region]))
                         for region in boss):
             return True
         if fallback_keys is not None:
@@ -494,9 +509,11 @@ def install(world, check, location, route_tests):
              else alternatives(logic_terms.Ref(trigger, player) for trigger in triggers) if triggers
              else logic_terms.TRUE)
     ordinary = logic_terms.And(guest, alternatives(leg_terms))
-    paths = [ordinary] + [logic_terms.ReachRegion(world, region) if region not in masked
-                          else logic_terms.And(logic_terms.ReachRegion(world, region), tizi_madness.mask_term(world))
-                          for region in boss]
+    def boss_path(region):
+        term = (logic_terms.ReachRegion(world, region) if region not in masked
+                else logic_terms.And(logic_terms.ReachRegion(world, region), tizi_madness.mask_term(world)))
+        return term if not boss_need[region] else logic_terms.And(term, logic_terms.Cap(world, boss_need[region], None))
+    paths = [ordinary] + [boss_path(region) for region in boss]
     term = alternatives(paths)
     if weapons:
         term = logic_terms.And(logic_terms.HasAny(hit_character.HIT_METHOD_ITEMS, player), term)
