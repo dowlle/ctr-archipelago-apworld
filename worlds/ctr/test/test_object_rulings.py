@@ -6,7 +6,7 @@ from unittest import mock
 
 from BaseClasses import CollectionState
 from Options import OptionError
-from .. import content_capability, content_plan, object_rulings, sanity, track_rulings
+from .. import box_spots, content_capability, content_plan, object_rulings, sanity, track_rulings
 from .test_content_plan import make_world
 from .test_custom_packages import named_fixture
 from .test_track_checks import check_options
@@ -28,6 +28,29 @@ def options(difficulty="easy", blue=False, boost="shared_global", wumpa="crates"
 
 
 class TestObjectRulings(unittest.TestCase):
+    def test_tv_world_replaced_seats_keep_ids_and_legacy_rooms(self):
+        opts = options()
+        opts["item_box_count"] = 15
+        with mock.patch.dict(box_spots.SEAT_SPOTS, {}, clear=True):
+            legacy = make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data()
+        current = make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data()
+
+        def boxes(wire):
+            return [c for c in wire["content_plan"]["checks"] if c["owner"] == TV and c["kind"] == "box"]
+
+        self.assertEqual([dict((k, v) for k, v in row.items() if k != "spot") for row in boxes(current)],
+                         boxes(legacy))
+        self.assertEqual([c["spot"]["number"] for c in boxes(current) if "spot" in c], [4, 6, 14])
+        self.assertEqual(current["content_plan"]["item_boxes"]["seat_spots"], [{"track_id": TV, "picked": [4, 6, 14]}])
+        for wire in (legacy, current):
+            wire = json.loads(json.dumps(wire))
+            restored = make_world({}, passthrough=wire, stop_before="pre_fill")
+            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        shifted = copy.deepcopy(current)
+        next(c for c in boxes(shifted) if "spot" in c)["spot"]["pos"][0] += 1
+        with self.assertRaisesRegex(OptionError, "reviewed fallback seat"):
+            make_world({}, passthrough=shifted, stop_before="pre_fill")
+
     def test_all_settings_wire_reachability_and_tracker(self):
         for difficulty in ("easy", "medium", "hard"):
             for blue in (False, True):

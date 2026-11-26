@@ -71,6 +71,8 @@ SPOT_FEATURE = box_spots.FEATURE
 COUNT_FEATURE = "box_count_v1"
 KEYS = ("shortcut_knowledge",)
 SPOT_KEY = "spot_sets"
+SEAT_SPOT_KEY = "seat_spots"
+SEAT_SPOT_FEATURE = "seat_spots_v2"
 KIND = "box"
 AWARD = "box"
 ARABIAN_DAY = "arabian-heights-day"
@@ -139,12 +141,36 @@ def add_spot_sets(record, tracks, package_by_id, seed, player):
     excluded = crate_exclusions.records(tracks, package_by_id, {s["track_id"] for s in sets})
     if excluded:
         record[crate_exclusions.KEY] = excluded
+    replacements = reviewed_seat_spot_sets(record, tracks, package_by_id)
+    if replacements:
+        record[SEAT_SPOT_KEY] = replacements
     return record
 
 
 def spot_sets(record):
     """{track id: spot set} of a record; {} without spots."""
     return {s["track_id"]: s for s in (record or {}).get(SPOT_KEY) or ()}
+
+
+def seat_spot_sets(record):
+    return {row["track_id"]: row["picked"] for row in (record or {}).get(SEAT_SPOT_KEY, ())}
+
+
+def reviewed_seat_spot_sets(record, tracks, packages):
+    full_spots = spot_sets(record)
+    replacements = []
+    for track in tracks:
+        if track["origin"] != "custom" or track["id"] in full_spots:
+            continue
+        package = packages.get(track.get("package_id"))
+        spots = box_spots.SEAT_SPOTS.get(box_spots.lev_pin(package))
+        if not spots:
+            continue
+        picked = [number for number, _, _ in track_boxes(track, record, package)
+                  if str(physical_seat(track, record, package, number)) in spots]
+        if picked:
+            replacements.append(dict(track_id=track["id"], picked=picked))
+    return replacements
 
 
 def keep_spot_sets(record, track_ids):
@@ -163,6 +189,12 @@ def keep_spot_sets(record, track_ids):
             record[crate_exclusions.KEY] = kept
         else:
             del record[crate_exclusions.KEY]
+    if record and SEAT_SPOT_KEY in record:
+        kept = [s for s in record[SEAT_SPOT_KEY] if s["track_id"] in track_ids]
+        if kept:
+            record[SEAT_SPOT_KEY] = kept
+        else:
+            del record[SEAT_SPOT_KEY]
     return record
 
 
@@ -170,7 +202,8 @@ def check_settings(record, capability=None):
     """Shape and values of a plan's `item_boxes` record. With the capability
     record (#133 PR 4c) present, the two Shortcut Knowledge tiers agree. The
     spot sets are checked against their tracks by check_spot_sets."""
-    if not isinstance(record, dict) or set(record) - {SPOT_KEY, crate_exclusions.KEY, "box_count", country_speedway.BOX_RULES_KEY} != set(KEYS):
+    optional = {SPOT_KEY, SEAT_SPOT_KEY, crate_exclusions.KEY, "box_count", country_speedway.BOX_RULES_KEY}
+    if not isinstance(record, dict) or set(record) - optional != set(KEYS):
         error("item_boxes must be a mapping of shortcut_knowledge and, with box spots, spot_sets.")
     tier = record["shortcut_knowledge"]
     if country_speedway.BOX_RULES_KEY in record:
@@ -194,6 +227,16 @@ def check_settings(record, capability=None):
         if (not isinstance(sets, list) or not sets or any(not isinstance(s, dict) or "track_id" not in s for s in sets)
                 or len({s["track_id"] for s in sets}) != len(sets)):
             error("item_boxes.spot_sets must be a nonempty list of spot sets, one per track.")
+    if SEAT_SPOT_KEY in record:
+        sets = record[SEAT_SPOT_KEY]
+        if (not isinstance(sets, list) or not sets or len(sets) > 160
+                or any(not isinstance(row, dict) or set(row) != {"track_id", "picked"}
+                       or type(row["track_id"]) is not str or not isinstance(row["picked"], list)
+                       or not row["picked"]
+                       or any(type(n) is not int or not 1 <= n <= SLOTS_PER_TRACK for n in row["picked"])
+                       or row["picked"] != sorted(set(row["picked"])) for row in sets)
+                or len(seat_spot_sets(record)) != len(sets)):
+            error("item_boxes.seat_spots must name distinct tracks and sorted fallback box numbers.")
     return record
 
 
@@ -253,6 +296,10 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                 if (track_id not in carried_ids
                         and crate_exclusions.ordinals(pin) - crate_exclusions.ordinals(pin, sanity_version=1)):
                     error("item_boxes is missing reviewed fallback exclusions.")
+    if SEAT_SPOT_KEY in record:
+        expected_spots = {row["track_id"]: row["picked"] for row in reviewed_seat_spot_sets(record, tracks, packages)}
+        if seat_spot_sets(record) != expected_spots:
+            error("item_boxes.seat_spots disagrees with this room's reviewed fallback seats.")
     if SPOT_KEY not in record:
         return
     if not set(sets) <= set(by_id):
@@ -302,7 +349,10 @@ def spot_of(track, record, package, number):
     """A box check's `spot` field, or None for a crate-seated or legacy box."""
     found = spot_entry(track, record, package)
     if found is None:
-        return None
+        if number not in seat_spot_sets(record).get(track["id"], ()):
+            return None
+        spot = box_spots.SEAT_SPOTS[box_spots.lev_pin(package)][str(physical_seat(track, record, package, number))]
+        return dict(number=number, pos=spot["pos"], rot_y=spot["rot_y"])
     return box_spots.wire_spot(box_spots.spots_by_number(found[1])[number])
 
 

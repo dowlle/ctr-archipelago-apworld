@@ -29,7 +29,7 @@
     {"number": 24, "pos": [2995, -802, 12404], "rot_y": 1372, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-green-hill-raceway", 802]},
     {"number": 25, "pos": [1571, 1461, 4607], "rot_y": 2783, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L3, L4 (only entry); shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-green-hill-raceway", 803]},
     {"number": 26, "pos": [-6193, 1855, 8421], "rot_y": 3091, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: behind link L1 (least demanding chain); shipped on dowlle's boost 0 ruling of 2026-11-24", "source_family": "ap_box", "provenance": ["cp1-green-hill-raceway", 804]},
-    {"number": 27, "pos": [-5258, 1363, 3422], "rot_y": 1646, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["cp1-green-hill-raceway", 805]}
+    {"number": 27, "pos": [-5173, 1368, 3275], "rot_y": 1646, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-24", "review": "CP1 ground map: on start ground", "source_family": "ap_box", "provenance": ["bp1-green-hill-raceway", 1]}
   ],
   "retired": []
 }

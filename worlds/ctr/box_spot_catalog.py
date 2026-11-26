@@ -27,9 +27,10 @@ _HEX64 = re.compile(r"[0-9a-f]{64}")
 
 INDEX_PATH = "data/box_spots/index.json"
 PROVENANCE_PATH = "data/box_spots/provenance.json"
+SEAT_SPOTS_PATH = "data/box_spots/seat-spots-v2.json"
 # Digest of the reviewed, canonical JSON evidence. Keep this approval separate
 # from the catalog data so editing a source record cannot approve its own kind.
-REVIEWED_PROVENANCE_SHA256 = "173aab3bf16ba7b3786079a871ffeb218dee4edbf5f068bdb52a37834230cd55"
+REVIEWED_PROVENANCE_SHA256 = "799d39885ff24f93b188ce70ae9e7c34f18bcc48d0a4265c3da785cc2fae74ad"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
@@ -191,6 +192,24 @@ def load_sources(read):
 
 def load_index(read):
     return json.loads(read(INDEX_PATH).decode("utf-8"))
+
+
+def load_seat_spots(read):
+    """Read the frozen v2 replacements for individual fallback crate ordinals."""
+    path = SEAT_SPOTS_PATH
+    catalog = json.loads(read(path))
+    if not isinstance(catalog, dict) or not catalog:
+        _fail(path, "expected reviewed seats keyed by LEV SHA-256")
+    for pin, seats in catalog.items():
+        if not _sha256(pin) or not isinstance(seats, dict) or not seats:
+            _fail(path, "a pin needs a nonempty set of replacements")
+        for ordinal, spot in seats.items():
+            if (not re.fullmatch(r"[1-9][0-9]{0,4}", ordinal) or int(ordinal) > 65536
+                    or not isinstance(spot, dict) or set(spot) != {"pos", "rot_y"}
+                    or not isinstance(spot["pos"], list) or len(spot["pos"]) != 3
+                    or not all(_int16(v) for v in (*spot["pos"], spot["rot_y"]))):
+                _fail(path, f"invalid seat replacement {pin}/{ordinal}")
+    return catalog
 
 
 def load_catalog(read, *, paths=None):
