@@ -28,7 +28,10 @@ its number under `retired`; a number is never reused
 (test/fixtures/box_spot_numbers_lock.json).
 
 LOGIC FIELDS (ruled 2026-11-06). `needs`: none, boost or usf, absent meaning
-usf, the careful default. `shortcut`: none, medium or hard; a spot exists in a
+usf, the careful default. `blue_fire` (rank 3, TT1 2026-11-26) is for a spot
+ruled "Boost 3"; it exists in a seed only with Progressive Boost and Blue Fire
+on, because without them no kart reaches rank 3 (the TV World crate removal of
+A4-52 does the same). Below rank 3 the seed's boost options never change a pool. `shortcut`: none, medium or hard; a spot exists in a
 seed only at that Shortcut Knowledge tier or above, and a hard spot also needs
 one level of each stat. `door`: Tiger Temple's stone door (Itemsanity weapon
 term). `no_gate`: a spot that was ruled to need nothing although it sits past a
@@ -89,9 +92,15 @@ def spots_by_number(entry):
     return {spot["number"]: spot for spot in entry["doc"]["spots"]}
 
 
-def eligible(entry, knowledge):
-    """Sorted numbers of a file's spots a Shortcut Knowledge tier creates."""
-    return sorted(s["number"] for s in entry["doc"]["spots"] if tier(s) <= knowledge)
+#: The `needs` rank that exists only with Blue Fire on.
+BLUE_FIRE_RANK = NEEDS["blue_fire"]
+
+
+def eligible(entry, knowledge, blue_fire=False):
+    """Sorted numbers of a file's spots a Shortcut Knowledge tier creates; a
+    blue_fire spot only when the seed has Progressive Boost with Blue Fire."""
+    return sorted(s["number"] for s in entry["doc"]["spots"]
+                  if tier(s) <= knowledge and (blue_fire or needs_rank(s) < BLUE_FIRE_RANK))
 
 
 def pick(numbers, seed, player, track_id, count=PICK):
@@ -124,19 +133,19 @@ def file_for(track, package=None):
     return None
 
 
-def spot_set(track, package, knowledge, seed, player, count=PICK):
+def spot_set(track, package, knowledge, seed, player, count=PICK, blue_fire=False):
     """The plan's `spot_sets` record of one track, or None without a file."""
     entry = file_for(track, package)
     if entry is None:
         return None
-    pool = eligible(entry, knowledge)
+    pool = eligible(entry, knowledge, blue_fire)
     out = dict(file_sha256=entry["sha256"], pool=len(pool), picked=pick(pool, seed, player, track["id"], count))
     if track.get("origin") == "custom":
         out["lev_sha256"] = lev_pin(package)
     return out
 
 
-def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True):
+def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True, blue_fire=False):
     """A plan's spot set against this build's file; returns the file entry."""
     entry = file_for(track, package)
     if entry is None:
@@ -148,7 +157,7 @@ def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_dig
         raise SpotFileError(f"box spots for {track['id']}: the seed was built with a different spot file")
     if track.get("origin") == "custom" and record["lev_sha256"] != lev_pin(package):
         raise SpotFileError(f"box spots for {track['id']}: the LEV pin differs from the package")
-    pool = eligible(entry, knowledge)
+    pool = eligible(entry, knowledge, blue_fire)
     picked = record["picked"]
     if (record["pool"] != len(pool) or not isinstance(picked, list) or picked != sorted(set(picked))
             or not set(picked) <= set(pool) or len(picked) != min(count, len(pool))):

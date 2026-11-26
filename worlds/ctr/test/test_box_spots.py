@@ -48,6 +48,7 @@ ARABIAN_DAY = "arabian-heights-day"
 DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
+TOASTY = "toasty-terrace"
 
 #: CP1: dowlle's Box Author Mode spots on named custom tracks (2026-11-24).
 #: track key -> (named block, LEV pin, first new number, spots shipped, numbers
@@ -130,7 +131,7 @@ class TestConversion(unittest.TestCase):
 
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
-        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, *DOWLLE_CUSTOM, ARABIAN_DAY, "sunset-vista"})
+        self.assertEqual(set(box_spots.CUSTOM_FILES), {*COMMUNITY, *DOWLLE_CUSTOM, ARABIAN_DAY, "sunset-vista", TOASTY})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -228,7 +229,7 @@ class TestFileChecks(unittest.TestCase):
             lambda d: d.__setitem__("retired", [1]),
             lambda d: spot(d).__setitem__("pos", [0, 0]),
             lambda d: spot(d).__setitem__("pos", [0, 40000, 0]),
-            lambda d: spot(d).__setitem__("needs", "blue_fire"),
+            lambda d: spot(d).__setitem__("needs", "mask"),
             lambda d: spot(d).__setitem__("shortcut", "easy"),
             lambda d: spot(d).__setitem__("height", 3),
             lambda d: spot(d).__setitem__("no_gate", False),
@@ -245,6 +246,16 @@ class TestFileChecks(unittest.TestCase):
 
     def test_absent_needs_means_usf(self):
         self.assertEqual(box_spots.needs_rank({"number": 1, "pos": [0, 0, 0], "rot_y": 0}), 2)
+
+    def test_blue_fire_is_rank_3_and_only_in_blue_fire_pools(self):
+        self.assertEqual(box_spots.needs_rank({"number": 1, "pos": [0, 0, 0], "rot_y": 0, "needs": "blue_fire"}), 3)
+        doc = dict(spots=[dict(number=1, pos=[0, 0, 0], rot_y=0, needs="none"),
+                          dict(number=2, pos=[0, 0, 0], rot_y=0, needs="usf"),
+                          dict(number=3, pos=[0, 0, 0], rot_y=0, needs="blue_fire"),
+                          dict(number=4, pos=[0, 0, 0], rot_y=0, needs="blue_fire", shortcut="hard")])
+        self.assertEqual(box_spots.eligible(dict(doc=doc), 2), [1, 2])
+        self.assertEqual(box_spots.eligible(dict(doc=doc), 2, blue_fire=True), [1, 2, 3, 4])
+        self.assertEqual(box_spots.eligible(dict(doc=doc), 0, blue_fire=True), [1, 2, 3])
 
 
 class TestSourceChecks(unittest.TestCase):
@@ -850,3 +861,99 @@ class TestDowlleCustomSpots(unittest.TestCase):
                             self.assertEqual(check.get("boost", 0), box_spots.needs_rank(spots[m]))
                     distribute_items_restrictive(world.multiworld)
                     self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
+
+
+TOASTY_LRG2_LEV = "8403e3f99ff4927accd15d6bb413181883316d2f1902b9e14bf2ab4eb3b1f0fa"
+TOASTY_130_LEV = "2b18c6305d3cfe591e979eabe42e7815fe475479d49f59d5b7b50b06f701ac5d"
+TOASTY_BLOCK = 74
+#: TT1: dowlle's Deck kit 8 placements, file entries 1 to 49 as Item Box 1 to 49.
+#: Entry 4 is held (airborne, out of pickup reach). The far-end ledge (32 to 35)
+#: and the high cluster (38 to 46) were ruled "Boost 3, or Boost 2 plus a Mask"
+#: (2026-11-26); without a Mask term they ship at Boost 3 (blue_fire).
+TOASTY_HELD = {4}
+TOASTY_BLUE_FIRE = set(range(32, 36)) | set(range(38, 47))
+TOASTY_NUMBERS = [n for n in range(1, 50) if n not in TOASTY_HELD]
+
+
+class TestToastyDeckSpots(unittest.TestCase):
+    """TT1: Toasty Terrace spots from Deck kit 8, on LRG2Pancho and 1.3.0."""
+
+    def options(self, **extra):
+        from .test_toasty_terrace import toasty_options
+        return toasty_options(**extra)
+
+    def test_file_keeps_source_order_rules_and_ids(self):
+        entry = box_spots.CUSTOM_FILES[TOASTY]
+        doc = entry["doc"]
+        self.assertEqual(doc["track"]["lev_sha256"], [TOASTY_LRG2_LEV, TOASTY_130_LEV])
+        self.assertEqual([s["number"] for s in doc["spots"]], TOASTY_NUMBERS)
+        rows = box_spots.SOURCE_RECORDS["tt1-toasty-terrace"]
+        self.assertEqual(rows["sha256"], "050fb13ea09c0ab213d9177dcbf7a732c16f8e8ad8edd1536a730994f1a764c6")
+        for spot in doc["spots"]:
+            n = spot["number"]
+            self.assertEqual(spot["provenance"], ["tt1-toasty-terrace", n])
+            self.assertEqual(rows["rows"][n], [n, *spot["pos"], spot["rot_y"]])
+            self.assertEqual(spot["needs"], "blue_fire" if n in TOASTY_BLUE_FIRE else "none")
+            self.assertEqual(CTR_LOCATION_IDS[f"Toasty Terrace: Item Box {n}"], 35200000 + 200 * TOASTY_BLOCK + 19 + n)
+        self.assertEqual(box_spots.eligible(entry, 2), [n for n in TOASTY_NUMBERS if n not in TOASTY_BLUE_FIRE])
+        self.assertEqual(box_spots.eligible(entry, 0, blue_fire=True), TOASTY_NUMBERS)
+
+    def test_boost_rule_spots_exist_only_with_blue_fire(self):
+        from .test_toasty_terrace import TRACK
+        cases = (("off", False), ("shared_global", False), ("shared_global", True), ("per_character", True))
+        for mode, blue in cases:
+            with self.subTest(mode=mode, blue_fire=blue):
+                world = make_world(self.options(item_box_count=50, progressive_boost=mode,
+                                                progressive_boost_blue_fire=blue), seed=7, stop_before="pre_fill")
+                wire = json.loads(json.dumps(world.fill_slot_data()))
+                plan = wire["content_plan"]
+                self.assertTrue(content_plan.validate(plan))
+                record = spot_set(plan, TRACK)
+                self.assertEqual(record["lev_sha256"], TOASTY_130_LEV)
+                expected = TOASTY_NUMBERS if blue else [n for n in TOASTY_NUMBERS if n not in TOASTY_BLUE_FIRE]
+                self.assertEqual((record["pool"], record["picked"]), (len(expected), expected))
+                checks = boxes(plan, TRACK)
+                self.assertEqual([c["spot"]["number"] for c in checks], expected)
+                for check in checks:
+                    rank = 3 if check["spot"]["number"] in TOASTY_BLUE_FIRE else 0
+                    self.assertEqual(check.get("boost", 0), rank, check["display_name"])
+                restored = make_world({}, passthrough=wire, stop_before="pre_fill")
+                self.assertEqual(json.loads(json.dumps(restored.fill_slot_data()))["content_plan"], plan)
+
+    def test_default_count_draws_only_boost_0_spots_without_blue_fire(self):
+        from .test_toasty_terrace import TRACK
+        plan = make_world(self.options(item_box_count=15), seed=11, stop_before="pre_fill").ctr_content_plan
+        record = spot_set(plan, TRACK)
+        self.assertEqual(record["pool"], 35)
+        self.assertEqual(len(record["picked"]), 15)
+        self.assertTrue(set(record["picked"]).isdisjoint(TOASTY_BLUE_FIRE | TOASTY_HELD))
+        self.assertTrue(all(c.get("boost", 0) == 0 for c in boxes(plan, TRACK)))
+
+    def test_full_fill_and_boost_3_gate(self):
+        world = make_world(self.options(item_box_count=50, progressive_boost="shared_global",
+                                        progressive_boost_blue_fire=True, accessibility="full"), seed=5)
+        distribute_items_restrictive(world.multiworld)
+        self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
+        names = {n: f"Toasty Terrace: Item Box {n}" for n in TOASTY_NUMBERS}
+        for boosts in (0, 2, 3):
+            state = CollectionState(world.multiworld)
+            for item, num in world.multiworld.get_all_state().prog_items[world.player].items():
+                for _ in range(min(num, boosts) if item.startswith("Progressive Boost") else num):
+                    state.collect(world.create_item(item), True)
+            for n, name in names.items():
+                with self.subTest(boosts=boosts, box=n):
+                    reach = world.multiworld.get_location(name, world.player).can_reach(state)
+                    self.assertEqual(reach, n not in TOASTY_BLUE_FIRE or boosts >= 3)
+
+    def test_rooms_from_before_tt1_keep_crate_seats(self):
+        from .test_toasty_terrace import TRACK
+        previous = {k: e for k, e in box_spots.CUSTOM_FILES.items() if k != TOASTY}
+        with mock.patch.dict(box_spots.CUSTOM_FILES, previous, clear=True):
+            world = make_world(self.options(item_box_count=15), seed=3, stop_before="pre_fill")
+            wire = json.loads(json.dumps(world.fill_slot_data()))
+        plan = wire["content_plan"]
+        self.assertIsNone(spot_set(plan, TRACK))
+        self.assertEqual(len(boxes(plan, TRACK)), 15)
+        self.assertTrue(all("spot" not in c for c in boxes(plan, TRACK)))
+        restored = make_world({}, seed=999, passthrough=wire, stop_before="pre_fill")
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data()))["content_plan"], plan)
