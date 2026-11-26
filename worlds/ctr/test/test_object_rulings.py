@@ -33,7 +33,8 @@ class TestObjectRulings(unittest.TestCase):
         opts["item_box_count"] = 15
         with mock.patch.dict(box_spots.SEAT_SPOTS, {}, clear=True):
             legacy = make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data()
-        current = make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data()
+        world = make_world(opts, seed=52, stop_before="pre_fill")
+        current = world.fill_slot_data()
 
         def boxes(wire):
             return [c for c in wire["content_plan"]["checks"] if c["owner"] == TV and c["kind"] == "box"]
@@ -50,6 +51,11 @@ class TestObjectRulings(unittest.TestCase):
         next(c for c in boxes(shifted) if "spot" in c)["spot"]["pos"][0] += 1
         with self.assertRaisesRegex(OptionError, "reviewed fallback seat"):
             make_world({}, passthrough=shifted, stop_before="pre_fill")
+        live_plan = {"content_plan": world.ctr_content_plan}
+        next(c for c in boxes(live_plan) if "spot" in c)["spot"]["pos"][0] += 1
+        with self.assertRaises(OptionError):
+            content_plan.validate(world.ctr_content_plan)
+        self.assertEqual(make_world(opts, seed=52, stop_before="pre_fill").fill_slot_data(), current)
 
     def test_all_settings_wire_reachability_and_tracker(self):
         for difficulty in ("easy", "medium", "hard"):

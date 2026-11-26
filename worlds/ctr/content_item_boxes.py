@@ -352,7 +352,7 @@ def spot_of(track, record, package, number):
         if number not in seat_spot_sets(record).get(track["id"], ()):
             return None
         spot = box_spots.SEAT_SPOTS[box_spots.lev_pin(package)][str(physical_seat(track, record, package, number))]
-        return dict(number=number, pos=spot["pos"], rot_y=spot["rot_y"])
+        return dict(number=number, pos=list(spot["pos"]), rot_y=spot["rot_y"])
     return box_spots.wire_spot(box_spots.spots_by_number(found[1])[number])
 
 
