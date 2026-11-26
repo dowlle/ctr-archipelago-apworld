@@ -71,6 +71,11 @@ def check_file(doc, path="<file>"):
 #: {LevelID: {doc, path, sha256}} and {track_key: {...}}, read once at import.
 RETAIL_FILES, CUSTOM_FILES, SOURCE_RECORDS = box_spot_catalog.load_catalog(_read)
 
+# Sparse authored replacements for fallback seats, indexed by the exact LEV
+# and original one-based weapon ordinal. These are ground anchors for AP
+# boxes. The weapon crates keep their original coordinates and identity.
+SEAT_SPOTS = box_spot_catalog.load_seat_spots(_read)
+
 
 def needs_rank(spot):
     return NEEDS[spot.get("needs", DEFAULT_NEEDS)]

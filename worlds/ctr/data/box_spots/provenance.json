@@ -1989,5 +1989,97 @@
       [14, 14, -5989, -9, 999, 1434],
       [15, 15, 6541, 626, -9849, 3991]
     ]
+  },
+  "bp1-baby-t-park": {
+    "kind": "reviewed_ap_proposal",
+    "track": "custom:baby-t-park",
+    "pins": [
+      "be161e0b11aa03505c501b7db012d830405e69e171f84633c2e24ffe9cc3cbf8"
+    ],
+    "record": "BP1 ground placement and mode clearance",
+    "sha256": "6a9ab57dfb5f747c7c874700039749718f02816478a3716275165ab70d5a7aa5",
+    "rows": [
+      [
+        1,
+        16,
+        924,
+        55,
+        -5406,
+        3393
+      ],
+      [
+        2,
+        19,
+        151,
+        58,
+        -5404,
+        2674
+      ]
+    ]
+  },
+  "bp1-garden-speedway": {
+    "kind": "reviewed_ap_proposal",
+    "track": "custom:garden-speedway",
+    "pins": [
+      "a04e15057ee83c80d98f0e88eb513eb51286e123b11e82155203b7ef9a43b23e"
+    ],
+    "record": "BP1 ground placement and mode clearance",
+    "sha256": "6a9ab57dfb5f747c7c874700039749718f02816478a3716275165ab70d5a7aa5",
+    "rows": [
+      [
+        1,
+        1,
+        3800,
+        648,
+        -556,
+        1052
+      ],
+      [
+        2,
+        8,
+        -8300,
+        1138,
+        -3296,
+        3948
+      ]
+    ]
+  },
+  "bp1-green-hill-raceway": {
+    "kind": "reviewed_ap_proposal",
+    "track": "custom:green-hill-raceway",
+    "pins": [
+      "50250966e9b31d13b140aaafa9433ffce19269898a0850edd0a1e8cf1207c760"
+    ],
+    "record": "BP1 ground placement and mode clearance",
+    "sha256": "6a9ab57dfb5f747c7c874700039749718f02816478a3716275165ab70d5a7aa5",
+    "rows": [
+      [
+        1,
+        27,
+        -5173,
+        1368,
+        3275,
+        1646
+      ]
+    ]
+  },
+  "bp1-inferno-island": {
+    "kind": "reviewed_ap_proposal",
+    "track": "custom:inferno-island",
+    "pins": [
+      "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32"
+    ],
+    "record": "BP1 ground placement and mode clearance",
+    "sha256": "6a9ab57dfb5f747c7c874700039749718f02816478a3716275165ab70d5a7aa5",
+    "rows": [
+      [
+        1,
+        18,
+        -4919,
+        166,
+        9071,
+        716
+      ]
+    ]
   }
 }

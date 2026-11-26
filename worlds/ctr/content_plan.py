@@ -447,6 +447,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_item_boxes.SPOT_FEATURE] if item_boxes and item_boxes.get(content_item_boxes.SPOT_KEY) else [])
             + ([content_item_boxes.crate_exclusions.FEATURE] if item_boxes and item_boxes.get(content_item_boxes.crate_exclusions.KEY) else [])
             + ([content_item_boxes.COUNT_FEATURE] if item_boxes and "box_count" in item_boxes else [])
+            + ([content_item_boxes.SEAT_SPOT_FEATURE] if item_boxes and content_item_boxes.SEAT_SPOT_KEY in item_boxes else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
             + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
@@ -1076,9 +1077,13 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
         if carried_boxes is not None:
             saved = carried_boxes.get(code, {})
             spot = saved.get("spot")
-            expects_spot = track["id"] in content_item_boxes.spot_sets(item_boxes)
+            expects_spot = (track["id"] in content_item_boxes.spot_sets(item_boxes)
+                            or slot in content_item_boxes.seat_spot_sets(item_boxes).get(track["id"], ()))
             if expects_spot != (spot is not None) or (spot is not None and spot["number"] != slot):
                 error("box spot number or track disagrees with the room's pick")
+            if slot in content_item_boxes.seat_spot_sets(item_boxes).get(track["id"], ()) \
+                    and spot != content_item_boxes.spot_of(track, item_boxes, package, slot):
+                error("box spot position disagrees with the room's reviewed fallback seat")
             if spot is not None:
                 box["spot"] = spot
             if "boost" in saved:
