@@ -11,9 +11,11 @@ import zipfile
 ROOT = "ctr/data/box_spots/"
 FIXTURES = (ROOT + "retail/POLAR_PASS.json", ROOT + "custom/dk-pass.json")
 PROVENANCE = ROOT + "provenance.json"
+CATALOG = "ctr/box_spot_catalog.py"
 
 with zipfile.ZipFile(sys.argv[1]) as source, zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as target:
     provenance = json.loads(source.read(PROVENANCE))
+    reviewed = json.dumps(provenance, sort_keys=True, separators=(",", ":")).encode()
     fixtures = {}
     for path in FIXTURES:
         doc = json.loads(source.read(path))
@@ -33,7 +35,16 @@ with zipfile.ZipFile(sys.argv[1]) as source, zipfile.ZipFile(sys.argv[2], "w", z
             rows=rows,
         )
         fixtures[path] = json.dumps(doc).encode()
-    fixtures[PROVENANCE] = json.dumps(provenance).encode()
+    synthetic = json.dumps(provenance, sort_keys=True, separators=(",", ":")).encode()
+    fixtures[PROVENANCE] = synthetic
+    # This test archive has its own reviewed snapshot. Verify that its input
+    # agrees with the release validator before substituting the fixture digest.
+    production_approval = hashlib.sha256(reviewed).hexdigest().encode()
+    fixture_approval = hashlib.sha256(synthetic).hexdigest().encode()
+    validator = source.read(CATALOG)
+    if validator.count(production_approval) != 1:
+        raise ValueError("Input apworld is missing the reviewed provenance digest")
+    fixtures[CATALOG] = validator.replace(production_approval, fixture_approval)
     for member in source.infolist():
         data = fixtures[member.filename] if member.filename in fixtures else source.read(member)
         target.writestr(member, data)
