@@ -7,7 +7,6 @@ from . import (arena_content, boss_track_shuffle, characters, content_bosses, co
 FIRST_RACE_WIN = {
     "trophy": "win the Trophy Race",
     "ctr": "win the CTR Challenge",
-    "relic": "earn a Relic in the Relic Race",
 }
 
 
@@ -73,10 +72,26 @@ def _first_race_wins(plan):
             continue
         checks = checks_by_pad[pad["id"]]
         first = gates[0]["mode"]
-        if content_plan.first_race_checks(checks, first):
-            wins[pad["id"]] = ("win the CTR Challenge race (letters optional)"
-                               if content_plan.merged_race(checks) else FIRST_RACE_WIN[first])
+        if not content_plan.first_race_checks(checks, first):
+            continue
+        if content_plan.merged_race(checks):
+            wins[pad["id"]] = "win the CTR Challenge race (letters optional)"
+        elif first == "relic":
+            awards = {check["routes"][0]["award"] for check in checks if check["kind"] == "relic"}
+            tier = next(tier for tier in content_plan.RELIC_TIERS if tier.lower() in awards)
+            wins[pad["id"]] = f"meet the {tier} Relic time"
+        else:
+            wins[pad["id"]] = FIRST_RACE_WIN[first]
     return wins
+
+
+def _encounter_requirement(node, inherits_first_win):
+    if not inherits_first_win:
+        return _requirement(node)
+    # In Any Percent the companion goals apply at the first race. The
+    # native Final Challenge selector only checks its own relic threshold.
+    terms = node["terms"] if node["op"] == "all" else (node,)
+    return " + ".join(_requirement(term) for term in terms if term["op"] not in ("checked", "distinct"))
 
 
 def lines(plan):
@@ -103,18 +118,24 @@ def lines(plan):
             races = []
             for encounter in encounters[pad["id"]]:
                 title = _entry_title(entries[encounter["entry_id"]], tracks)
-                gate = _requirement(requirements[encounter["requirement_id"]])
+                final = oxide and encounter["index"] == 1
+                inherits_first_win = final and plan["bosses"]["oxide_goal"] == content_bosses.GOAL_ANY
+                gate = _encounter_requirement(requirements[encounter["requirement_id"]], inherits_first_win)
                 needs = [gate] if gate else []
+                availability = ""
                 if oxide:
-                    challenge = "Final Challenge" if encounter["index"] else "Challenge"
+                    challenge = "Final Challenge" if final else "Challenge"
                     title = f"{challenge}: {title}"
+                    optional = plan["bosses"]["oxide_1_optional"]
                     if hub_gate:
                         needs.insert(0, hub_gate)
-                    if encounter["index"] and not plan["bosses"]["oxide_1_optional"]:
+                    if final and not optional:
                         needs.append("win N. Oxide's Challenge")
+                    elif optional and not final:
+                        availability = " [offered until won or Final Challenge opens]"
                     if wumpa_goal and encounter["completion_location"] == content_bosses.goal_location(plan["bosses"]):
                         needs.append(f"{wumpa_goal['count']:,} Wumpa Fruit banked in total")
-                races.append(f"{title} ({' + '.join(needs) or 'Free'})")
+                races.append(f"{title} ({' + '.join(needs) or 'Free'}){availability}")
             detail = " | ".join(races) or "Disabled"
             if races and not oxide and hub_gate:
                 detail += f" | Hub: {hub_gate}"

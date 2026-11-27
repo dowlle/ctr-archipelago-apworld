@@ -74,6 +74,30 @@ def test_single_stage_and_optional_oxide():
     oxide, = [line for line in text.splitlines() if "N. Oxide Garage:" in line]
     assert "750 Wumpa Fruit banked in total" in oxide
     assert "win N. Oxide's Challenge" not in oxide
+    assert "Challenge: Oxide Station (4 Keys) [offered until won or Final Challenge opens]" in oxide
+
+
+def test_any_percent_companion_gates_appear_on_first_challenge():
+    text = _spoiler({"oxide_goal": "any_percent", "bosses_required_goal": 2, "gems_required_goal": 2})
+    oxide, = [line for line in text.splitlines() if "N. Oxide Garage:" in line]
+    first, final = oxide.split(" | ")
+    assert "4 Keys + 2 Boss Wins + 2 Different Gems" in first
+    assert "18 Sapphire Relics + win N. Oxide's Challenge" in final
+    assert "Boss Wins" not in final
+    assert "Different Gems" not in final
+
+
+def test_relic_first_race_uses_lowest_tier_with_a_check():
+    pad_id = "pad:3"
+    plan = {
+        "pad_requirements": {},
+        "pads": [{"id": pad_id, "mode_gates": [{"mode": "relic"}, {"mode": "trophy"}]}],
+        "checks": [
+            {"kind": "relic", "location": 1, "routes": [{"own_pad_id": pad_id, "award": "platinum"}]},
+            {"kind": "relic", "location": 2, "routes": [{"own_pad_id": pad_id, "award": "gold"}]},
+        ],
+    }
+    assert pad_spoiler._first_race_wins(plan) == {pad_id: "meet the Gold Relic time"}
 
 
 def test_partial_family_gates_show_which_items_count():
