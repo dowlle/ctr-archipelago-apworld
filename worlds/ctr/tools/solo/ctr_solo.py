@@ -1197,12 +1197,54 @@ def _manifest_schema_valid(manifest: object, pin: str) -> bool:
 
 def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
     """Find one installed revision whose manifest and every named file match."""
+    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
+    return next((folder for folder, _ in _store_packages(tracks_root, wanted, descriptor["revision"])), None)
+
+
+def _installed_versions_by_pins(tracks_root: str, files) -> set:
+    """Every version under which a verified package in the shared store
+    carries these LEV and VRM pins (native InstalledVersionsByPins). A room
+    finds relic_files by revision and pins in the store only."""
+    if not isinstance(files, list) or not all(isinstance(f, dict) for f in files):
+        return set()
+    try:
+        wanted = {(f.get("role"), f.get("sha256"), f.get("bytes")) for f in files}
+    except TypeError:  # an unhashable value: no installed package carries it
+        return set()
+    return {manifest["version"] for _, manifest in _store_packages(tracks_root, wanted)}
+
+
+def _with_installed_relic_revision(tracks_root: str, descriptor: dict) -> dict:
+    """A merged descriptor names in relic_revision a version its Relic pair is
+    installed under, as the client's writers do (AP_SoloChooseRelicRevision):
+    the written one if the pair is installed under it, else the first
+    installed one in order. A descriptor recovered from an older room's
+    room.json can carry a label the installed Relic files do not, and a room
+    built from it would download the pair again. When the pair is not
+    installed the written revision stays: a room installs it under that name."""
+    revision = descriptor.get("relic_revision")
+    if "relic_files" not in descriptor:
+        return descriptor
+    installed = _installed_versions_by_pins(tracks_root, descriptor["relic_files"])
+    if not installed or revision in installed:
+        return descriptor
+    admit = _world_module("custom_packages").admit
+    for version in sorted(installed):
+        try:
+            return admit(dict(json.loads(json.dumps(descriptor)), relic_revision=version))
+        except Exception:  # not a revision admission takes: try the next one
+            continue
+    return descriptor
+
+
+def _store_packages(tracks_root: str, wanted: set, version: str | None = None):
+    """(folder, manifest) of every installed revision whose manifest carries
+    the wanted pins (and the version, when given) and every named file matches."""
     store = os.path.join(tracks_root, "packages")
     try:
         names = sorted(os.listdir(store))
     except OSError:
-        return None
-    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
+        return
     for name in names[:1024]:
         if len(name) != 64 or any(c not in "0123456789abcdef" for c in name):
             continue
@@ -1210,7 +1252,7 @@ def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
         if os.path.islink(folder):
             continue
         manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, store, unique_keys=True)
-        if not isinstance(manifest, dict) or manifest.get("version") != descriptor["revision"]:
+        if not isinstance(manifest, dict) or (version is not None and manifest.get("version") != version):
             continue
         if not _manifest_schema_valid(manifest, name):
             continue
@@ -1237,10 +1279,32 @@ def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
                         raise ValueError("linked manifest path")
                 if not os.path.isfile(current) or os.path.getsize(current) != entry["bytes"] or sha256_file(current) != entry["sha256"]:
                     raise ValueError("manifest file mismatch")
-            return folder
         except (OSError, ValueError):
             continue
-    return None
+        yield folder, manifest
+
+
+def _relic_only_pins(paths: Paths) -> set:
+    """Pins of every known Relic pair of a split track (merged mode builds),
+    from solo/pairs/mode-pairs.json, which the client writes from the
+    registry's mode_pairs and its built-in table. Such a pair is carried by
+    its race pair as relic_files and is never a track's main pair, also not
+    from an older room's metadata. A missing or unreadable file lists none."""
+    folder = os.path.join(paths.solo, "pairs")
+    data = _small_json(os.path.join(folder, "mode-pairs.json"), DESCRIPTOR_MAX_BYTES, folder)
+    rows = data.get("relic_only") if isinstance(data, dict) and data.get("schema_version") == 1 else None
+    found = set()
+    for row in rows if isinstance(rows, list) else []:
+        files = row.get("files") if isinstance(row, dict) else None
+        if not isinstance(files, list) or len(files) != 2 or not all(isinstance(f, dict) for f in files):
+            continue
+        pins = [(f.get("role"), f.get("sha256"), f.get("bytes")) for f in files]
+        # Only plain values reach the set: a malformed row is skipped, it never
+        # breaks the track list.
+        if (all(type(role) is str and type(sha) is str and type(size) is int for role, sha, size in pins)
+                and sorted(role for role, _, _ in pins) == ["lev", "vrm"]):
+            found.add(tuple(sorted(pins)))
+    return found
 
 
 def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
@@ -1260,12 +1324,15 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
             return not (saved and saved.get("revision") == raw.get("revision") and _pins(saved) == _pins(raw))
         sources.sort(key=priority)
     seen, result = set(), []
+    relic_only = _relic_only_pins(paths)
     for raw, source in sources:
         try:
             descriptor = admit(json.loads(json.dumps(raw)))
         except Exception:
             continue
         if tizi_madness.is_seed_excluded(descriptor):
+            continue
+        if tuple(_pins(descriptor)) in relic_only:
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
         identity = (destinations.canonical_track_key(key), revision)
@@ -1278,6 +1345,7 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
                                       for folder in folders):
             continue
         seen.add(identity)
+        descriptor = _with_installed_relic_revision(tracks_root, descriptor)
         modes = supported("custom", descriptor)
         result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
                        "revision": revision, "display_name": descriptor["display_name"],
@@ -1551,8 +1619,17 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                 required[:] = [name for name in required if name not in required_names]
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
-        if not any(_same_package(d, descriptor) for d in custom):
+        same = [d for d in custom if _same_package(d, descriptor)]
+        if not same:
+            if "relic_files" in descriptor and _relic_pair_taken(custom, descriptor["relic_files"]):
+                # Another entry of this YAML already uses the Relic pair: the
+                # track is written as before, so the file keeps passing admission.
+                _note(f"{descriptor['display_name']}: Relic Race file not added, "
+                      "another track entry of this YAML already uses it")
+                descriptor = _without_relic_pair(descriptor)
             custom.append(descriptor)
+        for listed_entry in same:
+            _carry_relic_pair(listed_entry, descriptor, [d for d in custom if d is not listed_entry])
     for track_id in guaranteed:
         if track_id == CORTEX_ID:
             continue
@@ -1579,6 +1656,82 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     else:
         section.pop("required_entries", None)
     return doc
+
+
+def _note(text: str) -> None:
+    """A line for the client's solo log (stderr); stdout is the protocol."""
+    print(f"[solo] {text}", file=sys.stderr)
+
+
+def _relic_pins(files) -> tuple:
+    return tuple(_pins({"files": files})) if isinstance(files, list) else ()
+
+
+def _pair_hashes(files) -> tuple:
+    """The LEV and VRM hashes of a pin pair, as admit_all compares pairs: by
+    hash alone, whatever size an entry declares."""
+    if not isinstance(files, list):
+        return ()
+    by_role = {f.get("role"): f.get("sha256") for f in files if isinstance(f, dict) and type(f.get("role")) is str}
+    return (by_role.get("lev"), by_role.get("vrm")) if len(files) == 2 else ()
+
+
+def _relic_pair_taken(entries, relic_files) -> bool:
+    """True when an entry already uses this Relic pair, as its main pair or as
+    its own relic_files. admit_all refuses a pair listed twice, comparing the
+    hashes only, so a differing declared size is the same pair here too."""
+    hashes = _pair_hashes(relic_files)
+    return bool(hashes) and any(
+        isinstance(d, dict) and hashes in (_pair_hashes(d.get("files")), _pair_hashes(d.get("relic_files")))
+        for d in entries)
+
+
+def _without_relic_pair(descriptor: dict) -> dict:
+    """The descriptor as it was written before merged mode builds. Evidence
+    rows that name a hash of the removed Relic pair go too: admission takes
+    only rows about the entry's own pinned files."""
+    plain = {k: json.loads(json.dumps(v)) for k, v in descriptor.items()
+             if k not in ("relic_files", "relic_revision", "relic_targets")}
+    if isinstance(plain.get("capabilities"), dict):
+        plain["capabilities"]["relic"] = False
+    kept = {f.get("sha256") for f in plain.get("files", ()) if isinstance(f, dict)}
+    if isinstance(plain.get("evidence"), list):
+        plain["evidence"] = [row for row in plain["evidence"]
+                             if not (isinstance(row, dict) and isinstance(row.get("file_hashes"), list)
+                                     and any(type(h) is not str or h not in kept for h in row["file_hashes"]))]
+    return plain
+
+
+def _carry_relic_pair(listed: dict, descriptor: dict, others=()) -> None:
+    """A YAML entry written before its track was merged (same race pins, no
+    Relic Race of its own) takes the installed entry's Relic pair, so the
+    picked track keeps every mode. An entry that already sets a Relic Race or
+    its own relic_files stays as the YAML has it, except that an entry naming
+    the same Relic pins takes the installed relic_revision: a room finds the
+    Relic files by revision and pins, and an older export could carry a label
+    the installed files do not. When another entry already uses the Relic
+    pair, nothing is carried: admit_all would refuse the repeated pair."""
+    relic = descriptor.get("relic_files")
+    if relic is None:
+        return
+    if "relic_files" in listed:
+        revision = descriptor.get("relic_revision")
+        if (isinstance(revision, str) and _relic_pins(listed["relic_files"]) == _relic_pins(relic)
+                and listed.get("relic_revision") != revision):
+            listed["relic_revision"] = revision
+        return
+    capabilities = listed.get("capabilities")
+    if "relic_targets" in listed or not isinstance(capabilities, dict) or capabilities.get("relic"):
+        return
+    if _relic_pair_taken(others, relic):
+        _note(f"{descriptor['display_name']}: Relic Race file not added to the loaded entry, "
+              "another track entry of this YAML already uses it")
+        return
+    for key in ("relic_files", "relic_revision", "relic_targets"):
+        if key in descriptor:
+            listed[key] = json.loads(json.dumps(descriptor[key]))
+    capabilities["relic"] = True
+    capabilities["time_trial"] = True
 
 
 def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: list[str], name: str) -> dict:
