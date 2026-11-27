@@ -36,7 +36,9 @@
     {"number": 31, "pos": [-2411, 1628, -13554], "rot_y": 115, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: no reachable link found; shipped on dowlle's Boost 0 review; pickup reach 51.3", "source_family": "ap_box", "provenance": ["im1-tv-world", 1313]},
     {"number": 32, "pos": [-3580, 1898, -9831], "rot_y": 2717, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: no reachable link found; shipped on dowlle's Boost 0 review; pickup reach 46.1", "source_family": "ap_box", "provenance": ["im1-tv-world", 1314]},
     {"number": 33, "pos": [1639, 2406, -9513], "rot_y": 70, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: no reachable link found; shipped on dowlle's Boost 0 review; pickup reach 53.0", "source_family": "ap_box", "provenance": ["im1-tv-world", 1315]},
-    {"number": 34, "pos": [-11579, 1878, -3306], "rot_y": 1044, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.3", "source_family": "ap_box", "provenance": ["im1-tv-world", 1316]}
+    {"number": 34, "pos": [-11579, 1878, -3306], "rot_y": 1044, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.3", "source_family": "ap_box", "provenance": ["im1-tv-world", 1316]},
+    {"number": 35, "pos": [11500, 1774, -1836], "rot_y": 3072, "needs": "blue_fire", "rule_of": "wumpa_crate:3", "source_family": "ap_box", "provenance": ["tv2-tv-world-ledge", 1], "source": "dowlle, TV World ledge boxes, 2026-11-27", "credit": "dowlle", "review": "2026-11-27", "note": "Upper ledge, east of Wumpa crates 3 to 6; needs what those crates need"},
+    {"number": 36, "pos": [10870, 1774, -1180], "rot_y": 2048, "needs": "blue_fire", "rule_of": "wumpa_crate:3", "source_family": "ap_box", "provenance": ["tv2-tv-world-ledge", 2], "source": "dowlle, TV World ledge boxes, 2026-11-27", "credit": "dowlle", "review": "2026-11-27", "note": "Upper ledge, north of Wumpa crates 3 to 6; needs what those crates need"}
   ],
   "retired": []
 }

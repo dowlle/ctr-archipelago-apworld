@@ -23,7 +23,7 @@ DEFAULT_NEEDS = "usf"
 SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
 DOORS = ("tiger_temple",)
 SPOT_FIELDS = {"number", "pos", "rot_y", "needs", "shortcut", "door", "no_gate", "source", "credit", "review",
-               "note", "source_family", "provenance", "rule_of"}
+               "note", "source_family", "provenance", "rule_of", "lev_sha256"}
 TEXT_FIELDS = ("source", "credit", "review", "note")
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -32,7 +32,7 @@ PROVENANCE_PATH = "data/box_spots/provenance.json"
 SEAT_SPOTS_PATH = "data/box_spots/seat-spots-v2.json"
 # Digest of the reviewed, canonical JSON evidence. Keep this approval separate
 # from the catalog data so editing a source record cannot approve its own kind.
-REVIEWED_PROVENANCE_SHA256 = "2cffb72ddf67b4db6cae9a87069eab9c49071c91c3c04b229dd96d96002a55e4"
+REVIEWED_PROVENANCE_SHA256 = "81c1f9e360b055dae1c467c45bb72f82d73d02bd15a0c94a296129d188dc11b2"
 SOURCE_FAMILIES = frozenset({"ap_box", "weapon_crate", "wumpa_crate", "loose_fruit", "time_crate", "ctr_letter"})
 AP_SOURCE_KINDS = frozenset({"box_author_export", "builtin_ap_table", "community_ap_submission",
                              "reviewed_ap_proposal"})
@@ -53,6 +53,13 @@ LEGACY_PATHS = {
     "data/box_spots/legacy/arabian-heights-day-a6-16.json": (
         "4cdafd7cab8eba20f2997d3ad86514affe99062ac4bae93e4c878ec853c39a8a",
         ("51f6d6d19e1044ba59d21ef80f9df1a9243f63e74900c4ada95e7dfbcabd8e65",)),
+    # Country Speedway's file before IM1b (1.3.1 pin only, spot 11 live) is
+    # kept for rooms that name it; its earlier version (85129c77, 2026-11-26)
+    # has the same numbers and positions, only ranks changed that day, and a
+    # room naming it restored against the later file on main as well.
+    "data/box_spots/legacy/country-speedway-1.3.1.json": (
+        "fd707c9166e349fb35809e271425c59ae539c2fc80ca92981afbd6439081b781",
+        ("85129c77c20cc81e43b196d920d77db4553d4f5d10b843c566a28c3d7fa6a3df",)),
 }
 
 
@@ -140,6 +147,14 @@ def check_draft_file(doc, path="<file>"):
             # checked where rulings are loaded (box_spots.check_rules).
             if track["kind"] != "custom" or parse_rule(spot["rule_of"]) is None or spot.get("needs") != "blue_fire":
                 _fail(path, f"spot {n}: rule_of is <kind>:<ordinal> on a custom file, with needs blue_fire")
+        if "lev_sha256" in spot:
+            # IM1b: a spot that exists only on some of the file's LEV pins
+            # (Country Speedway 3 and 4 overlap a 1.3.0 pickup, not a 1.3.1 one).
+            only = spot["lev_sha256"]
+            pins = track.get("lev_sha256") or []
+            if (track["kind"] != "custom" or not isinstance(only, list) or not only
+                    or len(set(only)) != len(only) or not set(only) < set(pins) or not all(_sha256(p) for p in only)):
+                _fail(path, f"spot {n}: lev_sha256 is a distinct, proper subset of the file's LEV pins")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):

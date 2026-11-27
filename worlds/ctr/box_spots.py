@@ -35,7 +35,10 @@ A4-52 does the same). Below rank 3 the seed's boost options never change a pool.
 seed only at that Shortcut Knowledge tier or above, and a hard spot also needs
 one level of each stat. `door`: Tiger Temple's stone door (Itemsanity weapon
 term). `no_gate`: a spot that was ruled to need nothing although it sits past a
-jump; carried so nobody gates it later.
+jump; carried so nobody gates it later. `lev_sha256` (IM1b, 2026-11-27): the
+spot exists only for a package whose LEV is one of these pins, a proper subset
+of the file's pins; on the file's other pins it is not in the pool and its
+number stays reserved.
 
 THE PICK (ruled 2026-11-06, "all spots equal"). Per track, the eligible spots
 (not retired, tier allowed) go into one pool. With 15 or fewer all are used and
@@ -138,9 +141,12 @@ def eligible(entry, knowledge, blue_fire=False, logic_difficulty=None, package=N
     """Sorted numbers of a file's spots a Shortcut Knowledge tier creates; a
     blue_fire spot only when the seed has Progressive Boost with Blue Fire. A
     `rule_of` spot exists as its crate ruling says (easy/medium need Blue Fire,
-    else it is removed and its ID stays registered)."""
+    else it is removed and its ID stays registered). A spot limited to some
+    of the file's LEV pins exists only for a package on one of them."""
+    pin = lev_pin(package)
     return sorted(s["number"] for s in entry["doc"]["spots"]
                   if tier(s) <= knowledge
+                  and ("lev_sha256" not in s or pin in s["lev_sha256"])
                   and ((rule_rank(s, package, blue_fire, logic_difficulty) is not None) if "rule_of" in s
                        else (blue_fire or needs_rank(s) < BLUE_FIRE_RANK)))
 

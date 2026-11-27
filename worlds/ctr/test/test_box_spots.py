@@ -49,6 +49,7 @@ DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 TOASTY = "toasty-terrace"
+COUNTRY_130 = "9fa73436daaf91434ede1d6fb036a8e6dff225c55533cc0be5723d229b5e53bd"
 #: IM1: dowlle's reviewed Box Author Mode placements of 2026-11-27, one file per
 #: Sunday LEV (test_im1_reviewed_boxes.py holds their counts, pins and ranks).
 IM1 = {"royal-raceway", "tv-world", "super-snocross-2", "arabian-heights-night", "yoshi-circuit",
@@ -140,7 +141,8 @@ class TestConversion(unittest.TestCase):
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
         self.assertEqual(set(box_spots.CUSTOM_FILES),
-                         {*COMMUNITY, *DOWLLE_CUSTOM, *RECOVERED_CUSTOM, *IM1, ARABIAN_DAY, "sunset-vista", TOASTY})
+                         {*COMMUNITY, *DOWLLE_CUSTOM, *RECOVERED_CUSTOM, *IM1, ARABIAN_DAY, "sunset-vista", TOASTY,
+                          "jungle-boogie-n-gage"})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -937,7 +939,8 @@ class TestDowlleCustomSpots(unittest.TestCase):
         for key, (block, pin, first, count, boost) in DOWLLE_CUSTOM.items():
             doc = box_spots.CUSTOM_FILES[key]["doc"]
             self.assertEqual(destinations.named_track(key).block_index, block, key)
-            self.assertEqual(doc["track"]["lev_sha256"], [pin], key)
+            # IM1b: Country Speedway's file covers the merged 1.3.1 and 1.3.0 pair.
+            self.assertEqual(doc["track"]["lev_sha256"], [pin, COUNTRY_130] if key == "country-speedway" else [pin], key)
             new = [s for s in doc["spots"] if s.get("source") == DOWLLE_2026_11_24]
             self.assertEqual([s["number"] for s in new], list(range(first, first + count)), key)
             self.assertEqual(max(s["number"] for s in doc["spots"]), first + count - 1, key)

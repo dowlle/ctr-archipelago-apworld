@@ -183,6 +183,8 @@ class TestRoyalRaceway(unittest.TestCase):
             self.assertTrue(all(not w.multiworld.get_location(c["display_name"], 1).can_reach(state) for c in checks))
 
     def test_mixed_room_preserves_other_candidates(self):
+        from .test_content_item_boxes import before_im1b
+        self.enterContext(before_im1b())  # Country Speedway 1.3.0 crate seats, as before IM1b
         from .test_country_speedway import PACKAGE as country_package
         from .test_toasty_terrace import PACKAGE as toasty_package
         options = royal_options()
