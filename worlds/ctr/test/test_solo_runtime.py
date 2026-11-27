@@ -1171,6 +1171,67 @@ class TestCustomTracks(SoloTestCase):
                                        self.assets, [race["id"]], [])
         self.assertNotIn("relic_files", result[GAME]["custom_tracks"][0])
 
+    def test_a_stale_relic_revision_takes_the_installed_one(self):
+        # MR2 review 2, finding 1: an older export named the registry label
+        # (1.1-relic) where the installed Relic package says 1.1. A room finds
+        # the Relic files by revision and pins, so the installed one is kept.
+        race, relic = self.split_track()
+        stale = dict(json.loads(json.dumps(race)), relic_revision="1.1-relic")
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [stale]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["relic_revision"], "1.1")
+        self.assertEqual(entry["relic_files"], relic["files"])
+        ctr_solo._world_module("custom_packages").admit_all(result[GAME]["custom_tracks"])
+        # Other Relic pins are the player's own choice and stay as written.
+        other = dict(json.loads(json.dumps(stale)), relic_files=race["files"][::-1])
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [other]}},
+                                       self.assets, [race["id"]], [])
+        self.assertEqual(result[GAME]["custom_tracks"][0]["relic_revision"], "1.1-relic")
+
+    def test_a_relic_pair_another_entry_uses_is_not_carried(self):
+        # MR2 review 2, finding 4: a race-only entry and a legacy entry under
+        # another key that already lists the Relic pair as its main pair.
+        # Carrying the pair would repeat it and admission would refuse the file.
+        race, relic = self.split_track()
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        legacy = dict(json.loads(json.dumps(relic)), id="package/fixture-split-old/1.1", content_id="fixture-split-old",
+                      uuid="0f0e0d0c-0b0a-4908-8706-00000000beef")
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        admit_all([older, legacy])  # valid as the player wrote it
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [older, legacy]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entries = result[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertEqual(len(mine), 1)
+        self.assertNotIn("relic_files", mine[0])
+        # A newly picked merged track is written without the pair for the same reason.
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [legacy]}},
+                                       self.assets, [race["id"]], [])
+        entries = result[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertNotIn("relic_files", mine)
+        self.assertFalse(mine["capabilities"]["relic"])
+
+    def test_malformed_mode_pairs_never_break_the_track_list(self):
+        # MR2 review 2, finding 5: valid hash and size with a list-valued role.
+        race, relic = self.split_track()
+        good = [{k: f[k] for k in ("role", "sha256", "bytes")} for f in relic["files"]]
+        bad = [dict(good[0], role=["lev"]), good[1]]
+        rows = [{"files": bad}, {"files": [dict(good[0], bytes=[1]), good[1]]}, {"files": "x"}, "x",
+                {"files": [good[0], dict(good[1], role={"a": 1})]}, {"files": good}]
+        with open(os.path.join(self.solo, "pairs", "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": rows}, handle)
+        self.assertEqual([t["id"] for t in self.tracks()], [race["id"]])
+        with open(os.path.join(self.solo, "pairs", "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": rows[:-1]}, handle)
+        self.assertEqual(sorted(t["id"] for t in self.tracks()), sorted([race["id"], relic["id"]]))
+
     def test_bad_descriptor_and_room_files_are_skipped(self):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         with open(os.path.join(self.descriptors, "bytes.json"), "wb") as handle:

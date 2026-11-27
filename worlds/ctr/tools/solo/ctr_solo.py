@@ -1255,9 +1255,14 @@ def _relic_only_pins(paths: Paths) -> set:
     found = set()
     for row in rows if isinstance(rows, list) else []:
         files = row.get("files") if isinstance(row, dict) else None
-        pins = _pins({"files": files}) if isinstance(files, list) and len(files) == 2 else []
-        if len(pins) == 2 and all(isinstance(sha, str) and type(size) is int for _, sha, size in pins):
-            found.add(tuple(pins))
+        if not isinstance(files, list) or len(files) != 2 or not all(isinstance(f, dict) for f in files):
+            continue
+        pins = [(f.get("role"), f.get("sha256"), f.get("bytes")) for f in files]
+        # Only plain values reach the set: a malformed row is skipped, it never
+        # breaks the track list.
+        if (all(type(role) is str and type(sha) is str and type(size) is int for role, sha, size in pins)
+                and sorted(role for role, _, _ in pins) == ["lev", "vrm"]):
+            found.add(tuple(sorted(pins)))
     return found
 
 
@@ -1574,9 +1579,15 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
         descriptor = by_id[track_id]["descriptor"]
         same = [d for d in custom if _same_package(d, descriptor)]
         if not same:
+            if "relic_files" in descriptor and _relic_pair_taken(custom, descriptor["relic_files"]):
+                # Another entry of this YAML already uses the Relic pair: the
+                # track is written as before, so the file keeps passing admission.
+                _note(f"{descriptor['display_name']}: Relic Race file not added, "
+                      "another track entry of this YAML already uses it")
+                descriptor = _without_relic_pair(descriptor)
             custom.append(descriptor)
         for listed_entry in same:
-            _carry_relic_pair(listed_entry, descriptor)
+            _carry_relic_pair(listed_entry, descriptor, [d for d in custom if d is not listed_entry])
     for track_id in guaranteed:
         if track_id == CORTEX_ID:
             continue
@@ -1605,14 +1616,56 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     return doc
 
 
-def _carry_relic_pair(listed: dict, descriptor: dict) -> None:
+def _note(text: str) -> None:
+    """A line for the client's solo log (stderr); stdout is the protocol."""
+    print(f"[solo] {text}", file=sys.stderr)
+
+
+def _relic_pins(files) -> tuple:
+    return tuple(_pins({"files": files})) if isinstance(files, list) else ()
+
+
+def _relic_pair_taken(entries, relic_files) -> bool:
+    """True when an entry already uses this Relic pair, as its main pair or as
+    its own relic_files. admit_all refuses a pair listed twice."""
+    pins = _relic_pins(relic_files)
+    return any(isinstance(d, dict) and pins in (_relic_pins(d.get("files")), _relic_pins(d.get("relic_files")))
+               for d in entries)
+
+
+def _without_relic_pair(descriptor: dict) -> dict:
+    """The descriptor as it was written before merged mode builds."""
+    plain = {k: json.loads(json.dumps(v)) for k, v in descriptor.items()
+             if k not in ("relic_files", "relic_revision", "relic_targets")}
+    if isinstance(plain.get("capabilities"), dict):
+        plain["capabilities"]["relic"] = False
+    return plain
+
+
+def _carry_relic_pair(listed: dict, descriptor: dict, others=()) -> None:
     """A YAML entry written before its track was merged (same race pins, no
     Relic Race of its own) takes the installed entry's Relic pair, so the
     picked track keeps every mode. An entry that already sets a Relic Race or
-    its own relic_files stays as the YAML has it."""
+    its own relic_files stays as the YAML has it, except that an entry naming
+    the same Relic pins takes the installed relic_revision: a room finds the
+    Relic files by revision and pins, and an older export could carry a label
+    the installed files do not. When another entry already uses the Relic
+    pair, nothing is carried: admit_all would refuse the repeated pair."""
+    relic = descriptor.get("relic_files")
+    if relic is None:
+        return
+    if "relic_files" in listed:
+        revision = descriptor.get("relic_revision")
+        if (isinstance(revision, str) and _relic_pins(listed["relic_files"]) == _relic_pins(relic)
+                and listed.get("relic_revision") != revision):
+            listed["relic_revision"] = revision
+        return
     capabilities = listed.get("capabilities")
-    if ("relic_files" not in descriptor or "relic_files" in listed or "relic_targets" in listed
-            or not isinstance(capabilities, dict) or capabilities.get("relic")):
+    if "relic_targets" in listed or not isinstance(capabilities, dict) or capabilities.get("relic"):
+        return
+    if _relic_pair_taken(others, relic):
+        _note(f"{descriptor['display_name']}: Relic Race file not added to the loaded entry, "
+              "another track entry of this YAML already uses it")
         return
     for key in ("relic_files", "relic_revision", "relic_targets"):
         if key in descriptor:
