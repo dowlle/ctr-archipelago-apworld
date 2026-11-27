@@ -23,7 +23,7 @@ DEFAULT_NEEDS = "usf"
 SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
 DOORS = ("tiger_temple",)
 SPOT_FIELDS = {"number", "pos", "rot_y", "needs", "shortcut", "door", "no_gate", "source", "credit", "review",
-               "note", "source_family", "provenance"}
+               "note", "source_family", "provenance", "rule_of"}
 TEXT_FIELDS = ("source", "credit", "review", "note")
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -107,6 +107,15 @@ def check_draft_file(doc, path="<file>"):
             # The retail fallback tables (box_spots._retail_tables) have no
             # Blue Fire filter, so rank 3 stays on custom files.
             _fail(path, f"spot {n}: needs blue_fire is only for custom tracks")
+        if "rule_of" in spot:
+            # TV2: the spot carries a crate's ruling (object_rulings), so the
+            # two cannot drift. `needs` stays the strictest bound (blue_fire)
+            # for any reader that ignores the rule.
+            from . import object_rulings
+            parsed = object_rulings.parse_rule(spot["rule_of"])
+            if (track["kind"] != "custom" or parsed is None or spot.get("needs") != "blue_fire"
+                    or not object_rulings.has_ruling(track["track_key"], *parsed)):
+                _fail(path, f"spot {n}: rule_of names a ruled crate of this custom track, with needs blue_fire")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):
