@@ -1218,6 +1218,99 @@ class TestCustomTracks(SoloTestCase):
         self.assertNotIn("relic_files", mine)
         self.assertFalse(mine["capabilities"]["relic"])
 
+    def store_package(self, descriptor: dict, version: str) -> str:
+        """Moves the descriptor's fixture files from its loose folder into a
+        shared store package under `version`, as an install does."""
+        source = os.path.join(self.assets, "tracks", descriptor["content_id"], "original")
+        files = []
+        for pin in descriptor["files"]:
+            name = next(n for n in os.listdir(source) if n.lower().endswith("." + pin["role"])
+                        and hashlib.sha256(open(os.path.join(source, n), "rb").read()).hexdigest() == pin["sha256"])
+            files.append((name, pin))
+        manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"], "version": version,
+                    "title": descriptor["display_name"], "compatibility": {"native_contract": 1, "apworld_contract": 1},
+                    "files": sorted(({"role": pin["role"], "path": "original/track." + pin["role"],
+                                      "sha256": pin["sha256"], "bytes": pin["bytes"]} for _, pin in files),
+                                    key=lambda item: (item["role"], item["path"]))}
+        blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        folder = os.path.join(self.assets, "tracks", "packages", hashlib.sha256(blob).hexdigest())
+        os.makedirs(os.path.join(folder, "original"))
+        with open(os.path.join(folder, "manifest.json"), "wb") as handle:
+            handle.write(blob)
+        for name, pin in files:
+            os.replace(os.path.join(source, name), os.path.join(folder, "original", "track." + pin["role"]))
+        return folder
+
+    def test_a_room_descriptor_takes_the_installed_relic_revision(self):
+        # MR2 review 3, finding 1: the Relic pair is installed under 1.1.0
+        # and the only race descriptor left is an older room's, naming 1.1.0-relic.
+        # A room finds relic_files by exact version, so the picker, a fresh
+        # selection and an older YAML entry all get the installed 1.1.0.
+        race, relic = self.split_track()
+        self.store_package(relic, "1.1.0")
+        os.unlink(os.path.join(self.descriptors, "fixture-split__1.0.json"))
+        os.unlink(os.path.join(self.descriptors, "fixture-split__1.1.json"))
+        stale = dict(json.loads(json.dumps(race)), relic_revision="1.1.0-relic")
+        room = os.path.join(self.solo, "rooms", "00112233445566778899aabbccddeeff")
+        os.makedirs(room)
+        with open(os.path.join(room, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [stale]}, handle)
+        tracks = self.tracks()
+        self.assertEqual([(t["id"], t["source"]) for t in tracks], [(race["id"], "room")])
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        fresh = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [])
+        entry, = fresh[GAME]["custom_tracks"]
+        self.assertEqual((entry["relic_revision"], entry["relic_files"]), ("1.1.0", relic["files"]))
+        admit_all(fresh[GAME]["custom_tracks"])
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        for listed in (older, stale):
+            with self.subTest(listed="race only" if listed is older else "stale label"):
+                doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [json.loads(json.dumps(listed))]}}
+                entry, = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+                self.assertEqual((entry["relic_revision"], entry["relic_files"]), ("1.1.0", relic["files"]))
+        # Not installed in the store, the written revision stays: a room
+        # installs the Relic pair under that name.
+        shutil.rmtree(os.path.join(self.assets, "tracks", "packages"))
+        fresh = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [])
+        self.assertEqual(fresh[GAME]["custom_tracks"][0]["relic_revision"], "1.1.0-relic")
+
+    def test_conflict_fallback_always_passes_admission(self):
+        # MR2 review 3, finding 4: admission compares pairs by hash alone, so a
+        # legacy entry declaring another size for the Relic hashes is the same
+        # pair; and a stripped Relic pair takes its evidence rows with it.
+        race, relic = self.split_track()
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        legacy = dict(json.loads(json.dumps(relic)), id="package/fixture-split-old/1.1", content_id="fixture-split-old",
+                      uuid="0f0e0d0c-0b0a-4908-8706-00000000beef")
+        for pin in legacy["files"]:
+            pin["bytes"] += 1
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        admit_all([older, legacy])
+        for listed in ([older, legacy], [legacy]):
+            with self.subTest(entries=len(listed)):
+                doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": json.loads(json.dumps(listed))}}
+                entries = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+                admit_all(entries)
+                mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+                self.assertNotIn("relic_files", mine)
+        # Evidence about the Relic files goes with them; evidence about the race files stays.
+        lev, vrm = (f["sha256"] for f in race["files"])
+        relic_lev, relic_vrm = (f["sha256"] for f in relic["files"])
+        rows = [dict(capability=c, file_hashes=h, verifier="fixture", revision=1, level="structural")
+                for c, h in (("arcade", [lev, vrm]), ("relic", [relic_lev, relic_vrm]), ("relic", [lev, relic_vrm]))]
+        with open(os.path.join(self.descriptors, "fixture-split__1.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(dict(race, evidence=rows), handle)
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [json.loads(json.dumps(legacy))]}}
+        entries = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertEqual(mine["evidence"], rows[:1])
+        self.assertNotIn("relic_files", mine)
+
     def test_malformed_mode_pairs_never_break_the_track_list(self):
         # MR2 review 2, finding 5: valid hash and size with a list-valued role.
         race, relic = self.split_track()
