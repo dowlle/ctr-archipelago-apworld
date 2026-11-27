@@ -1922,6 +1922,30 @@ class TestCustomTracks(SoloTestCase):
             listed = [row for row in ctr_solo.installed_tracks(paths, self.assets) if row["content_id"] == "big-forest"]
         self.assertEqual(len(listed), 1)
 
+    def test_a_newer_cut_of_one_package_is_one_row(self):
+        """PS2: two cuts of one package (one uuid and version, other files),
+        the older still installed and named by an old room: Play Solo lists
+        the newest install only, as the client's store scan folds them."""
+        meta = ("metadata/xdelta-source.json", {"schema_version": 1, "provider": "xdelta", "patch_sha256": "b" * 64,
+                                                 "bigfile_index": 5, "track_key": "cut-track"})
+        old = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-old", write_descriptor=False)
+        new = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-new", write_descriptor=False)
+        new["uuid"] = old["uuid"]
+        old_folder = self._store_build(old, "cut-old", meta)
+        self._store_build(new, "cut-new", meta)
+        os.utime(os.path.join(old_folder, "manifest.json"), (1_000_000, 1_000_000))
+        rooms = os.path.join(self.solo, "rooms", "old-room")
+        os.makedirs(rooms)
+        with open(os.path.join(rooms, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [old]}, handle)
+        with open(os.path.join(self.descriptors, "cut-track__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(new, handle)
+        rows = [row for row in self.tracks() if row.get("content_id") == "cut-track"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], new["id"])
+        self.assertEqual(rows[0]["build"], {f["role"]: f["sha256"] for f in new["files"]}["lev"][:16]
+                         + {f["role"]: f["sha256"] for f in new["files"]}["vrm"][:16])
+
     def test_one_build_keeps_its_plain_row_id(self):
         """PS2: with one build installed the row id stays the descriptor id;
         the build tag and origin are reported all the same."""

@@ -1248,12 +1248,6 @@ def _manifest_schema_valid(manifest: object, pin: str) -> bool:
         return False
 
 
-def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
-    """Find one installed revision whose manifest and every named file match."""
-    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
-    return next((folder for folder, _ in _store_packages(tracks_root, wanted, descriptor["revision"])), None)
-
-
 def _installed_versions_by_pins(tracks_root: str, files) -> set:
     """Every version under which a verified package in the shared store
     carries these LEV and VRM pins (native InstalledVersionsByPins). A room
@@ -1409,8 +1403,29 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
                "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
                "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
                "source": source, "build": _build_tag(descriptor), "origin": _build_origin(shared, descriptor),
-               "descriptor": descriptor}
+               "descriptor": descriptor, "_folder": shared}
         result.append(row)
+    # Cuts of one package (one package uuid and version, other files) are one
+    # track, as the client's store scan folds them (A3-29): the newest
+    # installed package stays, also when an older room still names the older
+    # cut. That room still finds its own files by pins.
+    def installed_at(row):
+        try:
+            return os.path.getmtime(os.path.join(row["_folder"], "manifest.json")) if row["_folder"] else -1.0
+        except OSError:
+            return -1.0
+    newest = {}
+    for row in result:
+        cut = (row["descriptor"]["uuid"], row["revision"])
+        if cut not in newest or (installed_at(row), row["build"]) > (installed_at(newest[cut]), newest[cut]["build"]):
+            newest[cut] = row
+    folded = [row for row in result if newest[(row["descriptor"]["uuid"], row["revision"])] is not row]
+    for row in folded:
+        _note(f"{row['display_name']} {row['revision']}: left out, a newer cut of the same package is installed")
+    folded_ids = {id(row) for row in folded}
+    result = [row for row in result if id(row) not in folded_ids]
+    for row in result:
+        del row["_folder"]
     # A pick names one build: rows that share a descriptor id get the build
     # tag in their row id (the client's AP_SoloBuildRowId).
     ids = [t["id"] for t in result]
@@ -1828,7 +1843,7 @@ def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: lis
     known_packages = _world_module("content_plan").PACKAGES
     tracks_root = os.path.join(assets, "tracks")
     for entry in section.get("custom_tracks", []):
-        folder = _shared_package_folder(tracks_root, entry)
+        folder = _package_folder(tracks_root, entry)  # the entry's own package first (PS2)
         manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, folder) if folder else None
         files = manifest.get("files", []) if isinstance(manifest, dict) else []
         public = any(_same_package(entry, package) for package in known_packages)
