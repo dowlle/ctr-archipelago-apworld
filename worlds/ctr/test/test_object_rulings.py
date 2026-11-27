@@ -28,6 +28,10 @@ def options(difficulty="easy", blue=False, boost="shared_global", wumpa="crates"
 
 
 class TestObjectRulings(unittest.TestCase):
+    # The fallback seats on TV World 1.1.0 (BP1) are what rooms generated
+    # before IM1's TV World spot file keep; new rooms use the spot file.
+    @mock.patch.dict(box_spots.CUSTOM_FILES, {k: v for k, v in box_spots.CUSTOM_FILES.items() if k != "tv-world"},
+                     clear=True)
     def test_tv_world_replaced_seats_keep_ids_and_legacy_rooms(self):
         opts = options()
         opts["item_box_count"] = 15
