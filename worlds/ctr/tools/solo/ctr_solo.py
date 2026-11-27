@@ -1088,7 +1088,9 @@ def _small_json(path: str, limit: int, inside: str, unique_keys: bool = False):
 
 def _descriptor_sources(paths: Paths) -> list:
     """(descriptor, source) pairs, unchecked: the world's own packages, the
-    descriptor files in solo/tracks, and the tracks of the solo rooms."""
+    descriptor files in solo/tracks, and the tracks of the solo rooms. The
+    client's embedded adapter (ap_solo_track_visibility.hpp) filters this
+    list as pairs, so its shape stays."""
     found = [(d, "built-in") for d in _world_module("content_plan").PACKAGES]
     if os.path.isdir(paths.tracks):
         for name in sorted(os.listdir(paths.tracks)):
@@ -1103,6 +1105,43 @@ def _descriptor_sources(paths: Paths) -> list:
             for descriptor in tracks if isinstance(tracks, list) else []:
                 found.append((descriptor, "room"))
     return found
+
+
+def _build_tag(descriptor: dict) -> str:
+    """The client's build tag of a descriptor's pins (AP_SoloBuildTag): the
+    first 8 hex digits of the LEV SHA-256 and then of the VRM SHA-256. Two
+    installs of one track key and version with other files differ in it."""
+    by_role = {pin["role"]: pin["sha256"] for pin in descriptor["files"]}
+    return by_role["lev"][:8] + by_role["vrm"][:8]
+
+
+def _build_origin(folder: str | None, descriptor: dict) -> dict:
+    """Where an installed build came from, as its package recorded it: a
+    Project Saphi download (directly or through a room's Install missing), an
+    xdelta patch import with the patch's SHA-256, or local files. Without a
+    package an xdelta locator in the descriptor still names the patch. The
+    client shows it beside the title when two builds share a track key and
+    version (PS2); nothing is paired or preferred by it."""
+    manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, folder) if folder else None
+    for file in manifest.get("files", []) if isinstance(manifest, dict) else []:
+        if not isinstance(file, dict) or file.get("role") != "presentation" or not isinstance(file.get("path"), str):
+            continue
+        source = _small_json(os.path.join(folder, file["path"]), 4096, folder)
+        if not isinstance(source, dict) or source.get("schema_version") != 1:
+            continue
+        provider = source.get("provider")
+        if file["path"] == "metadata/saphi-source.json" and provider == "projectsaphi":
+            return {"kind": "saphi"}
+        if file["path"] == "metadata/seed-source.json" and provider == "ctr-seed":
+            return {"kind": "saphi"}
+        if file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
+            sha = source.get("patch_sha256")
+            return {"kind": "patch", "patch_sha256": sha if isinstance(sha, str) else ""}
+    locator = descriptor.get("locator")
+    if isinstance(locator, dict) and locator.get("kind") == "xdelta":
+        sha = locator.get("patch_sha256")
+        return {"kind": "patch", "patch_sha256": sha if isinstance(sha, str) else ""}
+    return {"kind": "local"}
 
 
 def _pinned_file(folders: list, pin: dict) -> str | None:
@@ -1335,7 +1374,10 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
         if tuple(_pins(descriptor)) in relic_only:
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
-        identity = (destinations.canonical_track_key(key), revision)
+        # PS2: one row per build. Two installs of one track key and version
+        # with other files (a Saphi download beside a patch import) are both
+        # listed; the same files from another source are one row.
+        identity = (destinations.canonical_track_key(key), revision, tuple(_pins(descriptor)))
         if identity in seen:
             continue
         folders = [os.path.join(tracks_root, folder, "original")
@@ -1347,13 +1389,21 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
         seen.add(identity)
         descriptor = _with_installed_relic_revision(tracks_root, descriptor)
         modes = supported("custom", descriptor)
-        result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
-                       "revision": revision, "display_name": descriptor["display_name"],
-                       "author": descriptor["author"], "laps": descriptor["laps"],
-                       "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
-                       "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
-                       "source": source, "descriptor": descriptor})
-    result.sort(key=lambda t: (t["display_name"].lower(), t["revision"]))
+        row = {"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
+               "revision": revision, "display_name": descriptor["display_name"],
+               "author": descriptor["author"], "laps": descriptor["laps"],
+               "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
+               "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
+               "source": source, "build": _build_tag(descriptor), "origin": _build_origin(shared, descriptor),
+               "descriptor": descriptor}
+        result.append(row)
+    # A pick names one build: rows that share a descriptor id get the build
+    # tag in their row id (the client's AP_SoloBuildRowId).
+    ids = [t["id"] for t in result]
+    for row in result:
+        if ids.count(row["id"]) > 1:
+            row["id"] = f"{row['id']}@{row['build']}"
+    result.sort(key=lambda t: (t["display_name"].lower(), t["revision"], t["id"]))
     return result
 
 
@@ -1550,6 +1600,10 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                         track=packages[keys.index(CORTEX_ID)])
     twice = next((p for p, key in zip(packages, keys) if keys.count(key) > 1), None)
     if twice:
+        same = [p for p, key in zip(packages, keys) if key == keys[packages.index(twice)]]
+        if len({by_id[p]["revision"] for p in same}) == 1:
+            raise SoloError("track", f"Pick one copy of {by_id[twice]['display_name']}: two installs of version "
+                            f"{by_id[twice]['revision']} are picked.", track=twice)
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
     import copy
     doc = copy.deepcopy(doc)
@@ -1763,7 +1817,13 @@ def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: lis
                 public |= type(track_id) is int and 0 < track_id <= 100000000
             elif file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
                 locator = dict(kind="xdelta", patch_sha256=source.get("patch_sha256"),
-                               bigfile_index=source.get("bigfile_index"), source_url=source.get("source_url"))
+                               bigfile_index=source.get("bigfile_index"))
+                # The client's importer records no source_url (LRG2Pancho has
+                # none): a missing one is left out, not written as null, which
+                # admission refuses and which made the track "no known public
+                # source" (PS2).
+                if source.get("source_url") is not None:
+                    locator["source_url"] = source.get("source_url")
                 try:
                     _world_module("custom_packages").admit(dict(entry, locator=locator))
                 except ValueError:
