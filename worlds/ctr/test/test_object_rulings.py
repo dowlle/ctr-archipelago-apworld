@@ -12,6 +12,8 @@ from .test_custom_packages import named_fixture
 from .test_track_checks import check_options
 
 TV = "custom/tv-world/1.1.0"
+#: IM1's TV World spot file, present when older rooms restore.
+TV_FILE = box_spots.CUSTOM_FILES["tv-world"]
 PIN = "e3d765e824a2de96d06d1f34951b6d2ab51c027fb3353c62d8e7086b8ce1e33a"
 
 
@@ -49,8 +51,10 @@ class TestObjectRulings(unittest.TestCase):
         self.assertEqual(current["content_plan"]["item_boxes"]["seat_spots"], [{"track_id": TV, "picked": [4, 6, 14]}])
         for wire in (legacy, current):
             wire = json.loads(json.dumps(wire))
-            restored = make_world({}, passthrough=wire, stop_before="pre_fill")
-            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+            for files in ({}, {"tv-world": TV_FILE}):
+                with mock.patch.dict(box_spots.CUSTOM_FILES, files):
+                    restored = make_world({}, passthrough=copy.deepcopy(wire), stop_before="pre_fill")
+                    self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
         shifted = copy.deepcopy(current)
         next(c for c in boxes(shifted) if "spot" in c)["spot"]["pos"][0] += 1
         with self.assertRaisesRegex(OptionError, "reviewed fallback seat"):

@@ -73,6 +73,8 @@ def check_file(doc, path="<file>"):
 
 #: {LevelID: {doc, path, sha256}} and {track_key: {...}}, read once at import.
 RETAIL_FILES, CUSTOM_FILES, SOURCE_RECORDS = box_spot_catalog.load_catalog(_read)
+#: {SHA-256: entry} of replaced files kept for restoring older rooms (IM1).
+LEGACY_FILES = box_spot_catalog.load_legacy(_read, SOURCE_RECORDS, CUSTOM_FILES)
 
 # Sparse authored replacements for fallback seats, indexed by the exact LEV
 # and original one-based weapon ordinal. These are ground anchors for AP
@@ -120,15 +122,21 @@ def lev_pin(package):
                  and pin.get("role") == "lev"), None)
 
 
-def file_for(track, package=None):
+def file_for(track, package=None, file_sha256=None):
     """The spot file entry a plan track uses, or None. Retail by LevelID; a
     named custom track only when the package's LEV is one of the file's pins
-    (a generic `Custom Track N` never uses one, ruled 2026-11-06)."""
+    (a generic `Custom Track N` never uses one, ruled 2026-11-06). With the
+    `file_sha256` of a saved spot set that names a restore-only file of the
+    same track and pin (LEGACY_FILES), that older file."""
     if track.get("origin") == "retail":
         return RETAIL_FILES.get(track["retail_id"])
     if track.get("origin") == "custom" and "named_block" in track and package:
         entry = CUSTOM_FILES.get(destinations.canonical_track_key(package.get("content_id")))
         if entry and lev_pin(package) in entry["doc"]["track"]["lev_sha256"]:
+            legacy = LEGACY_FILES.get(file_sha256) if file_sha256 != entry["sha256"] else None
+            if (legacy and legacy["doc"]["track"]["track_key"] == entry["doc"]["track"]["track_key"]
+                    and lev_pin(package) in legacy["doc"]["track"]["lev_sha256"]):
+                return legacy
             return entry
     return None
 
@@ -146,8 +154,11 @@ def spot_set(track, package, knowledge, seed, player, count=PICK, blue_fire=Fals
 
 
 def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True, blue_fire=False):
-    """A plan's spot set against this build's file; returns the file entry."""
-    entry = file_for(track, package)
+    """A plan's spot set against this build's file; returns the file entry.
+    When restoring (no digest compare), a set that names a restore-only file
+    of the track is checked against that file."""
+    saved = record.get("file_sha256") if isinstance(record, dict) and not compare_digest else None
+    entry = file_for(track, package, saved)
     if entry is None:
         raise SpotFileError(f"box spots for {track['id']}: this build has no spot file for the track")
     keys = {"file_sha256", "pool", "picked"} | ({"lev_sha256"} if track.get("origin") == "custom" else set())

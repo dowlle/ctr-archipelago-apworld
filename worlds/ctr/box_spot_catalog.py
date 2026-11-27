@@ -41,6 +41,15 @@ DAY_PIN = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 NIGHT_PIN = "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c"
 DAY_SOURCE = "a6-16-night-weapon-crates"
 DAY_ROWS_SHA256 = "e1870b33d79aa48311c23320f6e7c495a82df014012a30e5dcfa3597516a39ae"
+#: Restore-only copies of spot files a later build replaced, by SHA-256 (IM1,
+#: 2026-11-27). A room whose spot set names one of these digests restores
+#: against it; generation and validation of a new room never use one. Day's
+#: alpha6 file (27 rows copied from Night's weapon crates) is kept for rooms
+#: generated on main between 2026-11-19 and 2026-11-20, which carry no box data.
+LEGACY_PATHS = {
+    "4cdafd7cab8eba20f2997d3ad86514affe99062ac4bae93e4c878ec853c39a8a":
+        "data/box_spots/legacy/arabian-heights-day-a6-16.json",
+}
 
 
 class SpotFileError(ValueError):
@@ -216,6 +225,22 @@ def load_seat_spots(read):
                     or not all(_int16(v) for v in (*spot["pos"], spot["rot_y"]))):
                 _fail(path, f"invalid seat replacement {pin}/{ordinal}")
     return catalog
+
+
+def load_legacy(read, source_records, custom):
+    """{SHA-256: entry} of the restore-only files; each must match its digest,
+    pass the source checks and replace a current custom file of the same track."""
+    out = {}
+    for digest, path in LEGACY_PATHS.items():
+        raw = read(path)
+        if hashlib.sha256(raw).hexdigest() != digest:
+            _fail(path, "does not match its frozen SHA-256")
+        doc = check_file(json.loads(raw.decode("utf-8")), source_records, path)
+        key = doc["track"].get("track_key")
+        if doc["track"]["kind"] != "custom" or key not in custom or custom[key]["sha256"] == digest:
+            _fail(path, "must be an older version of a current custom spot file")
+        out[digest] = dict(doc=doc, path=path, sha256=digest)
+    return out
 
 
 def load_catalog(read, *, paths=None):

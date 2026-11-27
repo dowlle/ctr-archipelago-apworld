@@ -7,13 +7,12 @@ or clearance check are held: their number stays free. Every spot is Boost 0
 except Royal Raceway 38 (plain Boost 2) and Snowy Valley 30 (Boost 1).
 """
 import copy
-import hashlib
 import json
-import pkgutil
 import unittest
 from unittest import mock
 
-from .. import box_spots, content_item_boxes, destinations, named_tracks
+from Options import OptionError
+from .. import box_spots, content_plan, destinations, named_tracks, track_rulings
 from ..Locations import CTR_LOCATION_IDS
 from .test_box_spots import spot_set
 from .test_content_item_boxes import box_options, boxes, btp, first_world
@@ -116,25 +115,57 @@ class TestIm1Generation(unittest.TestCase):
                 self.assertIsNone(spot_set(plan, tid))
                 self.assertTrue(all("spot" not in c for c in boxes(plan, tid)))
 
+    def old_catalog(self):
+        """The catalog as it was before IM1: no new files, Day's alpha6 rows."""
+        (legacy,) = box_spots.LEGACY_FILES.values()
+        files = {k: v for k, v in box_spots.CUSTOM_FILES.items() if k not in IM1}
+        files["arabian-heights-day"] = legacy
+        return legacy, mock.patch.dict(box_spots.CUSTOM_FILES, files, clear=True)
+
     def test_room_from_before_the_files_restores(self):
         """A room generated before IM1 keeps its crate seats (Arabian Heights
-        Day: its old weapon crate rows) and restores unchanged."""
-        main_day = json.loads(pkgutil.get_data("worlds.ctr", "test/fixtures/im1_day_before.json"))
+        Day: its old weapon crate rows, here with their Boost 2 terms under the
+        ruling version of that time) and restores unchanged, with and without
+        the room_compatibility stamp (main produced unstamped Day rooms between
+        2026-11-19 and 2026-11-20)."""
+        legacy, old = self.old_catalog()
         packages = [package_for(key, crates=0 if key == "arabian-heights-day" else 17) for key in IM1]
-        old_files = {k: v for k, v in box_spots.CUSTOM_FILES.items() if k not in IM1}
-        raw = json.dumps(main_day, indent=2).encode()
-        old_files["arabian-heights-day"] = dict(doc=main_day, path="data/box_spots/custom/arabian-heights-day.json",
-                                                sha256=hashlib.sha256(raw).hexdigest())
-        with mock.patch.dict(box_spots.CUSTOM_FILES, old_files, clear=True):
-            wire = json.loads(json.dumps(first_world(box_options(custom=packages, item_box_count=20)).fill_slot_data()))
+        for package in packages:
+            package["capabilities"]["super_turbo_pads"] = True
+        options = box_options(custom=packages, item_box_count=20, progressive_boost="shared_global",
+                              logic_difficulty="hard")
+        with old, mock.patch.object(track_rulings, "RULING_VERSION", 4):
+            wire = json.loads(json.dumps(first_world(options).fill_slot_data()))
         sets = {s["track_id"]: s for s in wire["content_plan"]["item_boxes"]["spot_sets"]}
         day = sets["custom/arabian-heights-day/1.0.0"]
-        self.assertEqual((day["pool"], len(day["picked"])), (27, 20))
+        self.assertEqual((day["file_sha256"], day["pool"], len(day["picked"])), (legacy["sha256"], 27, 20))
         self.assertLessEqual(set(day["picked"]), set(range(1, 28)))
+        self.assertTrue(any(c.get("boost") == 2 for c in boxes(wire["content_plan"], "custom/arabian-heights-day/1.0.0")))
         self.assertFalse(set(sets) & {f"custom/{k}/1.0.0" for k in IM1 if k != "arabian-heights-day"})
-        restored = make_world({}, seed=999, passthrough=copy.deepcopy(wire))
-        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), wire)
+        unstamped = copy.deepcopy(wire)
+        del unstamped["content_plan"]["room_compatibility"]
+        for room in (wire, unstamped):
+            restored = make_world({}, seed=999, passthrough=copy.deepcopy(room))
+            self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), room)
 
+    def test_restore_only_file_never_serves_a_new_room(self):
+        legacy, old = self.old_catalog()
+        package = package_for("arabian-heights-day", crates=0)
+        world = first_world(box_options(custom=[package], item_box_count=20))
+        current = box_spots.CUSTOM_FILES["arabian-heights-day"]
+        self.assertEqual(spot_set(world.ctr_content_plan, "custom/arabian-heights-day/1.0.0")["file_sha256"],
+                         current["sha256"])
+        with old:
+            stale = first_world(box_options(custom=[package], item_box_count=20)).ctr_content_plan
+        with self.assertRaises(OptionError):
+            content_plan.validate(stale)
+        # Only an older file of the same track and pin is ever used.
+        record = spot_set(stale, "custom/arabian-heights-day/1.0.0")
+        track = next(t for t in stale["tracks"] if t["id"] == "custom/arabian-heights-day/1.0.0")
+        self.assertIs(box_spots.file_for(track, package, record["file_sha256"]), legacy)
+        self.assertIs(box_spots.file_for(track, package), current)
+        self.assertIsNone(box_spots.file_for(track, package_for("arabian-heights-day", "01" * 32, 0),
+                                             record["file_sha256"]))
 
 if __name__ == "__main__":
     unittest.main()

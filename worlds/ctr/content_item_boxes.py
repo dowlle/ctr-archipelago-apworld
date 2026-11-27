@@ -343,7 +343,9 @@ def spot_entry(track, record, package=None):
     sets = spot_sets(record)
     if track["id"] not in sets:
         return None
-    entry = box_spots.file_for(track, package)
+    # check_spot_sets already refused a digest other than this build's file
+    # unless the room is being restored; then a restore-only file may apply.
+    entry = box_spots.file_for(track, package, sets[track["id"]].get("file_sha256"))
     if entry is None:
         error(f"item_boxes.spot_sets names {track['id']}, which has no box spot file in this build.")
     return sets[track["id"]], entry
