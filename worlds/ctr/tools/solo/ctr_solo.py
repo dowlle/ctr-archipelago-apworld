@@ -1243,6 +1243,24 @@ def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
     return None
 
 
+def _relic_only_pins(paths: Paths) -> set:
+    """Pins of every known Relic pair of a split track (merged mode builds),
+    from solo/pairs/mode-pairs.json, which the client writes from the
+    registry's mode_pairs and its built-in table. Such a pair is carried by
+    its race pair as relic_files and is never a track's main pair, also not
+    from an older room's metadata. A missing or unreadable file lists none."""
+    folder = os.path.join(paths.solo, "pairs")
+    data = _small_json(os.path.join(folder, "mode-pairs.json"), DESCRIPTOR_MAX_BYTES, folder)
+    rows = data.get("relic_only") if isinstance(data, dict) and data.get("schema_version") == 1 else None
+    found = set()
+    for row in rows if isinstance(rows, list) else []:
+        files = row.get("files") if isinstance(row, dict) else None
+        pins = _pins({"files": files}) if isinstance(files, list) and len(files) == 2 else []
+        if len(pins) == 2 and all(isinstance(sha, str) and type(size) is int for _, sha, size in pins):
+            found.add(tuple(pins))
+    return found
+
+
 def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
     """Admitted revisions resolved from the shared store or legacy room folders."""
     admit = _world_module("custom_packages").admit
@@ -1260,12 +1278,15 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
             return not (saved and saved.get("revision") == raw.get("revision") and _pins(saved) == _pins(raw))
         sources.sort(key=priority)
     seen, result = set(), []
+    relic_only = _relic_only_pins(paths)
     for raw, source in sources:
         try:
             descriptor = admit(json.loads(json.dumps(raw)))
         except Exception:
             continue
         if tizi_madness.is_seed_excluded(descriptor):
+            continue
+        if tuple(_pins(descriptor)) in relic_only:
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
         identity = (destinations.canonical_track_key(key), revision)
@@ -1551,8 +1572,11 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                 required[:] = [name for name in required if name not in required_names]
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
-        if not any(_same_package(d, descriptor) for d in custom):
+        same = [d for d in custom if _same_package(d, descriptor)]
+        if not same:
             custom.append(descriptor)
+        for listed_entry in same:
+            _carry_relic_pair(listed_entry, descriptor)
     for track_id in guaranteed:
         if track_id == CORTEX_ID:
             continue
@@ -1579,6 +1603,22 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     else:
         section.pop("required_entries", None)
     return doc
+
+
+def _carry_relic_pair(listed: dict, descriptor: dict) -> None:
+    """A YAML entry written before its track was merged (same race pins, no
+    Relic Race of its own) takes the installed entry's Relic pair, so the
+    picked track keeps every mode. An entry that already sets a Relic Race or
+    its own relic_files stays as the YAML has it."""
+    capabilities = listed.get("capabilities")
+    if ("relic_files" not in descriptor or "relic_files" in listed or "relic_targets" in listed
+            or not isinstance(capabilities, dict) or capabilities.get("relic")):
+        return
+    for key in ("relic_files", "relic_revision", "relic_targets"):
+        if key in descriptor:
+            listed[key] = json.loads(json.dumps(descriptor[key]))
+    capabilities["relic"] = True
+    capabilities["time_trial"] = True
 
 
 def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: list[str], name: str) -> dict:

@@ -1110,6 +1110,67 @@ class TestCustomTracks(SoloTestCase):
         self.assertNotIn(broken["id"], [t["id"] for t in tracks])
         self.assertNotIn(changed["id"], [t["id"] for t in tracks])
 
+    def split_track(self) -> tuple:
+        """A track whose Relic Race is in a second pair (merged mode builds):
+        the race descriptor carries the Relic pair as relic_files, as the
+        client publishes it, and the Relic pair has a descriptor of its own,
+        as an older client or an older room wrote it."""
+        relic = self.install("fixture-split", "1.1", "Fixture Split")
+        race = self.install("fixture-split", "1.0", "Fixture Split", write_descriptor=False)
+        race["capabilities"] = dict(race["capabilities"], relic=True, time_trial=True)
+        race.update(relic_files=relic["files"], relic_revision="1.1",
+                    relic_targets=dict(sapphire=86400, gold=67200, platinum=62400))
+        with open(os.path.join(self.descriptors, "fixture-split__1.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(race, handle)
+        pairs = os.path.join(self.solo, "pairs")
+        os.makedirs(pairs, exist_ok=True)
+        with open(os.path.join(pairs, "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": [
+                {"track_key": "fixture-split", "race_revision": "1.0",
+                 "files": [{k: f[k] for k in ("role", "sha256", "bytes")} for f in relic["files"]]}]}, handle)
+        return race, relic
+
+    def test_a_relic_pair_is_never_a_track_of_its_own(self):
+        race, relic = self.split_track()
+        # An older room's metadata still lists the Relic pair as a track.
+        room = os.path.join(self.solo, "rooms", "00112233445566778899aabbccddeeff")
+        os.makedirs(room)
+        with open(os.path.join(room, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [relic]}, handle)
+        tracks = self.tracks()
+        self.assertEqual([t["id"] for t in tracks], [race["id"]])
+        self.assertIn("relic", tracks[0]["modes"])
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        with self.assertRaisesRegex(ctr_solo.SoloError, "no longer available for seeds"):
+            ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [relic["id"]], [])
+        doc = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [race["id"]])
+        entry, = doc[GAME]["custom_tracks"]
+        self.assertEqual(entry["files"], race["files"])
+        self.assertEqual(entry["relic_files"], relic["files"])
+        self.assertEqual(entry["relic_targets"], race["relic_targets"])
+        # Without the client's list the Relic pair is listed as before.
+        os.unlink(os.path.join(self.solo, "pairs", "mode-pairs.json"))
+        self.assertEqual(sorted(t["id"] for t in self.tracks()), sorted([race["id"], relic["id"]]))
+
+    def test_an_older_yaml_entry_takes_the_relic_pair(self):
+        race, relic = self.split_track()
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [older]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["relic_files"], relic["files"])
+        self.assertEqual(entry["relic_revision"], "1.1")
+        self.assertTrue(entry["capabilities"]["relic"] and entry["capabilities"]["time_trial"])
+        self.assertNotIn("relic_files", doc[GAME]["custom_tracks"][0])  # the loaded YAML is not changed
+        # An entry that sets its own Relic Race stays as the YAML has it.
+        own = dict(older, capabilities=dict(older["capabilities"], relic=True),
+                   relic_targets=dict(sapphire=3, gold=2, platinum=1))
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [own]}},
+                                       self.assets, [race["id"]], [])
+        self.assertNotIn("relic_files", result[GAME]["custom_tracks"][0])
+
     def test_bad_descriptor_and_room_files_are_skipped(self):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         with open(os.path.join(self.descriptors, "bytes.json"), "wb") as handle:
