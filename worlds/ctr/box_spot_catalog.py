@@ -41,14 +41,18 @@ DAY_PIN = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 NIGHT_PIN = "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c"
 DAY_SOURCE = "a6-16-night-weapon-crates"
 DAY_ROWS_SHA256 = "e1870b33d79aa48311c23320f6e7c495a82df014012a30e5dcfa3597516a39ae"
-#: Restore-only copies of spot files a later build replaced, by SHA-256 (IM1,
-#: 2026-11-27). A room whose spot set names one of these digests restores
-#: against it; generation and validation of a new room never use one. Day's
-#: alpha6 file (27 rows copied from Night's weapon crates) is kept for rooms
-#: generated on main between 2026-11-19 and 2026-11-20, which carry no box data.
+#: Restore-only copies of spot files a later build replaced (IM1, 2026-11-27):
+#: path -> (SHA-256 of the copy, earlier byte versions of the same file). A room
+#: whose spot set names one of these digests restores against the copy;
+#: generation and validation of a new room never use one. Day's alpha6 file (27
+#: rows copied from Night's weapon crates) is kept for rooms generated on main
+#: between 2026-11-19 and 2026-11-20, which carry no box data of their own. Its
+#: first version (51f6d6d1, 2026-11-19) has the same numbers, positions, angles
+#: and logic fields; only the provenance fields were added on 2026-11-26.
 LEGACY_PATHS = {
-    "4cdafd7cab8eba20f2997d3ad86514affe99062ac4bae93e4c878ec853c39a8a":
-        "data/box_spots/legacy/arabian-heights-day-a6-16.json",
+    "data/box_spots/legacy/arabian-heights-day-a6-16.json": (
+        "4cdafd7cab8eba20f2997d3ad86514affe99062ac4bae93e4c878ec853c39a8a",
+        ("51f6d6d19e1044ba59d21ef80f9df1a9243f63e74900c4ada95e7dfbcabd8e65",)),
 }
 
 
@@ -228,18 +232,23 @@ def load_seat_spots(read):
 
 
 def load_legacy(read, source_records, custom):
-    """{SHA-256: entry} of the restore-only files; each must match its digest,
-    pass the source checks and replace a current custom file of the same track."""
+    """{SHA-256: entry} of the restore-only files, under their own and their
+    earlier digests; each must match its digest, pass the source checks and
+    replace a current custom file of the same track."""
     out = {}
-    for digest, path in LEGACY_PATHS.items():
+    for path, (digest, earlier) in LEGACY_PATHS.items():
         raw = read(path)
         if hashlib.sha256(raw).hexdigest() != digest:
             _fail(path, "does not match its frozen SHA-256")
         doc = check_file(json.loads(raw.decode("utf-8")), source_records, path)
         key = doc["track"].get("track_key")
-        if doc["track"]["kind"] != "custom" or key not in custom or custom[key]["sha256"] == digest:
+        if doc["track"]["kind"] != "custom" or key not in custom or custom[key]["sha256"] in (digest, *earlier):
             _fail(path, "must be an older version of a current custom spot file")
-        out[digest] = dict(doc=doc, path=path, sha256=digest)
+        entry = dict(doc=doc, path=path, sha256=digest)
+        for d in (digest, *earlier):
+            if d in out:
+                _fail(path, "a digest is listed twice")
+            out[d] = entry
     return out
 
 

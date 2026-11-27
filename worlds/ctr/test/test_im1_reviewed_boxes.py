@@ -7,7 +7,9 @@ or clearance check are held: their number stays free. Every spot is Boost 0
 except Royal Raceway 38 (plain Boost 2) and Snowy Valley 30 (Boost 1).
 """
 import copy
+import gzip
 import json
+import pkgutil
 import unittest
 from unittest import mock
 
@@ -117,7 +119,7 @@ class TestIm1Generation(unittest.TestCase):
 
     def old_catalog(self):
         """The catalog as it was before IM1: no new files, Day's alpha6 rows."""
-        (legacy,) = box_spots.LEGACY_FILES.values()
+        (legacy,) = {id(v): v for v in box_spots.LEGACY_FILES.values()}.values()
         files = {k: v for k, v in box_spots.CUSTOM_FILES.items() if k not in IM1}
         files["arabian-heights-day"] = legacy
         return legacy, mock.patch.dict(box_spots.CUSTOM_FILES, files, clear=True)
@@ -147,6 +149,20 @@ class TestIm1Generation(unittest.TestCase):
         for room in (wire, unstamped):
             restored = make_world({}, seed=999, passthrough=copy.deepcopy(room))
             self.assertEqual(json.loads(json.dumps(restored.fill_slot_data())), room)
+
+    def test_unstamped_day_room_from_main_of_2026_11_20_restores(self):
+        """A Day room generated at apworld main adb2ea01d (2026-11-20): no
+        room_compatibility stamp, spot set naming the file's first digest,
+        Boost 2 on its boxes. It restores unchanged."""
+        raw = pkgutil.get_data("worlds.ctr", "test/fixtures/im1_day_room_adb2ea01d.json.gz")
+        wire = json.loads(gzip.decompress(raw))
+        self.assertNotIn("room_compatibility", wire["content_plan"])
+        (day,) = [s for s in wire["content_plan"]["item_boxes"]["spot_sets"]
+                  if s["track_id"] == "custom/arabian-heights-day/1.0.0"]
+        self.assertEqual(day["file_sha256"][:8], "51f6d6d1")
+        self.assertTrue(any(c.get("boost") == 2 for c in boxes(wire["content_plan"], day["track_id"])))
+        restored = make_world({}, seed=999, passthrough=copy.deepcopy(wire))
+        self.assertEqual(json.loads(json.dumps(restored.fill_slot_data(), sort_keys=True)), wire)
 
     def test_restore_only_file_never_serves_a_new_room(self):
         legacy, old = self.old_catalog()
