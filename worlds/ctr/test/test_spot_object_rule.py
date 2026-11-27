@@ -6,6 +6,7 @@ shipped: the tests put it in place of the shipped table for their own duration.
 import copy
 import json
 import unittest
+from unittest import mock
 
 from BaseClasses import CollectionState
 from Options import OptionError
@@ -44,28 +45,39 @@ class TestSpotCarriesCrateRule(unittest.TestCase):
             doc = box_spots.CUSTOM_FILES["tv-world"]["doc"]
         self.assertEqual([s.get("rule_of") for s in doc["spots"]], ["wumpa_crate:3", "wumpa_crate:6", None, None])
         for text, parsed in (("wumpa_crate:3", ("wumpa_crate", 3)), ("weapon_crate:19", ("weapon_crate", 19))):
-            self.assertEqual(object_rulings.parse_rule(text), parsed)
-        for bad in ("wumpa_crate", "wumpa_crate:", "wumpa_crate:03", "wumpa_crate:x", "box:3", "", None, 3):
-            self.assertIsNone(object_rulings.parse_rule(bad))
+            self.assertEqual(box_spot_catalog.parse_rule(text), parsed)
+        for bad in ("wumpa_crate", "wumpa_crate:", "wumpa_crate:03", "wumpa_crate:x", "box:3", "", None, 3,
+                    "wumpa_crate:0", "wumpa_crate:65537", "wumpa_crate:" + "9" * 5000):
+            self.assertIsNone(box_spot_catalog.parse_rule(bad))
 
     def test_file_checks_refuse_a_rule_that_could_under_gate(self):
+        # A bad rule_of is also refused, whichever way it is wrong.
         doc = copy.deepcopy(entry("box_spots/custom/tv-world.json")["doc"])
         box_spot_catalog.check_draft_file(doc)
         for label, change in {
             "needs below the strictest bound": lambda s: s.__setitem__("needs", "usf"),
             "needs absent": lambda s: s.pop("needs"),
-            "a crate with no ruling": lambda s: s.__setitem__("rule_of", "wumpa_crate:2"),
-            "another kind": lambda s: s.__setitem__("rule_of", "weapon_crate:3"),
+            "an oversized ordinal": lambda s: s.__setitem__("rule_of", "wumpa_crate:" + "9" * 5000),
             "malformed": lambda s: s.__setitem__("rule_of", "wumpa_crate:3:4"),
         }.items():
             bad = copy.deepcopy(doc)
             change(bad["spots"][0])
             with self.subTest(label), self.assertRaises(box_spots.SpotFileError):
                 box_spot_catalog.check_draft_file(bad)
-        other = copy.deepcopy(doc)
-        other["track"]["track_key"] = "ancient-lake"
-        with self.assertRaises(box_spots.SpotFileError):
-            box_spot_catalog.check_draft_file(other)
+        # A rule_of on a track that has no ruling is refused where rulings load.
+        elsewhere = copy.deepcopy(entry("box_spots/custom/tv-world.json"))
+        elsewhere["doc"]["track"]["track_key"] = "ancient-lake"
+        with mock.patch.dict(box_spots.CUSTOM_FILES, {"ancient-lake": elsewhere}), self.assertRaises(box_spots.SpotFileError):
+            box_spots.check_rules()
+        # That a ruling exists is checked where rulings load (check_rules).
+        for text in ("wumpa_crate:2", "weapon_crate:3"):
+            bad = copy.deepcopy(entry("box_spots/custom/tv-world.json"))
+            bad["doc"]["spots"][0]["rule_of"] = text
+            with self.subTest(text), spot_files(custom=("tv-world",)):
+                box_spots.check_rules()
+                box_spots.CUSTOM_FILES["tv-world"] = bad
+                with self.assertRaises(box_spots.SpotFileError):
+                    box_spots.check_rules()
         retail = copy.deepcopy(box_spots.RETAIL_FILES[0]["doc"])
         retail["spots"][0].update(needs="blue_fire", rule_of="wumpa_crate:3")
         with self.assertRaises(box_spots.SpotFileError):
@@ -77,15 +89,15 @@ class TestSpotCarriesCrateRule(unittest.TestCase):
             for difficulty, level in (("easy", 0), ("medium", 1), ("hard", 2)):
                 for blue in (False, True):
                     present, _ = expected(difficulty, blue, "shared_global")
-                    self.assertEqual(box_spots.eligible(file, 2, blue, level, TRACK, PACKAGE), present,
+                    self.assertEqual(box_spots.eligible(file, 2, blue, level, PACKAGE), present,
                                      (difficulty, blue))
             # No capability record (both packs off): no Logic Difficulty, the ruled spots go.
-            self.assertEqual(box_spots.eligible(file, 2, False, None, TRACK, PACKAGE), [3, 4])
+            self.assertEqual(box_spots.eligible(file, 2, False, None, PACKAGE), [3, 4])
             # A package no ruling covers takes the spot's own blue_fire bound, never less.
             other = dict(PACKAGE, content_id="other-tv-world")
-            self.assertEqual(box_spots.eligible(file, 2, False, 2, TRACK, other), [3, 4])
-            self.assertEqual(box_spots.eligible(file, 2, True, 2, TRACK, other), [1, 2, 3, 4])
-            self.assertEqual(box_spots.spot_rank(box_spots.spots_by_number(file)[1], TRACK, other, True, 2), 3)
+            self.assertEqual(box_spots.eligible(file, 2, False, 2, other), [3, 4])
+            self.assertEqual(box_spots.eligible(file, 2, True, 2, other), [1, 2, 3, 4])
+            self.assertEqual(box_spots.spot_rank(box_spots.spots_by_number(file)[1], other, True, 2), 3)
 
     def test_rank_is_the_crate_rank(self):
         with spot_files(custom=("tv-world",)):
@@ -98,9 +110,9 @@ class TestSpotCarriesCrateRule(unittest.TestCase):
                         want = object_rulings.rank(TRACK, PACKAGE, "wumpa_crate", ordinal, cap)
                         if want is None:
                             continue
-                        self.assertEqual(box_spots.spot_rank(spots[n], TRACK, PACKAGE, blue, level), want)
-            self.assertEqual(box_spots.spot_rank(spots[3], TRACK, PACKAGE, False, 0), 0)
-            self.assertEqual(box_spots.spot_rank(spots[4], TRACK, PACKAGE, False, 0), 2)
+                        self.assertEqual(box_spots.spot_rank(spots[n], PACKAGE, blue, level), want)
+            self.assertEqual(box_spots.spot_rank(spots[3], PACKAGE, False, 0), 0)
+            self.assertEqual(box_spots.spot_rank(spots[4], PACKAGE, False, 0), 2)
 
     def test_every_setting_in_a_generated_room(self):
         for difficulty in ("easy", "medium", "hard"):
@@ -168,3 +180,67 @@ class TestSpotCarriesCrateRule(unittest.TestCase):
                 else:
                     others = lambda p: [c for c in p["checks"] if c["owner"] != TV]
                     self.assertEqual(others(withfile), others(base))
+
+
+    def test_catalog_loads_standalone_and_without_the_ruling_tables(self):
+        # The pack tool and the proposal tool import box_spot_catalog as a top-level
+        # module, and the world loads it before rulings exist: it must need neither.
+        import importlib.util
+        import sys
+        path = box_spot_catalog.__file__
+        spec = importlib.util.spec_from_file_location("box_spot_catalog_standalone", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.check_draft_file(copy.deepcopy(entry("box_spots/custom/tv-world.json")["doc"]))
+        self.assertNotIn("from . import", open(path, encoding="utf-8").read())
+        self.assertNotIn("from .", open(path, encoding="utf-8").read().replace("from . import", ""))
+
+    def test_package_on_another_lev_takes_the_strict_bound(self):
+        with spot_files(custom=("tv-world",)):
+            file = box_spots.CUSTOM_FILES["tv-world"]
+            spot = box_spots.spots_by_number(file)[1]
+            moved = copy.deepcopy(PACKAGE)
+            moved["files"][0]["sha256"] = "0" * 64
+            self.assertEqual(box_spots.eligible(file, 2, False, 2, moved), [3, 4])
+            self.assertEqual(box_spots.spot_rank(spot, moved, True, 2), 3)
+
+    def test_stats_only_room_keeps_the_hard_spots_like_the_crates(self):
+        # Boost off, Progressive Stats on: the capability record exists, so a spot
+        # follows its crates (hard keeps both at Boost 0; easy loses both).
+        for difficulty in ("easy", "hard"):
+            with self.subTest(difficulty), spot_files(custom=("tv-world",)):
+                opts = options(difficulty, False, "off", wumpa="crates")
+                opts.update(item_box_count=15, progressive_stats="shared_global")
+                plan = make_world(opts, seed=3, stop_before="pre_fill").ctr_content_plan
+                row = next(r for r in plan["sanity"]["tracks"] if r["track_id"] == TV)
+                crates_kept = 3 in row["wumpa_crate"] and 6 in row["wumpa_crate"]
+                picked = spot_set(plan, TV)["picked"]
+                self.assertEqual(crates_kept, difficulty == "hard")
+                self.assertEqual(set(RULED) <= set(picked), crates_kept)
+                for c in boxes(plan, TV):
+                    self.assertEqual(c.get("boost", 0), 0)
+
+    def test_spots_follow_the_crates_in_every_room_with_a_capability_record(self):
+        # Wumpasanity on: the crates 3 and 6 and the two spots stand or fall together,
+        # at the same rank, except in the documented room with both packs off.
+        for difficulty in ("easy", "medium", "hard"):
+            for blue in (False, True):
+                for boost in ("shared_global", "per_character"):
+                    with self.subTest(difficulty=difficulty, blue=blue, boost=boost), spot_files(custom=("tv-world",)):
+                        opts = options(difficulty, blue, boost, wumpa="crates")
+                        opts["item_box_count"] = 15
+                        plan = make_world(opts, seed=3, stop_before="pre_fill").ctr_content_plan
+                        row = next(r for r in plan["sanity"]["tracks"] if r["track_id"] == TV)
+                        crates = {c["location"]: c.get("boost", 0) for c in plan["checks"]
+                                  if c["owner"] == TV and c["kind"] in ("wumpa_crate",)}
+                        ruled = {c["location"]: c.get("boost", 0) for c in plan["checks"]
+                                 if c["owner"] == TV and c["location"] in range(37210066, 37210070)}
+                        kept = bool(ruled)
+                        self.assertEqual({3, 6} <= set(row["wumpa_crate"]), kept)
+                        spots = {c["spot"]["number"]: c.get("boost", 0) for c in boxes(plan, TV) if c["spot"]["number"] in RULED}
+                        self.assertEqual(bool(spots), kept)
+                        for boost_rank in list(ruled.values()) + list(spots.values()):
+                            self.assertEqual(boost_rank, 2 if difficulty == "hard" else 3)
+
+    def test_every_shipped_rule_of_names_a_ruling(self):
+        box_spots.check_rules()

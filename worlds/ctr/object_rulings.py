@@ -77,6 +77,15 @@ def carried_source(package):
     return None
 
 
+def _row_rank(row, capability):
+    """The rank a ruling row gives under a capability record."""
+    if row is None or row["hard_rank"] == 0:
+        return 0
+    if (capability or {}).get("logic_difficulty", 2) == 2:
+        return row["hard_rank"]
+    return row["blue_fire_rank"] if capability["boost_blue_fire"] else None
+
+
 def rank(track, package, kind, ordinal, capability, *, legacy=False):
     """None removes the object, zero preserves its existing rule.
 
@@ -87,21 +96,22 @@ def rank(track, package, kind, ordinal, capability, *, legacy=False):
     if track["origin"] != "custom" or not isinstance(key, str):
         return 0
     row, _ = _selection(package, kind, ordinal, legacy=legacy)
-    if row is None or row["hard_rank"] == 0:
+    return _row_rank(row, capability)
+
+
+def pinned_rank(content_id, pin, kind, ordinal, capability):
+    """The rank of an object's unscoped ruling row for this exact LEV pin, by
+    the same rule as `rank`; 0 when the row is for another LEV or absent.
+
+    A box spot that carries a crate's ruling (box_spots `rule_of`) reads this,
+    not `rank`: a spot file is pinned to LEVs, so it needs no revision
+    inheritance, and inheritance depends on plan data (the scoped rules
+    version) that a room without Wumpasanity does not carry.
+    """
+    if not isinstance(content_id, str):
         return 0
-    if (capability or {}).get("logic_difficulty", 2) == 2:
-        return row["hard_rank"]
-    return row["blue_fire_rank"] if capability["boost_blue_fire"] else None
-
-
-def parse_rule(text):
-    """A spot's `rule_of` text `<kind>:<ordinal>` as (kind, ordinal), or None."""
-    kind, sep, ordinal = text.partition(":") if isinstance(text, str) else ("", "", "")
-    if not sep or not ordinal.isascii() or not ordinal.isdigit() or str(int(ordinal)) != ordinal:
-        return None
-    return (kind, int(ordinal)) if kind in ("weapon_crate", "wumpa_crate", "wumpa_fruit") else None
-
-
-def has_ruling(content_id, kind, ordinal):
-    """Whether a track key has a ruling for this object (any revision)."""
-    return (kind, ordinal) in _selectors({"content_id": content_id})
+    for content in dict.fromkeys((canonical_track_key(content_id), content_id)):
+        row = RULINGS.get((content, kind, ordinal))
+        if row is not None and row["lev_sha256"] == pin:
+            return _row_rank(row, capability)
+    return 0

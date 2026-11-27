@@ -449,7 +449,7 @@ def box_terms(track, slot, capability, package=None, record=None):
     found = spot_entry(track, record, package)
     if found is not None:
         spot = box_spots.spots_by_number(found[1])[slot]
-        rank = (box_spots.spot_rank(spot, track, package, bool(capability.get("boost_blue_fire")),
+        rank = (box_spots.spot_rank(spot, package, bool(capability.get("boost_blue_fire")),
                                     capability.get("logic_difficulty", 2)) if boost_on else 0)
         if (rank and track_rulings.scoped_version() >= track_rulings.ARABIAN_BOOST_VERSION
                 and found[1]["doc"]["track"].get("track_key") == ARABIAN_DAY

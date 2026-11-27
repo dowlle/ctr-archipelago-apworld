@@ -43,6 +43,19 @@ DAY_SOURCE = "a6-16-night-weapon-crates"
 DAY_ROWS_SHA256 = "e1870b33d79aa48311c23320f6e7c495a82df014012a30e5dcfa3597516a39ae"
 
 
+RULE_KINDS = ("weapon_crate", "wumpa_crate", "wumpa_fruit")
+
+
+def parse_rule(text):
+    """A spot's `rule_of` text `<kind>:<ordinal>` as (kind, ordinal), or None.
+    Ordinals match object_rulings: 1 to 65536."""
+    kind, sep, ordinal = text.partition(":") if isinstance(text, str) else ("", "", "")
+    if (not sep or kind not in RULE_KINDS or not ordinal.isascii() or not ordinal.isdigit()
+            or len(ordinal) > 5 or ordinal[0] == "0" or not 1 <= int(ordinal) <= 65536):
+        return None
+    return kind, int(ordinal)
+
+
 class SpotFileError(ValueError):
     pass
 
@@ -110,12 +123,10 @@ def check_draft_file(doc, path="<file>"):
         if "rule_of" in spot:
             # TV2: the spot carries a crate's ruling (object_rulings), so the
             # two cannot drift. `needs` stays the strictest bound (blue_fire)
-            # for any reader that ignores the rule.
-            from . import object_rulings
-            parsed = object_rulings.parse_rule(spot["rule_of"])
-            if (track["kind"] != "custom" or parsed is None or spot.get("needs") != "blue_fire"
-                    or not object_rulings.has_ruling(track["track_key"], *parsed)):
-                _fail(path, f"spot {n}: rule_of names a ruled crate of this custom track, with needs blue_fire")
+            # for any reader that ignores the rule. That a ruling exists is
+            # checked where rulings are loaded (box_spots.check_rules).
+            if track["kind"] != "custom" or parse_rule(spot["rule_of"]) is None or spot.get("needs") != "blue_fire":
+                _fail(path, f"spot {n}: rule_of is <kind>:<ordinal> on a custom file, with needs blue_fire")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):
