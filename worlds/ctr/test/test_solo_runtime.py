@@ -1595,8 +1595,9 @@ class TestCustomTracks(SoloTestCase):
                                os.path.join(self.client, "ctr.apworld"), REPO)
         listed = [legacy, canonical]
         rows = ctr_solo.installed_tracks(paths, self.assets, listed)
-        self.assertEqual([row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}],
-                         [legacy["id"]])
+        # PS2: other files under the two keys are two builds; both are listed.
+        self.assertEqual(sorted(row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}),
+                         sorted([legacy["id"], canonical["id"]]))
         result = ctr_solo.apply_tracks(paths, {GAME: {"custom_tracks": listed}}, self.assets,
                                        [legacy["id"]], [], page=True)
         self.assertEqual(result[GAME]["custom_tracks"][0]["files"], legacy["files"])
@@ -1644,9 +1645,17 @@ class TestCustomTracks(SoloTestCase):
         saved = json.dumps({"custom_tracks": [old]})
         with open(room, "w", encoding="utf-8") as handle:
             handle.write(saved)
-        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
+        # PS2: the old copy's files are installed and differ, so it is a build
+        # of its own and stays listed beside the active row, never instead of it.
+        self.assertEqual(sorted(track["id"] for track in self.tracks()), sorted([current["id"], old["id"]]))
         with open(room, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), saved)
+        # The same files under the old key are one row: the active one.
+        same = dict(json.loads(json.dumps(current)), id=old["id"], content_id=old["content_id"], display_name="Old title")
+        with open(room, "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [same]}, handle)
+        shutil.rmtree(os.path.join(self.assets, "tracks", "n-gage-assembly-lane"))
+        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
 
     def test_removing_a_custom_copy_preserves_a_retail_title_mode_override(self):
         descriptor = self.install("crash-cove-custom", "1.0", "Crash Cove")
@@ -1806,6 +1815,145 @@ class TestCustomTracks(SoloTestCase):
                 with open(second_settings, "wb") as handle:
                     handle.write(damaged)
                 self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0"])
+
+    def _store_build(self, descriptor: dict, folder: str, presentation: tuple) -> str:
+        """Move the made-up files of `descriptor` from assets/tracks/<folder>
+        into a shared store package with one presentation file (its metadata
+        path and JSON), as the client's installers write it. The folder."""
+        source = os.path.join(self.assets, "tracks", folder, "original")
+        files = []
+        for pin in descriptor["files"]:
+            data = next(data for n in os.listdir(source) if n.lower().endswith("." + pin["role"])
+                        for data in [open(os.path.join(source, n), "rb").read()]
+                        if hashlib.sha256(data).hexdigest() == pin["sha256"])
+            files.append(("track." + pin["role"], data, pin))
+        path, meta = presentation
+        meta_blob = json.dumps(meta).encode()
+        manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"], "version": descriptor["revision"],
+                    "title": descriptor["display_name"], "compatibility": {"native_contract": 1, "apworld_contract": 1},
+                    "files": [{"role": pin["role"], "path": "original/" + name, "sha256": pin["sha256"], "bytes": pin["bytes"]}
+                              for name, _, pin in files]
+                    + [{"role": "presentation", "path": path, "sha256": hashlib.sha256(meta_blob).hexdigest(),
+                        "bytes": len(meta_blob)}]}
+        manifest["files"].sort(key=lambda item: (item["role"], item["path"]))
+        blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        package = os.path.join(self.assets, "tracks", "packages", hashlib.sha256(blob).hexdigest())
+        os.makedirs(os.path.join(package, "original"))
+        os.makedirs(os.path.join(package, os.path.dirname(path)), exist_ok=True)
+        with open(os.path.join(package, "manifest.json"), "wb") as handle:
+            handle.write(blob)
+        for name, data, _ in files:
+            with open(os.path.join(package, "original", name), "wb") as handle:
+                handle.write(data)
+        with open(os.path.join(package, path), "wb") as handle:
+            handle.write(meta_blob)
+        shutil.rmtree(os.path.join(self.assets, "tracks", folder))
+        return package
+
+    def test_two_builds_of_one_version_are_both_listed_and_picked_by_build(self):
+        """PS2: a Saphi download and an xdelta patch import of one track, same
+        track key and version, other files. Play Solo lists both, each row id
+        names its build, Save YAML writes the exact files of the build picked,
+        and picking both is refused with a plain message."""
+        patch_sha = "52a420e582fc44786210ae65817d7105c7d881c2f0b4387cebde2dce86064526"
+        saphi = self.install("big-forest", "1.0.0", "Big Forest", folder="bf-saphi", write_descriptor=False)
+        patch = self.install("big-forest", "1.0.0", "Big Forest", folder="bf-patch", write_descriptor=False)
+        patch["uuid"] = "7e10f11a-90d2-5669-9df7-e3241123e1ec"
+        patch["locator"] = {"kind": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73}
+        self._store_build(saphi, "bf-saphi", ("metadata/saphi-source.json", {
+            "schema_version": 1, "provider": "projectsaphi", "track_id": 49, "lev_media_id": 454,
+            "vrm_media_id": 455, "version": "1.0.0", "author": "A", "author_id": 12}))
+        self._store_build(patch, "bf-patch", ("metadata/xdelta-source.json", {
+            "schema_version": 1, "provider": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73,
+            "track_key": "big-forest"}))
+        tag = lambda d: {f["role"]: f["sha256"] for f in d["files"]}["lev"][:16] + \
+            {f["role"]: f["sha256"] for f in d["files"]}["vrm"][:16]
+        # As the client writes them: the first build under the plain name,
+        # the second under its build name.
+        with open(os.path.join(self.descriptors, "big-forest__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(saphi, handle)
+        build_name = f"big-forest__1.0.0@{tag(patch)}.json"
+        with open(os.path.join(self.descriptors, build_name), "w", encoding="utf-8") as handle:
+            json.dump(patch, handle)
+        rows = {row["build"]: row for row in self.tracks() if row.get("content_id") == "big-forest"}
+        self.assertEqual(set(rows), {tag(saphi), tag(patch)})
+        self.assertEqual(rows[tag(saphi)]["id"], f"package/big-forest/1.0.0@{tag(saphi)}")
+        self.assertEqual(rows[tag(patch)]["id"], f"package/big-forest/1.0.0@{tag(patch)}")
+        self.assertEqual(rows[tag(saphi)]["origin"], {"kind": "saphi"})
+        self.assertEqual(rows[tag(patch)]["origin"], {"kind": "patch", "patch_sha256": patch_sha})
+        for picked, other in ((patch, saphi), (saphi, patch)):
+            with self.subTest(picked=tag(picked)):
+                events, code = self.call("save-room-yaml", "--assets", self.assets, "--name", "Builds",
+                                         "--track", rows[tag(picked)]["id"])
+                self.assertEqual(code, 0, events)
+                entry, = ctr_solo.read_player_yaml(last(events)["yaml_path"])[GAME]["custom_tracks"]
+                self.assertEqual(entry["files"], picked["files"])
+                self.assertNotEqual(entry["files"], other["files"])
+                self.assertEqual("locator" in entry, picked is patch)
+                if picked is patch:  # the importer records no source_url: none is written
+                    self.assertEqual(entry["locator"], {"kind": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73})
+        events, code = self.call("save-room-yaml", "--assets", self.assets, "--track", rows[tag(saphi)]["id"],
+                                 "--track", rows[tag(patch)]["id"])
+        self.assertEqual(code, 2, events)
+        self.assertIn("Pick one copy of Big Forest", last(events)["message"])
+        # A YAML that lists one build starts with that build picked, not the other.
+        source = write_yaml(self.work, "saphi.yaml", "name: Solo\ngame: " + GAME + "\n" + GAME + ":\n  custom_tracks:\n    - "
+                            + json.dumps(saphi) + "\n")
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        starts = {row["build"]: row["start"] for row in last(events)["tracks"] if row.get("content_id") == "big-forest"}
+        self.assertEqual(starts, {tag(saphi): ctr_solo.PICK_POOL, tag(patch): 0})
+        # On the page the player switches that YAML from the Saphi build to the
+        # patch build: the YAML then lists the patch build only.
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [saphi], "required_entries": ["big-forest"]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [rows[tag(patch)]["id"]],
+                                       page=True)
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["files"], patch["files"])
+        self.assertEqual(result[GAME]["required_entries"], ["big-forest"])
+        # Without the page (or with the YAML's build still picked) the conflict is still refused.
+        with self.assertRaises(ctr_solo.SoloError):
+            ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [], page=False)
+        # Two builds whose tags collide cannot be told apart: one row stays.
+        from unittest.mock import patch as mock_patch
+        with mock_patch.object(ctr_solo, "_build_tag", return_value="0" * 32):
+            listed = [row for row in ctr_solo.installed_tracks(paths, self.assets) if row["content_id"] == "big-forest"]
+        self.assertEqual(len(listed), 1)
+
+    def test_a_newer_cut_of_one_package_is_one_row(self):
+        """PS2: two cuts of one package (one uuid and version, other files),
+        the older still installed and named by an old room: Play Solo lists
+        the newest install only, as the client's store scan folds them."""
+        meta = ("metadata/xdelta-source.json", {"schema_version": 1, "provider": "xdelta", "patch_sha256": "b" * 64,
+                                                 "bigfile_index": 5, "track_key": "cut-track"})
+        old = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-old", write_descriptor=False)
+        new = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-new", write_descriptor=False)
+        new["uuid"] = old["uuid"]
+        old_folder = self._store_build(old, "cut-old", meta)
+        self._store_build(new, "cut-new", meta)
+        os.utime(os.path.join(old_folder, "manifest.json"), (1_000_000, 1_000_000))
+        rooms = os.path.join(self.solo, "rooms", "old-room")
+        os.makedirs(rooms)
+        with open(os.path.join(rooms, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [old]}, handle)
+        with open(os.path.join(self.descriptors, "cut-track__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(new, handle)
+        rows = [row for row in self.tracks() if row.get("content_id") == "cut-track"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], new["id"])
+        self.assertEqual(rows[0]["build"], {f["role"]: f["sha256"] for f in new["files"]}["lev"][:16]
+                         + {f["role"]: f["sha256"] for f in new["files"]}["vrm"][:16])
+
+    def test_one_build_keeps_its_plain_row_id(self):
+        """PS2: with one build installed the row id stays the descriptor id;
+        the build tag and origin are reported all the same."""
+        track = self.install("solo-build", "1.0", "Solo Build")
+        row, = [row for row in self.tracks() if row.get("content_id") == "solo-build"]
+        self.assertEqual(row["id"], track["id"])
+        self.assertEqual(row["origin"], {"kind": "local"})
+        self.assertEqual(len(row["build"]), 32)
 
     def test_room_yaml_refuses_a_track_without_a_public_source(self):
         track = self.install("private-track", "1.0", "Private Track")

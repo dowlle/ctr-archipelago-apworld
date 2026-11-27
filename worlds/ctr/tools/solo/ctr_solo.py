@@ -1088,7 +1088,9 @@ def _small_json(path: str, limit: int, inside: str, unique_keys: bool = False):
 
 def _descriptor_sources(paths: Paths) -> list:
     """(descriptor, source) pairs, unchecked: the world's own packages, the
-    descriptor files in solo/tracks, and the tracks of the solo rooms."""
+    descriptor files in solo/tracks, and the tracks of the solo rooms. The
+    client's embedded adapter (ap_solo_track_visibility.hpp) filters this
+    list as pairs, so its shape stays."""
     found = [(d, "built-in") for d in _world_module("content_plan").PACKAGES]
     if os.path.isdir(paths.tracks):
         for name in sorted(os.listdir(paths.tracks)):
@@ -1103,6 +1105,57 @@ def _descriptor_sources(paths: Paths) -> list:
             for descriptor in tracks if isinstance(tracks, list) else []:
                 found.append((descriptor, "room"))
     return found
+
+
+def _build_tag(descriptor: dict) -> str:
+    """The client's build tag of a descriptor's pins (AP_SoloBuildTag): the
+    first 16 hex digits of the LEV SHA-256 and then of the VRM SHA-256. Two
+    installs of one track key and version with other files differ in it."""
+    by_role = {pin["role"]: pin["sha256"] for pin in descriptor["files"]}
+    return by_role["lev"][:16] + by_role["vrm"][:16]
+
+
+def _package_folder(tracks_root: str, descriptor: dict) -> str | None:
+    """The installed package of a descriptor's exact pins and version,
+    preferring the one with the descriptor's own package uuid, so the source
+    of a copy is read from its own package when byte-identical packages from
+    two sources are installed."""
+    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
+    first = None
+    for folder, manifest in _store_packages(tracks_root, wanted, descriptor["revision"]):
+        if manifest.get("package_uuid") == descriptor.get("uuid"):
+            return folder
+        first = first or folder
+    return first
+
+
+def _build_origin(folder: str | None, descriptor: dict) -> dict:
+    """Where an installed build came from, as its package recorded it: a
+    Project Saphi download (directly or through a room's Install missing), an
+    xdelta patch import with the patch's SHA-256, or local files. Without a
+    package an xdelta locator in the descriptor still names the patch. The
+    client shows it beside the title when two builds share a track key and
+    version (PS2); nothing is paired or preferred by it."""
+    manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, folder) if folder else None
+    for file in manifest.get("files", []) if isinstance(manifest, dict) else []:
+        if not isinstance(file, dict) or file.get("role") != "presentation" or not isinstance(file.get("path"), str):
+            continue
+        source = _small_json(os.path.join(folder, file["path"]), 4096, folder)
+        if not isinstance(source, dict) or source.get("schema_version") != 1:
+            continue
+        provider = source.get("provider")
+        if file["path"] == "metadata/saphi-source.json" and provider == "projectsaphi":
+            return {"kind": "saphi"}
+        if file["path"] == "metadata/seed-source.json" and provider == "ctr-seed":
+            return {"kind": "saphi"}
+        if file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
+            sha = source.get("patch_sha256")
+            return {"kind": "patch", "patch_sha256": sha if isinstance(sha, str) else ""}
+    locator = descriptor.get("locator")
+    if isinstance(locator, dict) and locator.get("kind") == "xdelta":
+        sha = locator.get("patch_sha256")
+        return {"kind": "patch", "patch_sha256": sha if isinstance(sha, str) else ""}
+    return {"kind": "local"}
 
 
 def _pinned_file(folders: list, pin: dict) -> str | None:
@@ -1193,12 +1246,6 @@ def _manifest_schema_valid(manifest: object, pin: str) -> bool:
         return digest == pin
     except (KeyError, TypeError, ValueError, UnicodeError):
         return False
-
-
-def _shared_package_folder(tracks_root: str, descriptor: dict) -> str | None:
-    """Find one installed revision whose manifest and every named file match."""
-    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
-    return next((folder for folder, _ in _store_packages(tracks_root, wanted, descriptor["revision"])), None)
 
 
 def _installed_versions_by_pins(tracks_root: str, files) -> set:
@@ -1335,26 +1382,67 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
         if tuple(_pins(descriptor)) in relic_only:
             continue
         key, revision = descriptor["content_id"], descriptor["revision"]
-        identity = (destinations.canonical_track_key(key), revision)
+        # PS2: one row per build. Two installs of one track key and version
+        # with other files (a Saphi download beside a patch import) are both
+        # listed; the same files from another source are one row.
+        identity = (destinations.canonical_track_key(key), revision, tuple(_pins(descriptor)))
         if identity in seen:
             continue
         folders = [os.path.join(tracks_root, folder, "original")
                    for candidate in destinations.equivalent_track_keys(key) for folder in (candidate, f"{candidate}-{revision}")]
-        shared = _shared_package_folder(tracks_root, descriptor)
+        shared = _package_folder(tracks_root, descriptor)
         if shared is None and not any(all(_pinned_file([folder], pin) for pin in descriptor["files"])
                                       for folder in folders):
             continue
         seen.add(identity)
         descriptor = _with_installed_relic_revision(tracks_root, descriptor)
         modes = supported("custom", descriptor)
-        result.append({"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
-                       "revision": revision, "display_name": descriptor["display_name"],
-                       "author": descriptor["author"], "laps": descriptor["laps"],
-                       "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
-                       "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
-                       "source": source, "descriptor": descriptor})
-    result.sort(key=lambda t: (t["display_name"].lower(), t["revision"]))
-    return result
+        row = {"id": descriptor["id"], "track_id": f"custom/{key}/{revision}", "content_id": key,
+               "revision": revision, "display_name": descriptor["display_name"],
+               "author": descriptor["author"], "laps": descriptor["laps"],
+               "modes": modes, "race_modes": modes + (["time_trial"] if descriptor["capabilities"]["time_trial"] else []),
+               "time_trial": descriptor["capabilities"]["time_trial"], "seed_usable": bool(modes),
+               "source": source, "build": _build_tag(descriptor), "origin": _build_origin(shared, descriptor),
+               "descriptor": descriptor, "_folder": shared}
+        result.append(row)
+    # Cuts of one package (one package uuid and version, other files) are one
+    # track, as the client's store scan folds them (A3-29): the newest
+    # installed package stays, also when an older room still names the older
+    # cut. That room still finds its own files by pins.
+    def installed_at(row):
+        try:
+            return os.path.getmtime(os.path.join(row["_folder"], "manifest.json")) if row["_folder"] else -1.0
+        except OSError:
+            return -1.0
+    newest = {}
+    for row in result:
+        cut = (row["descriptor"]["uuid"], row["revision"])
+        if cut not in newest or (installed_at(row), row["build"]) > (installed_at(newest[cut]), newest[cut]["build"]):
+            newest[cut] = row
+    folded = [row for row in result if newest[(row["descriptor"]["uuid"], row["revision"])] is not row]
+    for row in folded:
+        _note(f"{row['display_name']} {row['revision']}: left out, a newer cut of the same package is installed")
+    folded_ids = {id(row) for row in folded}
+    result = [row for row in result if id(row) not in folded_ids]
+    for row in result:
+        del row["_folder"]
+    # A pick names one build: rows that share a descriptor id get the build
+    # tag in their row id (the client's AP_SoloBuildRowId).
+    ids = [t["id"] for t in result]
+    for row in result:
+        if ids.count(row["id"]) > 1:
+            row["id"] = f"{row['id']}@{row['build']}"
+    # Two builds whose tags collide (a shared LEV and VRMs alike in 64 bits)
+    # cannot be told apart by a pick: the first stays, the other is named.
+    unique, taken = [], set()
+    for row in result:
+        if row["id"] in taken:
+            _note(f"{row['display_name']} {row['revision']}: left out, another installed build has the same build tag")
+            continue
+        taken.add(row["id"])
+        unique.append(row)
+    unique.sort(key=lambda t: (t["display_name"].lower(), t["revision"], t["id"]))
+    return unique
 
 
 #: The bundled Cortex Vortex files: the main pair and the relic pair (CV1).
@@ -1550,6 +1638,10 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
                         track=packages[keys.index(CORTEX_ID)])
     twice = next((p for p, key in zip(packages, keys) if keys.count(key) > 1), None)
     if twice:
+        same = [p for p, key in zip(packages, keys) if key == keys[packages.index(twice)]]
+        if len({by_id[p]["revision"] for p in same}) == 1:
+            raise SoloError("track", f"Pick one copy of {by_id[twice]['display_name']}: two installs of version "
+                            f"{by_id[twice]['revision']} are picked.", track=twice)
         raise SoloError("track", f"Pick one version of {by_id[twice]['display_name']}.", track=twice)
     import copy
     doc = copy.deepcopy(doc)
@@ -1571,11 +1663,18 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     # one: another version or other file pins is a conflict, refused rather
     # than guessed at (round 2 decision 5). The same package is not added
     # twice, and a guarantee the YAML already has is not repeated.
+    shown_off = [entry["descriptor"] for entry in by_id.values() if entry["id"] not in picked] if page else []
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         key = canonical_key(descriptor["content_id"])
         group = groups.get(key, ())
         if group and not _same_package(group[0], descriptor):
+            # PS2: the page showed the YAML's own installed build of this same
+            # version switched off and this build picked: the page replaces
+            # it, below. Another version stays a conflict (round 2 decision 5).
+            if all(listed.get("revision") == descriptor["revision"]
+                   and any(_same_package(listed, off) for off in shown_off) for listed in group):
+                continue
             other = group[0]
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
                             f"(version {other.get('revision', '?')}) differently from the installed version "
@@ -1744,7 +1843,7 @@ def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: lis
     known_packages = _world_module("content_plan").PACKAGES
     tracks_root = os.path.join(assets, "tracks")
     for entry in section.get("custom_tracks", []):
-        folder = _shared_package_folder(tracks_root, entry)
+        folder = _package_folder(tracks_root, entry)  # the entry's own package first (PS2)
         manifest = _small_json(os.path.join(folder, "manifest.json"), DESCRIPTOR_MAX_BYTES, folder) if folder else None
         files = manifest.get("files", []) if isinstance(manifest, dict) else []
         public = any(_same_package(entry, package) for package in known_packages)
@@ -1763,7 +1862,13 @@ def save_room_yaml(paths: Paths, assets: str, picked: list[str], guaranteed: lis
                 public |= type(track_id) is int and 0 < track_id <= 100000000
             elif file["path"] == "metadata/xdelta-source.json" and provider == "xdelta":
                 locator = dict(kind="xdelta", patch_sha256=source.get("patch_sha256"),
-                               bigfile_index=source.get("bigfile_index"), source_url=source.get("source_url"))
+                               bigfile_index=source.get("bigfile_index"))
+                # The client's importer records no source_url (LRG2Pancho has
+                # none): a missing one is left out, not written as null, which
+                # admission refuses and which made the track "no known public
+                # source" (PS2).
+                if source.get("source_url") is not None:
+                    locator["source_url"] = source.get("source_url")
                 try:
                     _world_module("custom_packages").admit(dict(entry, locator=locator))
                 except ValueError:
