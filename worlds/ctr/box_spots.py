@@ -98,11 +98,61 @@ def spots_by_number(entry):
 BLUE_FIRE_RANK = NEEDS["blue_fire"]
 
 
-def eligible(entry, knowledge, blue_fire=False):
+def rule_rank(spot, package, blue_fire, logic_difficulty):
+    """A `rule_of` spot's rank: the rank object_rulings gives the crate it
+    names, for the package's exact LEV. None means the ruling removes it in
+    this seed. Fails closed. The plan's capability record, the only place a
+    restored room finds Logic Difficulty, is empty when Progressive Boost and
+    Progressive Stats are both off; with no Logic Difficulty the spot is removed
+    (a crate keeps its check on hard there, a spot does not). Where no ruling
+    covers the package it takes the spot's own `needs` (blue_fire, so only with
+    Blue Fire), never a lower rank."""
+    if logic_difficulty is None:
+        return None
+    from . import object_rulings
+    kind, ordinal = box_spot_catalog.parse_rule(spot["rule_of"])
+    cap = dict(logic_difficulty=logic_difficulty, boost_blue_fire=bool(blue_fire))
+    rank = object_rulings.pinned_rank((package or {}).get("content_id"), lev_pin(package), kind, ordinal, cap)
+    if rank == 0:
+        return needs_rank(spot) if blue_fire else None
+    return rank
+
+
+def check_rules():
+    """Every shipped `rule_of` names a ruling row of its file's own LEV pins;
+    raises SpotFileError otherwise. Run by the tests and the pack check."""
+    from . import object_rulings
+    for key, entry in CUSTOM_FILES.items():
+        pins = entry["doc"]["track"]["lev_sha256"]
+        for spot in entry["doc"]["spots"]:
+            if "rule_of" not in spot:
+                continue
+            kind, ordinal = box_spot_catalog.parse_rule(spot["rule_of"])
+            rows = [object_rulings.RULINGS.get((content, kind, ordinal))
+                    for content in dict.fromkeys((destinations.canonical_track_key(key), key))]
+            if not any(row is not None and row["lev_sha256"] in pins for row in rows):
+                _fail(entry["path"], f"spot {spot['number']}: rule_of names no ruling for this file's LEV")
+
+
+def eligible(entry, knowledge, blue_fire=False, logic_difficulty=None, package=None):
     """Sorted numbers of a file's spots a Shortcut Knowledge tier creates; a
-    blue_fire spot only when the seed has Progressive Boost with Blue Fire."""
+    blue_fire spot only when the seed has Progressive Boost with Blue Fire. A
+    `rule_of` spot exists as its crate ruling says (easy/medium need Blue Fire,
+    else it is removed and its ID stays registered)."""
     return sorted(s["number"] for s in entry["doc"]["spots"]
-                  if tier(s) <= knowledge and (blue_fire or needs_rank(s) < BLUE_FIRE_RANK))
+                  if tier(s) <= knowledge
+                  and ((rule_rank(s, package, blue_fire, logic_difficulty) is not None) if "rule_of" in s
+                       else (blue_fire or needs_rank(s) < BLUE_FIRE_RANK)))
+
+
+def spot_rank(spot, package, blue_fire, logic_difficulty):
+    """The Progressive Boost rank a spot needs in this seed."""
+    if "rule_of" in spot:
+        rank = rule_rank(spot, package, blue_fire, logic_difficulty)
+        if rank is None:
+            raise ValueError("a removed spot has no rank")
+        return rank
+    return needs_rank(spot)
 
 
 def pick(numbers, seed, player, track_id, count=PICK):
@@ -141,19 +191,20 @@ def file_for(track, package=None, file_sha256=None):
     return None
 
 
-def spot_set(track, package, knowledge, seed, player, count=PICK, blue_fire=False):
+def spot_set(track, package, knowledge, seed, player, count=PICK, blue_fire=False, logic_difficulty=None):
     """The plan's `spot_sets` record of one track, or None without a file."""
     entry = file_for(track, package)
     if entry is None:
         return None
-    pool = eligible(entry, knowledge, blue_fire)
+    pool = eligible(entry, knowledge, blue_fire, logic_difficulty, package)
     out = dict(file_sha256=entry["sha256"], pool=len(pool), picked=pick(pool, seed, player, track["id"], count))
     if track.get("origin") == "custom":
         out["lev_sha256"] = lev_pin(package)
     return out
 
 
-def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True, blue_fire=False):
+def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True, blue_fire=False,
+                   logic_difficulty=None):
     """A plan's spot set against this build's file; returns the file entry.
     When restoring (no digest compare), a set that names a restore-only file
     of the track is checked against that file."""
@@ -168,7 +219,7 @@ def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_dig
         raise SpotFileError(f"box spots for {track['id']}: the seed was built with a different spot file")
     if track.get("origin") == "custom" and record["lev_sha256"] != lev_pin(package):
         raise SpotFileError(f"box spots for {track['id']}: the LEV pin differs from the package")
-    pool = eligible(entry, knowledge, blue_fire)
+    pool = eligible(entry, knowledge, blue_fire, logic_difficulty, package)
     picked = record["picked"]
     if (record["pool"] != len(pool) or not isinstance(picked, list) or picked != sorted(set(picked))
             or not set(picked) <= set(pool) or len(picked) != min(count, len(pool))):

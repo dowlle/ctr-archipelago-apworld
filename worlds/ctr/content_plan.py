@@ -1756,7 +1756,8 @@ def draw_plan(world, key_estimate=True):
     # Hand-placed spots (A3-14): each track's pick from its spot file, on a
     # generator of its own (box_spots.pick), so the world's stream is untouched.
     content_item_boxes.add_spot_sets(item_boxes, candidates, package_by_id, world.multiworld.seed, world.player,
-                                     bool(content_capability.settings(o).get("boost_blue_fire")))
+                                     bool(content_capability.settings(o).get("boost_blue_fire")),
+                                     content_capability.settings(o).get("logic_difficulty"))
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
     # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
     # Challenge venue. Nothing is drawn with bosses off.
@@ -3168,7 +3169,8 @@ def validate(plan, *, restoring=False):
     content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages,
                                        restoring=restoring, carried=carried_boxes is not None,
                                        require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record),
-                                       blue_fire=bool(capability.get("boost_blue_fire")))
+                                       blue_fire=bool(capability.get("boost_blue_fire")),
+                                       logic_difficulty=capability.get("logic_difficulty"))
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue

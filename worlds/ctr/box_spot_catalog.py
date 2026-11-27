@@ -23,7 +23,7 @@ DEFAULT_NEEDS = "usf"
 SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
 DOORS = ("tiger_temple",)
 SPOT_FIELDS = {"number", "pos", "rot_y", "needs", "shortcut", "door", "no_gate", "source", "credit", "review",
-               "note", "source_family", "provenance"}
+               "note", "source_family", "provenance", "rule_of"}
 TEXT_FIELDS = ("source", "credit", "review", "note")
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -54,6 +54,19 @@ LEGACY_PATHS = {
         "4cdafd7cab8eba20f2997d3ad86514affe99062ac4bae93e4c878ec853c39a8a",
         ("51f6d6d19e1044ba59d21ef80f9df1a9243f63e74900c4ada95e7dfbcabd8e65",)),
 }
+
+
+RULE_KINDS = ("weapon_crate", "wumpa_crate", "wumpa_fruit")
+
+
+def parse_rule(text):
+    """A spot's `rule_of` text `<kind>:<ordinal>` as (kind, ordinal), or None.
+    Ordinals match object_rulings: 1 to 65536."""
+    kind, sep, ordinal = text.partition(":") if isinstance(text, str) else ("", "", "")
+    if (not sep or kind not in RULE_KINDS or not ordinal.isascii() or not ordinal.isdigit()
+            or len(ordinal) > 5 or ordinal[0] == "0" or not 1 <= int(ordinal) <= 65536):
+        return None
+    return kind, int(ordinal)
 
 
 class SpotFileError(ValueError):
@@ -120,6 +133,13 @@ def check_draft_file(doc, path="<file>"):
             # The retail fallback tables (box_spots._retail_tables) have no
             # Blue Fire filter, so rank 3 stays on custom files.
             _fail(path, f"spot {n}: needs blue_fire is only for custom tracks")
+        if "rule_of" in spot:
+            # TV2: the spot carries a crate's ruling (object_rulings), so the
+            # two cannot drift. `needs` stays the strictest bound (blue_fire)
+            # for any reader that ignores the rule. That a ruling exists is
+            # checked where rulings are loaded (box_spots.check_rules).
+            if track["kind"] != "custom" or parse_rule(spot["rule_of"]) is None or spot.get("needs") != "blue_fire":
+                _fail(path, f"spot {n}: rule_of is <kind>:<ordinal> on a custom file, with needs blue_fire")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")
         if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):

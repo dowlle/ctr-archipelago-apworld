@@ -120,18 +120,19 @@ def reviewed_pickups(package):
     return pin if pin in PICKUP_RULE_PINS else None
 
 
-def add_spot_sets(record, tracks, package_by_id, seed, player, blue_fire=False):
+def add_spot_sets(record, tracks, package_by_id, seed, player, blue_fire=False, logic_difficulty=None):
     """Put `spot_sets` into a record from settings(): the pick of every track
     in `tracks` that has a spot file. Draws nothing from the world's random
     stream (box_spots.pick). `blue_fire` is the capability record's
-    boost_blue_fire: only then do blue_fire spots join a pool."""
+    boost_blue_fire: only then do blue_fire spots join a pool. `logic_difficulty`
+    is the capability record's: a `rule_of` spot reads its crate ruling with it."""
     if not record:
         return record
     sets = []
     for track in tracks:
         found = box_spots.spot_set(track, package_by_id.get(track.get("package_id")),
                                    record["shortcut_knowledge"], seed, player, record.get("box_count", 15),
-                                   blue_fire)
+                                   blue_fire, logic_difficulty)
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
@@ -243,7 +244,7 @@ def check_settings(record, capability=None):
 
 
 def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False, require_reviewed_exclusions=False,
-                    blue_fire=False):
+                    blue_fire=False, logic_difficulty=None):
     """Validate saved picks and crate exclusions, or match the source catalog."""
     if not record:
         return
@@ -333,7 +334,7 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
                                          {k: v for k, v in sets[track_id].items() if k != "track_id"},
                                          record.get("box_count", 15), compare_digest=not restoring,
-                                         blue_fire=blue_fire)
+                                         blue_fire=blue_fire, logic_difficulty=logic_difficulty)
             except box_spots.SpotFileError as exc:
                 error(str(exc))
 
@@ -450,7 +451,8 @@ def box_terms(track, slot, capability, package=None, record=None):
     found = spot_entry(track, record, package)
     if found is not None:
         spot = box_spots.spots_by_number(found[1])[slot]
-        rank = box_spots.needs_rank(spot) if boost_on else 0
+        rank = (box_spots.spot_rank(spot, package, bool(capability.get("boost_blue_fire")),
+                                    capability.get("logic_difficulty", 2)) if boost_on else 0)
         if (rank and track_rulings.scoped_version() >= track_rulings.ARABIAN_BOOST_VERSION
                 and found[1]["doc"]["track"].get("track_key") == ARABIAN_DAY
                 and track_rulings.revision_ref(package) == ARABIAN_DAY_BOX_REVISION
