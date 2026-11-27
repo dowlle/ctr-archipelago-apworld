@@ -50,3 +50,17 @@ def test_audit_uses_the_inherited_generation_pickup_limit(tmp_path, monkeypatch)
     report = audit(registry, [descriptor], index)
     assert len(report["covered"]) == 3
     assert report["hits"] == []
+
+
+def test_a_spot_limited_to_another_pin_is_not_audited_on_this_one(tmp_path, monkeypatch):
+    """IM1b: a spot with lev_sha256 exists only on those pins (Country Speedway
+    3 and 4 on 1.3.1 only), so the audit of the race LEV leaves it out."""
+    from .. import box_spots
+    registry, descriptor, index, main, _ = fixture(tmp_path, monkeypatch)
+    other = "b" * 64
+    spot = dict(number=1, pos=[16, 0, 0], rot_y=0)
+    authored = lambda s: dict(doc=dict(track=dict(lev_sha256=[main, other]), spots=[s]))
+    monkeypatch.setitem(box_spots.CUSTOM_FILES, "audit-fixture", authored(spot))
+    assert audit(registry, [descriptor], index)["hits"]
+    monkeypatch.setitem(box_spots.CUSTOM_FILES, "audit-fixture", authored(dict(spot, lev_sha256=[other])))
+    assert audit(registry, [descriptor], index)["hits"] == []

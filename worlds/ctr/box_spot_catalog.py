@@ -153,7 +153,7 @@ def check_draft_file(doc, path="<file>"):
             only = spot["lev_sha256"]
             pins = track.get("lev_sha256") or []
             if (track["kind"] != "custom" or not isinstance(only, list) or not only
-                    or len(set(only)) != len(only) or not set(only) < set(pins) or not all(_sha256(p) for p in only)):
+                    or not all(_sha256(p) for p in only) or len(set(only)) != len(only) or not set(only) < set(pins)):
                 _fail(path, f"spot {n}: lev_sha256 is a distinct, proper subset of the file's LEV pins")
         if spot.get("shortcut", "none") not in SHORTCUT:
             _fail(path, f"spot {n}: shortcut must be none, medium or hard")

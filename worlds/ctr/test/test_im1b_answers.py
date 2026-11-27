@@ -196,7 +196,7 @@ class TestAnswerFiveCountrySpeedway(unittest.TestCase):
     def test_file_check_refuses_a_bad_lev_subset(self):
         doc = copy.deepcopy(box_spots.CUSTOM_FILES["country-speedway"]["doc"])
         box_spot_catalog.check_draft_file(doc)
-        for bad in ([], [CS131, CS130], [CS131, CS131], ["01" * 32], CS131):
+        for bad in ([], [CS131, CS130], [CS131, CS131], ["01" * 32], CS131, [{}], [[]], [None]):
             broken = copy.deepcopy(doc)
             broken["spots"][2]["lev_sha256"] = bad
             with self.subTest(bad=bad), self.assertRaises(box_spots.SpotFileError):
