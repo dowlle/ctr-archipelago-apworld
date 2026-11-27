@@ -1,0 +1,28 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "sid-house", "name": "Sid House", "lev_sha256": ["985663bf855f45fd8b71fe23ada322effb738c5fcf55cbd6c2710f95c631b112"]},
+  "spots": [
+    {"number": 1, "pos": [2400, -2240, -3744], "rot_y": 1024, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1221]},
+    {"number": 2, "pos": [3488, -832, -1888], "rot_y": 310, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1222]},
+    {"number": 3, "pos": [736, 504, -608], "rot_y": 2769, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 52.6", "source_family": "ap_box", "provenance": ["im1-sid-house", 1223]},
+    {"number": 4, "pos": [-1184, 575, -1696], "rot_y": 2088, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1224]},
+    {"number": 5, "pos": [1760, 575, -4512], "rot_y": 2048, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1225]},
+    {"number": 6, "pos": [-3040, 575, -5920], "rot_y": 3276, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1226]},
+    {"number": 7, "pos": [-4064, 575, -5472], "rot_y": 3866, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1227]},
+    {"number": 8, "pos": [-4000, 575, -1312], "rot_y": 0, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1228]},
+    {"number": 9, "pos": [-2464, 597, 32], "rot_y": 862, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.8", "source_family": "ap_box", "provenance": ["im1-sid-house", 1229]},
+    {"number": 10, "pos": [-1760, 575, 2912], "rot_y": 291, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1230]},
+    {"number": 11, "pos": [-2016, 575, 3488], "rot_y": 0, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1231]},
+    {"number": 12, "pos": [1440, 575, 4448], "rot_y": 864, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1232]},
+    {"number": 13, "pos": [5664, -832, 5088], "rot_y": 1089, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1233]},
+    {"number": 14, "pos": [6560, -832, 4512], "rot_y": 1766, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1234]},
+    {"number": 15, "pos": [6816, -1595, -160], "rot_y": 2872, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1235]},
+    {"number": 16, "pos": [1760, -2240, 3232], "rot_y": 3425, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1236]},
+    {"number": 17, "pos": [-608, -2240, 1696], "rot_y": 3072, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1237]},
+    {"number": 18, "pos": [-2912, -2240, 3616], "rot_y": 3072, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1238]},
+    {"number": 19, "pos": [-4960, -2240, 1184], "rot_y": 2056, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1239]},
+    {"number": 20, "pos": [-4448, -2240, -2208], "rot_y": 1720, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.0", "source_family": "ap_box", "provenance": ["im1-sid-house", 1240]}
+  ],
+  "retired": []
+}
