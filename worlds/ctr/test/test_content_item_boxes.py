@@ -70,11 +70,25 @@ def before_cp1():
     its track (Baby T Park, the test package, among them) keeps crate seating."""
     kept = {}
     for key, e in box_spots.CUSTOM_FILES.items():
+        if key == "country-speedway":
+            e = country_speedway_before_im1b()
         spots = [s for s in e["doc"]["spots"] if s.get("source") != DOWLLE_2026_11_24]
         if spots:
             kept[key] = dict(e, doc=dict(e["doc"], spots=spots))
     with mock.patch.dict(box_spots.CUSTOM_FILES, kept, clear=True):
         yield
+
+
+def country_speedway_before_im1b():
+    """The Country Speedway spot file before IM1b (1.3.1 pin only, spot 11
+    live), kept as a restore-only copy: 1.3.0 rooms of that time use crate
+    seats with the 1.3.0 pickup rules."""
+    return next(v for v in box_spots.LEGACY_FILES.values() if v["path"].endswith("/country-speedway-1.3.1.json"))
+
+
+def before_im1b():
+    """The catalog before IM1b for Country Speedway: its 1.3.1-only file."""
+    return mock.patch.dict(box_spots.CUSTOM_FILES, {"country-speedway": country_speedway_before_im1b()})
 
 
 @contextlib.contextmanager

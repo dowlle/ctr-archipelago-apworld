@@ -135,6 +135,8 @@ class TestToastyTerrace(unittest.TestCase):
             self.assertTrue(all(not w.multiworld.get_location(c["display_name"], 1).can_reach(state) for c in checks))
 
     def test_mixed_room_preserves_country_exceptions(self):
+        from .test_content_item_boxes import before_im1b
+        self.enterContext(before_im1b())  # Country Speedway 1.3.0 crate seats, as before IM1b
         from .test_country_speedway import PACKAGE as country_package
         options = toasty_options()
         options["content_pool"]["tracks"]["custom"].append(copy.deepcopy(country_package))

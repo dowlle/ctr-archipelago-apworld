@@ -49,6 +49,11 @@ DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
 DOWLLE_2026_11_24_COUNTS = {0: 34, 1: 35, 2: 34, 3: 30, 4: 22, 5: 35, 6: 18, 7: 35, 8: 0, 9: 34, 10: 35, 11: 33, 12: 34, 13: 35, 14: 27, 15: 35, 16: 35, 17: 35}
 ARABIAN_DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 TOASTY = "toasty-terrace"
+COUNTRY_130 = "9fa73436daaf91434ede1d6fb036a8e6dff225c55533cc0be5723d229b5e53bd"
+#: IM1: dowlle's reviewed Box Author Mode placements of 2026-11-27, one file per
+#: Sunday LEV (test_im1_reviewed_boxes.py holds their counts, pins and ranks).
+IM1 = {"royal-raceway", "tv-world", "super-snocross-2", "arabian-heights-night", "yoshi-circuit",
+       "snowy-valley", "sid-house", "redrock-ravine", "sunken-sprint"}
 RECOVERED_CUSTOM = {
     "acropolis": (91, "20785164f1123ab6ed8b3f5026aaeed781496aabfee4fc5f662847f49cd54a74", 50, {22, 23}),
     "nina-s-nightmare": (90, "7fc42abb12130c546a7b500815a3d3a372c4178f4f063b56460730443f4ea0a0", 29, {6, 10, 25}),
@@ -136,7 +141,8 @@ class TestConversion(unittest.TestCase):
     def test_catalog_covers_the_18_retail_tracks_and_the_named_custom_files(self):
         self.assertEqual(sorted(box_spots.RETAIL_FILES), list(range(18)))
         self.assertEqual(set(box_spots.CUSTOM_FILES),
-                         {*COMMUNITY, *DOWLLE_CUSTOM, *RECOVERED_CUSTOM, ARABIAN_DAY, "sunset-vista", TOASTY})
+                         {*COMMUNITY, *DOWLLE_CUSTOM, *RECOVERED_CUSTOM, *IM1, ARABIAN_DAY, "sunset-vista", TOASTY,
+                          "jungle-boogie-n-gage"})
         for e in box_spots.RETAIL_FILES.values():
             self.assertTrue(all(s.get("source") in ("builtin", DOWLLE_2026_11_24) for s in e["doc"]["spots"]), e["path"])
             self.assertEqual(e["doc"]["retired"], [], e["path"])
@@ -308,12 +314,24 @@ class TestSourceChecks(unittest.TestCase):
                 box_spots.check_file(dict(doc, spots=[dict(original, **changes)]))
 
     def test_published_day_rows_are_the_only_donor_exception(self):
+        """IM1 retired Day's 27 copied weapon crate rows (Item Box 1 to 27) and
+        ships authored AP spots from 28. The frozen A6-16 record still admits
+        those rows as weapon crates only, never relabelled as AP boxes."""
         doc = box_spots.CUSTOM_FILES[ARABIAN_DAY]["doc"]
-        self.assertEqual([s["number"] for s in doc["spots"]], list(range(1, 28)))
-        self.assertEqual({s["source_family"] for s in doc["spots"]}, {"weapon_crate"})
+        self.assertEqual(doc["retired"], list(range(1, 28)))
+        self.assertEqual([s["number"] for s in doc["spots"]], list(range(28, 51)))
+        self.assertEqual({s["source_family"] for s in doc["spots"]}, {"ap_box"})
         box_spots.check_file(doc)
+        source = box_spots.SOURCE_RECORDS[box_spot_catalog.DAY_SOURCE]
+        n, *pos, yaw = source["rows"][1]
+        row = dict(number=n, pos=pos, rot_y=yaw, needs="none", source_family="weapon_crate",
+                   provenance=[box_spot_catalog.DAY_SOURCE, 1])
+        legacy = dict(doc, spots=[row], retired=[])
+        box_spots.check_file(legacy)
         with self.assertRaisesRegex(box_spots.SpotFileError, "LEV donor models"):
-            box_spots.check_file(dict(doc, spots=[dict(doc["spots"][0], source_family="ap_box")]))
+            box_spots.check_file(dict(legacy, spots=[dict(row, source_family="ap_box")]))
+        with self.assertRaisesRegex(box_spots.SpotFileError, "retired"):
+            box_spots.check_file(dict(doc, spots=[row]))
 
     def test_bx3_model_8_refused_even_if_labelled_ap(self):
         doc = box_spots.CUSTOM_FILES["chasqui-rally"]["doc"]
@@ -619,6 +637,8 @@ class TestCommunitySpotFiles(unittest.TestCase):
         self.assertEqual(boxes(other, other_id), [])
 
     def test_arabian_day_stands_nights_layout_on_its_pinned_crateless_lev(self):
+        """IM1: Day carries Night's 23 reviewed AP box positions as Item Box 28
+        to 50, Boost 0; Item Box 1 to 27 (the old weapon crate rows) are retired."""
         package = btp(0)
         package.update(content_id=ARABIAN_DAY, display_name="Arabian Heights Day",
                        id=f"package/{ARABIAN_DAY}/1.0.0", revision="1.0.0", evidence=[])
@@ -629,16 +649,18 @@ class TestCommunitySpotFiles(unittest.TestCase):
         plan = world.ctr_content_plan
         track_id = f"custom/{ARABIAN_DAY}/1.0.0"
         own = boxes(plan, track_id)
-        numbers = list(range(1, 28))
+        numbers = list(range(28, 51))
         record = spot_set(plan, track_id)
         self.assertEqual((record["lev_sha256"], record["pool"], record["picked"]),
-                         (ARABIAN_DAY_LEV, 27, numbers))
+                         (ARABIAN_DAY_LEV, 23, numbers))
         self.assertEqual([check["location"] for check in own],
                          [named_tracks.location_code(3, f"item_box_{n}") for n in numbers])
         self.assertEqual([check["display_name"] for check in own],
                          [f"Arabian Heights Day: Item Box {n}" for n in numbers])
-        self.assertEqual([check["spot"]["number"] for check in own if check.get("boost") == 2],
-                         [])
+        self.assertEqual([check for check in own if check.get("boost")], [])
+        night = box_spots.CUSTOM_FILES["arabian-heights-night"]["doc"]["spots"]
+        self.assertEqual([(c["spot"]["pos"], c["spot"]["rot_y"]) for c in own],
+                         [(s["pos"], s["rot_y"]) for s in night])
         distribute_items_restrictive(world.multiworld)
         self.assertTrue(world.multiworld.fulfills_accessibility(CollectionState(world.multiworld)))
 
@@ -657,6 +679,13 @@ class TestCommunitySpotFiles(unittest.TestCase):
                            revision=revision, evidence=[])
             package["files"][0]["sha256"] = pin
             package["capabilities"]["super_turbo_pads"] = True
+        # IM1 gave Night's pin a spot file; its crate seat ruling still decides
+        # rooms generated before it and other revisions, so test it without.
+        # Day's LEV has no crates: its boxes are spots, now IM1's Boost 0 set.
+        seated = {k: v for k, v in box_spots.CUSTOM_FILES.items() if k != "arabian-heights-night"}
+        files = mock.patch.dict(box_spots.CUSTOM_FILES, seated, clear=True)
+        files.start()
+        self.addCleanup(files.stop)
         for package in (day, night):
             tid = package["id"].replace("package/", "custom/")
             options = box_options(custom=[package], item_box_count=50, progressive_boost="shared_global",
@@ -678,7 +707,7 @@ class TestCommunitySpotFiles(unittest.TestCase):
             lap = f"{package['display_name']}: Complete One Lap"
             self.assertFalse(old_world.multiworld.get_location(lap, 1).can_reach(state_at(old_world, 0)))
             self.assertTrue(world.multiworld.get_location(lap, 1).can_reach(state_at(world, 0)))
-            self.assertTrue(any(c.get("boost") == 2 for c in boxes(saved["content_plan"], tid)))
+            self.assertEqual(any(c.get("boost") == 2 for c in boxes(saved["content_plan"], tid)), package is night)
             self.assertEqual([c["location"] for c in boxes(plan, tid)],
                              [c["location"] for c in boxes(saved["content_plan"], tid)])
 
@@ -910,7 +939,8 @@ class TestDowlleCustomSpots(unittest.TestCase):
         for key, (block, pin, first, count, boost) in DOWLLE_CUSTOM.items():
             doc = box_spots.CUSTOM_FILES[key]["doc"]
             self.assertEqual(destinations.named_track(key).block_index, block, key)
-            self.assertEqual(doc["track"]["lev_sha256"], [pin], key)
+            # IM1b: Country Speedway's file covers the merged 1.3.1 and 1.3.0 pair.
+            self.assertEqual(doc["track"]["lev_sha256"], [pin, COUNTRY_130] if key == "country-speedway" else [pin], key)
             new = [s for s in doc["spots"] if s.get("source") == DOWLLE_2026_11_24]
             self.assertEqual([s["number"] for s in new], list(range(first, first + count)), key)
             self.assertEqual(max(s["number"] for s in doc["spots"]), first + count - 1, key)

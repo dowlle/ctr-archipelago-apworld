@@ -84,7 +84,10 @@ def audit(registry, descriptors, lev_index):
         crates = [(i, o) for i, o in enumerate(main) if o.model_id == 8]
         authored = box_spots.CUSTOM_FILES.get(destinations.canonical_track_key(key))
         if authored and pin in authored["doc"]["track"]["lev_sha256"]:
-            layouts = [[(s["number"], s["pos"], None) for s in authored["doc"]["spots"]]]
+            # A spot limited to some of the file's pins (lev_sha256) exists only
+            # for a package whose race LEV is one of them.
+            layouts = [[(s["number"], s["pos"], None) for s in authored["doc"]["spots"]
+                        if "lev_sha256" not in s or pin in s["lev_sha256"]]]
         else:
             replacements = box_spots.SEAT_SPOTS.get(pin, {})
             layouts = []
