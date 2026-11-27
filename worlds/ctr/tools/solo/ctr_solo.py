@@ -1109,10 +1109,24 @@ def _descriptor_sources(paths: Paths) -> list:
 
 def _build_tag(descriptor: dict) -> str:
     """The client's build tag of a descriptor's pins (AP_SoloBuildTag): the
-    first 8 hex digits of the LEV SHA-256 and then of the VRM SHA-256. Two
+    first 16 hex digits of the LEV SHA-256 and then of the VRM SHA-256. Two
     installs of one track key and version with other files differ in it."""
     by_role = {pin["role"]: pin["sha256"] for pin in descriptor["files"]}
-    return by_role["lev"][:8] + by_role["vrm"][:8]
+    return by_role["lev"][:16] + by_role["vrm"][:16]
+
+
+def _package_folder(tracks_root: str, descriptor: dict) -> str | None:
+    """The installed package of a descriptor's exact pins and version,
+    preferring the one with the descriptor's own package uuid, so the source
+    of a copy is read from its own package when byte-identical packages from
+    two sources are installed."""
+    wanted = {(pin["role"], pin["sha256"], pin["bytes"]) for pin in descriptor["files"]}
+    first = None
+    for folder, manifest in _store_packages(tracks_root, wanted, descriptor["revision"]):
+        if manifest.get("package_uuid") == descriptor.get("uuid"):
+            return folder
+        first = first or folder
+    return first
 
 
 def _build_origin(folder: str | None, descriptor: dict) -> dict:
@@ -1382,7 +1396,7 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
             continue
         folders = [os.path.join(tracks_root, folder, "original")
                    for candidate in destinations.equivalent_track_keys(key) for folder in (candidate, f"{candidate}-{revision}")]
-        shared = _shared_package_folder(tracks_root, descriptor)
+        shared = _package_folder(tracks_root, descriptor)
         if shared is None and not any(all(_pinned_file([folder], pin) for pin in descriptor["files"])
                                       for folder in folders):
             continue
@@ -1403,8 +1417,17 @@ def installed_tracks(paths: Paths, assets: str, listed=()) -> list:
     for row in result:
         if ids.count(row["id"]) > 1:
             row["id"] = f"{row['id']}@{row['build']}"
-    result.sort(key=lambda t: (t["display_name"].lower(), t["revision"], t["id"]))
-    return result
+    # Two builds whose tags collide (a shared LEV and VRMs alike in 64 bits)
+    # cannot be told apart by a pick: the first stays, the other is named.
+    unique, taken = [], set()
+    for row in result:
+        if row["id"] in taken:
+            _note(f"{row['display_name']} {row['revision']}: left out, another installed build has the same build tag")
+            continue
+        taken.add(row["id"])
+        unique.append(row)
+    unique.sort(key=lambda t: (t["display_name"].lower(), t["revision"], t["id"]))
+    return unique
 
 
 #: The bundled Cortex Vortex files: the main pair and the relic pair (CV1).
@@ -1625,11 +1648,18 @@ def apply_tracks(paths: Paths, doc: dict, assets: str, picked: list[str], guaran
     # one: another version or other file pins is a conflict, refused rather
     # than guessed at (round 2 decision 5). The same package is not added
     # twice, and a guarantee the YAML already has is not repeated.
+    shown_off = [entry["descriptor"] for entry in by_id.values() if entry["id"] not in picked] if page else []
     for track_id in packages:
         descriptor = by_id[track_id]["descriptor"]
         key = canonical_key(descriptor["content_id"])
         group = groups.get(key, ())
         if group and not _same_package(group[0], descriptor):
+            # PS2: the page showed the YAML's own installed build of this same
+            # version switched off and this build picked: the page replaces
+            # it, below. Another version stays a conflict (round 2 decision 5).
+            if all(listed.get("revision") == descriptor["revision"]
+                   and any(_same_package(listed, off) for off in shown_off) for listed in group):
+                continue
             other = group[0]
             raise SoloError("track", f"This YAML already lists {by_id[track_id]['display_name']} "
                             f"(version {other.get('revision', '?')}) differently from the installed version "

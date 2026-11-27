@@ -1866,8 +1866,8 @@ class TestCustomTracks(SoloTestCase):
         self._store_build(patch, "bf-patch", ("metadata/xdelta-source.json", {
             "schema_version": 1, "provider": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73,
             "track_key": "big-forest"}))
-        tag = lambda d: {f["role"]: f["sha256"] for f in d["files"]}["lev"][:8] + \
-            {f["role"]: f["sha256"] for f in d["files"]}["vrm"][:8]
+        tag = lambda d: {f["role"]: f["sha256"] for f in d["files"]}["lev"][:16] + \
+            {f["role"]: f["sha256"] for f in d["files"]}["vrm"][:16]
         # As the client writes them: the first build under the plain name,
         # the second under its build name.
         with open(os.path.join(self.descriptors, "big-forest__1.0.0.json"), "w", encoding="utf-8") as handle:
@@ -1903,6 +1903,24 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(code, 0, events)
         starts = {row["build"]: row["start"] for row in last(events)["tracks"] if row.get("content_id") == "big-forest"}
         self.assertEqual(starts, {tag(saphi): ctr_solo.PICK_POOL, tag(patch): 0})
+        # On the page the player switches that YAML from the Saphi build to the
+        # patch build: the YAML then lists the patch build only.
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [saphi], "required_entries": ["big-forest"]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [rows[tag(patch)]["id"]],
+                                       page=True)
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["files"], patch["files"])
+        self.assertEqual(result[GAME]["required_entries"], ["big-forest"])
+        # Without the page (or with the YAML's build still picked) the conflict is still refused.
+        with self.assertRaises(ctr_solo.SoloError):
+            ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [], page=False)
+        # Two builds whose tags collide cannot be told apart: one row stays.
+        from unittest.mock import patch as mock_patch
+        with mock_patch.object(ctr_solo, "_build_tag", return_value="0" * 32):
+            listed = [row for row in ctr_solo.installed_tracks(paths, self.assets) if row["content_id"] == "big-forest"]
+        self.assertEqual(len(listed), 1)
 
     def test_one_build_keeps_its_plain_row_id(self):
         """PS2: with one build installed the row id stays the descriptor id;
@@ -1911,7 +1929,7 @@ class TestCustomTracks(SoloTestCase):
         row, = [row for row in self.tracks() if row.get("content_id") == "solo-build"]
         self.assertEqual(row["id"], track["id"])
         self.assertEqual(row["origin"], {"kind": "local"})
-        self.assertEqual(len(row["build"]), 16)
+        self.assertEqual(len(row["build"]), 32)
 
     def test_room_yaml_refuses_a_track_without_a_public_source(self):
         track = self.install("private-track", "1.0", "Private Track")
