@@ -55,6 +55,7 @@
     "track_origin_letters": "Uses the default for installed custom tracks. Set it in a YAML.",
     "placed_track_letters": "Defaults off in Play Solo. To test registered adventure-pack placements, set it in a YAML.",
     "custom_tracks": "A list. The Custom Tracks page owns it.",
+    "track_fill": "Experimental. Enable in YAML and launch the client with CTR_TRACK_FILL=1.",
     "required_entries": "A list. The Custom Tracks page owns it.",
     "cortex_vortex_track": "The Custom Tracks page owns it.",
     "requirement_weights": "A dictionary of weights. Set it in a YAML.",

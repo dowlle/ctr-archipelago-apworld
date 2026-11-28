@@ -13,7 +13,7 @@ from .test_content_plan_row3 import SHAPE  # noqa: F401, the module's inputs sta
 
 #: Plan section 2, by table.
 SECTION_2 = """
-retail_tracks track_modes custom_tracks cortex_vortex_track required_entries
+retail_tracks track_modes custom_tracks track_fill cortex_vortex_track required_entries
 cup_count cup_tracks cup_custom_legs one_lap_cups crystal_challenge_count crystal_arenas
 boss_garages boss_cups garage_requirement_level boss_track_shuffle boss_track_pool boss_opponent_shuffle
 boss_character_pool boss_track_assignment boss_kit_shuffle boss_attack_assignment boss_attack_intensity
@@ -46,7 +46,7 @@ sapphire_relic_count gold_relic_count platinum_relic_count
 """.split()
 DEFAULTS = dict(cup_count=5, cup_custom_legs=4, crystal_challenge_count=4, boss_cups=0, boss_garages=1,
                 one_lap_cups=1, shuffle_keys=1, shuffle_gems=1, two_stage_density=4, wumpa_shop_slots=10,
-                item_box_count=15, track_origin_letters=1, placed_track_letters=0)
+                item_box_count=15, track_origin_letters=1, placed_track_letters=0, track_fill=0)
 GARAGE_POOL = ["Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway"]
 
 
@@ -60,7 +60,7 @@ def own_options():
 class TestOptionSet(unittest.TestCase):
     def test_section_2_is_the_option_set(self):
         self.assertEqual(own_options(), set(SECTION_2))
-        self.assertEqual(len(SECTION_2), 102)
+        self.assertEqual(len(SECTION_2), 103)
 
     def test_every_retired_name_is_gone(self):
         self.assertFalse(own_options() & set(RETIRED))

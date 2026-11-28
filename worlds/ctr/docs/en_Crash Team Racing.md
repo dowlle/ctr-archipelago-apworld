@@ -224,6 +224,10 @@ random_without_4_keys refuses a rule of 4 Keys.
 
 ### Custom Tracks
 
+`track_fill: true` enables experimental Relic Races on eligible pinned custom track builds.
+The room includes the time crates and targets and requires a client launched with `CTR_TRACK_FILL=1`.
+The default is off.
+
 `custom_tracks` is a list of track packages. Use **Export YAML** in Options >
 Custom Tracks for one track, or **Save YAML for a room** on the Play Solo >
 Custom Tracks page for your selections. Entries use `track_key`; older YAMLs

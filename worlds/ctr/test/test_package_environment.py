@@ -56,6 +56,17 @@ class PackageEnvironmentTests(unittest.TestCase):
             for name in files:
                 self.assertEqual(packed.read(prefix + name), (source / name).read_bytes(), name)
 
+    def test_packed_world_keeps_complete_track_fill_catalogue(self):
+        prefix = "ctr/data/track_fill/"
+        source = WORLD / "data" / "track_fill"
+        index = json.loads((source / "index.json").read_bytes())
+        files = {"index.json", *(f"{key}/{sha[:16]}.json" for key, pins in index.items() for sha in pins)}
+        with zipfile.ZipFile(self.archive) as packed:
+            self.assertEqual({name.removeprefix(prefix) for name in packed.namelist()
+                              if name.startswith(prefix)}, files)
+            for name in files:
+                self.assertEqual(packed.read(prefix + name), (source / name).read_bytes(), name)
+
     @unittest.skipIf(os.environ.get("CTR_PACKED_APWORLD"), "Launcher rules run in the CTR pytest suite")
     def test_launcher_pack_rules_keep_shared_presets_and_omit_solo_tools(self):
         from Utils import read_apignore
