@@ -4,6 +4,8 @@
 The geometry tools directory supplies BX1's analyze.py and its dependencies.
 The local LEV index and capability sheet are inputs and are never packaged.
 Run with --check to re-derive and compare the complete output directory.
+Authored (hand-placed, donorless) fill files already in the output directory
+are kept as they are.
 
 WF1 weapon crates: --weapon-targets names each target LEV, its donor, the
 package lap count (or null for the capability sheet's), the fit rule and the
@@ -301,6 +303,23 @@ def generate(args, fill_module, analyze, np):
     return output, report
 
 
+def authored_fills(directory, fill_module):
+    """Hand-placed layouts (JB1) have no donor to derive them from. They are
+    kept as committed, revalidated against their catalogue pin and laps."""
+    index = read_json(directory / "index.json") if (directory / "index.json").exists() else {}
+    out = {}
+    for path in sorted(directory.glob("*/*.json")):
+        fill = read_json(path)
+        if fill.get("donors") != [] or "source" not in fill:
+            continue
+        pin = index.get(path.parent.name, {}).get(fill["lev_sha256"])
+        if not pin or pin["fill_sha256"] != fill["fill_sha256"]:
+            raise ValueError(f"authored fill {path} has no matching catalogue pin")
+        fill_module.validate(fill, fill["lev_sha256"], pin["laps"])
+        out[path.relative_to(directory)] = (fill, pin["laps"])
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for argument in ("geometry-tools", "inventory", "lev-paths", "sheet-rows", "pack-rows", "registry", "output"):
@@ -313,9 +332,15 @@ def main():
     import analyze
     import numpy
 
-    output, report = generate(args, load_fill_module(), analyze, numpy)
+    fill_module = load_fill_module()
+    output, report = generate(args, fill_module, analyze, numpy)
     catalogue = {}
     laps = {}
+    for path, (fill, fill_laps) in authored_fills(args.output, fill_module).items():
+        if path in output:
+            raise ValueError(f"{path} is both generated and authored")
+        output[path] = fill
+        laps[fill["lev_sha256"]] = fill_laps
     for entry in report:
         if entry["status"] == "generated" and laps.setdefault(entry["lev_sha256"], entry["laps"]) != entry["laps"]:
             raise ValueError(f"time and weapon families disagree on laps for {entry['lev_sha256']}")

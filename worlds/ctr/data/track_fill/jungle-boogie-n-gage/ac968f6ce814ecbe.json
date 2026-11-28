@@ -1,0 +1,256 @@
+{
+  "counts": {
+    "fruit_crates": 0,
+    "grid": 0,
+    "letters": 0,
+    "loose_fruit": 0,
+    "time_crates": 0,
+    "weapon_crates": 16
+  },
+  "donors": [],
+  "families": {
+    "fruit_crates": [],
+    "grid": null,
+    "letters": {},
+    "loose_fruit": [],
+    "time_crates": [],
+    "weapon_crates": [
+      {
+        "pos": [
+          2788,
+          -169,
+          -545
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1767,
+          0
+        ]
+      },
+      {
+        "pos": [
+          2895,
+          -173,
+          -313
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1767,
+          0
+        ]
+      },
+      {
+        "pos": [
+          3002,
+          -189,
+          -80
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1767,
+          0
+        ]
+      },
+      {
+        "pos": [
+          3108,
+          -208,
+          153
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1767,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -1108,
+          87,
+          11959
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          75,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -1137,
+          90,
+          11705
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          75,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -1167,
+          86,
+          11450
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          75,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -1196,
+          76,
+          11196
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          75,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -16995,
+          1160,
+          -1573
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1250,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -16754,
+          1123,
+          -1487
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1250,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -16513,
+          1089,
+          -1400
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1250,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -16272,
+          1058,
+          -1313
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -1250,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -5705,
+          1010,
+          -15472
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -795,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -5464,
+          1010,
+          -15560
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -795,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -5224,
+          998,
+          -15649
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -795,
+          0
+        ]
+      },
+      {
+        "pos": [
+          -4984,
+          974,
+          -15737
+        ],
+        "rank": 0,
+        "rank_source": "start_ground",
+        "rot": [
+          0,
+          -795,
+          0
+        ]
+      }
+    ]
+  },
+  "fill_sha256": "841e0e02634a622b03f2db0ae4d63396b22ca46f89b37b4046ce56cbd20c082b",
+  "generator": {
+    "name": "ctr-track-fill",
+    "version": 1
+  },
+  "lev_sha256": "ac968f6ce814ecbe67a7efd6e926f4fa7c59803c56e8f05a194156962ec0f906",
+  "relic_targets": null,
+  "schema": 1,
+  "source": {
+    "kind": "authored",
+    "provenance": "jb1-jungle-boogie-n-gage"
+  }
+}
