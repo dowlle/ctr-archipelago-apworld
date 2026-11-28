@@ -21,6 +21,10 @@ EMPTY_FAMILIES = {"letters": {}, "fruit_crates": [], "loose_fruit": []}
 #: ground at Boost 0, otherwise USF. `rank` uses the box spot `needs` scale.
 RANK_SOURCES = ("donor_ruling", "start_ground", "default_usf")
 RANK_NAMES = ("none", "boost", "usf")
+#: A hand-placed layout (JB1) has no donor. It names its review instead and
+#: is held to the weapon-only rules of a ruled donor.
+AUTHORED_KIND = "authored"
+AUTHORED_RANK_SOURCES = ("start_ground", "default_usf")
 HEX_SHA = re.compile(r"[0-9a-f]{64}")
 TRACK_KEY = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -52,9 +56,9 @@ def _position(value):
 
 def validate(fill, lev_sha, laps):
     """Validate the frozen record against the package LEV and lap count."""
-    if not _fields(fill, (
-            "schema", "lev_sha256", "generator", "donors", "families",
-            "counts", "relic_targets", "fill_sha256")):
+    record = ("schema", "lev_sha256", "generator", "donors", "families", "counts", "relic_targets", "fill_sha256")
+    authored = type(fill) is dict and fill.get("donors") == []
+    if not _fields(fill, record + (("source",) if authored else ())):
         raise ValueError("fill has unsupported or incomplete record fields")
     if not _int(fill["schema"], 1, 1):
         raise ValueError("unsupported track fill schema")
@@ -65,8 +69,14 @@ def validate(fill, lev_sha, laps):
             or not _int(generator["version"], 1, 1)):
         raise ValueError("unsupported track fill generator")
     donors = fill["donors"]
-    if type(donors) is not list or not 1 <= len(donors) <= 2:
-        raise ValueError("track fill requires one or two donors")
+    if authored:
+        source = fill["source"]
+        if (not _fields(source, ("kind", "provenance")) or source["kind"] != AUTHORED_KIND
+                or type(source["provenance"]) is not str or len(source["provenance"]) > 64
+                or not TRACK_KEY.fullmatch(source["provenance"])):
+            raise ValueError("invalid authored track fill source")
+    elif type(donors) is not list or not 1 <= len(donors) <= 2:
+        raise ValueError("track fill requires one or two donors or an authored source")
     seen = {lev_sha}
     has_ruled_donor = False
     for donor in donors:
@@ -93,6 +103,10 @@ def validate(fill, lev_sha, laps):
         raise ValueError("invalid time crate set size")
     if has_ruled_donor and (len(donors) != 1 or crates or families["grid"] is not None):
         raise ValueError("a ruled weak donor requires a weapon-only fill")
+    if authored and (crates or families["grid"] is not None or not weapons
+                     or any(type(crate) is dict and crate.get("rank_source") not in AUTHORED_RANK_SOURCES
+                            for crate in weapons)):
+        raise ValueError("an authored track fill requires weapon crates ranked on the target alone")
     seen_positions = set()
     for crate in weapons:
         if (not _fields(crate, ("pos", "rot", "rank", "rank_source")) or not _position(crate["pos"])

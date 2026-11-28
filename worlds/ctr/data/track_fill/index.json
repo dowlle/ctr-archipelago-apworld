@@ -135,6 +135,12 @@
       "fill_sha256": "945fe3e87808942e93005e00e167e0073b706cb117ebb4626e919dd50655c033"
     }
   },
+  "jungle-boogie-n-gage": {
+    "ac968f6ce814ecbe67a7efd6e926f4fa7c59803c56e8f05a194156962ec0f906": {
+      "laps": 3,
+      "fill_sha256": "841e0e02634a622b03f2db0ae4d63396b22ca46f89b37b4046ce56cbd20c082b"
+    }
+  },
   "mario-circuit-1": {
     "a9c8989b857d547eec29b0728899c8f34a878401c2c6dfb2a4b49b9301ab4e83": {
       "laps": 3,
