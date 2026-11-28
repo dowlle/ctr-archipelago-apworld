@@ -1,5 +1,4 @@
 import logging
-import json
 from typing import ClassVar, Dict, List
 
 from BaseClasses import MultiWorld, Item, Tutorial, ItemClassification
@@ -200,7 +199,8 @@ class ctrAPWorld(World):
                 raise OptionError("CTR: This room was made with v0.2.x. Play it on the v0.2.4 client.")
             content_plan.restore(self, passthrough)
         else:
-            from . import content_bosses, content_item_boxes, tizi_madness, track_origins
+            from . import character_looks, content_bosses, content_item_boxes, tizi_madness, track_origins
+            character_looks.park(self)
             content_bosses.garages_off_goal_as_disabled(self.options)
             content_plan.drop_duplicate_tracks(self)
             content_plan.swap_in_bundled_cortex(self)
@@ -447,10 +447,13 @@ class ctrAPWorld(World):
         content_item_pool.audit_room_before_output(multiworld)
 
     def write_spoiler(self, spoiler_handle) -> None:
-        """Record this seed's content plan, its boss encounters, plando and item
+        """Record this seed's pad requirements, boss encounters, plando and item
         link accounting, and the Hit Character Key fallback."""
-        spoiler_handle.write("\nCTR independent content/item plan:\n")
-        json.dump(self.ctr_content_plan, spoiler_handle, indent=2)
+        from . import pad_spoiler
+        player = self.multiworld.player_name[self.player]
+        spoiler_handle.write(f"\nCTR warp-pad unlock requirements ({player}):\n")
+        for line in pad_spoiler.lines(self.ctr_content_plan):
+            spoiler_handle.write(f"  {line}\n")
         from . import track_rulings
         if track_rulings.enabled(self.ctr_content_plan):
             for package, family, revision, digest in track_rulings.spoiler_sources(self.ctr_content_plan):

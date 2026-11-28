@@ -111,7 +111,7 @@ class TestCarriedPickupLimits(unittest.TestCase):
             wire = first_world(options, seed=3).fill_slot_data()
             plan = wire["content_plan"]
             source = plan["track_ruling_sources"]
-            self.assertEqual(source["version"], track_rulings.RULING_VERSION)
+            self.assertEqual(source["version"], track_rulings.BASE_RULING_VERSION)
             self.assertIs(source["pickup_limits"], True)
             exclusion, = plan["item_boxes"][crate_exclusions.KEY]
             self.assertEqual(exclusion, dict(track_id=tid, lev_sha256="ab" * 32,
@@ -132,7 +132,7 @@ class TestCarriedPickupLimits(unittest.TestCase):
         wire = first_world(options, seed=3).fill_slot_data()
         plan = wire["content_plan"]
         history = plan["track_ruling_sources"]
-        self.assertEqual(history["version"], track_rulings.RULING_VERSION)
+        self.assertEqual(history["version"], track_rulings.BASE_RULING_VERSION)
         self.assertNotIn("pickup_limits", history)
         self.assertEqual(plan["sanity"]["exclusion_version"], 2)
         self.assertEqual([r["track_id"] for r in plan["item_boxes"][crate_exclusions.KEY]],
@@ -150,7 +150,7 @@ class TestCarriedPickupLimits(unittest.TestCase):
             tid = f"custom/sunset-vista/{revision}"
             lap = next(c for c in plan["checks"] if c["owner"] == tid and c["kind"] == "lap")
             self.assertEqual(lap.get("boost", 0), 0)
-            self.assertEqual(plan["track_ruling_sources"]["version"], track_rulings.RULING_VERSION)
+            self.assertEqual(plan["track_ruling_sources"]["version"], track_rulings.BASE_RULING_VERSION)
             if pin:
                 self.assertIn((f"package/sunset-vista/{revision}", "finish", "1.2.0",
                                track_rulings.REVIEWS["sunset-vista"][0][0]), track_rulings.spoiler_sources(plan))

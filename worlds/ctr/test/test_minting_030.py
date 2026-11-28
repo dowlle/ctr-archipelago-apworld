@@ -25,8 +25,8 @@ from .. import named_tracks as nt
 
 L = ctrAPWorld.location_name_to_id
 I = ctrAPWorld.item_name_to_id
-REGISTRY_COMMIT = "a92f7189fa1705714ff40132d270f5af10f4d483"
-REGISTRY_DIGEST = "30e3a4be7f69ff9e65448086e3097a24ea898f9cacc2b8778882b2774b353aac"
+REGISTRY_COMMIT = "0dc6e844f67c3002a559de55c7e38ebf10ea1fda"
+REGISTRY_DIGEST = "afa520c9795d8ab694ddbf4952a94ad9702098f11d34e8ac0ff2be2193dca27c"
 NEW_CLASSES = ("named_track", "cup_win", "cup_sweep", "cup_leg_victory", "lap_completion",
                "crystalsanity", "custom_relic", "custom_track_race_v2", "custom_wumpa",
                "custom_item_boxes", "wumpa_shop")
@@ -209,12 +209,12 @@ class TestNamedBatch(unittest.TestCase):
         self.assertEqual(doc["registry"], {"repository": "https://github.com/dowlle/ctr-track-registry",
                                            "commit": REGISTRY_COMMIT, "digest": REGISTRY_DIGEST})
         blocks = [row["block_index"] for row in doc["tracks"]]
-        self.assertEqual(blocks, sorted(set(range(90)) - {14, 16, 68}))
+        self.assertEqual(blocks, sorted(set(range(92)) - {14, 16, 68}))
         keys = {row["track_key"] for row in doc["tracks"]}
         # 14 and 68 are `reserved` (hubs, no race mode confirmed); 16 is
         # `builtin` (the hard-coded Cortex Vortex block).
         self.assertFalse(keys & {"christmas-hub", "st-patricks-day-hub-world", "cortex-vortex"})
-        self.assertEqual(len(nt.NAMED_TRACKS), 87)
+        self.assertEqual(len(nt.NAMED_TRACKS), 89)
 
     def test_offset_layout_of_the_0_3_0_step(self):
         self.assertEqual(L["Baby T Park: Cup Leg Victory"], nt.location_code(8, "cup_leg_victory"))
@@ -279,8 +279,9 @@ class TestFourthPassGossamersCastle(unittest.TestCase):
         self.assertEqual(row.block_index, 17)
         self.assertIn("9cf03bb8d60c7c675c25bbbc97e269e5cadccb91ab40bfce7072ed7558a045b6", row.revisions)
 
-    def test_block_90_and_up_are_not_minted(self):
-        self.assertNotIn(90, {r.block_index for r in nt.NAMED_TRACKS})
+    def test_sunday_registry_blocks_follow_the_previous_catalogue(self):
+        tail = {r.track_key: r.block_index for r in nt.NAMED_TRACKS if r.block_index >= 90}
+        self.assertEqual(tail, {"nina-s-nightmare": 90, "acropolis": 91})
 
 
 class TestMintedItems(unittest.TestCase):

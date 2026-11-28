@@ -3,10 +3,11 @@ import copy
 import json
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from BaseClasses import CollectionState
 from Options import OptionError
-from .. import characters, content_capability, content_item_boxes as boxes, content_plan, royal_raceway, sanity
+from .. import box_spots, characters, content_capability, content_item_boxes as boxes, content_plan, royal_raceway, sanity
 from .test_content_plan import make_world, profile_options
 
 PACKAGE = json.loads((Path(__file__).parent / "fixtures/royal_raceway_100.json").read_text())
@@ -41,7 +42,15 @@ def own(p, kinds=None):
     return [c for c in p["checks"] if c["owner"] == TRACK and (kinds is None or c["kind"] in kinds)]
 
 
+def without_spot_file():
+    """The catalog before IM1's Royal Raceway spot file: the crate seats that
+    rooms generated before it keep."""
+    return mock.patch.dict(box_spots.CUSTOM_FILES, {k: v for k, v in box_spots.CUSTOM_FILES.items()
+                                                    if k != "royal-raceway"}, clear=True)
+
+
 class TestRoyalRaceway(unittest.TestCase):
+    @without_spot_file()
     def test_pickups_boost_zero_and_finishes_boost_two(self):
         for count in (0, 1, 5, 15, 50):
             for mode in ("shared_global", "per_character"):
@@ -174,6 +183,8 @@ class TestRoyalRaceway(unittest.TestCase):
             self.assertTrue(all(not w.multiworld.get_location(c["display_name"], 1).can_reach(state) for c in checks))
 
     def test_mixed_room_preserves_other_candidates(self):
+        from .test_content_item_boxes import before_im1b
+        self.enterContext(before_im1b())  # Country Speedway 1.3.0 crate seats, as before IM1b
         from .test_country_speedway import PACKAGE as country_package
         from .test_toasty_terrace import PACKAGE as toasty_package
         options = royal_options()

@@ -470,6 +470,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             + ([content_item_boxes.SPOT_FEATURE] if item_boxes and item_boxes.get(content_item_boxes.SPOT_KEY) else [])
             + ([content_item_boxes.crate_exclusions.FEATURE] if item_boxes and item_boxes.get(content_item_boxes.crate_exclusions.KEY) else [])
             + ([content_item_boxes.COUNT_FEATURE] if item_boxes and "box_count" in item_boxes else [])
+            + ([content_item_boxes.SEAT_SPOT_FEATURE] if item_boxes and content_item_boxes.SEAT_SPOT_KEY in item_boxes else [])
             + ([content_cups.FEATURE] if any(e["kind"] == content_cups.KIND for e in entries) else [])
             + ([content_bosses.FEATURE] if bosses is not None else [])
             + ([content_cups.GEM_FEATURE] if any(e["kind"] == content_cups.KIND
@@ -492,6 +493,7 @@ def required_features(requirements, entries=(), checks=(), settings=None, packs=
             # Lap completion, origin letters, then the versioned optional pickup semantics.
             + ([content_laps.FEATURE] if any(c["kind"] == content_laps.KIND for c in checks) else [])
             + ([track_origins.FEATURE] if any("letters" in t for t in tracks) else [])
+            + ([track_origins.PLACEMENT_FEATURE] if any("placed_letters" in t for t in tracks) else [])
             + ([content_pickups.FEATURE] if repeatable_pickups else [])
             + ([tizi_madness.FEATURE] if tizi_mask else [])
             # A6-48: a Final Challenge-only venue's checks left out.
@@ -848,7 +850,7 @@ def draw_racer_locks(world, plan, racers):
         by_id[pad_id]["racer_lock"] = characters.ROSTER_CHARACTER_ID[name]
 
 
-def supported_modes(origin, package=None):
+def supported_modes(origin, package=None, placed_letters=False):
     """Modes a track can run, in MODES order (#133 PR 3).
 
     Retail tracks and Cortex Vortex run all three (Cortex Vortex's bundled
@@ -866,7 +868,7 @@ def supported_modes(origin, package=None):
     out = []
     if caps["arcade"]:
         out.append("trophy")
-        if caps["ctr_tokens"]:
+        if caps["ctr_tokens"] or placed_letters:
             out.append("ctr")
     if caps["relic"] and caps["time_trial"]:
         out.append("relic")
@@ -1100,9 +1102,13 @@ def track_checks(track, entry_id, pad_id, modes, settings=None, letters=(), pack
         if carried_boxes is not None:
             saved = carried_boxes.get(code, {})
             spot = saved.get("spot")
-            expects_spot = track["id"] in content_item_boxes.spot_sets(item_boxes)
+            expects_spot = (track["id"] in content_item_boxes.spot_sets(item_boxes)
+                            or slot in content_item_boxes.seat_spot_sets(item_boxes).get(track["id"], ()))
             if expects_spot != (spot is not None) or (spot is not None and spot["number"] != slot):
                 error("box spot number or track disagrees with the room's pick")
+            if slot in content_item_boxes.seat_spot_sets(item_boxes).get(track["id"], ()) \
+                    and spot != content_item_boxes.spot_of(track, item_boxes, package, slot):
+                error("box spot position disagrees with the room's reviewed fallback seat")
             if spot is not None:
                 box["spot"] = spot
             if "boost" in saved:
@@ -1529,7 +1535,8 @@ def draw_plan(world, key_estimate=True):
         error(f"track_modes names {', '.join(unknown)}, which is not a track of this seed.")
     candidates = []
     for track, package, addressing in pool:
-        supported = supported_modes(track["origin"], package)
+        placed = o.placed_track_letters.value and "named_block" in addressing and track_origins.has_letter_placements(package)
+        supported = supported_modes(track["origin"], package, placed)
         wanted = next((overrides[name] for name in track_names(track, package, reserved) if name in overrides), None)
         if wanted is None:
             wanted = next((override for name, override in overrides.items()
@@ -1736,10 +1743,14 @@ def draw_plan(world, key_estimate=True):
     # Per-track check families (#133 PR 3b). Lettersanity modes 1 and 2 draw
     # letters_per_track letters per CTR Challenge here, before the ledger is
     # sized, in pad order; nothing is drawn when Lettersanity is off.
-    if o.track_origin_letters.value:
-        for track in chosen:
-            if "named_block" in track and "ctr" in track["modes"]:
-                code = track_origins.letters_for_package(package_by_id[track["package_id"]])
+    for track in chosen:
+        if "named_block" in track and "ctr" in track["modes"]:
+            package = package_by_id[track["package_id"]]
+            placed = o.placed_track_letters.value and track_origins.has_letter_placements(package)
+            if placed:
+                track["placed_letters"] = True
+            if o.track_origin_letters.value:
+                code = track_origins.letters_for_package(package, placed=placed)
                 if code != track_origins.DEFAULT:
                     track["letters"] = code
     letters = {}
@@ -1775,7 +1786,9 @@ def draw_plan(world, key_estimate=True):
     item_boxes = content_item_boxes.settings(o)
     # Hand-placed spots (A3-14): each track's pick from its spot file, on a
     # generator of its own (box_spots.pick), so the world's stream is untouched.
-    content_item_boxes.add_spot_sets(item_boxes, candidates, package_by_id, world.multiworld.seed, world.player)
+    content_item_boxes.add_spot_sets(item_boxes, candidates, package_by_id, world.multiworld.seed, world.player,
+                                     bool(content_capability.settings(o).get("boost_blue_fire")),
+                                     content_capability.settings(o).get("logic_difficulty"))
     # Boss garages (#133 PR 6): the four venues (the retail pairs, or the #169
     # tier 1 draw, one draw only with boss_track_shuffle on) and the Final
     # Challenge venue. Nothing is drawn with bosses off.
@@ -3023,6 +3036,12 @@ def _validate(plan, *, restoring=False):
             "package records are not canonical or not sorted by id")
     tracks, entries, pads = table("tracks"), table("entries"), table("pads")
     for track in tracks.values():
+        if "placed_letters" in track:
+            require(track["placed_letters"] is True and track.get("origin") == "custom"
+                    and "named_block" in track and "ctr" in track.get("modes", ())
+                    and track.get("letters", "CNK") == "CNK"
+                    and track_origins.has_letter_placements(packages.get(track.get("package_id"))),
+                    "invalid placed letter revision")
         if "letters" in track:
             code = track["letters"]
             require(track.get("origin") == "custom" and "named_block" in track and "ctr" in track.get("modes", ())
@@ -3206,7 +3225,9 @@ def _validate(plan, *, restoring=False):
     # Hand-placed spots (A3-14): before any box check is recomputed from them.
     content_item_boxes.check_spot_sets(item_boxes, [tracks[i] for i in standalone_ids if i in tracks], packages,
                                        restoring=restoring, carried=carried_boxes is not None,
-                                       require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record))
+                                       require_reviewed_exclusions=bool(sanity_record and "exclusion_version" in sanity_record),
+                                       blue_fire=bool(capability.get("boost_blue_fire")),
+                                       logic_difficulty=capability.get("logic_difficulty"))
     for entry in entries.values():
         if entry["kind"] != content_cups.KIND:
             continue
@@ -3273,7 +3294,8 @@ def _validate(plan, *, restoring=False):
             require(track["laps"] == package["laps"] and track["display_name"] == package["display_name"] and
                     track["id"] == "custom/" + package["content_id"] + "/" + package["revision"], "custom track metadata mismatch")
             check_custom_identity(track, package, slot)
-        require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")))),
+        require(set(track["modes"]) <= set(supported_modes(track["origin"], packages.get(track.get("package_id")),
+                                                         track.get("placed_letters", False))),
                 "a track mode its capabilities do not allow")
         pad_id = next(p["id"] for p in pads.values() if p["entry_id"] == entry["id"])
         locations, _items = plan_letters(plan, track, settings)
@@ -3638,9 +3660,6 @@ def _restore(world, slot_data):
         getattr(world.options, key).value = int(co.get(key, False))
     world.options.trap_display.value = co.get("trap_display", 0)
     world._ctr_trap_display_salt = co.get("trap_display_salt")
-    # Character looks (JL2): the envelope's list, absent meaning none.
-    from . import character_looks
-    character_looks.allowed_looks(world)
     # Itemsanity and Hit Character (#133 PR 4d): the plan's record, and the
     # room's encounter block verbatim (no redraw), its fallback checked against
     # the plan's unlock wins.

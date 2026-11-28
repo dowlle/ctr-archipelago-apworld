@@ -22,7 +22,7 @@ oxide_goal oxide_1_optional bosses_required_goal gems_required_goal goal_wumpa o
 oxide_final_challenge_relic_count oxide_final_track
 pad_placement race_mode_order adventure_structure warppad_unlock_requirements requirement_weights two_stage_density
 warp_pad_rules racer_locked_pads shuffle_keys shuffle_gems
-podium_rungs cup_only_podium_rungs relic_perfect_checks lettersanity letters_per_track track_origin_letters cup_sweep_checks
+podium_rungs cup_only_podium_rungs relic_perfect_checks lettersanity letters_per_track track_origin_letters placed_track_letters cup_sweep_checks
 lap_completion_checks box_locations item_box_count itemboxsanity wumpasanity itemsanity
 crystalsanity wumpa_check hit_character wumpa_shop_slots wumpa_shop_prices wumpa_shop_logic_scale wumpa_shop_progression wumpa_shop_hints
 item_pool start_inventory_from_pool trap_fill_percentage trap_weights wumpa_bundles reserve_top_up character_looks
@@ -46,7 +46,7 @@ sapphire_relic_count gold_relic_count platinum_relic_count
 """.split()
 DEFAULTS = dict(cup_count=5, cup_custom_legs=4, crystal_challenge_count=4, boss_cups=0, boss_garages=1,
                 one_lap_cups=1, shuffle_keys=1, shuffle_gems=1, two_stage_density=4, wumpa_shop_slots=10,
-                item_box_count=15, track_origin_letters=1, track_fill=0)
+                item_box_count=15, track_origin_letters=1, placed_track_letters=0, track_fill=0)
 GARAGE_POOL = ["Crash Cove", "Roo's Tubes", "Mystery Caves", "Sewer Speedway"]
 
 
@@ -70,7 +70,7 @@ class TestOptionSet(unittest.TestCase):
         self.assertEqual(len(grouped), len(set(grouped)))
         hints = ctrAPOptions.type_hints
         self.assertEqual({cls for name, cls in hints.items() if name in SECTION_2} -
-                         {hints["start_inventory_from_pool"], hints["box_locations"]},
+                         {hints["start_inventory_from_pool"], hints["box_locations"], hints["character_looks"]},
                          set(grouped))
 
     def test_defaults_are_the_plan_table(self):

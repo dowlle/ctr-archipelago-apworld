@@ -1,0 +1,12 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "tv-world", "name": "TV World", "lev_sha256": ["e3d765e824a2de96d06d1f34951b6d2ab51c027fb3353c62d8e7086b8ce1e33a"]},
+  "spots": [
+    {"number": 1, "pos": [11000, 1774, -1836], "rot_y": 1024, "needs": "blue_fire", "rule_of": "wumpa_crate:3", "source": "community", "credit": "test fixture", "note": "TV2 test fixture, not a placement; carries Wumpa crate 3's ruling"},
+    {"number": 2, "pos": [10300, 1774, -1836], "rot_y": 3072, "needs": "blue_fire", "rule_of": "wumpa_crate:6", "source": "community", "credit": "test fixture", "note": "TV2 test fixture, not a placement; carries Wumpa crate 6's ruling"},
+    {"number": 3, "pos": [6038, 959, -6000], "rot_y": 0, "needs": "none", "source": "community", "credit": "test fixture", "note": "TV2 test fixture, not a placement; an ordinary spot beside the two"},
+    {"number": 4, "pos": [6600, 1064, -6000], "rot_y": 0, "needs": "usf", "source": "community", "credit": "test fixture", "note": "TV2 test fixture, not a placement; a plain Boost 2 spot beside the two"}
+  ],
+  "retired": []
+}

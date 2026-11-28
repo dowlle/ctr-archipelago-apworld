@@ -20,8 +20,10 @@
     "TURBO_TRACK"
   ],
   "custom": [
+    "acropolis",
     "ancient-lake",
     "arabian-heights-day",
+    "arabian-heights-night",
     "arctic-alleyway",
     "baby-t-park",
     "big-forest",
@@ -41,8 +43,19 @@
     "green-hill-raceway",
     "haven-stadium",
     "inferno-island",
+    "jungle-boogie-n-gage",
     "neon-paradise",
     "neonstadion",
-    "sunset-vista"
+    "nina-s-nightmare",
+    "redrock-ravine",
+    "royal-raceway",
+    "sid-house",
+    "snowy-valley",
+    "sunken-sprint",
+    "sunset-vista",
+    "super-snocross-2",
+    "toasty-terrace",
+    "tv-world",
+    "yoshi-circuit"
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "format": "ctr-ap-box-spots",
+  "version": 1,
+  "track": {"kind": "custom", "track_key": "redrock-ravine", "name": "Redrock Ravine", "lev_sha256": ["860d5d340207cdf3ab564cddb8fdad5cc5d171db382b0a74ae15761d9687a3d3"]},
+  "spots": [
+    {"number": 1, "pos": [4000, 516, 96], "rot_y": 648, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 52.4", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1090]},
+    {"number": 2, "pos": [4704, 1402, 4064], "rot_y": 282, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 51.3", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1091]},
+    {"number": 3, "pos": [5856, 1575, 3872], "rot_y": 1219, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 51.8", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1092]},
+    {"number": 4, "pos": [9120, 3709, -160], "rot_y": 1436, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 51.5", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1093]},
+    {"number": 5, "pos": [13920, 2572, -1632], "rot_y": 1278, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 52.9", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1094]},
+    {"number": 6, "pos": [13536, 2610, -4192], "rot_y": 1261, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.1", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1095]},
+    {"number": 7, "pos": [17696, 2394, -5280], "rot_y": 2321, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.7", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1096]},
+    {"number": 8, "pos": [12640, 2597, -5984], "rot_y": 2776, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 52.4", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1097]},
+    {"number": 9, "pos": [12768, 2402, -8608], "rot_y": 1609, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.1", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1098]},
+    {"number": 10, "pos": [17568, 2093, -10784], "rot_y": 1299, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.5", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1099]},
+    {"number": 11, "pos": [18720, 2095, -12768], "rot_y": 1732, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 52.0", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1100]},
+    {"number": 12, "pos": [16288, 2164, -15520], "rot_y": 3313, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 50.5", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1101]},
+    {"number": 13, "pos": [12064, 2064, -11936], "rot_y": 3501, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 54.4", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1102]},
+    {"number": 14, "pos": [7776, 2341, -11808], "rot_y": 2966, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.7", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1103]},
+    {"number": 15, "pos": [4064, 2726, -13664], "rot_y": 2647, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.3", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1104]},
+    {"number": 16, "pos": [1824, 1968, -13792], "rot_y": 3301, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 50.3", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1105]},
+    {"number": 17, "pos": [-160, 1405, -11808], "rot_y": 3829, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 51.9", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1106]},
+    {"number": 18, "pos": [1504, 1423, -7648], "rot_y": 4061, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.3", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1107]},
+    {"number": 19, "pos": [-1504, 122, -3424], "rot_y": 3710, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.5", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1108]},
+    {"number": 20, "pos": [-1568, -14, -2208], "rot_y": 4068, "needs": "none", "source": "dowlle, Box Author Mode, 2026-11-27", "review": "IM1 ground map: on start ground; pickup reach 53.0", "source_family": "ap_box", "provenance": ["im1-redrock-ravine", 1109]}
+  ],
+  "retired": []
+}

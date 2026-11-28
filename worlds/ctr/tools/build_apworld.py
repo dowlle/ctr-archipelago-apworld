@@ -22,7 +22,9 @@ def main():
     read = lambda path: (world / path).read_bytes()
     paths = {path.relative_to(world).as_posix()
              for kind in ("retail", "custom") for path in (world / "data/box_spots" / kind).glob("*.json")}
-    box_spot_catalog.load_catalog(read, paths=paths)
+    _, custom, sources = box_spot_catalog.load_catalog(read, paths=paths)
+    box_spot_catalog.load_legacy(read, sources, custom)
+    box_spot_catalog.load_seat_spots(read)
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.getcwd(), "ctr.apworld")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(WORLD):

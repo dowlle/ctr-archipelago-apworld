@@ -208,14 +208,15 @@ class TestDescribe(SoloTestCase):
         result = last(events)
         self.assertEqual(result["event"], "result")
         names = [o["name"] for o in result["options"]]
-        self.assertEqual(set(names), set(ctrAPOptions.type_hints))
+        self.assertNotIn("character_looks", names)
+        self.assertEqual(set(names), set(ctrAPOptions.type_hints) - {"character_looks"})
         overlay = result["overlay"]
         overlay_names = [n for g in overlay["groups"] for n in g["options"]]
         self.assertFalse(set(overlay_names) - set(names), "overlay names an option the world does not have")
         self.assertGreaterEqual(len(overlay_names), 12)
         for rule in overlay["rules"]:
             self.assertIn(rule["option"], names)
-        self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure"])
+        self.assertEqual([p["id"] for p in result["presets"]], ["quick", "standard", "full_adventure", "trophy_hunt"])
         # Solo forces DeathLink off (SOLO_FORCED), so the options screen has no
         # DeathLink row (ruling of 2026-11-02).
         self.assertNotIn("death_link", overlay_names)
@@ -224,7 +225,8 @@ class TestDescribe(SoloTestCase):
 
     def test_every_world_option_is_on_the_screen_or_left_out_with_a_reason(self):
         """Alpha2: Play Solo offers every option that can be a row. A new world
-        option must be placed in a group or named in left_out with its reason."""
+        option in the Solo schema must be placed in a group or named in
+        left_out with its reason."""
         from worlds.ctr.Options import ctrAPOptions
         events, code = self.call("describe")
         self.assertEqual(code, 0, events)
@@ -234,7 +236,8 @@ class TestDescribe(SoloTestCase):
         left_out = overlay["left_out"]
         self.assertEqual(len(shown), len(set(shown)), "an option sits in two groups")
         self.assertFalse(set(shown) & set(left_out), "an option is both shown and left out")
-        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints),
+        self.assertNotIn("character_looks", set(shown) | set(left_out))
+        self.assertEqual(set(shown) | set(left_out), set(ctrAPOptions.type_hints) - {"character_looks"},
                          "place every new option in a group or give it a left_out reason")
         for name, reason in left_out.items():
             self.assertTrue(reason.strip(), name)
@@ -735,6 +738,12 @@ class TestRelicCounts(SoloTestCase):
             with open(self.preset(name), encoding="utf-8") as handle:
                 self.assertNotIn("item_pool", handle.read(), "presets keep their values (A4-24 review is open)")
 
+    def test_trophy_hunt_shows_its_own_relic_counts(self):
+        """Trophy Hunt asks for 18 Platinum Relics on top of the default pool, so
+        its screen starts there, not at the release defaults."""
+        values = self.describe("--yaml", self.preset("trophy_hunt.yaml"))["values"]
+        self.assertEqual(values["item_pool"], {"sapphire": 18, "gold": 18, "platinum": 18})
+
     def test_an_imported_yaml_starts_at_its_own_base_relics(self):
         path = write_yaml(self.work, "pool.yaml", f"""name: Pool
 game: {GAME}
@@ -1101,6 +1110,221 @@ class TestCustomTracks(SoloTestCase):
         self.assertNotIn(broken["id"], [t["id"] for t in tracks])
         self.assertNotIn(changed["id"], [t["id"] for t in tracks])
 
+    def split_track(self) -> tuple:
+        """A track whose Relic Race is in a second pair (merged mode builds):
+        the race descriptor carries the Relic pair as relic_files, as the
+        client publishes it, and the Relic pair has a descriptor of its own,
+        as an older client or an older room wrote it."""
+        relic = self.install("fixture-split", "1.1", "Fixture Split")
+        race = self.install("fixture-split", "1.0", "Fixture Split", write_descriptor=False)
+        race["capabilities"] = dict(race["capabilities"], relic=True, time_trial=True)
+        race.update(relic_files=relic["files"], relic_revision="1.1",
+                    relic_targets=dict(sapphire=86400, gold=67200, platinum=62400))
+        with open(os.path.join(self.descriptors, "fixture-split__1.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(race, handle)
+        pairs = os.path.join(self.solo, "pairs")
+        os.makedirs(pairs, exist_ok=True)
+        with open(os.path.join(pairs, "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": [
+                {"track_key": "fixture-split", "race_revision": "1.0",
+                 "files": [{k: f[k] for k in ("role", "sha256", "bytes")} for f in relic["files"]]}]}, handle)
+        return race, relic
+
+    def test_a_relic_pair_is_never_a_track_of_its_own(self):
+        race, relic = self.split_track()
+        # An older room's metadata still lists the Relic pair as a track.
+        room = os.path.join(self.solo, "rooms", "00112233445566778899aabbccddeeff")
+        os.makedirs(room)
+        with open(os.path.join(room, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [relic]}, handle)
+        tracks = self.tracks()
+        self.assertEqual([t["id"] for t in tracks], [race["id"]])
+        self.assertIn("relic", tracks[0]["modes"])
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        with self.assertRaisesRegex(ctr_solo.SoloError, "no longer available for seeds"):
+            ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [relic["id"]], [])
+        doc = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [race["id"]])
+        entry, = doc[GAME]["custom_tracks"]
+        self.assertEqual(entry["files"], race["files"])
+        self.assertEqual(entry["relic_files"], relic["files"])
+        self.assertEqual(entry["relic_targets"], race["relic_targets"])
+        # Without the client's list the Relic pair is listed as before.
+        os.unlink(os.path.join(self.solo, "pairs", "mode-pairs.json"))
+        self.assertEqual(sorted(t["id"] for t in self.tracks()), sorted([race["id"], relic["id"]]))
+
+    def test_an_older_yaml_entry_takes_the_relic_pair(self):
+        race, relic = self.split_track()
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [older]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["relic_files"], relic["files"])
+        self.assertEqual(entry["relic_revision"], "1.1")
+        self.assertTrue(entry["capabilities"]["relic"] and entry["capabilities"]["time_trial"])
+        self.assertNotIn("relic_files", doc[GAME]["custom_tracks"][0])  # the loaded YAML is not changed
+        # An entry that sets its own Relic Race stays as the YAML has it.
+        own = dict(older, capabilities=dict(older["capabilities"], relic=True),
+                   relic_targets=dict(sapphire=3, gold=2, platinum=1))
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [own]}},
+                                       self.assets, [race["id"]], [])
+        self.assertNotIn("relic_files", result[GAME]["custom_tracks"][0])
+
+    def test_a_stale_relic_revision_takes_the_installed_one(self):
+        # MR2 review 2, finding 1: an older export named the registry label
+        # (1.1-relic) where the installed Relic package says 1.1. A room finds
+        # the Relic files by revision and pins, so the installed one is kept.
+        race, relic = self.split_track()
+        stale = dict(json.loads(json.dumps(race)), relic_revision="1.1-relic")
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [stale]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["relic_revision"], "1.1")
+        self.assertEqual(entry["relic_files"], relic["files"])
+        ctr_solo._world_module("custom_packages").admit_all(result[GAME]["custom_tracks"])
+        # Other Relic pins are the player's own choice and stay as written.
+        other = dict(json.loads(json.dumps(stale)), relic_files=race["files"][::-1])
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [other]}},
+                                       self.assets, [race["id"]], [])
+        self.assertEqual(result[GAME]["custom_tracks"][0]["relic_revision"], "1.1-relic")
+
+    def test_a_relic_pair_another_entry_uses_is_not_carried(self):
+        # MR2 review 2, finding 4: a race-only entry and a legacy entry under
+        # another key that already lists the Relic pair as its main pair.
+        # Carrying the pair would repeat it and admission would refuse the file.
+        race, relic = self.split_track()
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        legacy = dict(json.loads(json.dumps(relic)), id="package/fixture-split-old/1.1", content_id="fixture-split-old",
+                      uuid="0f0e0d0c-0b0a-4908-8706-00000000beef")
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        admit_all([older, legacy])  # valid as the player wrote it
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [older, legacy]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])
+        entries = result[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertEqual(len(mine), 1)
+        self.assertNotIn("relic_files", mine[0])
+        # A newly picked merged track is written without the pair for the same reason.
+        result = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {"custom_tracks": [legacy]}},
+                                       self.assets, [race["id"]], [])
+        entries = result[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertNotIn("relic_files", mine)
+        self.assertFalse(mine["capabilities"]["relic"])
+
+    def store_package(self, descriptor: dict, version: str) -> str:
+        """Moves the descriptor's fixture files from its loose folder into a
+        shared store package under `version`, as an install does."""
+        source = os.path.join(self.assets, "tracks", descriptor["content_id"], "original")
+        files = []
+        for pin in descriptor["files"]:
+            name = next(n for n in os.listdir(source) if n.lower().endswith("." + pin["role"])
+                        and hashlib.sha256(open(os.path.join(source, n), "rb").read()).hexdigest() == pin["sha256"])
+            files.append((name, pin))
+        manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"], "version": version,
+                    "title": descriptor["display_name"], "compatibility": {"native_contract": 1, "apworld_contract": 1},
+                    "files": sorted(({"role": pin["role"], "path": "original/track." + pin["role"],
+                                      "sha256": pin["sha256"], "bytes": pin["bytes"]} for _, pin in files),
+                                    key=lambda item: (item["role"], item["path"]))}
+        blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        folder = os.path.join(self.assets, "tracks", "packages", hashlib.sha256(blob).hexdigest())
+        os.makedirs(os.path.join(folder, "original"))
+        with open(os.path.join(folder, "manifest.json"), "wb") as handle:
+            handle.write(blob)
+        for name, pin in files:
+            os.replace(os.path.join(source, name), os.path.join(folder, "original", "track." + pin["role"]))
+        return folder
+
+    def test_a_room_descriptor_takes_the_installed_relic_revision(self):
+        # MR2 review 3, finding 1: the Relic pair is installed under 1.1.0
+        # and the only race descriptor left is an older room's, naming 1.1.0-relic.
+        # A room finds relic_files by exact version, so the picker, a fresh
+        # selection and an older YAML entry all get the installed 1.1.0.
+        race, relic = self.split_track()
+        self.store_package(relic, "1.1.0")
+        os.unlink(os.path.join(self.descriptors, "fixture-split__1.0.json"))
+        os.unlink(os.path.join(self.descriptors, "fixture-split__1.1.json"))
+        stale = dict(json.loads(json.dumps(race)), relic_revision="1.1.0-relic")
+        room = os.path.join(self.solo, "rooms", "00112233445566778899aabbccddeeff")
+        os.makedirs(room)
+        with open(os.path.join(room, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [stale]}, handle)
+        tracks = self.tracks()
+        self.assertEqual([(t["id"], t["source"]) for t in tracks], [(race["id"], "room")])
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        fresh = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [])
+        entry, = fresh[GAME]["custom_tracks"]
+        self.assertEqual((entry["relic_revision"], entry["relic_files"]), ("1.1.0", relic["files"]))
+        admit_all(fresh[GAME]["custom_tracks"])
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        for listed in (older, stale):
+            with self.subTest(listed="race only" if listed is older else "stale label"):
+                doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [json.loads(json.dumps(listed))]}}
+                entry, = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+                self.assertEqual((entry["relic_revision"], entry["relic_files"]), ("1.1.0", relic["files"]))
+        # Not installed in the store, the written revision stays: a room
+        # installs the Relic pair under that name.
+        shutil.rmtree(os.path.join(self.assets, "tracks", "packages"))
+        fresh = ctr_solo.apply_tracks(paths, {"name": "P", "game": GAME, GAME: {}}, self.assets, [race["id"]], [])
+        self.assertEqual(fresh[GAME]["custom_tracks"][0]["relic_revision"], "1.1.0-relic")
+
+    def test_conflict_fallback_always_passes_admission(self):
+        # MR2 review 3, finding 4: admission compares pairs by hash alone, so a
+        # legacy entry declaring another size for the Relic hashes is the same
+        # pair; and a stripped Relic pair takes its evidence rows with it.
+        race, relic = self.split_track()
+        admit_all = ctr_solo._world_module("custom_packages").admit_all
+        paths = ctr_solo.Paths(self.work, self.solo, "", "")
+        legacy = dict(json.loads(json.dumps(relic)), id="package/fixture-split-old/1.1", content_id="fixture-split-old",
+                      uuid="0f0e0d0c-0b0a-4908-8706-00000000beef")
+        for pin in legacy["files"]:
+            pin["bytes"] += 1
+        older = {k: v for k, v in race.items() if k not in ("relic_files", "relic_revision", "relic_targets")}
+        older["capabilities"] = dict(race["capabilities"], relic=False)
+        admit_all([older, legacy])
+        for listed in ([older, legacy], [legacy]):
+            with self.subTest(entries=len(listed)):
+                doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": json.loads(json.dumps(listed))}}
+                entries = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+                admit_all(entries)
+                mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+                self.assertNotIn("relic_files", mine)
+        # Evidence about the Relic files goes with them; evidence about the race files stays.
+        lev, vrm = (f["sha256"] for f in race["files"])
+        relic_lev, relic_vrm = (f["sha256"] for f in relic["files"])
+        rows = [dict(capability=c, file_hashes=h, verifier="fixture", revision=1, level="structural")
+                for c, h in (("arcade", [lev, vrm]), ("relic", [relic_lev, relic_vrm]), ("relic", [lev, relic_vrm]))]
+        with open(os.path.join(self.descriptors, "fixture-split__1.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(dict(race, evidence=rows), handle)
+        doc = {"name": "P", "game": GAME, GAME: {"custom_tracks": [json.loads(json.dumps(legacy))]}}
+        entries = ctr_solo.apply_tracks(paths, doc, self.assets, [race["id"]], [])[GAME]["custom_tracks"]
+        admit_all(entries)
+        mine, = [e for e in entries if e["content_id"] == "fixture-split"]
+        self.assertEqual(mine["evidence"], rows[:1])
+        self.assertNotIn("relic_files", mine)
+
+    def test_malformed_mode_pairs_never_break_the_track_list(self):
+        # MR2 review 2, finding 5: valid hash and size with a list-valued role.
+        race, relic = self.split_track()
+        good = [{k: f[k] for k in ("role", "sha256", "bytes")} for f in relic["files"]]
+        bad = [dict(good[0], role=["lev"]), good[1]]
+        rows = [{"files": bad}, {"files": [dict(good[0], bytes=[1]), good[1]]}, {"files": "x"}, "x",
+                {"files": [good[0], dict(good[1], role={"a": 1})]}, {"files": good}]
+        with open(os.path.join(self.solo, "pairs", "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": rows}, handle)
+        self.assertEqual([t["id"] for t in self.tracks()], [race["id"]])
+        with open(os.path.join(self.solo, "pairs", "mode-pairs.json"), "w", encoding="utf-8") as handle:
+            json.dump({"schema_version": 1, "relic_only": rows[:-1]}, handle)
+        self.assertEqual(sorted(t["id"] for t in self.tracks()), sorted([race["id"], relic["id"]]))
+
     def test_bad_descriptor_and_room_files_are_skipped(self):
         self.install("fixture-loop", "2.1", "Fixture Loop")
         with open(os.path.join(self.descriptors, "bytes.json"), "wb") as handle:
@@ -1371,8 +1595,9 @@ class TestCustomTracks(SoloTestCase):
                                os.path.join(self.client, "ctr.apworld"), REPO)
         listed = [legacy, canonical]
         rows = ctr_solo.installed_tracks(paths, self.assets, listed)
-        self.assertEqual([row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}],
-                         [legacy["id"]])
+        # PS2: other files under the two keys are two builds; both are listed.
+        self.assertEqual(sorted(row["id"] for row in rows if row["id"] in {legacy["id"], canonical["id"]}),
+                         sorted([legacy["id"], canonical["id"]]))
         result = ctr_solo.apply_tracks(paths, {GAME: {"custom_tracks": listed}}, self.assets,
                                        [legacy["id"]], [], page=True)
         self.assertEqual(result[GAME]["custom_tracks"][0]["files"], legacy["files"])
@@ -1420,9 +1645,17 @@ class TestCustomTracks(SoloTestCase):
         saved = json.dumps({"custom_tracks": [old]})
         with open(room, "w", encoding="utf-8") as handle:
             handle.write(saved)
-        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
+        # PS2: the old copy's files are installed and differ, so it is a build
+        # of its own and stays listed beside the active row, never instead of it.
+        self.assertEqual(sorted(track["id"] for track in self.tracks()), sorted([current["id"], old["id"]]))
         with open(room, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), saved)
+        # The same files under the old key are one row: the active one.
+        same = dict(json.loads(json.dumps(current)), id=old["id"], content_id=old["content_id"], display_name="Old title")
+        with open(room, "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [same]}, handle)
+        shutil.rmtree(os.path.join(self.assets, "tracks", "n-gage-assembly-lane"))
+        self.assertEqual([track["id"] for track in self.tracks()], [current["id"]])
 
     def test_removing_a_custom_copy_preserves_a_retail_title_mode_override(self):
         descriptor = self.install("crash-cove-custom", "1.0", "Crash Cove")
@@ -1583,6 +1816,145 @@ class TestCustomTracks(SoloTestCase):
                     handle.write(damaged)
                 self.assertEqual([t["revision"] for t in self.tracks()], ["2.1.0"])
 
+    def _store_build(self, descriptor: dict, folder: str, presentation: tuple) -> str:
+        """Move the made-up files of `descriptor` from assets/tracks/<folder>
+        into a shared store package with one presentation file (its metadata
+        path and JSON), as the client's installers write it. The folder."""
+        source = os.path.join(self.assets, "tracks", folder, "original")
+        files = []
+        for pin in descriptor["files"]:
+            data = next(data for n in os.listdir(source) if n.lower().endswith("." + pin["role"])
+                        for data in [open(os.path.join(source, n), "rb").read()]
+                        if hashlib.sha256(data).hexdigest() == pin["sha256"])
+            files.append(("track." + pin["role"], data, pin))
+        path, meta = presentation
+        meta_blob = json.dumps(meta).encode()
+        manifest = {"schema_version": 1, "package_uuid": descriptor["uuid"], "version": descriptor["revision"],
+                    "title": descriptor["display_name"], "compatibility": {"native_contract": 1, "apworld_contract": 1},
+                    "files": [{"role": pin["role"], "path": "original/" + name, "sha256": pin["sha256"], "bytes": pin["bytes"]}
+                              for name, _, pin in files]
+                    + [{"role": "presentation", "path": path, "sha256": hashlib.sha256(meta_blob).hexdigest(),
+                        "bytes": len(meta_blob)}]}
+        manifest["files"].sort(key=lambda item: (item["role"], item["path"]))
+        blob = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        package = os.path.join(self.assets, "tracks", "packages", hashlib.sha256(blob).hexdigest())
+        os.makedirs(os.path.join(package, "original"))
+        os.makedirs(os.path.join(package, os.path.dirname(path)), exist_ok=True)
+        with open(os.path.join(package, "manifest.json"), "wb") as handle:
+            handle.write(blob)
+        for name, data, _ in files:
+            with open(os.path.join(package, "original", name), "wb") as handle:
+                handle.write(data)
+        with open(os.path.join(package, path), "wb") as handle:
+            handle.write(meta_blob)
+        shutil.rmtree(os.path.join(self.assets, "tracks", folder))
+        return package
+
+    def test_two_builds_of_one_version_are_both_listed_and_picked_by_build(self):
+        """PS2: a Saphi download and an xdelta patch import of one track, same
+        track key and version, other files. Play Solo lists both, each row id
+        names its build, Save YAML writes the exact files of the build picked,
+        and picking both is refused with a plain message."""
+        patch_sha = "52a420e582fc44786210ae65817d7105c7d881c2f0b4387cebde2dce86064526"
+        saphi = self.install("big-forest", "1.0.0", "Big Forest", folder="bf-saphi", write_descriptor=False)
+        patch = self.install("big-forest", "1.0.0", "Big Forest", folder="bf-patch", write_descriptor=False)
+        patch["uuid"] = "7e10f11a-90d2-5669-9df7-e3241123e1ec"
+        patch["locator"] = {"kind": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73}
+        self._store_build(saphi, "bf-saphi", ("metadata/saphi-source.json", {
+            "schema_version": 1, "provider": "projectsaphi", "track_id": 49, "lev_media_id": 454,
+            "vrm_media_id": 455, "version": "1.0.0", "author": "A", "author_id": 12}))
+        self._store_build(patch, "bf-patch", ("metadata/xdelta-source.json", {
+            "schema_version": 1, "provider": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73,
+            "track_key": "big-forest"}))
+        tag = lambda d: {f["role"]: f["sha256"] for f in d["files"]}["lev"][:16] + \
+            {f["role"]: f["sha256"] for f in d["files"]}["vrm"][:16]
+        # As the client writes them: the first build under the plain name,
+        # the second under its build name.
+        with open(os.path.join(self.descriptors, "big-forest__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(saphi, handle)
+        build_name = f"big-forest__1.0.0@{tag(patch)}.json"
+        with open(os.path.join(self.descriptors, build_name), "w", encoding="utf-8") as handle:
+            json.dump(patch, handle)
+        rows = {row["build"]: row for row in self.tracks() if row.get("content_id") == "big-forest"}
+        self.assertEqual(set(rows), {tag(saphi), tag(patch)})
+        self.assertEqual(rows[tag(saphi)]["id"], f"package/big-forest/1.0.0@{tag(saphi)}")
+        self.assertEqual(rows[tag(patch)]["id"], f"package/big-forest/1.0.0@{tag(patch)}")
+        self.assertEqual(rows[tag(saphi)]["origin"], {"kind": "saphi"})
+        self.assertEqual(rows[tag(patch)]["origin"], {"kind": "patch", "patch_sha256": patch_sha})
+        for picked, other in ((patch, saphi), (saphi, patch)):
+            with self.subTest(picked=tag(picked)):
+                events, code = self.call("save-room-yaml", "--assets", self.assets, "--name", "Builds",
+                                         "--track", rows[tag(picked)]["id"])
+                self.assertEqual(code, 0, events)
+                entry, = ctr_solo.read_player_yaml(last(events)["yaml_path"])[GAME]["custom_tracks"]
+                self.assertEqual(entry["files"], picked["files"])
+                self.assertNotEqual(entry["files"], other["files"])
+                self.assertEqual("locator" in entry, picked is patch)
+                if picked is patch:  # the importer records no source_url: none is written
+                    self.assertEqual(entry["locator"], {"kind": "xdelta", "patch_sha256": patch_sha, "bigfile_index": 73})
+        events, code = self.call("save-room-yaml", "--assets", self.assets, "--track", rows[tag(saphi)]["id"],
+                                 "--track", rows[tag(patch)]["id"])
+        self.assertEqual(code, 2, events)
+        self.assertIn("Pick one copy of Big Forest", last(events)["message"])
+        # A YAML that lists one build starts with that build picked, not the other.
+        source = write_yaml(self.work, "saphi.yaml", "name: Solo\ngame: " + GAME + "\n" + GAME + ":\n  custom_tracks:\n    - "
+                            + json.dumps(saphi) + "\n")
+        events, code = self.call("tracks", "--assets", self.assets, "--yaml", source)
+        self.assertEqual(code, 0, events)
+        starts = {row["build"]: row["start"] for row in last(events)["tracks"] if row.get("content_id") == "big-forest"}
+        self.assertEqual(starts, {tag(saphi): ctr_solo.PICK_POOL, tag(patch): 0})
+        # On the page the player switches that YAML from the Saphi build to the
+        # patch build: the YAML then lists the patch build only.
+        paths = ctr_solo.Paths(os.path.join(self.client, "solo-runtime"), self.solo,
+                               os.path.join(self.client, "ctr.apworld"), REPO)
+        doc = {GAME: {"custom_tracks": [saphi], "required_entries": ["big-forest"]}}
+        result = ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [rows[tag(patch)]["id"]],
+                                       page=True)
+        entry, = result[GAME]["custom_tracks"]
+        self.assertEqual(entry["files"], patch["files"])
+        self.assertEqual(result[GAME]["required_entries"], ["big-forest"])
+        # Without the page (or with the YAML's build still picked) the conflict is still refused.
+        with self.assertRaises(ctr_solo.SoloError):
+            ctr_solo.apply_tracks(paths, doc, self.assets, [rows[tag(patch)]["id"]], [], page=False)
+        # Two builds whose tags collide cannot be told apart: one row stays.
+        from unittest.mock import patch as mock_patch
+        with mock_patch.object(ctr_solo, "_build_tag", return_value="0" * 32):
+            listed = [row for row in ctr_solo.installed_tracks(paths, self.assets) if row["content_id"] == "big-forest"]
+        self.assertEqual(len(listed), 1)
+
+    def test_a_newer_cut_of_one_package_is_one_row(self):
+        """PS2: two cuts of one package (one uuid and version, other files),
+        the older still installed and named by an old room: Play Solo lists
+        the newest install only, as the client's store scan folds them."""
+        meta = ("metadata/xdelta-source.json", {"schema_version": 1, "provider": "xdelta", "patch_sha256": "b" * 64,
+                                                 "bigfile_index": 5, "track_key": "cut-track"})
+        old = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-old", write_descriptor=False)
+        new = self.install("cut-track", "1.0.0", "Cut Track", folder="cut-new", write_descriptor=False)
+        new["uuid"] = old["uuid"]
+        old_folder = self._store_build(old, "cut-old", meta)
+        self._store_build(new, "cut-new", meta)
+        os.utime(os.path.join(old_folder, "manifest.json"), (1_000_000, 1_000_000))
+        rooms = os.path.join(self.solo, "rooms", "old-room")
+        os.makedirs(rooms)
+        with open(os.path.join(rooms, "room.json"), "w", encoding="utf-8") as handle:
+            json.dump({"custom_tracks": [old]}, handle)
+        with open(os.path.join(self.descriptors, "cut-track__1.0.0.json"), "w", encoding="utf-8") as handle:
+            json.dump(new, handle)
+        rows = [row for row in self.tracks() if row.get("content_id") == "cut-track"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], new["id"])
+        self.assertEqual(rows[0]["build"], {f["role"]: f["sha256"] for f in new["files"]}["lev"][:16]
+                         + {f["role"]: f["sha256"] for f in new["files"]}["vrm"][:16])
+
+    def test_one_build_keeps_its_plain_row_id(self):
+        """PS2: with one build installed the row id stays the descriptor id;
+        the build tag and origin are reported all the same."""
+        track = self.install("solo-build", "1.0", "Solo Build")
+        row, = [row for row in self.tracks() if row.get("content_id") == "solo-build"]
+        self.assertEqual(row["id"], track["id"])
+        self.assertEqual(row["origin"], {"kind": "local"})
+        self.assertEqual(len(row["build"]), 32)
+
     def test_room_yaml_refuses_a_track_without_a_public_source(self):
         track = self.install("private-track", "1.0", "Private Track")
         events, code = self.call("save-room-yaml", "--assets", self.assets, "--track", track["id"])
@@ -1661,7 +2033,7 @@ class TestCustomTracks(SoloTestCase):
         self.assertEqual(sorted(t["source"] for t in self.tracks()), ["room", "room"])
 
     def test_every_start_takes_one_and_two_tracks_and_a_guaranteed_pad(self):
-        """Probe matrix of round 2 decision 5: the three presets and two
+        """Probe matrix of round 2 decision 5: the four presets and two
         imported YAMLs (with and without their own content), seeds 1 and 2."""
         import yaml
         loop = self.install("fixture-loop", "2.1", "Fixture Loop")
@@ -1670,7 +2042,7 @@ class TestCustomTracks(SoloTestCase):
             {"name": "Imported", "game": GAME, GAME: dict(oxide_goal="any_percent", death_link="off",
                                                           itemsanity=True, accessibility="full")}))
         planned = self.yaml_with_content("planned.yaml")
-        starts = [self.preset(n) for n in ("quick.yaml", "standard.yaml", "full_adventure.yaml")] + [plain, planned]
+        starts = [self.preset(n) for n in ("quick.yaml", "standard.yaml", "full_adventure.yaml", "trophy_hunt.yaml")] + [plain, planned]
         picks = (([loop], []), ([loop], [loop]), ([loop, hill], [hill]), ([loop, hill], [loop, hill]))
         for source in starts:
             for picked, guaranteed in picks:

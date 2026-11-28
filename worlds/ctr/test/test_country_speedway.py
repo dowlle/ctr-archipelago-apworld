@@ -7,6 +7,7 @@ import unittest
 from BaseClasses import CollectionState
 from Options import OptionError
 from .. import characters, content_item_boxes as boxes, content_plan, country_speedway as country, sanity
+from .test_content_item_boxes import before_im1b
 from .test_content_plan import make_world, profile_options
 
 PACKAGE = json.loads((Path(__file__).parent / "fixtures/country_speedway_130.json").read_text())
@@ -23,6 +24,12 @@ def country_options(**extra):
 
 
 class TestCountrySpeedway(unittest.TestCase):
+    """1.3.0 crate seats with their pickup rules: rooms generated before IM1b
+    keep them; new 1.3.0 rooms use the spot file (test_im1b_answers.py)."""
+
+    def setUp(self):
+        self.enterContext(before_im1b())
+
     def test_reused_older_lev_uses_the_latest_pickup_rules_and_current_counts(self):
         from .. import track_rulings
         old_pin = next(pin for pin, revision in track_rulings.REVIEWS["country-speedway"] if revision == "1.2.1")
@@ -110,7 +117,7 @@ class TestCountrySpeedway(unittest.TestCase):
         self.assertEqual(len(checks), 14)
         for n, _, _ in checks:
             self.assertEqual(boxes.box_terms(track, n, dict(boost_mode=1), package, record)[0],
-                             int(n in (2, 3, 4, 11, 14)))
+                             int(n in (3, 4, 14)))
 
     def test_route_and_locked_racer_are_independent(self):
         for seed in range(12):
