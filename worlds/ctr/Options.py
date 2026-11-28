@@ -1538,8 +1538,10 @@ def _normalized_track_entry(entry):
 
 class TrackFill(Toggle):
     """Experimental. Give eligible custom track revisions a Relic Race using
-    same-road time crate placements and verified targets. Off by default. A
-    room that uses a fill requires a client launched with CTR_TRACK_FILL=1."""
+    same-road time crate placements and verified targets, and real weapon
+    crates where a pinned revision has none (Arabian Heights Day gets
+    Arabian Heights Night's 27). Off by default. A room that uses a fill
+    requires a client launched with CTR_TRACK_FILL=1."""
     display_name = "Track Fill"
 
 

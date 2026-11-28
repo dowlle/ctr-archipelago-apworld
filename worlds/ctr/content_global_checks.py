@@ -106,18 +106,32 @@ def _route(entry_id, mode, pad_id, award, leg_id=None):
     return dict(entry_id=entry_id, mode=mode, leg_id=leg_id, encounter_id=None, own_pad_id=pad_id, award=award)
 
 
-def no_crates(track, packages):
-    """True for a custom track whose package states no weapon crates."""
+def crate_rank(track, packages, item_boxes=None, standalone=True):
+    """The Progressive Boost rank a weapon crate on this track needs, or None
+    when the track has none to roll. 0 for every track but a filled one. A
+    custom track whose package states no weapon crates has none, unless its
+    frozen fill adds them (WF1b, dowlle 2026-11-26: "they need to count for
+    the logic for both"): then the lowest rank among the filled crates no AP
+    box takes over in this room, None when every one is seated. The seats are
+    the track's own box checks, which only a standalone pad track has."""
     package = (packages or {}).get(track.get("package_id"))
-    return track.get("origin") == "custom" and bool(package) and \
-        package["capabilities"].get("weapon_crates", 1) == 0
+    if track.get("origin") != "custom" or not package or package["capabilities"].get("weapon_crates", 1) != 0:
+        return 0
+    from .content_item_boxes import free_fill_ranks
+    ranks = free_fill_ranks(track, item_boxes if standalone else None, package)
+    return min(ranks) if ranks else None
 
 
-def race_routes(tracks, entries, pads, packages=None):
+def no_crates(track, packages, item_boxes=None, standalone=True):
+    """True for a custom track with no weapon crate to roll (crate_rank)."""
+    return crate_rank(track, packages, item_boxes, standalone) is None
+
+
+def race_routes(tracks, entries, pads, packages=None, item_boxes=None):
     """[(physical pad, entry id, pad id, mode, origin)] of every Trophy Race and
     CTR Challenge in the plan, in physical pad order, then mode order. A custom
     track with no weapon crates is skipped."""
-    by_track = {track["id"]: track for track in tracks if not no_crates(track, packages)}
+    by_track = {track["id"]: track for track in tracks if not no_crates(track, packages, item_boxes)}
     pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
     out = []
     for entry in entries:
@@ -130,21 +144,29 @@ def race_routes(tracks, entries, pads, packages=None):
     return sorted(out, key=lambda r: (r[0], MODE_ORDER.index(r[3])))
 
 
-def cup_routes(tracks, entries, pads, packages=None):
+def cup_routes(tracks, entries, pads, packages=None, item_boxes=None):
     """[(physical pad, entry id, pad id, "cup", leg id)] of every leg of every
     cup in the plan (#133 PR 5b), in physical pad order, then leg order. A leg
     on a custom track with no weapon crates is skipped: nothing can be hit
     there."""
     by_track = {track["id"]: track for track in tracks}
     pad_of = {pad["entry_id"]: pad["id"] for pad in pads if pad["entry_id"] is not None}
+    standalone = standalone_tracks(entries, pad_of)
     out = []
     for entry in entries:
         if entry["kind"] != content_cups.KIND or entry["id"] not in pad_of:
             continue
         pad_id = pad_of[entry["id"]]
         out.extend((int(pad_id.split(":")[1]), entry["id"], pad_id, content_cups.MODE, leg["id"])
-                   for leg in entry["legs"] if not no_crates(by_track[leg["track_id"]], packages))
+                   for leg in entry["legs"]
+                   if not no_crates(by_track[leg["track_id"]], packages, item_boxes, leg["track_id"] in standalone))
     return sorted(out, key=lambda r: r[0])
+
+
+def standalone_tracks(entries, pad_of=None):
+    """Track ids a track entry on a pad races (their box checks are seats)."""
+    return {entry["track_id"] for entry in entries
+            if entry.get("kind") == "track" and (pad_of is None or entry["id"] in pad_of)}
 
 
 def hit_routes(routes, legs):
@@ -155,7 +177,7 @@ def hit_routes(routes, legs):
     return sorted(out, key=lambda r: (r[0], MODE_ORDER.index(r[3])))
 
 
-def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
+def checks(record, tracks, entries, pads, packages=None, boss_hits=None, item_boxes=None):
     """Every global check of the record, Itemsanity first (frozen class order),
     then Hit Character (engine id order). Refuses a plan in which a check has no
     route. `tracks` holds every plan track, cup-only leg tracks included.
@@ -164,12 +186,12 @@ def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
     its Hit check takes those routes after the others."""
     if not record:
         return []
-    routes = race_routes(tracks, entries, pads, packages)
+    routes = race_routes(tracks, entries, pads, packages, item_boxes)
     out = []
     if record.get("itemsanity"):
         # Every Trophy Race and CTR Challenge; with none, every cup leg (A3-7).
         use = ([(r[0], r[1], r[2], r[3], None) for r in routes] if routes
-               else cup_routes(tracks, entries, pads, packages))
+               else cup_routes(tracks, entries, pads, packages, item_boxes))
         if not use:
             error("itemsanity needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
                   "trophy or ctr mode or a cup, or turn itemsanity off. No content was changed.")
@@ -178,7 +200,7 @@ def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
             out.append(dict(location=code, owner=OWNER, kind="itemsanity", display_name=name,
                             routes=[_route(e, m, p, award, leg) for _phys, e, p, m, leg in use]))
     if record.get("hit_character"):
-        own = hit_routes(routes, cup_routes(tracks, entries, pads, packages))
+        own = hit_routes(routes, cup_routes(tracks, entries, pads, packages, item_boxes))
         if not own:
             error("hit_character needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
                   "trophy or ctr mode or a cup, or turn hit_character off. No content was changed.")
@@ -191,22 +213,23 @@ def checks(record, tracks, entries, pads, packages=None, boss_hits=None):
     return out
 
 
-def check_count(record, tracks, packages=None, cup_legs=()):
+def check_count(record, tracks, packages=None, cup_legs=(), item_boxes=None):
     """How many global checks a plan with these tracks holds (before the pads
     are assigned), refusing a family with no route as `checks` does.
     `cup_legs` is the track record of every leg of the plan's cups."""
     if not record:
         return 0
     racing = [t for t in tracks if "arena_id" not in t and set(t.get("modes", ())) & set(RACE_MODES)
-              and not no_crates(t, packages)]
+              and not no_crates(t, packages, item_boxes)]
+    standalone = {t["id"] for t in tracks}
     count = 0
     if record.get("itemsanity"):
-        if not racing and all(no_crates(t, packages) for t in cup_legs):
+        if not racing and all(no_crates(t, packages, item_boxes, t["id"] in standalone) for t in cup_legs):
             error("itemsanity needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
                   "trophy or ctr mode or a cup, or turn itemsanity off. No content was changed.")
         count += len(itemsanity.ITEMSANITY_CLASS.all_locations())
     if record.get("hit_character"):
-        if not racing and all(no_crates(t, packages) for t in cup_legs):
+        if not racing and all(no_crates(t, packages, item_boxes, t["id"] in standalone) for t in cup_legs):
             error("hit_character needs at least one Trophy Race, CTR Challenge or cup in the plan; select the "
                   "trophy or ctr mode or a cup, or turn hit_character off. No content was changed.")
         count += len(characters.CHARACTER_ID_TO_NAME)
@@ -285,6 +308,44 @@ def _appearance(target, lock):
     return tuple(players)
 
 
+def route_crate_ranks(plan, routes):
+    """One rank per route: the boost rank a weapon crate on the route's track needs (crate_rank),
+    0 with the boost chain off. Every route here has a crate: a track with
+    none has no route (WF1b)."""
+    if not plan.get("capability", {}).get("boost_mode"):
+        return [0] * len(routes)
+    entries = {entry["id"]: entry for entry in plan["entries"]}
+    tracks = {track["id"]: track for track in plan["tracks"]}
+    packages = {package["id"]: package for package in plan["packages"]}
+    standalone = standalone_tracks(plan["entries"], {pad.get("entry_id") for pad in plan["pads"]})
+    out = []
+    for route in routes:
+        entry = entries.get(route["entry_id"], {})
+        if route["mode"] == content_cups.MODE:
+            track_id = next(leg["track_id"] for leg in entry["legs"] if leg["id"] == route["leg_id"])
+        elif route["mode"] in content_bosses.MODES and entry.get("legs"):
+            track_id = entry["legs"][0]["track_id"]  # a boss cup: the boss can be hit in its first leg
+        else:
+            track_id = entry.get("track_id")  # a race, or a boss race on its venue
+        if track_id not in tracks:
+            out.append(0)
+            continue
+        # A saved room seats its crates by its own frozen spots, never by
+        # today's catalog (content_item_boxes.FROZEN).
+        from .content_item_boxes import FROZEN, frozen_spots
+        token = FROZEN.set(frozen_spots(plan))
+        try:
+            # A boss race on a custom garage venue stands no AP box (native
+            # ap_boxes.c), so every filled crate is free there; a boss cup's
+            # leg may stand its pad's boxes and keeps the seats.
+            seated = track_id in standalone and route["mode"] != content_bosses.MODE
+            rank = crate_rank(tracks[track_id], packages, plan.get("item_boxes"), seated)
+        finally:
+            FROZEN.reset(token)
+        out.append(rank or 0)
+    return out
+
+
 def install(world, check, location, route_tests):
     """Set the access rule of one global check. `route_tests` is
     [(entry region name, stage-2 Term or None, route)] for the check's routes."""
@@ -312,24 +373,29 @@ def install(world, check, location, route_tests):
     if kind == "itemsanity":
         weapon = check["display_name"].removeprefix("Itemsanity: ").removesuffix(" (Juiced)")
         boost = weapon == "Turbo" and bool(world.options.progressive_boost.value)
-        if any(route["mode"] == content_cups.MODE for _entry, _test, route in route_tests):
+        plan = world.ctr_content_plan
+        crate = route_crate_ranks(plan, [route for _entry, _test, route in route_tests])
+        if (any(route["mode"] == content_cups.MODE for _entry, _test, route in route_tests)
+                or any(crate)):
             # Cup leg routes (A3-7): the finish of every earlier leg, bound
-            # to the cup pad's racer lock, as a Cup Leg Victory route.
-            plan = world.ctr_content_plan
+            # to the cup pad's racer lock, as a Cup Leg Victory route. A
+            # filled weapon crate's rank (WF1b) binds to the pad's racer lock
+            # the same way, on top of that finish.
             pad_by_id = {pad["id"]: pad for pad in plan["pads"]}
             entry_by_id = {entry["id"]: entry for entry in plan["entries"]}
             tracks = {track["id"]: track for track in plan["tracks"]}
             packages = {package["id"]: package for package in plan["packages"]}
             capability = plan.get("capability", {})
 
-            def leg_need(route):
-                if route["mode"] != content_cups.MODE:
+            def leg_need(route, crate_need):
+                if route["mode"] != content_cups.MODE and not crate_need:
                     return 0, None
                 lock = pad_by_id[route["own_pad_id"]]["racer_lock"]
-                return (content_cups.prefix_boost(entry_by_id[route["entry_id"]], route["leg_id"], tracks, capability,
-                                                  packages),
+                prefix = (content_cups.prefix_boost(entry_by_id[route["entry_id"]], route["leg_id"], tracks, capability,
+                                                    packages) if route["mode"] == content_cups.MODE else 0)
+                return (max(prefix, crate_need),
                         characters.CHARACTER_ID_TO_NAME[lock] if lock is not None else None)
-            needs = tuple(leg_need(route) for _entry, _test, route in route_tests)
+            needs = tuple(leg_need(route, need) for (_entry, _test, route), need in zip(route_tests, crate))
 
             def any_route(state):
                 return any(state.can_reach(entry, "Region", player) and (test is None or test(state))
@@ -367,7 +433,12 @@ def install(world, check, location, route_tests):
     # encounter's region (garage gate and the race's own requirement); the win
     # check's boost rank is not needed to hit the racer (Rulebook: the player
     # does not need to beat the boss first).
+    crate_by_route = dict(zip((id(route) for _entry, _test, route in route_tests),
+                              route_crate_ranks(plan, [route for _entry, _test, route in route_tests])))
     boss = tuple(entry for entry, _test, route in route_tests if route["mode"] in content_bosses.MODES)
+    # WF1b: hitting the boss needs a weapon rolled on its venue's filled crates.
+    boss_need = {entry: crate_by_route[id(route)] for entry, _test, route in route_tests
+                 if route["mode"] in content_bosses.MODES}
     for (entry, test, route), (_entry, stage, _route) in zip(route_tests, route_terms):
         if route["mode"] in content_bosses.MODES:
             continue
@@ -379,6 +450,8 @@ def install(world, check, location, route_tests):
         # so the boost term binds to the same appearance racer.
         need = (content_cups.prefix_boost(entries[route["entry_id"]], route["leg_id"], tracks, capability, packages)
                 if route["mode"] == content_cups.MODE else 0)
+        # WF1b: a filled weapon crate's rank, for the racer who rolls it.
+        need = max(need, crate_by_route[id(route)])
         if players:
             legs.append((entry, test, players, need))
             racers = []
@@ -419,6 +492,9 @@ def install(world, check, location, route_tests):
             return False
         if boss and any(state.can_reach(region, "Region", player)
                         and (region not in masked or state.has(tizi_madness.MASK_ITEM, player))
+                        and (not boss_need[region]
+                             or progressive_capability.gate_satisfied(world, state, player,
+                                                                      boost_min=boss_need[region]))
                         for region in boss):
             return True
         if fallback_keys is not None:
@@ -437,9 +513,11 @@ def install(world, check, location, route_tests):
              else alternatives(logic_terms.Ref(trigger, player) for trigger in triggers) if triggers
              else logic_terms.TRUE)
     ordinary = logic_terms.And(guest, alternatives(leg_terms))
-    paths = [ordinary] + [logic_terms.ReachRegion(world, region) if region not in masked
-                          else logic_terms.And(logic_terms.ReachRegion(world, region), tizi_madness.mask_term(world))
-                          for region in boss]
+    def boss_path(region):
+        term = (logic_terms.ReachRegion(world, region) if region not in masked
+                else logic_terms.And(logic_terms.ReachRegion(world, region), tizi_madness.mask_term(world)))
+        return term if not boss_need[region] else logic_terms.And(term, logic_terms.Cap(world, boss_need[region], None))
+    paths = [ordinary] + [boss_path(region) for region in boss]
     term = alternatives(paths)
     if weapons:
         term = logic_terms.And(logic_terms.HasAny(hit_character.HIT_METHOD_ITEMS, player), term)

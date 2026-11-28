@@ -62,7 +62,7 @@ import json
 
 from Options import OptionError
 
-from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace, track_rulings
+from . import box_spots, named_tracks, crate_exclusions, country_speedway, green_hill_raceway, royal_raceway, toasty_terrace, track_fill, track_rulings
 from .custom_fallback_families import CUSTOM_ITEM_BOX_CLASS
 from .item_boxes import BOX_RULES, ITEM_BOX_CLASS, PLACED_COUNTS, SK_REQUIRED_TIER, SLOTS_PER_TRACK
 
@@ -120,6 +120,116 @@ def reviewed_pickups(package):
     return pin if pin in PICKUP_RULE_PINS else None
 
 
+def weapon_seat_file(track, package):
+    """The spot file entry when its spots are a weapon crate layout that this
+    room's track fill turns into real weapon crates (WF1, Arabian Heights Day).
+    The spots then act as fallback seats on those crates, capped at 15 boxes
+    (dowlle, 2026-11-26). Every spot must match a fill crate exactly."""
+    if track.get("origin") != "custom" or not track_fill.package_weapons(package):
+        return None
+    entry = box_spots.file_for(track, package)
+    if entry is None or any(spot.get("source_family") != "weapon_crate" for spot in entry["doc"]["spots"]):
+        return None
+    if len(track_fill.seated_ordinals(package, entry["doc"]["spots"])) != len(entry["doc"]["spots"]):
+        error(f"{track['id']}: weapon crate spots must each match a filled weapon crate exactly.")
+    return entry
+
+
+def spot_cap(track, package, record):
+    """How many spots a track picks: the Item Box Count, or at most 15 when the
+    spots are fallback seats on filled weapon crates. A saved room decides by
+    its own frozen spots, never by today's catalog."""
+    count = (record or {}).get("box_count", 15)
+    if track.get("id") in _frozen():
+        spots = _frozen()[track["id"]]
+        seats = track_fill.seated_ordinals(package, spots)
+        return min(count, box_spots.PICK) if spots and len(seats) == len(spots) else count
+    return min(count, box_spots.PICK) if weapon_seat_file(track, package) else count
+
+
+def check_fill_seats(track, package, record):
+    """A saved pick on filled crates follows the rules native enforces: one box
+    per filled crate at its own angle, and either every box is a seat (at most
+    15) or none is."""
+    spots = _frozen().get(track["id"])
+    weapons = track_fill.package_weapons(package)
+    if not spots or not weapons:
+        return
+    by_pos = {}
+    for i, crate in enumerate(weapons):
+        by_pos[tuple(crate["pos"])] = (i, crate["rot"][1])
+    claimed = []
+    for spot in spots:
+        found = by_pos.get(tuple(spot["pos"]))
+        if found is not None:
+            if found[1] != spot["rot_y"] or found[0] in claimed:
+                error(f"item_boxes.spot_sets puts two boxes or a turned box on one filled crate of {track['id']}.")
+            claimed.append(found[0])
+    if claimed and (len(claimed) != len(spots) or len(spots) > box_spots.PICK):
+        error(f"item_boxes.spot_sets mixes fallback seats and spots on {track['id']}.")
+
+
+import contextvars
+
+#: Box spots a frozen room carries, {track id: [spot]}, set while a saved
+#: plan is validated so its seats come from its own checks (WF1). A context
+#: variable, so concurrent validations never read each other's spots.
+FROZEN = contextvars.ContextVar("ctr_frozen_box_spots", default={})
+
+
+def _frozen():
+    return FROZEN.get()
+
+
+def frozen_spots(plan):
+    """{track id: [spot]} of a plan's box checks that carry a spot."""
+    out = {}
+    checks = plan.get("checks") if isinstance(plan, dict) else None
+    for check in checks if isinstance(checks, (list, tuple)) else ():
+        spot = check.get("spot") if isinstance(check, dict) and check.get("kind") == KIND else None
+        owner = check.get("owner") if isinstance(check, dict) else None
+        if isinstance(owner, str) and isinstance(spot, dict) and isinstance(spot.get("pos"), (list, tuple)) and "rot_y" in spot:
+            out.setdefault(owner, []).append(spot)
+    return out
+
+
+def seated_crates(track, record, package):
+    """Fill weapon ordinals an AP box takes over in this room (sanity omits them).
+    A saved room uses the spot positions it carries, never today's catalog."""
+    found = spot_sets(record).get(track["id"])
+    if found is None or not track_fill.package_weapons(package):
+        return []
+    lev = (package.get("capabilities") or {}).get("weapon_crates", 0)
+    if track["id"] in _frozen():
+        return track_fill.seated_ordinals(package, _frozen()[track["id"]], lev)
+    entry = box_spots.file_for(track, package)
+    if entry is None:
+        return []
+    by_number = box_spots.spots_by_number(entry)
+    return track_fill.seated_ordinals(package, [by_number[n] for n in found["picked"] if n in by_number], lev)
+
+
+def free_fill_ranks(track, record, package):
+    """The ranks of the filled weapon crates (WF1) no AP box takes over in this
+    room, in fill order (WF1b, dowlle 2026-11-26: a seated crate is no item
+    source). [] for a track that is not filled. `record` is the room's
+    item_boxes record when the track has box checks, else None (no seats).
+    Hand-placed spots seat the crates at their exact place and angle; a track
+    without a spot file seats its fallback boxes as native does (fill order,
+    spread, at most 15)."""
+    weapons = track_fill.package_weapons(package) if track.get("origin") == "custom" else []
+    if not weapons or ((package or {}).get("capabilities") or {}).get("weapon_crates") != 0:
+        return []
+    seated = set()
+    if record:
+        if track["id"] in spot_sets(record):
+            seated = set(seated_crates(track, record, package))
+        else:
+            slots = len(track_boxes(track, record, package))
+            seated = {physical_seat(track, record, package, n) for n in range(1, slots + 1)}
+    return [crate["rank"] for number, crate in enumerate(weapons, 1) if number not in seated]
+
+
 def add_spot_sets(record, tracks, package_by_id, seed, player, blue_fire=False, logic_difficulty=None):
     """Put `spot_sets` into a record from settings(): the pick of every track
     in `tracks` that has a spot file. Draws nothing from the world's random
@@ -130,9 +240,9 @@ def add_spot_sets(record, tracks, package_by_id, seed, player, blue_fire=False, 
         return record
     sets = []
     for track in tracks:
-        found = box_spots.spot_set(track, package_by_id.get(track.get("package_id")),
-                                   record["shortcut_knowledge"], seed, player, record.get("box_count", 15),
-                                   blue_fire, logic_difficulty)
+        package = package_by_id.get(track.get("package_id"))
+        found = box_spots.spot_set(track, package, record["shortcut_knowledge"], seed, player,
+                                   spot_cap(track, package, record), blue_fire, logic_difficulty)
         if found is not None:
             sets.append(dict(track_id=track["id"], **found))
     record[SPOT_KEY] = sets
@@ -317,7 +427,8 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
                     error(f"item_boxes.spot_sets is missing retail track {track_id}.")
                 continue
             picked = spot_set["picked"]
-            if (picked != sorted(set(picked)) or len(picked) != min(spot_set["pool"], record.get("box_count", 15))
+            check_fill_seats(track, package, record)
+            if (picked != sorted(set(picked)) or len(picked) != min(spot_set["pool"], spot_cap(track, package, record))
                     or not (track["origin"] == "retail" and "lev_sha256" not in spot_set
                             or "named_block" in track and package is not None
                             and spot_set.get("lev_sha256") == box_spots.lev_pin(package))):
@@ -330,10 +441,11 @@ def check_spot_sets(record, tracks, packages, *, restoring=False, carried=False,
         if has_file != (track_id in sets) and not (has_file and track.get("origin") == "custom"):
             error(f"item_boxes.spot_sets disagrees with this build's box spot files for {track_id}.")
         if track_id in sets:
+            check_fill_seats(track, package, record)
             try:
                 box_spots.check_spot_set(track, package, record["shortcut_knowledge"],
                                          {k: v for k, v in sets[track_id].items() if k != "track_id"},
-                                         record.get("box_count", 15), compare_digest=not restoring,
+                                         spot_cap(track, package, record), compare_digest=not restoring,
                                          blue_fire=blue_fire, logic_difficulty=logic_difficulty)
             except box_spots.SpotFileError as exc:
                 error(str(exc))
@@ -391,6 +503,11 @@ def seat_limit(package):
     from .sanity import reviewed_counts
 
     raw = crate_count(package)
+    if raw == 0 and track_fill.package_weapons(package):
+        # WF1: a LEV measured without weapon crates seats its fallback boxes
+        # on the crates its frozen fill adds (native ap_boxes.c, fill order).
+        # A reviewed pickup prefix bounds the LEV's own crates, not these.
+        return len(track_fill.package_weapons(package))
     reviewed = reviewed_counts(package)
     return min(raw, reviewed[0]) if raw is not None and reviewed is not None else raw
 
@@ -463,6 +580,12 @@ def box_terms(track, slot, capability, package=None, record=None):
     if track["origin"] == "retail":
         boost_min, needs_stats = BOX_RULES.get((track["display_name"], slot), (0, False))
         return (boost_min if boost_on else 0), bool(needs_stats and stats_on)
+    weapons = track_fill.package_weapons(package) if track["origin"] == "custom" else []
+    if weapons and crate_count(package) == 0:
+        # WF1: a fallback box on a filled crate needs at least that crate's
+        # frozen rank, on top of the track's finish term.
+        rank = weapons[physical_seat(track, record, package, slot) - 1]["rank"]
+        return (max(finish_boost(track, capability, package), rank) if boost_on else 0), False
     if track["id"] in (record or {}).get(country_speedway.BOX_RULES_KEY, ()):
         pin = reviewed_pickups(package)
         if pin == country_speedway.LEV_SHA256:

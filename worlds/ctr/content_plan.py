@@ -307,14 +307,25 @@ def resolve_packages(raw, where="custom_tracks", *, historical=False, dropped=No
         if where == "custom_tracks" and not historical and use_fill:
             for package in packages:
                 caps = package["capabilities"]
-                if not caps["time_trial"] or caps["relic"]:
+                if "relic_files" in package:
                     continue
                 key = destinations.canonical_track_key(package["content_id"])
                 fill = track_fill.bundled(key, package["files"][0]["sha256"], package["laps"])
-                if fill:
+                if not fill:
+                    continue
+                # Every family the room uses must be absent on the measured
+                # LEV; a copy never stands beside the track's own objects. Each
+                # family is chosen on its own, so a descriptor without a
+                # measured weapon count still keeps its time crates.
+                fill = track_fill.select_families(
+                    fill, time=caps["time_trial"] and not caps["relic"],
+                    weapons=caps.get("weapon_crates") == 0)
+                if not fill:
+                    continue
+                if track_fill.time_crates(fill):
                     caps["relic"] = True
                     package["relic_targets"] = {tier: fill["relic_targets"][tier] for tier in track_fill.TIERS}
-                    package["fill"] = fill
+                package["fill"] = fill
         return packages
     except custom_packages.PackageError as exc:
         if where == "custom_tracks":
@@ -1282,9 +1293,13 @@ def generate(world):
                  f"with {opener}.")
         plan = _draw_fitting(world)
     validate(plan)
-    filled = [package["display_name"] for package in plan["packages"] if "fill" in package]
-    if filled:
-        adjusted(world, "track_fill", "Track fill enables Relic Race on " + ", ".join(filled) + ".")
+    filled = [package["display_name"] for package in plan["packages"]
+              if track_fill.time_crates(package.get("fill"))]
+    armed = [package["display_name"] for package in plan["packages"] if track_fill.package_weapons(package)]
+    if filled or armed:
+        adjusted(world, "track_fill", " ".join(
+            (["Track fill enables Relic Race on " + ", ".join(filled) + "."] if filled else [])
+            + (["Track fill adds weapon crates on " + ", ".join(armed) + "."] if armed else [])))
     ranges = [f"{package} {kind} {first}" + (f"-{last}" if last != first else "")
               for package, kind, first, last in track_rulings.omitted_pickups(plan, enabled_only=False)]
     if ranges:
@@ -1893,7 +1908,8 @@ def draw_plan(world, key_estimate=True):
     global_checks = content_global_checks.settings(o)
     check_count += content_global_checks.check_count(global_checks, [t for t in chosen if "cup_index" not in t],
                                                      package_by_id,
-                                                     [leg for t in chosen if "cup_index" in t for leg in t["legs"]])
+                                                     [leg for t in chosen if "cup_index" in t for leg in t["legs"]],
+                                                     item_boxes)
     # Pool-only packs (#133 PR 4a) take ledger rows like the letter items; they
     # use slots that would otherwise be filler, as on the legacy path.
     packs = pack_settings(o)
@@ -2175,7 +2191,8 @@ def draw_plan(world, key_estimate=True):
             {t["id"]: t for t in plan_tracks}, garage_reqs, boss_cups, boss_opponents,
             content_requirements.MODES[unlock_mode], package_by_id, bool(world.options.one_lap_cups.value))
         boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=encounters))
-    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits))
+    checks.extend(content_global_checks.checks(global_checks, plan_tracks, entries, pads, package_by_id, boss_hits,
+                                               item_boxes))
     checks.extend(boss_checks)
     # Cup leg and boss race routes of the per-track checks (row 10i).
     checks.extend(content_race_routes.extend(
@@ -2249,7 +2266,10 @@ def draw_plan(world, key_estimate=True):
         relic_tracks = {entry["track_id"] for entry in entries
                         if entry["kind"] == "track" and "relic" in entry["modes"]}
         for package in packages:
-            if "fill" in package and package_track_id(package) not in relic_tracks:
+            # A time crate fill alone matters only to a scheduled Relic Race.
+            # Weapon crates are raced in every other mode, so they stay.
+            if ("fill" in package and package_track_id(package) not in relic_tracks
+                    and not track_fill.package_weapons(package)):
                 del package["fill"], package["relic_targets"]
                 package["capabilities"]["relic"] = False
     pad_record = dict(mode=content_requirements.MODES[unlock_mode])
@@ -2982,6 +3002,16 @@ def goal_envelope(plan):
 @track_rulings.validation
 def validate(plan, *, restoring=False):
     """Closed shape plus registry/ownership/accounting for the implemented profile."""
+    # WF1: seats on filled crates follow the plan's own frozen box spots.
+    token = content_item_boxes.FROZEN.set(content_item_boxes.frozen_spots(plan))
+    try:
+        return _validate(plan, restoring=restoring)
+    finally:
+        content_item_boxes.FROZEN.reset(token)
+
+
+def _validate(plan, *, restoring=False):
+    """validate() without the frozen spot context."""
     from .content_plan_schema import validate_shape
     try:
         validate_shape(plan)
@@ -3369,7 +3399,7 @@ def validate(plan, *, restoring=False):
     # Itemsanity and Hit Character (#133 PR 4d), recomputed from the layout.
     boss_hits = content_bosses.hit_routes(dict(entries=boss_entries, encounters=boss_encounters))
     for check in content_global_checks.checks(global_checks, plan["tracks"], plan["entries"], plan["pads"], packages,
-                                              boss_hits):
+                                              boss_hits, item_boxes):
         require(check["location"] not in expected_checks, "duplicate check identity")
         expected_checks[check["location"]] = check
     # Wumpa Shop slots (job J11): the last 5 x N checks, in hub and slot

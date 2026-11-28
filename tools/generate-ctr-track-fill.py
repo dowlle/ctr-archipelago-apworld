@@ -4,6 +4,17 @@
 The geometry tools directory supplies BX1's analyze.py and its dependencies.
 The local LEV index and capability sheet are inputs and are never packaged.
 Run with --check to re-derive and compare the complete output directory.
+
+WF1 weapon crates: --weapon-targets names each target LEV, its donor, the
+package lap count (or null for the capability sheet's), the fit rule and the
+rank of every donor crate, and optionally donor ordinals to exclude. The donor's
+weapon crates (model 8, instance-table order, full rotation) are copied at
+their exact position and rotation. The target must hold no weapon crate. The fit is
+OV1's 512-unit neighbourhood rule ("strict"), keeping the crates that pass, or
+"ruled" for an explicitly approved layout: a weaker donor may be used for
+weapon crates, but every kept crate must still have ground at the donor's
+height. The report lists the strict rule's misses. A weapon family
+joins any time crate family of the same LEV in one file.
 """
 
 import argparse
@@ -113,22 +124,35 @@ def generate(args, fill_module, analyze, np):
         distance = analyze.measure(pos, *ground)["distance"]
         return {keys[i] for i in nearby}, distance
 
-    def safe_position(donor, target, pos):
+    def safe_position(donor, target, pos, ruled=False):
         nearby, height = neighbourhood(donor, pos)
         target_nearby, target_height = neighbourhood(target, pos)
-        return bool(nearby and nearby == target_nearby and math.isfinite(height)
-                    and abs(target_height - height) <= 20)
+        grounded = math.isfinite(height) and abs(target_height - height) <= 20
+        # A ruled layout keeps the ruled exact positions; only the ground under
+        # each crate must still be there at the same height.
+        return grounded if ruled else bool(nearby and nearby == target_nearby and grounded)
 
-    def donor_info(target, one):
+    def supported_position(target, pos):
+        ground = analyze.measure(pos, *collision(target)[2])
+        # Crate origins are quantized to integer LEV coordinates.
+        return ground["horizontal"] <= 1 and -1 <= ground["dy"] <= 384
+
+    def donor_info(target, one, *, ruled=False):
         source = geometry(one)
         target_geo = geometry(target)
         if source["road_sha"] and source["road_sha"] == target_geo["road_sha"]:
             kind, overlap = "identical", 1.0
         else:
             comparison = analyze.compare(source, target_geo)
-            if not comparison or comparison["road"] < 0.95:
+            if not comparison:
                 return None
-            kind, overlap = "similar>=0.95", comparison["road"]
+            overlap = comparison["road"]
+            if overlap >= 0.95:
+                kind = "similar>=0.95"
+            elif ruled and overlap > 0:
+                kind = "ruled"
+            else:
+                return None
         return dict(lev_sha256=one, road_sha256=source["road_sha"], kind=kind, overlap=round(overlap * 100000))
 
     def matched_donors(target, candidates):
@@ -151,6 +175,19 @@ def generate(args, fill_module, analyze, np):
             source = match["lev_sha256"]
             return target_times(rows[source]), match
         return None, None
+
+    def weapon_crates(sha):
+        data = Path(paths[sha]).read_bytes()[4:]
+        word = lambda offset: struct.unpack_from("<I", data, offset)[0]
+        crates = []
+        # Level.numInstances and ptrInstDefs; InstDef is 0x40 bytes with the
+        # model pointer at 0x10, position at 0x30 and rotation at 0x36.
+        for at in range(word(0x10), word(0x10) + 0x40 * word(0x0C), 0x40):
+            model = word(at + 0x10)
+            if model and struct.unpack_from("<h", data, model + 16)[0] == 8:
+                crates.append((list(struct.unpack_from("<3h", data, at + 0x30)),
+                               list(struct.unpack_from("<3h", data, at + 0x36))))
+        return crates
 
     output, report = {}, []
     for key, revision, target in registry_pins:
@@ -186,7 +223,7 @@ def generate(args, fill_module, analyze, np):
             provenance = [donor]
             if times_donor and times_donor["lev_sha256"] != sha:
                 provenance.append(times_donor)
-            families = dict(fill_module.EMPTY_FAMILIES, grid=None, time_crates=crates)
+            families = dict(fill_module.EMPTY_FAMILIES, grid=None, time_crates=crates, weapon_crates=[])
             payload = dict(schema=1, lev_sha256=target, generator=dict(name="ctr-track-fill", version=1),
                            donors=provenance, families=families,
                            counts={name: len(value or ()) for name, value in families.items()},
@@ -203,6 +240,64 @@ def generate(args, fill_module, analyze, np):
             break
         else:
             entry["status"] = "incomplete crate set" if donors else "no same-road crate donor"
+    for spec in read_json(args.weapon_targets)["targets"] if args.weapon_targets else ():
+        key, target, donor = spec["track"], spec["target"], spec["donor"]
+        laps = spec["laps"] or laps_for(target)
+        entry = dict(track=key, family="weapon_crates", lev_sha256=target, donor=donor, fit=spec["fit"])
+        report.append(entry)
+        if not laps:
+            entry["status"] = "no verified lap count"
+            continue
+        ruled = spec["fit"] == "ruled"
+        ruling = spec.get("ruling")
+        explicit_ruling = ruled and isinstance(ruling, str) and bool(ruling.strip())
+        if explicit_ruling:
+            entry["ruling"] = ruling
+        info = donor_info(target, donor, ruled=explicit_ruling)
+        if inventory[target]["weapon"] or weapon_crates(target):
+            entry["status"] = "target already has weapon crates"
+            continue
+        crates = weapon_crates(donor)
+        if not info or len(crates) != inventory[donor]["weapon"] or len(crates) != len(spec["ranks"]):
+            entry["status"] = "no same-road donor or donor inventory differs"
+            continue
+        # Donor ordinals an earlier review dropped from this layout stay out.
+        excluded = set(spec.get("exclude", ()))
+        weak = info["kind"] == "ruled"
+        if weak and not any(track == key and sha == target for track, _, sha in registry_pins):
+            entry["status"] = "weak donor target is not pinned to this track"
+            continue
+        passed = [n not in excluded and safe_position(donor, target, pos, ruled)
+                  and (not weak or supported_position(target, pos))
+                  for n, (pos, _) in enumerate(crates, 1)]
+        strict = [safe_position(donor, target, pos) for pos, _ in crates]
+        entry.update(kept=sum(passed), total=len(crates), overlap=info["overlap"],
+                     dropped=[n for n, ok in enumerate(passed, 1) if not ok],
+                     strict_fit_failed=[n for n, ok in enumerate(strict, 1) if not ok])
+        if ruled and not weak and not all(passed):
+            entry["status"] = "ruled layout no longer fits"
+            continue
+        weapons = [dict(pos=pos, rot=rot, rank=rank["rank"], rank_source=rank["rank_source"])
+                   for (pos, rot), rank, ok in zip(crates, spec["ranks"], passed) if ok]
+        if not weapons:
+            entry["status"] = "no crate passes the fit"
+            continue
+        path = Path(key) / (target[:16] + ".json")
+        payload = output.get(path) or dict(
+            schema=1, lev_sha256=target, generator=dict(name="ctr-track-fill", version=1), donors=[],
+            families=dict(fill_module.EMPTY_FAMILIES, grid=None, time_crates=[], weapon_crates=[]),
+            relic_targets=None)
+        if payload["lev_sha256"] != target:
+            raise ValueError(f"ambiguous LEV prefix in {path}")
+        if all(one["lev_sha256"] != donor for one in payload["donors"]):
+            payload["donors"].append(info)
+        payload["families"]["weapon_crates"] = weapons
+        payload["counts"] = {name: len(value or ()) for name, value in payload["families"].items()}
+        payload.pop("fill_sha256", None)
+        payload["fill_sha256"] = fill_module.payload_sha256(payload)
+        fill_module.validate(payload, target, laps)
+        output[path] = payload
+        entry.update(status="generated", laps=laps)
     return output, report
 
 
@@ -211,6 +306,7 @@ def main():
     for argument in ("geometry-tools", "inventory", "lev-paths", "sheet-rows", "pack-rows", "registry", "output"):
         parser.add_argument("--" + argument, type=Path, required=True)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--weapon-targets", type=Path)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     sys.path.insert(0, str(args.geometry_tools.resolve()))
@@ -219,7 +315,10 @@ def main():
 
     output, report = generate(args, load_fill_module(), analyze, numpy)
     catalogue = {}
-    laps = {entry["lev_sha256"]: entry["laps"] for entry in report if entry["status"] == "generated"}
+    laps = {}
+    for entry in report:
+        if entry["status"] == "generated" and laps.setdefault(entry["lev_sha256"], entry["laps"]) != entry["laps"]:
+            raise ValueError(f"time and weapon families disagree on laps for {entry['lev_sha256']}")
     for path, fill in sorted(output.items()):
         pin = fill["lev_sha256"]
         catalogue.setdefault(path.parent.name, {})[pin] = {"laps": laps[pin], "fill_sha256": fill["fill_sha256"]}

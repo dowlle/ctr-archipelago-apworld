@@ -265,14 +265,19 @@ def admit(descriptor, where="package", *, frozen_fill=False):
     if "fill" in d:
         from . import track_fill
 
-        if not caps["relic"] or not caps["time_trial"] or "relic_files" in d:
-            _fail(where + ".fill", "requires Relic Race on the main LEV and VRM pair")
         try:
             fill = track_fill.validate(d["fill"], pins[0]["sha256"], laps)
         except ValueError as exc:
             _fail(where + ".fill", str(exc))
-        if any(out["relic_targets"][tier] != fill["relic_targets"][tier] for tier in RELIC_TIERS):
-            _fail(where + ".fill", "relic targets disagree with the package")
+        if track_fill.time_crates(fill):
+            if not caps["relic"] or not caps["time_trial"] or "relic_files" in d:
+                _fail(where + ".fill", "requires Relic Race on the main LEV and VRM pair")
+            if any(out["relic_targets"][tier] != fill["relic_targets"][tier] for tier in RELIC_TIERS):
+                _fail(where + ".fill", "relic targets disagree with the package")
+        # WF1: weapon crates fill only a LEV measured without any. The
+        # package keeps the measured count; the fill adds its own ordinals.
+        if track_fill.weapon_crates(fill) and (caps.get("weapon_crates") != 0 or "relic_files" in d):
+            _fail(where + ".fill", "weapon crates fill only a LEV measured without weapon crates")
         out["fill"] = fill
     evidence = d["evidence"]
     if type(evidence) is not list or len(evidence) > MAX_EVIDENCE:

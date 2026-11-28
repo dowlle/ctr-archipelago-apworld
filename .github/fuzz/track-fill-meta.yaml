@@ -1,10 +1,17 @@
 # Keep unrelated options at their packed defaults. Seeds still vary the
-# layout and mode order while always using a filled Relic Race.
+# layout and mode order while always using a filled Relic Race, and always
+# race Arabian Heights Day's 27 filled weapon crates (WF1) at varied Item Box
+# and Itemboxsanity counts. WF1b: Itemsanity and Hit Character route through
+# the filled crates no AP box takes over, so both vary too.
 Crash Team Racing:
   accessibility: full
   track_fill: true
   race_mode_order: {fixed: 1, per_pad: 1}
   relic_perfect_checks: true
+  item_box_count: {0: 1, 15: 2, 50: 1}
+  itemboxsanity: {0: 1, 20: 1, 50: 1}
+  itemsanity: {false: 1, true: 1}
+  hit_character: {false: 1, true: 1}
   custom_tracks:
     - id: package/acid-lake/1.0.0
       content_id: acid-lake
@@ -18,6 +25,18 @@ Crash Team Racing:
         - {role: lev, sha256: e2a9e1daaf89ebd499d657462d19ae9c0be488f18c04d1e391d4abb6e5e791a6, bytes: 810876, format: ctr-lev, format_version: 1}
         - {role: vrm, sha256: 0d75e1e0da02092c09728b3c38aef8eff0d5170fb626b7db48fa7a885a9429af, bytes: 458808, format: ctr-vrm, format_version: 1}
       evidence: []
-  required_entries: [acid-lake]
+    - id: package/arabian-heights-day/1.0.0
+      content_id: arabian-heights-day
+      uuid: ce0924b4-38d6-59b6-ac43-83a2fdb2f042
+      revision: "1.0.0"
+      display_name: Arabian Heights Day
+      author: Unknown
+      laps: 3
+      capabilities: {time_trial: true, arcade: true, relic: false, ctr_tokens: false, wumpa: false, super_turbo_pads: true, weapon_crates: 0, fruit_crates: 0, loose_fruit: 0, checkpoints: 90, ai_nav: true}
+      files:
+        - {role: lev, sha256: a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900, bytes: 2363952, format: ctr-lev, format_version: 1}
+        - {role: vrm, sha256: 0f8113d3e98d472b938bac0ed8d83327714e5a0260d143c5115c383dc5392366, bytes: 458808, format: ctr-vrm, format_version: 1}
+      evidence: []
+  required_entries: [acid-lake, arabian-heights-day]
   track_modes: {default: [trophy, ctr, relic], acid-lake: [relic]}
   retail_tracks: [all]
