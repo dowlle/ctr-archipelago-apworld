@@ -121,6 +121,7 @@
           "global_checks_v1",
           "item_boxes_v1",
           "crate_exclusions_v1",
+          "seat_spots_v2",
           "cup_entries_v1",
           "boss_encounters_v1",
           "gem_cups_v1",
@@ -137,6 +138,7 @@
           "pad_client_v1",
           "lap_checks_v1",
           "origin_letters_v1",
+          "placed_track_letters_v1",
           "repeatable_pickups_v1",
           "tizi_mask_v1",
           "final_only_venue_v1",
@@ -706,6 +708,9 @@
               "minLength": 3,
               "maxLength": 3,
               "pattern": "^[A-Z0-9]{3}$"
+            },
+            "placed_letters": {
+              "const": true
             },
             "room_title": {
               "type": "string",
@@ -1951,6 +1956,19 @@
       "type": "object",
       "properties": {
         "pickup_rules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "seat_spots": {
+          "description": "Fallback Item Box numbers with individual authored positions. Requires seat_spots_v2.",
+          "type": "array", "minItems": 1, "maxItems": 160,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["track_id", "picked"],
+            "properties": {
+              "track_id": {"type": "string"},
+              "picked": {"type": "array", "minItems": 1, "maxItems": 15, "uniqueItems": true,
+                         "items": {"type": "integer", "minimum": 1, "maximum": 15}}
+            }
+          }
+        },
         "box_count": {"type": "integer", "minimum": 1, "maximum": 50, "not": {"const": 15}},
         "crate_exclusions": {
           "description": "Reviewed fallback crate exclusions from data/crate_exclusions.json, only for affected pad tracks without spots. Requires crate_exclusions_v1.",

@@ -528,9 +528,16 @@ class RelicPerfectChecks(Toggle):
 
 
 class TrackOriginLetters(DefaultOnToggle):
-    """Use the origin game's letters on verified custom tracks that ship those models."""
+    """Use the origin game's letters on verified custom tracks with matching
+    models or supported letter placements."""
     display_name = "Track Origin Letters"
     # The emitted track code is already shown in the content-plan spoiler.
+    visibility = Visibility.all & ~Visibility.spoiler
+
+
+class PlacedTrackLetters(Toggle):
+    """Enable CTR Challenges using client-placed letters on supported custom track revisions."""
+    display_name = "Placed Track Letters"
     visibility = Visibility.all & ~Visibility.spoiler
 
 
@@ -586,17 +593,9 @@ class ReserveTopUp(DefaultOnToggle):
 
 
 class CharacterLooks(OptionSet):
-    """Character looks to add to the filler items that are not traps. Empty by
-    default.
-
-    Each look is a filler item that changes how a racer looks. "Joe Mama" makes
-    Komodo Joe look like Komodo Moe (model by Lockheart). Each allowed look is
-    drawn at weight 1, beside Wumpa Fruit at 6, and can arrive more than once.
-    The newest look you receive is worn from the next load; the Joe Look row in
-    the in-game options switches between the looks you have and the original.
-    Looks only change the model, never stats or logic."""
+    """Parked until the client supports player-supplied character models."""
     display_name = "Character Looks"
-    valid_keys = ["Joe Mama"]
+    visibility = Visibility.none
     default = frozenset()
 
 
@@ -1879,6 +1878,7 @@ class ctrAPOptions(PerGameCommonOptions):
     relic_perfect_checks: RelicPerfectChecks
     lettersanity: Lettersanity
     track_origin_letters: TrackOriginLetters
+    placed_track_letters: PlacedTrackLetters
     letters_per_track: LettersPerTrack
     cup_sweep_checks: CupSweepChecks
     lap_completion_checks: LapCompletionChecks
@@ -1952,11 +1952,11 @@ ap_ctr_option_groups: Dict[str, List[Any]] = {
     "Pads and Requirements": [PadPlacement, RaceModeOrder, AdventureStructure, WarpPadUnlockRequirements,
                               RequirementWeights, TwoStageDensity, WarpPadRules, RacerLockedPads, ShuffleKeys,
                               ShuffleGems],
-    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, LettersPerTrack, CupSweepChecks,
+    "Checks": [PodiumRungs, CupOnlyPodiumRungs, RelicPerfectChecks, Lettersanity, TrackOriginLetters, PlacedTrackLetters, LettersPerTrack, CupSweepChecks,
                LapCompletionChecks, ItemBoxCount, Itemboxsanity, Wumpasanity, Itemsanity, Crystalsanity, WumpaCheck, HitCharacter],
     "Wumpa Shop": [WumpaShopSlots, WumpaShopPrices, WumpaShopLogicScale, WumpaShopProgression, WumpaShopHints,
                     ShopHintsProgressionOnly],
-    "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp, CharacterLooks,
+    "Items and Traps": [ContentItemPool, TrapFillPercentage, TrapWeights, WumpaBundles, ReserveTopUp,
                         ProgressiveStartingWumpa, TurboGrant, TiziHelper,
                         TrapDisplay],
     "Characters and Stats": [StartingCharacter, CharacterUnlocks, RemovePlayableOxide, StartingStatClass, PentaStats,

@@ -3,6 +3,8 @@
   "version": 2,
   "rulings": [
     {"content_id": "arabian-heights-night", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: needs USF to finish"},
+    {"content_id": "arabian-heights-day", "revision": "1.0.0", "lev_sha256": "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900", "finish_rank": 0, "since": 5, "ruling": "Project ruling 2026-11-25 23:25 CET: Appie completed a lap at Boost 0 and ruled the track finishable at that rank"},
+    {"content_id": "arabian-heights-night", "revision": "1.1.0", "lev_sha256": "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c", "finish_rank": 0, "since": 5, "ruling": "Project ruling 2026-11-25 23:25 CET: Appie ruled that Night drives the same as Day and takes its Boost 0 lap and finish rule"},
     {"content_id": "baby-t-park", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
     {"content_id": "cortex-vortex", "finish_rank": 2, "ruling": "Project ruling 2026-10-18 01:44 CEST: Cortex Vortex (bundled) needs USF to finish"},
     {"content_id": "north-pole", "finish_rank": 0, "ruling": "Project ruling 2026-10-18 01:44 CEST: does not need USF, generic terms only"},
@@ -15,6 +17,10 @@
     {"content_id": "lights-out", "revision": "1.0.0", "lev_sha256": "5ebdb9f235ba0c07ba5c72b715c949afdd6062fcf3208f45a1c13936ffb529c6", "finish_rank": 1, "ruling": "Project ruling 2026-11-05 07:19 CET: every finish check needs the first boost"},
     {"content_id": "neon-paradise", "revision": "1.0.0", "lev_sha256": "665d19819c437ab9ab6cbccac7c0202979405f16e1af39e06d9ea1d3286be9d0", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
     {"content_id": "neon-paradise", "revision": "1.1.0", "lev_sha256": "639434d84fe6de4ba88a31a1dd5a11291d640617ab25af9c7bfbd5d383b53d5d", "finish_rank": 0, "ruling": "Project ruling 2026-11-05 07:19 CET: does not need USF, generic terms only"},
-    {"content_id": "sunset-vista", "revision": "1.2.0", "lev_sha256": "97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5", "finish_rank": 0, "ruling": "Project ruling 2026-11-20 07:55 CET: in-game pass with Boost NONE finished a lap without boost, so it does not need USF, generic terms only"}
+    {"content_id": "sunset-vista", "revision": "1.2.0", "lev_sha256": "97fd76f06e3c57207560751728eb23dbf81980887e5f7e25f2296917578735b5", "finish_rank": 0, "ruling": "Project ruling 2026-11-20 07:55 CET: in-game pass with Boost NONE finished a lap without boost, so it does not need USF, generic terms only"},
+    {"content_id": "coco-park-2025", "revision": "1.1.0", "lev_sha256": "bbebd28a0c61723b632a1535d26a5f90d061f6c918403a851680f64e487f9a1c", "since": 6, "finish_rank": 0, "ruling": "Driver ruling 2026-11-26: a lap was registered at Boost 0"},
+    {"content_id": "country-speedway", "revision": "1.3.1", "lev_sha256": "504946fdd87d040cce6dfadcf158759b53962d2a08b41002ad97949051b3d996", "since": 6, "finish_rank": 0, "ruling": "Driver ruling 2026-11-26: a lap was registered at Boost 0"},
+    {"content_id": "haven-stadium", "revision": "1.1.0", "lev_sha256": "37f2daddfe7fd988b091b914536737f77a3ac07384e120a25b7e3d69386e3188", "since": 6, "finish_rank": 1, "ruling": "Driver ruling 2026-11-26: a lap without Boost 1 requires a glitch"},
+    {"content_id": "inferno-island", "revision": "1.3.0", "lev_sha256": "d8863cf0274fc29ac8e2118e666604ddc80ebbe49d5c747dd91acec6a07dfd32", "since": 6, "finish_rank": 0, "ruling": "Driver ruling 2026-11-26: a lap was registered at Boost 0"}
   ]
 }

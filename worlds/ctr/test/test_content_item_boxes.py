@@ -60,12 +60,43 @@ def box_options(custom=None, tier="medium", **extra):
     return options
 
 
+DOWLLE_2026_11_24 = "dowlle, Box Author Mode, 2026-11-24"
+
+
+@contextlib.contextmanager
+def before_cp1():
+    """The custom files as they shipped before CP1 added dowlle's 2026-11-24
+    spots: those spots removed, and a file holding nothing else left out, so
+    its track (Baby T Park, the test package, among them) keeps crate seating."""
+    kept = {}
+    for key, e in box_spots.CUSTOM_FILES.items():
+        if key == "country-speedway":
+            e = country_speedway_before_im1b()
+        spots = [s for s in e["doc"]["spots"] if s.get("source") != DOWLLE_2026_11_24]
+        if spots:
+            kept[key] = dict(e, doc=dict(e["doc"], spots=spots))
+    with mock.patch.dict(box_spots.CUSTOM_FILES, kept, clear=True):
+        yield
+
+
+def country_speedway_before_im1b():
+    """The Country Speedway spot file before IM1b (1.3.1 pin only, spot 11
+    live), kept as a restore-only copy: 1.3.0 rooms of that time use crate
+    seats with the 1.3.0 pickup rules."""
+    return next(v for v in box_spots.LEGACY_FILES.values() if v["path"].endswith("/country-speedway-1.3.1.json"))
+
+
+def before_im1b():
+    """The catalog before IM1b for Country Speedway: its 1.3.1-only file."""
+    return mock.patch.dict(box_spots.CUSTOM_FILES, {"country-speedway": country_speedway_before_im1b()})
+
+
 @contextlib.contextmanager
 def builtin_only():
     """The 18 retail files as they shipped before A7-1: built-in spots only."""
     r = {lid: dict(e, doc=dict(e["doc"], spots=[s for s in e["doc"]["spots"] if s.get("source") == "builtin"]))
          for lid, e in box_spots.RETAIL_FILES.items()}
-    with mock.patch.dict(box_spots.RETAIL_FILES, r):
+    with mock.patch.dict(box_spots.RETAIL_FILES, r), before_cp1():
         yield
 
 
@@ -169,6 +200,9 @@ class TestRetailBoxes(BuiltinOnly):
 
 
 class TestCustomBoxes(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(before_cp1())
+
     def test_named_track_takes_one_box_per_seat(self):
         for crates, count in ((8, 8), (15, 15), (40, 15), (1, 1)):
             plan = make_world(box_options(custom=[btp(crates)]), seed=4).ctr_content_plan
@@ -307,6 +341,7 @@ class TestForgeries(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.enterClassContext(before_cp1())
         cls.world = first_world(box_options(**copy.deepcopy(cls.OPTIONS)), seed=2)
         cls.plan = cls.world.ctr_content_plan
 

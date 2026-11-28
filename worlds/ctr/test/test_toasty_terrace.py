@@ -6,7 +6,9 @@ import unittest
 
 from BaseClasses import CollectionState
 from Options import OptionError
-from .. import characters, content_item_boxes as boxes, content_plan, sanity, toasty_terrace
+from unittest import mock
+
+from .. import box_spots, characters, content_item_boxes as boxes, content_plan, sanity, toasty_terrace
 from .test_content_plan import make_world, profile_options
 
 PACKAGE = json.loads((Path(__file__).parent / "fixtures/toasty_terrace_130.json").read_text())
@@ -26,6 +28,13 @@ def toasty_options(**extra):
 
 class TestToastyTerrace(unittest.TestCase):
     def test_counts_ranks_tracker_and_physical_split(self):
+        # Crate seating as in rooms generated before TT1 shipped the 1.3.0
+        # spot file; test_box_spots.TestToastyDeckSpots covers the spots.
+        previous = {k: e for k, e in box_spots.CUSTOM_FILES.items() if k != "toasty-terrace"}
+        with mock.patch.dict(box_spots.CUSTOM_FILES, previous, clear=True):
+            self._counts_ranks_tracker_and_physical_split()
+
+    def _counts_ranks_tracker_and_physical_split(self):
         for count in (0, 1, 5, 15, 50):
             for mode in ("off", "shared_global", "per_character"):
                 for wumpa in ("off", "crates"):
@@ -126,6 +135,8 @@ class TestToastyTerrace(unittest.TestCase):
             self.assertTrue(all(not w.multiworld.get_location(c["display_name"], 1).can_reach(state) for c in checks))
 
     def test_mixed_room_preserves_country_exceptions(self):
+        from .test_content_item_boxes import before_im1b
+        self.enterContext(before_im1b())  # Country Speedway 1.3.0 crate seats, as before IM1b
         from .test_country_speedway import PACKAGE as country_package
         options = toasty_options()
         options["content_pool"]["tracks"]["custom"].append(copy.deepcopy(country_package))

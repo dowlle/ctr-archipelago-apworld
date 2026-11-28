@@ -11,22 +11,37 @@ from worlds.AutoWorld import data_package_checksum
 from . import destinations, named_tracks
 
 FEATURE = "origin_letters_v1"
+PLACEMENT_FEATURE = "placed_track_letters_v1"
 DEFAULT = "CTR"
 
 # Pinned together with named_tracks.json by tools/build_named_tracks.py.
 _CATALOGUE = json.loads(pkgutil.get_data(__package__, "data/origins.json"))
 
 
-def letters_for_package(package):
-    """Stage 1 requires models in the exact LEV the seed pins."""
+def _origin(package):
     row = _CATALOGUE["tracks"].get(destinations.canonical_track_key(package["content_id"]))
     if not row or row["review"] != "verified" or row["relation"] not in ("port", "remake"):
-        return DEFAULT
+        return {}, DEFAULT
     game = _CATALOGUE["games"][row["origin_game"]]
     code = game["code"]
+    if not game["racing_game"] or not set(code) <= set(DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS):
+        return {}, DEFAULT
+    return row, code
+
+
+def has_letter_placements(package):
+    if not package or not package["capabilities"]["arcade"]:
+        return False
+    row, code = _origin(package)
+    files = {record["role"]: record["sha256"] for record in package["files"]}
+    placement = row.get("letter_placements", {}).get(files["lev"])
+    return code == "CNK" and placement is not None and placement["vrm_sha256"] == files["vrm"]
+
+
+def letters_for_package(package, placed=False):
+    row, code = _origin(package)
     lev = package["files"][0]["sha256"]
-    if (game["racing_game"] and row.get("own_letter_models", {}).get(lev) == code
-            and set(code) <= set(DEFAULT + named_tracks.MINTED_ORIGIN_GLYPHS)):
+    if placed or row.get("own_letter_models", {}).get(lev) == code:
         return code
     return DEFAULT
 
@@ -50,24 +65,41 @@ class _OptionWorld(NamedTuple):
 
 
 @cache
-def legacy_option_world(world):
+def legacy_option_world(world, *, for_random=False):
     """The old alphabet of registered names for options rolled before the plan."""
     from .item_groups import letter_item_names
 
     from .character_looks import GROUP as LOOK_GROUP, LOOKS
+    from .sanity import NAMED_BASE as NAMED_SANITY_BASE
 
     # Character looks (JL2) are left out the same way: a random name roll or a
     # group draw (Filler, Everything) keeps the alphabet it had before them.
     # The Character Looks group itself stays for YAMLs that name it.
+    # HS3 named blocks start at 90. Keep early random rolls on the prior
+    # registry so appending the two blocks does not disturb existing seeds.
+    first_hs3_block = 90
+    named_min = named_tracks.NAMED_ITEM_BASE + first_hs3_block * named_tracks.ITEM_BUDGET
+    named_max = named_tracks.NAMED_ITEM_RANGE[1]
+    new_named_items = {name for name, code in world.item_name_to_id.items()
+                       if for_random and named_min <= code <= named_max}
     item_ids = {name: code for name, code in world.item_name_to_id.items()
-                if not _origin_item(code) and name not in LOOKS}
+                if not _origin_item(code) and name not in LOOKS and name not in new_named_items}
     item_names = frozenset(item_ids)
-    locations = frozenset(name for name, code in world.location_name_to_id.items() if not is_origin_location(code))
-    named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if not _origin_item(row["code"])]
+    def random_location_name(code):
+        block = named_tracks.block_of_location(code)
+        sanity_offset = code - NAMED_SANITY_BASE
+        new_sanity = first_hs3_block * 128 <= sanity_offset < named_tracks.NAMED_TRACK_LIMIT * 128
+        return (block is None or block[0] < first_hs3_block) and not new_sanity
+
+    locations = frozenset(name for name, code in world.location_name_to_id.items()
+                          if not is_origin_location(code) and (not for_random or random_location_name(code)))
+    named_items = [row for row in named_tracks.NAMED_TRACK_ITEM_DATA if row["name"] in item_names]
     item_groups = {group: (members if group == LOOK_GROUP else frozenset(members) - set(LOOKS))
                    for group, members in world.item_name_groups.items()}
     item_groups["Everything"] = item_names
     item_groups["CTR Letters"] = frozenset(letter_item_names(named_items))
+    if new_named_items:
+        item_groups = {group: members - new_named_items for group, members in item_groups.items()}
     return _OptionWorld(world.game, item_names, locations, item_groups, world.location_name_groups)
 
 

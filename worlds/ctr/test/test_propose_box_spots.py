@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from tools.propose_box_spots import GROUND, KILL, NO_RESPONSE, TRIGGER, Mesh, ground_height, propose
+from ..box_spot_catalog import SpotFileError, check_draft_file
 from ..box_spots import check_file
 
 
@@ -38,7 +39,9 @@ def lev():
 def test_deterministic_and_spread_in_lap_order(lev):
     doc, report = propose(lev, TRACK, 16)
     assert (doc, report) == propose(lev, TRACK, 16)
-    assert check_file(doc)
+    assert check_draft_file(doc)
+    with pytest.raises(SpotFileError, match="missing or unknown source_family"):
+        check_file(doc)
     assert 8 <= len(doc["spots"]) <= 16
     assert {row["checkpoint"] for row in report["spots"]} == {0, 1, 2, 3}
     distances = [row["distance"] for row in report["spots"]]
@@ -86,7 +89,7 @@ def test_append_preserves_existing_numbers_and_retired_holes(lev):
     assert doc["spots"][:len(base["spots"])] == base["spots"]
     assert doc["retired"] == base["retired"]
     assert [row["number"] for row in report["spots"]] == [49, 50]
-    assert check_file(doc)
+    assert check_draft_file(doc)
     with pytest.raises(ValueError, match="exact LEV pin"):
         propose(lev, dict(TRACK, lev_sha256=["b" * 64]), 50, base)
 

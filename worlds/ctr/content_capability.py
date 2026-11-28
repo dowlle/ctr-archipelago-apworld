@@ -22,8 +22,9 @@ term, because it crosses the line.
     (ruling 2026-10-17). the project's per-package rulings in
     `data/usf_finish_rulings.json` (2026-10-18) decide first, by content id
     and, for a row scoped to one revision (A2-22), revision and LEV pin:
-    Arabian Heights Night and Cortex Vortex need USF; TV World, North Pole and
-    Baby T Park take the generic terms only. A ruling may also set the first
+    Cortex Vortex needs USF; the reviewed Arabian Heights Day and Night
+    revisions, TV World, North Pole and Baby T Park take the generic terms
+    only. A ruling may also set the first
     boost (rank 1). A custom package that is not ruled and does not state
     `super_turbo_pads` is treated as having one, the safe direction;
   * Trophy Race: F, and on easy and medium the first rank on every
@@ -155,8 +156,20 @@ def letter_boost(track, award, package=None):
     return LETTER_BOOST.get((_name(track), award), 0)
 
 
+def exact_versioned_finish(package):
+    """A finish-only review leaves the package's other ruling sources intact."""
+    exact = (package.get("content_id"), *track_rulings.revision_ref(package))
+    version = track_rulings.scoped_version()
+    return max(((key[3], rank) for key, rank in USF_FINISH_RULINGS.items()
+                if len(key) == 4 and key[:3] == exact and key[3] <= version),
+               default=(0, None))[1]
+
+
 def ruled_finish(package):
     """Resolve the exact finish rank, inherited rank or unscoped default."""
+    exact = exact_versioned_finish(package)
+    if exact is not None:
+        return exact
     content = package.get("content_id")
     rows = finish_ruling_rows(content)
     scoped = rows.get(track_rulings.scoped_source(package, rows),

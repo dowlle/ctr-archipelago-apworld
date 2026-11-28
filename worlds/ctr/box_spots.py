@@ -28,11 +28,17 @@ its number under `retired`; a number is never reused
 (test/fixtures/box_spot_numbers_lock.json).
 
 LOGIC FIELDS (ruled 2026-11-06). `needs`: none, boost or usf, absent meaning
-usf, the careful default. `shortcut`: none, medium or hard; a spot exists in a
+usf, the careful default. `blue_fire` (rank 3, TT1 2026-11-26) is for a spot
+ruled "Boost 3"; it exists in a seed only with Progressive Boost and Blue Fire
+on, because without them no kart reaches rank 3 (the TV World crate removal of
+A4-52 does the same). Below rank 3 the seed's boost options never change a pool. `shortcut`: none, medium or hard; a spot exists in a
 seed only at that Shortcut Knowledge tier or above, and a hard spot also needs
 one level of each stat. `door`: Tiger Temple's stone door (Itemsanity weapon
 term). `no_gate`: a spot that was ruled to need nothing although it sits past a
-jump; carried so nobody gates it later.
+jump; carried so nobody gates it later. `lev_sha256` (IM1b, 2026-11-27): the
+spot exists only for a package whose LEV is one of these pins, a proper subset
+of the file's pins; on the file's other pins it is not in the pool and its
+number stays reserved.
 
 THE PICK (ruled 2026-11-06, "all spots equal"). Per track, the eligible spots
 (not retired, tier allowed) go into one pool. With 15 or fewer all are used and
@@ -42,135 +48,41 @@ seeded from the multiworld seed, the player, "box_spots" and the track id; the
 world's random stream is never touched.
 """
 import hashlib
-import json
 import pkgutil
 import random
-import re
 
-from . import destinations
+from . import box_spot_catalog, destinations
+from .box_spot_catalog import DEFAULT_NEEDS, MAX_NUMBER, NEEDS, SHORTCUT, SpotFileError, _fail
 
-FORMAT = "ctr-ap-box-spots"
-VERSION = 1
 FEATURE = "box_spots_v1"
-#: Spot numbers per track (the alpha3 data package, ruled 2026-11-06).
-MAX_NUMBER = 50
 #: Boxes a track carries in one seed at most.
 PICK = 15
-#: The `needs` field as a Progressive Boost rank (USF is the second upgrade).
-NEEDS = {"none": 0, "boost": 1, "usf": 2}
-DEFAULT_NEEDS = "usf"
-#: The `shortcut` field as the Shortcut Knowledge tier that creates the spot.
-SHORTCUT = {"none": 0, "medium": 1, "hard": 2}
-DOORS = ("tiger_temple",)
-SPOT_FIELDS = {"number", "pos", "rot_y", "needs", "shortcut", "door", "no_gate", "source", "credit", "review",
-               "note"}
-TEXT_FIELDS = ("source", "credit", "review", "note")
-_HEX64 = re.compile(r"[0-9a-f]{64}")
-
-INDEX_PATH = "data/box_spots/index.json"
-
-
-class SpotFileError(ValueError):
-    pass
-
-
-def _fail(path, message):
-    raise SpotFileError(f"CTR box spot file {path}: {message}")
-
-
-def _int16(value):
-    return type(value) is int and -32768 <= value <= 32767
-
-
-def check_file(doc, path="<file>"):
-    """Shape and values of one spot file; returns it. Raises SpotFileError."""
-    if not isinstance(doc, dict) or set(doc) != {"format", "version", "track", "spots", "retired"}:
-        _fail(path, "must hold exactly format, version, track, spots and retired")
-    if doc["format"] != FORMAT or doc["version"] != VERSION:
-        _fail(path, f"format must be {FORMAT} version {VERSION}")
-    track = doc["track"]
-    if not isinstance(track, dict) or track.get("kind") not in ("retail", "custom"):
-        _fail(path, "track.kind must be retail or custom")
-    if track["kind"] == "retail":
-        if set(track) != {"kind", "level_id", "name"} or type(track["level_id"]) is not int:
-            _fail(path, "a retail track names exactly kind, level_id and name")
-    else:
-        if set(track) != {"kind", "track_key", "name", "lev_sha256"}:
-            _fail(path, "a custom track names exactly kind, track_key, name and lev_sha256")
-        pins = track["lev_sha256"]
-        if not isinstance(pins, list) or not pins or any(not isinstance(p, str) or not _HEX64.fullmatch(p)
-                                                         for p in pins):
-            _fail(path, "lev_sha256 must be a nonempty list of lowercase SHA-256 digests")
-    retired = doc["retired"]
-    if not isinstance(retired, list) or any(type(n) is not int or not 1 <= n <= MAX_NUMBER for n in retired) \
-            or len(set(retired)) != len(retired):
-        _fail(path, f"retired must be distinct numbers 1 to {MAX_NUMBER}")
-    spots = doc["spots"]
-    if not isinstance(spots, list):
-        _fail(path, "spots must be a list")
-    seen = set()
-    for spot in spots:
-        if not isinstance(spot, dict) or not {"number", "pos", "rot_y"} <= set(spot) or set(spot) - SPOT_FIELDS:
-            _fail(path, "a spot holds number, pos and rot_y, and only known fields")
-        n = spot["number"]
-        if type(n) is not int or not 1 <= n <= MAX_NUMBER or n in seen:
-            _fail(path, f"spot numbers must be distinct, 1 to {MAX_NUMBER}")
-        if n in retired:
-            _fail(path, f"spot {n} is retired")
-        seen.add(n)
-        pos = spot["pos"]
-        if not isinstance(pos, list) or len(pos) != 3 or not all(_int16(v) for v in pos):
-            _fail(path, f"spot {n}: pos must be three signed 16-bit LEV units")
-        # An engine angle, 0x1000 a full turn; kept as authored (the built-in
-        # rows hold values outside 0 to 4095), so only the LEV width is checked.
-        if not _int16(spot["rot_y"]):
-            _fail(path, f"spot {n}: rot_y must be a signed 16-bit engine angle")
-        if spot.get("needs", DEFAULT_NEEDS) not in NEEDS:
-            _fail(path, f"spot {n}: needs must be none, boost or usf")
-        if spot.get("shortcut", "none") not in SHORTCUT:
-            _fail(path, f"spot {n}: shortcut must be none, medium or hard")
-        if "door" in spot and (spot["door"] not in DOORS or track.get("level_id") != 4 or track["kind"] != "retail"):
-            _fail(path, f"spot {n}: door is only tiger_temple, on retail Tiger Temple")
-        if "no_gate" in spot and (spot["no_gate"] is not True or spot.get("needs") != "none"):
-            _fail(path, f"spot {n}: no_gate is true only, on a spot that needs none")
-        if any(not isinstance(spot.get(k, ""), str) for k in TEXT_FIELDS):
-            _fail(path, f"spot {n}: source, credit, review and note are text")
-    return doc
 
 
 def _read(path):
     raw = pkgutil.get_data(__package__, path)
     if raw is None:
-        _fail(path, "is missing from this apworld")
+        raise SpotFileError(f"CTR box spot file {path}: is missing from this apworld")
     return raw
 
 
 def load_index():
-    return json.loads(_read(INDEX_PATH).decode("utf-8"))
+    return box_spot_catalog.load_index(_read)
 
 
-def _load_all():
-    index = load_index()
-    if set(index) != {"retail", "custom"}:
-        raise SpotFileError(f"CTR box spot index {INDEX_PATH} must list retail and custom")
-    retail, custom = {}, {}
-    for kind, out, key in (("retail", retail, "level_id"), ("custom", custom, "track_key")):
-        for name in index[kind]:
-            path = f"data/box_spots/{kind}/{name}.json"
-            raw = _read(path)
-            doc = check_file(json.loads(raw.decode("utf-8")), path)
-            if doc["track"]["kind"] != kind:
-                _fail(path, f"sits under {kind} but describes a {doc['track']['kind']} track")
-            if kind == "custom" and doc["track"]["track_key"] != name:
-                _fail(path, "file name and track_key differ")
-            if doc["track"][key] in out:
-                _fail(path, "a second file for the same track")
-            out[doc["track"][key]] = dict(doc=doc, path=path, sha256=hashlib.sha256(raw).hexdigest())
-    return retail, custom
+def check_file(doc, path="<file>"):
+    return box_spot_catalog.check_file(doc, SOURCE_RECORDS, path)
 
 
 #: {LevelID: {doc, path, sha256}} and {track_key: {...}}, read once at import.
-RETAIL_FILES, CUSTOM_FILES = _load_all()
+RETAIL_FILES, CUSTOM_FILES, SOURCE_RECORDS = box_spot_catalog.load_catalog(_read)
+#: {SHA-256: entry} of replaced files kept for restoring older rooms (IM1).
+LEGACY_FILES = box_spot_catalog.load_legacy(_read, SOURCE_RECORDS, CUSTOM_FILES)
+
+# Sparse authored replacements for fallback seats, indexed by the exact LEV
+# and original one-based weapon ordinal. These are ground anchors for AP
+# boxes. The weapon crates keep their original coordinates and identity.
+SEAT_SPOTS = box_spot_catalog.load_seat_spots(_read)
 
 
 def needs_rank(spot):
@@ -185,9 +97,68 @@ def spots_by_number(entry):
     return {spot["number"]: spot for spot in entry["doc"]["spots"]}
 
 
-def eligible(entry, knowledge):
-    """Sorted numbers of a file's spots a Shortcut Knowledge tier creates."""
-    return sorted(s["number"] for s in entry["doc"]["spots"] if tier(s) <= knowledge)
+#: The `needs` rank that exists only with Blue Fire on.
+BLUE_FIRE_RANK = NEEDS["blue_fire"]
+
+
+def rule_rank(spot, package, blue_fire, logic_difficulty):
+    """A `rule_of` spot's rank: the rank object_rulings gives the crate it
+    names, for the package's exact LEV. None means the ruling removes it in
+    this seed. Fails closed. The plan's capability record, the only place a
+    restored room finds Logic Difficulty, is empty when Progressive Boost and
+    Progressive Stats are both off; with no Logic Difficulty the spot is removed
+    (a crate keeps its check on hard there, a spot does not). Where no ruling
+    covers the package it takes the spot's own `needs` (blue_fire, so only with
+    Blue Fire), never a lower rank."""
+    if logic_difficulty is None:
+        return None
+    from . import object_rulings
+    kind, ordinal = box_spot_catalog.parse_rule(spot["rule_of"])
+    cap = dict(logic_difficulty=logic_difficulty, boost_blue_fire=bool(blue_fire))
+    rank = object_rulings.pinned_rank((package or {}).get("content_id"), lev_pin(package), kind, ordinal, cap)
+    if rank == 0:
+        return needs_rank(spot) if blue_fire else None
+    return rank
+
+
+def check_rules():
+    """Every shipped `rule_of` names a ruling row of its file's own LEV pins;
+    raises SpotFileError otherwise. Run by the tests and the pack check."""
+    from . import object_rulings
+    for key, entry in CUSTOM_FILES.items():
+        pins = entry["doc"]["track"]["lev_sha256"]
+        for spot in entry["doc"]["spots"]:
+            if "rule_of" not in spot:
+                continue
+            kind, ordinal = box_spot_catalog.parse_rule(spot["rule_of"])
+            rows = [object_rulings.RULINGS.get((content, kind, ordinal))
+                    for content in dict.fromkeys((destinations.canonical_track_key(key), key))]
+            if not any(row is not None and row["lev_sha256"] in pins for row in rows):
+                _fail(entry["path"], f"spot {spot['number']}: rule_of names no ruling for this file's LEV")
+
+
+def eligible(entry, knowledge, blue_fire=False, logic_difficulty=None, package=None):
+    """Sorted numbers of a file's spots a Shortcut Knowledge tier creates; a
+    blue_fire spot only when the seed has Progressive Boost with Blue Fire. A
+    `rule_of` spot exists as its crate ruling says (easy/medium need Blue Fire,
+    else it is removed and its ID stays registered). A spot limited to some
+    of the file's LEV pins exists only for a package on one of them."""
+    pin = lev_pin(package)
+    return sorted(s["number"] for s in entry["doc"]["spots"]
+                  if tier(s) <= knowledge
+                  and ("lev_sha256" not in s or pin in s["lev_sha256"])
+                  and ((rule_rank(s, package, blue_fire, logic_difficulty) is not None) if "rule_of" in s
+                       else (blue_fire or needs_rank(s) < BLUE_FIRE_RANK)))
+
+
+def spot_rank(spot, package, blue_fire, logic_difficulty):
+    """The Progressive Boost rank a spot needs in this seed."""
+    if "rule_of" in spot:
+        rank = rule_rank(spot, package, blue_fire, logic_difficulty)
+        if rank is None:
+            raise ValueError("a removed spot has no rank")
+        return rank
+    return needs_rank(spot)
 
 
 def pick(numbers, seed, player, track_id, count=PICK):
@@ -207,34 +178,44 @@ def lev_pin(package):
                  and pin.get("role") == "lev"), None)
 
 
-def file_for(track, package=None):
+def file_for(track, package=None, file_sha256=None):
     """The spot file entry a plan track uses, or None. Retail by LevelID; a
     named custom track only when the package's LEV is one of the file's pins
-    (a generic `Custom Track N` never uses one, ruled 2026-11-06)."""
+    (a generic `Custom Track N` never uses one, ruled 2026-11-06). With the
+    `file_sha256` of a saved spot set that names a restore-only file of the
+    same track and pin (LEGACY_FILES), that older file."""
     if track.get("origin") == "retail":
         return RETAIL_FILES.get(track["retail_id"])
     if track.get("origin") == "custom" and "named_block" in track and package:
         entry = CUSTOM_FILES.get(destinations.canonical_track_key(package.get("content_id")))
         if entry and lev_pin(package) in entry["doc"]["track"]["lev_sha256"]:
+            legacy = LEGACY_FILES.get(file_sha256) if file_sha256 != entry["sha256"] else None
+            if (legacy and legacy["doc"]["track"]["track_key"] == entry["doc"]["track"]["track_key"]
+                    and lev_pin(package) in legacy["doc"]["track"]["lev_sha256"]):
+                return legacy
             return entry
     return None
 
 
-def spot_set(track, package, knowledge, seed, player, count=PICK):
+def spot_set(track, package, knowledge, seed, player, count=PICK, blue_fire=False, logic_difficulty=None):
     """The plan's `spot_sets` record of one track, or None without a file."""
     entry = file_for(track, package)
     if entry is None:
         return None
-    pool = eligible(entry, knowledge)
+    pool = eligible(entry, knowledge, blue_fire, logic_difficulty, package)
     out = dict(file_sha256=entry["sha256"], pool=len(pool), picked=pick(pool, seed, player, track["id"], count))
     if track.get("origin") == "custom":
         out["lev_sha256"] = lev_pin(package)
     return out
 
 
-def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True):
-    """A plan's spot set against this build's file; returns the file entry."""
-    entry = file_for(track, package)
+def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_digest=True, blue_fire=False,
+                   logic_difficulty=None):
+    """A plan's spot set against this build's file; returns the file entry.
+    When restoring (no digest compare), a set that names a restore-only file
+    of the track is checked against that file."""
+    saved = record.get("file_sha256") if isinstance(record, dict) and not compare_digest else None
+    entry = file_for(track, package, saved)
     if entry is None:
         raise SpotFileError(f"box spots for {track['id']}: this build has no spot file for the track")
     keys = {"file_sha256", "pool", "picked"} | ({"lev_sha256"} if track.get("origin") == "custom" else set())
@@ -244,7 +225,7 @@ def check_spot_set(track, package, knowledge, record, count=PICK, *, compare_dig
         raise SpotFileError(f"box spots for {track['id']}: the seed was built with a different spot file")
     if track.get("origin") == "custom" and record["lev_sha256"] != lev_pin(package):
         raise SpotFileError(f"box spots for {track['id']}: the LEV pin differs from the package")
-    pool = eligible(entry, knowledge)
+    pool = eligible(entry, knowledge, blue_fire, logic_difficulty, package)
     picked = record["picked"]
     if (record["pool"] != len(pool) or not isinstance(picked, list) or picked != sorted(set(picked))
             or not set(picked) <= set(pool) or len(picked) != min(count, len(pool))):
