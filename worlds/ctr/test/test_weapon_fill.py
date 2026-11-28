@@ -4,6 +4,12 @@ crates under the experimental track fill switch.
 dowlle, 2026-11-26: the weapon crates go on exactly Night's 27
 positions, and the published Item Box numbers 1 to 27 stay on them as fallback
 AP seats until Day has its own AP placements, at most 15 per track.
+
+Day has those placements since IM1 (dowlle, 2026-11-27): reviewed AP spots 28
+to 50, none on a filled crate, so all 27 crates stay weapon crates in a new
+room. The published file of spots 1 to 27 is kept for restoring older rooms;
+`published_day_spots()` puts it back as Day's current file so the seats on
+filled crates keep their coverage.
 """
 
 import copy
@@ -22,6 +28,18 @@ DAY = "arabian-heights-day"
 DAY_LEV = "a84dcf7132574b3b2cdd3d51ac4511cd68bbdd38e77ea31208be2029bbb72900"
 NIGHT_LEV = "8093b663855d3fd0096fd2980a85bc6efe334c0aff250e8a33eea11909e5c21c"
 TRACK = f"custom/{DAY}/1.0.0"
+
+
+def _published_day_file():
+    return next(entry for entry in box_spots.LEGACY_FILES.values()
+                if entry["doc"]["track"]["track_key"] == DAY
+                and all(s.get("source_family") == "weapon_crate" for s in entry["doc"]["spots"]))
+
+
+def published_day_spots():
+    """Day's 2026-11-26 spot file (1 to 27 on the filled crates) as its current file."""
+    from unittest.mock import patch
+    return patch.dict(box_spots.CUSTOM_FILES, {DAY: _published_day_file()})
 
 
 def day_package():
@@ -49,7 +67,7 @@ def sanity_row(plan):
 def test_day_fill_is_nights_layout_with_the_published_spot_ranks():
     fill = track_fill.bundled(DAY, DAY_LEV, 3)
     weapons = fill["families"]["weapon_crates"]
-    spots = box_spots.CUSTOM_FILES[DAY]["doc"]["spots"]
+    spots = _published_day_file()["doc"]["spots"]
     assert fill["families"]["time_crates"] == [] and fill["relic_targets"] is None
     assert [d["lev_sha256"] for d in fill["donors"]] == [NIGHT_LEV]
     assert len(weapons) == 27 == fill["counts"]["weapon_crates"]
@@ -59,6 +77,12 @@ def test_day_fill_is_nights_layout_with_the_published_spot_ranks():
         assert track_fill.RANK_NAMES[crate["rank"]] == spot.get("needs", "usf")
     # The fill holds no time crates, so Day gains no Relic Race.
     assert track_fill.bundled(DAY, DAY_LEV, 5) is None
+    # Today's file: reviewed AP spots 28 to 50, 1 to 27 retired, none on a crate.
+    current = box_spots.CUSTOM_FILES[DAY]["doc"]
+    assert [s["number"] for s in current["spots"]] == list(range(28, 51))
+    assert current["retired"] == list(range(1, 28))
+    assert {s["source_family"] for s in current["spots"]} == {"ap_box"}
+    assert track_fill.seated_ordinals(dict(fill=fill), current["spots"]) == []
 
 
 def test_mario_accepts_a_ruled_weak_donor_for_weapon_crates_only():
@@ -112,7 +136,30 @@ def test_switch_off_keeps_todays_day_room():
 
 
 @pytest.mark.parametrize("count", [15, 50])
+def test_fill_room_keeps_all_27_crates_beside_the_reviewed_spots(count):
+    world, plan = plan_of(day_options(track_fill=True, item_box_count=count, itemboxsanity=50,
+                                      accessibility="full"))
+    package, = plan["packages"]
+    assert len(package["fill"]["families"]["weapon_crates"]) == 27
+    record = content_item_boxes.spot_sets(plan["item_boxes"])[TRACK]
+    assert record["pool"] == 23 and len(record["picked"]) == min(count, 23)
+    assert set(record["picked"]) <= set(range(28, 51))
+    own = boxes(plan, TRACK)
+    assert [c["spot"]["number"] for c in own] == record["picked"]
+    assert content_item_boxes.seated_crates(next(t for t in plan["tracks"] if t["id"] == TRACK), plan["item_boxes"], package) == []
+    row = sanity_row(plan)
+    assert row["counts"][0] == 27 and row["weapon_crate"] == list(range(1, 28))
+    distribute_items_restrictive(world.multiworld)
+    assert world.multiworld.fulfills_accessibility(CollectionState(world.multiworld))
+
+
+@pytest.mark.parametrize("count", [15, 50])
 def test_fill_room_seats_at_most_15_published_numbers_on_real_crates(count):
+    with published_day_spots():
+        _seats_at_most_15(count)
+
+
+def _seats_at_most_15(count):
     world, plan = plan_of(day_options(track_fill=True, item_box_count=count, itemboxsanity=50,
                                       accessibility="full"))
     wire = world.fill_slot_data()
@@ -171,7 +218,7 @@ def test_weapon_fill_requires_a_crateless_lev():
 
 def test_seated_ordinals_follow_exact_position_and_angle():
     package = dict(fill=track_fill.bundled(DAY, DAY_LEV, 3))
-    spots = box_spots.spots_by_number(box_spots.CUSTOM_FILES[DAY])
+    spots = box_spots.spots_by_number(_published_day_file())
     assert track_fill.seated_ordinals(package, [spots[3], spots[21]]) == [3, 21]
     moved = dict(spots[3], rot_y=spots[3]["rot_y"] + 1)
     assert track_fill.seated_ordinals(package, [moved]) == []
@@ -248,8 +295,11 @@ def sanity_row_of(plan, track_id):
 def test_restore_uses_the_rooms_own_spots_not_the_catalog():
     """A fill room keeps its seats when Day's spot file later changes."""
     from unittest.mock import patch
-    wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
-                                            seed=11).fill_slot_data()))
+    with published_day_spots():
+        wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
+                                                seed=11).fill_slot_data()))
+    assert any(c.get("kind") == "box" and c["owner"] == TRACK and c["spot"]["number"] <= 27
+               for c in wire["content_plan"]["checks"])
     with patch.dict(box_spots.CUSTOM_FILES, {}, clear=False):
         box_spots.CUSTOM_FILES.pop(DAY, None)
         restored = make_world(day_options(), seed=999, passthrough=wire)
@@ -265,10 +315,14 @@ def test_donor_ruling_may_carry_any_rank():
 
 def test_catalog_correction_and_tampered_seats_on_restore():
     from unittest.mock import patch
-    wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
-                                            seed=11).fill_slot_data()))
+    with published_day_spots():
+        wire = json.loads(json.dumps(make_world(day_options(track_fill=True, itemboxsanity=50, item_box_count=50),
+                                                seed=11).fill_slot_data()))
+    # A room seated on the published file restores on today's catalog.
+    restored = make_world(day_options(), seed=999, passthrough=wire)
+    assert json.loads(json.dumps(restored.fill_slot_data())) == wire
     # A later correction of one Day spot leaves the saved room restorable.
-    corrected = copy.deepcopy(box_spots.CUSTOM_FILES[DAY])
+    corrected = copy.deepcopy(_published_day_file())
     corrected["doc"]["spots"][1]["pos"] = [0, 0, 0]
     with patch.dict(box_spots.CUSTOM_FILES, {DAY: corrected}):
         restored = make_world(day_options(), seed=999, passthrough=wire)
@@ -315,16 +369,25 @@ def global_routes(plan, kind):
     return [c for c in plan["checks"] if c["kind"] == kind]
 
 
-@pytest.mark.parametrize("count", [15, 50, 0])
-def test_day_only_pool_with_itemsanity_generates(count):
+@pytest.mark.parametrize("count,published", [(15, False), (50, False), (0, False), (15, True), (50, True)])
+def test_day_only_pool_with_itemsanity_generates(count, published):
     # Count 0: no AP box seats, Weapon Crate checks give the start its room.
+    # Today's reviewed spots seat no crate; the published file seats up to 15.
+    if published:
+        with published_day_spots():
+            _day_only_generates(count, published)
+    else:
+        _day_only_generates(count, published)
+
+
+def _day_only_generates(count, published):
     extra = dict(item_box_count=count) if count else dict(box_locations=False, itemboxsanity=50)
     world, plan = plan_of(day_only(**extra))
     package, = plan["packages"]
     track, = plan["tracks"]
     free = content_item_boxes.free_fill_ranks(track, plan.get("item_boxes"), package)
     # The cap of 15 keeps at least 12 of Day's 27 crates free.
-    assert len(free) == (27 if count == 0 else 12)
+    assert len(free) == (12 if published else 27)
     for kind in ("itemsanity", "hit"):
         checks = global_routes(plan, kind)
         assert checks and all(r["entry_id"] == "entry/" + TRACK for c in checks for r in c["routes"])
@@ -448,10 +511,15 @@ def test_usf_only_free_crates_put_usf_on_the_route():
 
 
 def test_installed_rules_need_the_free_crates_rank():
-    """Day-only seed 254 seats all eight Boost 0 crates, so its 12 free
-    filled crates all need USF (rank 2): Itemsanity: Bomb and every
-    ordinary Hit check open with the Bomb and two Progressive Boosts, not
-    with one, and never without the Bomb."""
+    """With the published file, Day-only seed 254 seats all eight Boost 0
+    crates, so its 12 free filled crates all need USF (rank 2): Itemsanity:
+    Bomb and every ordinary Hit check open with the Bomb and two Progressive
+    Boosts, not with one, and never without the Bomb."""
+    with published_day_spots():
+        _installed_rules_need_rank_2()
+
+
+def _installed_rules_need_rank_2():
     world = make_world(day_only(), seed=254)
     plan = world.ctr_content_plan
     package, = plan["packages"]
@@ -465,8 +533,9 @@ def test_installed_rules_need_the_free_crates_rank():
                if c["kind"] == "hit" and all(r["mode"] not in ("boss_race", "boss_cup") for r in c["routes"]))
     pool = [item for item in mw.itempool if item.player == player]
     progression = [item for item in pool if item.advancement and item.name not in (boost, "Bomb")]
-    # The boosts stand pre-placed on box locations in this room.
+    # Boosts pre-placed on locations, then any left in the pool.
     boosts = [loc.item for loc in mw.get_locations(player) if loc.item is not None and loc.item.name == boost]
+    boosts += [item for item in pool if item.name == boost]
     assert len(boosts) >= 2
 
     boosts_held = boosts
